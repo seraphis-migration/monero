@@ -56,7 +56,8 @@ set(performance_tests_headers
   performance_tests.h
   performance_utils.h
   single_tx_test_base.h
-  balance_check.h)
+  balance_check.h
+  mock_tx.h)
 
 monero_add_minimal_executable(performance_tests
   ${performance_tests_sources}
@@ -68,6 +69,7 @@ target_link_libraries(performance_tests
     common
     cncrypto
     epee
+    mock_tx
     ringct
     ${Boost_CHRONO_LIBRARY}
     ${CMAKE_THREAD_LIBS_INIT}

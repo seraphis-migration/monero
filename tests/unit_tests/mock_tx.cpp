@@ -34,6 +34,7 @@
 #include "gtest/gtest.h"
 
 #include <iostream>
+#include <memory>
 #include <vector>
 
 
@@ -73,6 +74,45 @@ void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
     {
       EXPECT_TRUE(gen.expected_result == TestType::ExpectAnyThrow);
     }
+  }
+}
+
+void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
+{
+  std::vector<std::shared_ptr<mock_tx::MockTxCLSAG>> txs_to_verify;
+  txs_to_verify.reserve(gen_data.size());
+  TestType expected_result = TestType::ExpectTrue;
+
+  for (const auto &gen : gen_data)
+  {
+    try
+    {
+      // update expected result
+      expected_result = gen.expected_result;
+
+      // inputs
+      auto inputs{mock_tx::gen_mock_tx_clsag_inputs(gen.input_amounts, gen.ref_set_size)};
+
+      // destinations
+      auto destinations{mock_tx::gen_mock_tx_clsag_dests(gen.output_amounts)};
+
+      // make tx to validate
+      txs_to_verify.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations));
+    }
+    catch (...)
+    {
+      EXPECT_TRUE(expected_result == TestType::ExpectAnyThrow);
+    }
+  }
+
+  try
+  {
+    // validate tx
+    EXPECT_TRUE(mock_tx::validate_mock_tx(txs_to_verify));
+  }
+  catch (...)
+  {
+    EXPECT_TRUE(expected_result == TestType::ExpectAnyThrow);
   }
 }
 
@@ -165,7 +205,24 @@ TEST(mock_tx, clsag)
   run_mock_tx_test(gen_data);
 }
 
+TEST(mock_tx_batching, clsag)
+{
+  /// a batch of 3 tx
+  std::vector<MockTxGenData> gen_data;
+  gen_data.resize(3);
 
+  for (auto &gen : gen_data)
+  {
+    gen.input_amounts.push_back(2);
+    gen.input_amounts.push_back(1);
+    gen.output_amounts.push_back(2);
+    gen.output_amounts.push_back(1);
+    gen.ref_set_size = 10;  
+  }
+
+  /// run tests
+  run_mock_tx_test_batch(gen_data);
+}
 
 
 
