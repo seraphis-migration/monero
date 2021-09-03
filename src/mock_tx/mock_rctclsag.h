@@ -29,6 +29,8 @@
 // Mock tx: plain RCT on CLSAG with BP+
 // NOT FOR PRODUCTION
 
+#pragma once
+
 //local headers
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
@@ -40,8 +42,6 @@
 
 //forward declarations
 
-
-#pragma once
 
 namespace mock_tx
 {

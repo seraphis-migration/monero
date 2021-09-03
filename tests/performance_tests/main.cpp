@@ -36,6 +36,7 @@
 #include "performance_utils.h"
 
 // tests
+#include "balance_check.h"
 #include "construct_tx.h"
 #include "check_tx_signature.h"
 #include "check_hash.h"
@@ -111,6 +112,20 @@ int main(int argc, char** argv)
 
   performance_timer timer;
   timer.start();
+
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 1, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 1, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 1, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 1, 2);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 1, 2);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 1, 2);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 2, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 2, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 2, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 16, 16);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 16, 16);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 16, 16);
+
 
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 1, false);
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 2, false);
