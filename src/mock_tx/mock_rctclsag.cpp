@@ -34,6 +34,7 @@
 #include "crypto/crypto-ops.h"
 #include "device/device.hpp"
 #include "ringct/multiexp.h"
+#include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctSigs.h"
 #include "ringct/rctTypes.h"
@@ -46,6 +47,15 @@
 #include <vector>
 
 
+//-----------------------------------------------------------------
+static inline unsigned char *operator &(crypto::ec_scalar &scalar) {
+    return &reinterpret_cast<unsigned char &>(scalar);
+}
+//-----------------------------------------------------------------
+static inline const unsigned char *operator &(const crypto::ec_scalar &scalar) {
+    return &reinterpret_cast<const unsigned char &>(scalar);
+}
+//-----------------------------------------------------------------
 namespace mock_tx
 {
 //-----------------------------------------------------------------
@@ -61,18 +71,20 @@ bool multiexp_balance_check(const rct::keyV &commitment_set1, const rct::keyV &c
 
     for (size_t i = 0; i < commitment_set1.size(); ++i)
     {
-        multiexp_balance.emplace_back({ONE, commitment_set1[i]});
+        multiexp_balance.push_back({ONE, commitment_set1[i]});
     }
 
     for (size_t j = 0; j < commitment_set2.size(); ++j)
     {
-        multiexp_balance.emplace_back({MINUS_ONE, commitment_set2[j]});
+        multiexp_balance.push_back({MINUS_ONE, commitment_set2[j]});
     }
 
     // check the balance using multiexponentiation magic
     // sum(commitment set 1) - sum(commitment set 2) ?= group identity
     if (!(rct::straus(multiexp_balance) == ONE))
         return false;
+
+    return true;
 }
 //-----------------------------------------------------------------
 MockCLSAGENoteImage MockTxCLSAGInput::to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const
@@ -80,12 +92,12 @@ MockCLSAGENoteImage MockTxCLSAGInput::to_enote_image(const crypto::secret_key &p
     MockCLSAGENoteImage image;
 
     // C' = x' G + a H
-    image.m_pseudo_amount_commitment = rct::rct2sk(rct::commit(m_amount, rct::sk2rct(pseudo_blinding_factor)));
+    image.m_pseudo_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(pseudo_blinding_factor)));
 
     // KI = ko * Hp(Ko)
     crypto::public_key pubkey;
     CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_onetime_privkey, pubkey), "Failed to derive public key");
-    crypto::crypto_ops::generate_key_image(pubkey, m_onetime_privkey, image.m_key_image);
+    crypto::generate_key_image(pubkey, m_onetime_privkey, image.m_key_image);
 
     // KI_stored = (1/8)*KI
     // - for efficiently checking that the key image is in the prime subgroup during tx verification
@@ -105,31 +117,33 @@ MockCLSAGENote MockTxCLSAGDest::to_enote() const
     enote.m_onetime_address = m_onetime_address;
 
     // C = x G + a H
-    enote.m_amount_commitment = rct::rct2sk(rct::commit(m_amount, rct::sk2rct(m_amount_blinding_factor)));
+    enote.m_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(m_amount_blinding_factor)));
 
     return enote;
 }
 //-----------------------------------------------------------------
-MockTxCLSAGENote make_mock_tx_clsag_enote(const crypto::secret_key &onetime_privkey,
+MockCLSAGENote make_mock_tx_clsag_enote(const crypto::secret_key &onetime_privkey,
     const crypto::secret_key &amount_blinding_factor, const rct::xmr_amount amount)
 {
-    MockTxCLSAGENote enote;
+    MockCLSAGENote enote;
 
     // Ko = ko G
     CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(onetime_privkey, enote.m_onetime_address),
         "Failed to derive public key");
 
     // C = x G + a H
-    enote.m_amount_commitment = rct::rct2sk(rct::commit(amount, rct::sk2rct(amount_blinding_factor)));
+    enote.m_amount_commitment = rct::rct2pk(rct::commit(amount, rct::sk2rct(amount_blinding_factor)));
 
     // memo: random
-    enote.m_enote_pubkey = rct::rct2pk(rct:pkGen());
+    enote.m_enote_pubkey = rct::rct2pk(rct::pkGen());
     enote.m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+
+    return enote;
 }
 //-----------------------------------------------------------------
-MockTxCLSAGENote gen_mock_tx_clsag_enote()
+MockCLSAGENote gen_mock_tx_clsag_enote()
 {
-    MockTxCLSAGENote enote;
+    MockCLSAGENote enote;
 
     // all random
     enote.m_onetime_address = rct::rct2pk(rct::pkGen());
@@ -140,10 +154,10 @@ MockTxCLSAGENote gen_mock_tx_clsag_enote()
     return enote;
 }
 //-----------------------------------------------------------------
-std::vector<MockTxCLSAGInput> gen_mock_tx_clsag_inputs(const std::vector<rct::xmr_amount> &amounts
+std::vector<MockTxCLSAGInput> gen_mock_tx_clsag_inputs(const std::vector<rct::xmr_amount> &amounts,
     const std::size_t ref_set_size)
 {
-    CHECK_AND_ASSERT_THROW_MES(ref_set_size.size() > 0, "Tried to create inputs with no ref set size.");
+    CHECK_AND_ASSERT_THROW_MES(ref_set_size > 0, "Tried to create inputs with no ref set size.");
 
     std::vector<MockTxCLSAGInput> inputs;
 
@@ -253,11 +267,9 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGDest> &destinations,
     /// prepare tx
     m_outputs.clear();
     m_input_images.clear();
-    m_input_ref_sets.clear();
     m_tx_proofs.clear();
     m_outputs.reserve(destinations.size());
     m_input_images.reserve(inputs_to_spend.size());
-    m_input_ref_sets.reserve(inputs_to_spend.size());
     m_tx_proofs.reserve(inputs_to_spend.size());
 
 
@@ -324,7 +336,8 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGDest> &destinations,
 
         // vector of pairs <onetime addr, amount commitment>
         for (const auto &input_ref : inputs_to_spend[input_index].m_input_ref_set)
-            referenced_enotes_converted.emplace_back(ctkey{input_ref.m_onetime_address, input_ref.m_amount_commitment});
+            referenced_enotes_converted.emplace_back(rct::ctkey{rct::pk2rct(input_ref.m_onetime_address),
+                rct::pk2rct(input_ref.m_amount_commitment)});
 
         // spent enote privkeys <ko, x>
         spent_enote_converted.dest = rct::sk2rct(inputs_to_spend[input_index].m_onetime_privkey);
@@ -362,7 +375,7 @@ bool MockTxCLSAG::validate() const
 
 
     /// all inputs must have the same reference set size
-    std::size_t ref_set_size{m_tx_proofs[0].m_referenced_enotes_converted.size()}
+    std::size_t ref_set_size{m_tx_proofs[0].m_referenced_enotes_converted.size()};
 
     for (const auto &tx_proof : m_tx_proofs)
     {
@@ -375,8 +388,8 @@ bool MockTxCLSAG::validate() const
     //       tags in m_input_images are.
     for (std::size_t input_index{0}; input_index < m_input_images.size(); ++input_index)
     {
-        if (rct::scalarmult8(rct::ki2rct(m_input_images[input_index].m_key_image)) !=
-                m_tx_proofs[input_index].m_clsag_proof.I)
+        if (!(rct::scalarmult8(rct::ki2rct(m_input_images[input_index].m_key_image)) ==
+                m_tx_proofs[input_index].m_clsag_proof.I))
             return false;
 
         // sanity check
@@ -400,7 +413,7 @@ bool MockTxCLSAG::validate() const
 
     for (std::size_t output_index{0}; output_index < m_outputs.size(); ++output_index)
     {
-        output_commitments.emplace_back(rct::pk2rct(output.m_amount_commitment));
+        output_commitments.emplace_back(rct::pk2rct(m_outputs[output_index].m_amount_commitment));
 
         // double check that the two stored copies of output commitments match
         if (m_outputs[output_index].m_amount_commitment != rct::rct2pk(m_range_proof.V[output_index]))
@@ -426,6 +439,8 @@ bool MockTxCLSAG::validate() const
                 rct::pk2rct(m_input_images[input_index].m_pseudo_amount_commitment)))
             return false;
     }
+
+    return true;
 }
 //-----------------------------------------------------------------
 std::size_t MockTxCLSAG::get_size_bytes() const
@@ -446,7 +461,7 @@ std::size_t MockTxCLSAG::get_size_bytes() const
 
     if (m_tx_proofs.size())
         // note: ignore the key image stored in the clsag, it is double counted by the input's MockCLSAGENoteImage struct
-        size += m_tx_proofs.size() * (32 * (2 + m_tx_proofs[0].s.size()));
+        size += m_tx_proofs.size() * (32 * (2 + m_tx_proofs[0].m_clsag_proof.s.size()));
 
     return size;
 }
