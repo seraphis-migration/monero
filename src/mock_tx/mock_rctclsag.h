@@ -125,11 +125,12 @@ class MockTxCLSAG final
 {
 public:
 //constructors
-    // default constructor: default
+    // default constructor
+    MockTxCLSAG() = default;
 
     // normal constructor: new tx
-    MockTxCLSAG(const std::vector<MockTxCLSAGDest> &destinations,
-        const std::vector<MockTxCLSAGInput> &inputs_to_spend);
+    MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+        const std::vector<MockTxCLSAGDest> &destinations);
 
     // normal constructor: from existing tx byte blob
     //mock tx doesn't do this
@@ -147,8 +148,8 @@ public:
 
 private:
     // make a transaction
-    void make_tx(const std::vector<MockTxCLSAGDest> &destinations,
-        const std::vector<MockTxCLSAGInput> &inputs_to_spend);
+    void make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+        const std::vector<MockTxCLSAGDest> &destinations);
 
 //member variables
     // tx input images  (spent e-notes)

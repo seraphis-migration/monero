@@ -27,19 +27,20 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "crypto/crypto.h"
-#include "mock_tx/mock_rctclsag.h"
+#include "mock_rctclsag.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
 #include "gtest/gtest.h"
 
+#include <iostream>
 #include <vector>
 
 
 enum class TestType
 {
   ExpectTrue,
-  ExpectThrow
+  ExpectAnyThrow
 };
 
 struct MockTxGenData
@@ -54,29 +55,24 @@ void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
 {
   for (const auto &gen : gen_data)
   {
-    // inputs
-    auto inputs{gen_mock_tx_clsag_inputs(gen.input_amounts, gen.ref_set_size)};
-
-    // destinations
-    auto destinations{gen_mock_tx_clsag_dests(gen.output_amounts)};
-
-    // make tx
-    mock_tx::MockTxCLSAG tx{inputs, destinations};
-
-    // validate tx
-    bool result{tx.validate()};
-
-    switch (gen.expected_result)
+    try
     {
-      case (TestType::ExpectTrue):
-        EXPECT_TRUE(result);
-        break;
-      case (TestType::ExpectThrow):
-        EXPECT_THROW(result);
-        break;
-      default:
-        break;
-    };
+      // inputs
+      auto inputs{mock_tx::gen_mock_tx_clsag_inputs(gen.input_amounts, gen.ref_set_size)};
+
+      // destinations
+      auto destinations{mock_tx::gen_mock_tx_clsag_dests(gen.output_amounts)};
+
+      // make tx
+      mock_tx::MockTxCLSAG tx{inputs, destinations};
+
+      // validate tx
+      EXPECT_TRUE(tx.validate());
+    }
+    catch (...)
+    {
+      EXPECT_TRUE(gen.expected_result == TestType::ExpectAnyThrow);
+    }
   }
 }
 
@@ -85,7 +81,7 @@ TEST(mock_tx, clsag)
 {
   /// success cases
   std::vector<MockTxGenData> gen_data;
-  gen_data.resize(10);
+  gen_data.resize(11);
 
   // 1-in/1-out; ref set 1
   gen_data[0].expected_result = TestType::ExpectTrue;
@@ -116,7 +112,7 @@ TEST(mock_tx, clsag)
   // 16-in/16-out; ref set 1
   gen_data[4].expected_result = TestType::ExpectTrue;
   gen_data[4].ref_set_size = 1;
-  for (std::size_t i{0}; i < 16; ++16)
+  for (std::size_t i{0}; i < 16; ++i)
   {
     gen_data[4].input_amounts.push_back(1);
     gen_data[4].output_amounts.push_back(1);
@@ -125,7 +121,7 @@ TEST(mock_tx, clsag)
   // 16-in/16-out; ref set 10
   gen_data[5].expected_result = TestType::ExpectTrue;
   gen_data[5].ref_set_size = 10;
-  for (std::size_t i{0}; i < 16; ++16)
+  for (std::size_t i{0}; i < 16; ++i)
   {
     gen_data[5].input_amounts.push_back(1);
     gen_data[5].output_amounts.push_back(1);
@@ -134,7 +130,7 @@ TEST(mock_tx, clsag)
   // 16-in/16-out + amounts 0
   gen_data[6].expected_result = TestType::ExpectTrue;
   gen_data[6].ref_set_size = 10;
-  for (std::size_t i{0}; i < 16; ++16)
+  for (std::size_t i{0}; i < 16; ++i)
   {
     gen_data[6].input_amounts.push_back(0);
     gen_data[6].output_amounts.push_back(0);
@@ -143,23 +139,23 @@ TEST(mock_tx, clsag)
   /// failure cases
 
   // no inputs
-  gen_data[7].expected_result = TestType::ExpectThrow;
+  gen_data[7].expected_result = TestType::ExpectAnyThrow;
   gen_data[7].output_amounts.push_back(0);
   gen_data[7].ref_set_size = 10;
 
   // no outputs
-  gen_data[8].expected_result = TestType::ExpectThrow;
+  gen_data[8].expected_result = TestType::ExpectAnyThrow;
   gen_data[8].input_amounts.push_back(0);
   gen_data[8].ref_set_size = 10;
 
   // no ref set size
-  gen_data[9].expected_result = TestType::ExpectThrow;
+  gen_data[9].expected_result = TestType::ExpectAnyThrow;
   gen_data[9].input_amounts.push_back(1);
   gen_data[9].output_amounts.push_back(1);
   gen_data[9].ref_set_size = 0;
 
   // amounts don't balance
-  gen_data[10].expected_result = TestType::ExpectThrow;
+  gen_data[10].expected_result = TestType::ExpectAnyThrow;
   gen_data[10].input_amounts.push_back(2);
   gen_data[10].output_amounts.push_back(1);
   gen_data[10].ref_set_size = 10;
