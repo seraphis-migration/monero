@@ -139,10 +139,14 @@ public:
 
 //member functions
     // validate the transaction
-    bool validate() const;
+    // - if 'defer_batchable' is set, then batchable validation steps won't be executed
+    bool validate(const bool defer_batchable = false) const;
 
     // get size of tx
     std::size_t get_size_bytes() const;
+
+    // get range proof
+    const rct::BulletproofPlus& get_range_proof() const {return m_range_proof;}
 
     //get_tx_byte_blob()
 
@@ -163,6 +167,9 @@ private:
     // CLSAGs proving membership/ownership/unspentness for each input
     std::vector<MockCLSAGProof> m_tx_proofs;
 };
+
+// validate a set of mock tx
+bool validate_mock_tx(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate);
 
 } //namespace mock_tx
 

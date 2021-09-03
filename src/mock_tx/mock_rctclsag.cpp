@@ -204,6 +204,28 @@ std::vector<MockTxCLSAGDest> gen_mock_tx_clsag_dests(const std::vector<rct::xmr_
     return destinations;
 }
 //-----------------------------------------------------------------
+bool validate_mock_tx(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
+{
+    std::vector<const rct::BulletproofPlus*> range_proofs;
+    range_proofs.reserve(txs_to_validate.size());
+
+    for (const auto &tx : txs_to_validate)
+    {
+        // validate unbatchable parts of tx
+        if (!tx->validate(true))
+            return false;
+
+        // gather range proofs
+        range_proofs.push_back(&(tx->get_range_proof()));
+    }
+
+    // batch verify range proofs
+    if (!rct::bulletproof_plus_VERIFY(range_proofs))
+        return false;
+
+    return true;
+}
+//-----------------------------------------------------------------
 MockTxCLSAG::MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
     const std::vector<MockTxCLSAGDest> &destinations)
 {
@@ -343,7 +365,7 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
     }
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate() const
+bool MockTxCLSAG::validate(const bool defer_batchable) const
 {
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to validate tx that has no outputs.");
     CHECK_AND_ASSERT_THROW_MES(m_input_images.size() > 0, "Tried to validate tx that has no input images.");
@@ -407,8 +429,11 @@ bool MockTxCLSAG::validate() const
 
 
     /// check range proof on output enotes
-    if (!rct::bulletproof_plus_VERIFY(m_range_proof))
-        return false;
+    if (!defer_batchable)
+    {
+        if (!rct::bulletproof_plus_VERIFY(m_range_proof))
+            return false;
+    }
 
 
     /// verify input membership/ownership/unspentness proofs
