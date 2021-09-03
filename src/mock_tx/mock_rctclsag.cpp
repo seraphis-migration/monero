@@ -48,43 +48,24 @@
 
 
 //-----------------------------------------------------------------
-static inline unsigned char *operator &(crypto::ec_scalar &scalar) {
+// type conversions for easier calls to sc_add(), sc_sub()
+static inline unsigned char *operator &(crypto::ec_scalar &scalar)
+{
     return &reinterpret_cast<unsigned char &>(scalar);
 }
 //-----------------------------------------------------------------
-static inline const unsigned char *operator &(const crypto::ec_scalar &scalar) {
+static inline const unsigned char *operator &(const crypto::ec_scalar &scalar)
+{
     return &reinterpret_cast<const unsigned char &>(scalar);
 }
 //-----------------------------------------------------------------
 namespace mock_tx
 {
 //-----------------------------------------------------------------
-bool multiexp_balance_check(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2)
+bool balance_check(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2)
 {
-    std::vector<rct::MultiexpData> multiexp_balance;
-    multiexp_balance.reserve(commitment_set1.size() + commitment_set2.size());
-
-    rct::key ZERO = rct::zero();
-    rct::key ONE = rct::identity();
-    rct::key MINUS_ONE;
-    sc_sub(MINUS_ONE.bytes, ZERO.bytes, ONE.bytes);
-
-    for (size_t i = 0; i < commitment_set1.size(); ++i)
-    {
-        multiexp_balance.push_back({ONE, commitment_set1[i]});
-    }
-
-    for (size_t j = 0; j < commitment_set2.size(); ++j)
-    {
-        multiexp_balance.push_back({MINUS_ONE, commitment_set2[j]});
-    }
-
-    // check the balance using multiexponentiation magic
-    // sum(commitment set 1) - sum(commitment set 2) ?= group identity
-    if (!(rct::straus(multiexp_balance) == ONE))
-        return false;
-
-    return true;
+    // balance check method chosen from perf test: tests/performance_tests/balance_check.h
+    return rct::equalKeys(rct::addKeys(commitment_set1), rct::addKeys(commitment_set2));
 }
 //-----------------------------------------------------------------
 MockCLSAGENoteImage MockTxCLSAGInput::to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const
@@ -224,7 +205,7 @@ std::vector<MockTxCLSAGDest> gen_mock_tx_clsag_dests(const std::vector<rct::xmr_
 }
 //-----------------------------------------------------------------
 MockTxCLSAG::MockTxCLSAG(const std::vector<MockTxCLSAGDest> &destinations,
-    std::vector<MockTxCLSAGInput> &inputs_to_spend)
+    const std::vector<MockTxCLSAGInput> &inputs_to_spend)
 {
     CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any destinations.");
     CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() > 0, "Tried to make tx without any inputs.");
@@ -326,7 +307,6 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGDest> &destinations,
 
     /// membership + ownership/unspentness proofs
     // - clsag for each input
-    // build input ref sets
     for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
     {
         // convert tx info to form expected by proveRctCLSAGSimple()
@@ -421,7 +401,7 @@ bool MockTxCLSAG::validate() const
     }
 
     // sum(pseudo output commitments) ?= sum(output commitments)
-    if (!multiexp_balance_check(pseudo_commitments, output_commitments))
+    if (!balance_check(pseudo_commitments, output_commitments))
         return false;
 
 

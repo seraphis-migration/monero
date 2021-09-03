@@ -46,8 +46,8 @@
 namespace mock_tx
 {
 
-// use multiexponentiation to check if two commitment sets balance (sum to zero)
-bool multiexp_balance_check(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2);
+// check if two commitment sets balance (sum to zero)
+bool balance_check(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2);
 
 struct MockCLSAGENote final
 {
@@ -129,7 +129,7 @@ public:
 
     // normal constructor: new tx
     MockTxCLSAG(const std::vector<MockTxCLSAGDest> &destinations,
-        std::vector<MockTxCLSAGInput> &inputs_to_spend);
+        const std::vector<MockTxCLSAGInput> &inputs_to_spend);
 
     // normal constructor: from existing tx byte blob
     //mock tx doesn't do this

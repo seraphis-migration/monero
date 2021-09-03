@@ -36,7 +36,6 @@
 
 #include <vector>
 
-#include <iostream>
 
 enum class BalanceCheckType
 {
@@ -44,7 +43,6 @@ enum class BalanceCheckType
     MultiexpComp,
     Rctops
 };
-
 
 template<BalanceCheckType CheckType, std::size_t set1_size, std::size_t set2_size>
 class test_balance_check
