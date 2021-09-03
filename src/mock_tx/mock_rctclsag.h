@@ -41,7 +41,7 @@
 //forward declarations
 
 
-#pragma once;
+#pragma once
 
 namespace mock_tx
 {
@@ -58,7 +58,7 @@ struct MockCLSAGENote final
     crypto::public_key m_enote_pubkey;
     rct::xmr_amount m_encoded_amount;
 
-    static std::size_t get_size_bytes() const {return 32*3 + 8;}
+    static std::size_t get_size_bytes() {return 32*3 + 8;}
 };
 
 struct MockCLSAGENoteImage final
@@ -66,7 +66,7 @@ struct MockCLSAGENoteImage final
     crypto::public_key m_pseudo_amount_commitment;
     crypto::key_image m_key_image;
 
-    static std::size_t get_size_bytes() const {return 32*2;}
+    static std::size_t get_size_bytes() {return 32*2;}
 };
 
 struct MockTxCLSAGInput final
@@ -102,24 +102,24 @@ struct MockCLSAGProof final
     // the CLSAG proof
     rct::clsag m_clsag_proof;
     // vector of pairs <Ko_i, C_i> for referenced enotes
-    ctkeyV m_referenced_enotes_converted;
-}
+    rct::ctkeyV m_referenced_enotes_converted;
+};
 
 // create mock enote from known info
-MockTxCLSAGENote make_mock_tx_clsag_enote(const crypto::secret_key &onetime_privkey,
-    const crypto::secret_key &amount_blinding_factor, const xmr_amount amount);
+MockCLSAGENote make_mock_tx_clsag_enote(const crypto::secret_key &onetime_privkey,
+    const crypto::secret_key &amount_blinding_factor, const rct::xmr_amount amount);
 
 // create random mock enote
-MockTxCLSAGENote gen_mock_tx_clsag_enote()
+MockCLSAGENote gen_mock_tx_clsag_enote();
 
 // create random mock inputs
 // note: number of inputs implied by size of 'amounts'
-std::vector<MockTxCLSAGInput> gen_mock_tx_clsag_inputs(const std::vector<xmr_amount> &amounts,
+std::vector<MockTxCLSAGInput> gen_mock_tx_clsag_inputs(const std::vector<rct::xmr_amount> &amounts,
     const std::size_t ref_set_size);
 
 // create random mock destinations
 // note: number of destinations implied by size of 'amounts'
-std::vector<MockTxCLSAGDest> gen_mock_tx_clsag_dests(const std::vector<xmr_amount> &amounts);
+std::vector<MockTxCLSAGDest> gen_mock_tx_clsag_dests(const std::vector<rct::xmr_amount> &amounts);
 
 class MockTxCLSAG final
 {
