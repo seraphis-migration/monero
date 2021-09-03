@@ -33,15 +33,24 @@ extern "C"
 #include "crypto-ops.h"
 }
 #include "crypto.h"
+#include "x25519.h"
 
 namespace crypto
 {
 
 public_key get_G();
 public_key get_H();
+public_key get_X();
+public_key get_U();
 ge_p3 get_G_p3();
 ge_p3 get_H_p3();
+ge_p3 get_X_p3();
+ge_p3 get_U_p3();
 ge_cached get_G_cached();
 ge_cached get_H_cached();
+ge_cached get_X_cached();
+ge_cached get_U_cached();
+
+x25519_pubkey get_x25519_G();
 
 } //namespace crypto

@@ -29,7 +29,11 @@
 #pragma once
 
 #include "crypto/crypto.h"
+#include "cryptonote_basic/account_generators.h"
+#include "multisig_account_era_conversion_msg.h"
 #include "multisig_kex_msg.h"
+#include "multisig_partial_cn_key_image_msg.h"
+#include "multisig_signer_set_filter.h"
 
 #include <cstdint>
 #include <string>
@@ -77,6 +81,7 @@ namespace multisig
   */
   using multisig_keyset_map_memsafe_t = 
     std::unordered_map<crypto::public_key_memsafe, std::unordered_set<crypto::public_key>>;
+  using multisig_keyshare_origins_map_t = std::unordered_map<crypto::public_key, std::unordered_set<crypto::public_key>>;
 
   class multisig_account final
   {
@@ -93,18 +98,20 @@ namespace multisig
     *    - the first kex msg transmits the local base_common_privkey to other participants, for creating the group's
     *      common_privkey
     */
-    multisig_account(const crypto::secret_key &base_privkey,
+    multisig_account(const cryptonote::account_generator_era era,
+      const crypto::secret_key &base_privkey,
       const crypto::secret_key &base_common_privkey);
 
     // reconstruct from full account details (not recommended)
-    multisig_account(const std::uint32_t threshold,
+    multisig_account(const cryptonote::account_generator_era era,
+      const std::uint32_t threshold,
       std::vector<crypto::public_key> signers,
       const crypto::secret_key &base_privkey,
       const crypto::secret_key &base_common_privkey,
       std::vector<crypto::secret_key> multisig_privkeys,
       const crypto::secret_key &common_privkey,
       const crypto::public_key &multisig_pubkey,
-      const crypto::public_key &common_pubkey,
+      multisig_keyshare_origins_map_t keyshare_origins_map,
       const std::uint32_t kex_rounds_complete,
       multisig_keyset_map_memsafe_t kex_origins_map,
       std::string next_round_kex_message);
@@ -117,10 +124,14 @@ namespace multisig
   //overloaded operators: none
 
   //getters
+    // get account era
+    cryptonote::account_generator_era get_era() const { return m_account_era; }
     // get threshold
     std::uint32_t get_threshold() const { return m_threshold; }
     // get signers
     const std::vector<crypto::public_key>& get_signers() const { return m_signers; }
+    // get signers who are available for aggregation-style signing
+    std::vector<crypto::public_key> get_signers_available_for_aggregation_signing() const;
     // get base privkey
     const crypto::secret_key& get_base_privkey() const { return m_base_privkey; }
     // get base pubkey
@@ -135,12 +146,16 @@ namespace multisig
     const crypto::public_key& get_multisig_pubkey() const { return m_multisig_pubkey; }
     // get common pubkey
     const crypto::public_key& get_common_pubkey() const { return m_common_pubkey; }
+    // get keyshare to origins map
+    const multisig_keyshare_origins_map_t& get_keyshares_to_origins_map() const { return m_keyshare_to_origins_map; }
     // get kex rounds complete
     std::uint32_t get_kex_rounds_complete() const { return m_kex_rounds_complete; }
     // get kex keys to origins map
     const multisig_keyset_map_memsafe_t& get_kex_keys_to_origins_map() const { return m_kex_keys_to_origins_map; }
     // get the kex msg for the next round
     const std::string& get_next_kex_round_msg() const { return m_next_round_kex_message; }
+    // get account era conversion message for converting this account to 'new_era'
+    multisig_account_era_conversion_msg get_account_era_conversion_msg(const cryptonote::account_generator_era new_era) const;
 
   //account status functions
     // account has been intialized, and the account holder can use the 'common' key
@@ -152,7 +167,7 @@ namespace multisig
 
   //account helpers
   private:
-    // set the threshold (M) and signers (N)
+    // set the threshold (M) and signers (N), and initialize the 'available signers for aggregation signing' filter
     void set_multisig_config(const std::size_t threshold, std::vector<crypto::public_key> signers);
 
   //account mutators: key exchange to set up account
@@ -203,6 +218,26 @@ namespace multisig
     multisig_kex_msg get_multisig_kex_round_booster(const std::uint32_t threshold,
       const std::uint32_t num_signers,
       const std::vector<multisig_kex_msg> &expanded_msgs) const;
+    /**
+    * brief: add_signer_recommendations - Update keyshare-to-origins map with a specific signer's recommendations.
+    *    - Used to recover the keyshare-to-origins map if it is lost.
+    *    - Note: It is not a security problem if the recommended keys vector is unvalidated. A malicious signer COULD
+    *            provide an invalid keyshare recommendation list, which would likely prevent the local signer from
+    *            successfully completing signatures with that signer, BUT malicious signers have
+    *            other ways to prevent the local account from co-signing a message with them.
+    *            It is worth noting that:
+    *            1) The malicious signer recommending invalid keyshares CANNOT prevent the local account from co-signing
+    *               messages with M-1 honest other signers.
+    *            2) Not validating keyshare lists may make it difficult to properly track down which signer caused a given
+    *               signature attempt to fail. However, effective validation would require messages from all signers
+    *               in order to do something like evaluate_multisig_kex_round_msgs(). Unfortunately, requiring > M signers
+    *               to recover aggregation-style signing would violate the invariant that a multisig account should only
+    *               require M honest signers to work once account setup is complete.
+    * param: conversion_msg - a conversion message from a non-local signer ('origin') with recommended keyshares
+    *        (we abuse the conversion msg api instead of implementing an entirely new msg format and plumbing for this
+    *        method that primarly exists to help legacy accounts)
+    */
+    void add_signer_recommendations(const multisig_account_era_conversion_msg &conversion_msg);
 
   private:
     // implementation of kex_update() (non-transactional)
@@ -215,22 +250,43 @@ namespace multisig
     std::vector<crypto::public_key> get_kex_exclude_pubkeys() const;
     /**
     * brief: initialize_kex_update - initialize the multisig account for the first kex round
+    *    - Collect the local signer's shared keys to ignore in incoming messages, build the aggregate ancillary key
+    *      if appropriate.
+    * param: generators - generators this account uses
     * param: expanded_msgs - set of multisig kex messages to process
     * param: kex_rounds_required - number of rounds required for kex (not including post-kex verification round)
     */
-    void initialize_kex_update(const std::vector<multisig_kex_msg> &expanded_msgs,
-      const std::uint32_t kex_rounds_required);
+    void initialize_kex_update(const cryptonote::account_generators &generators,
+      const std::vector<multisig_kex_msg> &expanded_msgs,
+      const std::uint32_t kex_rounds_required,
+      std::vector<crypto::public_key> &exclude_pubkeys_out);
     /**
     * brief: finalize_kex_update - Helper for kex_update_impl()
-    * param: kex_rounds_required - number of rounds required for kex (not including post-kex verification round)
+    * param: generators - generators this account uses
+    * param: kex_rounds_required - number of rounds required for kex
     * param: result_keys_to_origins_map - map between keys for the next round and the other participants they correspond to
     * inoutparam: temp_account_inout - account to perform last update steps on
     */
-    void finalize_kex_update(const std::uint32_t kex_rounds_required,
+    void finalize_kex_update(const cryptonote::account_generators &generators,
+      const std::uint32_t kex_rounds_required,
       multisig_keyset_map_memsafe_t result_keys_to_origins_map);
+
+  //account use functions
+  public:
+    /**
+    * brief: try_get_aggregate_signing_key - Get an aggregate privkey corresponding to a filtered list of signers.
+    *   - For each privkey share that the local signer has, it only contributes that privkey if it's signer id
+    *     is ordered lowest in the filtered list.
+    * param: filter - filter for selecting signers out of the signer list for creating a signature
+    * outparam: aggregate_key_out - local signer's privkey contribution to a multisig signing event
+    */
+    bool try_get_aggregate_signing_key(const signer_set_filter filter, crypto::secret_key &aggregate_key_out) const;
 
   //member variables
   private:
+    /// which era this account is calibrated for
+    cryptonote::account_generator_era m_account_era;
+
     /// misc. account details
     // [M] minimum number of co-signers to sign a message with the aggregate pubkey
     std::uint32_t m_threshold{0};
@@ -239,22 +295,28 @@ namespace multisig
 
     /// local participant's personal keys
     // base keypair of the participant
-    // - used for signing messages, as the initial base key for key exchange, and to make DH derivations for key exchange
+    // - used for signing messages, to make the initial base key for key exchange, and to make DH derivations for key exchange
     crypto::secret_key m_base_privkey;
+    // - used for signing messages (base_privkey * G)
     crypto::public_key m_base_pubkey;
     // common base privkey, used to produce the aggregate common privkey
     crypto::secret_key m_base_common_privkey;
 
     /// core multisig account keys
     // the account's private key shares of the multisig address
-    // TODO: also record which other signers have these privkeys, to enable aggregation signing (instead of round-robin)
     std::vector<crypto::secret_key> m_multisig_privkeys;
+    std::vector<crypto::public_key> m_multisig_keyshare_pubkeys;
     // a privkey owned by all multisig participants (e.g. a cryptonote view key)
     crypto::secret_key m_common_privkey;
     // the multisig public key (e.g. a cryptonote spend key)
     crypto::public_key m_multisig_pubkey;
     // the common public key (e.g. a view spend key)
     crypto::public_key m_common_pubkey;
+
+    /// records which other signers have each of the local signer's multisig privkeys
+    multisig_keyshare_origins_map_t m_keyshare_to_origins_map;
+    /// helper filter that records which other signers are present in m_keyshare_to_origins_map
+    signer_set_filter m_available_signers_for_aggregation{0};
 
     /// kex variables
     // number of key exchange rounds that have been completed (all messages for the round collected and processed)
@@ -287,4 +349,22 @@ namespace multisig
   * return: number of setup rounds required
   */
   std::uint32_t multisig_setup_rounds_required(const std::uint32_t num_signers, const std::uint32_t threshold);
+
+  /**
+  * brief: get_multisig_account_with_new_generator_era - get a multisig account built around an account generator era
+  *     different from an existing account (i.e. migrate the old account to a different account generator era))
+  *   - Requires at least M - 1 other signers to contribute conversion messages.
+  *   - Conversion messages are needed to compute the new account's multisig group key (and prove that the new key
+  *     has the correct discrete-log equivalence with the old multisig group key), and to provide signer keyshare
+  *     recommendations to the new account so the new account can perform aggregation-style signing (more signers can
+  *     be added to the account later on with the .add_signer_recommendations() method).
+  * param: original_account - original account to migrate
+  * param: new_era - era of the new account
+  * param: conversion_msgs - account conversion messages from other signers (msgs from local signer are ignored)
+  * outparam: new_account_out - migrated account using the new era
+  */
+  void get_multisig_account_with_new_generator_era(const multisig_account &original_account,
+    const cryptonote::account_generator_era new_era,
+    const std::vector<multisig_account_era_conversion_msg> &conversion_msgs,
+    multisig_account &new_account_out);
 } //namespace multisig

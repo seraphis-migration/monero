@@ -29,18 +29,21 @@
 #include "multisig_account.h"
 
 #include "crypto/crypto.h"
+extern "C"
+{
+#include "crypto/crypto-ops.h"
+}
+#include "cryptonote_basic/account_generators.h"
 #include "cryptonote_config.h"
 #include "include_base_utils.h"
 #include "multisig.h"
 #include "multisig_kex_msg.h"
+#include "multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
-
-#include <boost/math/special_functions/binomial.hpp>
+#include "seraphis_crypto/math_utils.h"
 
 #include <algorithm>
-#include <cmath>
 #include <cstdint>
-#include <limits>
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
@@ -87,17 +90,19 @@ namespace multisig
   * 
   *    Result:
   *      - privkey = H(derivation)
-  *      - pubkey = privkey * G
+  *      - pubkey = privkey * derivation_generator
+  * param: derivation_generator - generator to derive with
   * param: derivation - a curve point
   * outparam: derived_pubkey_out - public key of the resulting privkey
   * return: multisig private key
   */
   //----------------------------------------------------------------------------------------------------------------------
-  static crypto::secret_key calculate_multisig_keypair_from_derivation(const crypto::public_key_memsafe &derivation,
+  static crypto::secret_key calculate_multisig_keypair_from_derivation(const rct::key &derivation_generator,
+    const crypto::public_key_memsafe &derivation,
     crypto::public_key &derived_pubkey_out)
   {
     crypto::secret_key blinded_skey = get_multisig_blinded_secret_key(rct::rct2sk(rct::pk2rct(derivation)));
-    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(blinded_skey, derived_pubkey_out), "Failed to derive public key");
+    derived_pubkey_out = rct::rct2pk(rct::scalarmultKey(derivation_generator, rct::sk2rct(blinded_skey)));
 
     return blinded_skey;
   }
@@ -186,7 +191,8 @@ namespace multisig
   * return: final multisig public spend key for the account
   */
   //----------------------------------------------------------------------------------------------------------------------
-  static crypto::public_key generate_multisig_aggregate_key(std::vector<crypto::public_key> final_keys,
+  static crypto::public_key generate_multisig_aggregate_key(const rct::key &aggregation_generator,
+    std::vector<crypto::public_key> final_keys,
     std::vector<crypto::secret_key> &privkeys_inout)
   {
     // collect all public keys that will go into the spend key (these don't need to be memsafe)
@@ -199,9 +205,9 @@ namespace multisig
 
     for (std::size_t multisig_keys_index{0}; multisig_keys_index < privkeys_inout.size(); ++multisig_keys_index)
     {
-      crypto::public_key pubkey;
-      CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(privkeys_inout[multisig_keys_index], pubkey),
-        "Failed to derive public key");
+      crypto::public_key pubkey{
+          rct::rct2pk(rct::scalarmultKey(aggregation_generator, rct::sk2rct(privkeys_inout[multisig_keys_index])))
+        };
 
       own_keys_mapping[pubkey] = multisig_keys_index;
 
@@ -243,6 +249,10 @@ namespace multisig
       // build aggregate key (merge operation)
       rct::addKeys(aggregate_key, aggregate_key, converted_pubkey);
     }
+
+    // sanity check (this should never fail because multisig kex messages internally prevent non-prime message keys)
+    CHECK_AND_ASSERT_THROW_MES(rct::isInMainSubgroup(aggregate_key),
+      "Multisig pubkey is not in the main subgroup.");
 
     return rct::rct2pk(aggregate_key);
   }
@@ -338,25 +348,15 @@ namespace multisig
     // - origins = all the signing pubkeys that recommended a given msg pubkey
     for (const auto &expanded_msg : expanded_msgs)
     {
-      // in round 1, only the signing pubkey is treated as a msg pubkey
-      if (round == 1)
+      // copy all pubkeys from message into list
+      for (const auto &pubkey : expanded_msg.get_msg_pubkeys())
       {
-        // note: ignores duplicates
-        sanitized_pubkeys_out[expanded_msg.get_signing_pubkey()].insert(expanded_msg.get_signing_pubkey());
-      }
-      // in other rounds, only the msg pubkeys are treated as msg pubkeys
-      else
-      {
-        // copy all pubkeys from message into list
-        for (const auto &pubkey : expanded_msg.get_msg_pubkeys())
-        {
-          // ignore pubkeys in 'ignore' set
-          if (std::find(exclude_pubkeys.begin(), exclude_pubkeys.end(), pubkey) != exclude_pubkeys.end())
-            continue;
+        // ignore pubkeys in 'ignore' set
+        if (std::find(exclude_pubkeys.begin(), exclude_pubkeys.end(), pubkey) != exclude_pubkeys.end())
+          continue;
 
-          // note: ignores duplicates
-          sanitized_pubkeys_out[pubkey].insert(expanded_msg.get_signing_pubkey());
-        }
+        // note: ignores duplicates
+        sanitized_pubkeys_out[pubkey].insert(expanded_msg.get_signing_pubkey());
       }
     }
 
@@ -476,28 +476,6 @@ namespace multisig
       num_signers_required << ").");
 
     // 3. each origin should recommend a precise number of pubkeys
-
-    // TODO: move to a 'math' library, with unit tests
-    auto n_choose_k_f =
-      [](const std::uint32_t n, const std::uint32_t k) -> std::uint32_t
-      {
-        static_assert(std::numeric_limits<std::int32_t>::digits <= std::numeric_limits<double>::digits,
-          "n_choose_k requires no rounding issues when converting between int32 <-> double.");
-
-        if (n < k)
-          return 0;
-
-        double fp_result = boost::math::binomial_coefficient<double>(n, k);
-
-        if (fp_result < 0)
-          return 0;
-
-        if (fp_result > std::numeric_limits<std::int32_t>::max())  // note: std::round() returns std::int32_t
-          return 0;
-
-        return static_cast<std::uint32_t>(std::round(fp_result));
-      };
-
     // other signers: (N - 2) choose (msg_round_num - 1)
       // - Each signer recommends keys they share with other signers.
       // - In each round, every group of size 'round num' will have a key. From a single signer's perspective,
@@ -507,10 +485,10 @@ namespace multisig
       // - Other signers will recommend (N - 2) choose (msg_round_num - 1) pubkeys (after removing keys shared with local).
       // Note: Keys shared with local are filtered out to facilitate kex round boosting, where one or more signers may
       //       have boosted the local signer (implying they didn't have access to the local signer's previous round msg).
-    const std::uint32_t expected_recommendations_others = n_choose_k_f(signers.size() - 2, round - 1);
+    const std::uint32_t expected_recommendations_others = sp::math::n_choose_k(signers.size() - 2, round - 1);
 
     // local: (N - 1) choose (msg_round_num - 1)
-    const std::uint32_t expected_recommendations_self = n_choose_k_f(signers.size() - 1, round - 1);
+    const std::uint32_t expected_recommendations_self = sp::math::n_choose_k(signers.size() - 1, round - 1);
 
     // note: expected_recommendations_others would be 0 in the last round of 1-of-N, but we don't call this function for
     //       that case
@@ -684,7 +662,8 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: INTERNAL
   //----------------------------------------------------------------------------------------------------------------------
-  std::vector<crypto::public_key> multisig_account::get_kex_exclude_pubkeys() const
+  std::vector<crypto::public_key> multisig_account::get_kex_exclude_pubkeys(
+    const cryptonote::account_generators &generators) const
   {
     // exclude all keys the local account recommends
     std::vector<crypto::public_key> exclude_pubkeys;
@@ -692,12 +671,14 @@ namespace multisig
     if (m_kex_rounds_complete == 0)
     {
       // in the first round, only the local pubkey is recommended by the local signer
-      exclude_pubkeys.emplace_back(m_base_pubkey);
+      const rct::key initial_pubkey{rct::scalarmultKey(rct::pk2rct(generators.m_primary), rct::sk2rct(m_base_privkey))};
+      exclude_pubkeys.emplace_back(initial_pubkey);
     }
     else
     {
-      // in other rounds, kex msgs will contain participants' shared keys, so ignore shared keys the account helped
-      //     create for this round
+      // in other rounds, kex msgs will contain participants' shared keys
+
+      // ignore shared keys the account helped create for this round
       for (const auto &shared_key_with_origins : m_kex_keys_to_origins_map)
         exclude_pubkeys.emplace_back(shared_key_with_origins.first);
     }
@@ -707,8 +688,9 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: INTERNAL
   //----------------------------------------------------------------------------------------------------------------------
-  void multisig_account::initialize_kex_update(const std::vector<multisig_kex_msg> &expanded_msgs,
-    const std::uint32_t kex_rounds_required)
+  void multisig_account::initialize_kex_update(const cryptonote::account_generators &generators,
+      const std::vector<multisig_kex_msg> &expanded_msgs,
+      const std::uint32_t kex_rounds_required)
   {
     // initialization is only needed during the first round
     if (m_kex_rounds_complete > 0)
@@ -737,8 +719,7 @@ namespace multisig
     make_multisig_common_privkey(std::move(participant_base_common_privkeys), m_common_privkey);
 
     // set common pubkey
-    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_common_privkey, m_common_pubkey),
-      "Failed to derive public key");
+    m_common_pubkey = rct::rct2pk(rct::scalarmultKey(rct::pk2rct(generators.m_secondary), rct::sk2rct(m_common_privkey)));
 
     // if N-of-N, then the base privkey will be used directly to make the account's share of the final key
     if (kex_rounds_required == 1)
@@ -750,8 +731,9 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: INTERNAL
   //----------------------------------------------------------------------------------------------------------------------
-  void multisig_account::finalize_kex_update(const std::uint32_t kex_rounds_required,
-    multisig_keyset_map_memsafe_t result_keys_to_origins_map)
+  void multisig_account::finalize_kex_update(const cryptonote::account_generators &generators,
+      const std::uint32_t kex_rounds_required,
+      multisig_keyset_map_memsafe_t result_keys_to_origins_map)
   {
     std::vector<crypto::public_key> next_msg_keys;
 
@@ -781,11 +763,44 @@ namespace multisig
       for (const auto &result_key_and_origins : result_keys_to_origins_map)
         result_keys.emplace_back(result_key_and_origins.first);
 
-      // compute final aggregate key, update local multisig privkeys with aggregation coefficients applied
-      m_multisig_pubkey = generate_multisig_aggregate_key(std::move(result_keys), m_multisig_privkeys);
+      // save pre-aggregation privkeys as pubkeys for migrating the origins map below
+      std::vector<crypto::public_key> preagg_keyshares;
+      preagg_keyshares.reserve(m_multisig_privkeys.size());
 
-      // no longer need the account's pubkeys saved for this round (they were only used to build exclude_pubkeys)
-      // TODO: record [pre-aggregation pubkeys : origins] map for aggregation-style signing
+      for (const crypto::secret_key &multisig_privkey : m_multisig_privkeys)
+      {
+        preagg_keyshares.emplace_back(
+            rct::rct2pk(rct::scalarmultKey(rct::pk2rct(generators.m_primary), rct::sk2rct(multisig_privkey)))
+          );
+      }
+
+      // compute final aggregate key, update local multisig privkeys with aggregation coefficients applied
+      m_multisig_pubkey =
+        generate_multisig_aggregate_key(rct::pk2rct(generators.m_primary), std::move(result_keys), m_multisig_privkeys);
+
+      // prepare for aggregation-style signing
+      m_multisig_keyshare_pubkeys.resize(m_multisig_privkeys.size());
+      signer_set_filter temp_filter;
+
+      for (std::size_t keyshare_index{0}; keyshare_index < m_multisig_privkeys.size(); ++keyshare_index)
+      {
+        // 1) convert keyshares to pubkeys for convenience when assembling aggregate keys
+        m_multisig_keyshare_pubkeys[keyshare_index] = rct::rct2pk(rct::scalarmultKey(
+            rct::pk2rct(generators.m_primary),
+            rct::sk2rct(m_multisig_privkeys[keyshare_index]))
+          );
+
+        // 2) record [post-aggregation pubkeys : origins] map for aggregation-style signing
+        m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[keyshare_index]] =
+          std::move(m_kex_keys_to_origins_map[preagg_keyshares[keyshare_index]]);
+
+        // 3) update 'available signers' for aggregation-style signing
+        multisig_signers_to_filter(m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[keyshare_index]],
+          m_signers,
+          temp_filter);
+        m_available_signers_for_aggregation |= temp_filter;
+      }
+
       m_kex_keys_to_origins_map.clear();
 
       // save keys that should be recommended to other signers
@@ -803,7 +818,7 @@ namespace multisig
 
       // derivations are shared secrets between each group of N - M + 1 signers of which the local account is a member
       // - convert them to private keys: multisig_key = H(derivation)
-      // - note: shared key = multisig_key[i]*G is recorded in the kex msg for sending to other participants
+      // - note: shared key = multisig_key[i]*primary_generator is recorded in the kex msg for sending to other participants
       //   instead of the original 'derivation' value (which MUST be kept secret!)
       m_multisig_privkeys.clear();
       m_multisig_privkeys.reserve(result_keys_to_origins_map.size());
@@ -814,10 +829,12 @@ namespace multisig
       for (const auto &derivation_and_origins : result_keys_to_origins_map)
       {
         // multisig_privkey = H(derivation)
-        // derived pubkey = multisig_key * G
+        // derived pubkey = multisig_key * generators.m_primary
         crypto::public_key_memsafe derived_pubkey;
         m_multisig_privkeys.push_back(
-            calculate_multisig_keypair_from_derivation(derivation_and_origins.first, derived_pubkey)
+            calculate_multisig_keypair_from_derivation(rct::pk2rct(generators.m_primary),
+              derivation_and_origins.first,
+              derived_pubkey)
           );
 
         // save the account's kex key mappings for this round [derived pubkey : other signers who will have the same key]
@@ -849,9 +866,11 @@ namespace multisig
 
     // make next round's message (or reproduce the post-kex verification round if kex is complete)
     m_next_round_kex_message = multisig_kex_msg{
-      (m_kex_rounds_complete > kex_rounds_required ? kex_rounds_required : m_kex_rounds_complete) + 1,
-      m_base_privkey,
-      std::move(next_msg_keys)}.get_msg();
+        get_kex_msg_version(m_account_era),
+        (m_kex_rounds_complete > kex_rounds_required ? kex_rounds_required : m_kex_rounds_complete) + 1,
+        m_base_privkey,
+        std::move(next_msg_keys)
+      }.get_msg();
   }
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: INTERNAL
@@ -869,11 +888,15 @@ namespace multisig
     CHECK_AND_ASSERT_THROW_MES(m_kex_rounds_complete < kex_rounds_required + 1,
       "Multisig kex has already completed all required rounds (including post-kex verification).");
 
+    // account generators
+    cryptonote::account_generators generators{get_account_generators(m_account_era)};
+
     // initialize account update
-    this->initialize_kex_update(expanded_msgs, kex_rounds_required);
+    this->initialize_kex_update(generators, expanded_msgs, kex_rounds_required);
 
     // process messages into a [pubkey : {origins}] map
     multisig_keyset_map_memsafe_t result_keys_to_origins_map;
+
     multisig_kex_process_round_msgs(
       m_base_privkey,
       m_base_pubkey,
@@ -881,7 +904,7 @@ namespace multisig
       m_threshold,
       m_signers,
       expanded_msgs,
-      this->get_kex_exclude_pubkeys(),
+      this->get_kex_exclude_pubkeys(generators),
       incomplete_signer_set,
       result_keys_to_origins_map);
 
@@ -907,10 +930,13 @@ namespace multisig
       "booster (there is no round available to boost).");
     CHECK_AND_ASSERT_THROW_MES(expanded_msgs.size() > 0, "At least one input kex message expected.");
 
+    // account generators
+    cryptonote::account_generators generators{get_account_generators(m_account_era)};
+
     // sanitize pubkeys from input msgs
     multisig_keyset_map_memsafe_t pubkey_origins_map;
     const std::uint32_t msgs_round{
-        multisig_kex_msgs_sanitize_pubkeys(expanded_msgs, this->get_kex_exclude_pubkeys(), pubkey_origins_map)
+        multisig_kex_msgs_sanitize_pubkeys(expanded_msgs, this->get_kex_exclude_pubkeys(generators), pubkey_origins_map)
       };
     CHECK_AND_ASSERT_THROW_MES(msgs_round == expected_msgs_round, "Kex messages were not for expected round.");
 
@@ -931,13 +957,15 @@ namespace multisig
       for (const auto &derivation_and_origins : derivation_to_origins_map)
       {
         // multisig_privkey = H(derivation)
-        // derived pubkey = multisig_key * G
+        // derived pubkey = multisig_key * generators.m_primary
         crypto::public_key_memsafe derived_pubkey;
-        calculate_multisig_keypair_from_derivation(derivation_and_origins.first, derived_pubkey);
+        calculate_multisig_keypair_from_derivation(rct::pk2rct(generators.m_primary),
+          derivation_and_origins.first,
+          derived_pubkey);
 
         // save keys that should be recommended to other signers
-        // - The keys multisig_key*G are sent to other participants in the message, so they can be used to produce the final
-        //   multisig key via generate_multisig_spend_public_key().
+        // - The keys multisig_key*generators.m_primary are sent to other participants in the message, so they can be used
+        //   to produce the final multisig key via generate_multisig_spend_public_key().
         next_msg_keys.push_back(derived_pubkey);
       }
     }
@@ -949,7 +977,12 @@ namespace multisig
     }
 
     // produce a kex message for the round after the round this account is currently working on
-    return multisig_kex_msg{msgs_round + 1, m_base_privkey, std::move(next_msg_keys)}.get_msg();
+    return multisig_kex_msg{
+        get_kex_msg_version(m_account_era),
+        msgs_round + 1,
+        m_base_privkey,
+        std::move(next_msg_keys)
+      }.get_msg();
   }
   //----------------------------------------------------------------------------------------------------------------------
 } //namespace multisig

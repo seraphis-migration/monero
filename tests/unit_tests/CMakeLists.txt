@@ -30,6 +30,7 @@ set(unit_tests_sources
   account.cpp
   apply_permutation.cpp
   address_from_url.cpp
+  async.cpp
   base58.cpp
   blockchain_db.cpp
   block_queue.cpp
@@ -37,8 +38,10 @@ set(unit_tests_sources
   bootstrap_node_selector.cpp
   bulletproofs.cpp
   bulletproofs_plus.cpp
+  bulletproofs_plus2.cpp
   canonical_amounts.cpp
   chacha.cpp
+  checkpoint_cache.cpp
   checkpoints.cpp
   command_line.cpp
   crypto.cpp
@@ -52,6 +55,7 @@ set(unit_tests_sources
   epee_utils.cpp
   expect.cpp
   fee.cpp
+  grootle.cpp
   json_serialization.cpp
   get_xtype_from_string.cpp
   hashchain.cpp
@@ -69,6 +73,7 @@ set(unit_tests_sources
   mul_div.cpp
   multiexp.cpp
   multisig.cpp
+  multisig_signing.cpp
   net.cpp
   node_server.cpp
   notify.cpp
@@ -77,11 +82,23 @@ set(unit_tests_sources
   pruning.cpp
   random.cpp
   rolling_median.cpp
+  rw_lock.cpp
   scaling_2021.cpp
   serialization.cpp
+  seraphis_basic.cpp
+  seraphis_crypto.cpp
+  seraphis_enote_scanning.cpp
+  seraphis_knowledge_proofs.cpp
+  seraphis_input_selection.cpp
+  seraphis_integration.cpp
+  seraphis_legacy.cpp
+  seraphis_multisig.cpp
+  seraphis_serialization.cpp
+  seraphis_tx.cpp
   sha256.cpp
   slow_memmem.cpp
   subaddress.cpp
+  tasking_system_demo.cpp
   test_tx_utils.cpp
   test_peerlist.cpp
   test_protocol_pack.cpp
@@ -103,6 +120,7 @@ set(unit_tests_sources
   is_hdd.cpp
   aligned.cpp
   rpc_version_str.cpp
+  x25519.cpp
   zmq_rpc.cpp)
 
 set(unit_tests_headers
@@ -113,6 +131,7 @@ monero_add_minimal_executable(unit_tests
   ${unit_tests_headers})
 target_link_libraries(unit_tests
   PRIVATE
+    async
     ringct
     cryptonote_protocol
     cryptonote_core
@@ -120,10 +139,15 @@ target_link_libraries(unit_tests
     daemon_rpc_server
     blockchain_db
     lmdb_lib
+    mx25519_static
     rpc
     net
     serialization
+    seraphis_core
     seraphis_crypto
+    seraphis_impl
+    seraphis_main
+    seraphis_mocks
     wallet
     p2p
     version
@@ -133,6 +157,9 @@ target_link_libraries(unit_tests
     ${CMAKE_THREAD_LIBS_INIT}
     ${EXTRA_LIBRARIES}
     ${ZMQ_LIB})
+target_include_directories(unit_tests
+  PRIVATE
+    ${MX25519_INCLUDE})
 set_property(TARGET unit_tests
   PROPERTY
     FOLDER "tests")

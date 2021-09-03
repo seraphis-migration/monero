@@ -29,10 +29,13 @@
 set(crypto_sources
   aesb.c
   blake256.c
+  blake2b.c
   chacha.c
   crypto-ops-data.c
   crypto-ops.c
   crypto.cpp
+  eclib_interface.cpp
+  eclib_test.cpp
   generators.cpp
   groestl.c
   hash-extra-blake.c
@@ -49,7 +52,9 @@ set(crypto_sources
   slow-hash.c
   rx-slow-hash.c
   CryptonightR_JIT.c
-  tree-hash.c)
+  tree-hash.c
+  twofish.c
+  x25519.cpp)
 
 if(ARCH_ID STREQUAL "i386" OR ARCH_ID STREQUAL "x86_64" OR ARCH_ID STREQUAL "x86-64" OR ARCH_ID STREQUAL "amd64")
 list(APPEND crypto_sources CryptonightR_template.S)
@@ -70,11 +75,15 @@ monero_add_library(cncrypto
 target_link_libraries(cncrypto
   PUBLIC
     epee
+    mx25519_static
     randomx
     ${Boost_SYSTEM_LIBRARY}
     ${sodium_LIBRARIES}
   PRIVATE
     ${EXTRA_LIBRARIES})
+target_include_directories(cncrypto
+  PRIVATE
+    ${MX25519_INCLUDE})
 
 if (ARM)
   option(NO_OPTIMIZED_MULTIPLY_ON_ARM

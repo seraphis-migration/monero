@@ -27,14 +27,25 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "crypto/crypto.h"
+#include "crypto/generators.h"
+#include "cryptonote_basic/account_generators.h"
+#include "multisig/multisig.h"
 #include "multisig/multisig_account.h"
+#include "multisig/multisig_account_era_conversion_msg.h"
 #include "multisig/multisig_kex_msg.h"
+#include "multisig/multisig_mocks.h"
+#include "multisig/multisig_partial_cn_key_image_msg.h"
+#include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
+#include "ringct/rctTypes.h"
 #include "wallet/wallet2.h"
 
 #include "gtest/gtest.h"
 
 #include <cstdint>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 static const struct
 {
@@ -66,6 +77,8 @@ static const struct
 
 static const size_t KEYS_COUNT = 5;
 
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 static void make_wallet(unsigned int idx, tools::wallet2 &wallet)
 {
   ASSERT_TRUE(idx < sizeof(test_addresses) / sizeof(test_addresses[0]));
@@ -89,7 +102,8 @@ static void make_wallet(unsigned int idx, tools::wallet2 &wallet)
     ASSERT_TRUE(0);
   }
 }
-
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 static std::vector<std::string> exchange_round(std::vector<tools::wallet2>& wallets, const std::vector<std::string>& infos)
 {
   std::vector<std::string> new_infos;
@@ -140,7 +154,8 @@ static std::vector<std::string> exchange_round_force_update(std::vector<tools::w
 
   return new_infos;
 }
-
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 static void check_results(const std::vector<std::string> &intermediate_infos,
   std::vector<tools::wallet2>& wallets,
   const std::uint32_t M)
@@ -222,7 +237,8 @@ static void check_results(const std::vector<std::string> &intermediate_infos,
   EXPECT_EQ(wallets[0].get_account().get_keys().m_account_address.m_spend_public_key, rct::rct2pk(composite_pubkey));
   wallets[0].encrypt_keys("");
 }
-
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 static void make_wallets(const unsigned int M, const unsigned int N, const bool force_update)
 {
   std::vector<tools::wallet2> wallets(N);
@@ -277,7 +293,8 @@ static void make_wallets(const unsigned int M, const unsigned int N, const bool 
 
   check_results(intermediate_infos, wallets, M);
 }
-
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 static void make_wallets_boosting(std::vector<tools::wallet2>& wallets, unsigned int M)
 {
   ASSERT_TRUE(wallets.size() > 1 && wallets.size() <= KEYS_COUNT);
@@ -375,49 +392,214 @@ static void make_wallets_boosting(std::vector<tools::wallet2>& wallets, unsigned
 
   check_results(intermediate_infos, wallets, M);
 }
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static void make_multisig_signer_list(const std::uint32_t num_signers, std::vector<crypto::public_key> &signer_list_out)
+{
+  signer_list_out.clear();
+  signer_list_out.reserve(num_signers);
 
+  for (std::uint32_t i{0}; i < num_signers; ++i)
+    signer_list_out.emplace_back(rct::rct2pk(rct::pkGen()));
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static void test_multisig_signer_set_filter(const std::uint32_t threshold, const std::uint32_t num_signers)
+{
+  using namespace multisig;
+
+  std::vector<crypto::public_key> signer_list;
+  std::vector<crypto::public_key> allowed_signers;
+  std::vector<crypto::public_key> filtered_signers;
+  signer_set_filter aggregate_filter;
+  std::vector<signer_set_filter> filters;
+
+  make_multisig_signer_list(num_signers, signer_list);
+
+  // all signers are allowed
+  allowed_signers = signer_list;
+  EXPECT_NO_THROW(multisig_signers_to_filter(allowed_signers, signer_list, aggregate_filter));
+  EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(threshold, num_signers, aggregate_filter, filters));
+  for (const signer_set_filter filter : filters)
+  {
+    EXPECT_NO_THROW(get_filtered_multisig_signers(filter, threshold, signer_list, filtered_signers));
+    EXPECT_TRUE(filtered_signers.size() == threshold);
+  }
+
+  // num_signers - 1 signers are allowed
+  if (num_signers > threshold)
+  {
+    allowed_signers.pop_back();
+    EXPECT_NO_THROW(multisig_signers_to_filter(allowed_signers, signer_list, aggregate_filter));
+    EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(threshold, num_signers, aggregate_filter, filters));
+    for (const signer_set_filter filter : filters)
+    {
+      EXPECT_NO_THROW(get_filtered_multisig_signers(filter, threshold, signer_list, filtered_signers));
+      EXPECT_TRUE(filtered_signers.size() == threshold);
+    }
+  }
+
+  // threshold signers are allowed
+  while (allowed_signers.size() > threshold)
+    allowed_signers.pop_back();
+
+  EXPECT_NO_THROW(multisig_signers_to_filter(allowed_signers, signer_list, aggregate_filter));
+  EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(threshold, num_signers, aggregate_filter, filters));
+  for (const signer_set_filter filter : filters)
+  {
+    EXPECT_NO_THROW(get_filtered_multisig_signers(filter, threshold, signer_list, filtered_signers));
+    EXPECT_TRUE(filtered_signers.size() == threshold);
+  }
+
+  // < threshold signers are not allowed
+  if (threshold > 0)
+  {
+    allowed_signers.pop_back();
+    EXPECT_NO_THROW(multisig_signers_to_filter(allowed_signers, signer_list, aggregate_filter));
+    EXPECT_ANY_THROW(aggregate_multisig_signer_set_filter_to_permutations(threshold, num_signers, aggregate_filter, filters));
+  }
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static void test_multisig_cn_key_image_recovery(const std::uint32_t M, const std::uint32_t N)
+{
+  ASSERT_TRUE(M <= N);
+  ASSERT_TRUE(N > 0);
+
+  using namespace multisig;
+  const cryptonote::account_generator_era cn_era = cryptonote::account_generator_era::cryptonote;
+
+  // make M-of-N cryptonote-era multisig accounts
+  std::vector<multisig_account> accounts;
+  EXPECT_NO_THROW(multisig::mocks::make_multisig_mock_accounts(cn_era, M, N, accounts));
+  ASSERT_TRUE(accounts.size() > 0);
+
+  // collect multisig account private spend key
+  std::unordered_set<crypto::secret_key> collected_multisig_privkeys;
+
+  for (const multisig_account &account : accounts)
+  {
+    const auto &privkeys = account.get_multisig_privkeys();
+
+    for (const crypto::secret_key &privkey : privkeys)
+      collected_multisig_privkeys.insert(privkey);
+  }
+
+  crypto::secret_key k_s{rct::rct2sk(rct::Z)};
+
+  for (const crypto::secret_key &k_s_partial : collected_multisig_privkeys)
+    sc_add(to_bytes(k_s), to_bytes(k_s), to_bytes(k_s_partial));
+
+  // sanity check: multisig pubkey from private keys
+  const crypto::public_key recomputed_multisig_pubkey{rct::rct2pk(rct::scalarmultBase(rct::sk2rct(k_s)))};
+  ASSERT_TRUE(recomputed_multisig_pubkey == accounts[0].get_multisig_pubkey());
+
+  // generate random onetime addresses
+  const std::size_t num_Kos{3};
+
+  std::vector<crypto::public_key> rand_Kos;
+  rand_Kos.resize(num_Kos);
+
+  for (crypto::public_key &rand_Ko : rand_Kos)
+    rand_Ko = rct::rct2pk(rct::pkGen());
+
+  // compute expected key image cores k^s Hp(Ko)
+  std::vector<crypto::key_image> expected_KI_cores;
+  expected_KI_cores.resize(num_Kos);
+
+  for (std::size_t i{0}; i < num_Kos; ++i)
+    crypto::generate_key_image(rand_Kos[i], k_s, expected_KI_cores[i]);
+
+  // save Kos and key image cores in a map for convenience
+  std::unordered_map<crypto::public_key, crypto::public_key> expected_recovered_key_image_cores;
+
+  for (std::size_t i{0}; i < num_Kos; ++i)
+    expected_recovered_key_image_cores[rand_Kos[i]] = rct::rct2pk(rct::ki2rct(expected_KI_cores[i]));
+
+  // each account makes partial KI messages for each Ko
+  std::unordered_map<crypto::public_key,
+    std::unordered_map<crypto::public_key, multisig_partial_cn_key_image_msg>> partial_ki_msgs;
+
+  for (const multisig_account &account : accounts)
+  {
+    for (const crypto::public_key &rand_Ko : rand_Kos)
+    {
+      EXPECT_NO_THROW((partial_ki_msgs[rand_Ko][account.get_base_pubkey()] =
+        multisig_partial_cn_key_image_msg{account.get_base_privkey(), rand_Ko, account.get_multisig_privkeys()}));
+    }
+  }
+
+  // recover the key image cores
+  std::unordered_map<crypto::public_key, signer_set_filter> onetime_addresses_with_insufficient_partial_kis;
+  std::unordered_map<crypto::public_key, signer_set_filter> onetime_addresses_with_invalid_partial_kis;
+  std::unordered_map<crypto::public_key, crypto::public_key> recovered_key_image_cores;
+
+  EXPECT_NO_THROW(multisig_recover_cn_keyimage_cores(accounts[0].get_threshold(),
+    accounts[0].get_signers(),
+    accounts[0].get_multisig_pubkey(),
+    partial_ki_msgs,
+    onetime_addresses_with_insufficient_partial_kis,
+    onetime_addresses_with_invalid_partial_kis,
+    recovered_key_image_cores));
+
+  // check that key image cores were recovered
+  EXPECT_TRUE(expected_recovered_key_image_cores.size() == recovered_key_image_cores.size());
+  EXPECT_TRUE(onetime_addresses_with_insufficient_partial_kis.size() == 0);
+  EXPECT_TRUE(onetime_addresses_with_invalid_partial_kis.size() == 0);
+
+  for (const auto &recovered_key_image_core : recovered_key_image_cores)
+  {
+    EXPECT_TRUE(expected_recovered_key_image_cores.find(recovered_key_image_core.first) != 
+      expected_recovered_key_image_cores.end());
+
+    EXPECT_TRUE(expected_recovered_key_image_cores.at(recovered_key_image_core.first) == 
+      recovered_key_image_core.second);
+  }
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 TEST(multisig, make_1_2)
 {
   make_wallets(1, 2, false);
   make_wallets(1, 2, true);
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 TEST(multisig, make_1_3)
 {
   make_wallets(1, 3, false);
   make_wallets(1, 3, true);
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 TEST(multisig, make_2_2)
 {
   make_wallets(2, 2, false);
   make_wallets(2, 2, true);
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 TEST(multisig, make_3_3)
 {
   make_wallets(3, 3, false);
   make_wallets(3, 3, true);
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 TEST(multisig, make_2_3)
 {
   make_wallets(2, 3, false);
   make_wallets(2, 3, true);
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 TEST(multisig, make_2_4)
 {
   make_wallets(2, 4, false);
   make_wallets(2, 4, true);
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 TEST(multisig, make_2_4_boosting)
 {
   std::vector<tools::wallet2> wallets(4);
   make_wallets_boosting(wallets, 2);
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 TEST(multisig, multisig_kex_msg)
 {
   using namespace multisig;
@@ -438,66 +620,418 @@ TEST(multisig, multisig_kex_msg)
 
   const crypto::secret_key ancillary_skey{rct::rct2sk(rct::skGen())};
 
+  // default version
+  const std::uint32_t v{get_kex_msg_version(cryptonote::account_generator_era::cryptonote)};
+
   // misc. edge cases
   EXPECT_NO_THROW((multisig_kex_msg{}));
-  EXPECT_ANY_THROW((multisig_kex_msg{multisig_kex_msg{}.get_msg()}));
+  EXPECT_EQ(multisig_kex_msg{}.get_version(), 0);
+  EXPECT_NO_THROW((multisig_kex_msg{multisig_kex_msg{}.get_msg()}));
   EXPECT_ANY_THROW((multisig_kex_msg{"abc"}));
-  EXPECT_ANY_THROW((multisig_kex_msg{0, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
-  EXPECT_ANY_THROW((multisig_kex_msg{1, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
-  EXPECT_ANY_THROW((multisig_kex_msg{1, signing_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
-  EXPECT_ANY_THROW((multisig_kex_msg{1, crypto::null_skey, std::vector<crypto::public_key>{}, ancillary_skey}));
+  EXPECT_ANY_THROW((multisig_kex_msg{v, 0, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
+  EXPECT_ANY_THROW((multisig_kex_msg{v, 1, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
+  EXPECT_ANY_THROW((multisig_kex_msg{v, 1, signing_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
+  EXPECT_ANY_THROW((multisig_kex_msg{v, 1, crypto::null_skey, std::vector<crypto::public_key>{}, ancillary_skey}));
+  EXPECT_ANY_THROW((multisig_kex_msg{v, 1, signing_skey, std::vector<crypto::public_key>{}, ancillary_skey}));
 
   // test that messages are both constructible and reversible
 
   // round 1
   EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{1, signing_skey, std::vector<crypto::public_key>{}, ancillary_skey}.get_msg()
-    }));
-  EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{1, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey}.get_msg()
+      multisig_kex_msg{v, 1, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey}.get_msg()
     }));
 
   // round 2
   EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{2, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey}.get_msg()
+      multisig_kex_msg{v, 2, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey}.get_msg()
     }));
   EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{2, signing_skey, std::vector<crypto::public_key>{pubkey1}, crypto::null_skey}.get_msg()
+      multisig_kex_msg{v, 2, signing_skey, std::vector<crypto::public_key>{pubkey1}, crypto::null_skey}.get_msg()
     }));
   EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2}, ancillary_skey}.get_msg()
+      multisig_kex_msg{v, 2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2}, ancillary_skey}.get_msg()
     }));
   EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2, pubkey3}, crypto::null_skey}.get_msg()
+      multisig_kex_msg{v, 2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2, pubkey3}, crypto::null_skey}.get_msg()
     }));
 
-  // test that keys can be recovered if stored in a message and the message's reverse
+  // prepare: test that keys can be recovered if stored in a message and the message's reverse
+  auto test_recovery = [&](const std::uint32_t v)
+  {
+    // round 1
+    multisig_kex_msg msg_rnd1{v, 1, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey};
+    multisig_kex_msg msg_rnd1_reverse{msg_rnd1.get_msg()};
+    EXPECT_EQ(msg_rnd1.get_version(), v);
+    EXPECT_EQ(msg_rnd1.get_round(), 1);
+    EXPECT_EQ(msg_rnd1.get_round(), msg_rnd1_reverse.get_round());
+    EXPECT_EQ(msg_rnd1.get_signing_pubkey(), signing_pubkey);
+    EXPECT_EQ(msg_rnd1.get_signing_pubkey(), msg_rnd1_reverse.get_signing_pubkey());
+    EXPECT_EQ(msg_rnd1.get_msg_pubkeys().size(), 1);
+    EXPECT_EQ(msg_rnd1.get_msg_pubkeys().size(), msg_rnd1_reverse.get_msg_pubkeys().size());
+    EXPECT_EQ(msg_rnd1.get_msg_privkey(), ancillary_skey);
+    EXPECT_EQ(msg_rnd1.get_msg_privkey(), msg_rnd1_reverse.get_msg_privkey());
 
-  // round 1
-  const multisig_kex_msg msg_rnd1{1, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey};
-  const multisig_kex_msg msg_rnd1_reverse{msg_rnd1.get_msg()};
-  EXPECT_EQ(msg_rnd1.get_round(), 1);
-  EXPECT_EQ(msg_rnd1.get_round(), msg_rnd1_reverse.get_round());
-  EXPECT_EQ(msg_rnd1.get_signing_pubkey(), signing_pubkey);
-  EXPECT_EQ(msg_rnd1.get_signing_pubkey(), msg_rnd1_reverse.get_signing_pubkey());
-  EXPECT_EQ(msg_rnd1.get_msg_pubkeys().size(), 0);
-  EXPECT_EQ(msg_rnd1.get_msg_pubkeys().size(), msg_rnd1_reverse.get_msg_pubkeys().size());
-  EXPECT_EQ(msg_rnd1.get_msg_privkey(), ancillary_skey);
-  EXPECT_EQ(msg_rnd1.get_msg_privkey(), msg_rnd1_reverse.get_msg_privkey());
+    // round 2
+    multisig_kex_msg msg_rnd2{v, 2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2}, ancillary_skey};
+    multisig_kex_msg msg_rnd2_reverse{msg_rnd2.get_msg()};
+    EXPECT_EQ(msg_rnd2.get_version(), v);
+    EXPECT_EQ(msg_rnd2.get_round(), 2);
+    EXPECT_EQ(msg_rnd2.get_round(), msg_rnd2_reverse.get_round());
+    EXPECT_EQ(msg_rnd2.get_signing_pubkey(), signing_pubkey);
+    EXPECT_EQ(msg_rnd2.get_signing_pubkey(), msg_rnd2_reverse.get_signing_pubkey());
+    ASSERT_EQ(msg_rnd2.get_msg_pubkeys().size(), 2);
+    ASSERT_EQ(msg_rnd2.get_msg_pubkeys().size(), msg_rnd2_reverse.get_msg_pubkeys().size());
+    EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[0], pubkey1);
+    EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[1], pubkey2);
+    EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[0], msg_rnd2_reverse.get_msg_pubkeys()[0]);
+    EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[1], msg_rnd2_reverse.get_msg_pubkeys()[1]);
+    EXPECT_EQ(msg_rnd2.get_msg_privkey(), crypto::null_skey);
+    EXPECT_EQ(msg_rnd2.get_msg_privkey(), msg_rnd2_reverse.get_msg_privkey());
+  };
 
-  // round 2
-  const multisig_kex_msg msg_rnd2{2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2}, ancillary_skey};
-  const multisig_kex_msg msg_rnd2_reverse{msg_rnd2.get_msg()};
-  EXPECT_EQ(msg_rnd2.get_round(), 2);
-  EXPECT_EQ(msg_rnd2.get_round(), msg_rnd2_reverse.get_round());
-  EXPECT_EQ(msg_rnd2.get_signing_pubkey(), signing_pubkey);
-  EXPECT_EQ(msg_rnd2.get_signing_pubkey(), msg_rnd2_reverse.get_signing_pubkey());
-  ASSERT_EQ(msg_rnd2.get_msg_pubkeys().size(), 2);
-  ASSERT_EQ(msg_rnd2.get_msg_pubkeys().size(), msg_rnd2_reverse.get_msg_pubkeys().size());
-  EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[0], pubkey1);
-  EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[1], pubkey2);
-  EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[0], msg_rnd2_reverse.get_msg_pubkeys()[0]);
-  EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[1], msg_rnd2_reverse.get_msg_pubkeys()[1]);
-  EXPECT_EQ(msg_rnd2.get_msg_privkey(), crypto::null_skey);
-  EXPECT_EQ(msg_rnd2.get_msg_privkey(), msg_rnd2_reverse.get_msg_privkey());
+  // test that all versions work
+  EXPECT_NO_THROW(test_recovery(get_kex_msg_version(cryptonote::account_generator_era::cryptonote)));
+  EXPECT_NO_THROW(test_recovery(get_kex_msg_version(cryptonote::account_generator_era::seraphis)));
 }
+//-------------------------------------------------------------------------------------------------------------------
+TEST(multisig, multisig_signer_set_filter)
+{
+  using namespace multisig;
+
+  // 0 threshold, 0 signers
+  test_multisig_signer_set_filter(0, 0);
+
+  // 0 threshold, 1 signer
+  test_multisig_signer_set_filter(0, 1);
+
+  // 1 threshold, 1 signer
+  test_multisig_signer_set_filter(1, 1);
+
+  // 0 threshold, 2 signers
+  test_multisig_signer_set_filter(0, 2);
+
+  // 1 threshold, 2 signers
+  test_multisig_signer_set_filter(1, 2);
+
+  // 2 threshold, 2 signers
+  test_multisig_signer_set_filter(2, 2);
+
+  // 1 threshold, 3 signers
+  test_multisig_signer_set_filter(1, 3);
+
+  // 2 threshold, 3 signers
+  test_multisig_signer_set_filter(2, 3);
+
+  // 3 threshold, 3 signers
+  test_multisig_signer_set_filter(3, 3);
+
+  // 3 threshold, 7 signers
+  test_multisig_signer_set_filter(3, 7);
+
+  // check that signer set permutations have the expected members: 2 threshold, 4 signers -> 3 allowed
+
+  using namespace multisig;
+
+  std::vector<crypto::public_key> signer_list;
+  std::vector<crypto::public_key> allowed_signers;
+  std::vector<crypto::public_key> filtered_signers;
+  signer_set_filter aggregate_filter;
+  std::vector<signer_set_filter> filters;
+  std::uint32_t threshold{2};
+  std::uint32_t num_signers{4};
+
+  make_multisig_signer_list(num_signers, signer_list);
+
+  allowed_signers = signer_list;
+  allowed_signers.pop_back();
+  EXPECT_NO_THROW(multisig_signers_to_filter(allowed_signers, signer_list, aggregate_filter));
+  EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(threshold, num_signers, aggregate_filter, filters));
+  EXPECT_TRUE(filters.size() == 3);
+
+  EXPECT_NO_THROW(get_filtered_multisig_signers(filters[0], threshold, signer_list, filtered_signers));
+  EXPECT_TRUE(filtered_signers.size() == threshold);
+  EXPECT_TRUE(filtered_signers[0] == signer_list[0]);
+  EXPECT_TRUE(filtered_signers[1] == signer_list[1]);
+
+  EXPECT_NO_THROW(get_filtered_multisig_signers(filters[1], threshold, signer_list, filtered_signers));
+  EXPECT_TRUE(filtered_signers.size() == threshold);
+  EXPECT_TRUE(filtered_signers[0] == signer_list[0]);
+  EXPECT_TRUE(filtered_signers[1] == signer_list[2]);
+
+  EXPECT_NO_THROW(get_filtered_multisig_signers(filters[2], threshold, signer_list, filtered_signers));
+  EXPECT_TRUE(filtered_signers.size() == threshold);
+  EXPECT_TRUE(filtered_signers[0] == signer_list[1]);
+  EXPECT_TRUE(filtered_signers[1] == signer_list[2]);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(multisig, multisig_partial_cn_ki_msg)
+{
+  using namespace multisig;
+
+  std::vector<crypto::secret_key> privkeys;
+  for (std::size_t i{0}; i < 3; ++i)
+    privkeys.emplace_back(rct::rct2sk(rct::skGen()));
+
+  crypto::secret_key signing_skey{rct::rct2sk(rct::skGen())};
+  crypto::public_key signing_pubkey;
+  crypto::secret_key_to_public_key(signing_skey, signing_pubkey);
+
+  // create a message: misc. edge cases
+  const crypto::public_key rand_Ko{rct::rct2pk(rct::pkGen())};
+
+  EXPECT_NO_THROW((multisig_partial_cn_key_image_msg{}));
+  EXPECT_NO_THROW((multisig_partial_cn_key_image_msg{multisig_partial_cn_key_image_msg{}.get_msg()}));
+  EXPECT_ANY_THROW((multisig_partial_cn_key_image_msg{"abc"}));
+  EXPECT_ANY_THROW((multisig_partial_cn_key_image_msg{crypto::null_skey, crypto::null_pkey, std::vector<crypto::secret_key>{}}));
+  EXPECT_ANY_THROW((multisig_partial_cn_key_image_msg{crypto::null_skey, rand_Ko, std::vector<crypto::secret_key>{}}));
+  EXPECT_ANY_THROW((multisig_partial_cn_key_image_msg{signing_skey, crypto::null_pkey, std::vector<crypto::secret_key>{}}));
+  EXPECT_ANY_THROW((multisig_partial_cn_key_image_msg{crypto::null_skey, rand_Ko, privkeys}));
+  EXPECT_ANY_THROW((multisig_partial_cn_key_image_msg{signing_skey, crypto::null_pkey, privkeys}));
+  EXPECT_ANY_THROW((multisig_partial_cn_key_image_msg{signing_skey, rand_Ko, std::vector<crypto::secret_key>{}}));
+
+  // test that messages are both constructible and reversible
+  EXPECT_NO_THROW((multisig_partial_cn_key_image_msg{
+      multisig_partial_cn_key_image_msg{signing_skey, rand_Ko, std::vector<crypto::secret_key>{privkeys[0]}}.get_msg()
+    }));
+  EXPECT_NO_THROW((multisig_partial_cn_key_image_msg{
+      multisig_partial_cn_key_image_msg{signing_skey, rand_Ko, privkeys}.get_msg()
+    }));
+
+  // test that message contents can be recovered if stored in a message and the message's reverse
+  auto test_recovery = [&](const crypto::public_key &Ko, const crypto::key_image &KI_base)
+  {
+    std::vector<crypto::public_key> expected_multisig_keyshares;
+    std::vector<crypto::public_key> expected_partial_keyimages;
+    expected_multisig_keyshares.reserve(privkeys.size());
+    expected_partial_keyimages.reserve(privkeys.size());
+    for (const crypto::secret_key &privkey : privkeys)
+    {
+      expected_multisig_keyshares.emplace_back(
+          rct::rct2pk(rct::scalarmultKey(rct::pk2rct(crypto::get_G()), rct::sk2rct(privkey)))
+        );
+      expected_partial_keyimages.emplace_back(
+          rct::rct2pk(rct::scalarmultKey(rct::ki2rct(KI_base), rct::sk2rct(privkey)))
+        );
+    }
+
+    multisig_partial_cn_key_image_msg recovery_test_msg{signing_skey, Ko, privkeys};
+    multisig_partial_cn_key_image_msg recovery_test_msg_reverse{recovery_test_msg.get_msg()};
+    EXPECT_EQ(recovery_test_msg.get_onetime_address(), Ko);
+    EXPECT_EQ(recovery_test_msg.get_onetime_address(), recovery_test_msg_reverse.get_onetime_address());
+    EXPECT_EQ(recovery_test_msg.get_signing_pubkey(), signing_pubkey);
+    EXPECT_EQ(recovery_test_msg.get_signing_pubkey(), recovery_test_msg_reverse.get_signing_pubkey());
+    EXPECT_EQ(recovery_test_msg.get_partial_key_images().size(), privkeys.size());
+    EXPECT_EQ(recovery_test_msg.get_partial_key_images(), recovery_test_msg_reverse.get_partial_key_images());
+    EXPECT_EQ(recovery_test_msg.get_partial_key_images().size(), recovery_test_msg.get_multisig_keyshares().size());
+    EXPECT_EQ(recovery_test_msg.get_multisig_keyshares(), recovery_test_msg_reverse.get_multisig_keyshares());
+    EXPECT_EQ(recovery_test_msg.get_multisig_keyshares(), expected_multisig_keyshares);
+    EXPECT_EQ(recovery_test_msg.get_partial_key_images(), expected_partial_keyimages);
+  };
+
+  // get key image base
+  crypto::key_image KI_base;
+  crypto::generate_key_image(rand_Ko, rct::rct2sk(rct::I), KI_base);
+
+  // test recovery
+  EXPECT_NO_THROW(test_recovery(rand_Ko, KI_base));
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(multisig, multisig_conversion_msg)
+{
+  using namespace multisig;
+
+  std::vector<crypto::secret_key> privkeys;
+  for (std::size_t i{0}; i < 3; ++i)
+    privkeys.emplace_back(rct::rct2sk(rct::skGen()));
+
+  crypto::secret_key signing_skey{rct::rct2sk(rct::skGen())};
+  crypto::public_key signing_pubkey;
+  crypto::secret_key_to_public_key(signing_skey, signing_pubkey);
+
+  // misc. edge cases
+  const auto zero = static_cast<cryptonote::account_generator_era>(0);
+  const auto one = static_cast<cryptonote::account_generator_era>(1);
+
+  EXPECT_NO_THROW((multisig_account_era_conversion_msg{}));
+  EXPECT_NO_THROW((multisig_account_era_conversion_msg{multisig_account_era_conversion_msg{}.get_msg()}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{"abc"}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{crypto::null_skey, zero, zero, std::vector<crypto::secret_key>{}}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{crypto::null_skey, one, one, std::vector<crypto::secret_key>{}}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{signing_skey, zero, zero, std::vector<crypto::secret_key>{}}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{crypto::null_skey, one, one, privkeys}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{signing_skey, zero, zero, privkeys}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{signing_skey, zero, one, privkeys}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{signing_skey, one, zero, privkeys}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{signing_skey, one, one, std::vector<crypto::secret_key>{}}));
+
+  // test that messages are both constructible and reversible
+  EXPECT_NO_THROW((multisig_account_era_conversion_msg{
+      multisig_account_era_conversion_msg{signing_skey, one, one, std::vector<crypto::secret_key>{privkeys[0]}}.get_msg()
+    }));
+  EXPECT_NO_THROW((multisig_account_era_conversion_msg{
+      multisig_account_era_conversion_msg{signing_skey, one, one, privkeys}.get_msg()
+    }));
+
+  // test that message contents can be recovered if stored in a message and the message's reverse
+  auto test_recovery = [&](const cryptonote::account_generator_era old_era, const cryptonote::account_generator_era new_era)
+  {
+    std::vector<crypto::public_key> expected_old_keyshares;
+    std::vector<crypto::public_key> expected_new_keyshares;
+    expected_old_keyshares.reserve(privkeys.size());
+    expected_new_keyshares.reserve(privkeys.size());
+    for (const crypto::secret_key &privkey : privkeys)
+    {
+      expected_old_keyshares.emplace_back(
+          rct::rct2pk(rct::scalarmultKey(rct::pk2rct(cryptonote::get_primary_generator(old_era)), rct::sk2rct(privkey)))
+        );
+      expected_new_keyshares.emplace_back(
+          rct::rct2pk(rct::scalarmultKey(rct::pk2rct(cryptonote::get_primary_generator(new_era)), rct::sk2rct(privkey)))
+        );
+    }
+
+    multisig_account_era_conversion_msg recovery_test_msg{signing_skey, old_era, new_era, privkeys};
+    multisig_account_era_conversion_msg recovery_test_msg_reverse{recovery_test_msg.get_msg()};
+    EXPECT_EQ(recovery_test_msg.get_old_era(), old_era);
+    EXPECT_EQ(recovery_test_msg_reverse.get_old_era(), old_era);
+    EXPECT_EQ(recovery_test_msg.get_new_era(), new_era);
+    EXPECT_EQ(recovery_test_msg_reverse.get_new_era(), new_era);
+    EXPECT_EQ(recovery_test_msg.get_signing_pubkey(), signing_pubkey);
+    EXPECT_EQ(recovery_test_msg.get_signing_pubkey(), recovery_test_msg_reverse.get_signing_pubkey());
+    EXPECT_EQ(recovery_test_msg.get_old_keyshares().size(), privkeys.size());
+    EXPECT_EQ(recovery_test_msg.get_old_keyshares(), recovery_test_msg_reverse.get_old_keyshares());
+    EXPECT_EQ(recovery_test_msg.get_old_keyshares().size(), recovery_test_msg.get_new_keyshares().size());
+    EXPECT_EQ(recovery_test_msg.get_new_keyshares(), recovery_test_msg_reverse.get_new_keyshares());
+    EXPECT_EQ(recovery_test_msg.get_new_keyshares(), expected_new_keyshares);
+    EXPECT_EQ(recovery_test_msg.get_old_keyshares(), expected_old_keyshares);
+    if (old_era == new_era)
+    {
+      EXPECT_EQ(recovery_test_msg.get_new_keyshares(), recovery_test_msg.get_old_keyshares());
+    }
+  };
+
+  // test all version combinations
+  EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::cryptonote, cryptonote::account_generator_era::cryptonote));
+  EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::cryptonote, cryptonote::account_generator_era::seraphis));
+  EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::seraphis, cryptonote::account_generator_era::cryptonote));
+  EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::seraphis, cryptonote::account_generator_era::seraphis));
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(multisig, multisig_cn_key_image_recovery)
+{
+  test_multisig_cn_key_image_recovery(1, 2);
+  test_multisig_cn_key_image_recovery(2, 2);
+  test_multisig_cn_key_image_recovery(2, 3);
+  test_multisig_cn_key_image_recovery(2, 4);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(multisig, multisig_account_conversions)
+{
+  std::vector<multisig::multisig_account> accounts;
+  multisig::multisig_account converted_account;
+  std::vector<multisig::multisig_account_era_conversion_msg> conversion_msgs;
+
+  const auto cn_era = cryptonote::account_generator_era::cryptonote;
+  const auto sp_era = cryptonote::account_generator_era::seraphis;
+
+  // 1-of-2
+  EXPECT_NO_THROW(multisig::mocks::make_multisig_mock_accounts(cn_era, 1, 2, accounts));
+  conversion_msgs.clear();
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(sp_era)));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], sp_era, conversion_msgs, converted_account));
+  EXPECT_EQ(converted_account.get_era(), sp_era);
+
+  // 2-of-2: cryptonote -> seraphis
+  EXPECT_NO_THROW(multisig::mocks::make_multisig_mock_accounts(cn_era, 2, 2, accounts));
+  conversion_msgs.clear();
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(sp_era)));
+  EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(converted_account.get_signers_available_for_aggregation_signing());
+  EXPECT_TRUE(converted_account.get_signers_available_for_aggregation_signing() == converted_account.get_signers());
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(sp_era)));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_EQ(converted_account.get_era(), sp_era);
+
+  // 2-of-2: cryptonote -> cryptonote
+  conversion_msgs.clear();
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(cn_era)));
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(cn_era)));
+  EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], cn_era, conversion_msgs, converted_account));
+
+  // 2-of-2: seraphis -> cryptonote
+  EXPECT_NO_THROW(multisig::mocks::make_multisig_mock_accounts(sp_era, 2, 2, accounts));
+  conversion_msgs.clear();
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(cn_era)));
+  EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], cn_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], cn_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(cn_era)));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], cn_era, conversion_msgs, converted_account));
+  EXPECT_EQ(converted_account.get_era(), cn_era);
+
+  // 2-of-3: cryptonote -> seraphis
+  EXPECT_NO_THROW(multisig::mocks::make_multisig_mock_accounts(cn_era, 2, 3, accounts));
+  conversion_msgs.clear();
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(sp_era)));
+  EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], sp_era, conversion_msgs, converted_account));
+  // check that signer recommendations are preserved even if only 'threshold - 1' accounts participants in conversion
+  EXPECT_NO_THROW(converted_account.get_signers_available_for_aggregation_signing());
+  EXPECT_TRUE(converted_account.get_signers_available_for_aggregation_signing() == converted_account.get_signers());
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[2], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(converted_account.get_signers_available_for_aggregation_signing());
+  EXPECT_TRUE(converted_account.get_signers_available_for_aggregation_signing() == converted_account.get_signers());
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(sp_era)));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_EQ(converted_account.get_era(), sp_era);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(multisig, multisig_signer_recommendations_recovery)
+{
+  std::vector<multisig::multisig_account> accounts;
+  multisig::multisig_account converted_account;
+  multisig::multisig_account_era_conversion_msg conversion_msg;
+
+  const auto cn_era = cryptonote::account_generator_era::cryptonote;
+
+  // 2-of-3: can recover signer recommendations for aggregation if lost
+  EXPECT_NO_THROW(multisig::mocks::make_multisig_mock_accounts(cn_era, 2, 3, accounts));
+
+  // reset account to remove keyshare map
+  accounts[0] = multisig::multisig_account{
+      accounts[0].get_era(),
+      accounts[0].get_threshold(),
+      accounts[0].get_signers(),
+      accounts[0].get_base_privkey(),
+      accounts[0].get_base_common_privkey(),
+      accounts[0].get_multisig_privkeys(),
+      accounts[0].get_common_privkey(),
+      accounts[0].get_multisig_pubkey(),
+      multisig::multisig_keyshare_origins_map_t{},  //remove keyshare map
+      accounts[0].get_kex_rounds_complete(),
+      multisig::multisig_keyset_map_memsafe_t{},
+      ""
+    };
+
+  // now only self is available for aggregation signing
+  std::vector<crypto::public_key> available_signers{accounts[0].get_signers_available_for_aggregation_signing()};
+  EXPECT_TRUE(available_signers.size() == 1);
+  EXPECT_TRUE(available_signers[0] == accounts[0].get_base_pubkey());
+
+  // add player 1
+  EXPECT_NO_THROW(conversion_msg = accounts[1].get_account_era_conversion_msg(cn_era));
+  EXPECT_NO_THROW(accounts[0].add_signer_recommendations(conversion_msg));
+
+  // now self and player 1 are available
+  available_signers = accounts[0].get_signers_available_for_aggregation_signing();
+  EXPECT_TRUE(available_signers.size() == 2);
+
+  // add player 2
+  EXPECT_NO_THROW(conversion_msg = accounts[2].get_account_era_conversion_msg(cn_era));
+  EXPECT_NO_THROW(accounts[0].add_signer_recommendations(conversion_msg));
+
+  // now everyone is available for aggregation signing
+  available_signers = accounts[0].get_signers_available_for_aggregation_signing();
+  EXPECT_TRUE(available_signers == accounts[0].get_signers());
+}
+//-------------------------------------------------------------------------------------------------------------------

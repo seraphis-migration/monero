@@ -48,7 +48,7 @@ template<test_multiexp_algorithm algorithm, size_t npoints, size_t c=0>
 class test_multiexp
 {
 public:
-  static const size_t loop_count = npoints >= 1024 ? 10 : npoints < 256 ? 1000 : 100;
+  static const size_t loop_count = (npoints >= 1024 ? 10 : npoints < 256 ? 1000 : 100);
 
   bool init()
   {

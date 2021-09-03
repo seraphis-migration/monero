@@ -1,4 +1,4 @@
-// Copyright (c) 2021, The Monero Project
+// Copyright (c) 2021-2023, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -38,7 +38,8 @@ namespace cryptonote
 enum class account_generator_era : unsigned char
 {
   unknown = 0,
-  cryptonote = 1  //and ringct
+  cryptonote = 1,  //and ringct
+  seraphis = 2
 };
 
 struct account_generators
@@ -51,6 +52,8 @@ inline crypto::public_key get_primary_generator(const account_generator_era era)
 {
   if (era == account_generator_era::cryptonote)
     return crypto::get_G();
+  else if (era == account_generator_era::seraphis)
+    return crypto::get_U();
   else
     return crypto::null_pkey;  //error
 }
@@ -59,6 +62,8 @@ inline crypto::public_key get_secondary_generator(const account_generator_era er
 {
   if (era == account_generator_era::cryptonote)
     return crypto::get_G();
+  else if (era == account_generator_era::seraphis)
+    return crypto::get_X();
   else
     return crypto::null_pkey;  //error
 }

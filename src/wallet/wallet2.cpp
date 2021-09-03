@@ -58,6 +58,7 @@ using namespace epee;
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "rpc/core_rpc_server_error_codes.h"
 #include "misc_language.h"
+#include "cryptonote_basic/account_generators.h"
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "multisig/multisig.h"
 #include "multisig/multisig_account.h"
@@ -5529,6 +5530,8 @@ void wallet2::get_uninitialized_multisig_account(multisig::multisig_account &acc
 {
   // create uninitialized multisig account
   account_out = multisig::multisig_account{
+      // we only support cryptonote accounts here
+      cryptonote::account_generator_era::cryptonote,
       // k_base = H(normal private spend key)
       multisig::get_multisig_blinded_secret_key(this->get_account().get_keys().m_spend_secret_key),
       // k_view = H(normal private view key)
@@ -5541,14 +5544,12 @@ void wallet2::get_reconstructed_multisig_account(multisig::multisig_account &acc
   CHECK_AND_ASSERT_THROW_MES(this->multisig(), "The wallet is not multisig, so the multisig account couldn't be reconstructed");
 
   // reconstruct multisig account
-  crypto::public_key common_pubkey;
-  crypto::secret_key_to_public_key(this->get_account().get_keys().m_view_secret_key, common_pubkey);
-
   multisig::multisig_keyset_map_memsafe_t kex_origins_map;
   for (const auto &derivation : m_multisig_derivations)
     kex_origins_map[derivation];
 
   account_out = multisig::multisig_account{
+      cryptonote::account_generator_era::cryptonote,
       m_multisig_threshold,
       m_multisig_signers,
       this->get_account().get_keys().m_spend_secret_key,
@@ -5556,7 +5557,7 @@ void wallet2::get_reconstructed_multisig_account(multisig::multisig_account &acc
       this->get_account().get_keys().m_multisig_keys,
       this->get_account().get_keys().m_view_secret_key,
       m_account_public_address.m_spend_public_key,
-      common_pubkey,
+      multisig::multisig_keyshare_origins_map_t{},  //keyshare to origins map: not used
       m_multisig_rounds_passed,
       std::move(kex_origins_map),
       ""

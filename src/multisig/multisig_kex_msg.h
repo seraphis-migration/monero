@@ -29,8 +29,10 @@
 #pragma once
 
 #include "crypto/crypto.h"
+#include "cryptonote_basic/account_generators.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 
@@ -40,24 +42,24 @@ namespace multisig
   // multisig key exchange message
   // - can parse and validate an input message
   // - can construct and sign a new message
+  // - INVARIANT: message pubkeys are in the prime subgroup
   //
-  // msg_content = kex_round | signing_pubkey | expand(msg_pubkeys) | OPTIONAL msg_privkey
-  // msg_to_sign = versioning-domain-sep | msg_content
-  // msg = versioning-domain-sep | b58(msg_content | crypto_sig[signing_privkey](msg_to_sign))
+  // msg_content = kex_round || signing_pubkey || expand(msg_pubkeys) || OPTIONAL msg_privkey
+  // msg_to_sign = versioning-domain-sep || msg_content
+  // msg = versioning-domain-sep || b58(msg_content || crypto_sig[signing_privkey](msg_to_sign))
   //
   // note: round 1 messages will contain a private key (e.g. for the aggregate multisig private view key)
   ///
   class multisig_kex_msg final
   {
-  //member types: none
-
   //constructors
   public:
     // default constructor
     multisig_kex_msg() = default;
 
     // construct from info
-    multisig_kex_msg(const std::uint32_t round,
+    multisig_kex_msg(const std::uint32_t version,
+      const std::uint32_t round,
       const crypto::secret_key &signing_privkey,
       std::vector<crypto::public_key> msg_pubkeys,
       const crypto::secret_key &msg_privkey = crypto::null_skey);
@@ -83,11 +85,14 @@ namespace multisig
     const crypto::secret_key& get_msg_privkey() const { return m_msg_privkey; }
     // get msg signing pubkey
     const crypto::public_key& get_signing_pubkey() const { return m_signing_pubkey; }
+    // get msg version
+    std::uint32_t get_version() const { return m_version; }
 
   private:
-    // msg_to_sign = versioning-domain-sep | kex_round | signing_pubkey | expand(msg_pubkeys) | OPTIONAL msg_privkey
+    // msg_to_sign = versioning-domain-sep || kex_round || signing_pubkey || expand(msg_pubkeys) || OPTIONAL msg_privkey
+    // - signed by the signing pubkey
     crypto::hash get_msg_to_sign() const;
-    // set: msg string based on msg contents, signing pubkey based on input privkey
+    // set: msg string based on msg contents, signing pubkey defined from input privkey
     void construct_msg(const crypto::secret_key &signing_privkey);
     // parse msg string into parts, validate contents and signature
     void parse_and_validate_msg();
@@ -96,6 +101,8 @@ namespace multisig
   private:
     // message as string
     std::string m_msg;
+    // kex message version
+    std::uint32_t m_version;
 
     // key exchange round this msg was produced for
     std::uint32_t m_kex_round;
@@ -103,7 +110,15 @@ namespace multisig
     std::vector<crypto::public_key> m_msg_pubkeys;
     // privkey stored in msg (if kex round 1)
     crypto::secret_key m_msg_privkey;
+
     // pubkey used to sign this msg
     crypto::public_key m_signing_pubkey;
   };
+
+  //todo
+  std::uint32_t get_kex_msg_version(const cryptonote::account_generator_era era);
+
+  //todo
+  bool check_kex_msg_versions(const std::vector<multisig_kex_msg> &messages, const std::uint32_t expected_version);
+
 } //namespace multisig

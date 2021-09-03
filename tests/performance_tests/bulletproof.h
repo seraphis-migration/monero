@@ -65,7 +65,7 @@ template<bool batch, size_t start, size_t repeat, size_t mul, size_t add, size_t
 class test_aggregated_bulletproof
 {
 public:
-  static const size_t loop_count = 500 / (N * repeat);
+  static const size_t loop_count = 250 / (N * repeat);
 
   bool init()
   {

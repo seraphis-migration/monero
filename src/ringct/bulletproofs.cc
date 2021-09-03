@@ -69,7 +69,7 @@ static rct::keyV vector_dup(const rct::key &x, size_t n);
 static rct::key inner_product(const rct::keyV &a, const rct::keyV &b);
 
 static constexpr size_t maxN = 64;
-static constexpr size_t maxM = BULLETPROOF_MAX_OUTPUTS;
+static constexpr size_t maxM = BULLETPROOF_PLUS_MAX_OUTPUTS*8;
 static ge_p3 Hi_p3[maxN*maxM], Gi_p3[maxN*maxM];
 static std::shared_ptr<straus_cached_data> straus_HiGi_cache;
 static std::shared_ptr<pippenger_cached_data> pippenger_HiGi_cache;

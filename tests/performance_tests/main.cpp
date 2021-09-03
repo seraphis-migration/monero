@@ -28,6 +28,9 @@
 // 
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include <chrono>
+#include <memory>
+
 #include <boost/regex.hpp>
 
 #include "common/util.h"
@@ -36,6 +39,9 @@
 #include "performance_utils.h"
 
 // tests
+#include "async.h"
+#include "balance_check.h"
+#include "blake2b.h"
 #include "construct_tx.h"
 #include "check_tx_signature.h"
 #include "check_hash.h"
@@ -65,6 +71,9 @@
 #include "multiexp.h"
 #include "sig_mlsag.h"
 #include "sig_clsag.h"
+#include "seraphis_tx.h"
+#include "grootle.h"
+#include "view_scan.h"
 
 namespace po = boost::program_options;
 
@@ -112,6 +121,485 @@ int main(int argc, char** argv)
 
   performance_timer timer;
   timer.start();
+
+
+  // test threadpools
+  ParamsShuttleAsync p_async;
+  p_async.core_params = p.core_params;
+
+  p_async.description = "async: main thread, 1 task @ 100us";
+  p_async.num_extra_threads          = 0;
+  p_async.num_tasks                  = 1;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{100};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread, 100 tasks @ 100us";
+  p_async.num_extra_threads          = 0;
+  p_async.num_tasks                  = 100;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{100};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread + 1, 100 tasks @ 100us";
+  p_async.num_extra_threads          = 1;
+  p_async.num_tasks                  = 100;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{100};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread + 2, 100 tasks @ 100us";
+  p_async.num_extra_threads          = 2;
+  p_async.num_tasks                  = 100;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{100};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread + 2, 100 tasks @ 1000us";
+  p_async.num_extra_threads          = 2;
+  p_async.num_tasks                  = 100;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{1000};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread + 6, 100 tasks @ 1000us";
+  p_async.num_extra_threads          = 6;
+  p_async.num_tasks                  = 100;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{1000};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread + 6, 10000 tasks @ 1us";
+  p_async.num_extra_threads          = 6;
+  p_async.num_tasks                  = 10000;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{1};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread + 6, 100000 tasks @ 0us";
+  p_async.num_extra_threads          = 6;
+  p_async.num_tasks                  = 100000;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{0};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread + 2, 100000 task @ 0us";
+  p_async.num_extra_threads          = 2;
+  p_async.num_tasks                  = 100000;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{0};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread + 1, 100000 task @ 0us";
+  p_async.num_extra_threads          = 1;
+  p_async.num_tasks                  = 100000;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{0};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread, 100000 task @ 0us";
+  p_async.num_extra_threads          = 0;
+  p_async.num_tasks                  = 100000;
+  p_async.sleepy_task_cadence        = 0;
+  p_async.task_duration              = std::chrono::microseconds{0};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{0};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread + 6, 1000 tasks @ 100us, sleep every 5th for 100us";
+  p_async.num_extra_threads          = 6;
+  p_async.num_tasks                  = 1000;
+  p_async.sleepy_task_cadence        = 5;
+  p_async.task_duration              = std::chrono::microseconds{100};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{100};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  p_async.description = "async: main thread + 6, 1000 tasks @ 10us, sleep every 5th for 1000us";
+  p_async.num_extra_threads          = 6;
+  p_async.num_tasks                  = 1000;
+  p_async.sleepy_task_cadence        = 5;
+  p_async.task_duration              = std::chrono::microseconds{10};
+  p_async.sleepy_task_sleep_duration = std::chrono::microseconds{1000};
+  TEST_PERFORMANCE0(filter, p_async, test_common_threadpool); p_async.description = "";
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool);
+  TEST_PERFORMANCE0(filter, p_async, test_async_threadpool_with_fanout);
+  TEST_PERFORMANCE0(filter, p_async, test_parent_threadpool);
+
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+
+  // test deciphering address tags
+  ParamsShuttleAddressTagDecipher p_address_tag_decipher;
+  p_address_tag_decipher.core_params = p.core_params;
+  p_address_tag_decipher.mode = AddressTagDecipherModes::ALL_SUCCESSFUL_DECIPHER;
+  TEST_PERFORMANCE0(filter, p_address_tag_decipher, test_jamtis_address_tag_decipher_sp);
+  p_address_tag_decipher.mode = AddressTagDecipherModes::NO_SUCCESSFUL_DECIPHER;
+  TEST_PERFORMANCE0(filter, p_address_tag_decipher, test_jamtis_address_tag_decipher_sp);
+
+  // test client-side scanning in a seraphis remote-scanning workflow
+  ParamsShuttleScannerClient p_client_scan;
+  p_client_scan.core_params = p.core_params;
+  p_client_scan.mode = ScannerClientModes::ALL_FAKE;
+  TEST_PERFORMANCE0(filter, p_client_scan, test_remote_scanner_client_scan_sp);
+  p_client_scan.mode = ScannerClientModes::ONE_FAKE_TAG_MATCH;
+  TEST_PERFORMANCE0(filter, p_client_scan, test_remote_scanner_client_scan_sp);
+  p_client_scan.mode = ScannerClientModes::ONE_OWNED;
+  TEST_PERFORMANCE0(filter, p_client_scan, test_remote_scanner_client_scan_sp);
+
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+
+  // test blake2b
+  TEST_PERFORMANCE2(filter, p, test_blake2b, 32, false);
+  TEST_PERFORMANCE2(filter, p, test_blake2b, 32, true);
+  TEST_PERFORMANCE2(filter, p, test_blake2b, 200, false);
+  TEST_PERFORMANCE2(filter, p, test_blake2b, 200, true);
+  TEST_PERFORMANCE2(filter, p, test_blake2b, 2000, false);
+  TEST_PERFORMANCE2(filter, p, test_blake2b, 2000, true);
+  TEST_PERFORMANCE2(filter, p, test_blake2b, 16384, false);
+  TEST_PERFORMANCE2(filter, p, test_blake2b, 16384, true);
+
+  TEST_PERFORMANCE2(filter, p, test_blake2b_streaming, 32, false);
+  TEST_PERFORMANCE2(filter, p, test_blake2b_streaming, 32, true);
+  TEST_PERFORMANCE2(filter, p, test_blake2b_streaming, 200, false);
+  TEST_PERFORMANCE2(filter, p, test_blake2b_streaming, 200, true);
+  TEST_PERFORMANCE2(filter, p, test_blake2b_streaming, 2000, false);
+  TEST_PERFORMANCE2(filter, p, test_blake2b_streaming, 2000, true);
+  TEST_PERFORMANCE2(filter, p, test_blake2b_streaming, 16384, false);
+  TEST_PERFORMANCE2(filter, p, test_blake2b_streaming, 16384, true);
+
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+
+  // test view scan performance with view tags
+  ParamsShuttleViewScan p_view_scan;
+  p_view_scan.core_params = p.core_params;
+
+  TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_cn);
+  TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_cn_optimized);
+  TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_sp);
+  p_view_scan.test_view_tag_check = true;
+  TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_cn);
+  TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_cn_optimized);
+  TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_sp);
+
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+
+  /// BP/BP+ tests for comparisons with zkcrypto benchmarks
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 1, 1, 1, 0, 1); // 1x 1
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 2, 1, 1, 0, 1); // 1x 2
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 4, 1, 1, 0, 1); // 1x 4
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 8, 1, 1, 0, 1); // 1x 8
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 16, 1, 1, 0, 1); // 1x 16
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 32, 1, 1, 0, 1); // 1x 32
+
+  ParamsShuttleBPPAgg p_bpp_agg;
+  p_bpp_agg = {p.core_params, true, {1}, {1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 1
+  p_bpp_agg = {p.core_params, true, {2}, {1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 2
+  p_bpp_agg = {p.core_params, true, {4}, {1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 4
+  p_bpp_agg = {p.core_params, true, {8}, {1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 8
+  p_bpp_agg = {p.core_params, true, {16}, {1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 16
+  p_bpp_agg = {p.core_params, true, {32}, {1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 32
+
+
+/*
+  /// BP+ tests, looking at DDOS risks
+  /// - does adding one large aggregate proof among many small aggregation proofs cause worse average verification
+  //    performance when batching than if the large proof were validated separately?
+  ParamsShuttleBPPAgg p_bpp_agg;
+  std::size_t max_bpp_size{32};
+
+  p_bpp_agg = {p.core_params, true, {2}, {8}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 8x 2
+  p_bpp_agg = {p.core_params, true, {max_bpp_size}, {8}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 8x 32
+  p_bpp_agg = {p.core_params, true, {max_bpp_size}, {1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 32
+  p_bpp_agg = {p.core_params, true, {2,max_bpp_size}, {7,1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 7x 2, 1x 32
+  p_bpp_agg = {p.core_params, true, {2,max_bpp_size}, {8,8}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 8x 2, 8x 32
+  p_bpp_agg = {p.core_params, true, {2}, {16}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 2
+  p_bpp_agg = {p.core_params, true, {max_bpp_size}, {16}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 32
+  p_bpp_agg = {p.core_params, true, {2,max_bpp_size}, {15,1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 15x 2, 1x 32
+
+  p_bpp_agg = {p.core_params, true, {16}, {16}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 16
+  p_bpp_agg = {p.core_params, true, {max_bpp_size}, {16}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 32
+  p_bpp_agg = {p.core_params, true, {16,max_bpp_size}, {16,16}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 16, 16x 32
+*/
+
+  /// mock tx performance tests
+  SpTxPerfIncrementer incrementer;
+  ParamsShuttleSpTx p_seraphis_tx;
+  p_seraphis_tx.core_params = p.core_params;
+
+
+  /// TEST: SpTxSquashedV1
+  // notes:
+  // - legacy inputs are not batched in any way
+  // - seraphis input membership proofs and range proofs can be batched with output range proofs
+
+  // TEST 1: SpTxSquashedV1 {legacy inputs}
+  incrementer = {
+      {1}, //batch sizes
+      {1, 2, 4, 7, 12, 16}, //legacy in counts
+      {0}, //sp in counts
+      {2}, //out counts
+      {16}, //legacy ring size
+      {2}, //decomp n
+      {2} //decomp m limits
+    };
+  while (incrementer.next(p_seraphis_tx))
+  {
+    // ignore n^m
+    if (p_seraphis_tx.n != 2 || p_seraphis_tx.m != 2)
+      continue;
+
+    TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+  // TEST 2: SpTxSquashedV1 {legacy ring size}
+  incrementer = {
+      {1}, //batch sizes
+      {1}, //legacy in counts
+      {0}, //sp in counts
+      {2}, //out counts
+      {1, 2, 4, 7, 12, 16, 25}, //legacy ring size
+      {2}, //decomp n
+      {2} //decomp m limits
+    };
+  while (incrementer.next(p_seraphis_tx))
+  {
+    // ignore n^m
+    if (p_seraphis_tx.n != 2 || p_seraphis_tx.m != 2)
+      continue;
+
+    TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+  // TEST 3: SpTxSquashedV1 {sp inputs}
+  incrementer = {
+      {1}, //batch sizes
+      {0}, //legacy in counts
+      {1, 2, 4, 7, 12, 16}, //seraphis in counts
+      {2}, //out counts
+      {2}, //legacy ring size
+      {2}, //decomp n
+      {7} //decomp m limits
+    };
+  while (incrementer.next(p_seraphis_tx))
+  {
+    // only decomp 2^7
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m == 7)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+  // TEST 4: SpTxSquashedV1 {decomp}
+  incrementer = {
+      {1}, //batch sizes
+      {0}, //legacy in counts
+      {2}, //seraphis in counts
+      {2}, //out counts
+      {2}, //legacy ring size
+      {2, 3}, //decomp n
+      {12, 7} //decomp m limits
+    };
+  while (incrementer.next(p_seraphis_tx))
+  {
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m >= 2)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+  // TEST 5: SpTxSquashedV1 {decomp 2-series, batch size 25}
+  incrementer = {
+      {25}, //batch sizes
+      {0}, //legacy in counts
+      {2}, //seraphis in counts
+      {2}, //out counts
+      {2}, //legacy ring size
+      {2}, //decomp n
+      {12} //decomp m limits
+    };
+  while (incrementer.next(p_seraphis_tx))
+  {
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m >= 2)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+  // TEST 6: SpTxSquashedV1 {outputs, batch size 1}
+  incrementer = {
+      {1}, //batch sizes
+      {0}, //legacy in counts
+      {1, 2, 4, 7, 12, 16}, //seraphis in counts
+      {1, 2, 4, 7, 12, 16}, //out counts
+      {2}, //legacy ring size
+      {2}, //decomp n
+      {7} //decomp m limits
+    };
+  while (incrementer.next(p_seraphis_tx))
+  {
+    // only decomp 2^7
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m == 7)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+  // TEST 7: SpTxSquashedV1 {16in/out, batch sizes 7, 15}
+  incrementer = {
+      {7, 15}, //batch sizes
+      {0}, //legacy in counts
+      {16}, //seraphis in counts
+      {16}, //out counts
+      {2}, //legacy ring size
+      {2}, //decomp n
+      {7} //decomp m limits
+    };
+  while (incrementer.next(p_seraphis_tx))
+  {
+    // only decomp 2^7
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m == 7)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+  // TEST 8: SpTxSquashedV1 {outputs, batch size 25}
+  incrementer = {
+      {25}, //batch sizes
+      {0}, //legacy in counts
+      {1, 2, 4, 7, 12, 16}, //seraphis in counts
+      {1, 2, 4, 7, 12, 16}, //out counts
+      {2}, //legacy ring size
+      {2}, //decomp n
+      {7} //decomp m limits
+    };
+  while (incrementer.next(p_seraphis_tx))
+  {
+    // only decomp 2^7
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m == 7)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+  /// TEST: SpTxSquashedV1 (end)
+
+
+/*
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 1, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 1, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 1, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 1, 2);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 1, 2);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 1, 2);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 2, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 2, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 2, 1);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 16, 16);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 16, 16);
+  TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 16, 16);
+
+
+  // test groth/bootle proofs
+
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 3, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 3, 2, true);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 4, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 5, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 6, 2, true);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 6, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 7, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 8, 2, false);
+
+  TEST_PERFORMANCE4(filter, p, test_grootle, 3, 3, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 3, 4, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 3, 5, 2, false);
+
+
 
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 1, false);
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 2, false);
@@ -249,6 +737,31 @@ int main(int argc, char** argv)
 
   TEST_PERFORMANCE1(filter, p, test_range_proof, true);
   TEST_PERFORMANCE1(filter, p, test_range_proof, false);
+  */
+
+  /*
+  // 16 amounts
+  // 1 proof - 16 amounts
+  TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, true, 16);
+  // 16 proofs - 1 amount
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 1, 1, 1, 0, 16);
+
+  // 1 proof - 32 amounts
+  TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, true, 32);
+  // 2 proofs - 16 amounts
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 16, 1, 1, 0, 2);
+
+  // batching vs aggregating
+  // 5 proofs - 16 amounts
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 16, 1, 1, 0, 5);
+  // 10 proofs - 8 amounts
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 8, 1, 1, 0, 10);
+  // 20 proofs - 4 amounts
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 4, 1, 1, 0, 20);
+  // 40 proofs - 2 amounts
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 2, 1, 1, 0, 40);
+  // 80 proofs - 1 amount
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 1, 1, 1, 0, 80);
 
   TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, true, 1); // 1 bulletproof_plus with 1 amount
   TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, false, 1);
@@ -270,6 +783,7 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, false, 2, 1, 1, 0, 64);
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 2, 1, 1, 0, 64); // 64 proof, each with 2 amounts
 
+  // 16 inputs
   TEST_PERFORMANCE2(filter, p, test_bulletproof, true, 1); // 1 bulletproof with 1 amount
   TEST_PERFORMANCE2(filter, p, test_bulletproof, false, 1);
 
@@ -289,6 +803,8 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 1, 8, 1, 1, 4); // 32 proofs, with 1, 2, 3, 4 amounts, 8 of each
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, false, 2, 1, 1, 0, 64);
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 2, 1, 1, 0, 64); // 64 proof, each with 2 amounts
+
+
 
   TEST_PERFORMANCE1(filter, p, test_crypto_ops, op_sc_add);
   TEST_PERFORMANCE1(filter, p, test_crypto_ops, op_sc_sub);
@@ -354,7 +870,9 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE2(filter, p, test_multiexp, multiexp_straus_cached, 1024);
   TEST_PERFORMANCE2(filter, p, test_multiexp, multiexp_straus_cached, 2048);
   TEST_PERFORMANCE2(filter, p, test_multiexp, multiexp_straus_cached, 4096);
+  */
 
+  /*
 #if 1
   TEST_PERFORMANCE3(filter, p, test_multiexp, multiexp_pippenger, 2, 1);
   TEST_PERFORMANCE3(filter, p, test_multiexp, multiexp_pippenger, 4, 2);
@@ -599,6 +1117,7 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE3(filter, p, test_multiexp, multiexp_pippenger, 4096, 8);
   TEST_PERFORMANCE3(filter, p, test_multiexp, multiexp_pippenger, 4096, 9);
 #endif
+  */
 
   std::cout << "Tests finished. Elapsed time: " << timer.elapsed_ms() / 1000 << " sec" << std::endl;
 

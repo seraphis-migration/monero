@@ -32,6 +32,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "crypto/x25519.h"
 #include "cryptonote_config.h"
 #include "ringct/rctTypes.h"
 #include "wipeable_string.h"
@@ -211,6 +212,14 @@ private:
     void append_impl(const boost::string_ref label, const crypto::key_image &key_image_buffer)
     {
         this->append_labeled_buffer(label, key_image_buffer.data, sizeof(key_image_buffer));
+    }
+    void append_impl(const boost::string_ref label, const crypto::x25519_scalar &x25519_scalar_buffer)
+    {
+        this->append_labeled_buffer(label, x25519_scalar_buffer.data, sizeof(x25519_scalar_buffer));
+    }
+    void append_impl(const boost::string_ref label, const crypto::x25519_pubkey &x25519_pubkey_buffer)
+    {
+        this->append_labeled_buffer(label, x25519_pubkey_buffer.data, sizeof(x25519_pubkey_buffer));
     }
     void append_impl(const boost::string_ref label, const std::string &string_buffer)
     {

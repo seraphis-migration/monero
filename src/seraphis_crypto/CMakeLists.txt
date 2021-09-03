@@ -27,7 +27,16 @@
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 set(seraphis_crypto_sources
-  dummy.cpp)
+  bulletproofs_plus2.cpp
+  grootle.cpp
+  math_utils.cpp
+  matrix_proof.cpp
+  sp_composition_proof.cpp
+  sp_crypto_utils.cpp
+  sp_generator_factory.cpp
+  sp_hash_functions.cpp
+  sp_legacy_proof_helpers.cpp
+  sp_multiexp.cpp)
 
 monero_find_all_headers(seraphis_crypto_headers, "${CMAKE_CURRENT_SOURCE_DIR}")
 

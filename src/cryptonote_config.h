@@ -232,6 +232,20 @@ namespace config
   std::string const GENESIS_TX = "013c01ff0001ffffffffffff03029b2e4c0281c0b02e7c53291a94d1d0cbff8883f8024f5142ee494ffbbd08807121017767aafcde9be00dcfd098715ebcf7f410daebc582fda69d24a28e9d0bc890d1";
   uint32_t const GENESIS_NONCE = 10000;
 
+  // misc config
+  const constexpr uint16_t SP_MAX_COINBASE_OUTPUTS_V1 = 60000;  //todo: what to set this to?
+  const constexpr uint16_t SP_MAX_INPUTS_V1 = 128 - BULLETPROOF_MAX_OUTPUTS;
+  const constexpr uint16_t SP_MAX_OUTPUTS_V1 = BULLETPROOF_MAX_OUTPUTS;
+  const constexpr uint16_t SP_GROOTLE_N_V1 = 2;
+  const constexpr uint16_t SP_GROOTLE_M_V1 = 7;  //v1: 2^7 = 128
+  // note: SP_REF_SET_* version number should line up with intended grootle n^m decomposition
+  const constexpr std::uint64_t LEGACY_RING_SIZE_V1 = 16;
+  const constexpr std::uint64_t SP_REF_SET_BIN_RADIUS_V1 = 127;
+  const constexpr std::uint64_t SP_REF_SET_NUM_BIN_MEMBERS_V1 = 8;
+  const constexpr std::uint64_t DISCRETIZED_FEE_LEVEL_NUMERATOR_X100 = 150;  //fee level factor = 1.5
+  const constexpr std::uint64_t DISCRETIZED_FEE_SIG_FIGS = 1;
+  const constexpr std::uint64_t BULLETPROOF_PLUS2_MAX_COMMITMENTS = 128;
+
   // Hash domain separators
   const char HASH_KEY_BULLETPROOF_EXPONENT[] = "bulletproof";
   const char HASH_KEY_BULLETPROOF_PLUS_EXPONENT[] = "bulletproof_plus";
@@ -255,6 +269,67 @@ namespace config
   const constexpr char HASH_KEY_MULTISIG_TX_PRIVKEYS_SEED[] = "multisig_tx_privkeys_seed";
   const constexpr char HASH_KEY_MULTISIG_TX_PRIVKEYS[] = "multisig_tx_privkeys";
   const constexpr char HASH_KEY_TXHASH_AND_MIXRING[] = "txhash_and_mixring";
+  const constexpr char HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR[] = "multisig_binonce_merge_factor";
+  const constexpr char HASH_KEY_SERAPHIS_X[] = "seraphis_X";
+  const constexpr char HASH_KEY_SERAPHIS_U[] = "seraphis_U";
+
+  const constexpr char TRANSCRIPT_PREFIX[] = "monero";
+
+  const constexpr char HASH_KEY_LEGACY_ENOTE_IDENTIFIER[] = "legacy_enote_identifier";
+  const constexpr char HASH_KEY_LEGACY_RING_SIGNATURES_MESSAGE_V1[] = "legacy_ring_signatures_message_v1";
+
+  const constexpr char HASH_KEY_SERAPHIS_GENERATOR_FACTORY[] = "sp_generator_factory";
+  const constexpr char HASH_KEY_SERAPHIS_SQUASHED_ENOTE[] = "sp_squashed_enote";
+  const constexpr char HASH_KEY_SERAPHIS_TX_CONTEXTUAL_VALIDATION_ID_V1[] = "sp_tx_contextual_validation_id_v1";
+  const constexpr char HASH_KEY_SERAPHIS_TX_CONTEXTUAL_VALIDATION_ID_V2[] = "sp_tx_contextual_validation_id_v2";
+  const constexpr char HASH_KEY_SERAPHIS_TX_PROPOSAL_MESSAGE_V1[] = "sp_tx_proposal_message_v1";
+  const constexpr char HASH_KEY_SERAPHIS_MEMBERSHIP_PROOF_MESSAGE_V1[] = "sp_membership_proof_message_v1";
+  const constexpr char HASH_KEY_SERAPHIS_INPUT_IMAGES_PREFIX_V1[] = "sp_input_images_prefix_v1";
+  const constexpr char HASH_KEY_SERAPHIS_TX_PROOFS_PREFIX_V1[] = "sp_tx_proofs_prefix_v1";
+  const constexpr char HASH_KEY_SERAPHIS_TX_ARTIFACTS_MERKLE_ROOT_V1[] = "sp_tx_artifacts_merkle_root_v1";
+  const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_TYPE_COINBASE_V1[] = "sp_txtype_coinbase_v1";
+  const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_TYPE_SQUASHED_V1[] = "sp_txtype_squashed_v1";
+
+  const constexpr char HASH_KEY_SERAPHIS_ADDRESS_OWNERSHIP_PROOF_OFFSET_V1[] = "sp_address_ownership_proof_offset_v1";
+  const constexpr char HASH_KEY_SERAPHIS_ENOTE_KEY_IMAGE_PROOF_MESSAGE_V1[] = "sp_enote_key_image_proof_message_v1";
+  const constexpr char HASH_KEY_SERAPHIS_ENOTE_UNSPENT_PROOF_MESSAGE_V1[] = "sp_enote_unspent_proof_message_v1";
+
+  const constexpr char HASH_KEY_BULLETPROOF_PLUS2_TRANSCRIPT[] = "bpp2_transcript";
+  const constexpr char HASH_KEY_BULLETPROOF_PLUS2_TRANSCRIPT_UPDATE[] = "bpp2_tupdate";
+  const constexpr char HASH_KEY_MATRIX_PROOF_AGGREGATION_COEFF[] = "matrix_proof_aggregation_coeff";
+  const constexpr char HASH_KEY_MATRIX_PROOF_CHALLENGE_MSG[] = "matrix_proof_challenge_msg";
+  const constexpr char HASH_KEY_MATRIX_PROOF_CHALLENGE[] = "matrix_proof_challenge";
+  const constexpr char HASH_KEY_GROOTLE_CHALLENGE[] = "grootle_challenge";
+  const constexpr char HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE[] = "sp_composition_proof_challenge_message";
+  const constexpr char HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE[] = "sp_composition_proof_challenge";
+  const constexpr char HASH_KEY_BINNED_REF_SET_GENERATOR_SEED[] = "binned_refset_generator_seed";
+  const constexpr char HASH_KEY_BINNED_REF_SET_MEMBER[] = "binned_refset_member";
+
+  const constexpr char HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY[] = "jamtis_unlock_amounts_key";
+  const constexpr char HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET[] = "jamtis_generate_address_secret";
+  const constexpr char HASH_KEY_JAMTIS_CIPHERTAG_SECRET[] = "jamtis_cipher_tag_secret";
+  const constexpr char HASH_KEY_JAMTIS_FINDRECEIVED_KEY[] = "jamtis_find_received_key";
+  const constexpr char HASH_KEY_JAMTIS_INDEX_EXTENSION_GENERATOR[] = "jamtis_index_extension_generator";
+  const constexpr char HASH_KEY_JAMTIS_ADDRESS_PRIVKEY[] = "jamtis_address_privkey";
+  const constexpr char HASH_KEY_JAMTIS_SPENDKEY_EXTENSION_G[] = "jamtis_spendkey_extension_g";
+  const constexpr char HASH_KEY_JAMTIS_SPENDKEY_EXTENSION_X[] = "jamtis_spendkey_extension_x";
+  const constexpr char HASH_KEY_JAMTIS_SPENDKEY_EXTENSION_U[] = "jamtis_spendkey_extension_u";
+  const constexpr char HASH_KEY_JAMTIS_ADDRESS_TAG_HINT[] = "jamtis_address_tag_hint";
+  const constexpr char HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG[] = "jamtis_encrypted_address_tag";
+  const constexpr char HASH_KEY_JAMTIS_VIEW_TAG[] = "jamtis_view_tag";
+  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN[] = "jamtis_sr_secret_plain";
+  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELFSEND_DUMMY[] = "jamtis_selfsend_dummy";
+  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELFSEND_CHANGE[] = "jamtis_selfsend_change";
+  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELFSEND_SELF_SPEND[] = "jamtis_selfsend_self_spend";
+  const constexpr char HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION_G[] = "jamtis_sender_extension_g";
+  const constexpr char HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION_X[] = "jamtis_sender_extension_x";
+  const constexpr char HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION_U[] = "jamtis_sender_extension_u";
+  const constexpr char HASH_KEY_JAMTIS_AMOUNT_BAKED_KEY_PLAIN[] = "jamtis_amount_baked_key_plain";
+  const constexpr char HASH_KEY_JAMTIS_AMOUNT_BAKED_KEY_SELFSEND[] = "jamtis_amount_baked_key_selfsend";
+  const constexpr char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR[] = "jamtis_amount_commitment_blinding_factor";
+  const constexpr char HASH_KEY_JAMTIS_ENCODED_AMOUNT_MASK[] = "jamtis_encoded_amount_mask";
+  const constexpr char HASH_KEY_JAMTIS_INPUT_CONTEXT_COINBASE[] = "jamtis_input_context_coinbase";
+  const constexpr char HASH_KEY_JAMTIS_INPUT_CONTEXT_STANDARD[] = "jamtis_input_context_standard";
 
   // Multisig
   const uint32_t MULTISIG_MAX_SIGNERS{16};

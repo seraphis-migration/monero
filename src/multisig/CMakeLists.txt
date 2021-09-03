@@ -29,9 +29,20 @@
 set(multisig_sources
   multisig.cpp
   multisig_account.cpp
+  multisig_account_era_conversion_msg.cpp
   multisig_account_kex_impl.cpp
+  multisig_clsag.cpp
   multisig_clsag_context.cpp
   multisig_kex_msg.cpp
+  multisig_mocks.cpp
+  multisig_nonce_cache.cpp
+  multisig_partial_cn_key_image_msg.cpp
+  multisig_partial_sig_makers.cpp
+  multisig_signer_set_filter.cpp
+  multisig_signing_errors.cpp
+  multisig_signing_helper_types.cpp
+  multisig_signing_helper_utils.cpp
+  multisig_sp_composition_proof.cpp
   multisig_tx_builder_ringct.cpp)
 
 set(multisig_headers)
@@ -53,5 +64,12 @@ target_link_libraries(multisig
     cryptonote_core
     common
     cncrypto
+    seraphis_crypto
   PRIVATE
     ${EXTRA_LIBRARIES})
+
+target_include_directories(multisig
+  PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+  PRIVATE
+    ${Boost_INCLUDE_DIRS})

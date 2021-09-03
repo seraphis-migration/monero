@@ -70,6 +70,7 @@ static bool make_multisig_accounts(std::vector<cryptonote::account_base> &accoun
     // create account and collect signer
     multisig_accounts.emplace_back(
         multisig_account{
+          cryptonote::account_generator_era::cryptonote,
           get_multisig_blinded_secret_key(accounts[account_index].get_keys().m_spend_secret_key),
           get_multisig_blinded_secret_key(accounts[account_index].get_keys().m_view_secret_key)
         }

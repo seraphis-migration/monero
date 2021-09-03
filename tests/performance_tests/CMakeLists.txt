@@ -41,6 +41,7 @@ set(performance_tests_headers
   generate_key_image.h
   generate_key_image_helper.h
   generate_keypair.h
+  grootle.h
   signature.h
   is_out_to_acc.h
   out_can_be_to_acc.h
@@ -55,19 +56,29 @@ set(performance_tests_headers
   multi_tx_test_base.h
   performance_tests.h
   performance_utils.h
-  single_tx_test_base.h)
+  single_tx_test_base.h
+  balance_check.h
+  seraphis_tx.h
+  view_scan.h)
 
 monero_add_minimal_executable(performance_tests
   ${performance_tests_sources}
   ${performance_tests_headers})
 target_link_libraries(performance_tests
   PRIVATE
+    async
     wallet
     cryptonote_core
     common
     cncrypto
     epee
+    randomx
+    ringct
+    seraphis_core
     seraphis_crypto
+    seraphis_impl
+    seraphis_main
+    seraphis_mocks
     ${Boost_CHRONO_LIBRARY}
     ${CMAKE_THREAD_LIBS_INIT}
     ${EXTRA_LIBRARIES})
