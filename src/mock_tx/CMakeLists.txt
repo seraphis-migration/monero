@@ -41,7 +41,10 @@ target_link_libraries(mock_tx
     cncrypto
     device
   PRIVATE
-    ${Boost_INCLUDE_DIRS}
     ${EXTRA_LIBRARIES})
 
-target_include_directories(mock_tx PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(mock_tx
+  PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+  PRIVATE
+    ${Boost_INCLUDE_DIRS})

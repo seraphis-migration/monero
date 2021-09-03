@@ -204,8 +204,8 @@ std::vector<MockTxCLSAGDest> gen_mock_tx_clsag_dests(const std::vector<rct::xmr_
     return destinations;
 }
 //-----------------------------------------------------------------
-MockTxCLSAG::MockTxCLSAG(const std::vector<MockTxCLSAGDest> &destinations,
-    const std::vector<MockTxCLSAGInput> &inputs_to_spend)
+MockTxCLSAG::MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+    const std::vector<MockTxCLSAGDest> &destinations)
 {
     CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any destinations.");
     CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() > 0, "Tried to make tx without any inputs.");
@@ -237,11 +237,11 @@ MockTxCLSAG::MockTxCLSAG(const std::vector<MockTxCLSAGDest> &destinations,
             "Tried to make tx with an input that has a malformed real spend index.");
     }
 
-    make_tx(destinations, inputs_to_spend);
+    make_tx(inputs_to_spend, destinations);
 }
 //-----------------------------------------------------------------
-void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGDest> &destinations,
-        const std::vector<MockTxCLSAGInput> &inputs_to_spend)
+void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+    const std::vector<MockTxCLSAGDest> &destinations)
 {
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() == 0, "Tried to make tx when tx already exists.");
 
@@ -298,6 +298,7 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGDest> &destinations,
     // 3. set last input image's pseudo blinding factor equal to
     //    sum(output blinding factors) - sum(input image blinding factors)_except_last
     m_input_images.emplace_back(inputs_to_spend.back().to_enote_image(sum_output_blinding_factors));
+    pseudo_blinding_factors.back() = sum_output_blinding_factors;
 
 
     /// range proofs
@@ -396,7 +397,7 @@ bool MockTxCLSAG::validate() const
         output_commitments.emplace_back(rct::pk2rct(m_outputs[output_index].m_amount_commitment));
 
         // double check that the two stored copies of output commitments match
-        if (m_outputs[output_index].m_amount_commitment != rct::rct2pk(m_range_proof.V[output_index]))
+        if (m_outputs[output_index].m_amount_commitment != rct::rct2pk(rct::scalarmult8(m_range_proof.V[output_index])))
             return false;
     }
 
