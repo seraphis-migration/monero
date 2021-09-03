@@ -32,7 +32,8 @@ set(ringct_basic_sources
   rctCryptoOps.c
   multiexp.cc
   bulletproofs.cc
-  bulletproofs_plus.cc)
+  bulletproofs_plus.cc
+  triptych.cc)
 
 monero_find_all_headers(ringct_basic_private_headers "${CMAKE_CURRENT_SOURCE_DIR}")
 
