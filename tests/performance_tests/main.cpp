@@ -63,6 +63,7 @@
 #include "bulletproof.h"
 #include "bulletproof_plus.h"
 #include "crypto_ops.h"
+#include "mock_tx.h"
 #include "multiexp.h"
 #include "sig_mlsag.h"
 #include "sig_clsag.h"
@@ -103,15 +104,70 @@ int main(int argc, char** argv)
 
   const std::string filter = tools::glob_to_regex(command_line::get_arg(vm, arg_filter));
   const std::string timings_database = command_line::get_arg(vm, arg_timings_database);
-  Params p;
+  ParamsShuttle p;
   if (!timings_database.empty())
-    p.td = TimingsDatabase(timings_database);
-  p.verbose = command_line::get_arg(vm, arg_verbose);
-  p.stats = command_line::get_arg(vm, arg_stats);
-  p.loop_multiplier = command_line::get_arg(vm, arg_loop_multiplier);
+    p.core_params.td = TimingsDatabase(timings_database);
+  p.core_params.verbose = command_line::get_arg(vm, arg_verbose);
+  p.core_params.stats = command_line::get_arg(vm, arg_stats);
+  p.core_params.loop_multiplier = command_line::get_arg(vm, arg_loop_multiplier);
 
   performance_timer timer;
   timer.start();
+
+
+  // max number of tx to batch validate
+  std::vector<std::size_t> batch_sizes{1, 2, 4, 7, 11};
+
+  // input/output counts
+  std::vector<std::size_t> in_out_counts{1, 2, 4, 7, 12, 16};
+
+  // ref set: n^m
+  std::vector<std::size_t> ref_set_decomp_n{2, 3, 4, 6, 9};
+  std::vector<std::size_t> ref_set_decomp_m_limit{12, 7, 6, 5, 4};
+
+  // mock test params shuttle
+  ParamsShuttleMockTx p_mock_tx;
+  p_mock_tx.core_params = p.core_params;
+
+  for (const auto batch_size : batch_sizes) {
+  for (const auto in_count : in_out_counts) {
+  for (const auto out_count :in_out_counts) {
+  for (std::size_t n_index{0}; n_index < ref_set_decomp_n.size(); ++n_index)
+  {
+    std::size_t m_start;
+
+    if (ref_set_decomp_n[n_index] == 2)
+      m_start = 0;
+    else
+      m_start = 2;
+
+    for (std::size_t m{m_start}; m <= ref_set_decomp_m_limit[n_index]; ++m)
+    {
+      p_mock_tx.batch_size = batch_size;
+      p_mock_tx.in_count = in_count;
+      p_mock_tx.out_count = out_count;
+      p_mock_tx.n = ref_set_decomp_n[n_index];
+      p_mock_tx.m = m;
+
+      // only perf test 2-series decomposition for tx protocols that are unaffected by decomposition
+      if (ref_set_decomp_n[n_index] == 2)
+      {
+        // limit CLSAG to 2^8
+        if (m <= 8)
+          TEST_PERFORMANCE0(filter, p_mock_tx, test_mock_tx);
+      }
+    }
+  }
+  }}}
+
+
+
+
+
+
+
+
+
 
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 1, 1);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 1, 1);

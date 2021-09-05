@@ -31,6 +31,7 @@
 #pragma once
 
 #include <iostream>
+#include <type_traits>
 #include <stdint.h>
 
 #include <boost/chrono.hpp>
@@ -75,14 +76,40 @@ struct Params
   unsigned loop_multiplier;
 };
 
-template <typename T>
+struct ParamsShuttle
+{
+  Params core_params;
+};
+
+template <typename T, typename ParamsT,
+  typename std::enable_if<!std::is_same<ParamsT, ParamsShuttle>::value, bool>::type = true>
+bool init_test_runner(T &test, ParamsT params_shuttle)
+{
+  if (!test.init(params_shuttle))
+    return false;
+
+  return true;
+}
+
+template <typename T, typename ParamsT,
+  typename std::enable_if<std::is_same<ParamsT, ParamsShuttle>::value, bool>::type = true>
+bool init_test_runner(T &test, ParamsT params_shuttle)
+{
+  if (!test.init())
+    return false;
+
+  return true;
+}
+
+template <typename T, typename ParamsT>
 class test_runner
 {
 public:
-  test_runner(const Params &params)
+  test_runner(const ParamsT &params_shuttle)
     : m_elapsed(0)
-    , m_params(params)
-    , m_per_call_timers(T::loop_count * params.loop_multiplier, {true})
+    , m_params_shuttle(params_shuttle)
+    , m_core_params(params_shuttle.core_params)
+    , m_per_call_timers(T::loop_count * params_shuttle.core_params.loop_multiplier, {true})
   {
   }
 
@@ -91,23 +118,23 @@ public:
     static_assert(0 < T::loop_count, "T::loop_count must be greater than 0");
 
     T test;
-    if (!test.init())
+    if (!init_test_runner(test, m_params_shuttle))
       return false;
 
     performance_timer timer;
     timer.start();
     warm_up();
-    if (m_params.verbose)
+    if (m_core_params.verbose)
       std::cout << "Warm up: " << timer.elapsed_ms() << " ms" << std::endl;
 
     timer.start();
-    for (size_t i = 0; i < T::loop_count * m_params.loop_multiplier; ++i)
+    for (size_t i = 0; i < T::loop_count * m_core_params.loop_multiplier; ++i)
     {
-      if (m_params.stats)
+      if (m_core_params.stats)
         m_per_call_timers[i].resume();
       if (!test.test())
         return false;
-      if (m_params.stats)
+      if (m_core_params.stats)
         m_per_call_timers[i].pause();
     }
     m_elapsed = timer.elapsed_ms();
@@ -122,7 +149,7 @@ public:
   int time_per_call(int scale = 1) const
   {
     static_assert(0 < T::loop_count, "T::loop_count must be greater than 0");
-    return m_elapsed * scale / (T::loop_count * m_params.loop_multiplier);
+    return m_elapsed * scale / (T::loop_count * m_core_params.loop_multiplier);
   }
 
   uint64_t get_min() const { return m_stats->get_min(); }
@@ -156,19 +183,23 @@ private:
 private:
   volatile uint64_t m_warm_up;  ///<! This field is intended for preclude compiler optimizations
   int m_elapsed;
-  Params m_params;
+  Params m_core_params;
+  ParamsT m_params_shuttle;
   std::vector<tools::PerformanceTimer> m_per_call_timers;
   std::unique_ptr<Stats<tools::PerformanceTimer, uint64_t>> m_stats;
 };
 
-template <typename T>
-void run_test(const std::string &filter, Params &params, const char* test_name)
+template <typename T, typename ParamsT>
+void run_test(const std::string &filter, ParamsT &params_shuttle, const char* test_name)
 {
+  static_assert(std::is_base_of<ParamsShuttle, ParamsT>::value, "Must use a ParamsShuttle.");
+  Params &params = params_shuttle.core_params;
+
   boost::smatch match;
   if (!filter.empty() && !boost::regex_match(std::string(test_name), match, boost::regex(filter)))
     return;
 
-  test_runner<T> runner(params);
+  test_runner<T, ParamsT> runner(params_shuttle);
   if (runner.run())
   {
     if (params.verbose)
