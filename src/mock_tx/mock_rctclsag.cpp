@@ -68,6 +68,48 @@ bool balance_check(const rct::keyV &commitment_set1, const rct::keyV &commitment
     return rct::equalKeys(rct::addKeys(commitment_set1), rct::addKeys(commitment_set2));
 }
 //-----------------------------------------------------------------
+static std::size_t compute_rangeproof_grouping_size(const std::size_t num_amounts, const std::size_t max_num_splits)
+{
+    // if there are 'n' amounts, split them into power-of-2 groups up to 'max num splits' times
+    // n = 7, split = 1: [4, 3]
+    // n = 7, split = 2: [2, 2, 2, 1]
+    // n = 11, split = 1: [8, 3]
+    // n = 11, split = 2: [4, 4, 3]
+
+    std::size_t split_size{num_amounts};
+    std::size_t rangeproof_splits{max_num_splits};
+
+    while (rangeproof_splits > 0)
+    {
+        // if split size isn't a power of 2, then the split is [power of 2, remainder]
+        // - this can only occur the first passthrough
+        std::size_t last_bit_pos{0};
+        std::size_t temp_size{split_size};
+
+        while (temp_size)
+        {
+            temp_size = temp_size >> 1;
+            ++last_bit_pos;
+        }
+
+        if ((1 << (last_bit_pos - 1)) == split_size)
+            split_size = split_size >> 1;
+        else
+            split_size = (1 << (last_bit_pos - 1));
+
+        // min split size is 1
+        if (split_size <= 1)
+        {
+            split_size = 1;
+            break;
+        }
+
+        --rangeproof_splits;
+    }
+
+    return split_size;
+}
+//-----------------------------------------------------------------
 MockCLSAGENoteImage MockTxCLSAGInput::to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const
 {
     MockCLSAGENoteImage image;
@@ -330,55 +372,26 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
     // - for output amount commitments
 
     // get number of amounts to aggregate in each proof
-    std::size_t split_size = output_amounts.size();
-    std::size_t rangeproof_splits = max_rangeproof_splits;
-
-    while (rangeproof_splits > 0)
-    {
-        // if split size isn't a power of 2, then the split is [power of 2, remainder]
-        // - this can only occur the first passthrough
-        std::size_t last_bit_pos{0};
-        std::size_t temp_size{split_size};
-
-        while (temp_size)
-        {
-            temp_size = temp_size >> 1;
-            ++last_bit_pos;
-        }
-
-        if ((1 << (last_bit_pos - 1)) == split_size)
-            split_size = split_size >> 1;
-        else
-            split_size = (1 << (last_bit_pos - 1));
-
-        // min split size is 1
-        if (split_size <= 1)
-        {
-            split_size = 1;
-            break;
-        }
-
-        --rangeproof_splits;
-    }
+    std::size_t split_size{compute_rangeproof_grouping_size(output_amounts.size(), max_rangeproof_splits)};
 
     // make the range proofs
     for (std::size_t output_index{0}; output_index < output_amounts.size(); output_index += split_size)
     {
-        std::vector<rct::xmr_amount> output_amounts_temp;
-        std::vector<rct::key> output_amount_commitment_blinding_factors_temp;
-        output_amounts_temp.reserve(split_size);
-        output_amount_commitment_blinding_factors_temp.reserve(split_size);
+        std::vector<rct::xmr_amount> output_amounts_group;
+        std::vector<rct::key> output_amount_commitment_blinding_factors_group;
+        output_amounts_group.reserve(split_size);
+        output_amount_commitment_blinding_factors_group.reserve(split_size);
 
         for (std::size_t chunk_index{output_index};
             chunk_index < (output_index + split_size) && chunk_index < output_amounts.size();
             ++chunk_index)
         {
-            output_amounts_temp.emplace_back(output_amounts[chunk_index]);
-            output_amount_commitment_blinding_factors_temp.emplace_back(output_amount_commitment_blinding_factors[chunk_index]);
+            output_amounts_group.emplace_back(output_amounts[chunk_index]);
+            output_amount_commitment_blinding_factors_group.emplace_back(output_amount_commitment_blinding_factors[chunk_index]);
         }
 
         m_range_proofs.emplace_back(
-            rct::bulletproof_plus_PROVE(output_amounts_temp, output_amount_commitment_blinding_factors_temp));
+            rct::bulletproof_plus_PROVE(output_amounts_group, output_amount_commitment_blinding_factors_group));
     }
 
 
