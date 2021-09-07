@@ -121,6 +121,9 @@ int main(int argc, char** argv)
   // input/output counts
   std::vector<std::size_t> in_out_counts{1, 2, 4, 7, 12, 16};
 
+  // range proof splitting
+  std::vector<std::size_t> rangeproof_splits{/*0, 1,*/ 2, 3, 4};
+
   // ref set: n^m
   std::vector<std::size_t> ref_set_decomp_n{2, 3, 4, 6, 9};
   std::vector<std::size_t> ref_set_decomp_m_limit{12, 7, 6, 5, 4};
@@ -131,7 +134,10 @@ int main(int argc, char** argv)
 
   for (const auto batch_size : batch_sizes) {
   for (const auto in_count : in_out_counts) {
-  for (const auto out_count :in_out_counts) {
+  for (const auto out_count : in_out_counts) {
+  for (const auto rangeproof_split : rangeproof_splits) {
+    if (rangeproof_split > out_count/2)
+      continue;
   for (std::size_t n_index{0}; n_index < ref_set_decomp_n.size(); ++n_index)
   {
     std::size_t m_start;
@@ -148,6 +154,7 @@ int main(int argc, char** argv)
       p_mock_tx.out_count = out_count;
       p_mock_tx.n = ref_set_decomp_n[n_index];
       p_mock_tx.m = m;
+      p_mock_tx.num_rangeproof_splits = rangeproof_split;
 
       // only perf test 2-series decomposition for tx protocols that are unaffected by decomposition
       if (ref_set_decomp_n[n_index] == 2)
@@ -158,7 +165,7 @@ int main(int argc, char** argv)
       }
     }
   }
-  }}}
+  }}}}
 
 
 
@@ -320,6 +327,17 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE1(filter, p, test_range_proof, true);
   TEST_PERFORMANCE1(filter, p, test_range_proof, false);
 
+  // 16 amounts
+  // 1 proof - 16 amounts
+  TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, true, 16);
+  // 16 proofs - 1 amount
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 1, 1, 1, 0, 16);
+
+  // 1 proof - 32 amounts
+  TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, true, 32);
+  // 2 proofs - 16 amounts
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 16, 1, 1, 0, 2);
+
   TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, true, 1); // 1 bulletproof_plus with 1 amount
   TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, false, 1);
 
@@ -339,6 +357,9 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 1, 8, 1, 1, 4); // 32 proofs, with 1, 2, 3, 4 amounts, 8 of each
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, false, 2, 1, 1, 0, 64);
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 2, 1, 1, 0, 64); // 64 proof, each with 2 amounts
+
+  // 16 inputs
+  TEST_PERFORMANCE4(filter, p, test_triptych, 2, 7, 2, 16);
 
   TEST_PERFORMANCE4(filter, p, test_triptych, 2, 2, 2, 2);
   TEST_PERFORMANCE4(filter, p, test_triptych, 2, 3, 2, 2);
