@@ -46,10 +46,11 @@ enum class TestType
 
 struct MockTxGenData
 {
-  std::size_t ref_set_size;
+  std::size_t ref_set_size{1};
   std::vector<rct::xmr_amount> input_amounts;
   std::vector<rct::xmr_amount> output_amounts;
-  TestType expected_result;
+  TestType expected_result{TestType::ExpectTrue};
+  std::size_t num_rangeproof_splits{0};
 };
 
 void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
@@ -65,7 +66,7 @@ void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
       auto destinations{mock_tx::gen_mock_tx_clsag_dests(gen.output_amounts)};
 
       // make tx
-      mock_tx::MockTxCLSAG tx{inputs, destinations};
+      mock_tx::MockTxCLSAG tx{inputs, destinations, gen.num_rangeproof_splits};
 
       // validate tx
       EXPECT_TRUE(tx.validate());
@@ -97,7 +98,11 @@ void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
       auto destinations{mock_tx::gen_mock_tx_clsag_dests(gen.output_amounts)};
 
       // make tx to validate
-      txs_to_verify.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations));
+      txs_to_verify.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations, gen.num_rangeproof_splits));
+
+      // sanity check that rangeproof split is actually splitting the rangeproof
+      if (gen.num_rangeproof_splits > 0 && gen.output_amounts.size() > 1)
+        EXPECT_TRUE(txs_to_verify.back()->get_range_proofs().size() > 1);
     }
     catch (...)
     {
@@ -108,7 +113,7 @@ void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
   try
   {
     // validate tx
-    EXPECT_TRUE(mock_tx::validate_mock_tx(txs_to_verify));
+    EXPECT_TRUE(mock_tx::validate_mock_txs(txs_to_verify));
   }
   catch (...)
   {
@@ -220,8 +225,25 @@ TEST(mock_tx_batching, clsag)
     gen.ref_set_size = 10;  
   }
 
+  /// 3 tx, 11 inputs/outputs each, range proofs split x3
+  std::vector<MockTxGenData> gen_data_split;
+  gen_data_split.resize(3);
+
+  for (auto &gen : gen_data_split)
+  {
+    for (int i{0}; i < 11; ++i)
+    {
+      gen.input_amounts.push_back(2);
+      gen.output_amounts.push_back(2);
+    }
+
+    gen.ref_set_size = 10;  
+    gen.num_rangeproof_splits = 3;
+  }
+
   /// run tests
   run_mock_tx_test_batch(gen_data);
+  run_mock_tx_test_batch(gen_data_split);
 }
 
 

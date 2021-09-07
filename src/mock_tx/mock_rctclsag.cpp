@@ -204,10 +204,10 @@ std::vector<MockTxCLSAGDest> gen_mock_tx_clsag_dests(const std::vector<rct::xmr_
     return destinations;
 }
 //-----------------------------------------------------------------
-bool validate_mock_tx(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
+bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
 {
     std::vector<const rct::BulletproofPlus*> range_proofs;
-    range_proofs.reserve(txs_to_validate.size());
+    range_proofs.reserve(txs_to_validate.size()*10);
 
     for (const auto &tx : txs_to_validate)
     {
@@ -216,7 +216,8 @@ bool validate_mock_tx(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_va
             return false;
 
         // gather range proofs
-        range_proofs.push_back(&(tx->get_range_proof()));
+        for (const auto &range_proof : tx->get_range_proofs())
+            range_proofs.push_back(&range_proof);
     }
 
     // batch verify range proofs
@@ -227,7 +228,8 @@ bool validate_mock_tx(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_va
 }
 //-----------------------------------------------------------------
 MockTxCLSAG::MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-    const std::vector<MockTxCLSAGDest> &destinations)
+    const std::vector<MockTxCLSAGDest> &destinations,
+    const std::size_t max_rangeproof_splits)
 {
     CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any destinations.");
     CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() > 0, "Tried to make tx without any inputs.");
@@ -259,11 +261,12 @@ MockTxCLSAG::MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
             "Tried to make tx with an input that has a malformed real spend index.");
     }
 
-    make_tx(inputs_to_spend, destinations);
+    make_tx(inputs_to_spend, destinations, max_rangeproof_splits);
 }
 //-----------------------------------------------------------------
 void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-    const std::vector<MockTxCLSAGDest> &destinations)
+    const std::vector<MockTxCLSAGDest> &destinations,
+    const std::size_t max_rangeproof_splits)
 {
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() == 0, "Tried to make tx when tx already exists.");
 
@@ -325,7 +328,58 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
 
     /// range proofs
     // - for output amount commitments
-    m_range_proof = rct::bulletproof_plus_PROVE(output_amounts, output_amount_commitment_blinding_factors);
+
+    // get number of amounts to aggregate in each proof
+    std::size_t split_size = output_amounts.size();
+    std::size_t rangeproof_splits = max_rangeproof_splits;
+
+    while (rangeproof_splits > 0)
+    {
+        // if split size isn't a power of 2, then the split is [power of 2, remainder]
+        // - this can only occur the first passthrough
+        std::size_t last_bit_pos{0};
+        std::size_t temp_size{split_size};
+
+        while (temp_size)
+        {
+            temp_size = temp_size >> 1;
+            ++last_bit_pos;
+        }
+
+        if ((1 << (last_bit_pos - 1)) == split_size)
+            split_size = split_size >> 1;
+        else
+            split_size = (1 << (last_bit_pos - 1));
+
+        // min split size is 1
+        if (split_size <= 1)
+        {
+            split_size = 1;
+            break;
+        }
+
+        --rangeproof_splits;
+    }
+
+    // make the range proofs
+    for (std::size_t output_index{0}; output_index < output_amounts.size(); output_index += split_size)
+    {
+        std::vector<rct::xmr_amount> output_amounts_temp;
+        std::vector<rct::key> output_amount_commitment_blinding_factors_temp;
+        output_amounts_temp.reserve(split_size);
+        output_amount_commitment_blinding_factors_temp.reserve(split_size);
+
+        for (std::size_t chunk_index{output_index};
+            chunk_index < (output_index + split_size) && chunk_index < output_amounts.size();
+            ++chunk_index)
+        {
+            output_amounts_temp.emplace_back(output_amounts[chunk_index]);
+            output_amount_commitment_blinding_factors_temp.emplace_back(output_amount_commitment_blinding_factors[chunk_index]);
+        }
+
+        m_range_proofs.emplace_back(
+            rct::bulletproof_plus_PROVE(output_amounts_temp, output_amount_commitment_blinding_factors_temp));
+    }
 
 
     /// membership + ownership/unspentness proofs
@@ -370,10 +424,18 @@ bool MockTxCLSAG::validate(const bool defer_batchable) const
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to validate tx that has no outputs.");
     CHECK_AND_ASSERT_THROW_MES(m_input_images.size() > 0, "Tried to validate tx that has no input images.");
     CHECK_AND_ASSERT_THROW_MES(m_tx_proofs.size() > 0, "Tried to validate tx that has no input proofs.");
-    CHECK_AND_ASSERT_THROW_MES(m_range_proof.V.size() > 0, "Tried to validate tx that has no range proofs.");
+    CHECK_AND_ASSERT_THROW_MES(m_range_proofs.size() > 0, "Tried to validate tx that has no range proofs.");
+    CHECK_AND_ASSERT_THROW_MES(m_range_proofs[0].V.size() > 0, "Tried to validate tx that has no range proofs.");
 
     /// there must be the correct number of proofs
-    if (m_tx_proofs.size() != m_input_images.size() || m_range_proof.V.size() != m_outputs.size())
+    if (m_tx_proofs.size() != m_input_images.size())
+        return false;
+
+    std::size_t num_rangeproofed_commitments{0};
+    for (const auto &range_proof : m_range_proofs)
+        num_rangeproofed_commitments += range_proof.V.size();
+
+    if (num_rangeproofed_commitments != m_outputs.size())
         return false;
 
 
@@ -414,12 +476,20 @@ bool MockTxCLSAG::validate(const bool defer_batchable) const
     for (const auto &input_image : m_input_images)
         pseudo_commitments.emplace_back(rct::pk2rct(input_image.m_pseudo_amount_commitment));
 
+    std::size_t range_proof_index{0};
+    std::size_t range_proof_grouping_size = m_range_proofs[0].V.size();
+
     for (std::size_t output_index{0}; output_index < m_outputs.size(); ++output_index)
     {
         output_commitments.emplace_back(rct::pk2rct(m_outputs[output_index].m_amount_commitment));
 
         // double check that the two stored copies of output commitments match
-        if (m_outputs[output_index].m_amount_commitment != rct::rct2pk(rct::scalarmult8(m_range_proof.V[output_index])))
+        if (m_range_proofs[range_proof_index].V.size() == output_index - range_proof_index*range_proof_grouping_size)
+            ++range_proof_index;
+
+        if (m_outputs[output_index].m_amount_commitment !=
+                rct::rct2pk(rct::scalarmult8(m_range_proofs[range_proof_index].V[output_index -
+                    range_proof_index*range_proof_grouping_size])))
             return false;
     }
 
@@ -431,7 +501,13 @@ bool MockTxCLSAG::validate(const bool defer_batchable) const
     /// check range proof on output enotes
     if (!defer_batchable)
     {
-        if (!rct::bulletproof_plus_VERIFY(m_range_proof))
+        std::vector<const rct::BulletproofPlus*> range_proofs;
+        range_proofs.reserve(m_range_proofs.size());
+
+        for (const auto &range_proof : m_range_proofs)
+            range_proofs.push_back(&range_proof);
+
+        if (!rct::bulletproof_plus_VERIFY(range_proofs))
             return false;
     }
 
@@ -463,7 +539,8 @@ std::size_t MockTxCLSAG::get_size_bytes() const
     size += m_input_images.size() * MockCLSAGENoteImage::get_size_bytes();
     size += m_outputs.size() * MockCLSAGENote::get_size_bytes();
     // note: ignore the amount commitment set stored in the rangee proof, they are double counted by the output set
-    size += 32 * (6 + m_range_proof.L.size() + m_range_proof.R.size());
+    for (const auto &range_proof : m_range_proofs)
+        size += 32 * (6 + range_proof.L.size() + range_proof.R.size());
 
     if (m_tx_proofs.size())
         // note: ignore the key image stored in the clsag, it is double counted by the input's MockCLSAGENoteImage struct

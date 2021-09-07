@@ -65,7 +65,7 @@ namespace rct
 
     // Proof bounds
     static constexpr size_t maxN = 64; // maximum number of bits in range
-    static constexpr size_t maxM = BULLETPROOF_MAX_OUTPUTS; // maximum number of outputs to aggregate into a single proof
+    static constexpr size_t maxM = BULLETPROOF_MAX_OUTPUTS*2; // maximum number of outputs to aggregate into a single proof
 
     // Cached public generators
     static rct::key Hi[maxN*maxM], Gi[maxN*maxM];

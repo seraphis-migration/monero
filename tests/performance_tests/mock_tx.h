@@ -39,11 +39,13 @@
 
 struct ParamsShuttleMockTx final : public ParamsShuttle
 {
-    std::size_t batch_size;
-    std::size_t in_count;
-    std::size_t out_count;
-    std::size_t n;
-    std::size_t m;
+    std::size_t batch_size{1};
+    std::size_t in_count{1};
+    std::size_t out_count{1};
+    // ref set size: n^m
+    std::size_t n{2};
+    std::size_t m{0};
+    std::size_t num_rangeproof_splits{0};
 };
 
 class test_mock_tx
@@ -99,7 +101,7 @@ class test_mock_tx
                     auto destinations{mock_tx::gen_mock_tx_clsag_dests(output_amounts)};
 
                     // make tx
-                    m_txs.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations));
+                    m_txs.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations, params.num_rangeproof_splits));
                 }
                 catch (...)
                 {
@@ -109,11 +111,14 @@ class test_mock_tx
 
             // report tx info
             if (params.batch_size == 1)
+            {
                 std::cout << "Size (bytes): " << m_txs.back()->get_size_bytes() << " || "
                           << "batch size: " << params.batch_size << " || "
                           << "inputs: " << params.in_count << " || "
                           << "outputs: " << params.out_count << " || "
+                          << "rangeproof split: " << params.num_rangeproof_splits << " || "
                           << "ref set size (" << params.n << "^" << params.m << "): " << ref_set_size << '\n';
+            }
 
             return true;
         }
@@ -122,7 +127,7 @@ class test_mock_tx
         {
             try
             {
-                return mock_tx::validate_mock_tx(m_txs);
+                return mock_tx::validate_mock_txs(m_txs);
             }
             catch (...)
             {

@@ -38,6 +38,7 @@
 //third party headers
 
 //standard headers
+#include <memory>
 #include <vector>
 
 //forward declarations
@@ -130,7 +131,8 @@ public:
 
     // normal constructor: new tx
     MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-        const std::vector<MockTxCLSAGDest> &destinations);
+        const std::vector<MockTxCLSAGDest> &destinations,
+        const std::size_t max_rangeproof_splits);
 
     // normal constructor: from existing tx byte blob
     //mock tx doesn't do this
@@ -146,14 +148,15 @@ public:
     std::size_t get_size_bytes() const;
 
     // get range proof
-    const rct::BulletproofPlus& get_range_proof() const {return m_range_proof;}
+    const std::vector<rct::BulletproofPlus>& get_range_proofs() const {return m_range_proofs;}
 
     //get_tx_byte_blob()
 
 private:
     // make a transaction
     void make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-        const std::vector<MockTxCLSAGDest> &destinations);
+        const std::vector<MockTxCLSAGDest> &destinations,
+        const std::size_t max_rangeproof_splits);
 
 //member variables
     // tx input images  (spent e-notes)
@@ -161,15 +164,15 @@ private:
     // tx outputs (new e-notes)
     std::vector<MockCLSAGENote> m_outputs;
 
-    // range proof
-    rct::BulletproofPlus m_range_proof;
+    // range proofs
+    std::vector<rct::BulletproofPlus> m_range_proofs;
 
     // CLSAGs proving membership/ownership/unspentness for each input
     std::vector<MockCLSAGProof> m_tx_proofs;
 };
 
 // validate a set of mock tx
-bool validate_mock_tx(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate);
+bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate);
 
 } //namespace mock_tx
 
