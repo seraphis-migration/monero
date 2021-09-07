@@ -83,8 +83,9 @@ struct ParamsShuttle
 
 template <typename T, typename ParamsT,
   typename std::enable_if<!std::is_same<ParamsT, ParamsShuttle>::value, bool>::type = true>
-bool init_test_runner(T &test, ParamsT params_shuttle)
+bool init_test(T &test, ParamsT &params_shuttle)
 {
+  // assume if the params shuttle isn't the base shuttle type, then the test must take the shuttle as an input on init
   if (!test.init(params_shuttle))
     return false;
 
@@ -93,7 +94,7 @@ bool init_test_runner(T &test, ParamsT params_shuttle)
 
 template <typename T, typename ParamsT,
   typename std::enable_if<std::is_same<ParamsT, ParamsShuttle>::value, bool>::type = true>
-bool init_test_runner(T &test, ParamsT params_shuttle)
+bool init_test(T &test, ParamsT &params_shuttle)
 {
   if (!test.init())
     return false;
@@ -118,7 +119,7 @@ public:
     static_assert(0 < T::loop_count, "T::loop_count must be greater than 0");
 
     T test;
-    if (!init_test_runner(test, m_params_shuttle))
+    if (!init_test(test, m_params_shuttle))
       return false;
 
     performance_timer timer;

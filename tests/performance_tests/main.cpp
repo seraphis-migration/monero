@@ -116,13 +116,13 @@ int main(int argc, char** argv)
 
 
   // max number of tx to batch validate
-  std::vector<std::size_t> batch_sizes{1, 2, 4, 7, 11};
+  std::vector<std::size_t> batch_sizes{1, 2, 4, 7, 11, 25};
 
   // input/output counts
   std::vector<std::size_t> in_out_counts{1, 2, 4, 7, 12, 16};
 
   // range proof splitting
-  std::vector<std::size_t> rangeproof_splits{/*0, 1,*/ 2, 3, 4};
+  std::vector<std::size_t> rangeproof_splits{0, 1, 2, 3, 4};
 
   // ref set: n^m
   std::vector<std::size_t> ref_set_decomp_n{2, 3, 4, 6, 9};
@@ -134,21 +134,19 @@ int main(int argc, char** argv)
 
   for (const auto batch_size : batch_sizes) {
   for (const auto in_count : in_out_counts) {
-  for (const auto out_count : in_out_counts) {
-  for (const auto rangeproof_split : rangeproof_splits) {
-    if (rangeproof_split > out_count/2)
-      continue;
-  for (std::size_t n_index{0}; n_index < ref_set_decomp_n.size(); ++n_index)
-  {
+  for (std::size_t n_index{0}; n_index < ref_set_decomp_n.size(); ++n_index) {
     std::size_t m_start;
 
     if (ref_set_decomp_n[n_index] == 2)
       m_start = 0;
     else
       m_start = 2;
+  for (std::size_t m{m_start}; m <= ref_set_decomp_m_limit[n_index]; ++m) {
+  for (const auto out_count : in_out_counts) {
+  for (const auto rangeproof_split : rangeproof_splits) {
+    if (rangeproof_split > out_count/2)
+      continue;
 
-    for (std::size_t m{m_start}; m <= ref_set_decomp_m_limit[n_index]; ++m)
-    {
       p_mock_tx.batch_size = batch_size;
       p_mock_tx.in_count = in_count;
       p_mock_tx.out_count = out_count;
@@ -163,9 +161,7 @@ int main(int argc, char** argv)
         if (m <= 8)
           TEST_PERFORMANCE0(filter, p_mock_tx, test_mock_tx);
       }
-    }
-  }
-  }}}}
+  }}}}}}
 
 
 
@@ -337,6 +333,18 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, true, 32);
   // 2 proofs - 16 amounts
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 16, 1, 1, 0, 2);
+
+  // batching vs aggregating
+  // 5 proofs - 16 amounts
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 16, 1, 1, 0, 5);
+  // 10 proofs - 8 amounts
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 8, 1, 1, 0, 10);
+  // 20 proofs - 4 amounts
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 4, 1, 1, 0, 20);
+  // 40 proofs - 2 amounts
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 2, 1, 1, 0, 40);
+  // 80 proofs - 1 amount
+  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 1, 1, 1, 0, 80);
 
   TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, true, 1); // 1 bulletproof_plus with 1 amount
   TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, false, 1);
