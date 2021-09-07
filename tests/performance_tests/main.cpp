@@ -115,6 +115,8 @@ int main(int argc, char** argv)
   timer.start();
 
 
+  /// mock tx performance tests
+
   // max number of tx to batch validate
   std::vector<std::size_t> batch_sizes{1, 2, 4, 7, 11, 25};
 
@@ -147,31 +149,24 @@ int main(int argc, char** argv)
     if (rangeproof_split > out_count/2)
       continue;
 
-      p_mock_tx.batch_size = batch_size;
-      p_mock_tx.in_count = in_count;
-      p_mock_tx.out_count = out_count;
-      p_mock_tx.n = ref_set_decomp_n[n_index];
-      p_mock_tx.m = m;
-      p_mock_tx.num_rangeproof_splits = rangeproof_split;
+    p_mock_tx.batch_size = batch_size;
+    p_mock_tx.in_count = in_count;
+    p_mock_tx.out_count = out_count;
+    p_mock_tx.n = ref_set_decomp_n[n_index];
+    p_mock_tx.m = m;
+    p_mock_tx.num_rangeproof_splits = rangeproof_split;
 
-      // only perf test 2-series decomposition for tx protocols that are unaffected by decomposition
-      if (ref_set_decomp_n[n_index] == 2)
-      {
-        // limit CLSAG to 2^8
-        if (m <= 8)
-          TEST_PERFORMANCE0(filter, p_mock_tx, test_mock_tx);
-      }
+    // only perf test 2-series decomposition for tx protocols that are unaffected by decomposition
+    if (ref_set_decomp_n[n_index] == 2)
+    {
+      // limit CLSAG to 2^8
+      if (m <= 8)
+        TEST_PERFORMANCE0(filter, p_mock_tx, test_mock_tx);
+    }
   }}}}}}
 
 
-
-
-
-
-
-
-
-
+  /*
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 1, 1);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 1, 1);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 1, 1);
@@ -322,6 +317,7 @@ int main(int argc, char** argv)
 
   TEST_PERFORMANCE1(filter, p, test_range_proof, true);
   TEST_PERFORMANCE1(filter, p, test_range_proof, false);
+  */
 
   // 16 amounts
   // 1 proof - 16 amounts
@@ -397,6 +393,7 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, false, 2, 1, 1, 0, 64);
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 2, 1, 1, 0, 64); // 64 proof, each with 2 amounts
 
+  /*
   TEST_PERFORMANCE1(filter, p, test_crypto_ops, op_sc_add);
   TEST_PERFORMANCE1(filter, p, test_crypto_ops, op_sc_sub);
   TEST_PERFORMANCE1(filter, p, test_crypto_ops, op_sc_mul);
@@ -461,7 +458,9 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE2(filter, p, test_multiexp, multiexp_straus_cached, 1024);
   TEST_PERFORMANCE2(filter, p, test_multiexp, multiexp_straus_cached, 2048);
   TEST_PERFORMANCE2(filter, p, test_multiexp, multiexp_straus_cached, 4096);
+  */
 
+  /*
 #if 1
   TEST_PERFORMANCE3(filter, p, test_multiexp, multiexp_pippenger, 2, 1);
   TEST_PERFORMANCE3(filter, p, test_multiexp, multiexp_pippenger, 4, 2);
@@ -706,6 +705,7 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE3(filter, p, test_multiexp, multiexp_pippenger, 4096, 8);
   TEST_PERFORMANCE3(filter, p, test_multiexp, multiexp_pippenger, 4096, 9);
 #endif
+  */
 
   std::cout << "Tests finished. Elapsed time: " << timer.elapsed_ms() / 1000 << " sec" << std::endl;
 
