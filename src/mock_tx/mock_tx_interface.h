@@ -159,7 +159,7 @@ public:
         const std::vector<MockDest<MockTxType>> &destinations,
         const MockTxParamPack<MockTxType> &param_pack)
     {
-        validate_and_make_tx(inputs_to_spend, destinations, param_pack);
+        make_tx(inputs_to_spend, destinations, param_pack);
     }
 
     // normal constructor: from existing tx byte blob
@@ -179,7 +179,7 @@ public:
 
 private:
     // validate and make a transaction
-    virtual void validate_and_make_tx(const std::vector<MockInput<MockTxType>> &inputs_to_spend,
+    virtual void make_tx(const std::vector<MockInput<MockTxType>> &inputs_to_spend,
         const std::vector<MockDest<MockTxType>> &destinations,
         const MockTxParamPack<MockTxType> &param_pack) = 0;
 

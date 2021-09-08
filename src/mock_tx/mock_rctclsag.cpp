@@ -121,7 +121,7 @@ std::vector<MockTxCLSAGInput> gen_mock_tx_inputs(const std::vector<rct::xmr_amou
                 // add random enote
                 else
                 {
-                    // make an enote at m_input_ref_set[ref_index]
+                    // generate a random enote at m_input_ref_set[ref_index]
                     gen_mock_tx_enote_rct(inputs[input_index].m_input_ref_set[ref_index]);
                 }
             }
@@ -148,57 +148,20 @@ std::vector<MockTxCLSAGDest> gen_mock_tx_dests(const std::vector<rct::xmr_amount
     return destinations;
 }
 //-----------------------------------------------------------------
-void MockTxCLSAG::validate_and_make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-        const std::vector<MockTxCLSAGDest> &destinations,
-        const MockTxParamPack<MockTxCLSAG> &param_pack)
-{
-    CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any destinations.");
-    CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() > 0, "Tried to make tx without any inputs.");
-
-    // amounts must balance
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(inputs_to_spend, destinations),
-        "Tried to make tx with unbalanced amounts.");
-
-    // validate inputs
-    std::size_t ref_set_size{inputs_to_spend[0].m_input_ref_set.size()};
-
-    for (const auto &input : inputs_to_spend)
-    {
-        // inputs must have same number of ring members
-        CHECK_AND_ASSERT_THROW_MES(ref_set_size == input.m_input_ref_set.size(),
-            "Tried to make tx with inputs that don't have the same input reference set sizes.");
-
-        // input real spend indices must not be malformed
-        CHECK_AND_ASSERT_THROW_MES(input.m_input_ref_set_real_index < input.m_input_ref_set.size(),
-            "Tried to make tx with an input that has a malformed real spend index.");
-    }
-
-    make_tx(inputs_to_spend, destinations, param_pack.max_rangeproof_splits);
-}
-//-----------------------------------------------------------------
-void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+void MockTxCLSAG::make_tx_transfers(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
     const std::vector<MockTxCLSAGDest> &destinations,
-    const std::size_t max_rangeproof_splits)
+    std::vector<rct::xmr_amount> &output_amounts,
+    std::vector<rct::key> &output_amount_commitment_blinding_factors,
+    std::vector<crypto::secret_key> &pseudo_blinding_factors)
 {
-    CHECK_AND_ASSERT_THROW_MES(m_outputs.size() == 0, "Tried to make tx when tx already exists.");
-
-    /// prepare tx
-    m_outputs.clear();
-    m_input_images.clear();
-    m_tx_proofs.clear();
-    m_outputs.reserve(destinations.size());
-    m_input_images.reserve(inputs_to_spend.size());
-    m_tx_proofs.reserve(inputs_to_spend.size());
-
-
-    /// balance proof
-    // - blinding factors need to balance
+    // note: blinding factors need to balance for balance proof
+    output_amounts.clear();
+    output_amount_commitment_blinding_factors.clear();
+    pseudo_blinding_factors.clear();
 
     // 1. get aggregate blinding factor of outputs
     crypto::secret_key sum_output_blinding_factors = rct::rct2sk(rct::zero());
 
-    std::vector<rct::xmr_amount> output_amounts;
-    std::vector<rct::key> output_amount_commitment_blinding_factors;
     output_amounts.reserve(destinations.size());
     output_amount_commitment_blinding_factors.reserve(destinations.size());
 
@@ -216,7 +179,6 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
     }
 
     // 2. create all but last input image with random pseudo blinding factor
-    std::vector<crypto::secret_key> pseudo_blinding_factors;
     pseudo_blinding_factors.resize(inputs_to_spend.size(), rct::rct2sk(rct::zero()));
 
     for (std::size_t input_index{0}; input_index + 1 < inputs_to_spend.size(); ++input_index)
@@ -236,8 +198,12 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
     //    sum(output blinding factors) - sum(input image blinding factors)_except_last
     m_input_images.emplace_back(inputs_to_spend.back().to_enote_image(sum_output_blinding_factors));
     pseudo_blinding_factors.back() = sum_output_blinding_factors;
-
-
+}
+//-----------------------------------------------------------------
+void MockTxCLSAG::make_tx_rangeproofs(const std::vector<rct::xmr_amount> &output_amounts,
+    const std::vector<rct::key> &output_amount_commitment_blinding_factors,
+    const std::size_t max_rangeproof_splits)
+{
     /// range proofs
     // - for output amount commitments
 
@@ -263,8 +229,11 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         m_range_proofs.emplace_back(
             rct::bulletproof_plus_PROVE(output_amounts_group, output_amount_commitment_blinding_factors_group));
     }
-
-
+}
+//-----------------------------------------------------------------
+void MockTxCLSAG::make_tx_input_proofs(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+    const std::vector<crypto::secret_key> &pseudo_blinding_factors)
+{
     /// membership + ownership/unspentness proofs
     // - clsag for each input
     for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
@@ -302,7 +271,59 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
     }
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_semantics()
+void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+        const std::vector<MockTxCLSAGDest> &destinations,
+        const MockTxParamPack<MockTxCLSAG> &param_pack)
+{
+    /// validate inputs and prepare to make tx
+    CHECK_AND_ASSERT_THROW_MES(m_outputs.size() == 0, "Tried to make tx when tx already exists.");
+    CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any destinations.");
+    CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() > 0, "Tried to make tx without any inputs.");
+
+    // amounts must balance
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(inputs_to_spend, destinations),
+        "Tried to make tx with unbalanced amounts.");
+
+    // validate tx inputs
+    std::size_t ref_set_size{inputs_to_spend[0].m_input_ref_set.size()};
+
+    for (const auto &input : inputs_to_spend)
+    {
+        // inputs must have same number of ring members
+        CHECK_AND_ASSERT_THROW_MES(ref_set_size == input.m_input_ref_set.size(),
+            "Tried to make tx with inputs that don't have the same input reference set sizes.");
+
+        // input real spend indices must not be malformed
+        CHECK_AND_ASSERT_THROW_MES(input.m_input_ref_set_real_index < input.m_input_ref_set.size(),
+            "Tried to make tx with an input that has a malformed real spend index.");
+    }
+
+    /// prepare tx
+    m_outputs.clear();
+    m_input_images.clear();
+    m_tx_proofs.clear();
+    m_outputs.reserve(destinations.size());
+    m_input_images.reserve(inputs_to_spend.size());
+    m_tx_proofs.reserve(inputs_to_spend.size());
+
+    /// make tx
+    std::vector<rct::xmr_amount> output_amounts;
+    std::vector<rct::key> output_amount_commitment_blinding_factors;
+    std::vector<crypto::secret_key> pseudo_blinding_factors;
+
+    make_tx_transfers(inputs_to_spend,
+        destinations,
+        output_amounts,
+        output_amount_commitment_blinding_factors,
+        pseudo_blinding_factors);
+    make_tx_rangeproofs(output_amounts,
+        output_amount_commitment_blinding_factors,
+        param_pack.max_rangeproof_splits);
+    make_tx_input_proofs(inputs_to_spend,
+        pseudo_blinding_factors);
+}
+//-----------------------------------------------------------------
+bool MockTxCLSAG::validate_tx_semantics() const
 {
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to validate tx that has no outputs.");
     CHECK_AND_ASSERT_THROW_MES(m_input_images.size() > 0, "Tried to validate tx that has no input images.");
@@ -334,7 +355,7 @@ bool MockTxCLSAG::validate_tx_semantics()
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_linking_tags()
+bool MockTxCLSAG::validate_tx_linking_tags() const
 {
     /// input linking tags must be in the prime subgroup: KI = 8*[(1/8) * KI]
     // note: I cheat a bit here for the mock-up. The linking tags in the clsag_proof are not mul(1/8), but the
@@ -357,7 +378,7 @@ bool MockTxCLSAG::validate_tx_linking_tags()
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_amount_balance()
+bool MockTxCLSAG::validate_tx_amount_balance() const
 {
     /// check that amount commitments balance
     rct::keyV pseudo_commitments;
@@ -392,7 +413,7 @@ bool MockTxCLSAG::validate_tx_amount_balance()
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_rangeproofs(defer_batchable)
+bool MockTxCLSAG::validate_tx_rangeproofs(defer_batchable) const
 {
     /// check range proof on output enotes
     if (!defer_batchable)
@@ -410,7 +431,7 @@ bool MockTxCLSAG::validate_tx_rangeproofs(defer_batchable)
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_input_proofs()
+bool MockTxCLSAG::validate_tx_input_proofs() const
 {
     /// verify input membership/ownership/unspentness proofs
     for (std::size_t input_index{0}; input_index < m_input_images.size(); ++input_index)
