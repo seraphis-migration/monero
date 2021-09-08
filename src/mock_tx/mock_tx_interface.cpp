@@ -45,14 +45,14 @@ namespace mock_tx
 std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const std::size_t ref_set_decomp_m)
 {
     // ref set size = n^m
-    std::size_t ref_set_size;
+    std::size_t ref_set_size{ref_set_decomp_n};
 
-    if (params.n == 0 || params.m == 0)
+    if (ref_set_decomp_n == 0 || ref_set_decomp_m == 0)
         ref_set_size = 1;
     else
     {
-        for (std::size_t mul{1}; mul < params.m; ++mul)
-            ref_set_size *= params.n;
+        for (std::size_t mul{1}; mul < ref_set_decomp_m; ++mul)
+            ref_set_size *= ref_set_decomp_n;
     }
 
     return ref_set_size;

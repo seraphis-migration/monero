@@ -27,7 +27,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "crypto/crypto.h"
-#include "mock_rctclsag.h"
+#include "mock_tx/mock_rctclsag.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
@@ -60,13 +60,14 @@ void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
     try
     {
       // inputs
-      auto inputs{mock_tx::gen_mock_tx_clsag_inputs(gen.input_amounts, gen.ref_set_size)};
+      auto inputs{mock_tx::gen_mock_tx_inputs<mock_tx::MockTxCLSAG>(gen.input_amounts, gen.ref_set_size, 1)};
 
       // destinations
-      auto destinations{mock_tx::gen_mock_tx_clsag_dests(gen.output_amounts)};
+      auto destinations{mock_tx::gen_mock_tx_dests<mock_tx::MockTxCLSAG>(gen.output_amounts)};
 
       // make tx
-      mock_tx::MockTxCLSAG tx{inputs, destinations, gen.num_rangeproof_splits};
+      mock_tx::MockTxCLSAGParams tx_params{gen.num_rangeproof_splits};
+      mock_tx::MockTxCLSAG tx{inputs, destinations, tx_params};
 
       // validate tx
       EXPECT_TRUE(tx.validate());
@@ -92,13 +93,14 @@ void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
       expected_result = gen.expected_result;
 
       // inputs
-      auto inputs{mock_tx::gen_mock_tx_clsag_inputs(gen.input_amounts, gen.ref_set_size)};
+      auto inputs{mock_tx::gen_mock_tx_inputs<mock_tx::MockTxCLSAG>(gen.input_amounts, gen.ref_set_size, 1)};
 
       // destinations
-      auto destinations{mock_tx::gen_mock_tx_clsag_dests(gen.output_amounts)};
+      auto destinations{mock_tx::gen_mock_tx_dests<mock_tx::MockTxCLSAG>(gen.output_amounts)};
 
       // make tx to validate
-      txs_to_verify.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations, gen.num_rangeproof_splits));
+      mock_tx::MockTxCLSAGParams tx_params{gen.num_rangeproof_splits};
+      txs_to_verify.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations, tx_params));
 
       // sanity check that rangeproof split is actually splitting the rangeproof
       if (gen.num_rangeproof_splits > 0 && gen.output_amounts.size() > 1)

@@ -33,6 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 

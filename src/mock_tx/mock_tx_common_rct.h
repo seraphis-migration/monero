@@ -26,7 +26,7 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Mock tx: plain RingCTT common types/functions
+// Mock tx: plain RingCT common types/functions
 // NOT FOR PRODUCTION
 
 #pragma once
@@ -56,7 +56,7 @@ struct MockENoteRCT
     crypto::public_key m_enote_pubkey;
     rct::xmr_amount m_encoded_amount;
 
-    static virtual std::size_t get_size_bytes() {return 32*3 + 8;}
+    static std::size_t get_size_bytes() {return 32*3 + 8;}
 };
 
 struct MockENoteImageRCT
@@ -64,7 +64,7 @@ struct MockENoteImageRCT
     crypto::public_key m_pseudo_amount_commitment;
     crypto::key_image m_key_image;
 
-    static virtual std::size_t get_size_bytes() {return 32*2;}
+    static std::size_t get_size_bytes() {return 32*2;}
 };
 
 template <typename MockTxType>
