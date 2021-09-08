@@ -35,8 +35,8 @@
 #include "crypto/crypto.h"
 #include "crypto/crypto-ops.h"
 #include "device/device.hpp"
+#include "mock_tx_common_rct.h"
 #include "mock_tx_interface.h"
-#include "ringct/multiexp.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctSigs.h"
@@ -76,45 +76,7 @@ MockCLSAGENoteImage MockTxCLSAGInput::to_enote_image(const crypto::secret_key &p
 MockCLSAGENote MockTxCLSAGDest::to_enote() const
 {
     MockCLSAGENote enote;
-
-    enote.m_enote_pubkey = m_enote_pubkey;
-    enote.m_encoded_amount = m_encoded_amount;
-    enote.m_onetime_address = m_onetime_address;
-
-    // C = x G + a H
-    enote.m_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(m_amount_blinding_factor)));
-
-    return enote;
-}
-//-----------------------------------------------------------------
-MockCLSAGENote make_mock_tx_clsag_enote(const crypto::secret_key &onetime_privkey,
-    const crypto::secret_key &amount_blinding_factor, const rct::xmr_amount amount)
-{
-    MockCLSAGENote enote;
-
-    // Ko = ko G
-    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(onetime_privkey, enote.m_onetime_address),
-        "Failed to derive public key");
-
-    // C = x G + a H
-    enote.m_amount_commitment = rct::rct2pk(rct::commit(amount, rct::sk2rct(amount_blinding_factor)));
-
-    // memo: random
-    enote.m_enote_pubkey = rct::rct2pk(rct::pkGen());
-    enote.m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-
-    return enote;
-}
-//-----------------------------------------------------------------
-MockCLSAGENote gen_mock_tx_clsag_enote()
-{
-    MockCLSAGENote enote;
-
-    // all random
-    enote.m_onetime_address = rct::rct2pk(rct::pkGen());
-    enote.m_amount_commitment = rct::rct2pk(rct::pkGen());
-    enote.m_enote_pubkey = rct::rct2pk(rct::pkGen());
-    enote.m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+    MockDestRCT::to_enote_rct(enote);
 
     return enote;
 }
@@ -143,23 +105,24 @@ std::vector<MockTxCLSAGInput> gen_mock_tx_inputs(const std::vector<rct::xmr_amou
             inputs[input_index].m_amount = amounts[input_index];
 
             // construct reference set
-            inputs[input_index].m_input_ref_set.reserve(ref_set_size);
+            inputs[input_index].m_input_ref_set.resize(ref_set_size);
 
             for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
             {
                 // insert real input at \pi
                 if (ref_index == inputs[input_index].m_input_ref_set_real_index)
                 {
-                    inputs[input_index].m_input_ref_set.emplace_back(
-                            make_mock_tx_clsag_enote(inputs[input_index].m_onetime_privkey,
-                                    inputs[input_index].m_amount_blinding_factor,
-                                    inputs[input_index].m_amount)
-                        );
+                    // make an enote at m_input_ref_set[ref_index]
+                    make_mock_tx_enote_rct(inputs[input_index].m_onetime_privkey,
+                            inputs[input_index].m_amount_blinding_factor,
+                            inputs[input_index].m_amount,
+                            inputs[input_index].m_input_ref_set[ref_index]);
                 }
                 // add random enote
                 else
                 {
-                    inputs[input_index].m_input_ref_set.emplace_back(gen_mock_tx_clsag_enote());
+                    // make an enote at m_input_ref_set[ref_index]
+                    gen_mock_tx_enote_rct(inputs[input_index].m_input_ref_set[ref_index]);
                 }
             }
         }
@@ -178,39 +141,11 @@ std::vector<MockTxCLSAGDest> gen_mock_tx_dests(const std::vector<rct::xmr_amount
 
         for (std::size_t dest_index{0}; dest_index < amounts.size(); ++dest_index)
         {
-            // all random except amount
-            destinations[dest_index].m_onetime_address = rct::rct2pk(rct::pkGen());
-            destinations[dest_index].m_amount_blinding_factor = rct::rct2sk(rct::skGen());
-            destinations[dest_index].m_amount = amounts[dest_index];
-            destinations[dest_index].m_enote_pubkey = rct::rct2pk(rct::pkGen());
-            destinations[dest_index].m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+            gen_mock_tx_dest_rct(amounts[dest_index], destinations[dest_index]);
         }
     }
 
     return destinations;
-}
-//-----------------------------------------------------------------
-bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
-{
-    std::vector<const rct::BulletproofPlus*> range_proofs;
-    range_proofs.reserve(txs_to_validate.size()*10);
-
-    for (const auto &tx : txs_to_validate)
-    {
-        // validate unbatchable parts of tx
-        if (!tx->validate(true))
-            return false;
-
-        // gather range proofs
-        for (const auto &range_proof : tx->get_range_proofs())
-            range_proofs.push_back(&range_proof);
-    }
-
-    // batch verify range proofs
-    if (!rct::bulletproof_plus_VERIFY(range_proofs))
-        return false;
-
-    return true;
 }
 //-----------------------------------------------------------------
 void MockTxCLSAG::validate_and_make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
@@ -367,7 +302,7 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
     }
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate(const bool defer_batchable) const
+bool MockTxCLSAG::validate_tx_semantics()
 {
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to validate tx that has no outputs.");
     CHECK_AND_ASSERT_THROW_MES(m_input_images.size() > 0, "Tried to validate tx that has no input images.");
@@ -396,6 +331,11 @@ bool MockTxCLSAG::validate(const bool defer_batchable) const
             return false;
     }
 
+    return true;
+}
+//-----------------------------------------------------------------
+bool MockTxCLSAG::validate_tx_linking_tags()
+{
     /// input linking tags must be in the prime subgroup: KI = 8*[(1/8) * KI]
     // note: I cheat a bit here for the mock-up. The linking tags in the clsag_proof are not mul(1/8), but the
     //       tags in m_input_images are.
@@ -414,7 +354,11 @@ bool MockTxCLSAG::validate(const bool defer_batchable) const
     /// input linking tags must not exist in the blockchain
     //not implemented for mockup
 
-
+    return true;
+}
+//-----------------------------------------------------------------
+bool MockTxCLSAG::validate_tx_amount_balance()
+{
     /// check that amount commitments balance
     rct::keyV pseudo_commitments;
     rct::keyV output_commitments;
@@ -445,7 +389,11 @@ bool MockTxCLSAG::validate(const bool defer_batchable) const
     if (!balance_check_equality(pseudo_commitments, output_commitments))
         return false;
 
-
+    return true;
+}
+//-----------------------------------------------------------------
+bool MockTxCLSAG::validate_tx_rangeproofs(defer_batchable)
+{
     /// check range proof on output enotes
     if (!defer_batchable)
     {
@@ -459,7 +407,11 @@ bool MockTxCLSAG::validate(const bool defer_batchable) const
             return false;
     }
 
-
+    return true;
+}
+//-----------------------------------------------------------------
+bool MockTxCLSAG::validate_tx_input_proofs()
+{
     /// verify input membership/ownership/unspentness proofs
     for (std::size_t input_index{0}; input_index < m_input_images.size(); ++input_index)
     {
@@ -469,6 +421,26 @@ bool MockTxCLSAG::validate(const bool defer_batchable) const
                 rct::pk2rct(m_input_images[input_index].m_pseudo_amount_commitment)))
             return false;
     }
+
+    return true;
+}
+//-----------------------------------------------------------------
+bool MockTxCLSAG::validate(const bool defer_batchable) const
+{
+    if (!validate_tx_semantics())
+        return false;
+
+    if (!validate_tx_linking_tags())
+        return false;
+
+    if (!validate_tx_amount_balance())
+        return false;
+
+    if (!validate_tx_rangeproofs(defer_batchable))
+        return false;
+
+    if (!validate_tx_input_proofs())
+        return false;
 
     return true;
 }
@@ -495,6 +467,29 @@ std::size_t MockTxCLSAG::get_size_bytes() const
         size += m_tx_proofs.size() * (32 * (2 + m_tx_proofs[0].m_clsag_proof.s.size()));
 
     return size;
+}
+//-----------------------------------------------------------------
+bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
+{
+    std::vector<const rct::BulletproofPlus*> range_proofs;
+    range_proofs.reserve(txs_to_validate.size()*10);
+
+    for (const auto &tx : txs_to_validate)
+    {
+        // validate unbatchable parts of tx
+        if (!tx->validate(true))
+            return false;
+
+        // gather range proofs
+        for (const auto &range_proof : tx->get_range_proofs())
+            range_proofs.push_back(&range_proof);
+    }
+
+    // batch verify range proofs
+    if (!rct::bulletproof_plus_VERIFY(range_proofs))
+        return false;
+
+    return true;
 }
 //-----------------------------------------------------------------
 } //namespace mock_tx

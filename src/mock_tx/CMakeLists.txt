@@ -28,6 +28,7 @@
 
 set(mock_tx_sources
   mock_tx_interface.cpp
+  mock_tx_common_rct.cpp
   mock_rctclsag.cpp)
 
 monero_find_all_headers(mock_tx_headers, "${CMAKE_CURRENT_SOURCE_DIR}")

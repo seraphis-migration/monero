@@ -33,6 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "mock_tx_common_rct.h"
 #include "mock_tx_interface.h"
 #include "ringct/rctTypes.h"
 
@@ -51,55 +52,27 @@ namespace mock_tx
 class MockTxCLSAG;
 
 template <>
-struct MockENote<MockTxCLSAG>
-{
-    crypto::public_key m_onetime_address;
-    crypto::public_key m_amount_commitment;
-
-    // memo
-    crypto::public_key m_enote_pubkey;
-    rct::xmr_amount m_encoded_amount;
-
-    static std::size_t get_size_bytes() {return 32*3 + 8;}
-};
+struct MockENote<MockTxCLSAG> : public MockENoteRCT
+{};
 using MockCLSAGENote = MockENote<MockTxCLSAG>;
 
 template <>
-struct MockENoteImage<MockTxCLSAG>
-{
-    crypto::public_key m_pseudo_amount_commitment;
-    crypto::key_image m_key_image;
-
-    static std::size_t get_size_bytes() {return 32*2;}
-};
+struct MockENoteImage<MockTxCLSAG> : public MockENoteImageRCT
+{};
 using MockCLSAGENoteImage = MockENoteImage<MockTxCLSAG>;
 
 template <>
-struct MockInput<MockTxCLSAG>
+struct MockInput<MockTxCLSAG> : public MockInputRct<MockTxCLSAG>
 {
-    crypto::secret_key m_onetime_privkey;
-    crypto::secret_key m_amount_blinding_factor;
-    rct::xmr_amount m_amount;
-    std::vector<MockCLSAGENote> m_input_ref_set;
-    std::size_t m_input_ref_set_real_index;
-
     // convert this input to an e-note-image
     MockCLSAGENoteImage to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const;
 };
 using MockTxCLSAGInput = MockInput<MockTxCLSAG>;
 
 template <>
-struct MockDest<MockTxCLSAG>
+struct MockDest<MockTxCLSAG> : public MockDestRCT
 {
     // destination (for creating an e-note to send an amount to someone)
-
-    crypto::public_key m_onetime_address;
-    crypto::secret_key m_amount_blinding_factor;
-    rct::xmr_amount m_amount;
-
-    // for the memo
-    crypto::public_key m_enote_pubkey;
-    rct::xmr_amount m_encoded_amount;
 
     // convert this destination into an e-note
     MockCLSAGENote to_enote() const;
@@ -113,13 +86,6 @@ struct MockCLSAGProof final
     // vector of pairs <Ko_i, C_i> for referenced enotes
     rct::ctkeyV m_referenced_enotes_converted;
 };
-
-// create mock enote from known info
-MockCLSAGENote make_mock_tx_clsag_enote(const crypto::secret_key &onetime_privkey,
-    const crypto::secret_key &amount_blinding_factor, const rct::xmr_amount amount);
-
-// create random mock enote
-MockCLSAGENote gen_mock_tx_clsag_enote();
 
 // create random mock inputs
 // note: number of inputs implied by size of 'amounts'
@@ -180,6 +146,13 @@ private:
     void make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         const std::vector<MockTxCLSAGDest> &destinations,
         const std::size_t max_rangeproof_splits);
+
+    // validate pieces of the tx
+    bool validate_tx_semantics() const;
+    bool validate_tx_linking_tags() const;
+    bool validate_tx_amount_balance() const;
+    bool validate_tx_rangeproofs(defer_batchable) const;
+    bool validate_tx_input_proofs() const;
 
 //member variables
     // tx input images  (spent e-notes)
