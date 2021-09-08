@@ -28,7 +28,7 @@
 
 #pragma once
 
-#include "mock_rctclsag.h"
+#include "mock_tx/mock_rctclsag.h"
 #include "performance_tests.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -57,17 +57,6 @@ class test_mock_tx
         {
             m_txs.reserve(params.batch_size);
 
-            // ref set size: n^m
-            std::size_t ref_set_size{params.n};
-            
-            if (params.n == 0 || params.m == 0)
-                ref_set_size = 1;
-            else
-            {
-                for (std::size_t mul{1}; mul < params.m; ++mul)
-                    ref_set_size *= params.n;
-            }
-
             // divide max amount into equal-size chunks to distribute among more numerous of inputs vs outputs
             if (params.in_count == 0 || params.out_count == 0)
                 return false;
@@ -95,13 +84,14 @@ class test_mock_tx
                         input_amounts.back() += amount_chunk*(params.out_count - params.in_count);
 
                     // inputs
-                    auto inputs{mock_tx::gen_mock_tx_clsag_inputs(input_amounts, ref_set_size)};
+                    auto inputs{mock_tx::gen_mock_tx_inputs<mock_tx::MockTxCLSAG>(input_amounts, params.n, params.m)};
 
                     // destinations
-                    auto destinations{mock_tx::gen_mock_tx_clsag_dests(output_amounts)};
+                    auto destinations{mock_tx::gen_mock_tx_dests<mock_tx::MockTxCLSAG>(output_amounts)};
 
                     // make tx
-                    m_txs.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations, params.num_rangeproof_splits));
+                    mock_tx::MockTxCLSAGParams tx_params{params.num_rangeproof_splits};
+                    m_txs.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations, tx_params));
                 }
                 catch (...)
                 {
@@ -117,7 +107,8 @@ class test_mock_tx
                           << "inputs: " << params.in_count << " || "
                           << "outputs: " << params.out_count << " || "
                           << "rangeproof split: " << params.num_rangeproof_splits << " || "
-                          << "ref set size (" << params.n << "^" << params.m << "): " << ref_set_size << '\n';
+                          << "ref set size (" << params.n << "^" << params.m << "): " <<
+                            mock_tx::ref_set_size_from_decomp(params.m, params.n) << '\n';
             }
 
             return true;

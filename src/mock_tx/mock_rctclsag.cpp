@@ -35,6 +35,7 @@
 #include "crypto/crypto.h"
 #include "crypto/crypto-ops.h"
 #include "device/device.hpp"
+#include "misc_log_ex.h"
 #include "mock_tx_common_rct.h"
 #include "mock_tx_interface.h"
 #include "ringct/bulletproofs_plus.h"
@@ -81,7 +82,8 @@ MockCLSAGENote MockTxCLSAGDest::to_enote() const
     return enote;
 }
 //-----------------------------------------------------------------
-std::vector<MockTxCLSAGInput> gen_mock_tx_inputs(const std::vector<rct::xmr_amount> &amounts,
+template <>
+std::vector<MockTxCLSAGInput> gen_mock_tx_inputs<MockTxCLSAG>(const std::vector<rct::xmr_amount> &amounts,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m)
 {
@@ -131,7 +133,8 @@ std::vector<MockTxCLSAGInput> gen_mock_tx_inputs(const std::vector<rct::xmr_amou
     return inputs;
 }
 //-----------------------------------------------------------------
-std::vector<MockTxCLSAGDest> gen_mock_tx_dests(const std::vector<rct::xmr_amount> &amounts)
+template <>
+std::vector<MockTxCLSAGDest> gen_mock_tx_dests<MockTxCLSAG>(const std::vector<rct::xmr_amount> &amounts)
 {
     std::vector<MockTxCLSAGDest> destinations;
 
@@ -273,7 +276,7 @@ void MockTxCLSAG::make_tx_input_proofs(const std::vector<MockTxCLSAGInput> &inpu
 //-----------------------------------------------------------------
 void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         const std::vector<MockTxCLSAGDest> &destinations,
-        const MockTxParamPack<MockTxCLSAG> &param_pack)
+        const MockTxCLSAGParams &param_pack)
 {
     /// validate inputs and prepare to make tx
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() == 0, "Tried to make tx when tx already exists.");
@@ -413,7 +416,7 @@ bool MockTxCLSAG::validate_tx_amount_balance() const
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_rangeproofs(defer_batchable) const
+bool MockTxCLSAG::validate_tx_rangeproofs(const bool defer_batchable) const
 {
     /// check range proof on output enotes
     if (!defer_batchable)
@@ -490,7 +493,8 @@ std::size_t MockTxCLSAG::get_size_bytes() const
     return size;
 }
 //-----------------------------------------------------------------
-bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
+template <>
+bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
 {
     std::vector<const rct::BulletproofPlus*> range_proofs;
     range_proofs.reserve(txs_to_validate.size()*10);

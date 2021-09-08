@@ -62,7 +62,7 @@ struct MockENoteImage<MockTxCLSAG> : public MockENoteImageRCT
 using MockCLSAGENoteImage = MockENoteImage<MockTxCLSAG>;
 
 template <>
-struct MockInput<MockTxCLSAG> : public MockInputRct<MockTxCLSAG>
+struct MockInput<MockTxCLSAG> : public MockInputRCT<MockTxCLSAG>
 {
     // convert this input to an e-note-image
     MockCLSAGENoteImage to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const;
@@ -90,20 +90,21 @@ struct MockCLSAGProof final
 // create random mock inputs
 // note: number of inputs implied by size of 'amounts'
 template <>
-std::vector<MockTxCLSAGInput> gen_mock_tx_inputs(const std::vector<rct::xmr_amount> &amounts,
+std::vector<MockTxCLSAGInput> gen_mock_tx_inputs<MockTxCLSAG>(const std::vector<rct::xmr_amount> &amounts,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m);
 
 // create random mock destinations
 // note: number of destinations implied by size of 'amounts'
 template <>
-std::vector<MockTxCLSAGDest> gen_mock_tx_dests(const std::vector<rct::xmr_amount> &amounts);
+std::vector<MockTxCLSAGDest> gen_mock_tx_dests<MockTxCLSAG>(const std::vector<rct::xmr_amount> &amounts);
 
 template <>
 struct MockTxParamPack<MockTxCLSAG>
 {
     std::size_t max_rangeproof_splits;
 };
+using MockTxCLSAGParams = MockTxParamPack<MockTxCLSAG>;
 
 
 class MockTxCLSAG final : public MockTx<MockTxCLSAG>
@@ -116,8 +117,10 @@ public:
     // normal constructor: new tx
     MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         const std::vector<MockTxCLSAGDest> &destinations,
-        const MockTxParamPack<MockTxCLSAG> &param_pack) : MockTx<MockTxCLSAG>{inputs_to_spend, destinations, param_pack}
-    {}
+        const MockTxCLSAGParams &param_pack) : MockTx<MockTxCLSAG>{inputs_to_spend, destinations, param_pack}
+    {
+        make_tx(inputs_to_spend, destinations, param_pack);
+    }
 
     // normal constructor: from existing tx byte blob
     //mock tx doesn't do this
@@ -141,7 +144,7 @@ private:
     // make a transaction
     void make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         const std::vector<MockTxCLSAGDest> &destinations,
-        const MockTxParamPack<MockTxCLSAG> &param_pack) override;
+        const MockTxCLSAGParams &param_pack);
 
     // make transfers: input images, outputs, balance proof
     void make_tx_transfers(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
@@ -163,7 +166,7 @@ private:
     bool validate_tx_semantics() const;
     bool validate_tx_linking_tags() const;
     bool validate_tx_amount_balance() const;
-    bool validate_tx_rangeproofs(defer_batchable) const;
+    bool validate_tx_rangeproofs(const bool defer_batchable) const;
     bool validate_tx_input_proofs() const;
 
 //member variables
@@ -181,7 +184,7 @@ private:
 
 // validate a set of mock tx
 template <>
-bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate);
+bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate);
 
 } //namespace mock_tx
 

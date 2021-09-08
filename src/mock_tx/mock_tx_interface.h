@@ -45,7 +45,8 @@
 
 //forward declarations
 
-
+namespace crypto
+{
 // type conversions for easier calls to sc_add(), sc_sub()
 static inline unsigned char *operator &(crypto::ec_scalar &scalar)
 {
@@ -55,6 +56,7 @@ static inline const unsigned char *operator &(const crypto::ec_scalar &scalar)
 {
     return &reinterpret_cast<const unsigned char &>(scalar);
 }
+} //namespace crypto
 
 
 namespace mock_tx
@@ -158,9 +160,7 @@ public:
     MockTx(const std::vector<MockInput<MockTxType>> &inputs_to_spend,
         const std::vector<MockDest<MockTxType>> &destinations,
         const MockTxParamPack<MockTxType> &param_pack)
-    {
-        make_tx(inputs_to_spend, destinations, param_pack);
-    }
+    {}
 
     // normal constructor: from existing tx byte blob
     //mock tx doesn't do this
@@ -178,11 +178,6 @@ public:
     //get_tx_byte_blob()
 
 private:
-    // validate and make a transaction
-    virtual void make_tx(const std::vector<MockInput<MockTxType>> &inputs_to_spend,
-        const std::vector<MockDest<MockTxType>> &destinations,
-        const MockTxParamPack<MockTxType> &param_pack) = 0;
-
 //member variables
 };
 
