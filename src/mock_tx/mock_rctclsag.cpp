@@ -26,6 +26,8 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// NOT FOR PRODUCTION
+
 //paired header
 #include "mock_rctclsag.h"
 
@@ -33,6 +35,7 @@
 #include "crypto/crypto.h"
 #include "crypto/crypto-ops.h"
 #include "device/device.hpp"
+#include "mock_tx_interface.h"
 #include "ringct/multiexp.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
@@ -40,75 +43,14 @@
 #include "ringct/rctTypes.h"
 
 //third party headers
-#include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
 #include <memory>
 #include <vector>
 
 
-//-----------------------------------------------------------------
-// type conversions for easier calls to sc_add(), sc_sub()
-static inline unsigned char *operator &(crypto::ec_scalar &scalar)
-{
-    return &reinterpret_cast<unsigned char &>(scalar);
-}
-//-----------------------------------------------------------------
-static inline const unsigned char *operator &(const crypto::ec_scalar &scalar)
-{
-    return &reinterpret_cast<const unsigned char &>(scalar);
-}
-//-----------------------------------------------------------------
 namespace mock_tx
 {
-//-----------------------------------------------------------------
-bool balance_check(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2)
-{
-    // balance check method chosen from perf test: tests/performance_tests/balance_check.h
-    return rct::equalKeys(rct::addKeys(commitment_set1), rct::addKeys(commitment_set2));
-}
-//-----------------------------------------------------------------
-static std::size_t compute_rangeproof_grouping_size(const std::size_t num_amounts, const std::size_t max_num_splits)
-{
-    // if there are 'n' amounts, split them into power-of-2 groups up to 'max num splits' times
-    // n = 7, split = 1: [4, 3]
-    // n = 7, split = 2: [2, 2, 2, 1]
-    // n = 11, split = 1: [8, 3]
-    // n = 11, split = 2: [4, 4, 3]
-
-    std::size_t split_size{num_amounts};
-    std::size_t rangeproof_splits{max_num_splits};
-
-    while (rangeproof_splits > 0)
-    {
-        // if split size isn't a power of 2, then the split is [power of 2, remainder]
-        // - this can only occur the first passthrough
-        std::size_t last_bit_pos{0};
-        std::size_t temp_size{split_size};
-
-        while (temp_size)
-        {
-            temp_size = temp_size >> 1;
-            ++last_bit_pos;
-        }
-
-        if ((1 << (last_bit_pos - 1)) == split_size)
-            split_size = split_size >> 1;
-        else
-            split_size = (1 << (last_bit_pos - 1));
-
-        // min split size is 1
-        if (split_size <= 1)
-        {
-            split_size = 1;
-            break;
-        }
-
-        --rangeproof_splits;
-    }
-
-    return split_size;
-}
 //-----------------------------------------------------------------
 MockCLSAGENoteImage MockTxCLSAGInput::to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const
 {
@@ -177,10 +119,12 @@ MockCLSAGENote gen_mock_tx_clsag_enote()
     return enote;
 }
 //-----------------------------------------------------------------
-std::vector<MockTxCLSAGInput> gen_mock_tx_clsag_inputs(const std::vector<rct::xmr_amount> &amounts,
-    const std::size_t ref_set_size)
+std::vector<MockTxCLSAGInput> gen_mock_tx_inputs(const std::vector<rct::xmr_amount> &amounts,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m)
 {
-    CHECK_AND_ASSERT_THROW_MES(ref_set_size > 0, "Tried to create inputs with no ref set size.");
+    CHECK_AND_ASSERT_THROW_MES(ref_set_decomp_n > 0, "Tried to create inputs with no ref set size.");
+    std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};
 
     std::vector<MockTxCLSAGInput> inputs;
 
@@ -224,7 +168,7 @@ std::vector<MockTxCLSAGInput> gen_mock_tx_clsag_inputs(const std::vector<rct::xm
     return inputs;
 }
 //-----------------------------------------------------------------
-std::vector<MockTxCLSAGDest> gen_mock_tx_clsag_dests(const std::vector<rct::xmr_amount> &amounts)
+std::vector<MockTxCLSAGDest> gen_mock_tx_dests(const std::vector<rct::xmr_amount> &amounts)
 {
     std::vector<MockTxCLSAGDest> destinations;
 
@@ -269,25 +213,16 @@ bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_v
     return true;
 }
 //-----------------------------------------------------------------
-MockTxCLSAG::MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-    const std::vector<MockTxCLSAGDest> &destinations,
-    const std::size_t max_rangeproof_splits)
+void MockTxCLSAG::validate_and_make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+        const std::vector<MockTxCLSAGDest> &destinations,
+        const MockTxParamPack<MockTxCLSAG> &param_pack)
 {
     CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any destinations.");
     CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() > 0, "Tried to make tx without any inputs.");
 
     // amounts must balance
-    using boost::multiprecision::uint128_t;
-    uint128_t input_sum{0};
-    uint128_t output_sum{0};
-
-    for (const auto &input : inputs_to_spend)
-        input_sum += input.m_amount;
-
-    for (const auto &dest : destinations)
-        output_sum += dest.m_amount;
-
-    CHECK_AND_ASSERT_THROW_MES(input_sum == output_sum, "Tried to make tx with unbalanced amounts.");
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(inputs_to_spend, destinations),
+        "Tried to make tx with unbalanced amounts.");
 
     // validate inputs
     std::size_t ref_set_size{inputs_to_spend[0].m_input_ref_set.size()};
@@ -303,7 +238,7 @@ MockTxCLSAG::MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
             "Tried to make tx with an input that has a malformed real spend index.");
     }
 
-    make_tx(inputs_to_spend, destinations, max_rangeproof_splits);
+    make_tx(inputs_to_spend, destinations, param_pack.max_rangeproof_splits);
 }
 //-----------------------------------------------------------------
 void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
@@ -507,7 +442,7 @@ bool MockTxCLSAG::validate(const bool defer_batchable) const
     }
 
     // sum(pseudo output commitments) ?= sum(output commitments)
-    if (!balance_check(pseudo_commitments, output_commitments))
+    if (!balance_check_equality(pseudo_commitments, output_commitments))
         return false;
 
 
@@ -551,7 +486,7 @@ std::size_t MockTxCLSAG::get_size_bytes() const
     std::size_t size{0};
     size += m_input_images.size() * MockCLSAGENoteImage::get_size_bytes();
     size += m_outputs.size() * MockCLSAGENote::get_size_bytes();
-    // note: ignore the amount commitment set stored in the rangee proof, they are double counted by the output set
+    // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
     for (const auto &range_proof : m_range_proofs)
         size += 32 * (6 + range_proof.L.size() + range_proof.R.size());
 
