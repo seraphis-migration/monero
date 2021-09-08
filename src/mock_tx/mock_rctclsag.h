@@ -33,6 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "mock_tx_interface.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -47,10 +48,10 @@
 namespace mock_tx
 {
 
-// check if two commitment sets balance (sum to zero)
-bool balance_check(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2);
+class MockTxCLSAG;
 
-struct MockCLSAGENote final
+template <>
+struct MockENote<MockTxCLSAG>
 {
     crypto::public_key m_onetime_address;
     crypto::public_key m_amount_commitment;
@@ -61,16 +62,20 @@ struct MockCLSAGENote final
 
     static std::size_t get_size_bytes() {return 32*3 + 8;}
 };
+using MockCLSAGENote = MockENote<MockTxCLSAG>;
 
-struct MockCLSAGENoteImage final
+template <>
+struct MockENoteImage<MockTxCLSAG>
 {
     crypto::public_key m_pseudo_amount_commitment;
     crypto::key_image m_key_image;
 
     static std::size_t get_size_bytes() {return 32*2;}
 };
+using MockCLSAGENoteImage = MockENoteImage<MockTxCLSAG>;
 
-struct MockTxCLSAGInput final
+template <>
+struct MockInput<MockTxCLSAG>
 {
     crypto::secret_key m_onetime_privkey;
     crypto::secret_key m_amount_blinding_factor;
@@ -81,8 +86,10 @@ struct MockTxCLSAGInput final
     // convert this input to an e-note-image
     MockCLSAGENoteImage to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const;
 };
+using MockTxCLSAGInput = MockInput<MockTxCLSAG>;
 
-struct MockTxCLSAGDest final
+template <>
+struct MockDest<MockTxCLSAG>
 {
     // destination (for creating an e-note to send an amount to someone)
 
@@ -97,6 +104,7 @@ struct MockTxCLSAGDest final
     // convert this destination into an e-note
     MockCLSAGENote to_enote() const;
 };
+using MockTxCLSAGDest = MockDest<MockTxCLSAG>;
 
 struct MockCLSAGProof final
 {
@@ -115,14 +123,24 @@ MockCLSAGENote gen_mock_tx_clsag_enote();
 
 // create random mock inputs
 // note: number of inputs implied by size of 'amounts'
-std::vector<MockTxCLSAGInput> gen_mock_tx_clsag_inputs(const std::vector<rct::xmr_amount> &amounts,
-    const std::size_t ref_set_size);
+template <>
+std::vector<MockTxCLSAGInput> gen_mock_tx_inputs(const std::vector<rct::xmr_amount> &amounts,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m);
 
 // create random mock destinations
 // note: number of destinations implied by size of 'amounts'
-std::vector<MockTxCLSAGDest> gen_mock_tx_clsag_dests(const std::vector<rct::xmr_amount> &amounts);
+template <>
+std::vector<MockTxCLSAGDest> gen_mock_tx_dests(const std::vector<rct::xmr_amount> &amounts);
 
-class MockTxCLSAG final
+template <>
+struct MockTxParamPack<MockTxCLSAG>
+{
+    std::size_t max_rangeproof_splits;
+};
+
+
+class MockTxCLSAG final : public MockTx<MockTxCLSAG>
 {
 public:
 //constructors
@@ -132,7 +150,8 @@ public:
     // normal constructor: new tx
     MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         const std::vector<MockTxCLSAGDest> &destinations,
-        const std::size_t max_rangeproof_splits);
+        const MockTxParamPack<MockTxCLSAG> &param_pack) : MockTx<MockTxCLSAG>{inputs_to_spend, destinations, param_pack}
+    {}
 
     // normal constructor: from existing tx byte blob
     //mock tx doesn't do this
@@ -142,10 +161,10 @@ public:
 //member functions
     // validate the transaction
     // - if 'defer_batchable' is set, then batchable validation steps won't be executed
-    bool validate(const bool defer_batchable = false) const;
+    bool validate(const bool defer_batchable = false) const override;
 
     // get size of tx
-    std::size_t get_size_bytes() const;
+    std::size_t get_size_bytes() const override;
 
     // get range proof
     const std::vector<rct::BulletproofPlus>& get_range_proofs() const {return m_range_proofs;}
@@ -154,6 +173,10 @@ public:
 
 private:
     // make a transaction
+    void validate_and_make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+        const std::vector<MockTxCLSAGDest> &destinations,
+        const MockTxParamPack<MockTxCLSAG> &param_pack) override;
+
     void make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         const std::vector<MockTxCLSAGDest> &destinations,
         const std::size_t max_rangeproof_splits);
@@ -172,6 +195,7 @@ private:
 };
 
 // validate a set of mock tx
+template <>
 bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate);
 
 } //namespace mock_tx
