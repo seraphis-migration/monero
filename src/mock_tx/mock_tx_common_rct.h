@@ -39,7 +39,6 @@
 //third party headers
 
 //standard headers
-#include <type_traits>
 #include <vector>
 
 //forward declarations

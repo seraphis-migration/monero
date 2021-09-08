@@ -139,13 +139,25 @@ public:
 
 private:
     // make a transaction
-    void validate_and_make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+    void make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         const std::vector<MockTxCLSAGDest> &destinations,
         const MockTxParamPack<MockTxCLSAG> &param_pack) override;
 
-    void make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+    // make transfers: input images, outputs, balance proof
+    void make_tx_transfers(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         const std::vector<MockTxCLSAGDest> &destinations,
+        std::vector<rct::xmr_amount> &output_amounts,
+        std::vector<rct::key> &output_amount_commitment_blinding_factors,
+        std::vector<crypto::secret_key> &pseudo_blinding_factors);
+
+    // make range proofs: for output amounts
+    void make_tx_rangeproofs(const std::vector<rct::xmr_amount> &output_amounts,
+        const std::vector<rct::key> &output_amount_commitment_blinding_factors,
         const std::size_t max_rangeproof_splits);
+
+    // make input proofs: membership, ownership, unspentness (i.e. prove key images are constructed correctly)
+    void make_tx_input_proofs(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+        const std::vector<crypto::secret_key> &pseudo_blinding_factors);
 
     // validate pieces of the tx
     bool validate_tx_semantics() const;

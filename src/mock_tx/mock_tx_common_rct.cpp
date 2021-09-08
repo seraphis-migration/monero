@@ -29,22 +29,16 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_rctclsag.h"
+#include "mock_tx_common_rct.h"
 
 //local headers
 #include "crypto/crypto.h"
-#include "crypto/crypto-ops.h"
-#include "device/device.hpp"
-#include "mock_tx_interface.h"
-#include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
-#include "ringct/rctSigs.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
 
 //standard headers
-#include <memory>
 #include <vector>
 
 
