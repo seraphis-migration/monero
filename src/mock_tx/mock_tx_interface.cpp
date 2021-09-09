@@ -32,6 +32,7 @@
 #include "mock_tx_interface.h"
 
 //local headers
+#include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
@@ -104,6 +105,40 @@ bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &c
 {
     // balance check method chosen from perf test: tests/performance_tests/balance_check.h
     return rct::equalKeys(rct::addKeys(commitment_set1), rct::addKeys(commitment_set2));
+}
+//-----------------------------------------------------------------
+std::vector<rct::BulletproofPlus> make_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
+    const std::vector<rct::key> &amount_commitment_blinding_factors,
+    const std::size_t max_rangeproof_splits)
+{
+    /// range proofs
+    // - for output amount commitments
+    std::vector<rct::BulletproofPlus> range_proofs;
+
+    // get number of amounts to aggregate in each proof
+    std::size_t split_size{compute_rangeproof_grouping_size(amounts.size(), max_rangeproof_splits)};
+
+    // make the range proofs
+    for (std::size_t output_index{0}; output_index < amounts.size(); output_index += split_size)
+    {
+        std::vector<rct::xmr_amount> amounts_group;
+        std::vector<rct::key> amount_commitment_blinding_factors_group;
+        amounts_group.reserve(split_size);
+        amount_commitment_blinding_factors_group.reserve(split_size);
+
+        for (std::size_t chunk_index{output_index};
+            chunk_index < (output_index + split_size) && chunk_index < amounts.size();
+            ++chunk_index)
+        {
+            amounts_group.emplace_back(amounts[chunk_index]);
+            amount_commitment_blinding_factors_group.emplace_back(amount_commitment_blinding_factors[chunk_index]);
+        }
+
+        range_proofs.emplace_back(
+            rct::bulletproof_plus_PROVE(amounts_group, amount_commitment_blinding_factors_group));
+    }
+
+    return range_proofs;
 }
 //-----------------------------------------------------------------
 } //namespace mock_tx

@@ -126,7 +126,7 @@ namespace rct
     }
 
     // Invert a nonzero scalar
-    static key invert(const key &x)
+    key invert(const key &x)
     {
         CHECK_AND_ASSERT_THROW_MES(!(x == ZERO), "Cannot invert zero!");
 
@@ -285,6 +285,13 @@ namespace rct
         }
 
         return r;
+    }
+
+    rct::key get_gen_U()
+    {
+        init_gens();
+
+        return U;
     }
 
     // Generate a Triptych proof

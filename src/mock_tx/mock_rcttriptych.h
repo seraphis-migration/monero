@@ -26,7 +26,7 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Mock tx: plain RingCT on CLSAG with BP+
+// Mock tx: RingCT on Triptych with BP+
 // NOT FOR PRODUCTION
 
 #pragma once
@@ -49,75 +49,82 @@
 namespace mock_tx
 {
 
-class MockTxCLSAG;
+class MockTxTriptych;
 
 template <>
-struct MockENote<MockTxCLSAG> : public MockENoteRCT
+struct MockENote<MockTxTriptych> : public MockENoteRCT
 {};
-using MockCLSAGENote = MockENote<MockTxCLSAG>;
+using MockTriptychENote = MockENote<MockTxTriptych>;
 
 template <>
-struct MockENoteImage<MockTxCLSAG> : public MockENoteImageRCT
+struct MockENoteImage<MockTxTriptych> : public MockENoteImageRCT
 {};
-using MockCLSAGENoteImage = MockENoteImage<MockTxCLSAG>;
+using MockTriptychENoteImage = MockENoteImage<MockTxTriptych>;
 
 template <>
-struct MockInput<MockTxCLSAG> : public MockInputRCT<MockTxCLSAG>
+struct MockInput<MockTxTriptych> : public MockInputRCT<MockTxTriptych>
 {
+    std::size_t m_ref_set_decomp_n;
+    std::size_t m_ref_set_decomp_m;
+
     // convert this input to an e-note-image
-    MockCLSAGENoteImage to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const;
+    MockTriptychENoteImage to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const;
 };
-using MockTxCLSAGInput = MockInput<MockTxCLSAG>;
+using MockTxTriptychInput = MockInput<MockTxTriptych>;
 
 template <>
-struct MockDest<MockTxCLSAG> : public MockDestRCT
+struct MockDest<MockTxTriptych> : public MockDestRCT
 {
     // destination (for creating an e-note to send an amount to someone)
 
     // convert this destination into an e-note
-    MockCLSAGENote to_enote() const;
+    MockTriptychENote to_enote() const;
 };
-using MockTxCLSAGDest = MockDest<MockTxCLSAG>;
+using MockTxTriptychDest = MockDest<MockTxTriptych>;
 
-struct MockCLSAGProof final
+struct MockTriptychProof final
 {
-    // the CLSAG proof
-    rct::clsag m_clsag_proof;
-    // vector of pairs <Ko_i, C_i> for referenced enotes
-    rct::ctkeyV m_referenced_enotes_converted;
+    // the Triptych proof
+    rct::TriptychProof m_triptych_proof;
+    // onetime addresses Ko
+    rct::keyV m_onetime_addresses;
+    // output commitments C
+    rct::keyV m_commitments;
+    // pseudo-output commitment C'
+    rct::key m_pseudo_amount_commitment;
 };
 
 // create random mock inputs
 // note: number of inputs implied by size of 'amounts'
 template <>
-std::vector<MockTxCLSAGInput> gen_mock_tx_inputs<MockTxCLSAG>(const std::vector<rct::xmr_amount> &amounts,
+std::vector<MockTxTriptychInput> gen_mock_tx_inputs<MockTxTriptych>(const std::vector<rct::xmr_amount> &amounts,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m);
 
 // create random mock destinations
 // note: number of destinations implied by size of 'amounts'
 template <>
-std::vector<MockTxCLSAGDest> gen_mock_tx_dests<MockTxCLSAG>(const std::vector<rct::xmr_amount> &amounts);
+std::vector<MockTxTriptychDest> gen_mock_tx_dests<MockTxTriptych>(const std::vector<rct::xmr_amount> &amounts);
 
 template <>
-struct MockTxParamPack<MockTxCLSAG>
+struct MockTxParamPack<MockTxTriptych>
 {
     std::size_t max_rangeproof_splits;
 };
-using MockTxCLSAGParams = MockTxParamPack<MockTxCLSAG>;
+using MockTxTriptychParams = MockTxParamPack<MockTxTriptych>;
 
 
-class MockTxCLSAG final : public MockTx<MockTxCLSAG>
+class MockTxTriptych final : public MockTx<MockTxTriptych>
 {
 public:
 //constructors
     // default constructor
-    MockTxCLSAG() = default;
+    MockTxTriptych() = default;
 
     // normal constructor: new tx
-    MockTxCLSAG(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-        const std::vector<MockTxCLSAGDest> &destinations,
-        const MockTxCLSAGParams &param_pack) : MockTx<MockTxCLSAG>{inputs_to_spend, destinations, param_pack}
+    MockTxTriptych(const std::vector<MockTxTriptychInput> &inputs_to_spend,
+        const std::vector<MockTxTriptychDest> &destinations,
+        const MockTxTriptychParams &param_pack) : MockTx<MockTxTriptych>{inputs_to_spend, destinations, param_pack}
     {
         make_tx(inputs_to_spend, destinations, param_pack);
     }
@@ -142,19 +149,19 @@ public:
 
 private:
     // make a transaction
-    void make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-        const std::vector<MockTxCLSAGDest> &destinations,
-        const MockTxCLSAGParams &param_pack);
+    void make_tx(const std::vector<MockTxTriptychInput> &inputs_to_spend,
+        const std::vector<MockTxTriptychDest> &destinations,
+        const MockTxTriptychParams &param_pack);
 
     // make transfers: input images, outputs, balance proof
-    void make_tx_transfers(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-        const std::vector<MockTxCLSAGDest> &destinations,
+    void make_tx_transfers(const std::vector<MockTxTriptychInput> &inputs_to_spend,
+        const std::vector<MockTxTriptychDest> &destinations,
         std::vector<rct::xmr_amount> &output_amounts,
         std::vector<rct::key> &output_amount_commitment_blinding_factors,
         std::vector<crypto::secret_key> &pseudo_blinding_factors);
 
     // make input proofs: membership, ownership, unspentness (i.e. prove key images are constructed correctly)
-    void make_tx_input_proofs(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+    void make_tx_input_proofs(const std::vector<MockTxTriptychInput> &inputs_to_spend,
         const std::vector<crypto::secret_key> &pseudo_blinding_factors);
 
     // validate pieces of the tx
@@ -166,20 +173,23 @@ private:
 
 //member variables
     // tx input images  (spent e-notes)
-    std::vector<MockCLSAGENoteImage> m_input_images;
+    std::vector<MockTriptychENoteImage> m_input_images;
     // tx outputs (new e-notes)
-    std::vector<MockCLSAGENote> m_outputs;
+    std::vector<MockTriptychENote> m_outputs;
 
     // range proofs
     std::vector<rct::BulletproofPlus> m_range_proofs;
 
-    // CLSAGs proving membership/ownership/unspentness for each input
-    std::vector<MockCLSAGProof> m_tx_proofs;
+    // Triptych proofs proving membership/ownership/unspentness for each input
+    std::vector<MockTriptychProof> m_tx_proofs;
+    // decomposition of ref set size: n^m
+    std::size_t m_ref_set_decomp_n;
+    std::size_t m_ref_set_decomp_m;
 };
 
 // validate a set of mock tx
 template <>
-bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate);
+bool validate_mock_txs<MockTxTriptych>(const std::vector<std::shared_ptr<MockTxTriptych>> &txs_to_validate);
 
 } //namespace mock_tx
 

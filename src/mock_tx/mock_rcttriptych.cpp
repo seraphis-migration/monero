@@ -29,19 +29,18 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_rctclsag.h"
+#include "mock_rcttriptych.h"
 
 //local headers
 #include "crypto/crypto.h"
 #include "crypto/crypto-ops.h"
-#include "device/device.hpp"
 #include "misc_log_ex.h"
 #include "mock_tx_common_rct.h"
 #include "mock_tx_interface.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
-#include "ringct/rctSigs.h"
 #include "ringct/rctTypes.h"
+#include "ringct/triptych.h"
 
 //third party headers
 
@@ -53,44 +52,43 @@
 namespace mock_tx
 {
 //-----------------------------------------------------------------
-MockCLSAGENoteImage MockTxCLSAGInput::to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const
+MockTriptychENoteImage MockTxTriptychInput::to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const
 {
-    MockCLSAGENoteImage image;
+    MockTriptychENoteImage image;
 
     // C' = x' G + a H
     image.m_pseudo_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(pseudo_blinding_factor)));
 
-    // KI = ko * Hp(Ko)
-    crypto::public_key pubkey;
-    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_onetime_privkey, pubkey), "Failed to derive public key");
-    crypto::generate_key_image(pubkey, m_onetime_privkey, image.m_key_image);
+    // KI = 1/ko * U
+    rct::key inv_ko{rct::invert(rct::sk2rct(m_onetime_privkey))};
+    rct::key key_image{rct::scalarmultKey(rct::get_gen_U(), inv_ko)};
 
     // KI_stored = (1/8)*KI
     // - for efficiently checking that the key image is in the prime subgroup during tx verification
     rct::key storable_ki;
-    rct::scalarmultKey(storable_ki, rct::ki2rct(image.m_key_image), rct::INV_EIGHT);
+    rct::scalarmultKey(storable_ki, key_image, rct::INV_EIGHT);
     image.m_key_image = rct::rct2ki(storable_ki);
 
     return image;
 }
 //-----------------------------------------------------------------
-MockCLSAGENote MockTxCLSAGDest::to_enote() const
+MockTriptychENote MockTxTriptychDest::to_enote() const
 {
-    MockCLSAGENote enote;
+    MockTriptychENote enote;
     MockDestRCT::to_enote_rct(enote);
 
     return enote;
 }
 //-----------------------------------------------------------------
 template <>
-std::vector<MockTxCLSAGInput> gen_mock_tx_inputs<MockTxCLSAG>(const std::vector<rct::xmr_amount> &amounts,
+std::vector<MockTxTriptychInput> gen_mock_tx_inputs<MockTxTriptych>(const std::vector<rct::xmr_amount> &amounts,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m)
 {
     CHECK_AND_ASSERT_THROW_MES(ref_set_decomp_n > 0, "Tried to create inputs with no ref set size.");
     std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};
 
-    std::vector<MockTxCLSAGInput> inputs;
+    std::vector<MockTxTriptychInput> inputs;
 
     if (amounts.size() > 0)
     {
@@ -105,6 +103,8 @@ std::vector<MockTxCLSAGInput> gen_mock_tx_inputs<MockTxCLSAG>(const std::vector<
             inputs[input_index].m_onetime_privkey = rct::rct2sk(rct::skGen());
             inputs[input_index].m_amount_blinding_factor = rct::rct2sk(rct::skGen());
             inputs[input_index].m_amount = amounts[input_index];
+            inputs[input_index].m_ref_set_decomp_n = ref_set_decomp_n;
+            inputs[input_index].m_ref_set_decomp_m = ref_set_decomp_m;
 
             // construct reference set
             inputs[input_index].m_input_ref_set.resize(ref_set_size);
@@ -134,9 +134,9 @@ std::vector<MockTxCLSAGInput> gen_mock_tx_inputs<MockTxCLSAG>(const std::vector<
 }
 //-----------------------------------------------------------------
 template <>
-std::vector<MockTxCLSAGDest> gen_mock_tx_dests<MockTxCLSAG>(const std::vector<rct::xmr_amount> &amounts)
+std::vector<MockTxTriptychDest> gen_mock_tx_dests<MockTxTriptych>(const std::vector<rct::xmr_amount> &amounts)
 {
-    std::vector<MockTxCLSAGDest> destinations;
+    std::vector<MockTxTriptychDest> destinations;
 
     if (amounts.size() > 0)
     {
@@ -151,8 +151,8 @@ std::vector<MockTxCLSAGDest> gen_mock_tx_dests<MockTxCLSAG>(const std::vector<rc
     return destinations;
 }
 //-----------------------------------------------------------------
-void MockTxCLSAG::make_tx_transfers(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-    const std::vector<MockTxCLSAGDest> &destinations,
+void MockTxTriptych::make_tx_transfers(const std::vector<MockTxTriptychInput> &inputs_to_spend,
+    const std::vector<MockTxTriptychDest> &destinations,
     std::vector<rct::xmr_amount> &output_amounts,
     std::vector<rct::key> &output_amount_commitment_blinding_factors,
     std::vector<crypto::secret_key> &pseudo_blinding_factors)
@@ -203,49 +203,52 @@ void MockTxCLSAG::make_tx_transfers(const std::vector<MockTxCLSAGInput> &inputs_
     pseudo_blinding_factors.back() = sum_output_blinding_factors;
 }
 //-----------------------------------------------------------------
-void MockTxCLSAG::make_tx_input_proofs(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+void MockTxTriptych::make_tx_input_proofs(const std::vector<MockTxTriptychInput> &inputs_to_spend,
     const std::vector<crypto::secret_key> &pseudo_blinding_factors)
 {
     /// membership + ownership/unspentness proofs
-    // - clsag for each input
+    // - Triptych for each input
     for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
     {
-        // convert tx info to form expected by proveRctCLSAGSimple()
-        rct::ctkeyV referenced_enotes_converted;
-        rct::ctkey spent_enote_converted;
-        referenced_enotes_converted.reserve(inputs_to_spend[0].m_input_ref_set.size());
+        // convert tx info to form expected by triptych_prove()
+        MockTriptychProof mock_Triptych_proof;
+        mock_Triptych_proof.m_onetime_addresses.reserve(inputs_to_spend[0].m_input_ref_set.size());
+        mock_Triptych_proof.m_commitments.reserve(inputs_to_spend[0].m_input_ref_set.size());
 
-        // vector of pairs <onetime addr, amount commitment>
         for (const auto &input_ref : inputs_to_spend[input_index].m_input_ref_set)
-            referenced_enotes_converted.emplace_back(rct::ctkey{rct::pk2rct(input_ref.m_onetime_address),
-                rct::pk2rct(input_ref.m_amount_commitment)});
+        {
+            mock_Triptych_proof.m_onetime_addresses.emplace_back(rct::pk2rct(input_ref.m_onetime_address));
+            mock_Triptych_proof.m_commitments.emplace_back(rct::pk2rct(input_ref.m_amount_commitment));
+        }
 
-        // spent enote privkeys <ko, x>
-        spent_enote_converted.dest = rct::sk2rct(inputs_to_spend[input_index].m_onetime_privkey);
-        spent_enote_converted.mask = rct::sk2rct(inputs_to_spend[input_index].m_amount_blinding_factor);
+        mock_Triptych_proof.m_pseudo_amount_commitment = rct::pk2rct(m_input_images[input_index].m_pseudo_amount_commitment);
 
-        // create CLSAG proof and save it
-        MockCLSAGProof mock_clsag_proof;
-        mock_clsag_proof.m_clsag_proof = rct::proveRctCLSAGSimple(
-                rct::zero(),                  // empty message for mockup
-                referenced_enotes_converted,  // vector of pairs <Ko_i, C_i> for referenced enotes
-                spent_enote_converted,        // pair <ko, x> for input's onetime privkey and amount blinding factor
-                rct::sk2rct(pseudo_blinding_factors[input_index]),       // pseudo-output blinding factor x'
-                rct::pk2rct(m_input_images[input_index].m_pseudo_amount_commitment),  // pseudo-output commitment C'
-                nullptr, nullptr, nullptr,    // no multisig
-                inputs_to_spend[input_index].m_input_ref_set_real_index,  // real index in input set
-                hw::get_device("default")
+        // commitment to zero privkey: C - C' = (x - x')*G
+        rct::key c_to_zero_privkey;
+        sc_sub(c_to_zero_privkey.bytes,
+            &(inputs_to_spend[input_index].m_amount_blinding_factor),
+            &(pseudo_blinding_factors[input_index]));
+
+        // create Triptych proof
+        mock_Triptych_proof.m_triptych_proof = rct::triptych_prove(
+                mock_Triptych_proof.m_onetime_addresses,         // one-time pubkeys Ko
+                mock_Triptych_proof.m_commitments,               // output commitments C
+                mock_Triptych_proof.m_pseudo_amount_commitment,  // pseudo-output commitment C'
+                inputs_to_spend[input_index].m_input_ref_set_real_index,             // real spend index \pi
+                rct::sk2rct(inputs_to_spend[input_index].m_onetime_privkey),         // one-time privkey ko
+                c_to_zero_privkey,   // commitment to zero blinding factor (x - x')
+                inputs_to_spend[input_index].m_ref_set_decomp_n,  // decomp n
+                inputs_to_spend[input_index].m_ref_set_decomp_m,  // decomp m
+                rct::zero()          // empty message for mockup
             );
 
-        mock_clsag_proof.m_referenced_enotes_converted = std::move(referenced_enotes_converted);
-
-        m_tx_proofs.emplace_back(mock_clsag_proof);
+        m_tx_proofs.emplace_back(std::move(mock_Triptych_proof));
     }
 }
 //-----------------------------------------------------------------
-void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-        const std::vector<MockTxCLSAGDest> &destinations,
-        const MockTxCLSAGParams &param_pack)
+void MockTxTriptych::make_tx(const std::vector<MockTxTriptychInput> &inputs_to_spend,
+        const std::vector<MockTxTriptychDest> &destinations,
+        const MockTxTriptychParams &param_pack)
 {
     /// validate inputs and prepare to make tx
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() == 0, "Tried to make tx when tx already exists.");
@@ -257,13 +260,15 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         "Tried to make tx with unbalanced amounts.");
 
     // validate tx inputs
-    std::size_t ref_set_size{inputs_to_spend[0].m_input_ref_set.size()};
+    m_ref_set_decomp_n = inputs_to_spend[0].m_ref_set_decomp_n;
+    m_ref_set_decomp_m = inputs_to_spend[0].m_ref_set_decomp_m;
 
     for (const auto &input : inputs_to_spend)
     {
-        // inputs must have same number of ring members
-        CHECK_AND_ASSERT_THROW_MES(ref_set_size == input.m_input_ref_set.size(),
-            "Tried to make tx with inputs that don't have the same input reference set sizes.");
+        // inputs must have same ring member set decomposition (i.e. size = n^m)
+        CHECK_AND_ASSERT_THROW_MES(input.m_ref_set_decomp_n == m_ref_set_decomp_n &&
+            input.m_ref_set_decomp_m == m_ref_set_decomp_m,
+            "Tried to make tx with inputs that don't have the same input reference set decompositions.");
 
         // input real spend indices must not be malformed
         CHECK_AND_ASSERT_THROW_MES(input.m_input_ref_set_real_index < input.m_input_ref_set.size(),
@@ -295,7 +300,7 @@ void MockTxCLSAG::make_tx(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
         pseudo_blinding_factors);
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_semantics() const
+bool MockTxTriptych::validate_tx_semantics() const
 {
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to validate tx that has no outputs.");
     CHECK_AND_ASSERT_THROW_MES(m_input_images.size() > 0, "Tried to validate tx that has no input images.");
@@ -316,30 +321,31 @@ bool MockTxCLSAG::validate_tx_semantics() const
 
 
     /// all inputs must have the same reference set size
-    std::size_t ref_set_size{m_tx_proofs[0].m_referenced_enotes_converted.size()};
+    std::size_t ref_set_size{m_tx_proofs[0].m_onetime_addresses.size()};
 
     for (const auto &tx_proof : m_tx_proofs)
     {
-        if (tx_proof.m_referenced_enotes_converted.size() != ref_set_size)
+        if (tx_proof.m_onetime_addresses.size() != ref_set_size ||
+            tx_proof.m_commitments.size() != ref_set_size)
             return false;
     }
 
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_linking_tags() const
+bool MockTxTriptych::validate_tx_linking_tags() const
 {
     /// input linking tags must be in the prime subgroup: KI = 8*[(1/8) * KI]
-    // note: I cheat a bit here for the mock-up. The linking tags in the clsag_proof are not mul(1/8), but the
+    // note: I cheat a bit here for the mock-up. The linking tags in the Triptych_proof are not mul(1/8), but the
     //       tags in m_input_images are.
     for (std::size_t input_index{0}; input_index < m_input_images.size(); ++input_index)
     {
         if (!(rct::scalarmult8(rct::ki2rct(m_input_images[input_index].m_key_image)) ==
-                m_tx_proofs[input_index].m_clsag_proof.I))
+                m_tx_proofs[input_index].m_triptych_proof.J))
             return false;
 
         // sanity check
-        if (m_tx_proofs[input_index].m_clsag_proof.I == rct::identity())
+        if (m_tx_proofs[input_index].m_triptych_proof.J == rct::identity())
             return false;
     }
 
@@ -350,7 +356,7 @@ bool MockTxCLSAG::validate_tx_linking_tags() const
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_amount_balance() const
+bool MockTxTriptych::validate_tx_amount_balance() const
 {
     /// check that amount commitments balance
     rct::keyV pseudo_commitments;
@@ -385,7 +391,7 @@ bool MockTxCLSAG::validate_tx_amount_balance() const
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_rangeproofs(const bool defer_batchable) const
+bool MockTxTriptych::validate_tx_rangeproofs(const bool defer_batchable) const
 {
     /// check range proof on output enotes
     if (!defer_batchable)
@@ -403,22 +409,30 @@ bool MockTxCLSAG::validate_tx_rangeproofs(const bool defer_batchable) const
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_input_proofs() const
+bool MockTxTriptych::validate_tx_input_proofs() const
 {
     /// verify input membership/ownership/unspentness proofs
-    for (std::size_t input_index{0}; input_index < m_input_images.size(); ++input_index)
+    for (std::size_t input_index{0}; input_index < m_tx_proofs.size(); ++input_index)
     {
-        if (!rct::verRctCLSAGSimple(rct::zero(),  // empty message for mockup
-                m_tx_proofs[input_index].m_clsag_proof,
-                m_tx_proofs[input_index].m_referenced_enotes_converted,
-                rct::pk2rct(m_input_images[input_index].m_pseudo_amount_commitment)))
+        std::vector<rct::TriptychProof*> proof;
+        proof.emplace_back(&(m_tx_proofs[input_index].m_triptych_proof));
+
+        // note: only verify one triptych proof at a time (not batchable in my approach where all inputs define separate rings)
+        if (!rct::triptych_verify(
+                m_tx_proofs[input_index].m_onetime_addresses,
+                m_tx_proofs[input_index].m_commitments,
+                rct::keyV{m_tx_proofs[input_index].m_pseudo_amount_commitment},
+                proof,
+                m_ref_set_decomp_n,
+                m_ref_set_decomp_m,
+                rct::keyV{rct::zero()}))  // empty message for mockup
             return false;
     }
 
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate(const bool defer_batchable) const
+bool MockTxTriptych::validate(const bool defer_batchable) const
 {
     if (!validate_tx_semantics())
         return false;
@@ -438,7 +452,7 @@ bool MockTxCLSAG::validate(const bool defer_batchable) const
     return true;
 }
 //-----------------------------------------------------------------
-std::size_t MockTxCLSAG::get_size_bytes() const
+std::size_t MockTxTriptych::get_size_bytes() const
 {
     // doesn't include (compared to a real tx):
     // - ring member references (e.g. indices or explicit copies)
@@ -449,21 +463,26 @@ std::size_t MockTxCLSAG::get_size_bytes() const
     // - each output has its own enote pub key
 
     std::size_t size{0};
-    size += m_input_images.size() * MockCLSAGENoteImage::get_size_bytes();
-    size += m_outputs.size() * MockCLSAGENote::get_size_bytes();
+    size += m_input_images.size() * MockTriptychENoteImage::get_size_bytes();
+    size += m_outputs.size() * MockTriptychENote::get_size_bytes();
     // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
     for (const auto &range_proof : m_range_proofs)
         size += 32 * (6 + range_proof.L.size() + range_proof.R.size());
 
     if (m_tx_proofs.size())
-        // note: ignore the key image stored in the clsag, it is double counted by the input's MockCLSAGENoteImage struct
-        size += m_tx_proofs.size() * (32 * (2 + m_tx_proofs[0].m_clsag_proof.s.size()));
+    {
+        // note: ignore the key image stored in the Triptych proof, it is double counted by the input's MockTriptychENoteImage struct
+        size += m_tx_proofs.size() * (32 * (8 + 
+                        m_tx_proofs[0].m_triptych_proof.X.size() +
+                        m_tx_proofs[0].m_triptych_proof.Y.size() +
+                        ref_set_size_from_decomp(m_ref_set_decomp_n, m_ref_set_decomp_m)));
+    }
 
     return size;
 }
 //-----------------------------------------------------------------
 template <>
-bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
+bool validate_mock_txs<MockTxTriptych>(const std::vector<std::shared_ptr<MockTxTriptych>> &txs_to_validate)
 {
     std::vector<const rct::BulletproofPlus*> range_proofs;
     range_proofs.reserve(txs_to_validate.size()*10);
