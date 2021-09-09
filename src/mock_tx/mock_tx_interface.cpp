@@ -107,7 +107,7 @@ bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &c
     return rct::equalKeys(rct::addKeys(commitment_set1), rct::addKeys(commitment_set2));
 }
 //-----------------------------------------------------------------
-std::vector<rct::BulletproofPlus> make_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
+std::vector<rct::BulletproofPlus> make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
     const std::size_t max_rangeproof_splits)
 {

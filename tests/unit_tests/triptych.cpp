@@ -51,7 +51,7 @@ TEST(triptych, random)
         std::vector<TriptychProof> p;
         p.reserve(N_proofs);
         p.resize(0);
-        std::vector<TriptychProof *> proofs;
+        std::vector<const TriptychProof *> proofs;
         proofs.reserve(N_proofs);
         proofs.resize(0);
 

@@ -556,7 +556,7 @@ namespace rct
     }
 
     // Verify a batch of Triptych proofs with common input keys
-    bool triptych_verify(const keyV &M, const keyV &P, const keyV &C_offsets, std::vector<TriptychProof *> &proofs, const size_t n, const size_t m, const keyV &messages)
+    bool triptych_verify(const keyV &M, const keyV &P, const keyV &C_offsets, const std::vector<const TriptychProof *> &proofs, const size_t n, const size_t m, const keyV &messages)
     {
         // Global checks
         CHECK_AND_ASSERT_THROW_MES(n > 1, "Must have n > 1!");
@@ -574,9 +574,9 @@ namespace rct
         CHECK_AND_ASSERT_THROW_MES(messages.size() == N_proofs, "Incorrect number of messages!");
 
         // Per-proof checks
-        for (TriptychProof *p: proofs)
+        for (const TriptychProof *p: proofs)
         {
-            TriptychProof &proof = *p;
+            const TriptychProof &proof = *p;
 
             CHECK_AND_ASSERT_THROW_MES(!(proof.J == IDENTITY), "Proof group element should not be zero!");
             CHECK_AND_ASSERT_THROW_MES(proof.X.size() == m, "Bad proof vector size!");
@@ -638,7 +638,7 @@ namespace rct
         // Start per-proof data assembly
         for (size_t i_proofs = 0; i_proofs < N_proofs; i_proofs++)
         {
-            TriptychProof &proof = *proofs[i_proofs];
+            const TriptychProof &proof = *proofs[i_proofs];
 
             // Per-proof random weights
             key w1 = ZERO;

@@ -42,6 +42,6 @@ namespace rct
     rct::key get_gen_U();
 
     TriptychProof triptych_prove(const keyV &, const keyV &, const key &, const size_t, const key &, const key &, const size_t, const size_t, const key &);
-    bool triptych_verify(const keyV &, const keyV &, const keyV &, std::vector<TriptychProof *> &, const size_t, const size_t, const keyV &);
+    bool triptych_verify(const keyV &, const keyV &, const keyV &, const std::vector<const TriptychProof *> &, const size_t, const size_t, const keyV &);
 }
 
