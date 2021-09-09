@@ -74,6 +74,11 @@ std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const s
 ///
 std::size_t compute_rangeproof_grouping_size(const std::size_t num_amounts, const std::size_t max_num_splits);
 
+// make BP+ range proofs
+std::vector<rct::BulletproofPlus> make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
+    const std::vector<rct::key> &amount_commitment_blinding_factors,
+    const std::size_t max_rangeproof_splits);
+
 template <typename MockTxType>
 struct MockENote
 {
