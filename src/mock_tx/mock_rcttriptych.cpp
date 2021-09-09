@@ -414,7 +414,7 @@ bool MockTxTriptych::validate_tx_input_proofs() const
     /// verify input membership/ownership/unspentness proofs
     for (std::size_t input_index{0}; input_index < m_tx_proofs.size(); ++input_index)
     {
-        std::vector<rct::TriptychProof*> proof;
+        std::vector<const rct::TriptychProof*> proof;
         proof.emplace_back(&(m_tx_proofs[input_index].m_triptych_proof));
 
         // note: only verify one triptych proof at a time (not batchable in my approach where all inputs define separate rings)
