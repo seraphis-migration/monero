@@ -79,6 +79,9 @@ std::vector<rct::BulletproofPlus> make_bpp_rangeproofs(const std::vector<rct::xm
     const std::vector<rct::key> &amount_commitment_blinding_factors,
     const std::size_t max_rangeproof_splits);
 
+// check if two commitment sets balance based on a sum to zero
+bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2);
+
 template <typename MockTxType>
 struct MockENote
 {
@@ -114,9 +117,6 @@ struct MockDest
     // convert this destination into an e-note (recommended)
     MockENote<MockTxType> to_enote() const;
 };
-
-// check if two commitment sets balance based on a sum to zero
-bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2);
 
 // check if input and output amounts balance
 template <typename MockTxType>
