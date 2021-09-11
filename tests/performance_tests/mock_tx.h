@@ -28,7 +28,8 @@
 
 #pragma once
 
-#include "mock_tx/mock_rctclsag.h"
+#include "mock_tx/mock_rct_clsag.h"
+#include "mock_tx/mock_tx_utils.h"
 #include "performance_tests.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -83,15 +84,17 @@ class test_mock_tx
                     else if (params.out_count > params.in_count)
                         input_amounts.back() += amount_chunk*(params.out_count - params.in_count);
 
-                    // inputs
-                    auto inputs{mock_tx::gen_mock_tx_inputs<mock_tx::MockTxCLSAG>(input_amounts, params.n, params.m)};
-
-                    // destinations
-                    auto destinations{mock_tx::gen_mock_tx_dests<mock_tx::MockTxCLSAG>(output_amounts)};
+                    // mock params
+                    mock_tx::MockTxParamPack tx_params;
+                    
+                    tx_params.max_rangeproof_splits = params.num_rangeproof_splits;
+                    tx_params.ref_set_decomp_n = params.n;
+                    tx_params.ref_set_decomp_m = params.m;
 
                     // make tx
-                    mock_tx::MockTxCLSAGParams tx_params{params.num_rangeproof_splits};
-                    m_txs.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations, tx_params));
+                    m_txs.push_back(
+                        mock_tx::make_mock_tx<mock_tx::MockTxCLSAG>(tx_params, input_amounts, output_amounts)
+                        );
                 }
                 catch (...)
                 {

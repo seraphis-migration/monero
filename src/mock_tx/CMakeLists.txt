@@ -27,10 +27,11 @@
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 set(mock_tx_sources
-  mock_tx_interface.cpp
-  mock_tx_common_rct.cpp
-  mock_rctclsag.cpp
-  mock_rcttriptych.cpp)
+  mock_tx.cpp
+  mock_tx_utils.cpp
+  mock_tx_rct_base.cpp
+  mock_tx_rct_components.cpp
+  mock_rct_clsag.cpp)
 
 monero_find_all_headers(mock_tx_headers, "${CMAKE_CURRENT_SOURCE_DIR}")
 
