@@ -33,8 +33,10 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "misc_log_ex.h"
 #include "mock_tx.h"
 #include "mock_tx_rct_base.h"
+#include "mock_tx_rct_components.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -66,7 +68,7 @@ public:
             m_range_proofs{std::move(range_proofs)},
             m_tx_proofs{std::move(tx_proofs)}
         {
-            CHECK_AND_ASSERT_THROW_MSG(validate_tx_semantics(), "Failed to assemble MockTxCLSAG.");
+            CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble MockTxCLSAG.");
         }
 
     /// normal constructor: from existing tx byte blob

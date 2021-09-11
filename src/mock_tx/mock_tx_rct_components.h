@@ -54,7 +54,7 @@ namespace mock_tx
 ////
 // MockENoteRctV1 - RCT ENote V1
 ///
-struct MockENoteRctV1 : public MockENoteRct
+struct MockENoteRctV1 final : public MockENoteRct
 {
     // memo
     crypto::public_key m_enote_pubkey;
@@ -64,26 +64,50 @@ struct MockENoteRctV1 : public MockENoteRct
     {
         return MockENoteRct::get_size_bytes() + 32 + 8;
     }
+
+    /**
+    * brief: make_v1 - make a V1 RCT ENote
+    * param: onetime_privkey -
+    * param: amount_blinding_factor -
+    * param: amount -
+    */
+    void make_v1(const crypto::secret_key &onetime_privkey,
+        const crypto::secret_key &amount_blinding_factor,
+        const rct::xmr_amount amount);
+    /**
+    * brief: gen_v1 - generate a V1 RCT ENote (random)
+    */
+    void gen_v1();
 };
 
 ////
 // MockENoteImageRctV1 - RCT ENote Image V1
 ///
-using MockENoteImageRctV1 = MockENoteImageRct;
+struct MockENoteImageRctV1 final : public MockENoteImageRct
+{
+    static std::size_t get_size_bytes() { return get_size_bytes_base(); }
+};
 
 ////
 // MockInputRctV1 - RCT Input V1
 ///
-struct MockInputRctV1 : public MockInputRct<MockENoteRctV1>
+struct MockInputRctV1 final : public MockInputRct<MockENoteRctV1>
 {
-    // convert this input to an e-note-image
+    // convert this input to an e-note-image (CryptoNote style)
     MockENoteImageRctV1 to_enote_image_v1(const crypto::secret_key &pseudo_blinding_factor) const;
+
+    /**
+    * brief: gen_v1 - generate a V1 RCT Input (random)
+    * param: amount -
+    * param: ref_set_size -
+    */
+    void gen_v1(const rct::xmr_amount amount, const std::size_t ref_set_size);
 };
 
 ////
 // MockDestRctV1 - RCT Destination V1
 ///
-struct MockDestRctV1 : public MockDestRCT
+struct MockDestRctV1 final : public MockDestRct
 {
     // memo
     crypto::public_key m_enote_pubkey;
@@ -91,6 +115,12 @@ struct MockDestRctV1 : public MockDestRCT
 
     // convert this destination into a V1 enote
     MockENoteRctV1 to_enote_v1() const;
+
+    /**
+    * brief: gen_mock_tx_rct_dest_v1 - generate a V1 RCT Destination (random)
+    * param: amount -
+    */
+    void gen_v1(const rct::xmr_amount amount);
 };
 
 ////
@@ -108,35 +138,6 @@ struct MockRctProofV1 final
 /////////////////////////////////////////// Make Mock Pieces ///////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/**
-* brief: make_mock_tx_rct_enote_v1 - make a V1 RCT ENote
-* param: onetime_privkey -
-* param: amount_blinding_factor -
-* param: amount -
-* outparam: enote_out -
-*/
-void make_mock_tx_rct_enote_v1(const crypto::secret_key &onetime_privkey,
-    const crypto::secret_key &amount_blinding_factor,
-    const rct::xmr_amount amount,
-    MockENoteRctV1 &enote_out);
-/**
-* brief: gen_mock_tx_rct_enote_v1 - generate a V1 RCT ENote (all random)
-* outparam: enote_out -
-*/
-void gen_mock_tx_rct_enote_v1(MockENoteRctV1 &enote_out);
-/**
-* brief: gen_mock_tx_rct_dest_v1 - generate a V1 RCT Destination (all random)
-* param: amount -
-* outparam: dest_out -
-*/
-void gen_mock_tx_rct_dest_v1(const rct::xmr_amount amount, MockDestRctV1 &dest_out);
-/**
-* brief: gen_mock_tx_rct_dest_v1 - generate a V1 RCT Input (all random)
-* param: amount -
-* param: ref_set_size -
-* outparam: input_out -
-*/
-void gen_mock_tx_rct_input_v1(const rct::xmr_amount amount, const std::size_t ref_set_size, MockInputRctV1 &input_out);
 /**
 * brief: gen_mock_rct_inputs_v1 - generate a set of V1 RCT Inputs (all random)
 *   - The number of inputs to make is inferred from amounts.size().
@@ -160,15 +161,18 @@ std::vector<MockDestRctV1> gen_mock_rct_dests_v1(const std::vector<rct::xmr_amou
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // make transfers: input images, outputs, balance proof
-void make_tx_transfers(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
+void make_tx_transfers_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<MockDestRctV1> &destinations,
-    std::vector<rct::xmr_amount> &output_amounts,
-    std::vector<rct::key> &output_amount_commitment_blinding_factors,
-    std::vector<crypto::secret_key> &pseudo_blinding_factors);
+    std::vector<MockENoteImageRctV1> &input_images_out,
+    std::vector<MockENoteRctV1> &outputs_out,
+    std::vector<rct::xmr_amount> &output_amounts_out,
+    std::vector<rct::key> &output_amount_commitment_blinding_factors_out,
+    std::vector<crypto::secret_key> &pseudo_blinding_factors_out);
 
 // make input proofs: membership, ownership, unspentness (i.e. prove key images are constructed correctly)
-void make_tx_input_proofs(const std::vector<MockTxCLSAGInput> &inputs_to_spend,
-    const std::vector<crypto::secret_key> &pseudo_blinding_factors);
+void make_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
+    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
+    std::vector<MockRctProofV1> &proofs_out);
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -196,7 +200,7 @@ bool validate_mock_tx_rct_linking_tags_v1(const std::vector<MockRctProofV1> &pro
 */
 bool validate_mock_tx_rct_amount_balance_v1(const std::vector<MockENoteImageRctV1> &images,
     const std::vector<MockENoteRctV1> &outputs,
-    const std::vector<BulletproofPlus> &range_proofs,
+    const std::vector<rct::BulletproofPlus> &range_proofs,
     const bool defer_batchable);
 /**
 * brief: validate_mock_tx_rct_proofs_v1 - validate a set of V1 RCT proofs from a tx

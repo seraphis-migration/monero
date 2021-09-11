@@ -29,18 +29,14 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_rctclsag.h"
+#include "mock_rct_clsag.h"
 
 //local headers
-#include "crypto/crypto.h"
-#include "crypto/crypto-ops.h"
-#include "device/device.hpp"
 #include "misc_log_ex.h"
-#include "mock_tx_common_rct.h"
-#include "mock_tx_interface.h"
+#include "mock_tx_rct_base.h"
+#include "mock_tx_rct_components.h"
+#include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
-#include "ringct/rctOps.h"
-#include "ringct/rctSigs.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -52,248 +48,6 @@
 
 namespace mock_tx
 {
-//-----------------------------------------------------------------
-MockENoteImageRctV1 MockInputRctV1::to_enote_image(const crypto::secret_key &pseudo_blinding_factor) const
-{
-    MockENoteImageRctV1 image;
-
-    // C' = x' G + a H
-    image.m_pseudo_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(pseudo_blinding_factor)));
-
-    // KI = ko * Hp(Ko)
-    crypto::public_key pubkey;
-    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_onetime_privkey, pubkey), "Failed to derive public key");
-    crypto::generate_key_image(pubkey, m_onetime_privkey, image.m_key_image);
-
-    // KI_stored = (1/8)*KI
-    // - for efficiently checking that the key image is in the prime subgroup during tx verification
-    rct::key storable_ki;
-    rct::scalarmultKey(storable_ki, rct::ki2rct(image.m_key_image), rct::INV_EIGHT);
-    image.m_key_image = rct::rct2ki(storable_ki);
-
-    return image;
-}
-//-----------------------------------------------------------------
-MockENoteRctV1 MockTxCLSAGDest::to_enote() const
-{
-    MockENoteRctV1 enote;
-    MockDestRCT::to_enote_rct(enote);
-
-    return enote;
-}
-//-----------------------------------------------------------------
-template <>
-std::vector<MockInputRctV1> gen_mock_tx_inputs<MockTxCLSAG>(const std::vector<rct::xmr_amount> &amounts,
-    const std::size_t ref_set_decomp_n,
-    const std::size_t ref_set_decomp_m)
-{
-    CHECK_AND_ASSERT_THROW_MES(ref_set_decomp_n > 0, "Tried to create inputs with no ref set size.");
-    std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};
-
-    std::vector<MockInputRctV1> inputs;
-
-    if (amounts.size() > 0)
-    {
-        inputs.resize(amounts.size());
-
-        for (std::size_t input_index{0}; input_index < amounts.size(); ++input_index)
-        {
-            // \pi = rand()
-            inputs[input_index].m_input_ref_set_real_index = crypto::rand_idx(ref_set_size);
-
-            // prep real input
-            inputs[input_index].m_onetime_privkey = rct::rct2sk(rct::skGen());
-            inputs[input_index].m_amount_blinding_factor = rct::rct2sk(rct::skGen());
-            inputs[input_index].m_amount = amounts[input_index];
-
-            // construct reference set
-            inputs[input_index].m_input_ref_set.resize(ref_set_size);
-
-            for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
-            {
-                // insert real input at \pi
-                if (ref_index == inputs[input_index].m_input_ref_set_real_index)
-                {
-                    // make an enote at m_input_ref_set[ref_index]
-                    make_mock_tx_enote_rct(inputs[input_index].m_onetime_privkey,
-                            inputs[input_index].m_amount_blinding_factor,
-                            inputs[input_index].m_amount,
-                            inputs[input_index].m_input_ref_set[ref_index]);
-                }
-                // add random enote
-                else
-                {
-                    // generate a random enote at m_input_ref_set[ref_index]
-                    gen_mock_tx_enote_rct(inputs[input_index].m_input_ref_set[ref_index]);
-                }
-            }
-        }
-    }
-
-    return inputs;
-}
-//-----------------------------------------------------------------
-template <>
-std::vector<MockTxCLSAGDest> gen_mock_tx_dests<MockTxCLSAG>(const std::vector<rct::xmr_amount> &amounts)
-{
-    std::vector<MockTxCLSAGDest> destinations;
-
-    if (amounts.size() > 0)
-    {
-        destinations.resize(amounts.size());
-
-        for (std::size_t dest_index{0}; dest_index < amounts.size(); ++dest_index)
-        {
-            gen_mock_tx_dest_rct(amounts[dest_index], destinations[dest_index]);
-        }
-    }
-
-    return destinations;
-}
-//-----------------------------------------------------------------
-void MockTxCLSAG::make_tx_transfers(const std::vector<MockInputRctV1> &inputs_to_spend,
-    const std::vector<MockTxCLSAGDest> &destinations,
-    std::vector<rct::xmr_amount> &output_amounts,
-    std::vector<rct::key> &output_amount_commitment_blinding_factors,
-    std::vector<crypto::secret_key> &pseudo_blinding_factors)
-{
-    // note: blinding factors need to balance for balance proof
-    output_amounts.clear();
-    output_amount_commitment_blinding_factors.clear();
-    pseudo_blinding_factors.clear();
-
-    // 1. get aggregate blinding factor of outputs
-    crypto::secret_key sum_output_blinding_factors = rct::rct2sk(rct::zero());
-
-    output_amounts.reserve(destinations.size());
-    output_amount_commitment_blinding_factors.reserve(destinations.size());
-
-    for (const auto &dest : destinations)
-    {
-        // build output set
-        m_outputs.emplace_back(dest.to_enote());
-
-        // add output's amount commitment blinding factor
-        sc_add(&sum_output_blinding_factors, &sum_output_blinding_factors, &dest.m_amount_blinding_factor);
-
-        // prepare for range proofs
-        output_amounts.emplace_back(dest.m_amount);
-        output_amount_commitment_blinding_factors.emplace_back(rct::sk2rct(dest.m_amount_blinding_factor));
-    }
-
-    // 2. create all but last input image with random pseudo blinding factor
-    pseudo_blinding_factors.resize(inputs_to_spend.size(), rct::rct2sk(rct::zero()));
-
-    for (std::size_t input_index{0}; input_index + 1 < inputs_to_spend.size(); ++input_index)
-    {
-        // built input image set
-        crypto::secret_key pseudo_blinding_factor{rct::rct2sk(rct::skGen())};
-        m_input_images.emplace_back(inputs_to_spend[input_index].to_enote_image(pseudo_blinding_factor));
-
-        // subtract blinding factor from sum
-        sc_sub(&sum_output_blinding_factors, &sum_output_blinding_factors, &pseudo_blinding_factor);
-
-        // save input's pseudo amount commitment blinding factor
-        pseudo_blinding_factors[input_index] = pseudo_blinding_factor;
-    }
-
-    // 3. set last input image's pseudo blinding factor equal to
-    //    sum(output blinding factors) - sum(input image blinding factors)_except_last
-    m_input_images.emplace_back(inputs_to_spend.back().to_enote_image(sum_output_blinding_factors));
-    pseudo_blinding_factors.back() = sum_output_blinding_factors;
-}
-//-----------------------------------------------------------------
-void MockTxCLSAG::make_tx_input_proofs(const std::vector<MockInputRctV1> &inputs_to_spend,
-    const std::vector<crypto::secret_key> &pseudo_blinding_factors)
-{
-    /// membership + ownership/unspentness proofs
-    // - clsag for each input
-    for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
-    {
-        // convert tx info to form expected by proveRctCLSAGSimple()
-        rct::ctkeyV referenced_enotes_converted;
-        rct::ctkey spent_enote_converted;
-        referenced_enotes_converted.reserve(inputs_to_spend[0].m_input_ref_set.size());
-
-        // vector of pairs <onetime addr, amount commitment>
-        for (const auto &input_ref : inputs_to_spend[input_index].m_input_ref_set)
-            referenced_enotes_converted.emplace_back(rct::ctkey{rct::pk2rct(input_ref.m_onetime_address),
-                rct::pk2rct(input_ref.m_amount_commitment)});
-
-        // spent enote privkeys <ko, x>
-        spent_enote_converted.dest = rct::sk2rct(inputs_to_spend[input_index].m_onetime_privkey);
-        spent_enote_converted.mask = rct::sk2rct(inputs_to_spend[input_index].m_amount_blinding_factor);
-
-        // create CLSAG proof and save it
-        MockCLSAGProof mock_clsag_proof;
-        mock_clsag_proof.m_clsag_proof = rct::proveRctCLSAGSimple(
-                rct::zero(),                  // empty message for mockup
-                referenced_enotes_converted,  // vector of pairs <Ko_i, C_i> for referenced enotes
-                spent_enote_converted,        // pair <ko, x> for input's onetime privkey and amount blinding factor
-                rct::sk2rct(pseudo_blinding_factors[input_index]),       // pseudo-output blinding factor x'
-                rct::pk2rct(m_input_images[input_index].m_pseudo_amount_commitment),  // pseudo-output commitment C'
-                nullptr, nullptr, nullptr,    // no multisig
-                inputs_to_spend[input_index].m_input_ref_set_real_index,  // real index in input set
-                hw::get_device("default")
-            );
-
-        mock_clsag_proof.m_referenced_enotes_converted = std::move(referenced_enotes_converted);
-
-        m_tx_proofs.emplace_back(mock_clsag_proof);
-    }
-}
-//-----------------------------------------------------------------
-void MockTxCLSAG::make_tx(const std::vector<MockInputRctV1> &inputs_to_spend,
-        const std::vector<MockTxCLSAGDest> &destinations,
-        const MockTxCLSAGParams &param_pack)
-{
-    /// validate inputs and prepare to make tx
-    CHECK_AND_ASSERT_THROW_MES(m_outputs.size() == 0, "Tried to make tx when tx already exists.");
-    CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any destinations.");
-    CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() > 0, "Tried to make tx without any inputs.");
-
-    // amounts must balance
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(inputs_to_spend, destinations),
-        "Tried to make tx with unbalanced amounts.");
-
-    // validate tx inputs
-    std::size_t ref_set_size{inputs_to_spend[0].m_input_ref_set.size()};
-
-    for (const auto &input : inputs_to_spend)
-    {
-        // inputs must have same number of ring members
-        CHECK_AND_ASSERT_THROW_MES(ref_set_size == input.m_input_ref_set.size(),
-            "Tried to make tx with inputs that don't have the same input reference set sizes.");
-
-        // input real spend indices must not be malformed
-        CHECK_AND_ASSERT_THROW_MES(input.m_input_ref_set_real_index < input.m_input_ref_set.size(),
-            "Tried to make tx with an input that has a malformed real spend index.");
-    }
-
-    /// prepare tx
-    m_outputs.clear();
-    m_input_images.clear();
-    m_tx_proofs.clear();
-    m_outputs.reserve(destinations.size());
-    m_input_images.reserve(inputs_to_spend.size());
-    m_tx_proofs.reserve(inputs_to_spend.size());
-
-    /// make tx
-    std::vector<rct::xmr_amount> output_amounts;
-    std::vector<rct::key> output_amount_commitment_blinding_factors;
-    std::vector<crypto::secret_key> pseudo_blinding_factors;
-
-    make_tx_transfers(inputs_to_spend,
-        destinations,
-        output_amounts,
-        output_amount_commitment_blinding_factors,
-        pseudo_blinding_factors);
-    m_range_proofs = make_bpp_rangeproofs(output_amounts,
-        output_amount_commitment_blinding_factors,
-        param_pack.max_rangeproof_splits);
-    make_tx_input_proofs(inputs_to_spend,
-        pseudo_blinding_factors);
-}
 //-----------------------------------------------------------------
 bool MockTxCLSAG::validate_tx_semantics() const
 {
@@ -335,7 +89,7 @@ bool MockTxCLSAG::validate_tx_linking_tags() const
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_amount_balance() const
+bool MockTxCLSAG::validate_tx_amount_balance(const bool defer_batchable) const
 {
     if (!validate_mock_tx_rct_amount_balance_v1(m_input_images, m_outputs, m_range_proofs, defer_batchable))
         return false;
@@ -343,7 +97,7 @@ bool MockTxCLSAG::validate_tx_amount_balance() const
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_input_proofs() const
+bool MockTxCLSAG::validate_tx_input_proofs(const bool defer_batchable) const
 {
     if (!validate_mock_tx_rct_proofs_v1(m_tx_proofs, m_input_images))
         return false;
@@ -391,7 +145,7 @@ std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &pa
     std::vector<MockInputRctV1> inputs_to_spend{gen_mock_rct_inputs_v1(in_amounts, ref_set_size)};
 
     // make mock destinations
-    std::vector<MockDestCLSAG> destinations{gen_mock_rct_dests_v1(out_amounts)};
+    std::vector<MockDestRctV1> destinations{gen_mock_rct_dests_v1(out_amounts)};
 
     /// make tx
     // tx components
@@ -419,10 +173,7 @@ std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &pa
         pseudo_blinding_factors,
         tx_proofs);
 
-    return std::make_shared<MockTxCLSAG>(std::vector<MockENoteImageRctV1> &input_images,
-        std::vector<MockENoteRctV1> &outputs,
-        std::vector<rct::BulletproofPlus> &range_proofs,
-        std::vector<MockRctProofV1> &tx_proofs);
+    return std::make_shared<MockTxCLSAG>(input_images, outputs, range_proofs, tx_proofs);
 }
 //-----------------------------------------------------------------
 template <>
