@@ -73,22 +73,7 @@ public:
     // validate the transaction
     // - if 'defer_batchable' is set, then batchable validation steps shouldn't be executed
     ///
-    virtual bool validate(const bool defer_batchable = false) const final
-    {
-        if (!validate_tx_semantics())
-            return false;
-
-        if (!validate_tx_linking_tags())
-            return false;
-
-        if (!validate_tx_amount_balance(defer_batchable))
-            return false;
-
-        if (!validate_tx_input_proofs(defer_batchable))
-            return false;
-
-        return true;
-    }
+    virtual bool validate(const bool defer_batchable = false) const;
 
     /// get size of tx
     virtual std::size_t get_size_bytes() const = 0;

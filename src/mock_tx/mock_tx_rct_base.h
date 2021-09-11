@@ -101,13 +101,13 @@ struct MockInputRct
 ///
 struct MockDestRct
 {
-    // destination (for creating an e-note to send an amount to someone)
+    /// destination (for creating an e-note to send an amount to someone)
 
     crypto::public_key m_onetime_address;
     crypto::secret_key m_amount_blinding_factor;
     rct::xmr_amount m_amount;
 
-    // convert this destination into an e-note
+    /// convert this destination into an e-note
     virtual void to_enote_rct_base(MockENoteRct &enote_inout) const final;
 
     /**

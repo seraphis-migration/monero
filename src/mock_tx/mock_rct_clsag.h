@@ -80,6 +80,13 @@ public:
     /// get size of tx
     std::size_t get_size_bytes() const override;
 
+    /// validate tx
+    bool validate(const bool defer_batchable = false) const override
+    {
+        // punt to the parent class
+        return this->MockTx::validate(defer_batchable);
+    }
+
     /// get range proof
     const std::vector<rct::BulletproofPlus>& get_range_proofs() const {return m_range_proofs;}
 

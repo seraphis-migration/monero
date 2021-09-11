@@ -27,7 +27,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "crypto/crypto.h"
-#include "mock_tx/mock_rctclsag.h"
+#include "mock_tx/mock_rct_clsag.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
@@ -59,18 +59,20 @@ void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
   {
     try
     {
-      // inputs
-      auto inputs{mock_tx::gen_mock_tx_inputs<mock_tx::MockTxCLSAG>(gen.input_amounts, gen.ref_set_size, 1)};
-
-      // destinations
-      auto destinations{mock_tx::gen_mock_tx_dests<mock_tx::MockTxCLSAG>(gen.output_amounts)};
+      // mock params
+      mock_tx::MockTxParamPack tx_params;
+      
+      tx_params.max_rangeproof_splits = gen.num_rangeproof_splits;
+      tx_params.ref_set_decomp_n = gen.ref_set_size;
+      tx_params.ref_set_decomp_m = 1;
 
       // make tx
-      mock_tx::MockTxCLSAGParams tx_params{gen.num_rangeproof_splits};
-      mock_tx::MockTxCLSAG tx{inputs, destinations, tx_params};
+      std::shared_ptr<mock_tx::MockTxCLSAG> tx{
+          mock_tx::make_mock_tx<mock_tx::MockTxCLSAG>(tx_params, gen.input_amounts, gen.output_amounts)
+        };
 
       // validate tx
-      EXPECT_TRUE(tx.validate());
+      EXPECT_TRUE(tx->validate());
     }
     catch (...)
     {
@@ -92,15 +94,17 @@ void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
       // update expected result
       expected_result = gen.expected_result;
 
-      // inputs
-      auto inputs{mock_tx::gen_mock_tx_inputs<mock_tx::MockTxCLSAG>(gen.input_amounts, gen.ref_set_size, 1)};
+      // mock params
+      mock_tx::MockTxParamPack tx_params;
+      
+      tx_params.max_rangeproof_splits = gen.num_rangeproof_splits;
+      tx_params.ref_set_decomp_n = gen.ref_set_size;
+      tx_params.ref_set_decomp_m = 1;
 
-      // destinations
-      auto destinations{mock_tx::gen_mock_tx_dests<mock_tx::MockTxCLSAG>(gen.output_amounts)};
-
-      // make tx to validate
-      mock_tx::MockTxCLSAGParams tx_params{gen.num_rangeproof_splits};
-      txs_to_verify.push_back(std::make_shared<mock_tx::MockTxCLSAG>(inputs, destinations, tx_params));
+      // make tx
+      txs_to_verify.push_back(
+          mock_tx::make_mock_tx<mock_tx::MockTxCLSAG>(tx_params, gen.input_amounts, gen.output_amounts)
+        );
 
       // sanity check that rangeproof split is actually splitting the rangeproof
       if (gen.num_rangeproof_splits > 0 && gen.output_amounts.size() > 1)
@@ -115,7 +119,7 @@ void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
   try
   {
     // validate tx
-    EXPECT_TRUE(mock_tx::validate_mock_txs(txs_to_verify));
+    EXPECT_TRUE(mock_tx::validate_mock_txs<mock_tx::MockTxCLSAG>(txs_to_verify));
   }
   catch (...)
   {

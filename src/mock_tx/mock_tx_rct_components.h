@@ -56,7 +56,7 @@ namespace mock_tx
 ///
 struct MockENoteRctV1 final : public MockENoteRct
 {
-    // memo
+    /// memo
     crypto::public_key m_enote_pubkey;
     rct::xmr_amount m_encoded_amount;
 
@@ -93,7 +93,7 @@ struct MockENoteImageRctV1 final : public MockENoteImageRct
 ///
 struct MockInputRctV1 final : public MockInputRct<MockENoteRctV1>
 {
-    // convert this input to an e-note-image (CryptoNote style)
+    /// convert this input to an e-note-image (CryptoNote style)
     MockENoteImageRctV1 to_enote_image_v1(const crypto::secret_key &pseudo_blinding_factor) const;
 
     /**
@@ -109,11 +109,11 @@ struct MockInputRctV1 final : public MockInputRct<MockENoteRctV1>
 ///
 struct MockDestRctV1 final : public MockDestRct
 {
-    // memo
+    /// memo
     crypto::public_key m_enote_pubkey;
     rct::xmr_amount m_encoded_amount;
 
-    // convert this destination into a V1 enote
+    /// convert this destination into a V1 enote
     MockENoteRctV1 to_enote_v1() const;
 
     /**
@@ -128,9 +128,9 @@ struct MockDestRctV1 final : public MockDestRct
 ///
 struct MockRctProofV1 final
 {
-    // a CLSAG proof
+    /// a CLSAG proof
     rct::clsag m_clsag_proof;
-    // vector of pairs <Ko_i, C_i> for referenced enotes
+    /// vector of pairs <Ko_i, C_i> for referenced enotes
     rct::ctkeyV m_referenced_enotes_converted;
 };
 
