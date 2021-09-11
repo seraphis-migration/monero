@@ -46,42 +46,39 @@
 namespace mock_tx
 {
 //-----------------------------------------------------------------
-void MockDestRCT::to_enote_rct(MockENoteRCT &enote_inout) const
+void MockENoteRct::make_base(const crypto::secret_key &onetime_privkey,
+    const crypto::secret_key &amount_blinding_factor,
+    const rct::xmr_amount amount)
 {
-    enote_inout.m_enote_pubkey = m_enote_pubkey;
-    enote_inout.m_encoded_amount = m_encoded_amount;
+    // Ko = ko G
+    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(onetime_privkey, m_onetime_address),
+        "Failed to derive public key");
+
+    // C = x G + a H
+    m_amount_commitment = rct::rct2pk(rct::commit(amount, rct::sk2rct(amount_blinding_factor)));
+}
+//-----------------------------------------------------------------
+void MockENoteRct::gen_base()
+{
+    // all random
+    m_onetime_address = rct::rct2pk(rct::pkGen());
+    m_amount_commitment = rct::rct2pk(rct::pkGen());
+}
+//-----------------------------------------------------------------
+void MockDestRct::gen_base(const rct::xmr_amount amount)
+{
+    // all random except amount
+    m_onetime_address = rct::rct2pk(rct::pkGen());
+    m_amount_blinding_factor = rct::rct2sk(rct::skGen());
+    m_amount = amount;
+}
+//-----------------------------------------------------------------
+void MockDestRct::to_enote_rct_base(MockENoteRct &enote_inout) const
+{
     enote_inout.m_onetime_address = m_onetime_address;
 
     // C = x G + a H
     enote_inout.m_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(m_amount_blinding_factor)));
-}
-//-----------------------------------------------------------------
-void make_mock_tx_rct_enote(const crypto::secret_key &onetime_privkey,
-    const crypto::secret_key &amount_blinding_factor,
-    const rct::xmr_amount amount,
-    MockENoteRCT &enote_inout)
-{
-    // Ko = ko G
-    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(onetime_privkey, enote_inout.m_onetime_address),
-        "Failed to derive public key");
-
-    // C = x G + a H
-    enote_inout.m_amount_commitment = rct::rct2pk(rct::commit(amount, rct::sk2rct(amount_blinding_factor)));
-}
-//-----------------------------------------------------------------
-void gen_mock_tx_rct_enote(MockENoteRCT &enote_inout)
-{
-    // all random
-    enote_inout.m_onetime_address = rct::rct2pk(rct::pkGen());
-    enote_inout.m_amount_commitment = rct::rct2pk(rct::pkGen());
-}
-//-----------------------------------------------------------------
-void gen_mock_tx_rct_dest(const rct::xmr_amount amount, MockDestRCT &dest_inout)
-{
-    // all random except amount
-    dest_inout.m_onetime_address = rct::rct2pk(rct::pkGen());
-    dest_inout.m_amount_blinding_factor = rct::rct2sk(rct::skGen());
-    dest_inout.m_amount = amount;
 }
 //-----------------------------------------------------------------
 } //namespace mock_tx

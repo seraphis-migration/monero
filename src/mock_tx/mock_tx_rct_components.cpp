@@ -53,6 +53,28 @@
 namespace mock_tx
 {
 //-----------------------------------------------------------------
+void MockENoteRctV1::make_v1(const crypto::secret_key &onetime_privkey,
+    const crypto::secret_key &amount_blinding_factor,
+    const rct::xmr_amount amount)
+{
+    // make base of enote
+    this->make_base(onetime_privkey, amount_blinding_factor, amount);
+
+    // memo: random
+    m_enote_pubkey = rct::rct2pk(rct::pkGen());
+    m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+}
+//-----------------------------------------------------------------
+void MockENoteRctV1::gen_v1()
+{
+    // gen base of enote
+    this->gen_base();
+
+    // memo: random
+    m_enote_pubkey = rct::rct2pk(rct::pkGen());
+    m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+}
+//-----------------------------------------------------------------
 MockENoteImageRctV1 MockInputRctV1::to_enote_image_v1(const crypto::secret_key &pseudo_blinding_factor) const
 {
     MockENoteImageRctV1 image;
@@ -74,78 +96,54 @@ MockENoteImageRctV1 MockInputRctV1::to_enote_image_v1(const crypto::secret_key &
     return image;
 }
 //-----------------------------------------------------------------
-MockENoteRctV1 MockDestRctV1::to_enote_v1() const
-{
-    MockENoteRctV1 enote;
-    MockDestRCT::to_enote_rct(enote);
-
-    return enote;
-}
-//-----------------------------------------------------------------
-void make_mock_tx_rct_enote_v1(const crypto::secret_key &onetime_privkey,
-    const crypto::secret_key &amount_blinding_factor,
-    const rct::xmr_amount amount,
-    MockENoteRctV1 &enote_out)
-{
-    // make base of enote
-    make_mock_tx_rct_enote(onetime_privkey, amount_blinding_factor, enote_out);
-
-    // memo: random
-    enote_out.m_enote_pubkey = rct::rct2pk(rct::pkGen());
-    enote_out.m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-}
-//-----------------------------------------------------------------
-void gen_mock_tx_rct_enote_v1(MockENoteRctV1 &enote_out)
-{
-    // gen base of enote
-    gen_mock_tx_rct_enote(enote_out);
-
-    // memo: random
-    enote_out.m_enote_pubkey = rct::rct2pk(rct::pkGen());
-    enote_out.m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-}
-//-----------------------------------------------------------------
-void gen_mock_tx_rct_dest_v1(const rct::xmr_amount amount, MockDestRctV1 &dest_out)
-{
-    // gen base of dest
-    gen_mock_tx_rct_dest(amount, dest_out);
-
-    // memo parts: random
-    dest_inout.m_enote_pubkey = rct::rct2pk(rct::pkGen());
-    dest_inout.m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-}
-//-----------------------------------------------------------------
-void gen_mock_tx_rct_input_v1(const rct::xmr_amount amount, const std::size_t ref_set_size, MockInputRctV1 &input_out)
+void MockInputRctV1::gen_v1(const rct::xmr_amount amount, const std::size_t ref_set_size)
 {
     // \pi = rand()
-    input_out.m_input_ref_set_real_index = crypto::rand_idx(ref_set_size);
+    m_input_ref_set_real_index = crypto::rand_idx(ref_set_size);
 
     // prep real input
-    input_out.m_onetime_privkey = rct::rct2sk(rct::skGen());
-    input_out.m_amount_blinding_factor = rct::rct2sk(rct::skGen());
-    input_out.m_amount = amounts[input_index];
+    m_onetime_privkey = rct::rct2sk(rct::skGen());
+    m_amount_blinding_factor = rct::rct2sk(rct::skGen());
+    m_amount = amount;
 
     // construct reference set
-    input_out.m_input_ref_set.resize(ref_set_size);
+    m_input_ref_set.resize(ref_set_size);
 
     for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
     {
         // insert real input at \pi
-        if (ref_index == input_out.m_input_ref_set_real_index)
+        if (ref_index == m_input_ref_set_real_index)
         {
             // make an enote at m_input_ref_set[ref_index]
-            make_mock_tx_rct_enote_v1(input_out.m_onetime_privkey,
-                    input_out.m_amount_blinding_factor,
-                    input_out.m_amount,
-                    input_out.m_input_ref_set[ref_index]);
+            m_input_ref_set[ref_index].make_v1(m_onetime_privkey,
+                    m_amount_blinding_factor,
+                    m_amount);
         }
         // add random enote
         else
         {
             // generate a random enote at m_input_ref_set[ref_index]
-            gen_mock_tx_rct_enote_v1(input_out.m_input_ref_set[ref_index]);
+            m_input_ref_set[ref_index].gen_v1();
         }
     }
+}
+//-----------------------------------------------------------------
+MockENoteRctV1 MockDestRctV1::to_enote_v1() const
+{
+    MockENoteRctV1 enote;
+    MockDestRct::to_enote_rct_base(enote);
+
+    return enote;
+}
+//-----------------------------------------------------------------
+void MockDestRctV1::gen_v1(const rct::xmr_amount amount)
+{
+    // gen base of dest
+    this->gen_base(amount);
+
+    // memo parts: random
+    m_enote_pubkey = rct::rct2pk(rct::pkGen());
+    m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
 }
 //-----------------------------------------------------------------
 std::vector<MockInputRctV1> gen_mock_rct_inputs_v1(const std::vector<rct::xmr_amount> &amounts,
@@ -161,7 +159,7 @@ std::vector<MockInputRctV1> gen_mock_rct_inputs_v1(const std::vector<rct::xmr_am
 
         for (std::size_t input_index{0}; input_index < amounts.size(); ++input_index)
         {
-            gen_mock_tx_rct_input_v1(amounts[input_index], ref_set_size, inputs[input_index]);
+            inputs[input_index].gen_v1(amounts[input_index], ref_set_size);
         }
     }
 
@@ -178,67 +176,74 @@ std::vector<MockDestRctV1> gen_mock_rct_dests_v1(const std::vector<rct::xmr_amou
 
         for (std::size_t dest_index{0}; dest_index < amounts.size(); ++dest_index)
         {
-            gen_mock_tx_rct_dest_v1(amounts[dest_index], destinations[dest_index]);
+            destinations[dest_index].gen_v1(amounts[dest_index]);
         }
     }
 
     return destinations;
 }
 //-----------------------------------------------------------------
-void MockTxCLSAG::make_tx_transfers(const std::vector<MockInputRctV1> &inputs_to_spend,
+void make_tx_transfers_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<MockDestRctV1> &destinations,
-    std::vector<rct::xmr_amount> &output_amounts,
-    std::vector<rct::key> &output_amount_commitment_blinding_factors,
-    std::vector<crypto::secret_key> &pseudo_blinding_factors)
+    std::vector<MockENoteImageRctV1> &input_images_out,
+    std::vector<MockENoteRctV1> &outputs_out,
+    std::vector<rct::xmr_amount> &output_amounts_out,
+    std::vector<rct::key> &output_amount_commitment_blinding_factors_out,
+    std::vector<crypto::secret_key> &pseudo_blinding_factors_out)
 {
     // note: blinding factors need to balance for balance proof
-    output_amounts.clear();
-    output_amount_commitment_blinding_factors.clear();
-    pseudo_blinding_factors.clear();
+    input_images_out.clear();
+    outputs_out.clear();
+    output_amounts_out.clear();
+    output_amount_commitment_blinding_factors_out.clear();
+    pseudo_blinding_factors_out.clear();
 
     // 1. get aggregate blinding factor of outputs
     crypto::secret_key sum_output_blinding_factors = rct::rct2sk(rct::zero());
 
-    output_amounts.reserve(destinations.size());
-    output_amount_commitment_blinding_factors.reserve(destinations.size());
+    input_images_out.reserve(destinations.size());
+    outputs_out.reserve(destinations.size());;
+    output_amounts_out.reserve(destinations.size());
+    output_amount_commitment_blinding_factors_out.reserve(destinations.size());
 
     for (const auto &dest : destinations)
     {
         // build output set
-        m_outputs.emplace_back(dest.to_enote());
+        outputs_out.emplace_back(dest.to_enote_v1());
 
         // add output's amount commitment blinding factor
         sc_add(&sum_output_blinding_factors, &sum_output_blinding_factors, &dest.m_amount_blinding_factor);
 
         // prepare for range proofs
-        output_amounts.emplace_back(dest.m_amount);
-        output_amount_commitment_blinding_factors.emplace_back(rct::sk2rct(dest.m_amount_blinding_factor));
+        output_amounts_out.emplace_back(dest.m_amount);
+        output_amount_commitment_blinding_factors_out.emplace_back(rct::sk2rct(dest.m_amount_blinding_factor));
     }
 
     // 2. create all but last input image with random pseudo blinding factor
-    pseudo_blinding_factors.resize(inputs_to_spend.size(), rct::rct2sk(rct::zero()));
+    pseudo_blinding_factors_out.reserve(inputs_to_spend.size());
 
     for (std::size_t input_index{0}; input_index + 1 < inputs_to_spend.size(); ++input_index)
     {
         // built input image set
         crypto::secret_key pseudo_blinding_factor{rct::rct2sk(rct::skGen())};
-        m_input_images.emplace_back(inputs_to_spend[input_index].to_enote_image(pseudo_blinding_factor));
+        input_images_out.emplace_back(inputs_to_spend[input_index].to_enote_image_v1(pseudo_blinding_factor));
 
         // subtract blinding factor from sum
         sc_sub(&sum_output_blinding_factors, &sum_output_blinding_factors, &pseudo_blinding_factor);
 
         // save input's pseudo amount commitment blinding factor
-        pseudo_blinding_factors[input_index] = pseudo_blinding_factor;
+        pseudo_blinding_factors_out.emplace_back(pseudo_blinding_factor);
     }
 
     // 3. set last input image's pseudo blinding factor equal to
     //    sum(output blinding factors) - sum(input image blinding factors)_except_last
-    m_input_images.emplace_back(inputs_to_spend.back().to_enote_image(sum_output_blinding_factors));
-    pseudo_blinding_factors.back() = sum_output_blinding_factors;
+    input_images_out.emplace_back(inputs_to_spend.back().to_enote_image_v1(sum_output_blinding_factors));
+    pseudo_blinding_factors_out.emplace_back(sum_output_blinding_factors);
 }
 //-----------------------------------------------------------------
-void MockTxCLSAG::make_tx_input_proofs(const std::vector<MockInputRctV1> &inputs_to_spend,
-    const std::vector<crypto::secret_key> &pseudo_blinding_factors)
+void make_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
+    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
+    std::vector<MockRctProofV1> &proofs_out)
 {
     /// membership + ownership/unspentness proofs
     // - clsag for each input
@@ -259,13 +264,13 @@ void MockTxCLSAG::make_tx_input_proofs(const std::vector<MockInputRctV1> &inputs
         spent_enote_converted.mask = rct::sk2rct(inputs_to_spend[input_index].m_amount_blinding_factor);
 
         // create CLSAG proof and save it
-        MockCLSAGProof mock_clsag_proof;
+        MockRctProofV1 mock_clsag_proof;
         mock_clsag_proof.m_clsag_proof = rct::proveRctCLSAGSimple(
                 rct::zero(),                  // empty message for mockup
                 referenced_enotes_converted,  // vector of pairs <Ko_i, C_i> for referenced enotes
                 spent_enote_converted,        // pair <ko, x> for input's onetime privkey and amount blinding factor
                 rct::sk2rct(pseudo_blinding_factors[input_index]),       // pseudo-output blinding factor x'
-                rct::pk2rct(m_input_images[input_index].m_pseudo_amount_commitment),  // pseudo-output commitment C'
+                rct::commit(inputs_to_spend[input_index].m_amount, rct::sk2rct(pseudo_blinding_factors[input_index])),  // pseudo-output commitment C'
                 nullptr, nullptr, nullptr,    // no multisig
                 inputs_to_spend[input_index].m_input_ref_set_real_index,  // real index in input set
                 hw::get_device("default")
@@ -273,7 +278,7 @@ void MockTxCLSAG::make_tx_input_proofs(const std::vector<MockInputRctV1> &inputs
 
         mock_clsag_proof.m_referenced_enotes_converted = std::move(referenced_enotes_converted);
 
-        m_tx_proofs.emplace_back(mock_clsag_proof);
+        proofs_out.emplace_back(mock_clsag_proof);
     }
 }
 //-----------------------------------------------------------------
@@ -303,7 +308,7 @@ bool validate_mock_tx_rct_linking_tags_v1(const std::vector<MockRctProofV1> &pro
 //-----------------------------------------------------------------
 bool validate_mock_tx_rct_amount_balance_v1(const std::vector<MockENoteImageRctV1> &images,
     const std::vector<MockENoteRctV1> &outputs,
-    const std::vector<BulletproofPlus> &range_proofs,
+    const std::vector<rct::BulletproofPlus> &range_proofs,
     const bool defer_batchable)
 {
     /// check that amount commitments balance
@@ -340,9 +345,9 @@ bool validate_mock_tx_rct_amount_balance_v1(const std::vector<MockENoteImageRctV
     if (!defer_batchable)
     {
         std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
-        range_proof_ptrs.reserve(m_range_proofs.size());
+        range_proof_ptrs.reserve(range_proofs.size());
 
-        for (const auto &range_proof : m_range_proofs)
+        for (const auto &range_proof : range_proofs)
             range_proof_ptrs.push_back(&range_proof);
 
         if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
@@ -359,8 +364,8 @@ bool validate_mock_tx_rct_proofs_v1(const std::vector<MockRctProofV1> &proofs,
     for (std::size_t input_index{0}; input_index < images.size(); ++input_index)
     {
         if (!rct::verRctCLSAGSimple(rct::zero(),  // empty message for mockup
-                m_tx_proofs[input_index].m_clsag_proof,
-                m_tx_proofs[input_index].m_referenced_enotes_converted,
+                proofs[input_index].m_clsag_proof,
+                proofs[input_index].m_referenced_enotes_converted,
                 rct::pk2rct(images[input_index].m_pseudo_amount_commitment)))
             return false;
     }

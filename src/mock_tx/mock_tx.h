@@ -34,7 +34,7 @@
 //local headers
 
 //third party headers
-#include "rct/rctTypes.h"
+#include "ringct/rctTypes.h"
 
 //standard headers
 #include <memory>
@@ -73,7 +73,7 @@ public:
     // validate the transaction
     // - if 'defer_batchable' is set, then batchable validation steps shouldn't be executed
     ///
-    bool validate(const bool defer_batchable = false) const final
+    virtual bool validate(const bool defer_batchable = false) const final
     {
         if (!validate_tx_semantics())
             return false;
@@ -81,10 +81,10 @@ public:
         if (!validate_tx_linking_tags())
             return false;
 
-        if (!validate_tx_amount_balance(const bool defer_batchable))
+        if (!validate_tx_amount_balance(defer_batchable))
             return false;
 
-        if (!validate_tx_input_proofs(const bool defer_batchable))
+        if (!validate_tx_input_proofs(defer_batchable))
             return false;
 
         return true;

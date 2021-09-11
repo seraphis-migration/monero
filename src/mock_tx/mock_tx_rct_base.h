@@ -55,6 +55,20 @@ struct MockENoteRct
     crypto::public_key m_amount_commitment;
 
     static std::size_t get_size_bytes() {return 32*2;}
+
+    /**
+    * brief: make_base - make an RCT ENote
+    * param: onetime_privkey -
+    * param: amount_blinding_factor -
+    * param: amount -
+    */
+    virtual void make_base(const crypto::secret_key &onetime_privkey,
+        const crypto::secret_key &amount_blinding_factor,
+        const rct::xmr_amount amount) final;
+    /**
+    * brief: gen_base - generate an RCT ENote (all random)
+    */
+    virtual void gen_base() final;
 };
 
 ////
@@ -94,31 +108,14 @@ struct MockDestRct
     rct::xmr_amount m_amount;
 
     // convert this destination into an e-note
-    void to_enote_rct_base(MockENoteRct &enote_inout) const final;
-};
+    virtual void to_enote_rct_base(MockENoteRct &enote_inout) const final;
 
-/**
-* brief: make_mock_tx_rct_enote - make an RCT ENote
-* param: onetime_privkey -
-* param: amount_blinding_factor -
-* param: amount -
-* inoutparam: enote_inout -
-*/
-void make_mock_tx_rct_enote(const crypto::secret_key &onetime_privkey,
-    const crypto::secret_key &amount_blinding_factor,
-    const rct::xmr_amount amount,
-    MockENoteRct &enote_inout);
-/**
-* brief: gen_mock_tx_rct_enote - generate an RCT ENote (all random)
-* inoutparam: enote_inout -
-*/
-void gen_mock_tx_rct_enote(MockENoteRct &enote_inout);
-/**
-* brief: gen_mock_tx_rct_dest - generate an RCT Destination (all random)
-* param: amount -
-* inoutparam: dest_inout -
-*/
-void gen_mock_tx_rct_dest(const rct::xmr_amount amount, MockDestRct &dest_inout);
+    /**
+    * brief: gen_base - generate an RCT Destination (all random)
+    * param: amount -
+    */
+    virtual void gen_base(const rct::xmr_amount amount) final;
+};
 
 } //namespace mock_tx
 
