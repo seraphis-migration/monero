@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_rct_clsag.h"
+#include "mock_rct_triptych.h"
 
 //local headers
 #include "misc_log_ex.h"
@@ -50,7 +50,7 @@
 namespace mock_tx
 {
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_semantics() const
+bool MockTxTriptych::validate_tx_semantics() const
 {
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to validate tx that has no outputs.");
     CHECK_AND_ASSERT_THROW_MES(m_input_images.size() > 0, "Tried to validate tx that has no input images.");
@@ -59,9 +59,11 @@ bool MockTxCLSAG::validate_tx_semantics() const
     CHECK_AND_ASSERT_THROW_MES(m_range_proofs[0].V.size() > 0, "Tried to validate tx that has no range proofs.");
 
     /// there must be the correct number of proofs
+    // input proofs
     if (m_tx_proofs.size() != m_input_images.size())
         return false;
 
+    // range proofs
     std::size_t num_rangeproofed_commitments{0};
     for (const auto &range_proof : m_range_proofs)
         num_rangeproofed_commitments += range_proof.V.size();
@@ -70,42 +72,48 @@ bool MockTxCLSAG::validate_tx_semantics() const
         return false;
 
 
-    /// all inputs must have the same reference set size
-    std::size_t ref_set_size{m_tx_proofs[0].m_referenced_enotes_converted.size()};
+    /// all inputs must have the same reference set size and decomposition
+    std::size_t decomp_n{m_tx_proofs[0].m_ref_set_decomp_n};
+    std::size_t decomp_m{m_tx_proofs[0].m_ref_set_decomp_m};
 
     for (const auto &tx_proof : m_tx_proofs)
     {
-        if (tx_proof.m_referenced_enotes_converted.size() != ref_set_size)
+        std::size_t ref_set_size{ref_set_size_from_decomp(tx_proof.m_ref_set_decomp_n, tx_proof.m_ref_set_decomp_m)};
+
+        if (tx_proof.m_ref_set_decomp_n != decomp_n ||
+            tx_proof.m_ref_set_decomp_m != decomp_m ||
+            tx_proof.m_onetime_addresses.size() != ref_set_size ||
+            tx_proof.m_commitments.size() != ref_set_size)
             return false;
     }
 
 
     /// input linking tags must be in the prime subgroup: KI = 8*[(1/8) * KI]
-    // note: I cheat a bit here for the mock-up. The linking tags in the clsag_proof are not mul(1/8), but the
-    //       tags in input images are.
+    // note: I cheat a bit here for the mock-up. The linking tags in the Triptych_proof are not mul(1/8), but the
+    //       tags in m_input_images are.
     for (std::size_t input_index{0}; input_index < m_input_images.size(); ++input_index)
     {
         if (!(rct::scalarmult8(rct::ki2rct(m_input_images[input_index].m_key_image)) ==
-                m_tx_proofs[input_index].m_clsag_proof.I))
+                m_tx_proofs[input_index].m_triptych_proof.J))
             return false;
 
         // sanity check
-        if (m_tx_proofs[input_index].m_clsag_proof.I == rct::identity())
+        if (m_tx_proofs[input_index].m_triptych_proof.J == rct::identity())
             return false;
     }
 
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_linking_tags() const
+bool MockTxTriptych::validate_tx_linking_tags() const
 {
-    if (!validate_mock_tx_rct_linking_tags_v1(m_tx_proofs, m_input_images))
+    if (!validate_mock_tx_rct_linking_tags_v2(m_tx_proofs, m_input_images))
         return false;
 
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_amount_balance(const bool defer_batchable) const
+bool MockTxTriptych::validate_tx_amount_balance(const bool defer_batchable) const
 {
     if (!validate_mock_tx_rct_amount_balance_v1(m_input_images, m_outputs, m_range_proofs, defer_batchable))
         return false;
@@ -113,15 +121,15 @@ bool MockTxCLSAG::validate_tx_amount_balance(const bool defer_batchable) const
     return true;
 }
 //-----------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_input_proofs(const bool defer_batchable) const
+bool MockTxTriptych::validate_tx_input_proofs(const bool defer_batchable) const
 {
-    if (!validate_mock_tx_rct_proofs_v1(m_tx_proofs, m_input_images))
+    if (!validate_mock_tx_rct_proofs_v2(m_tx_proofs))
         return false;
 
     return true;
 }
 //-----------------------------------------------------------------
-std::size_t MockTxCLSAG::get_size_bytes() const
+std::size_t MockTxTriptych::get_size_bytes() const
 {
     // doesn't include (compared to a real tx):
     // - ring member references (e.g. indices or explicit copies)
@@ -139,14 +147,19 @@ std::size_t MockTxCLSAG::get_size_bytes() const
         size += 32 * (6 + range_proof.L.size() + range_proof.R.size());
 
     if (m_tx_proofs.size())
-        // note: ignore the key image stored in the clsag, it is double counted by the input's enote image struct
-        size += m_tx_proofs.size() * (32 * (2 + m_tx_proofs[0].m_clsag_proof.s.size()));
+    {
+        // note: ignore the key image stored in the Triptych proof, it is double counted by the input's enote image struct
+        size += m_tx_proofs.size() * (32 * (8 + 
+                        m_tx_proofs[0].m_triptych_proof.X.size() +
+                        m_tx_proofs[0].m_triptych_proof.Y.size() +
+                        ref_set_size_from_decomp(m_tx_proofs[0].m_ref_set_decomp_n, m_tx_proofs[0].m_ref_set_decomp_m)));
+    }
 
     return size;
 }
 //-----------------------------------------------------------------
 template <>
-std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &params,
+std::shared_ptr<MockTxTriptych> make_mock_tx<MockTxTriptych>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts)
 {
@@ -168,7 +181,7 @@ std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &pa
     std::vector<MockENoteImageRctV1> input_images;
     std::vector<MockENoteRctV1> outputs;
     std::vector<rct::BulletproofPlus> range_proofs;
-    std::vector<MockRctProofV1> tx_proofs;
+    std::vector<MockRctProofV2> tx_proofs;
 
     // info shuttles for making components
     std::vector<rct::xmr_amount> output_amounts;
@@ -181,22 +194,25 @@ std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &pa
         output_amounts,
         output_amount_commitment_blinding_factors,
         pseudo_blinding_factors);
-    make_tx_images_rct_v1(inputs_to_spend,
+    make_tx_images_rct_v2(inputs_to_spend,
         pseudo_blinding_factors,
         input_images);
     make_bpp_rangeproofs(output_amounts,
         output_amount_commitment_blinding_factors,
         params.max_rangeproof_splits,
         range_proofs);
-    make_tx_input_proofs_rct_v1(inputs_to_spend,
+    make_tx_input_proofs_rct_v2(inputs_to_spend,
+        input_images,
         pseudo_blinding_factors,
+        params.ref_set_decomp_n,
+        params.ref_set_decomp_m,
         tx_proofs);
 
-    return std::make_shared<MockTxCLSAG>(input_images, outputs, range_proofs, tx_proofs);
+    return std::make_shared<MockTxTriptych>(input_images, outputs, range_proofs, tx_proofs);
 }
 //-----------------------------------------------------------------
 template <>
-bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
+bool validate_mock_txs<MockTxTriptych>(const std::vector<std::shared_ptr<MockTxTriptych>> &txs_to_validate)
 {
     std::vector<const rct::BulletproofPlus*> range_proofs;
     range_proofs.reserve(txs_to_validate.size()*10);

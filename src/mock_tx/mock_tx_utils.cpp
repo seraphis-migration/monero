@@ -32,6 +32,7 @@
 #include "mock_tx_utils.h"
 
 //local headers
+#include "misc_log_ex.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -110,20 +111,32 @@ bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &c
     return rct::equalKeys(rct::addKeys(commitment_set1), rct::addKeys(commitment_set2));
 }
 //-----------------------------------------------------------------
-std::vector<rct::BulletproofPlus> make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
+void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
-    const std::size_t max_rangeproof_splits)
+    const std::size_t max_rangeproof_splits,
+    std::vector<rct::BulletproofPlus> &range_proofs_out)
 {
     /// range proofs
     // - for output amount commitments
-    std::vector<rct::BulletproofPlus> range_proofs;
+    CHECK_AND_ASSERT_THROW_MES(amounts.size() == amount_commitment_blinding_factors.size(),
+        "Mismatching amounts and blinding factors.");
 
     // get number of amounts to aggregate in each proof
     std::size_t split_size{compute_rangeproof_grouping_size(amounts.size(), max_rangeproof_splits)};
 
     // make the range proofs
+    range_proofs_out.clear();
+
     for (std::size_t output_index{0}; output_index < amounts.size(); output_index += split_size)
     {
+        // initialization step
+        if (output_index == 0)
+        {
+            CHECK_AND_ASSERT_THROW_MES(split_size > 0, "Cannot aggregate 0 bulletproofs together.");
+            range_proofs_out.reserve(amounts.size() / split_size + 1);
+        }
+
+        // aggregate 'split_size' bulleproofs together at a time (with leftovers aggregated in final proof)
         std::vector<rct::xmr_amount> amounts_group;
         std::vector<rct::key> amount_commitment_blinding_factors_group;
         amounts_group.reserve(split_size);
@@ -137,11 +150,9 @@ std::vector<rct::BulletproofPlus> make_bpp_rangeproofs(const std::vector<rct::xm
             amount_commitment_blinding_factors_group.emplace_back(amount_commitment_blinding_factors[chunk_index]);
         }
 
-        range_proofs.emplace_back(
+        range_proofs_out.emplace_back(
             rct::bulletproof_plus_PROVE(amounts_group, amount_commitment_blinding_factors_group));
     }
-
-    return range_proofs;
 }
 //-----------------------------------------------------------------
 bool balance_check_in_out_amnts(const std::vector<rct::xmr_amount> &input_amounts,

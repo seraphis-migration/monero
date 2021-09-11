@@ -42,6 +42,7 @@
 #include "ringct/rctOps.h"
 #include "ringct/rctSigs.h"
 #include "ringct/rctTypes.h"
+#include "ringct/triptych.h"
 
 //third party headers
 
@@ -91,6 +92,25 @@ MockENoteImageRctV1 MockInputRctV1::to_enote_image_v1(const crypto::secret_key &
     // - for efficiently checking that the key image is in the prime subgroup during tx verification
     rct::key storable_ki;
     rct::scalarmultKey(storable_ki, rct::ki2rct(image.m_key_image), rct::INV_EIGHT);
+    image.m_key_image = rct::rct2ki(storable_ki);
+
+    return image;
+}
+MockENoteImageRctV1 MockInputRctV1::to_enote_image_v2(const crypto::secret_key &pseudo_blinding_factor) const
+{
+    MockENoteImageRctV1 image;
+
+    // C' = x' G + a H
+    image.m_pseudo_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(pseudo_blinding_factor)));
+
+    // KI = 1/ko * U
+    rct::key inv_ko{rct::invert(rct::sk2rct(m_onetime_privkey))};
+    rct::key key_image{rct::scalarmultKey(rct::get_gen_U(), inv_ko)};
+
+    // KI_stored = (1/8)*KI
+    // - for efficiently checking that the key image is in the prime subgroup during tx verification
+    rct::key storable_ki;
+    rct::scalarmultKey(storable_ki, key_image, rct::INV_EIGHT);
     image.m_key_image = rct::rct2ki(storable_ki);
 
     return image;
@@ -185,14 +205,12 @@ std::vector<MockDestRctV1> gen_mock_rct_dests_v1(const std::vector<rct::xmr_amou
 //-----------------------------------------------------------------
 void make_tx_transfers_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<MockDestRctV1> &destinations,
-    std::vector<MockENoteImageRctV1> &input_images_out,
     std::vector<MockENoteRctV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<rct::key> &output_amount_commitment_blinding_factors_out,
     std::vector<crypto::secret_key> &pseudo_blinding_factors_out)
 {
     // note: blinding factors need to balance for balance proof
-    input_images_out.clear();
     outputs_out.clear();
     output_amounts_out.clear();
     output_amount_commitment_blinding_factors_out.clear();
@@ -201,7 +219,6 @@ void make_tx_transfers_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend
     // 1. get aggregate blinding factor of outputs
     crypto::secret_key sum_output_blinding_factors = rct::rct2sk(rct::zero());
 
-    input_images_out.reserve(destinations.size());
     outputs_out.reserve(destinations.size());;
     output_amounts_out.reserve(destinations.size());
     output_amount_commitment_blinding_factors_out.reserve(destinations.size());
@@ -224,9 +241,7 @@ void make_tx_transfers_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend
 
     for (std::size_t input_index{0}; input_index + 1 < inputs_to_spend.size(); ++input_index)
     {
-        // built input image set
         crypto::secret_key pseudo_blinding_factor{rct::rct2sk(rct::skGen())};
-        input_images_out.emplace_back(inputs_to_spend[input_index].to_enote_image_v1(pseudo_blinding_factor));
 
         // subtract blinding factor from sum
         sc_sub(&sum_output_blinding_factors, &sum_output_blinding_factors, &pseudo_blinding_factor);
@@ -237,8 +252,45 @@ void make_tx_transfers_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend
 
     // 3. set last input image's pseudo blinding factor equal to
     //    sum(output blinding factors) - sum(input image blinding factors)_except_last
-    input_images_out.emplace_back(inputs_to_spend.back().to_enote_image_v1(sum_output_blinding_factors));
     pseudo_blinding_factors_out.emplace_back(sum_output_blinding_factors);
+}
+//-----------------------------------------------------------------
+void make_tx_images_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
+    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
+    std::vector<MockENoteImageRctV1> &input_images_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() == pseudo_blinding_factors.size(),
+        "Can't make enote images with mismatching inputs and pseudo blinding factors.");
+
+    input_images_out.clear();
+    input_images_out.reserve(inputs_to_spend.size());
+
+    for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
+    {
+        // construct images with CryptoNote style
+        input_images_out.emplace_back(
+                inputs_to_spend[input_index].to_enote_image_v1(pseudo_blinding_factors[input_index])
+            );
+    }
+}
+//-----------------------------------------------------------------
+void make_tx_images_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
+    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
+    std::vector<MockENoteImageRctV1> &input_images_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() == pseudo_blinding_factors.size(),
+        "Can't make enote images with mismatching inputs and pseudo blinding factors.");
+
+    input_images_out.clear();
+    input_images_out.reserve(inputs_to_spend.size());
+
+    for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
+    {
+        // construct images with Triptych style
+        input_images_out.emplace_back(
+                inputs_to_spend[input_index].to_enote_image_v2(pseudo_blinding_factors[input_index])
+            );
+    }
 }
 //-----------------------------------------------------------------
 void make_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
@@ -282,24 +334,80 @@ void make_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_sp
     }
 }
 //-----------------------------------------------------------------
+void make_tx_input_proofs_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
+    const std::vector<MockENoteImageRctV1> &input_images,
+    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    std::vector<MockRctProofV2> &proofs_out)
+{
+    /// membership + ownership/unspentness proofs
+    // - Triptych for each input
+    for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
+    {
+        CHECK_AND_ASSERT_THROW_MES(ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m) ==
+                    inputs_to_spend[input_index].m_input_ref_set.size(),
+                "Decomposition factors don't match ref set size."
+            );
+
+        CHECK_AND_ASSERT_THROW_MES(inputs_to_spend[input_index].m_input_ref_set_real_index <
+                    inputs_to_spend[input_index].m_input_ref_set.size(),
+                "Real proof index out of bounds."
+            );
+
+        MockRctProofV2 mock_Triptych_proof;
+
+        // convert tx info to form expected by triptych_prove()
+        mock_Triptych_proof.m_onetime_addresses.reserve(inputs_to_spend[input_index].m_input_ref_set.size());
+        mock_Triptych_proof.m_commitments.reserve(inputs_to_spend[input_index].m_input_ref_set.size());
+
+        for (const auto &input_ref : inputs_to_spend[input_index].m_input_ref_set)
+        {
+            mock_Triptych_proof.m_onetime_addresses.emplace_back(rct::pk2rct(input_ref.m_onetime_address));
+            mock_Triptych_proof.m_commitments.emplace_back(rct::pk2rct(input_ref.m_amount_commitment));
+        }
+
+        mock_Triptych_proof.m_pseudo_amount_commitment = rct::pk2rct(input_images[input_index].m_pseudo_amount_commitment);
+
+        // commitment to zero privkey: C - C' = (x - x')*G
+        rct::key c_to_zero_privkey;
+        sc_sub(c_to_zero_privkey.bytes,
+            &(inputs_to_spend[input_index].m_amount_blinding_factor),
+            &(pseudo_blinding_factors[input_index]));
+
+        // decomposition, ref set size: n^m
+        mock_Triptych_proof.m_ref_set_decomp_n = ref_set_decomp_n;
+        mock_Triptych_proof.m_ref_set_decomp_m = ref_set_decomp_m;
+
+        // create Triptych proof
+        mock_Triptych_proof.m_triptych_proof = rct::triptych_prove(
+                mock_Triptych_proof.m_onetime_addresses,                     // one-time pubkeys Ko
+                mock_Triptych_proof.m_commitments,                           // output commitments C
+                mock_Triptych_proof.m_pseudo_amount_commitment,              // pseudo-output commitment C'
+                inputs_to_spend[input_index].m_input_ref_set_real_index,     // real spend index \pi
+                rct::sk2rct(inputs_to_spend[input_index].m_onetime_privkey), // one-time privkey ko
+                c_to_zero_privkey,                                           // commitment to zero blinding factor (x - x')
+                mock_Triptych_proof.m_ref_set_decomp_n,                      // decomp n
+                mock_Triptych_proof.m_ref_set_decomp_m,                      // decomp m
+                rct::zero()                                                  // empty message for mockup
+            );
+
+        proofs_out.emplace_back(std::move(mock_Triptych_proof));
+    }
+}
+//-----------------------------------------------------------------
 bool validate_mock_tx_rct_linking_tags_v1(const std::vector<MockRctProofV1> &proofs,
     const std::vector<MockENoteImageRctV1> &images)
 {
-    /// input linking tags must be in the prime subgroup: KI = 8*[(1/8) * KI]
-    // note: I cheat a bit here for the mock-up. The linking tags in the clsag_proof are not mul(1/8), but the
-    //       tags in input images are.
-    for (std::size_t input_index{0}; input_index < images.size(); ++input_index)
-    {
-        if (!(rct::scalarmult8(rct::ki2rct(images[input_index].m_key_image)) ==
-                proofs[input_index].m_clsag_proof.I))
-            return false;
+    /// input linking tags must not exist in the blockchain
+    //not implemented for mockup
 
-        // sanity check
-        if (proofs[input_index].m_clsag_proof.I == rct::identity())
-            return false;
-    }
-
-
+    return true;
+}
+//-----------------------------------------------------------------
+bool validate_mock_tx_rct_linking_tags_v2(const std::vector<MockRctProofV2> &proofs,
+    const std::vector<MockENoteImageRctV1> &images)
+{
     /// input linking tags must not exist in the blockchain
     //not implemented for mockup
 
@@ -367,6 +475,29 @@ bool validate_mock_tx_rct_proofs_v1(const std::vector<MockRctProofV1> &proofs,
                 proofs[input_index].m_clsag_proof,
                 proofs[input_index].m_referenced_enotes_converted,
                 rct::pk2rct(images[input_index].m_pseudo_amount_commitment)))
+            return false;
+    }
+
+    return true;
+}
+//-----------------------------------------------------------------
+bool validate_mock_tx_rct_proofs_v2(const std::vector<MockRctProofV2> &proofs)
+{
+    /// verify input membership/ownership/unspentness proofs
+    for (std::size_t input_index{0}; input_index < proofs.size(); ++input_index)
+    {
+        std::vector<const rct::TriptychProof*> proof;
+        proof.emplace_back(&(proofs[input_index].m_triptych_proof));
+
+        // note: only verify one triptych proof at a time (not batchable in my approach where all inputs define separate rings)
+        if (!rct::triptych_verify(
+                proofs[input_index].m_onetime_addresses,
+                proofs[input_index].m_commitments,
+                rct::keyV{proofs[input_index].m_pseudo_amount_commitment},
+                proof,
+                proofs[input_index].m_ref_set_decomp_n,
+                proofs[input_index].m_ref_set_decomp_m,
+                rct::keyV{rct::zero()}))  // empty message for mockup
             return false;
     }
 
