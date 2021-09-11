@@ -96,6 +96,9 @@ struct MockInputRctV1 final : public MockInputRct<MockENoteRctV1>
     /// convert this input to an e-note-image (CryptoNote style)
     MockENoteImageRctV1 to_enote_image_v1(const crypto::secret_key &pseudo_blinding_factor) const;
 
+    /// convert this input to an e-note-image (Triptych style)
+    MockENoteImageRctV1 to_enote_image_v2(const crypto::secret_key &pseudo_blinding_factor) const;
+
     /**
     * brief: gen_v1 - generate a V1 RCT Input (random)
     * param: amount -
@@ -125,6 +128,7 @@ struct MockDestRctV1 final : public MockDestRct
 
 ////
 // MockRctProofV1 - RCT Input Proof V1
+// - CLSAG
 ///
 struct MockRctProofV1 final
 {
@@ -132,6 +136,25 @@ struct MockRctProofV1 final
     rct::clsag m_clsag_proof;
     /// vector of pairs <Ko_i, C_i> for referenced enotes
     rct::ctkeyV m_referenced_enotes_converted;
+};
+
+////
+// MockRctProofV2 - RCT Input Proof V2
+// - Triptych
+///
+struct MockRctProofV2 final
+{
+    // the Triptych proof
+    rct::TriptychProof m_triptych_proof;
+    // onetime addresses Ko
+    rct::keyV m_onetime_addresses;
+    // output commitments C
+    rct::keyV m_commitments;
+    // pseudo-output commitment C'
+    rct::key m_pseudo_amount_commitment;
+    // decomposition n^m
+    std::size_t m_ref_set_decomp_n;
+    std::size_t m_ref_set_decomp_m;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -160,19 +183,38 @@ std::vector<MockDestRctV1> gen_mock_rct_dests_v1(const std::vector<rct::xmr_amou
 ///////////////////////////////////////// Make Tx Components ///////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// make transfers: input images, outputs, balance proof
+// make transfers: outputs
 void make_tx_transfers_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<MockDestRctV1> &destinations,
-    std::vector<MockENoteImageRctV1> &input_images_out,
     std::vector<MockENoteRctV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<rct::key> &output_amount_commitment_blinding_factors_out,
     std::vector<crypto::secret_key> &pseudo_blinding_factors_out);
 
+// make enote images (CryptoNote style)
+void make_tx_images_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
+    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
+    std::vector<MockENoteImageRctV1> &input_images_out);
+
+// make enote images (Triptych style)
+void make_tx_images_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
+    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
+    std::vector<MockENoteImageRctV1> &input_images_out);
+
 // make input proofs: membership, ownership, unspentness (i.e. prove key images are constructed correctly)
+// CLSAGs
 void make_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<crypto::secret_key> &pseudo_blinding_factors,
     std::vector<MockRctProofV1> &proofs_out);
+
+// make input proofs: membership, ownership, unspentness (i.e. prove key images are constructed correctly)
+// Triptych proofs
+void make_tx_input_proofs_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
+    const std::vector<MockENoteImageRctV1> &input_images,
+    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    std::vector<MockRctProofV2> &proofs_out);
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -185,8 +227,15 @@ void make_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_sp
 * param: images -
 * return: true/false on verification result
 */
-// validate rct linking tags (key images)
 bool validate_mock_tx_rct_linking_tags_v1(const std::vector<MockRctProofV1> &proofs,
+    const std::vector<MockENoteImageRctV1> &images);
+/**
+* brief: validate_mock_tx_rct_linking_tags_v1 - validate linking tags in V2 RCT input proofs and images
+* param: proofs -
+* param: images -
+* return: true/false on verification result
+*/
+bool validate_mock_tx_rct_linking_tags_v2(const std::vector<MockRctProofV2> &proofs,
     const std::vector<MockENoteImageRctV1> &images);
 /**
 * brief: validate_mock_tx_rct_amount_balance_v1 - validate a set of V1 RCT balance proofs from a tx
@@ -211,6 +260,14 @@ bool validate_mock_tx_rct_amount_balance_v1(const std::vector<MockENoteImageRctV
 */
 bool validate_mock_tx_rct_proofs_v1(const std::vector<MockRctProofV1> &proofs,
     const std::vector<MockENoteImageRctV1> &images);
+/**
+* brief: validate_mock_tx_rct_proofs_v2 - validate a set of V2 RCT proofs from a tx
+*   - Triptych proofs for: membership, ownership, unspentness
+* param: proofs -
+* param: images -
+* return: true/false on verification result
+*/
+bool validate_mock_tx_rct_proofs_v2(const std::vector<MockRctProofV2> &proofs);
 
 } //namespace mock_tx
 

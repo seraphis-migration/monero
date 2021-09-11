@@ -84,11 +84,12 @@ std::size_t compute_rangeproof_grouping_size(const std::size_t num_amounts, cons
 * param: amounts -
 * param: amount_commitment_blinding_factors -
 * param: max_rangeproof_splits -
-* return: set of amount commitments with range proofs
+* outparam: range_proofs_out - set of amount commitments with range proofs
 */
-std::vector<rct::BulletproofPlus> make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
+void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
-    const std::size_t max_rangeproof_splits);
+    const std::size_t max_rangeproof_splits,
+    std::vector<rct::BulletproofPlus> &range_proofs_out);
 /**
 * brief: balance_check_equality - balance check between two commitment sets using an equality test
 *   - i.e. sum(inputs) ?= sum(outputs)
