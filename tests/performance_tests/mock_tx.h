@@ -29,12 +29,14 @@
 #pragma once
 
 #include "mock_tx/mock_rct_clsag.h"
+#include "mock_tx/mock_rct_triptych.h"
 #include "mock_tx/mock_tx_utils.h"
 #include "performance_tests.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
 #include <iostream>
+#include <type_traits>
 #include <vector>
 
 
@@ -49,6 +51,7 @@ struct ParamsShuttleMockTx final : public ParamsShuttle
     std::size_t num_rangeproof_splits{0};
 };
 
+template <typename MockTxType>
 class test_mock_tx
 {
     public:
@@ -56,6 +59,8 @@ class test_mock_tx
 
         bool init(const ParamsShuttleMockTx &params)
         {
+            static_assert(std::is_base_of<mock_tx::MockTx, MockTxType>::value, "Invalid mock tx type.");
+
             m_txs.reserve(params.batch_size);
 
             // divide max amount into equal-size chunks to distribute among more numerous of inputs vs outputs
@@ -93,7 +98,7 @@ class test_mock_tx
 
                     // make tx
                     m_txs.push_back(
-                        mock_tx::make_mock_tx<mock_tx::MockTxCLSAG>(tx_params, input_amounts, output_amounts)
+                            mock_tx::make_mock_tx<MockTxType>(tx_params, input_amounts, output_amounts)
                         );
                 }
                 catch (...)
@@ -121,7 +126,7 @@ class test_mock_tx
         {
             try
             {
-                return mock_tx::validate_mock_txs(m_txs);
+                return mock_tx::validate_mock_txs<MockTxType>(m_txs);
             }
             catch (...)
             {
@@ -130,5 +135,5 @@ class test_mock_tx
         }
 
     private:
-        std::vector<std::shared_ptr<mock_tx::MockTxCLSAG>> m_txs;
+        std::vector<std::shared_ptr<MockTxType>> m_txs;
 };
