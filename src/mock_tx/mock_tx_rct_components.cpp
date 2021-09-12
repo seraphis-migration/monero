@@ -203,43 +203,22 @@ std::vector<MockDestRctV1> gen_mock_rct_dests_v1(const std::vector<rct::xmr_amou
     return destinations;
 }
 //-----------------------------------------------------------------
-void make_tx_transfers_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
-    const std::vector<MockDestRctV1> &destinations,
-    std::vector<MockENoteRctV1> &outputs_out,
-    std::vector<rct::xmr_amount> &output_amounts_out,
-    std::vector<rct::key> &output_amount_commitment_blinding_factors_out,
-    std::vector<crypto::secret_key> &pseudo_blinding_factors_out)
+std::vector<crypto::secret_key> get_rct_pseudo_blinding_factors_v1(const std::size_t num_factors,
+    const std::vector<rct::key> &output_amount_commitment_blinding_factors)
 {
-    // note: blinding factors need to balance for balance proof
-    outputs_out.clear();
-    output_amounts_out.clear();
-    output_amount_commitment_blinding_factors_out.clear();
-    pseudo_blinding_factors_out.clear();
+    CHECK_AND_ASSERT_THROW_MES(num_factors > 0, "There must be > 0 pseudo amount commitments.");
 
-    // 1. get aggregate blinding factor of outputs
+    std::vector<crypto::secret_key> pseudo_blinding_factors;
+    pseudo_blinding_factors.reserve(num_factors);
+
+    // add together output blinding factors
     crypto::secret_key sum_output_blinding_factors = rct::rct2sk(rct::zero());
 
-    outputs_out.reserve(destinations.size());;
-    output_amounts_out.reserve(destinations.size());
-    output_amount_commitment_blinding_factors_out.reserve(destinations.size());
+    for (const auto &y : output_amount_commitment_blinding_factors)
+        sc_add(&sum_output_blinding_factors, &sum_output_blinding_factors, y.bytes);
 
-    for (const auto &dest : destinations)
-    {
-        // build output set
-        outputs_out.emplace_back(dest.to_enote_v1());
-
-        // add output's amount commitment blinding factor
-        sc_add(&sum_output_blinding_factors, &sum_output_blinding_factors, &dest.m_amount_blinding_factor);
-
-        // prepare for range proofs
-        output_amounts_out.emplace_back(dest.m_amount);
-        output_amount_commitment_blinding_factors_out.emplace_back(rct::sk2rct(dest.m_amount_blinding_factor));
-    }
-
-    // 2. create all but last input image with random pseudo blinding factor
-    pseudo_blinding_factors_out.reserve(inputs_to_spend.size());
-
-    for (std::size_t input_index{0}; input_index + 1 < inputs_to_spend.size(); ++input_index)
+    // all but last blinding factor are random
+    for (std::size_t factor_index{0}; factor_index + 1 < num_factors; ++factor_index)
     {
         crypto::secret_key pseudo_blinding_factor{rct::rct2sk(rct::skGen())};
 
@@ -247,48 +226,84 @@ void make_tx_transfers_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend
         sc_sub(&sum_output_blinding_factors, &sum_output_blinding_factors, &pseudo_blinding_factor);
 
         // save input's pseudo amount commitment blinding factor
-        pseudo_blinding_factors_out.emplace_back(pseudo_blinding_factor);
+        pseudo_blinding_factors.emplace_back(pseudo_blinding_factor);
     }
 
-    // 3. set last input image's pseudo blinding factor equal to
+    // set last pseudo blinding factor equal to
     //    sum(output blinding factors) - sum(input image blinding factors)_except_last
-    pseudo_blinding_factors_out.emplace_back(sum_output_blinding_factors);
+    pseudo_blinding_factors.emplace_back(sum_output_blinding_factors);
+
+    return pseudo_blinding_factors;
+}
+//-----------------------------------------------------------------
+void make_tx_outputs_rct_v1(const std::vector<MockDestRctV1> &destinations,
+    std::vector<MockENoteRctV1> &outputs_out,
+    std::vector<rct::xmr_amount> &output_amounts_out,
+    std::vector<rct::key> &output_amount_commitment_blinding_factors_out)
+{
+    // note: blinding factors need to balance for balance proof
+    outputs_out.clear();
+    outputs_out.reserve(destinations.size());;
+    output_amounts_out.clear();
+    output_amounts_out.reserve(destinations.size());
+    output_amount_commitment_blinding_factors_out.clear();
+    output_amount_commitment_blinding_factors_out.reserve(destinations.size());
+
+    for (const auto &dest : destinations)
+    {
+        // build output set
+        outputs_out.emplace_back(dest.to_enote_v1());
+
+        // prepare for range proofs
+        output_amounts_out.emplace_back(dest.m_amount);
+        output_amount_commitment_blinding_factors_out.emplace_back(rct::sk2rct(dest.m_amount_blinding_factor));
+    }
 }
 //-----------------------------------------------------------------
 void make_tx_images_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
-    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
-    std::vector<MockENoteImageRctV1> &input_images_out)
+    const std::vector<rct::key> &output_amount_commitment_blinding_factors,
+    std::vector<MockENoteImageRctV1> &input_images_out,
+    std::vector<crypto::secret_key> &pseudo_blinding_factors_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() == pseudo_blinding_factors.size(),
-        "Can't make enote images with mismatching inputs and pseudo blinding factors.");
-
     input_images_out.clear();
     input_images_out.reserve(inputs_to_spend.size());
+    pseudo_blinding_factors_out.clear();
 
+    // get pseudo blinding factors: last factor = sum(output factors) - sum(pseudo factors)_except_last
+    pseudo_blinding_factors_out = 
+        get_rct_pseudo_blinding_factors_v1(inputs_to_spend.size(), output_amount_commitment_blinding_factors);
+
+    CHECK_AND_ASSERT_THROW_MES(pseudo_blinding_factors_out.size() == inputs_to_spend.size(), "Vector size mismatch.");
+
+    // create images with CLSAG style
     for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
     {
-        // construct images with CryptoNote style
         input_images_out.emplace_back(
-                inputs_to_spend[input_index].to_enote_image_v1(pseudo_blinding_factors[input_index])
+                inputs_to_spend[input_index].to_enote_image_v1(pseudo_blinding_factors_out[input_index])
             );
     }
 }
 //-----------------------------------------------------------------
 void make_tx_images_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
-    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
-    std::vector<MockENoteImageRctV1> &input_images_out)
+    const std::vector<rct::key> &output_amount_commitment_blinding_factors,
+    std::vector<MockENoteImageRctV1> &input_images_out,
+    std::vector<crypto::secret_key> &pseudo_blinding_factors_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() == pseudo_blinding_factors.size(),
-        "Can't make enote images with mismatching inputs and pseudo blinding factors.");
-
     input_images_out.clear();
     input_images_out.reserve(inputs_to_spend.size());
+    pseudo_blinding_factors_out.clear();
 
+    // get pseudo blinding factors: last factor = sum(output factors) - sum(pseudo factors)_except_last
+    pseudo_blinding_factors_out = 
+        get_rct_pseudo_blinding_factors_v1(inputs_to_spend.size(), output_amount_commitment_blinding_factors);
+
+    CHECK_AND_ASSERT_THROW_MES(pseudo_blinding_factors_out.size() == inputs_to_spend.size(), "Vector size mismatch.");
+
+    // construct images with Triptych style
     for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
     {
-        // construct images with Triptych style
         input_images_out.emplace_back(
-                inputs_to_spend[input_index].to_enote_image_v2(pseudo_blinding_factors[input_index])
+                inputs_to_spend[input_index].to_enote_image_v2(pseudo_blinding_factors_out[input_index])
             );
     }
 }
