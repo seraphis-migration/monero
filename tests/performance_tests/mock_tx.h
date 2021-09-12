@@ -116,7 +116,7 @@ class test_mock_tx
                           << "outputs: " << params.out_count << " || "
                           << "rangeproof split: " << params.num_rangeproof_splits << " || "
                           << "ref set size (" << params.n << "^" << params.m << "): " <<
-                            mock_tx::ref_set_size_from_decomp(params.m, params.n) << '\n';
+                            mock_tx::ref_set_size_from_decomp(params.n, params.m) << '\n';
             }
 
             return true;
