@@ -152,7 +152,7 @@ std::size_t MockTxTriptych::get_size_bytes() const
         size += m_tx_proofs.size() * (32 * (8 + 
                         m_tx_proofs[0].m_triptych_proof.X.size() +
                         m_tx_proofs[0].m_triptych_proof.Y.size() +
-                        ref_set_size_from_decomp(m_tx_proofs[0].m_ref_set_decomp_n, m_tx_proofs[0].m_ref_set_decomp_m)));
+                        m_tx_proofs[0].m_ref_set_decomp_n * m_tx_proofs[0].m_ref_set_decomp_m));
     }
 
     return size;

@@ -136,6 +136,10 @@ int main(int argc, char** argv)
 
   for (const auto batch_size : batch_sizes) {
   for (const auto in_count : in_out_counts) {
+  for (const auto out_count : in_out_counts) {
+  for (const auto rangeproof_split : rangeproof_splits) {
+    if (rangeproof_split > out_count/2)
+      continue;
   for (std::size_t n_index{0}; n_index < ref_set_decomp_n.size(); ++n_index) {
     std::size_t m_start;
 
@@ -144,10 +148,6 @@ int main(int argc, char** argv)
     else
       m_start = 2;
   for (std::size_t m{m_start}; m <= ref_set_decomp_m_limit[n_index]; ++m) {
-  for (const auto out_count : in_out_counts) {
-  for (const auto rangeproof_split : rangeproof_splits) {
-    if (rangeproof_split > out_count/2)
-      continue;
 
     p_mock_tx.batch_size = batch_size;
     p_mock_tx.in_count = in_count;
@@ -161,7 +161,12 @@ int main(int argc, char** argv)
     {
       // limit CLSAG to 2^8
       if (m <= 8)
-        TEST_PERFORMANCE0(filter, p_mock_tx, test_mock_tx);
+        TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
+    }
+
+    if (ref_set_decomp_n[n_index] >= 2 && m >= 2)
+    {
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
     }
   }}}}}}
 

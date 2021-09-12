@@ -27,7 +27,9 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "crypto/crypto.h"
+#include "mock_tx/mock_tx.h"
 #include "mock_tx/mock_rct_clsag.h"
+#include "mock_tx/mock_rct_triptych.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
@@ -35,6 +37,7 @@
 
 #include <iostream>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 
@@ -44,32 +47,40 @@ enum class TestType
   ExpectAnyThrow
 };
 
-struct MockTxGenData
+enum class TxType
 {
-  std::size_t ref_set_size{1};
-  std::vector<rct::xmr_amount> input_amounts;
-  std::vector<rct::xmr_amount> output_amounts;
-  TestType expected_result{TestType::ExpectTrue};
-  std::size_t num_rangeproof_splits{0};
+  CLSAG,
+  Triptych
 };
 
-void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
+struct MockTxGenData
 {
+  std::size_t ref_set_decomp_n{1};
+  std::size_t ref_set_decomp_m{1};
+  std::vector<rct::xmr_amount> input_amounts;
+  std::vector<rct::xmr_amount> output_amounts;
+  std::size_t num_rangeproof_splits{0};
+  TestType expected_result{TestType::ExpectTrue};
+};
+
+template <typename MockTxType>
+static void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
+{
+  static_assert(std::is_base_of<mock_tx::MockTx, MockTxType>::value, "Invalid mock tx type.");
+
   for (const auto &gen : gen_data)
   {
     try
     {
       // mock params
       mock_tx::MockTxParamPack tx_params;
-      
+
       tx_params.max_rangeproof_splits = gen.num_rangeproof_splits;
-      tx_params.ref_set_decomp_n = gen.ref_set_size;
-      tx_params.ref_set_decomp_m = 1;
+      tx_params.ref_set_decomp_n = gen.ref_set_decomp_n;
+      tx_params.ref_set_decomp_m = gen.ref_set_decomp_m;
 
       // make tx
-      std::shared_ptr<mock_tx::MockTxCLSAG> tx{
-          mock_tx::make_mock_tx<mock_tx::MockTxCLSAG>(tx_params, gen.input_amounts, gen.output_amounts)
-        };
+      std::shared_ptr<MockTxType> tx{mock_tx::make_mock_tx<MockTxType>(tx_params, gen.input_amounts, gen.output_amounts)};
 
       // validate tx
       EXPECT_TRUE(tx->validate());
@@ -81,9 +92,10 @@ void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
   }
 }
 
-void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
+template <typename MockTxType>
+static void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
 {
-  std::vector<std::shared_ptr<mock_tx::MockTxCLSAG>> txs_to_verify;
+  std::vector<std::shared_ptr<MockTxType>> txs_to_verify;
   txs_to_verify.reserve(gen_data.size());
   TestType expected_result = TestType::ExpectTrue;
 
@@ -98,12 +110,12 @@ void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
       mock_tx::MockTxParamPack tx_params;
       
       tx_params.max_rangeproof_splits = gen.num_rangeproof_splits;
-      tx_params.ref_set_decomp_n = gen.ref_set_size;
-      tx_params.ref_set_decomp_m = 1;
+      tx_params.ref_set_decomp_n = gen.ref_set_decomp_n;
+      tx_params.ref_set_decomp_m = gen.ref_set_decomp_m;
 
       // make tx
       txs_to_verify.push_back(
-          mock_tx::make_mock_tx<mock_tx::MockTxCLSAG>(tx_params, gen.input_amounts, gen.output_amounts)
+          mock_tx::make_mock_tx<MockTxType>(tx_params, gen.input_amounts, gen.output_amounts)
         );
 
       // sanity check that rangeproof split is actually splitting the rangeproof
@@ -119,7 +131,7 @@ void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
   try
   {
     // validate tx
-    EXPECT_TRUE(mock_tx::validate_mock_txs<mock_tx::MockTxCLSAG>(txs_to_verify));
+    EXPECT_TRUE(mock_tx::validate_mock_txs<MockTxType>(txs_to_verify));
   }
   catch (...)
   {
@@ -128,92 +140,152 @@ void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
 }
 
 
+
+/////////////////////////////////////////////////////////////////////
+////////////////////////////// CLSAG ////////////////////////////////
+/////////////////////////////////////////////////////////////////////
+
 TEST(mock_tx, clsag)
 {
   /// success cases
   std::vector<MockTxGenData> gen_data;
-  gen_data.resize(11);
+  gen_data.reserve(20);
 
   // 1-in/1-out; ref set 1
-  gen_data[0].expected_result = TestType::ExpectTrue;
-  gen_data[0].input_amounts.push_back(1);
-  gen_data[0].output_amounts.push_back(1);
-  gen_data[0].ref_set_size = 1;
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.input_amounts.push_back(1);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 1;
+
+    gen_data.push_back(temp);
+  }
 
   // 1-in/1-out; ref set 10
-  gen_data[1].expected_result = TestType::ExpectTrue;
-  gen_data[1].input_amounts.push_back(1);
-  gen_data[1].output_amounts.push_back(1);
-  gen_data[1].ref_set_size = 10;
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.input_amounts.push_back(1);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 10;
+
+    gen_data.push_back(temp);
+  }
 
   // 1-in/2-out
-  gen_data[2].expected_result = TestType::ExpectTrue;
-  gen_data[2].input_amounts.push_back(2);
-  gen_data[2].output_amounts.push_back(1);
-  gen_data[2].output_amounts.push_back(1);
-  gen_data[2].ref_set_size = 10;
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.input_amounts.push_back(2);
+    temp.output_amounts.push_back(1);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 10;
+
+    gen_data.push_back(temp);
+  }
 
   // 2-in/1-out
-  gen_data[3].expected_result = TestType::ExpectTrue;
-  gen_data[3].input_amounts.push_back(1);
-  gen_data[3].input_amounts.push_back(1);
-  gen_data[3].output_amounts.push_back(2);
-  gen_data[3].ref_set_size = 10;
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.input_amounts.push_back(1);
+    temp.input_amounts.push_back(1);
+    temp.output_amounts.push_back(2);
+    temp.ref_set_decomp_n = 10;
+
+    gen_data.push_back(temp);
+  }
 
   // 16-in/16-out; ref set 1
-  gen_data[4].expected_result = TestType::ExpectTrue;
-  gen_data[4].ref_set_size = 1;
-  for (std::size_t i{0}; i < 16; ++i)
   {
-    gen_data[4].input_amounts.push_back(1);
-    gen_data[4].output_amounts.push_back(1);
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 1;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(1);
+      temp.output_amounts.push_back(1);
+    }
+
+    gen_data.push_back(temp);
   }
 
   // 16-in/16-out; ref set 10
-  gen_data[5].expected_result = TestType::ExpectTrue;
-  gen_data[5].ref_set_size = 10;
-  for (std::size_t i{0}; i < 16; ++i)
   {
-    gen_data[5].input_amounts.push_back(1);
-    gen_data[5].output_amounts.push_back(1);
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 10;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(1);
+      temp.output_amounts.push_back(1);
+    }
+
+    gen_data.push_back(temp);
   }
 
   // 16-in/16-out + amounts 0
-  gen_data[6].expected_result = TestType::ExpectTrue;
-  gen_data[6].ref_set_size = 10;
-  for (std::size_t i{0}; i < 16; ++i)
   {
-    gen_data[6].input_amounts.push_back(0);
-    gen_data[6].output_amounts.push_back(0);
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 10;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(0);
+      temp.output_amounts.push_back(0);
+    }
+
+    gen_data.push_back(temp);
   }
 
   /// failure cases
 
   // no inputs
-  gen_data[7].expected_result = TestType::ExpectAnyThrow;
-  gen_data[7].output_amounts.push_back(0);
-  gen_data[7].ref_set_size = 10;
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.output_amounts.push_back(0);
+    temp.ref_set_decomp_n = 10;
+
+    gen_data.push_back(temp);
+  }
 
   // no outputs
-  gen_data[8].expected_result = TestType::ExpectAnyThrow;
-  gen_data[8].input_amounts.push_back(0);
-  gen_data[8].ref_set_size = 10;
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.input_amounts.push_back(0);
+    temp.ref_set_decomp_n = 10;
+
+    gen_data.push_back(temp);
+  }
 
   // no ref set size
-  gen_data[9].expected_result = TestType::ExpectAnyThrow;
-  gen_data[9].input_amounts.push_back(1);
-  gen_data[9].output_amounts.push_back(1);
-  gen_data[9].ref_set_size = 0;
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.input_amounts.push_back(1);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 0;
+
+    gen_data.push_back(temp);
+  }
 
   // amounts don't balance
-  gen_data[10].expected_result = TestType::ExpectAnyThrow;
-  gen_data[10].input_amounts.push_back(2);
-  gen_data[10].output_amounts.push_back(1);
-  gen_data[10].ref_set_size = 10;
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.input_amounts.push_back(2);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 10;
+
+    gen_data.push_back(temp);
+  }
 
 
   /// run tests
-  run_mock_tx_test(gen_data);
+  run_mock_tx_test<mock_tx::MockTxCLSAG>(gen_data);
 }
 
 TEST(mock_tx_batching, clsag)
@@ -228,7 +300,7 @@ TEST(mock_tx_batching, clsag)
     gen.input_amounts.push_back(1);
     gen.output_amounts.push_back(2);
     gen.output_amounts.push_back(1);
-    gen.ref_set_size = 10;  
+    gen.ref_set_decomp_n = 10;  
   }
 
   /// 3 tx, 11 inputs/outputs each, range proofs split x3
@@ -243,14 +315,213 @@ TEST(mock_tx_batching, clsag)
       gen.output_amounts.push_back(2);
     }
 
-    gen.ref_set_size = 10;  
+    gen.ref_set_decomp_n = 10;  
     gen.num_rangeproof_splits = 3;
   }
 
   /// run tests
-  run_mock_tx_test_batch(gen_data);
-  run_mock_tx_test_batch(gen_data_split);
+  run_mock_tx_test_batch<mock_tx::MockTxCLSAG>(gen_data);
+  run_mock_tx_test_batch<mock_tx::MockTxCLSAG>(gen_data_split);
 }
+
+/////////////////////////////////////////////////////////////////////
+///////////////////////////// Triptych //////////////////////////////
+/////////////////////////////////////////////////////////////////////
+
+TEST(mock_tx, triptych)
+{
+  /// success cases
+  std::vector<MockTxGenData> gen_data;
+  gen_data.reserve(20);
+
+  // 1-in/1-out
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.input_amounts.push_back(1);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+  // 1-in/2-out
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.input_amounts.push_back(2);
+    temp.output_amounts.push_back(1);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+  // 2-in/1-out
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.input_amounts.push_back(1);
+    temp.input_amounts.push_back(1);
+    temp.output_amounts.push_back(2);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+  // 16-in/16-out; ref set 8
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(1);
+      temp.output_amounts.push_back(1);
+    }
+
+    gen_data.push_back(temp);
+  }
+
+  // 16-in/16-out; ref set 27
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 3;
+    temp.ref_set_decomp_m = 3;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(1);
+      temp.output_amounts.push_back(1);
+    }
+
+    gen_data.push_back(temp);
+  }
+
+  // 16-in/16-out; ref set 64
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 4;
+    temp.ref_set_decomp_m = 3;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(1);
+      temp.output_amounts.push_back(1);
+    }
+
+    gen_data.push_back(temp);
+  }
+
+  // 16-in/16-out + amounts 0
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(0);
+      temp.output_amounts.push_back(0);
+    }
+
+    gen_data.push_back(temp);
+  }
+
+  /// failure cases
+
+  // no inputs
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.output_amounts.push_back(0);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+  // no outputs
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.input_amounts.push_back(0);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+  // no ref set size
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.input_amounts.push_back(1);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 0;
+
+    gen_data.push_back(temp);
+  }
+
+  // amounts don't balance
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.input_amounts.push_back(2);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+
+  /// run tests
+  run_mock_tx_test<mock_tx::MockTxTriptych>(gen_data);
+}
+
+TEST(mock_tx_batching, triptych)
+{
+  /// a batch of 3 tx
+  std::vector<MockTxGenData> gen_data;
+  gen_data.resize(3);
+
+  for (auto &gen : gen_data)
+  {
+    gen.input_amounts.push_back(2);
+    gen.input_amounts.push_back(1);
+    gen.output_amounts.push_back(2);
+    gen.output_amounts.push_back(1);
+    gen.ref_set_decomp_n = 2;
+    gen.ref_set_decomp_m = 3;
+  }
+
+  /// 3 tx, 11 inputs/outputs each, range proofs split x3
+  std::vector<MockTxGenData> gen_data_split;
+  gen_data_split.resize(3);
+
+  for (auto &gen : gen_data_split)
+  {
+    for (int i{0}; i < 11; ++i)
+    {
+      gen.input_amounts.push_back(2);
+      gen.output_amounts.push_back(2);
+    }
+
+    gen.ref_set_decomp_n = 2;
+    gen.ref_set_decomp_m = 3;
+    gen.num_rangeproof_splits = 3;
+  }
+
+  /// run tests
+  run_mock_tx_test_batch<mock_tx::MockTxTriptych>(gen_data);
+  run_mock_tx_test_batch<mock_tx::MockTxTriptych>(gen_data_split);
+}
+
 
 
 
