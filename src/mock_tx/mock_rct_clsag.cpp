@@ -175,15 +175,14 @@ std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &pa
     std::vector<rct::key> output_amount_commitment_blinding_factors;
     std::vector<crypto::secret_key> pseudo_blinding_factors;
 
-    make_tx_transfers_rct_v1(inputs_to_spend,
-        destinations,
+    make_tx_outputs_rct_v1(destinations,
         outputs,
         output_amounts,
-        output_amount_commitment_blinding_factors,
-        pseudo_blinding_factors);
+        output_amount_commitment_blinding_factors);
     make_tx_images_rct_v1(inputs_to_spend,
-        pseudo_blinding_factors,
-        input_images);
+        output_amount_commitment_blinding_factors,
+        input_images,
+        pseudo_blinding_factors);
     make_bpp_rangeproofs(output_amounts,
         output_amount_commitment_blinding_factors,
         params.max_rangeproof_splits,

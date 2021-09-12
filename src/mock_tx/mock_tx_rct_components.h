@@ -62,7 +62,7 @@ struct MockENoteRctV1 final : public MockENoteRct
 
     static std::size_t get_size_bytes()
     {
-        return MockENoteRct::get_size_bytes() + 32 + 8;
+        return get_size_bytes_base() + 32 + 8;
     }
 
     /**
@@ -183,39 +183,77 @@ std::vector<MockDestRctV1> gen_mock_rct_dests_v1(const std::vector<rct::xmr_amou
 ///////////////////////////////////////// Make Tx Components ///////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-// make transfers: outputs
-void make_tx_transfers_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
-    const std::vector<MockDestRctV1> &destinations,
+/**
+* brief: get_rct_pseudo_blinding_factors_v1 - make pseudo blinding factors
+*   - The first 'num_factors - 1' blinding factors are random.
+*   - The last blinding factor equals sum(output factors) - sum(pseudo factors)_except_last
+* param: destinations -
+* outparam: outputs_out -
+* outparam: output_amounts_out -
+* outparam: output_amount_commitment_blinding_factors_out -
+* return: set of pseudo amount commitment blinding factors
+*/
+std::vector<crypto::secret_key> get_rct_pseudo_blinding_factors_v1(const std::size_t num_factors,
+    const std::vector<rct::key> &output_amount_commitment_blinding_factors);
+/**
+* brief: make_tx_outputs_rct_v1 - make V1 RCT outputs
+* param: destinations -
+* outparam: outputs_out -
+* outparam: output_amounts_out -
+* outparam: output_amount_commitment_blinding_factors_out -
+*/
+void make_tx_outputs_rct_v1(const std::vector<MockDestRctV1> &destinations,
     std::vector<MockENoteRctV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
-    std::vector<rct::key> &output_amount_commitment_blinding_factors_out,
-    std::vector<crypto::secret_key> &pseudo_blinding_factors_out);
-
-// make enote images (CryptoNote style)
+    std::vector<rct::key> &output_amount_commitment_blinding_factors_out);
+/**
+* brief: make_tx_images_rct_v1 - make V1 RCT enote images (CryptoNote style)
+* param: inputs_to_spend -
+* param: output_amount_commitment_blinding_factors -
+* outparam: input_images_out -
+* outparam: pseudo_blinding_factors_out -
+*/
 void make_tx_images_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
-    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
-    std::vector<MockENoteImageRctV1> &input_images_out);
-
-// make enote images (Triptych style)
+    const std::vector<rct::key> &output_amount_commitment_blinding_factors,
+    std::vector<MockENoteImageRctV1> &input_images_out,
+    std::vector<crypto::secret_key> &pseudo_blinding_factors_out);
+/**
+* brief: make_tx_images_rct_v2 - make V1 RCT enote images (Triptych style)
+* param: inputs_to_spend -
+* param: output_amount_commitment_blinding_factors -
+* outparam: input_images_out -
+* outparam: pseudo_blinding_factors_out -
+*/
 void make_tx_images_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
-    const std::vector<crypto::secret_key> &pseudo_blinding_factors,
-    std::vector<MockENoteImageRctV1> &input_images_out);
-
-// make input proofs: membership, ownership, unspentness (i.e. prove key images are constructed correctly)
-// CLSAGs
+    const std::vector<rct::key> &output_amount_commitment_blinding_factors,
+    std::vector<MockENoteImageRctV1> &input_images_out,
+    std::vector<crypto::secret_key> &pseudo_blinding_factors_out);
+/**
+* brief: make_tx_input_proofs_rct_v1 - make V1 RCT input proofs (CLSAGs)
+*   - input proofs: membership, ownership, unspentness (i.e. prove key images are constructed correctly)
+* param: inputs_to_spend -
+* param: pseudo_blinding_factors -
+* outparam: proofs_out -
+*/
 void make_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<crypto::secret_key> &pseudo_blinding_factors,
     std::vector<MockRctProofV1> &proofs_out);
-
-// make input proofs: membership, ownership, unspentness (i.e. prove key images are constructed correctly)
-// Triptych proofs
+/**
+* brief: make_tx_input_proofs_rct_v2 - make V2 RCT input proofs (Triptych proofs)
+*   - input proofs: membership, ownership, unspentness (i.e. prove key images are constructed correctly)
+* param: inputs_to_spend -
+* param: input_images -
+* param: pseudo_blinding_factors -
+* param: ref_set_decomp_n -
+* param: ref_set_decomp_m -
+* outparam: proofs_out -
+*/
 void make_tx_input_proofs_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<MockENoteImageRctV1> &input_images,
     const std::vector<crypto::secret_key> &pseudo_blinding_factors,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     std::vector<MockRctProofV2> &proofs_out);
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////// Validate Tx Components ////////////////////////////////////////////

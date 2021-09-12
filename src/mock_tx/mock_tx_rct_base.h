@@ -54,7 +54,7 @@ struct MockENoteRct
     crypto::public_key m_onetime_address;
     crypto::public_key m_amount_commitment;
 
-    static std::size_t get_size_bytes() {return 32*2;}
+    static std::size_t get_size_bytes_base() {return 32*2;}
 
     /**
     * brief: make_base - make an RCT ENote
