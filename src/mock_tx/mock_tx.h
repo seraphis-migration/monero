@@ -38,6 +38,7 @@
 
 //standard headers
 #include <memory>
+#include <string>
 #include <vector>
 
 //forward declarations
@@ -77,6 +78,9 @@ public:
 
     /// get size of tx
     virtual std::size_t get_size_bytes() const = 0;
+
+    /// get a short description of the tx type
+    virtual std::string get_descriptor() const = 0;
 
     //get_tx_byte_blob()
 

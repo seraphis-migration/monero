@@ -156,6 +156,18 @@ MockENoteRctV1 MockDestRctV1::to_enote_v1() const
     return enote;
 }
 //-----------------------------------------------------------------
+std::size_t MockRctProofV1::get_size_bytes() const
+{
+    // note: ignore the key image stored in the clsag, it is double counted by the input's enote image struct
+    return 32 * (2 + m_clsag_proof.s.size());
+}
+//-----------------------------------------------------------------
+std::size_t MockRctProofV2::get_size_bytes() const
+{
+    // note: ignore the key image stored in the Triptych proof, it is double counted by the input's enote image struct
+    return 32 * (8 + m_triptych_proof.X.size() + m_triptych_proof.Y.size() + m_ref_set_decomp_n * m_ref_set_decomp_m);
+}
+//-----------------------------------------------------------------
 void MockDestRctV1::gen_v1(const rct::xmr_amount amount)
 {
     // gen base of dest
@@ -236,7 +248,7 @@ std::vector<crypto::secret_key> get_rct_pseudo_blinding_factors_v1(const std::si
     return pseudo_blinding_factors;
 }
 //-----------------------------------------------------------------
-void make_tx_outputs_rct_v1(const std::vector<MockDestRctV1> &destinations,
+void make_v1_tx_outputs_rct_v1(const std::vector<MockDestRctV1> &destinations,
     std::vector<MockENoteRctV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<rct::key> &output_amount_commitment_blinding_factors_out)
@@ -260,7 +272,7 @@ void make_tx_outputs_rct_v1(const std::vector<MockDestRctV1> &destinations,
     }
 }
 //-----------------------------------------------------------------
-void make_tx_images_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
+void make_v1_tx_images_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<rct::key> &output_amount_commitment_blinding_factors,
     std::vector<MockENoteImageRctV1> &input_images_out,
     std::vector<crypto::secret_key> &pseudo_blinding_factors_out)
@@ -284,7 +296,7 @@ void make_tx_images_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
     }
 }
 //-----------------------------------------------------------------
-void make_tx_images_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
+void make_v1_tx_images_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<rct::key> &output_amount_commitment_blinding_factors,
     std::vector<MockENoteImageRctV1> &input_images_out,
     std::vector<crypto::secret_key> &pseudo_blinding_factors_out)
@@ -308,7 +320,7 @@ void make_tx_images_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
     }
 }
 //-----------------------------------------------------------------
-void make_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
+void make_v1_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<crypto::secret_key> &pseudo_blinding_factors,
     std::vector<MockRctProofV1> &proofs_out)
 {
@@ -349,7 +361,7 @@ void make_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_sp
     }
 }
 //-----------------------------------------------------------------
-void make_tx_input_proofs_rct_v2(const std::vector<MockInputRctV1> &inputs_to_spend,
+void make_v2_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to_spend,
     const std::vector<MockENoteImageRctV1> &input_images,
     const std::vector<crypto::secret_key> &pseudo_blinding_factors,
     const std::size_t ref_set_decomp_n,

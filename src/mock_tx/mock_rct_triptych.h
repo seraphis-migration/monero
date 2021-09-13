@@ -85,15 +85,18 @@ public:
 //destructor: default
 
 //member functions
-    /// get size of tx
-    std::size_t get_size_bytes() const override;
-
     /// validate tx
     bool validate(const bool defer_batchable = false) const override
     {
         // punt to the parent class
         return this->MockTx::validate(defer_batchable);
     }
+
+    /// get size of tx
+    std::size_t get_size_bytes() const override;
+
+    /// get a short description of the tx type
+    std::string get_descriptor() const override { return "Triptych"; }
 
     /// get range proof
     const std::vector<rct::BulletproofPlus>& get_range_proofs() const {return m_range_proofs;}

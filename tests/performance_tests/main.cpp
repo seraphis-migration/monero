@@ -139,6 +139,7 @@ int main(int argc, char** argv)
   for (const auto out_count : in_out_counts) {
   for (const auto rangeproof_split : rangeproof_splits) {
     if (rangeproof_split > out_count/2)
+    // if squashed model, test (out_count + in_count)/2
       continue;
   for (std::size_t n_index{0}; n_index < ref_set_decomp_n.size(); ++n_index) {
     std::size_t m_start;
@@ -171,7 +172,7 @@ int main(int argc, char** argv)
   }}}}}}
 
 
-  /*
+
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 1, 1);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 1, 1);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 1, 1);
@@ -184,7 +185,7 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 16, 16);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 16, 16);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 16, 16);
-
+  /*
 
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 1, false);
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 2, false);
