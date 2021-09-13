@@ -52,46 +52,25 @@ namespace mock_tx
 //-----------------------------------------------------------------
 bool MockTxCLSAG::validate_tx_semantics() const
 {
-    CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to validate tx that has no outputs.");
-    CHECK_AND_ASSERT_THROW_MES(m_input_images.size() > 0, "Tried to validate tx that has no input images.");
-    CHECK_AND_ASSERT_THROW_MES(m_tx_proofs.size() > 0, "Tried to validate tx that has no input proofs.");
-    CHECK_AND_ASSERT_THROW_MES(m_range_proofs.size() > 0, "Tried to validate tx that has no range proofs.");
-    CHECK_AND_ASSERT_THROW_MES(m_range_proofs[0].V.size() > 0, "Tried to validate tx that has no range proofs.");
-
-    /// there must be the correct number of proofs
-    if (m_tx_proofs.size() != m_input_images.size())
-        return false;
-
-    std::size_t num_rangeproofed_commitments{0};
-    for (const auto &range_proof : m_range_proofs)
-        num_rangeproofed_commitments += range_proof.V.size();
-
-    if (num_rangeproofed_commitments != m_outputs.size())
-        return false;
-
-
-    /// all inputs must have the same reference set size
-    std::size_t ref_set_size{m_tx_proofs[0].m_referenced_enotes_converted.size()};
-
-    for (const auto &tx_proof : m_tx_proofs)
+    // validate component counts (num inputs/outputs/etc.)
+    if (!validate_mock_tx_rct_semantics_component_counts_v1(m_tx_proofs.size(),
+        m_input_images.size(),
+        m_outputs.size(),
+        m_balance_proof))
     {
-        if (tx_proof.m_referenced_enotes_converted.size() != ref_set_size)
-            return false;
+        return false;
     }
 
-
-    /// input linking tags must be in the prime subgroup: KI = 8*[(1/8) * KI]
-    // note: I cheat a bit here for the mock-up. The linking tags in the clsag_proof are not mul(1/8), but the
-    //       tags in input images are.
-    for (std::size_t input_index{0}; input_index < m_input_images.size(); ++input_index)
+    // validate input proof reference set sizes
+    if (!validate_mock_tx_rct_semantics_ref_set_size_v1(m_tx_proofs, m_tx_proofs[0].m_referenced_enotes_converted.size()))
     {
-        if (!(rct::scalarmult8(rct::ki2rct(m_input_images[input_index].m_key_image)) ==
-                m_tx_proofs[input_index].m_clsag_proof.I))
-            return false;
+        return false;
+    }
 
-        // sanity check
-        if (m_tx_proofs[input_index].m_clsag_proof.I == rct::identity())
-            return false;
+    // validate linking tag semantics
+    if (!validate_mock_tx_rct_semantics_linking_tags_v1(m_input_images, m_tx_proofs))
+    {
+        return false;
     }
 
     return true;
@@ -107,7 +86,7 @@ bool MockTxCLSAG::validate_tx_linking_tags() const
 //-----------------------------------------------------------------
 bool MockTxCLSAG::validate_tx_amount_balance(const bool defer_batchable) const
 {
-    if (!validate_mock_tx_rct_amount_balance_v1(m_input_images, m_outputs, m_range_proofs, defer_batchable))
+    if (!validate_mock_tx_rct_amount_balance_v1(m_input_images, m_outputs, m_balance_proof, defer_batchable))
         return false;
 
     return true;
@@ -139,15 +118,14 @@ std::size_t MockTxCLSAG::get_size_bytes() const
     // outputs
     size += m_outputs.size() * MockENoteRctV1::get_size_bytes();
 
-    // range proofs
-    // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
-    for (const auto &range_proof : m_range_proofs)
-        size += 32 * (6 + range_proof.L.size() + range_proof.R.size());
-
     // input proofs
     if (m_tx_proofs.size())
         // note: ignore the key image stored in the clsag, it is double counted by the input's enote image struct
         size += m_tx_proofs.size() * m_tx_proofs[0].get_size_bytes();
+
+    // balance proof
+    if (m_balance_proof.get() != nullptr)
+        size += m_balance_proof->get_size_bytes();
 
     return size;
 }
@@ -174,7 +152,7 @@ std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &pa
     // tx components
     std::vector<MockENoteImageRctV1> input_images;
     std::vector<MockENoteRctV1> outputs;
-    std::vector<rct::BulletproofPlus> range_proofs;
+    std::shared_ptr<MockRctBalanceProofV1> balance_proof;
     std::vector<MockRctProofV1> tx_proofs;
 
     // info shuttles for making components
@@ -190,15 +168,15 @@ std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &pa
         output_amount_commitment_blinding_factors,
         input_images,
         pseudo_blinding_factors);
-    make_bpp_rangeproofs(output_amounts,
-        output_amount_commitment_blinding_factors,
-        params.max_rangeproof_splits,
-        range_proofs);
     make_v1_tx_input_proofs_rct_v1(inputs_to_spend,
         pseudo_blinding_factors,
         tx_proofs);
+    make_v1_tx_balance_proof_rct_v1(output_amounts,
+        output_amount_commitment_blinding_factors,
+        params.max_rangeproof_splits,
+        balance_proof);
 
-    return std::make_shared<MockTxCLSAG>(input_images, outputs, range_proofs, tx_proofs);
+    return std::make_shared<MockTxCLSAG>(input_images, outputs, balance_proof, tx_proofs);
 }
 //-----------------------------------------------------------------
 template <>
@@ -209,12 +187,20 @@ bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSA
 
     for (const auto &tx : txs_to_validate)
     {
+        if (tx.get() == nullptr)
+            return false;
+
         // validate unbatchable parts of tx
         if (!tx->validate(true))
             return false;
 
         // gather range proofs
-        for (const auto &range_proof : tx->get_range_proofs())
+        const auto balance_proof{tx->get_balance_proof()};
+
+        if (balance_proof.get() == nullptr)
+            return false;
+
+        for (const auto &range_proof : balance_proof->m_bpp_proofs)
             range_proofs.push_back(&range_proof);
     }
 

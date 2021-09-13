@@ -156,6 +156,16 @@ MockENoteRctV1 MockDestRctV1::to_enote_v1() const
     return enote;
 }
 //-----------------------------------------------------------------
+void MockDestRctV1::gen_v1(const rct::xmr_amount amount)
+{
+    // gen base of dest
+    this->gen_base(amount);
+
+    // memo parts: random
+    m_enote_pubkey = rct::rct2pk(rct::pkGen());
+    m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+}
+//-----------------------------------------------------------------
 std::size_t MockRctProofV1::get_size_bytes() const
 {
     // note: ignore the key image stored in the clsag, it is double counted by the input's enote image struct
@@ -168,14 +178,15 @@ std::size_t MockRctProofV2::get_size_bytes() const
     return 32 * (8 + m_triptych_proof.X.size() + m_triptych_proof.Y.size() + m_ref_set_decomp_n * m_ref_set_decomp_m);
 }
 //-----------------------------------------------------------------
-void MockDestRctV1::gen_v1(const rct::xmr_amount amount)
+std::size_t MockRctBalanceProofV1::get_size_bytes() const
 {
-    // gen base of dest
-    this->gen_base(amount);
+    // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
+    std::size_t size{0};
 
-    // memo parts: random
-    m_enote_pubkey = rct::rct2pk(rct::pkGen());
-    m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+    for (const auto &proof : m_bpp_proofs)
+        size += 32 * (6 + proof.L.size() + proof.R.size());;
+
+    return size;
 }
 //-----------------------------------------------------------------
 std::vector<MockInputRctV1> gen_mock_rct_inputs_v1(const std::vector<rct::xmr_amount> &amounts,
@@ -324,7 +335,7 @@ void make_v1_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to
     const std::vector<crypto::secret_key> &pseudo_blinding_factors,
     std::vector<MockRctProofV1> &proofs_out)
 {
-    /// membership + ownership/unspentness proofs
+    // membership + ownership/unspentness proofs
     // - clsag for each input
     for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
     {
@@ -368,7 +379,7 @@ void make_v2_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to
     const std::size_t ref_set_decomp_m,
     std::vector<MockRctProofV2> &proofs_out)
 {
-    /// membership + ownership/unspentness proofs
+    // membership + ownership/unspentness proofs
     // - Triptych for each input
     for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
     {
@@ -423,10 +434,137 @@ void make_v2_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to
     }
 }
 //-----------------------------------------------------------------
+void make_v1_tx_balance_proof_rct_v1(const std::vector<rct::xmr_amount> &output_amounts,
+    const std::vector<rct::key> &amount_commitment_blinding_factors,
+    const std::size_t max_rangeproof_splits,
+    std::shared_ptr<MockRctBalanceProofV1> &balance_proof_out)
+{
+    if (balance_proof_out.get() == nullptr)
+        balance_proof_out = std::make_shared<MockRctBalanceProofV1>();
+
+    // make range proofs (punt to BP+ builder)
+    std::vector<rct::BulletproofPlus> range_proofs;
+
+    make_bpp_rangeproofs(output_amounts,
+        amount_commitment_blinding_factors,
+        max_rangeproof_splits,
+        range_proofs);
+
+    balance_proof_out->m_bpp_proofs = std::move(range_proofs);
+}
+//-----------------------------------------------------------------
+bool validate_mock_tx_rct_semantics_component_counts_v1(const std::size_t num_input_proofs,
+        const std::size_t num_input_images,
+        const std::size_t num_outputs,
+        const std::shared_ptr<MockRctBalanceProofV1> &balance_proof)
+{
+    CHECK_AND_ASSERT_THROW_MES(num_input_proofs > 0, "Tried to validate tx that has no input proofs.");
+    CHECK_AND_ASSERT_THROW_MES(num_input_images > 0, "Tried to validate tx that has no input images.");
+    CHECK_AND_ASSERT_THROW_MES(num_outputs > 0, "Tried to validate tx that has no outputs.");
+    CHECK_AND_ASSERT_THROW_MES(balance_proof.get() != nullptr, "Tried to validate tx that has no balance.");
+    CHECK_AND_ASSERT_THROW_MES(balance_proof->m_bpp_proofs.size() > 0, "Tried to validate tx that has no range proofs.");
+    CHECK_AND_ASSERT_THROW_MES(balance_proof->m_bpp_proofs[0].V.size() > 0, "Tried to validate tx that has no range proofs.");
+
+    // input proofs
+    if (num_input_proofs != num_input_images)
+        return false;
+
+    // range proofs: must be one range-proofed commitment per output
+    std::size_t num_rangeproofed_commitments{0};
+
+    for (const auto &range_proof : balance_proof->m_bpp_proofs)
+        num_rangeproofed_commitments += range_proof.V.size();
+
+    if (num_rangeproofed_commitments != num_outputs)
+        return false;
+
+    return true;
+}
+//-----------------------------------------------------------------
+bool validate_mock_tx_rct_semantics_ref_set_size_v1(const std::vector<MockRctProofV1> &tx_proofs,
+    const std::size_t ref_set_size)
+{
+    // all proofs must have same ref set size
+    for (const auto &tx_proof : tx_proofs)
+    {
+        if (tx_proof.m_referenced_enotes_converted.size() != ref_set_size)
+            return false;
+    }
+
+    return true;
+}
+//-----------------------------------------------------------------
+bool validate_mock_tx_rct_semantics_ref_set_size_v2(const std::vector<MockRctProofV2> &tx_proofs,
+        const std::size_t ref_set_decomp_n,
+        const std::size_t ref_set_decomp_m)
+{
+    std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};
+
+    // all proofs must have the same decomposition: ref set size = n^m
+    for (const auto &tx_proof : tx_proofs)
+    {
+        if (tx_proof.m_ref_set_decomp_n != ref_set_decomp_n ||
+            tx_proof.m_ref_set_decomp_m != ref_set_decomp_m ||
+            tx_proof.m_onetime_addresses.size() != ref_set_size ||
+            tx_proof.m_commitments.size() != ref_set_size)
+            return false;
+    }
+
+    return true;
+}
+//-----------------------------------------------------------------
+bool validate_mock_tx_rct_semantics_linking_tags_v1(const std::vector<MockENoteImageRctV1> input_images,
+    const std::vector<MockRctProofV1> tx_proofs)
+{
+    // sanity check
+    if (input_images.size() != tx_proofs.size())
+        return false;
+
+    // input linking tags must be in the prime subgroup: KI = 8*[(1/8) * KI]
+    // note: I cheat a bit here for the mock-up. The linking tags in the clsag_proof are not mul(1/8), but the
+    //       tags in input images are.
+    for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
+    {
+        if (!(rct::scalarmult8(rct::ki2rct(input_images[input_index].m_key_image)) ==
+                tx_proofs[input_index].m_clsag_proof.I))
+            return false;
+
+        // sanity check
+        if (tx_proofs[input_index].m_clsag_proof.I == rct::identity())
+            return false;
+    }
+
+    return true;
+}
+//-----------------------------------------------------------------
+bool validate_mock_tx_rct_semantics_linking_tags_v2(const std::vector<MockENoteImageRctV1> input_images,
+    const std::vector<MockRctProofV2> tx_proofs)
+{
+    // sanity check
+    if (input_images.size() != tx_proofs.size())
+        return false;
+
+    // input linking tags must be in the prime subgroup: KI = 8*[(1/8) * KI]
+    // note: I cheat a bit here for the mock-up. The linking tags in the Triptych_proof are not mul(1/8), but the
+    //       tags in m_input_images are.
+    for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
+    {
+        if (!(rct::scalarmult8(rct::ki2rct(input_images[input_index].m_key_image)) ==
+                tx_proofs[input_index].m_triptych_proof.J))
+            return false;
+
+        // sanity check
+        if (tx_proofs[input_index].m_triptych_proof.J == rct::identity())
+            return false;
+    }
+
+    return true;
+}
+//-----------------------------------------------------------------
 bool validate_mock_tx_rct_linking_tags_v1(const std::vector<MockRctProofV1> &proofs,
     const std::vector<MockENoteImageRctV1> &images)
 {
-    /// input linking tags must not exist in the blockchain
+    // input linking tags must not exist in the blockchain
     //not implemented for mockup
 
     return true;
@@ -435,7 +573,7 @@ bool validate_mock_tx_rct_linking_tags_v1(const std::vector<MockRctProofV1> &pro
 bool validate_mock_tx_rct_linking_tags_v2(const std::vector<MockRctProofV2> &proofs,
     const std::vector<MockENoteImageRctV1> &images)
 {
-    /// input linking tags must not exist in the blockchain
+    // input linking tags must not exist in the blockchain
     //not implemented for mockup
 
     return true;
@@ -443,10 +581,19 @@ bool validate_mock_tx_rct_linking_tags_v2(const std::vector<MockRctProofV2> &pro
 //-----------------------------------------------------------------
 bool validate_mock_tx_rct_amount_balance_v1(const std::vector<MockENoteImageRctV1> &images,
     const std::vector<MockENoteRctV1> &outputs,
-    const std::vector<rct::BulletproofPlus> &range_proofs,
+    const std::shared_ptr<MockRctBalanceProofV1> balance_proof,
     const bool defer_batchable)
 {
-    /// check that amount commitments balance
+    if (balance_proof.get() == nullptr)
+        return false;
+
+    const std::vector<rct::BulletproofPlus> &range_proofs = balance_proof->m_bpp_proofs;
+
+    // sanity check
+    if (range_proofs.size() == 0)
+        return false;
+
+    // check that amount commitments balance
     rct::keyV pseudo_commitments;
     rct::keyV output_commitments;
     pseudo_commitments.reserve(images.size());
@@ -462,10 +609,17 @@ bool validate_mock_tx_rct_amount_balance_v1(const std::vector<MockENoteImageRctV
     {
         output_commitments.emplace_back(rct::pk2rct(outputs[output_index].m_amount_commitment));
 
-        // double check that the two stored copies of output commitments match
+        // assume range proofs are partitioned into groups of size 'range_proof_grouping_size' (except last one)
         if (range_proofs[range_proof_index].V.size() == output_index - range_proof_index*range_proof_grouping_size)
             ++range_proof_index;
 
+        // sanity checks
+        if (range_proofs.size() <= range_proof_index)
+            return false;
+        if (range_proofs[range_proof_index].V.size() <= output_index - range_proof_index*range_proof_grouping_size)
+            return false;
+
+        // double check that the two stored copies of output commitments match
         if (outputs[output_index].m_amount_commitment !=
                 rct::rct2pk(rct::scalarmult8(range_proofs[range_proof_index].V[output_index -
                     range_proof_index*range_proof_grouping_size])))
@@ -495,7 +649,7 @@ bool validate_mock_tx_rct_amount_balance_v1(const std::vector<MockENoteImageRctV
 bool validate_mock_tx_rct_proofs_v1(const std::vector<MockRctProofV1> &proofs,
     const std::vector<MockENoteImageRctV1> &images)
 {
-    /// verify membership/ownership/unspentness proofs
+    // verify membership/ownership/unspentness proofs
     for (std::size_t input_index{0}; input_index < images.size(); ++input_index)
     {
         if (!rct::verRctCLSAGSimple(rct::zero(),  // empty message for mockup
@@ -510,7 +664,7 @@ bool validate_mock_tx_rct_proofs_v1(const std::vector<MockRctProofV1> &proofs,
 //-----------------------------------------------------------------
 bool validate_mock_tx_rct_proofs_v2(const std::vector<MockRctProofV2> &proofs)
 {
-    /// verify input membership/ownership/unspentness proofs
+    // verify input membership/ownership/unspentness proofs
     for (std::size_t input_index{0}; input_index < proofs.size(); ++input_index)
     {
         std::vector<const rct::TriptychProof*> proof;
