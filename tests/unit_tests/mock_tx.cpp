@@ -81,6 +81,7 @@ static void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
 
       // make tx
       std::shared_ptr<MockTxType> tx{mock_tx::make_mock_tx<MockTxType>(tx_params, gen.input_amounts, gen.output_amounts)};
+      EXPECT_TRUE(tx.get() != nullptr);
 
       // validate tx
       EXPECT_TRUE(tx->validate());
@@ -120,7 +121,10 @@ static void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
 
       // sanity check that rangeproof split is actually splitting the rangeproof
       if (gen.num_rangeproof_splits > 0 && gen.output_amounts.size() > 1)
-        EXPECT_TRUE(txs_to_verify.back()->get_range_proofs().size() > 1);
+      {
+        EXPECT_TRUE(txs_to_verify.back()->get_balance_proof().get() != nullptr);
+        EXPECT_TRUE(txs_to_verify.back()->get_balance_proof()->m_bpp_proofs.size() > 1);
+      }
     }
     catch (...)
     {

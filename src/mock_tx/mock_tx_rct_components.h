@@ -161,6 +161,19 @@ struct MockRctProofV2 final
     std::size_t get_size_bytes() const;
 };
 
+////
+// MockRctBalanceProofV1 - RCT Balance Proof V1
+// - balance proof: implicit [sum(inputs) == sum(outputs)]
+// - range proof: Bulletproofs+
+///
+struct MockRctBalanceProofV1 final
+{
+    /// a set of BP+ proofs
+    std::vector<rct::BulletproofPlus> m_bpp_proofs;
+
+    std::size_t get_size_bytes() const;
+};
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////// Make Mock Pieces ///////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -258,11 +271,73 @@ void make_v2_tx_input_proofs_rct_v1(const std::vector<MockInputRctV1> &inputs_to
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     std::vector<MockRctProofV2> &proofs_out);
+/**
+* brief: make_v1_tx_balance_proof_rct_v1 - make V1 RCT balance proof
+*   - BP+ range proofs for all output amounts
+* param: output_amounts -
+* param: amount_commitment_blinding_factors -
+* param: max_rangeproof_splits -
+* outparam: balance_proof_out -
+*/
+void make_v1_tx_balance_proof_rct_v1(const std::vector<rct::xmr_amount> &output_amounts,
+    const std::vector<rct::key> &amount_commitment_blinding_factors,
+    const std::size_t max_rangeproof_splits,
+    std::shared_ptr<MockRctBalanceProofV1> &balance_proof_out);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////// Validate Tx Components ////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+/**
+* brief: validate_mock_tx_rct_semantics_proofcounts_v1 - check component counts for a transaction
+* param: num_input_proofs -
+* param: num_input_images -
+* param: num_outputs -
+* param: range_proofs -
+* return: true/false on verification result
+*/
+bool validate_mock_tx_rct_semantics_component_counts_v1(const std::size_t num_input_proofs,
+        const std::size_t num_input_images,
+        const std::size_t num_outputs,
+        const std::shared_ptr<MockRctBalanceProofV1> &balance_proof);
+/**
+* brief: validate_mock_tx_rct_semantics_ref_set_size_v1 - check reference set semenatics (v1 proofs: CLSAG)
+* param: tx_proofs -
+* param: ref_set_size -
+* return: true/false on verification result
+*/
+bool validate_mock_tx_rct_semantics_ref_set_size_v1(const std::vector<MockRctProofV1> &tx_proofs,
+        const std::size_t ref_set_size);
+/**
+* brief: validate_mock_tx_rct_semantics_ref_set_size_v2 - check reference set semenatics (v2 proofs: Triptych)
+* param: tx_proofs -
+* param: ref_set_decomp_n -
+* param: ref_set_decomp_m -
+* return: true/false on verification result
+*/
+bool validate_mock_tx_rct_semantics_ref_set_size_v2(const std::vector<MockRctProofV2> &tx_proofs,
+        const std::size_t ref_set_decomp_n,
+        const std::size_t ref_set_decomp_m);
+/**
+* brief: validate_mock_tx_rct_semantics_linking_tags_v1 - check linking tag semenatics (v1 proofs: CLSAG)
+*   - Stored images must be in large-prime Ed25519 subgroup.
+*   - Stored images must match between two storage locations (duplication in mock up).
+* param: input_images -
+* param: tx_proofs -
+* return: true/false on verification result
+*/
+bool validate_mock_tx_rct_semantics_linking_tags_v1(const std::vector<MockENoteImageRctV1> input_images,
+    const std::vector<MockRctProofV1> tx_proofs);
+/**
+* brief: validate_mock_tx_rct_semantics_linking_tags_v2 - check linking tag semenatics (v2 proofs: Triptych)
+*   - Stored images must be in large-prime Ed25519 subgroup.
+*   - Stored images must match between two storage locations (duplication in mock up).
+* param: input_images -
+* param: tx_proofs -
+* return: true/false on verification result
+*/
+bool validate_mock_tx_rct_semantics_linking_tags_v2(const std::vector<MockENoteImageRctV1> input_images,
+    const std::vector<MockRctProofV2> tx_proofs);
 /**
 * brief: validate_mock_tx_rct_linking_tags_v1 - validate linking tags in V1 RCT input proofs and images
 * param: proofs -
@@ -291,7 +366,7 @@ bool validate_mock_tx_rct_linking_tags_v2(const std::vector<MockRctProofV2> &pro
 */
 bool validate_mock_tx_rct_amount_balance_v1(const std::vector<MockENoteImageRctV1> &images,
     const std::vector<MockENoteRctV1> &outputs,
-    const std::vector<rct::BulletproofPlus> &range_proofs,
+    const std::shared_ptr<MockRctBalanceProofV1> balance_proof,
     const bool defer_batchable);
 /**
 * brief: validate_mock_tx_rct_proofs_v1 - validate a set of V1 RCT proofs from a tx

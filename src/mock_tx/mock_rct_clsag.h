@@ -62,11 +62,11 @@ public:
     /// normal constructor: new tx
     MockTxCLSAG(std::vector<MockENoteImageRctV1> &input_images,
         std::vector<MockENoteRctV1> &outputs,
-        std::vector<rct::BulletproofPlus> &range_proofs,
+        std::shared_ptr<MockRctBalanceProofV1> &balance_proof,
         std::vector<MockRctProofV1> &tx_proofs) :
             m_input_images{std::move(input_images)},
             m_outputs{std::move(outputs)},
-            m_range_proofs{std::move(range_proofs)},
+            m_balance_proof{std::move(balance_proof)},
             m_tx_proofs{std::move(tx_proofs)}
         {
             CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble MockTxCLSAG.");
@@ -91,8 +91,8 @@ public:
     /// get a short description of the tx type
     std::string get_descriptor() const override { return "CLSAG"; }
 
-    /// get range proof
-    const std::vector<rct::BulletproofPlus>& get_range_proofs() const {return m_range_proofs;}
+    /// get balance proof
+    const std::shared_ptr<MockRctBalanceProofV1> get_balance_proof() const { return m_balance_proof; }
 
     //get_tx_byte_blob()
 
@@ -108,8 +108,8 @@ private:
     std::vector<MockENoteImageRctV1> m_input_images;
     /// tx outputs (new e-notes)
     std::vector<MockENoteRctV1> m_outputs;
-    /// range proofs
-    std::vector<rct::BulletproofPlus> m_range_proofs;
+    /// balance proof (balance proof and range proofs)
+    std::shared_ptr<MockRctBalanceProofV1> m_balance_proof;
     /// CLSAGs proving membership/ownership/unspentness for each input
     std::vector<MockRctProofV1> m_tx_proofs;
 };
