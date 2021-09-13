@@ -140,20 +140,21 @@ std::size_t MockTxTriptych::get_size_bytes() const
     // - each output has its own enote pub key
 
     std::size_t size{0};
+
+    // input images
     size += m_input_images.size() * MockENoteImageRctV1::get_size_bytes();
+
+    // outputs
     size += m_outputs.size() * MockENoteRctV1::get_size_bytes();
+
+    // range proofs
     // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
     for (const auto &range_proof : m_range_proofs)
         size += 32 * (6 + range_proof.L.size() + range_proof.R.size());
 
+    // input proofs
     if (m_tx_proofs.size())
-    {
-        // note: ignore the key image stored in the Triptych proof, it is double counted by the input's enote image struct
-        size += m_tx_proofs.size() * (32 * (8 + 
-                        m_tx_proofs[0].m_triptych_proof.X.size() +
-                        m_tx_proofs[0].m_triptych_proof.Y.size() +
-                        m_tx_proofs[0].m_ref_set_decomp_n * m_tx_proofs[0].m_ref_set_decomp_m));
-    }
+        size += m_tx_proofs.size() * m_tx_proofs[0].get_size_bytes();
 
     return size;
 }
@@ -188,11 +189,11 @@ std::shared_ptr<MockTxTriptych> make_mock_tx<MockTxTriptych>(const MockTxParamPa
     std::vector<rct::key> output_amount_commitment_blinding_factors;
     std::vector<crypto::secret_key> pseudo_blinding_factors;
 
-    make_tx_outputs_rct_v1(destinations,
+    make_v1_tx_outputs_rct_v1(destinations,
         outputs,
         output_amounts,
         output_amount_commitment_blinding_factors);
-    make_tx_images_rct_v2(inputs_to_spend,
+    make_v1_tx_images_rct_v2(inputs_to_spend,
         output_amount_commitment_blinding_factors,
         input_images,
         pseudo_blinding_factors);
@@ -200,7 +201,7 @@ std::shared_ptr<MockTxTriptych> make_mock_tx<MockTxTriptych>(const MockTxParamPa
         output_amount_commitment_blinding_factors,
         params.max_rangeproof_splits,
         range_proofs);
-    make_tx_input_proofs_rct_v2(inputs_to_spend,
+    make_v2_tx_input_proofs_rct_v1(inputs_to_spend,
         input_images,
         pseudo_blinding_factors,
         params.ref_set_decomp_n,

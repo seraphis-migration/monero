@@ -110,7 +110,8 @@ class test_mock_tx
             // report tx info
             if (params.batch_size == 1)
             {
-                std::cout << "Size (bytes): " << m_txs.back()->get_size_bytes() << " || "
+                std::cout << m_txs.back()->get_descriptor() << " || "
+                          << "Size (bytes): " << m_txs.back()->get_size_bytes() << " || "
                           << "batch size: " << params.batch_size << " || "
                           << "inputs: " << params.in_count << " || "
                           << "outputs: " << params.out_count << " || "
