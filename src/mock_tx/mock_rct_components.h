@@ -33,7 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "mock_tx_rct_base.h"
+#include "mock_rct_base.h"
 #include "ringct/rctTypes.h"
 
 //third party headers

@@ -33,8 +33,8 @@
 
 //local headers
 #include "misc_log_ex.h"
-#include "mock_tx_rct_base.h"
-#include "mock_tx_rct_components.h"
+#include "mock_rct_base.h"
+#include "mock_rct_components.h"
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
@@ -195,7 +195,7 @@ bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSA
             return false;
 
         // gather range proofs
-        const auto balance_proof{tx->get_balance_proof()};
+        const std::shared_ptr<MockRctBalanceProofV1> balance_proof{tx->get_balance_proof()};
 
         if (balance_proof.get() == nullptr)
             return false;

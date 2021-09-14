@@ -29,8 +29,8 @@
 set(mock_tx_sources
   mock_tx.cpp
   mock_tx_utils.cpp
-  mock_tx_rct_base.cpp
-  mock_tx_rct_components.cpp
+  mock_rct_base.cpp
+  mock_rct_components.cpp
   mock_rct_clsag.cpp
   mock_rct_triptych.cpp)
 

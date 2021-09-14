@@ -29,14 +29,14 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_tx_rct_components.h"
+#include "mock_rct_components.h"
 
 //local headers
 #include "crypto/crypto.h"
 #include "crypto/crypto-ops.h"
 #include "device/device.hpp"
 #include "misc_log_ex.h"
-#include "mock_tx_rct_base.h"
+#include "mock_rct_base.h"
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
