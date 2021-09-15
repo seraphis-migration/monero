@@ -36,6 +36,7 @@
 #include "ringct/rctTypes.h"
 
 #include <iostream>
+#include <memory>
 #include <type_traits>
 #include <vector>
 
@@ -49,6 +50,218 @@ struct ParamsShuttleMockTx final : public ParamsShuttle
     std::size_t n{2};
     std::size_t m{0};
     std::size_t num_rangeproof_splits{0};
+};
+
+class MockTxPerfIncrementer final
+{
+public:
+//constructors
+    // default constructor
+    MockTxPerfIncrementer() = default;
+
+    // normal constructor
+    MockTxPerfIncrementer(std::vector<std::size_t> batch_sizes,
+        std::vector<std::size_t> in_counts,
+        std::vector<std::size_t> out_counts,
+        std::vector<std::size_t> rangeproof_splits,
+        std::vector<std::size_t> ref_set_decomp_n,
+        std::vector<std::size_t> ref_set_decomp_m_limit) :
+            m_batch_sizes{std::move(batch_sizes)},
+            m_in_counts{std::move(in_counts)},
+            m_out_counts{std::move(out_counts)},
+            m_rangeproof_splits{std::move(rangeproof_splits)},
+            m_ref_set_decomp_n{std::move(ref_set_decomp_n)},
+            m_ref_set_decomp_m_limit{std::move(ref_set_decomp_m_limit)}
+    {
+        init_decomp_m_current();
+    }
+
+    // move constructor
+    MockTxPerfIncrementer(MockTxPerfIncrementer &&incrementer)
+    {
+        *this = std::move(incrementer);
+    }
+
+//overloaded operators
+    // move assignment operator
+    MockTxPerfIncrementer& operator=(MockTxPerfIncrementer &&incrementer)
+    {
+        // self-assignment check
+        if (this == &incrementer)
+            return *this;
+
+        // move members
+        m_is_done = incrementer.m_is_done;
+        m_batch_sizes = std::move(incrementer.m_batch_sizes);
+        m_in_counts = std::move(incrementer.m_in_counts);
+        m_out_counts = std::move(incrementer.m_out_counts);
+        m_rangeproof_splits = std::move(incrementer.m_rangeproof_splits);
+        m_ref_set_decomp_n = std::move(incrementer.m_ref_set_decomp_n);
+        m_ref_set_decomp_m_limit = std::move(incrementer.m_ref_set_decomp_m_limit);
+
+        return *this;
+    }
+
+//member functions
+    bool is_done()
+    {
+        if (m_is_done)
+            return true;
+
+        if (m_batch_size_i >= m_batch_sizes.size() ||
+            m_in_i >= m_in_counts.size() ||
+            m_out_i >= m_out_counts.size() ||
+            m_rp_splits_i >= m_rangeproof_splits.size() ||
+            m_decomp_n_i >= m_ref_set_decomp_n.size() ||
+            m_decomp_m_limit_i >= m_ref_set_decomp_m_limit.size() ||
+            m_decomp_m_current > m_ref_set_decomp_m_limit[m_decomp_m_limit_i] ||
+            m_ref_set_decomp_n.size() != m_ref_set_decomp_m_limit.size())
+        {
+            m_is_done = true;
+        }
+
+        return m_is_done;
+    }
+
+    void get_params(ParamsShuttleMockTx &params)
+    {
+        if (is_done())
+            return;
+
+        params.batch_size = m_batch_sizes[m_batch_size_i];
+        params.in_count = m_in_counts[m_in_i];
+        params.out_count = m_out_counts[m_out_i];
+        params.n = m_ref_set_decomp_n[m_decomp_n_i];
+        params.m = m_decomp_m_current;
+        params.num_rangeproof_splits = m_rangeproof_splits[m_rp_splits_i];
+    }
+
+    void init_decomp_m_current()
+    {
+        m_decomp_m_current = 0;
+
+        if (is_done())
+            return;
+
+        // heuristic: start at n^2 for n > 2
+        if (m_ref_set_decomp_n[m_decomp_n_i] > 2)
+            m_decomp_m_current = 2;
+    }
+
+    bool next(ParamsShuttleMockTx &params)
+    {
+        if (is_done())
+            return false;
+
+        if (m_variations_requested == 0)
+        {
+            get_params(params);
+            ++m_variations_requested;
+            
+            return true;
+        }
+
+        // order:
+        // - batch size
+        //  - in count
+        //   - out count
+        //    - rp splits
+        //     - decomp n
+        //      - decomp m
+
+        if (m_decomp_m_current >= m_ref_set_decomp_m_limit[m_decomp_m_limit_i])
+        {
+            if (m_decomp_n_i + 1 >= m_ref_set_decomp_n.size())
+            {
+                if (m_rp_splits_i + 1 >= m_rangeproof_splits.size())
+                {
+                    if (m_out_i + 1 >= m_out_counts.size())
+                    {
+                        if (m_in_i + 1 >= m_in_counts.size())
+                        {
+                            if (m_batch_size_i + 1 >= m_batch_sizes.size())
+                            {
+                                // no where left to go
+                                m_is_done = true;
+                            }
+                            else
+                            {
+                                ++m_batch_size_i;
+                            }
+
+                            m_in_i = 0;
+                        }
+                        else
+                        {
+                            ++m_in_i;
+                        }
+
+                        m_out_i = 0;
+                    }
+                    else
+                    {
+                        ++m_out_i;
+                    }
+
+                    m_rp_splits_i = 0;
+                }
+                else
+                {
+                    ++m_rp_splits_i;
+                }
+
+                m_decomp_n_i = 0;
+                m_decomp_m_limit_i = 0;
+            }
+            else
+            {
+                ++m_decomp_n_i;
+                ++m_decomp_m_limit_i;
+            }
+
+            init_decomp_m_current();
+        }
+        else
+        {
+            ++m_decomp_m_current;
+        }
+
+        get_params(params);
+        ++m_variations_requested;
+
+        return !is_done();
+    }
+
+private:
+//member variables
+    // is the incrementer done? (true if incrementer has no param set to return)
+    bool m_is_done{false};
+
+    // count number of variations requested
+    std::size_t m_variations_requested{0};
+
+    // max number of tx to batch validate
+    std::vector<std::size_t> m_batch_sizes;
+    std::size_t m_batch_size_i{0};
+
+    // input counts
+    std::vector<std::size_t> m_in_counts;
+    std::size_t m_in_i{0};
+
+    // output counts
+    std::vector<std::size_t> m_out_counts;
+    std::size_t m_out_i{0};
+
+    // range proof splitting
+    std::vector<std::size_t> m_rangeproof_splits;
+    std::size_t m_rp_splits_i{0};
+
+    // ref set: n^m
+    std::vector<std::size_t> m_ref_set_decomp_n;
+    std::size_t m_decomp_n_i{0};
+    std::vector<std::size_t> m_ref_set_decomp_m_limit;
+    std::size_t m_decomp_m_limit_i{0};
+    std::size_t m_decomp_m_current{0};
 };
 
 template <typename MockTxType>

@@ -116,60 +116,38 @@ int main(int argc, char** argv)
 
 
   /// mock tx performance tests
-
-  // max number of tx to batch validate
-  std::vector<std::size_t> batch_sizes{1, 2, 4, 7, 11, 25};
-
-  // input/output counts
-  std::vector<std::size_t> in_out_counts{1, 2, 4, 7, 12, 16};
-
-  // range proof splitting
-  std::vector<std::size_t> rangeproof_splits{0, 1, 2, 3, 4};
-
-  // ref set: n^m
-  std::vector<std::size_t> ref_set_decomp_n{2, 3, 4, 6, 9};
-  std::vector<std::size_t> ref_set_decomp_m_limit{12, 7, 6, 5, 4};
-
-  // mock test params shuttle
+  MockTxPerfIncrementer incrementer;
   ParamsShuttleMockTx p_mock_tx;
   p_mock_tx.core_params = p.core_params;
 
-  for (const auto batch_size : batch_sizes) {
-  for (const auto in_count : in_out_counts) {
-  for (const auto out_count : in_out_counts) {
-  for (const auto rangeproof_split : rangeproof_splits) {
-    if (rangeproof_split > out_count/2)
+  incrementer = {
+      {1, 2, 4, 7, 11, 25}, //batch sizes
+      {1, 2, 4, 7, 12, 16}, //in counts
+      {1, 2, 4, 7, 12, 16}, //out counts
+      {0, 1, 2, 3, 4}, //rangeproof splits
+      {2, 3, 4, 6, 9}, //decomp n
+      {12, 7, 6, 5, 4} //decomp m limits
+    };
+
+  while (incrementer.next(p_mock_tx))
+  {
+    if (p_mock_tx.num_rangeproof_splits > p_mock_tx.out_count/2)
     // if squashed model, test (out_count + in_count)/2
       continue;
-  for (std::size_t n_index{0}; n_index < ref_set_decomp_n.size(); ++n_index) {
-    std::size_t m_start;
-
-    if (ref_set_decomp_n[n_index] == 2)
-      m_start = 0;
-    else
-      m_start = 2;
-  for (std::size_t m{m_start}; m <= ref_set_decomp_m_limit[n_index]; ++m) {
-
-    p_mock_tx.batch_size = batch_size;
-    p_mock_tx.in_count = in_count;
-    p_mock_tx.out_count = out_count;
-    p_mock_tx.n = ref_set_decomp_n[n_index];
-    p_mock_tx.m = m;
-    p_mock_tx.num_rangeproof_splits = rangeproof_split;
 
     // only perf test 2-series decomposition for tx protocols that are unaffected by decomposition
-    if (ref_set_decomp_n[n_index] == 2)
+    if (p_mock_tx.n == 2)
     {
       // limit CLSAG to 2^8
-      if (m <= 8)
+      if (p_mock_tx.m <= 8)
         TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
     }
 
-    if (ref_set_decomp_n[n_index] >= 2 && m >= 2)
+    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
     {
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
     }
-  }}}}}}
+  }
 
 
 

@@ -33,7 +33,10 @@
 
 //local headers
 #include "crypto/crypto.h"
+extern "C"
+{
 #include "crypto/crypto-ops.h"
+}
 #include "device/device.hpp"
 #include "misc_log_ex.h"
 #include "mock_rct_base.h"

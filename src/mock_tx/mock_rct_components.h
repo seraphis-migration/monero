@@ -60,10 +60,7 @@ struct MockENoteRctV1 final : public MockENoteRct
     crypto::public_key m_enote_pubkey;
     rct::xmr_amount m_encoded_amount;
 
-    static std::size_t get_size_bytes()
-    {
-        return get_size_bytes_base() + 32 + 8;
-    }
+    static std::size_t get_size_bytes() { return get_size_bytes_base() + 32 + 8; }
 
     /**
     * brief: make_v1 - make a V1 RCT ENote
