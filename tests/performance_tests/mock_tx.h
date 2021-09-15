@@ -112,9 +112,9 @@ public:
             m_in_i >= m_in_counts.size() ||
             m_out_i >= m_out_counts.size() ||
             m_rp_splits_i >= m_rangeproof_splits.size() ||
-            m_decomp_n_i >= m_ref_set_decomp_n.size() ||
-            m_decomp_m_limit_i >= m_ref_set_decomp_m_limit.size() ||
-            m_decomp_m_current > m_ref_set_decomp_m_limit[m_decomp_m_limit_i] ||
+            m_decomp_i >= m_ref_set_decomp_n.size() ||
+            m_decomp_i >= m_ref_set_decomp_m_limit.size() ||
+            m_decomp_m_current > m_ref_set_decomp_m_limit[m_decomp_i] ||
             m_ref_set_decomp_n.size() != m_ref_set_decomp_m_limit.size())
         {
             m_is_done = true;
@@ -131,7 +131,7 @@ public:
         params.batch_size = m_batch_sizes[m_batch_size_i];
         params.in_count = m_in_counts[m_in_i];
         params.out_count = m_out_counts[m_out_i];
-        params.n = m_ref_set_decomp_n[m_decomp_n_i];
+        params.n = m_ref_set_decomp_n[m_decomp_i];
         params.m = m_decomp_m_current;
         params.num_rangeproof_splits = m_rangeproof_splits[m_rp_splits_i];
     }
@@ -144,7 +144,7 @@ public:
             return;
 
         // heuristic: start at n^2 for n > 2
-        if (m_ref_set_decomp_n[m_decomp_n_i] > 2)
+        if (m_ref_set_decomp_n[m_decomp_i] > 2)
             m_decomp_m_current = 2;
     }
 
@@ -169,9 +169,9 @@ public:
         //     - decomp n
         //      - decomp m
 
-        if (m_decomp_m_current >= m_ref_set_decomp_m_limit[m_decomp_m_limit_i])
+        if (m_decomp_m_current >= m_ref_set_decomp_m_limit[m_decomp_i])
         {
-            if (m_decomp_n_i + 1 >= m_ref_set_decomp_n.size())
+            if (m_decomp_i + 1 >= m_ref_set_decomp_n.size())
             {
                 if (m_rp_splits_i + 1 >= m_rangeproof_splits.size())
                 {
@@ -210,13 +210,11 @@ public:
                     ++m_rp_splits_i;
                 }
 
-                m_decomp_n_i = 0;
-                m_decomp_m_limit_i = 0;
+                m_decomp_i = 0;
             }
             else
             {
-                ++m_decomp_n_i;
-                ++m_decomp_m_limit_i;
+                ++m_decomp_i;
             }
 
             init_decomp_m_current();
@@ -258,9 +256,8 @@ private:
 
     // ref set: n^m
     std::vector<std::size_t> m_ref_set_decomp_n;
-    std::size_t m_decomp_n_i{0};
+    std::size_t m_decomp_i{0};
     std::vector<std::size_t> m_ref_set_decomp_m_limit;
-    std::size_t m_decomp_m_limit_i{0};
     std::size_t m_decomp_m_current{0};
 };
 
