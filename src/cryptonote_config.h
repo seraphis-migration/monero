@@ -240,6 +240,11 @@ namespace config
   const char HASH_KEY_TRIPTYCH_H[] = "triptych H";
   const char HASH_KEY_TRIPTYCH_U[] = "triptych U";
   const char HASH_KEY_TRIPTYCH_TRANSCRIPT[] = "triptych transcript";
+  const char HASH_KEY_GROOTLE_TRANSCRIPT[] = "grootle transcript";
+  const char HASH_KEY_CONCISE_GROOTLE_TRANSCRIPT[] = "concise grootle transcript";
+  const char HASH_KEY_GROOTLE_Hi[] = "grootle Hi";
+  const char HASH_KEY_SERAPHIS_U[] = "seraphis U";
+  const char HASH_KEY_SERAPHIS_X[] = "seraphis X";
 
   namespace testnet
   {
