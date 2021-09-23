@@ -43,11 +43,12 @@
 #pragma once
 
 //local headers
-#include "rctTypes.h"
+#include "ringct/rctTypes.h"
 
 //third party headers
 
 //standard headers
+#include <vector>
 
 //forward declarations
 

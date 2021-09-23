@@ -54,6 +54,7 @@ set(unit_tests_sources
   fee.cpp
   json_serialization.cpp
   get_xtype_from_string.cpp
+  grootle.cpp
   hashchain.cpp
   hmac_keccak.cpp
   http.cpp

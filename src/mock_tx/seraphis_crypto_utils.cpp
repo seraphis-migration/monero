@@ -37,9 +37,9 @@ extern "C"
 #include "cryptonote_config.h"
 #include "grootle.h"
 #include "misc_log_ex.h"
-#include "multiexp.h"
-#include "rctOps.h"
-#include "rctTypes.h"
+#include "ringct/multiexp.h"
+#include "ringct/rctOps.h"
+#include "ringct/rctTypes.h"
 
 //third party headers
 #include <boost/thread/lock_guard.hpp>
@@ -157,26 +157,26 @@ void init_sp_gens()
     for (std::size_t i = 0; i < GROOTLE_MAX_MN; i++)
     {
         std::string hash = Hi_salt + tools::get_varint_data(i);
-        hash_to_p3(grootle_Hi_p3[i], hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
+        hash_to_p3(grootle_Hi_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
     }
 
     // Build U
     // U = keccak_to_pt("seraphis U")
     static const std::string U_salt(config::HASH_KEY_SERAPHIS_U);
-    hash_to_p3(U_p3, hash2rct(crypto::cn_fast_hash(U_salt.data(), U_salt.size())));
+    hash_to_p3(U_p3, rct::hash2rct(crypto::cn_fast_hash(U_salt.data(), U_salt.size())));
     ge_p3_tobytes(U.bytes, &U_p3);
 
     // Build X
     // X = keccak_to_pt("seraphis X")
     static const std::string X_salt(config::HASH_KEY_SERAPHIS_X);
-    hash_to_p3(X_p3, hash2rct(crypto::cn_fast_hash(X_salt.data(), X_salt.size())));
+    hash_to_p3(X_p3, rct::hash2rct(crypto::cn_fast_hash(X_salt.data(), X_salt.size())));
     ge_p3_tobytes(X.bytes, &X_p3);
 
     // Build H
-    ge_frombytes_vartime(&H_p3, H.bytes);
+    ge_frombytes_vartime(&H_p3, rct::H.bytes);
 
     // Build G
-    ge_frombytes_vartime(&G_p3, G.bytes);
+    ge_frombytes_vartime(&G_p3, rct::G.bytes);
 
     init_done = true;
 }
@@ -267,10 +267,7 @@ void decompose(std::vector<std::size_t> &r, const std::size_t val, const std::si
 ////
 // Commit to a scalar matrix
 // vector commitment for values a_{1,1}, ..., a_{1,n} ..., a_{m,n} and blinding factor x
-// C = x H + a_{1,1} H_{1,1} + a_{1,2} H_{1,2} + ... + a_{m,n} H_{m,n}
-//
-// note: blinding factor on generator 'H' so in Grootle proofs it is easier to aggregate proof
-//       elements in a multi-exponentiation ('G' is used for different elements, and DL separation is required)
+// C = x G + a_{1,1} H_{1,1} + a_{1,2} H_{1,2} + ... + a_{m,n} H_{m,n}
 ///
 void com_matrix(std::vector<rct::MultiexpData> &data, const rct::keyM &M, const rct::key &x)
 {
@@ -287,7 +284,7 @@ void com_matrix(std::vector<rct::MultiexpData> &data, const rct::keyM &M, const 
             data[j*n + i] = {M[j][i], grootle_Hi_p3[j*n + i]};
         }
     }
-    data[m*n] = {x, H_p3}; // mask
+    data[m*n] = {x, G_p3}; // mask
 }
 
 /// Kronecker delta
@@ -307,7 +304,7 @@ rct::key delta(const std::size_t x, const std::size_t y)
 ///
 rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m)
 {
-    CHECK_AND_ASSERT_THROW_MES(x.size() == m, "Bad convolution parameters!");
+    CHECK_AND_ASSERT_THROW_MES(x.size() >= m, "Bad convolution parameters!");
     CHECK_AND_ASSERT_THROW_MES(y.size() == 2, "Bad convolution parameters!");
 
     rct::key temp;
