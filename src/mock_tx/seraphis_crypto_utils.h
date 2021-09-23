@@ -34,7 +34,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "grootle.h"
-#include "rctTypes.h"
+#include "ringct/rctTypes.h"
 
 //third party headers
 
@@ -84,7 +84,7 @@ void decompose(std::vector<std::size_t> &r, const std::size_t val, const std::si
 ////
 // Commit to a scalar matrix
 // vector commitment for values a_{1,1}, ..., a_{1,n} ..., a_{m,n} and blinding factor x
-// C = x H + a_{1,1} H_{1,1} + a_{1,2} H_{1,2} + ... + a_{m,n} H_{m,n}
+// C = x G + a_{1,1} H_{1,1} + a_{1,2} H_{1,2} + ... + a_{m,n} H_{m,n}
 ///
 void com_matrix(std::vector<rct::MultiexpData> &data, const rct::keyM &M, const rct::key &x);
 

@@ -58,8 +58,6 @@ namespace sp
 // generators
 static ge_p3 Hi_p3[GROOTLE_MAX_MN];
 static ge_p3 G_p3;
-static ge_p3 U_p3;
-static rct::key U;
 
 // Useful scalar and group constants
 static const rct::key ZERO = rct::zero();
@@ -95,10 +93,6 @@ static void init_gens()
     // get G
     G_p3 = get_G_p3_gen();
 
-    // get U
-    U = get_U_gen();
-    U_p3 = get_U_p3_gen();
-
     init_done = true;
 }
 
@@ -112,14 +106,12 @@ static void transcript_init(rct::key &transcript)
 ////
 // Prefix for concise structure
 // [[[TODO: extend parallel structure to arbitrary numbers of commitments to zero (need separate mu for each after first)]]]
-// mu = H(H("domain-sep"), message, {M}, {P}, C_offset, J, K, A, B, C, D)
+// mu = H(H("domain-sep"), message, {M}, {P}, C_offset, A, B, C, D)
 ///
 static rct::key compute_concise_prefix(const rct::key &message,
     const rct::keyV &M,
     const rct::keyV &P,
     const rct::key &C_offset,
-    const rct::key &J,
-    const rct::key &K,
     const rct::key &A,
     const rct::key &B,
     const rct::key &C,
@@ -133,7 +125,7 @@ static rct::key compute_concise_prefix(const rct::key &message,
 
     // collect challenge string
     std::string hash;
-    hash.reserve((2*M.size() + 9)*sizeof(rct::key));
+    hash.reserve((2*M.size() + 7)*sizeof(rct::key));
     hash = std::string((const char*) challenge.bytes, sizeof(challenge));
     hash += std::string((const char*) message.bytes, sizeof(message));
     for (std::size_t k = 0; k < M.size(); k++)
@@ -142,8 +134,6 @@ static rct::key compute_concise_prefix(const rct::key &message,
         hash += std::string((const char*) P[k].bytes, sizeof(P[k]));
     }
     hash += std::string((const char*) C_offset.bytes, sizeof(C_offset));
-    hash += std::string((const char*) J.bytes, sizeof(J));
-    hash += std::string((const char*) K.bytes, sizeof(K));
     hash += std::string((const char*) A.bytes, sizeof(A));
     hash += std::string((const char*) B.bytes, sizeof(B));
     hash += std::string((const char*) C.bytes, sizeof(C));
@@ -160,23 +150,20 @@ static rct::key compute_concise_prefix(const rct::key &message,
 
 ////
 // Fiat-Shamir challenge
-// c = H(message, {X}, {Y})
+// c = H(message, {X})
 //
 // note: in practice, this extends the concise structure prefix (i.e. message = mu)
 // note2: in Triptych notation, c == xi
 ///
-static rct::key compute_challenge(const rct::key &message, const rct::keyV &X, const rct::keyV &Y)
+static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
 {
-    CHECK_AND_ASSERT_THROW_MES(X.size() == Y.size(), "Challenge inputs have incorrect size!");
-
     rct::key challenge;
     std::string hash;
-    hash.reserve((X.size() + Y.size() + 1)*sizeof(rct::key));
+    hash.reserve((X.size() + 1)*sizeof(rct::key));
     hash = std::string((const char*) message.bytes, sizeof(message));
     for (std::size_t j = 0; j < X.size(); j++)
     {
         hash += std::string((const char*) X[j].bytes, sizeof(X[j]));
-        hash += std::string((const char*) Y[j].bytes, sizeof(Y[j]));
     }
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
@@ -220,15 +207,6 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyV &M,
 
     /// Concise Grootle proof
     ConciseGrootleProof proof;
-
-
-    // Compute key images [[[TODO: remove]]]
-    // J = (1/r)*U
-    // K = s*J
-    // note: don't store (1/8)*J because domain-check with l*J is done by caller (tx protocol-level check)
-    proof.J = rct::scalarmultKey(U, sp::invert(r));
-    proof.K = rct::scalarmultKey(proof.J, s);
-    proof.K = rct::scalarmultKey(proof.K, rct::INV_EIGHT);   //store (1/8)*K
 
 
     /// Decomposition sub-proof commitments: A, B, C, D
@@ -348,7 +326,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyV &M,
     }
 
 
-    /// one-of-many sub-proof initial values: {rho}, mu, {X}, {Y}
+    /// one-of-many sub-proof initial values: {rho}, mu, {X}
 
     // rho elements: proof entropy
     rct::keyV rho;
@@ -360,21 +338,17 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyV &M,
 
     // mu: challenge
     const rct::key mu{
-            compute_concise_prefix(message, M, P, C_offset, proof.J, proof.K, proof.A, proof.B, proof.C, proof.D)
+            compute_concise_prefix(message, M, P, C_offset, proof.A, proof.B, proof.C, proof.D)
         };
 
-    // X, Y: 'encodings' of [p] (i.e. of the real signing index)
+    // X: 'encodings' of [p] (i.e. of the real signing index)
     proof.X = rct::keyV(m);
-    proof.Y = rct::keyV(m);
-    rct::key U_aggregate_prefix;
     rct::key c_zero_nominal_prefix_temp;
     rct::key C_zero_nominal_temp;
     for (std::size_t j = 0; j < m; j++)
     {
         std::vector<rct::MultiexpData> data_X;
         data_X.reserve(2*N);
-        
-        U_aggregate_prefix = ZERO;
 
         for (std::size_t k = 0; k < N; k++)
         {
@@ -385,38 +359,26 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyV &M,
             sc_mul(c_zero_nominal_prefix_temp.bytes, mu.bytes, p[k][j].bytes);
             rct::subKeys(C_zero_nominal_temp, P[k], C_offset);
             data_X.push_back({c_zero_nominal_prefix_temp, C_zero_nominal_temp});
-
-            // Y[j] += p[k][j]*U
-            sc_add(U_aggregate_prefix.bytes, U_aggregate_prefix.bytes, p[k][j].bytes);
         }
 
         // X[j] += rho[j]*G
         // note: addKeys1(X, rho, P) -> X = rho*G + P
         addKeys1(proof.X[j], rho[j], rct::straus(data_X));
         CHECK_AND_ASSERT_THROW_MES(!(proof.X[j] == IDENTITY), "Proof coefficient element should not be zero!");
-
-        // Y[j] += rho[j]*J
-        // (and the U_aggregate_prefix collected)
-        proof.Y[j] = rct::scalarmultKey(U, U_aggregate_prefix);
-        rct::key rho_J = rct::scalarmultKey(proof.J, rho[j]);
-        addKeys(proof.Y[j], proof.Y[j], rho_J);
-        CHECK_AND_ASSERT_THROW_MES(!(proof.Y[j] == IDENTITY), "Proof coefficient element should not be zero!");
     }
 
     // done: store (1/8)*P
     for (std::size_t j = 0; j < m; j++)
     {
         proof.X[j] = rct::scalarmultKey(proof.X[j], rct::INV_EIGHT);
-        proof.Y[j] = rct::scalarmultKey(proof.Y[j], rct::INV_EIGHT);
     }
     CHECK_AND_ASSERT_THROW_MES(proof.X.size() == m, "Proof coefficient vector is unexpected size!");
-    CHECK_AND_ASSERT_THROW_MES(proof.Y.size() == m, "Proof coefficient vector is unexpected size!");
 
 
     /// one-of-many sub-proof challenges
 
     // xi: challenge
-    const rct::key xi{compute_challenge(mu, proof.X, proof.Y)};
+    const rct::key xi{compute_challenge(mu, proof.X)};
 
     // xi^j: challenge powers
     rct::keyV xi_pow;
@@ -506,9 +468,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         CHECK_AND_ASSERT_THROW_MES(p, "Proof unexpectedly doesn't exist!");
         const ConciseGrootleProof &proof = *p;
 
-        CHECK_AND_ASSERT_THROW_MES(!(proof.J == IDENTITY), "Proof group element should not be zero!");
         CHECK_AND_ASSERT_THROW_MES(proof.X.size() == m, "Bad proof vector size!");
-        CHECK_AND_ASSERT_THROW_MES(proof.Y.size() == m, "Bad proof vector size!");
         CHECK_AND_ASSERT_THROW_MES(proof.f.size() == m, "Bad proof matrix size!");
         for (std::size_t j = 0; j < m; j++)
         {
@@ -534,15 +494,13 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
     // per-index storage:
     // 0            m*n-1       Hi[i]
-    // m*n                      G     (commitment blinding factors) [[[TODO: combine with zG stuff]]]
+    // m*n                      G     (commitment blinding factors & zG)
     // m*n+1        m*n+N       M[i]
     // m*n+N+1      m*n+2*N     P[i]
-    // m*n+2*N+1                U
-    // m*n+2*N+2                G     (proof elements: zG)
-    // ... then per-proof data
+    // ... then per-proof data (A, B, C, D, C_offset, {X})
     std::vector<rct::MultiexpData> data;
-    data.reserve((m*n + 1) + (2*N + 2) + N_proofs*(2*m + 7));
-    data.resize((m*n + 1) + (2*N + 2)); // set up for all common elements
+    data.reserve((m*n + 1) + 2*N + N_proofs*(m + 5));
+    data.resize((m*n + 1) + 2*N); // set up for all common elements
 
     // prep terms: {Hi}, G
     for (std::size_t i = 0; i < m*n; i++)
@@ -558,12 +516,6 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         data[m*n + N + 1 + k] = {ZERO, P[k]};
     }
 
-    // prep term: U
-    data[m*n + 2*N + 1] = {ZERO, U_p3};
-
-    // prep term: G
-    data[m*n + 2*N + 2] = {ZERO, G_p3};
-
 
     /// per-proof data assembly
     for (std::size_t i_proofs = 0; i_proofs < N_proofs; i_proofs++)
@@ -576,13 +528,11 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         rct::key w1 = ZERO;  // decomp part 1:   w1*[ A + xi*B == com_matrix(f, zA) ]
         rct::key w2 = ZERO;  // decomp part 2:   w2*[ xi*C + D == com_matrix(f(xi - f), zC) ]
         rct::key w3 = ZERO;  // main stuff:      w3*[ ... - zG == 0 ]
-        rct::key w4 = ZERO;  // key image stuff: w4*[ ... - zJ == 0 ]
-        while (w1 == ZERO || w2 == ZERO || w3 == ZERO || w4 == ZERO)
+        while (w1 == ZERO || w2 == ZERO || w3 == ZERO)
         {
             w1 = rct::skGen();
             w2 = rct::skGen();
             w3 = rct::skGen();
-            w4 = rct::skGen();
         }
 
         // Transcript challenges
@@ -591,14 +541,12 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
                     M,
                     P,
                     C_offsets[i_proofs],
-                    proof.J,
-                    proof.K,
                     proof.A,
                     proof.B,
                     proof.C,
                     proof.D)
             };
-        const rct::key xi{compute_challenge(mu, proof.X, proof.Y)};
+        const rct::key xi{compute_challenge(mu, proof.X)};
 
         // Challenge powers (negated)
         rct::keyV minus_xi_pow;
@@ -611,17 +559,13 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         }
 
         // Recover proof elements
-        ge_p3 K_p3;
         ge_p3 A_p3;
         ge_p3 B_p3;
         ge_p3 C_p3;
         ge_p3 D_p3;
         std::vector<ge_p3> X_p3;
-        std::vector<ge_p3> Y_p3;
         X_p3.resize(m);
-        Y_p3.resize(m);
 
-        scalarmult8(K_p3, proof.K);
         scalarmult8(A_p3, proof.A);
         scalarmult8(B_p3, proof.B);
         scalarmult8(C_p3, proof.C);
@@ -629,7 +573,6 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         for (std::size_t j = 0; j < m; j++)
         {
             scalarmult8(X_p3[j], proof.X[j]);
-            scalarmult8(Y_p3[j], proof.Y[j]);
         }
 
         // Reconstruct the f-matrix
@@ -651,9 +594,9 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         }
 
         // Matrix generators
-        //   w1* [ A + xi*B == ... f[j][i]                  * Hi[j][i] ... + zA * H ]
+        //   w1* [ A + xi*B == ... f[j][i]                  * Hi[j][i] ... + zA * G ]
         //       [          == com_matrix(f, zA)                                    ]
-        //   w2* [ xi*C + D == ... f[j][i] * (xi - f[j][i]) * Hi[j][i] ... + zC * H ]
+        //   w2* [ xi*C + D == ... f[j][i] * (xi - f[j][i]) * Hi[j][i] ... + zC * G ]
         //       [          == com_matrix(f(xi - f), zC)                            ]
         for (std::size_t j = 0; j < m; j++)
         {
@@ -677,7 +620,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
             }
         }
 
-        // H: w1*zA + w2*zC
+        // G: w1*zA + w2*zC
         sc_muladd(data[m*n].scalar.bytes, w1.bytes, proof.zA.bytes, data[m*n].scalar.bytes);  // w1*zA
         sc_muladd(data[m*n].scalar.bytes, w2.bytes, proof.zC.bytes, data[m*n].scalar.bytes);  // w2*zC
 
@@ -737,49 +680,30 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         sc_mul(temp.bytes, temp.bytes, sum_t.bytes);
         data.push_back({temp, C_offsets[i_proofs]});
 
-        // U, K
-        //   w4*[ sum_k( t_k * (U + mu*K ) - sum(...) - z J ] == 0
-        // U: w4*sum_t
-        sc_mul(temp.bytes, w4.bytes, sum_t.bytes);  // w4*sum_t
-        sc_add(data[m*n + 2*N + 1].scalar.bytes, data[m*n + 2*N + 1].scalar.bytes, temp.bytes);  // w4*sum_t*U
-
-        // K: w4*sum_t*mu
-        sc_mul(temp.bytes, temp.bytes, mu.bytes);  // w4*sum_t*mu
-        data.push_back({temp, K_p3});  // w4*sum_t*mu*K
-
-        // {X}, {Y}
+        // {X}
         //   w3*[ ... - sum_j( xi^j*X[j] ) - z G ] == 0
-        //   w4*[ ... - sum_j( xi^j*Y[j] ) - z J ] == 0
         for (std::size_t j = 0; j < m; j++)
         {
             // X[j]: -w3*xi^j
             sc_mul(temp.bytes, w3.bytes, minus_xi_pow[j].bytes);
             data.push_back({temp, X_p3[j]});
-
-            // Y[j]: -w4*xi^j
-            sc_mul(temp.bytes, w4.bytes, minus_xi_pow[j].bytes);
-            data.push_back({temp, Y_p3[j]});
         }
 
         // G, J
         //   w3*[ ... - z G ] == 0
-        //   w4*[ ... - z J ] == 0
         // G: -w3*z
         sc_mul(temp.bytes, MINUS_ONE.bytes, proof.z.bytes);
         sc_mul(temp.bytes, temp.bytes, w3.bytes);
-        sc_add(data[m*n + 2*N + 2].scalar.bytes, data[m*n + 2*N + 2].scalar.bytes, temp.bytes);
-
-        // J: -w4*z
-        sc_mul(temp.bytes, MINUS_ONE.bytes, proof.z.bytes);
-        sc_mul(temp.bytes, temp.bytes, w4.bytes);
-        data.push_back({temp, proof.J});
+        sc_add(data[m*n].scalar.bytes, data[m*n].scalar.bytes, temp.bytes);
     }
 
-    // Final check
-    CHECK_AND_ASSERT_THROW_MES(data.size() == (m*n + 1) + (2*N + 2) + N_proofs*(2*m + 7),
+
+    /// Final check
+    CHECK_AND_ASSERT_THROW_MES(data.size() == (m*n + 1) + 2*N + N_proofs*(m + 5),
         "Final proof data is incorrect size!");
 
-    // Verify all elements sum to zero
+
+    /// Verify all elements sum to zero
     if (!(rct::pippenger(data, cache, m*n, rct::get_pippenger_c(data.size())) == IDENTITY))
     {
         MERROR("Concise Grootle proof: verification failed!");
