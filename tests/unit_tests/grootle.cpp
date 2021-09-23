@@ -31,6 +31,7 @@
 
 #include "gtest/gtest.h"
 
+#include <cmath>
 #include <vector>
 
 
@@ -42,13 +43,13 @@ using namespace rct;
 // Variable: m (size exponent), l (signing index)
 TEST(grootle_concise, random)
 {
-    const std::size_t n = 2; // size base: N = n**m
+    const std::size_t n = 2; // size base: N = n^m
     const std::size_t N_proofs = 2; // number of proofs with common keys to verify in a batch
 
-    // Ring sizes: N = n**m
+    // Ring sizes: N = n^m
     for (std::size_t m = 2; m <= 6; m++)
     {
-        const std::size_t N = pow(n,m); // anonymity set size
+        const std::size_t N = std::pow(n, m); // anonymity set size
         std::vector<sp::ConciseGrootleProof> p;
         p.reserve(N_proofs);
         p.resize(0);
@@ -68,25 +69,25 @@ TEST(grootle_concise, random)
         key temp;
         for (std::size_t k = 0; k < N; k++)
         {
-            skpkGen(temp,M[k]);
-            skpkGen(temp,P[k]);
+            skpkGen(temp, M[k]);
+            skpkGen(temp, P[k]);
         }
 
         // Signing keys, messages, and commitment offsets
         key s1,s2;
         for (std::size_t i = 0; i < N_proofs; i++)
         {
-            skpkGen(r[i],M[i]);
-            skpkGen(s1,P[i]);
+            skpkGen(r[i], M[i]);
+            skpkGen(s1, P[i]);
             messages[i] = skGen();
-            skpkGen(s2,C_offsets[i]);
-            sc_sub(s[i].bytes,s1.bytes,s2.bytes);
+            skpkGen(s2, C_offsets[i]);
+            sc_sub(s[i].bytes, s1.bytes, s2.bytes);
         }
 
         // Build proofs
         for (std::size_t i = 0; i < N_proofs; i++)
         {
-            p.push_back(sp::concise_grootle_prove(M,P,C_offsets[i],i,r[i],s[i],n,m,messages[i]));
+            p.push_back(sp::concise_grootle_prove(M, P, C_offsets[i], i, r[i], s[i], n, m, messages[i]));
         }
         for (sp::ConciseGrootleProof &proof: p)
         {
@@ -94,7 +95,7 @@ TEST(grootle_concise, random)
         }
 
         // Verify batch
-        ASSERT_TRUE(sp::concise_grootle_verify(proofs, M,P,C_offsets,n,m,messages));
+        ASSERT_TRUE(sp::concise_grootle_verify(proofs, M, P, C_offsets, n, m, messages));
     }
 }
 
