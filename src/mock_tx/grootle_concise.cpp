@@ -82,7 +82,7 @@ static void init_gens()
     if (init_done) return;
 
     // get Hi generators
-    for (std::size_t i = 0; i < GROOTLE_MAX_MN; i++)
+    for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
     {
         Hi_p3[i] = get_grootle_Hi_p3_gen(i);
     }
@@ -129,8 +129,8 @@ static rct::key compute_concise_prefix(const rct::key &message,
     hash += std::string((const char*) message.bytes, sizeof(message));
     for (const auto &tuple : M)
     {
-        for (const auto &commitment : tuple)
-            hash += std::string((const char*) commitment.bytes, sizeof(commitment));
+        for (const auto &key : tuple)
+            hash += std::string((const char*) key.bytes, sizeof(key));
     }
     for (const auto &offset : C_offsets)
     {
@@ -163,7 +163,7 @@ static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
     std::string hash;
     hash.reserve((X.size() + 1)*sizeof(rct::key));
     hash = std::string((const char*) message.bytes, sizeof(message));
-    for (std::size_t j = 0; j < X.size(); j++)
+    for (std::size_t j = 0; j < X.size(); ++j)
     {
         hash += std::string((const char*) X[j].bytes, sizeof(X[j]));
     }
@@ -205,12 +205,12 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     // commitment to zero signing keys
     CHECK_AND_ASSERT_THROW_MES(l < M.size(), "Signing index out of bounds!");
 
-    for (std::size_t C_index = 0; C_index < num_keys; ++C_index)
+    for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
     {
         // verify: commitment to zero C_zero = M - C_offset = k*G
         rct::key C_zero_temp;
-        rct::subKeys(C_zero_temp, M[l][C_index], C_offsets[C_index]);
-        CHECK_AND_ASSERT_THROW_MES(rct::scalarmultBase(privkeys[C_index]) == C_zero_temp, "Bad commitment key!");
+        rct::subKeys(C_zero_temp, M[l][alpha], C_offsets[alpha]);
+        CHECK_AND_ASSERT_THROW_MES(rct::scalarmultBase(privkeys[alpha]) == C_zero_temp, "Bad commitment key!");
     }
 
     // statically initialize Grootle proof generators
@@ -235,10 +235,10 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     rct::keyM a = rct::keyMInit(n, m);
     CHECK_AND_ASSERT_THROW_MES(a.size() == m, "Bad matrix size!");
     CHECK_AND_ASSERT_THROW_MES(a[0].size() == n, "Bad matrix size!");
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
         a[j][0] = ZERO;
-        for (std::size_t i = 1; i < n; i++)
+        for (std::size_t i = 1; i < n; ++i)
         {
             a[j][i] = rct::skGen();
             sc_sub(a[j][0].bytes, a[j][0].bytes, a[j][i].bytes);
@@ -257,9 +257,9 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     rct::keyM sigma = rct::keyMInit(n, m);
     CHECK_AND_ASSERT_THROW_MES(sigma.size() == m, "Bad matrix size!");
     CHECK_AND_ASSERT_THROW_MES(sigma[0].size() == n, "Bad matrix size!");
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
-        for (std::size_t i = 0; i < n; i++)
+        for (std::size_t i = 0; i < n; ++i)
         {
             sigma[j][i] = delta(decomp_l[j], i);
         }
@@ -273,9 +273,9 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     rct::keyM a_sigma = rct::keyMInit(n, m);
     CHECK_AND_ASSERT_THROW_MES(a_sigma.size() == m, "Bad matrix size!");
     CHECK_AND_ASSERT_THROW_MES(a_sigma[0].size() == n, "Bad matrix size!");
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
-        for (std::size_t i = 0; i < n; i++)
+        for (std::size_t i = 0; i < n; ++i)
         {
             // a_sigma[j][i] = a[j][i]*(ONE - TWO*sigma[j][i])
             sc_mulsub(a_sigma[j][i].bytes, TWO.bytes, sigma[j][i].bytes, ONE.bytes);
@@ -289,9 +289,9 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
 
     // D: commit to squared a-values
     rct::keyM a_sq = rct::keyMInit(n, m);
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
-        for (std::size_t i = 0; i < n; i++)
+        for (std::size_t i = 0; i < n; ++i)
         {
             sc_mul(a_sq[j][i].bytes, a[j][i].bytes, a[j][i].bytes);
             sc_mul(a_sq[j][i].bytes, MINUS_ONE.bytes, a_sq[j][i].bytes);
@@ -313,20 +313,20 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     rct::keyM p = rct::keyMInit(m + 1, N);
     CHECK_AND_ASSERT_THROW_MES(p.size() == N, "Bad matrix size!");
     CHECK_AND_ASSERT_THROW_MES(p[0].size() == m + 1, "Bad matrix size!");
-    for (std::size_t k = 0; k < N; k++)
+    for (std::size_t k = 0; k < N; ++k)
     {
         std::vector<std::size_t> decomp_k;
         decomp_k.resize(m);
         decompose(decomp_k, k, n, m);
 
-        for (std::size_t j = 0; j < m+1; j++)
+        for (std::size_t j = 0; j < m+1; ++j)
         {
             p[k][j] = ZERO;
         }
         p[k][0] = a[0][decomp_k[0]];
         p[k][1] = delta(decomp_l[0], decomp_k[0]);
 
-        for (std::size_t j = 1; j < m; j++)
+        for (std::size_t j = 1; j < m; ++j)
         {
             rct::keyV temp;
             temp.resize(2);
@@ -343,7 +343,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     // {rho}: proof entropy
     rct::keyV rho;
     rho.reserve(m);
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
         rho.push_back(rct::skGen());
     }
@@ -353,25 +353,25 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
             compute_concise_prefix(message, M, C_offsets, proof.A, proof.B, proof.C, proof.D)
         };
 
-    // mu^C_index: concise prefix powers
+    // mu^alpha: concise prefix powers
     rct::keyV mu_pow = powers_of_key(mu, num_keys);
 
     // {X}: 'encodings' of [p] (i.e. of the real signing index 'l' in the referenced tuple set)
     proof.X = rct::keyV(m);
     rct::key c_zero_nominal_prefix_temp;
     rct::key C_zero_nominal_temp;
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
         std::vector<rct::MultiexpData> data_X;
-        data_X.reserve(2*N);
+        data_X.reserve(N*num_keys);
 
-        for (std::size_t k = 0; k < N; k++)
+        for (std::size_t k = 0; k < N; ++k)
         {
-            // X[j] += p[k][j] * sum_{C_index}( mu^C_index * (M[k][C_index] - C_offset[C_index]) )
-            for (std::size_t C_index = 0; C_index < num_keys; ++C_index)
+            // X[j] += p[k][j] * sum_{alpha}( mu^alpha * (M[k][alpha] - C_offset[alpha]) )
+            for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
-                sc_mul(c_zero_nominal_prefix_temp.bytes, mu_pow[C_index].bytes, p[k][j].bytes);
-                rct::subKeys(C_zero_nominal_temp, M[k][C_index], C_offsets[C_index]);
+                sc_mul(c_zero_nominal_prefix_temp.bytes, mu_pow[alpha].bytes, p[k][j].bytes);
+                rct::subKeys(C_zero_nominal_temp, M[k][alpha], C_offsets[alpha]);
                 data_X.push_back({c_zero_nominal_prefix_temp, C_zero_nominal_temp});
             }
         }
@@ -383,7 +383,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     }
 
     // done: store (1/8)*X
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
         proof.X[j] = rct::scalarmultKey(proof.X[j], rct::INV_EIGHT);
     }
@@ -403,9 +403,9 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
 
     // f-matrix
     proof.f = rct::keyMInit(n - 1, m);
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
-        for (std::size_t i = 1; i < n; i++)
+        for (std::size_t i = 1; i < n; ++i)
         {
             sc_muladd(proof.f[j][i - 1].bytes, sigma[j][i].bytes, xi.bytes, a[j][i].bytes);
             CHECK_AND_ASSERT_THROW_MES(!(proof.f[j][i - 1] == ZERO), "Proof matrix element should not be zero!");
@@ -421,17 +421,18 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     sc_muladd(proof.zC.bytes, rC.bytes, xi.bytes, rD.bytes);
     CHECK_AND_ASSERT_THROW_MES(!(proof.zC == ZERO), "Proof scalar element should not be zero!");
 
-    // z = (sum_{C_index}( mu^{C_index}*privkey[C_index] ))*xi^m -
+    // z = (sum_{alpha}( mu^{alpha}*privkey[alpha] ))*xi^m -
     //     rho[0]*xi^0 - ... - rho[m - 1]*xi^(m - 1)
-    for (std::size_t C_index = 0; C_index < num_keys; ++C_index)
+    proof.z = ZERO;
+    for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
     {
-        sc_muladd(proof.z.bytes, mu_pow[C_index].bytes, privkeys[C_index].bytes, proof.z.bytes);
+        sc_muladd(proof.z.bytes, mu_pow[alpha].bytes, privkeys[alpha].bytes, proof.z.bytes);  //z += mu^alpha*privkey[alpha]
     }
-    sc_mul(proof.z.bytes, proof.z.bytes, xi_pow[m].bytes);
+    sc_mul(proof.z.bytes, proof.z.bytes, xi_pow[m].bytes);  //z *= xi^m
 
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
-        sc_mulsub(proof.z.bytes, rho[j].bytes, xi_pow[j].bytes, proof.z.bytes);
+        sc_mulsub(proof.z.bytes, rho[j].bytes, xi_pow[j].bytes, proof.z.bytes);  //z -= rho[j]*xi^j
     }
     CHECK_AND_ASSERT_THROW_MES(!(proof.z == ZERO), "Proof scalar element should not be zero!");
 
@@ -441,7 +442,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     memwipe(&rB, sizeof(rct::key));
     memwipe(&rC, sizeof(rct::key));
     memwipe(&rD, sizeof(rct::key));
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
         memwipe(a[j].data(), a[j].size()*sizeof(rct::key));
     }
@@ -473,7 +474,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
     CHECK_AND_ASSERT_THROW_MES(M.size() == N, "Public key vector is wrong size!");
 
     // inputs line up with proofs
-    CHECK_AND_ASSERT_THROW_MES(proof_offsets.size() == N_proofs, "Incorrect number of commitment offsets!");
+    CHECK_AND_ASSERT_THROW_MES(proof_offsets.size() == N_proofs, "Commitment offsets don't match with input proofs!");
     CHECK_AND_ASSERT_THROW_MES(messages.size() == N_proofs, "Incorrect number of messages!");
 
     // commitment offsets must line up with input set
@@ -494,10 +495,10 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
         CHECK_AND_ASSERT_THROW_MES(proof.X.size() == m, "Bad proof vector size!");
         CHECK_AND_ASSERT_THROW_MES(proof.f.size() == m, "Bad proof matrix size!");
-        for (std::size_t j = 0; j < m; j++)
+        for (std::size_t j = 0; j < m; ++j)
         {
             CHECK_AND_ASSERT_THROW_MES(proof.f[j].size() == n - 1, "Bad proof matrix size!");
-            for (std::size_t i = 0; i < n - 1; i++)
+            for (std::size_t i = 0; i < n - 1; ++i)
             {
                 CHECK_AND_ASSERT_THROW_MES(sc_check(proof.f[j][i].bytes) == 0, "Bad scalar element in proof!");
             }
@@ -519,27 +520,27 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
     // per-index storage:
     // 0            m*n-1       Hi[i]
     // m*n                      G     (zA*G, zC*G, z*G)
-    // m*n+1                 m*n+num_keys  M[0][C_index]
+    // m*n+1                 m*n+num_keys    M[0][alpha]
     // ...
-    // m*n+(N-1)*num_keys  m*n+N*num_keys  M[N-1][C_index]
+    // m*n+1+(N-1)*num_keys  m*n+N*num_keys  M[N-1][alpha]
     // ... then per-proof data (A, B, C, D, {C_offsets}, {X})
     std::vector<rct::MultiexpData> data;
-    data.reserve((m*n + 1) + N*num_keys + N_proofs*(m + num_keys + 5));
+    data.reserve((m*n + 1) + N*num_keys + N_proofs*(m + num_keys + 4));
     data.resize((m*n + 1) + N*num_keys); // set up for all common elements
 
     // prep terms: {Hi}, G
-    for (std::size_t i = 0; i < m*n; i++)
+    for (std::size_t i = 0; i < m*n; ++i)
     {
         data[i] = {ZERO, Hi_p3[i]};
     }
     data[m*n] = {ZERO, G_p3};
 
     // prep terms: {{M}}
-    for (std::size_t k = 0; k < N; k++)
+    for (std::size_t k = 0; k < N; ++k)
     {
-        for (std::size_t C_index = 0; C_index < num_keys; ++C_index)
+        for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
         {
-            data[m*n + (1 + k)*(C_index + 1)] = {ZERO, M[k][C_index]};
+            data[m*n + (1 + alpha + k*num_keys)] = {ZERO, M[k][alpha]};
         }
     }
 
@@ -547,13 +548,13 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
     /// per-proof data assembly
     std::size_t skipped_offsets{0};
 
-    for (std::size_t i_proofs = 0; i_proofs < N_proofs; i_proofs++)
+    for (std::size_t i_proofs = 0; i_proofs < N_proofs; ++i_proofs)
     {
         const ConciseGrootleProof &proof = *(proofs[i_proofs]);
 
         // random weights
         // - to allow verifiying batches of proofs, must weight each proof's components randomly so an adversary doesn't
-        //   gain an advantage if >1 of their proofs is being validated in a batch
+        //   gain an advantage if >1 of their proofs are being validated in a batch
         rct::key w1 = ZERO;  // decomp part 1:   w1*[ A + xi*B == com_matrix(f, zA) ]
         rct::key w2 = ZERO;  // decomp part 2:   w2*[ xi*C + D == com_matrix(f(xi - f), zC) ]
         rct::key w3 = ZERO;  // main stuff:      w3*[ ... - zG == 0 ]
@@ -594,22 +595,22 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         scalarmult8(B_p3, proof.B);
         scalarmult8(C_p3, proof.C);
         scalarmult8(D_p3, proof.D);
-        for (std::size_t j = 0; j < m; j++)
+        for (std::size_t j = 0; j < m; ++j)
         {
             scalarmult8(X_p3[j], proof.X[j]);
         }
 
         // Reconstruct the f-matrix
         rct::keyM f = rct::keyMInit(n, m);
-        for (std::size_t j = 0; j < m; j++)
+        for (std::size_t j = 0; j < m; ++j)
         {
-            // f[j][0] = xi - sum(f[j][i]) [from i = 1 to n]
+            // f[j][0] = xi - sum(f[j][i]) [from i = [1, n)]
             f[j][0] = xi;
 
-            for (std::size_t i = 1; i < n; i++)
+            for (std::size_t i = 1; i < n; ++i)
             {
                 // note: indexing between f-matrix and proof.f is off by 1 because
-                //       'f[j][0] = xi - sum(f_{j,i}' is only implied by the proof, not recorded in it
+                //       'f[j][0] = xi - sum(f_{j,i})' is only implied by the proof, not recorded in it
                 CHECK_AND_ASSERT_THROW_MES(!(proof.f[j][i - 1] == ZERO), "Proof matrix element should not be zero!");
                 f[j][i] = proof.f[j][i - 1];
                 sc_sub(f[j][0].bytes, f[j][0].bytes, f[j][i].bytes);
@@ -622,9 +623,9 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         //       [          == com_matrix(f, zA)                                    ]
         //   w2* [ xi*C + D == ... f[j][i] * (xi - f[j][i]) * Hi[j][i] ... + zC * G ]
         //       [          == com_matrix(f(xi - f), zC)                            ]
-        for (std::size_t j = 0; j < m; j++)
+        for (std::size_t j = 0; j < m; ++j)
         {
-            for (std::size_t i = 0; i < n; i++)
+            for (std::size_t i = 0; i < n; ++i)
             {
                 // Hi: w1*f[j][i] + w2*f[j][i]*(xi - f[j][i]) ->
                 //     w1*f[j][i] + w2*xi*f[j][i] - w2*f[j][i]^2
@@ -663,69 +664,71 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         data.push_back({temp, B_p3});  // -w1*xi * B
 
         sc_mul(temp.bytes, MINUS_ONE.bytes, w2.bytes);
-        data.push_back({temp, D_p3});  // -w2*xi * C
+        data.push_back({temp, D_p3});  // -w2 * D
 
         sc_mul(temp.bytes, temp.bytes, xi.bytes);
-        data.push_back({temp, C_p3});  // -w2 * D
+        data.push_back({temp, C_p3});  // -w2*xi * C
 
         // {{M}}
         //   t_k = mul_all_j(f[j][decomp_k[j]])
-        //   w3*[ sum_k( t_k * sum_{C_index}(mu^C_index * (M[k][C_index] - C_offsets[C_index])) ) - sum(...) - z G ] == 0
+        //   w3*[ sum_k( t_k * sum_{alpha}(mu^alpha * (M[k][alpha] - C_offsets[alpha])) ) - sum(...) - z G ] == 0
         //
-        //   sum_k( w3*t_k*sum_{C_index}(mu^C_index*M[k][C_index]) ) -
-        //   w3*sum_k( t_k )*sum_{C_index}(mu^C_index*C_offsets[C_index]) -
-        //   w3*[ sum(...) - z G ] == 0
-        // M[k][C_index]: w3*t_k*mu^C_index
+        //   sum_k( w3*t_k*sum_{alpha}(mu^alpha*M[k][alpha]) ) -
+        //   w3*sum_k( t_k )*sum_{alpha}(mu^alpha*C_offsets[alpha]) -
+        //   w3*[ sum(...) + z G ] == 0
+        // M[k][alpha]: w3*t_k*mu^alpha
         rct::key sum_t = ZERO;
-        for (std::size_t k = 0; k < N; k++)
+        for (std::size_t k = 0; k < N; ++k)
         {
             rct::key t_k = ONE;
             std::vector<std::size_t> decomp_k;
             decomp_k.resize(m);
             decompose(decomp_k, k, n, m);
 
-            for (std::size_t j = 0; j < m; j++)
+            for (std::size_t j = 0; j < m; ++j)
             {
                 sc_mul(t_k.bytes, t_k.bytes, f[j][decomp_k[j]].bytes);  // mul_all_j(f[j][decomp_k[j]])
             }
 
-            for (std::size_t C_index = 0; C_index < num_keys; ++C_index)
-            {
-                sc_mul(temp.bytes, w3.bytes, t_k.bytes);  // w3*t_k
-                sc_mul(temp.bytes, temp.bytes, mu_pow[C_index].bytes);  // w3*t_k*mu^C_index
-                sc_add(data[m*n + (1 + k)*(C_index + 1)].scalar.bytes,
-                    data[m*n + (1 + k)*(C_index + 1)].scalar.bytes,
-                    temp.bytes);  // w3*t_k*M[k][C_index]
-            }
-
             sc_add(sum_t.bytes, sum_t.bytes, t_k.bytes);  // sum_k( t_k )
+
+            // borrow the t_k variable...
+            sc_mul(t_k.bytes, w3.bytes, t_k.bytes);  // w3*t_k
+
+            for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+            {
+                temp = t_k;
+                sc_mul(temp.bytes, temp.bytes, mu_pow[alpha].bytes);  // w3*t_k*mu^alpha
+                sc_add(data[m*n + (1 + alpha + k*num_keys)].scalar.bytes,
+                    data[m*n + (1 + alpha + k*num_keys)].scalar.bytes,
+                    temp.bytes);  // w3*t_k*M[k][alpha]
+            }
         }
 
-        // C_offsets
-        //   ... - w3*sum_k( t_k )*sum_{C_index}(mu^C_index*C_offsets[C_index]) ...
+        // {C_offsets}
+        //   ... - w3*sum_k( t_k )*sum_{alpha}(mu^alpha*C_offsets[alpha]) ...
         // 
-        // proof_offsets[i_proofs][C_index]: -w3*sum_t*mu^C_index
-        //
-        // optimization: skip if offset == identity
+        // proof_offsets[i_proofs][alpha]: -w3*sum_t*mu^alpha
         sc_mul(temp.bytes, MINUS_ONE.bytes, w3.bytes);
-        sc_mul(temp.bytes, temp.bytes, sum_t.bytes);
+        sc_mul(temp.bytes, temp.bytes, sum_t.bytes);  //-w3*sum_t
 
-        for (std::size_t C_index = 0; C_index < num_keys; ++C_index)
+        for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
         {
-            if (proof_offsets[i_proofs][C_index] == rct::identity())
+            // optimization: skip if offset == identity
+            if (proof_offsets[i_proofs][alpha] == rct::identity())
             {
                 ++skipped_offsets;
                 continue;
             }
 
             rct::key shuttle;
-            sc_mul(shuttle.bytes, temp.bytes, mu_pow[C_index].bytes);
-            data.push_back({shuttle, proof_offsets[i_proofs][C_index]});
+            sc_mul(shuttle.bytes, temp.bytes, mu_pow[alpha].bytes);  //-w3*sum_t*mu^alpha
+            data.push_back({shuttle, proof_offsets[i_proofs][alpha]});
         }
 
         // {X}
         //   w3*[ ... - sum_j( xi^j*X[j] ) - z G ] == 0
-        for (std::size_t j = 0; j < m; j++)
+        for (std::size_t j = 0; j < m; ++j)
         {
             // X[j]: -w3*xi^j
             sc_mul(temp.bytes, w3.bytes, minus_xi_pow[j].bytes);
@@ -742,7 +745,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
 
     /// Final check
-    CHECK_AND_ASSERT_THROW_MES(data.size() == (m*n + 1) + N*num_keys + N_proofs*(m + num_keys + 5) - skipped_offsets,
+    CHECK_AND_ASSERT_THROW_MES(data.size() == (m*n + 1) + N*num_keys + N_proofs*(m + num_keys + 4) - skipped_offsets,
         "Final proof data is incorrect size!");
 
 

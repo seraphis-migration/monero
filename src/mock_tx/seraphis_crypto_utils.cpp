@@ -362,7 +362,7 @@ rct::key small_scalar_gen(const std::size_t size_bytes)
     rct::key result{rct::skGen()};
 
     // clear all bytes above size desired
-    for (std::size_t byte_index = size_bytes - 1; byte_index < 32; ++byte_index)
+    for (std::size_t byte_index = size_bytes; byte_index < 32; ++byte_index)
     {
         result.bytes[byte_index] = 0;
     }
