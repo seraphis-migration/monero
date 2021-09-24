@@ -38,62 +38,120 @@
 using namespace rct;
 
 // Test random proofs in batches
-//
-// Fixed: n (size base)
-// Variable: m (size exponent), l (signing index)
-TEST(grootle_concise, random)
+bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
+    const std::size_t N_proofs,  // number of proofs with common keys to verify in a batch
+    const std::size_t num_keys,  // number of parallel keys per-proof
+    const std::size_t num_ident_offsets)  // number of commitment-to-zero offsets to set to identity element
 {
-    const std::size_t n = 2; // size base: N = n^m
-    const std::size_t N_proofs = 2; // number of proofs with common keys to verify in a batch
-
     // Ring sizes: N = n^m
     for (std::size_t m = 2; m <= 6; m++)
     {
-        const std::size_t N = std::pow(n, m); // anonymity set size
-        std::vector<sp::ConciseGrootleProof> p;
-        p.reserve(N_proofs);
-        p.resize(0);
-        std::vector<const sp::ConciseGrootleProof *> proofs;
+        // anonymity set size
+        const std::size_t N = std::pow(n, m);
+
+        // proofs
+        std::vector<sp::ConciseGrootleProof> proofs;
         proofs.reserve(N_proofs);
-        proofs.resize(0);
+        std::vector<const sp::ConciseGrootleProof *> proof_ptrs;
+        proof_ptrs.reserve(N_proofs);
 
         // Build key vectors
-        keyM M = keyV(N);
-        keyM proof_privkeys = keyV(N_proofs);
-        keyV messages = keyV(N_proofs);
-        keyM proof_offsets = keyV(N_proofs);
+        keyM M;                         // ref set (common)
+        M.resize(N, keyV(num_keys));
+        keyM proof_privkeys;            // privkey tuple per-proof (at secret indices in M)
+        proof_privkeys.resize(N_proofs, keyV(num_keys));
+        keyV proof_messages = keyV(N_proofs); // message per-proof
+        keyM proof_offsets;             // commitment offset tuple per-proof
+        proof_offsets.resize(N_proofs, keyV(num_keys));
 
         // Random keys
         key temp;
         for (std::size_t k = 0; k < N; k++)
         {
-            skpkGen(temp, M[k]);
-            skpkGen(temp, P[k]);
+            for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+            {
+                skpkGen(temp, M[k][alpha]);
+            }
         }
 
-        // Signing keys, messages, and commitment offsets
-        key s1,s2;
-        for (std::size_t i = 0; i < N_proofs; i++)
+        // Signing keys, proof_messages, and commitment offsets
+        key privkey, offset_privkey;
+        for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
         {
-            skpkGen(r[i], M[i]);
-            skpkGen(s1, P[i]);
-            messages[i] = skGen();
-            skpkGen(s2, C_offsets[i]);
-            sc_sub(s[i].bytes, s1.bytes, s2.bytes);
+            for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+            {
+                // set real-signer index = proof index (kludge)
+                skpkGen(privkey, M[proof_i][alpha]);  //m_{l, alpha} * G
+                proof_messages[proof_i] = skGen();
+
+                // set the first 'num_ident_offsets' commitment offsets equal to identity
+                // - the proof will show DL on G for the main key directly (instead of commitment to zero with offset)
+                if (alpha + 1 > num_ident_offsets)
+                {
+                    skpkGen(offset_privkey, proof_offsets[proof_i][alpha]);  //c_{alpha} * G
+                    sc_sub(proof_privkeys[proof_i][alpha].bytes, privkey.bytes, offset_privkey.bytes); //m - c [commitment to zero]
+                }
+                else
+                {
+                    proof_offsets[proof_i][alpha] = identity();
+                    proof_privkeys[proof_i][alpha] = privkey;
+                }
+            }
         }
 
         // Build proofs
-        for (std::size_t i = 0; i < N_proofs; i++)
+        for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
         {
-            p.push_back(sp::concise_grootle_prove(M, P, C_offsets[i], i, r[i], s[i], n, m, messages[i]));
+            proofs.push_back(
+                sp::concise_grootle_prove(M,
+                    proof_i,
+                    proof_offsets[proof_i],
+                    proof_privkeys[proof_i],
+                    n,
+                    m,
+                    proof_messages[proof_i])
+                );
         }
-        for (sp::ConciseGrootleProof &proof: p)
+        for (sp::ConciseGrootleProof &proof: proofs)
         {
-            proofs.push_back(&proof);
+            proof_ptrs.push_back(&proof);
         }
 
         // Verify batch
-        ASSERT_TRUE(sp::concise_grootle_verify(proofs, M, P, C_offsets, n, m, messages));
+        if (!sp::concise_grootle_verify(proof_ptrs, M, proof_offsets, n, m, proof_messages))
+            return false;
     }
+
+    return true;
+}
+
+
+// [[[TODO: test multiple layers (1-3), test identity offset (0-all)]]]
+// Fixed: n (size base)
+// Variable: m (size exponent), l (signing index)
+TEST(grootle_concise, random)
+{
+    //const std::size_t n                   // size base: N = n^m
+    //const std::size_t N_proofs            // number of proofs with common keys to verify in a batch
+    //const std::size_t num_keys            // number of parallel keys per-proof
+    //const std::size_t num_ident_offsets   // number of commitm
+    EXPECT_TRUE(test_grootle_proof(2, 1, 1, 0));
+    EXPECT_TRUE(test_grootle_proof(2, 1, 2, 0));
+    EXPECT_TRUE(test_grootle_proof(2, 1, 3, 0));
+    EXPECT_TRUE(test_grootle_proof(2, 1, 3, 1));
+    EXPECT_TRUE(test_grootle_proof(2, 1, 3, 2));
+    EXPECT_TRUE(test_grootle_proof(2, 1, 3, 3));
+
+    EXPECT_TRUE(test_grootle_proof(2, 2, 1, 0));
+    EXPECT_TRUE(test_grootle_proof(2, 2, 2, 0));
+    EXPECT_TRUE(test_grootle_proof(2, 2, 1, 1));
+    EXPECT_TRUE(test_grootle_proof(2, 2, 2, 1));
+    EXPECT_TRUE(test_grootle_proof(2, 2, 2, 2));
+
+    EXPECT_TRUE(test_grootle_proof(3, 2, 2, 1));
+    EXPECT_TRUE(test_grootle_proof(3, 3, 2, 1));
+    EXPECT_TRUE(test_grootle_proof(3, 3, 3, 0));
+    EXPECT_TRUE(test_grootle_proof(3, 3, 3, 1));
+    EXPECT_TRUE(test_grootle_proof(3, 3, 3, 3));
 }
 
