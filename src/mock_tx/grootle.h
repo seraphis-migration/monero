@@ -33,10 +33,18 @@
 // - prove DL knowledge with respect to G of the commitment to zero tuple {S_pi - O} for an index \pi
 //   in the set that is unknown to verifiers
 //
+// note: to prove DL of a point in S with respect to G directly, set its offset equal to the identity element I
+//
+// - variant 1 (large, fast): grootle         (uses fast verification technique from Lelantus-Spark)
+// - variant 2 (small, slow): concise grootle (uses size reduction technique from Triptych)
+//
+// note: variant 1 = variant 2 if S-tuples have only 1 key
+//
 // References:
+// - One-out-of-Many Proofs: Or How to Leak a Secret and Spend a Coin (Groth): https://eprint.iacr.org/2014/764
 // - Short Accountable Ring Signatures Based on DDH (Bootle): https://eprint.iacr.org/2015/643
 // - Triptych (Sarang Noether): https://eprint.iacr.org/2020/018
-// - Lelantus Spark (Aram Jivanyan, Aaron Feickert [Sarang Noether]): https://eprint.iacr.org/2021/1173
+// - Lelantus-Spark (Aram Jivanyan, Aaron Feickert [Sarang Noether]): https://eprint.iacr.org/2021/1173
 ///
 
 
@@ -60,33 +68,39 @@ namespace sp
 constexpr std::size_t GROOTLE_MAX_MN{128};
 
 
-/// concise Grootle proof (using the consise approach described in Triptych)
-struct ConciseGrootleProof
+/// Grootle proof
+struct GrootleProof
 {
-    rct::key J;
-    rct::key K;
-    rct::key A,B,C,D;
-    rct::keyV X,Y;
+    rct::key A, B, C, D;
     rct::keyM f;
-    rct::key zA,zC,z;
+    rct::keyM X;
+    rct::key zA, zC;
+    rct::keyV z;
 };
 
+/// concise Grootle proof (using the concise approach described in Triptych)
+struct ConciseGrootleProof
+{
+    rct::key A, B, C, D;
+    rct::keyM f;
+    rct::keyV X;
+    rct::key zA, zC, z;
+};
+
+
 /// create a concise grootle proof
-ConciseGrootleProof concise_grootle_prove(const rct::keyV &M,
-    const rct::keyV &P,
-    const rct::key &C_offset,
-    const std::size_t l,
-    const rct::key &r,
-    const rct::key &s,
-    const std::size_t n,
+ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
+    const std::size_t l,        // secret index into {{M}}
+    const rct::keyV &C_offsets,  // offsets for commitment to zero at index l
+    const rct::keyV &privkeys,  // privkeys of commitments to zero in 'M[l] - C_offsets'
+    const std::size_t n,        // decomp input set: n^m
     const std::size_t m,
-    const rct::key &message);
+    const rct::key &message);    // message to insert in Fiat-Shamir transform hash
 
 /// verify a set of concise grootle proofs that share a reference set
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
-    const rct::keyV &M,     // shared
-    const rct::keyV &P,     // shared
-    const rct::keyV &C_offsets, // per-proof
+    const rct::keyM &M,   //shared
+    const std::vector<rct::keyV> &proof_offsets, //per-proof
     const std::size_t n,
     const std::size_t m,
     const rct::keyV &messages); //per-proof

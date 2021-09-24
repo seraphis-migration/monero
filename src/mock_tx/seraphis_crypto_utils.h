@@ -26,6 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// Miscellaneous crypto utils for Seraphis
+
+
 #pragma once
 
 //local headers
@@ -61,6 +64,7 @@ rct::key invert(const rct::key &x);
 /// Make generators, but only once
 void init_sp_gens();
 
+/// Get generators
 ge_p3 get_grootle_Hi_p3_gen(const std::size_t i);
 ge_p3 get_G_p3_gen();
 ge_p3 get_H_p3_gen();
@@ -95,8 +99,20 @@ rct::key delta(const std::size_t x, const std::size_t y);
 // Compute a convolution with a degree-one polynomial
 // x: x_1, x_2, ..., x_m
 // y: a, b
-// return: a*x_1, b*x_1 + a*x_2, ..., b*x_{m - 2} + a*x_{m - 1}, b*x_m
+// return: [a*x_1], [b*x_1 + a*x_2], ..., [b*x_{m - 2} + a*x_{m - 1}], [b*x_m]
 ///
 rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m);
+
+////
+// return: (negate ? -1 : 1)*([key^0], [key^1], ..., [key^{num_pows - 1}])
+///
+rct::keyV powers_of_key(const rct::key &key, const std::size_t num_pows, const bool negate_all = false);
+
+////
+// Generate a curve scalar of arbitrary size (in bytes).
+//
+// WARNING: NOT FOR USE WITH CRYPTOGRAPHIC SECRETS
+///
+rct::key small_scalar_gen(const std::size_t size_bytes);
 
 } //namespace sp
