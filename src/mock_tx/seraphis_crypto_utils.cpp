@@ -67,6 +67,8 @@ static rct::key X;
 static const rct::key ZERO = rct::zero();
 static const rct::key ONE = rct::identity();
 static const rct::key IDENTITY = rct::identity();
+static const rct::key MINUS_ONE = { {0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9,
+    0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10} };
 
 // misc
 static boost::mutex init_mutex;
@@ -300,7 +302,7 @@ rct::key delta(const std::size_t x, const std::size_t y)
 // Compute a convolution with a degree-one polynomial
 // x: x_1, x_2, ..., x_m
 // y: a, b
-// return: a*x_1, b*x_1 + a*x_2, ..., b*x_{m - 2} + a*x_{m - 1}, b*x_m
+// return: [a*x_1], [b*x_1 + a*x_2], ..., [b*x_{m - 2} + a*x_{m - 1}], [b*x_m]
 ///
 rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m)
 {
@@ -318,6 +320,51 @@ rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m)
             sc_mul(temp.bytes, x[i].bytes, y[j].bytes);
             sc_add(result[i + j].bytes, result[i + j].bytes, temp.bytes);
         }
+    }
+
+    return result;
+}
+
+////
+// return: (negate ? -1 : 1)*([key^0], [key^1], ..., [key^{num_pows - 1}])
+///
+rct::keyV powers_of_key(const rct::key &key, const std::size_t num_pows, const bool negate_all)
+{
+    if (num_pows == 0)
+        return rct::keyV{};
+
+    rct::keyV pows;
+    pows.resize(num_pows);
+
+    if (negate_all)
+        pows[0] = MINUS_ONE;
+    else
+        pows[0] = ONE;
+
+    for (std::size_t i = 1; i < num_pows; i++)
+    {
+        sc_mul(pows[i].bytes, pows[i - 1].bytes, key.bytes);
+    }
+
+    return pows;
+}
+
+////
+// Generate a curve scalar of arbitrary size (in bytes).
+//
+// WARNING: NOT FOR USE WITH CRYPTOGRAPHIC SECRETS
+///
+rct::key small_scalar_gen(const std::size_t size_bytes)
+{
+    if (size_bytes == 0)
+        return rct::zero();
+
+    rct::key result{rct::skGen()};
+
+    // clear all bytes above size desired
+    for (std::size_t byte_index = size_bytes - 1; byte_index < 32; ++byte_index)
+    {
+        result.bytes[byte_index] = 0;
     }
 
     return result;

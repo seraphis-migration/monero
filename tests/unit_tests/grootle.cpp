@@ -58,12 +58,10 @@ TEST(grootle_concise, random)
         proofs.resize(0);
 
         // Build key vectors
-        keyV M = keyV(N);
-        keyV P = keyV(N);
-        keyV r = keyV(N_proofs);
-        keyV s = keyV(N_proofs);
+        keyM M = keyV(N);
+        keyM proof_privkeys = keyV(N_proofs);
         keyV messages = keyV(N_proofs);
-        keyV C_offsets = keyV(N_proofs);
+        keyM proof_offsets = keyV(N_proofs);
 
         // Random keys
         key temp;
