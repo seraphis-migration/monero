@@ -39,7 +39,6 @@ extern "C"
 #include "ringct/multiexp.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "ringct/triptych.h"
 #include "seraphis_crypto_utils.h"
 
 //third party headers
@@ -48,6 +47,7 @@ extern "C"
 
 //standard headers
 #include <cmath>
+#include <vector>
 
 
 namespace sp
@@ -471,6 +471,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 
     // commitment offsets must line up with input set
     const std::size_t num_keys = proof_offsets[0].size();
+    CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Unsufficient signing keys in proof!");
 
     for (const auto &C_offsets : proof_offsets)
         CHECK_AND_ASSERT_THROW_MES(C_offsets.size() == num_keys, "Incorrect number of commitment offsets!");
@@ -552,7 +553,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     ge_p3 M_agg_temp;
     for (std::size_t k = 0; k < N; ++k)
     {
-        multiExp_ge_p3(M_agg_temp, M[k], sw, true);  //TODO: update function to return-by-reference
+        multiExp_ge_p3(M_agg_temp, M[k], sw);  //TODO: update function to return-by-reference
 
         data[m*n + (1 + k)] = {ZERO, M_agg_temp};
     }

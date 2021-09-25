@@ -39,7 +39,6 @@ extern "C"
 #include "ringct/multiexp.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "ringct/triptych.h"
 #include "seraphis_crypto_utils.h"
 
 //third party headers
@@ -48,6 +47,7 @@ extern "C"
 
 //standard headers
 #include <cmath>
+#include <vector>
 
 
 namespace sp

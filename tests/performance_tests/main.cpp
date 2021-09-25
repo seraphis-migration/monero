@@ -63,11 +63,13 @@
 #include "bulletproof.h"
 #include "bulletproof_plus.h"
 #include "crypto_ops.h"
-#include "mock_tx.h"
 #include "multiexp.h"
 #include "sig_mlsag.h"
 #include "sig_clsag.h"
 #include "triptych.h"
+#include "triptych_proof.h"
+#include "mock_tx.h"
+#include "grootle.h"
 
 namespace po = boost::program_options;
 

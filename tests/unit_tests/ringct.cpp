@@ -1295,7 +1295,7 @@ TEST(ringct, multiexp_ge_p3)
             addKeys(check, check, temp);
         }
 
-        multiExp_ge_p3(test, pubkeys, privkeys, false);
+        multiExp_ge_p3(test, pubkeys, privkeys);
         ge_p3_tobytes(test_key.bytes, &test);
 
         EXPECT_TRUE(test_key == check);
@@ -1324,7 +1324,7 @@ TEST(ringct, multiexp_ge_p3)
             addKeys(check, check, temp);
         }
 
-        multiExp_ge_p3(test, pubkeys, privkeys, true);
+        multiExp_ge_p3(test, pubkeys, privkeys);
         ge_p3_tobytes(test_key.bytes, &test);
 
         EXPECT_TRUE(test_key == check);
