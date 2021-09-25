@@ -41,7 +41,7 @@ template<std::size_t a_n,
     std::size_t num_proofsV,
     std::size_t num_keysV,
     std::size_t num_ident_offsetsV>
-class test_grootle
+class test_concise_grootle
 {
     public:
         static const std::size_t loop_count = 1000;
