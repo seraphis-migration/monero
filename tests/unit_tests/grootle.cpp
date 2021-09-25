@@ -177,14 +177,14 @@ bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
         // make and test proofs
         if (type == GrootleProofType::Plain)
         {
-            return test_plain_grootle(N_proofs, n, m, M, proof_offsets, proof_privkeys, proof_messages);
+            if (!test_plain_grootle(N_proofs, n, m, M, proof_offsets, proof_privkeys, proof_messages))
+                return false;
         }
         else if (type == GrootleProofType::Concise)
         {
-            return test_concise_grootle(N_proofs, n, m, M, proof_offsets, proof_privkeys, proof_messages);
+            if (!test_concise_grootle(N_proofs, n, m, M, proof_offsets, proof_privkeys, proof_messages))
+                return false;
         }
-        else
-            return false;
     }
 
     return true;
