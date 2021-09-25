@@ -1268,3 +1268,65 @@ TEST(ringct, aggregated)
 
   ASSERT_TRUE(verRctSemanticsSimple(sp));
 }
+
+TEST(ringct, multiexp_ge_p3)
+{
+    ge_p3 test;
+    key test_key;
+    key check;
+    key temp;
+
+    // works normally
+    for (std::size_t i = 1; i < 5; ++i)
+    {
+        check = identity();
+
+        keyV pubkeys;
+        keyV privkeys;
+        pubkeys.reserve(i);
+        privkeys.reserve(i);
+
+        for (std::size_t j = 0; j < i; ++j)
+        {
+            pubkeys.push_back(pkGen());
+            privkeys.push_back(skGen());
+
+            scalarmultKey(temp, pubkeys.back(), privkeys.back());
+            addKeys(check, check, temp);
+        }
+
+        multiExp_ge_p3(test, pubkeys, privkeys, false);
+        ge_p3_tobytes(test_key.bytes, &test);
+
+        EXPECT_TRUE(test_key == check);
+    }
+
+    // privkey == 1 optimization works
+
+    for (std::size_t i = 1; i < 5; ++i)
+    {
+        check = identity();
+
+        keyV pubkeys;
+        keyV privkeys;
+        pubkeys.reserve(i);
+        privkeys.reserve(i);
+
+        for (std::size_t j = 0; j < i; ++j)
+        {
+            pubkeys.push_back(pkGen());
+            if (j < i/2)
+                privkeys.push_back(identity());
+            else
+                privkeys.push_back(skGen());
+
+            scalarmultKey(temp, pubkeys.back(), privkeys.back());
+            addKeys(check, check, temp);
+        }
+
+        multiExp_ge_p3(test, pubkeys, privkeys, true);
+        ge_p3_tobytes(test_key.bytes, &test);
+
+        EXPECT_TRUE(test_key == check);
+    }
+}

@@ -156,7 +156,7 @@ void init_sp_gens()
     // Build Hi generators
     // H_i = keccak_to_pt("grootle Hi", i)
     static const std::string Hi_salt(config::HASH_KEY_GROOTLE_Hi);
-    for (std::size_t i = 0; i < GROOTLE_MAX_MN; i++)
+    for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
     {
         std::string hash = Hi_salt + tools::get_varint_data(i);
         hash_to_p3(grootle_Hi_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
@@ -232,7 +232,7 @@ std::shared_ptr<rct::pippenger_cached_data> get_grootle_Hi_pippinger_cache_init(
 
     std::vector<rct::MultiexpData> data;
     data.reserve(GROOTLE_MAX_MN);
-    for (std::size_t i = 0; i < GROOTLE_MAX_MN; i++)
+    for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
     {
         data.push_back({ZERO, grootle_Hi_p3[i]});
     }
@@ -258,7 +258,7 @@ void decompose(std::vector<std::size_t> &r, const std::size_t val, const std::si
 
     std::size_t temp = val;
 
-    for (std::size_t i = 0; i < size; i++)
+    for (std::size_t i = 0; i < size; ++i)
     {
         std::size_t slot = std::pow(base, size - i - 1);
         r[size - i - 1] = temp/slot;
@@ -279,9 +279,9 @@ void com_matrix(std::vector<rct::MultiexpData> &data, const rct::keyM &M, const 
     CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "Bad matrix commitment parameters!");
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Bad matrix commitment result vector size!");
 
-    for (std::size_t j = 0; j < m; j++)
+    for (std::size_t j = 0; j < m; ++j)
     {
-        for (std::size_t i = 0; i < n; i++)
+        for (std::size_t i = 0; i < n; ++i)
         {
             data[j*n + i] = {M[j][i], grootle_Hi_p3[j*n + i]};
         }
@@ -313,9 +313,9 @@ rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m)
     rct::keyV result;
     result.resize(m + 1, ZERO);
 
-    for (std::size_t i = 0; i < m; i++)
+    for (std::size_t i = 0; i < m; ++i)
     {
-        for (std::size_t j = 0; j < 2; j++)
+        for (std::size_t j = 0; j < 2; ++j)
         {
             sc_mul(temp.bytes, x[i].bytes, y[j].bytes);
             sc_add(result[i + j].bytes, result[i + j].bytes, temp.bytes);
@@ -341,7 +341,7 @@ rct::keyV powers_of_key(const rct::key &key, const std::size_t num_pows, const b
     else
         pows[0] = ONE;
 
-    for (std::size_t i = 1; i < num_pows; i++)
+    for (std::size_t i = 1; i < num_pows; ++i)
     {
         sc_mul(pows[i].bytes, pows[i - 1].bytes, key.bytes);
     }

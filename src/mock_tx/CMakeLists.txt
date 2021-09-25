@@ -27,6 +27,7 @@
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 set(mock_tx_sources
+  grootle.cpp
   grootle_concise.cpp
   mock_tx.cpp
   mock_tx_utils.cpp

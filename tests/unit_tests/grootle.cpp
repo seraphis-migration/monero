@@ -37,23 +37,98 @@
 
 using namespace rct;
 
+enum GrootleProofType
+{
+    Concise,
+    Plain
+};
+
+bool test_plain_grootle(const std::size_t N_proofs,
+    const std::size_t n,
+    const std::size_t m,
+    const keyM &M,
+    const keyM &proof_offsets,
+    const keyM &proof_privkeys,
+    const keyV &proof_messages)
+{
+    std::vector<sp::GrootleProof> proofs;
+    proofs.reserve(N_proofs);
+    std::vector<const sp::GrootleProof *> proof_ptrs;
+    proof_ptrs.reserve(N_proofs);
+
+    for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
+    {
+        proofs.push_back(
+            sp::grootle_prove(M,
+                proof_i,
+                proof_offsets[proof_i],
+                proof_privkeys[proof_i],
+                n,
+                m,
+                proof_messages[proof_i])
+            );
+    }
+    for (sp::GrootleProof &proof: proofs)
+    {
+        proof_ptrs.push_back(&proof);
+    }
+
+    // Verify batch
+    if (!sp::grootle_verify(proof_ptrs, M, proof_offsets, n, m, proof_messages))
+        return false;
+
+    return true;
+}
+
+bool test_concise_grootle(const std::size_t N_proofs,
+    const std::size_t n,
+    const std::size_t m,
+    const keyM &M,
+    const keyM &proof_offsets,
+    const keyM &proof_privkeys,
+    const keyV &proof_messages)
+{
+    std::vector<sp::ConciseGrootleProof> proofs;
+    proofs.reserve(N_proofs);
+    std::vector<const sp::ConciseGrootleProof *> proof_ptrs;
+    proof_ptrs.reserve(N_proofs);
+
+    for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
+    {
+        proofs.push_back(
+            sp::concise_grootle_prove(M,
+                proof_i,
+                proof_offsets[proof_i],
+                proof_privkeys[proof_i],
+                n,
+                m,
+                proof_messages[proof_i])
+            );
+    }
+    for (sp::ConciseGrootleProof &proof: proofs)
+    {
+        proof_ptrs.push_back(&proof);
+    }
+
+    // Verify batch
+    if (!sp::concise_grootle_verify(proof_ptrs, M, proof_offsets, n, m, proof_messages))
+        return false;
+
+    return true;
+}
+
 // Test random proofs in batches
 bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
     const std::size_t N_proofs,  // number of proofs with common keys to verify in a batch
     const std::size_t num_keys,  // number of parallel keys per-proof
-    const std::size_t num_ident_offsets)  // number of commitment-to-zero offsets to set to identity element
+    const std::size_t num_ident_offsets,  // number of commitment-to-zero offsets to set to identity element
+    const GrootleProofType type)
 {
     // Ring sizes: N = n^m
     for (std::size_t m = 2; m <= 6; m++)
     {
         // anonymity set size
         const std::size_t N = std::pow(n, m);
-
-        // proofs
-        std::vector<sp::ConciseGrootleProof> proofs;
-        proofs.reserve(N_proofs);
-        std::vector<const sp::ConciseGrootleProof *> proof_ptrs;
-        proof_ptrs.reserve(N_proofs);
 
         // Build key vectors
         keyM M;                         // ref set (common)
@@ -99,59 +174,52 @@ bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
             }
         }
 
-        // Build proofs
-        for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
+        // make and test proofs
+        if (type == GrootleProofType::Plain)
         {
-            proofs.push_back(
-                sp::concise_grootle_prove(M,
-                    proof_i,
-                    proof_offsets[proof_i],
-                    proof_privkeys[proof_i],
-                    n,
-                    m,
-                    proof_messages[proof_i])
-                );
+            return test_plain_grootle(N_proofs, n, m, M, proof_offsets, proof_privkeys, proof_messages);
         }
-        for (sp::ConciseGrootleProof &proof: proofs)
+        else if (type == GrootleProofType::Concise)
         {
-            proof_ptrs.push_back(&proof);
+            return test_concise_grootle(N_proofs, n, m, M, proof_offsets, proof_privkeys, proof_messages);
         }
-
-        // Verify batch
-        if (!sp::concise_grootle_verify(proof_ptrs, M, proof_offsets, n, m, proof_messages))
+        else
             return false;
     }
 
     return true;
 }
 
-
-// [[[TODO: test multiple layers (1-3), test identity offset (0-all)]]]
-// Fixed: n (size base)
-// Variable: m (size exponent), l (signing index)
-TEST(grootle_concise, random)
+TEST(grootle, random)
 {
     //const std::size_t n                   // size base: N = n^m
     //const std::size_t N_proofs            // number of proofs with common keys to verify in a batch
     //const std::size_t num_keys            // number of parallel keys per-proof
-    //const std::size_t num_ident_offsets   // number of commitm
-    EXPECT_TRUE(test_grootle_proof(2, 1, 1, 0));
-    EXPECT_TRUE(test_grootle_proof(2, 1, 2, 0));
-    EXPECT_TRUE(test_grootle_proof(2, 1, 3, 0));
-    EXPECT_TRUE(test_grootle_proof(2, 1, 3, 1));
-    EXPECT_TRUE(test_grootle_proof(2, 1, 3, 2));
-    EXPECT_TRUE(test_grootle_proof(2, 1, 3, 3));
+    //const std::size_t num_ident_offsets   // number of commitment-to-zero offsets to set to identity element
+    //const GrootleProofType type           // proof type to test
 
-    EXPECT_TRUE(test_grootle_proof(2, 2, 1, 0));
-    EXPECT_TRUE(test_grootle_proof(2, 2, 2, 0));
-    EXPECT_TRUE(test_grootle_proof(2, 2, 1, 1));
-    EXPECT_TRUE(test_grootle_proof(2, 2, 2, 1));
-    EXPECT_TRUE(test_grootle_proof(2, 2, 2, 2));
+    std::vector<GrootleProofType> types = {GrootleProofType::Plain, GrootleProofType::Concise};
 
-    EXPECT_TRUE(test_grootle_proof(3, 2, 2, 1));
-    EXPECT_TRUE(test_grootle_proof(3, 3, 2, 1));
-    EXPECT_TRUE(test_grootle_proof(3, 3, 3, 0));
-    EXPECT_TRUE(test_grootle_proof(3, 3, 3, 1));
-    EXPECT_TRUE(test_grootle_proof(3, 3, 3, 3));
+    for (const auto type : types)
+    {
+        EXPECT_TRUE(test_grootle_proof(2, 1, 1, 0, type));
+        EXPECT_TRUE(test_grootle_proof(2, 1, 2, 0, type));
+        EXPECT_TRUE(test_grootle_proof(2, 1, 3, 0, type));
+        EXPECT_TRUE(test_grootle_proof(2, 1, 3, 1, type));
+        EXPECT_TRUE(test_grootle_proof(2, 1, 3, 2, type));
+        EXPECT_TRUE(test_grootle_proof(2, 1, 3, 3, type));
+
+        EXPECT_TRUE(test_grootle_proof(2, 2, 1, 0, type));
+        EXPECT_TRUE(test_grootle_proof(2, 2, 2, 0, type));
+        EXPECT_TRUE(test_grootle_proof(2, 2, 1, 1, type));
+        EXPECT_TRUE(test_grootle_proof(2, 2, 2, 1, type));
+        EXPECT_TRUE(test_grootle_proof(2, 2, 2, 2, type));
+
+        EXPECT_TRUE(test_grootle_proof(3, 2, 2, 1, type));
+        EXPECT_TRUE(test_grootle_proof(3, 3, 2, 1, type));
+        EXPECT_TRUE(test_grootle_proof(3, 3, 3, 0, type));
+        EXPECT_TRUE(test_grootle_proof(3, 3, 3, 1, type));
+        EXPECT_TRUE(test_grootle_proof(3, 3, 3, 3, type));
+    }
 }
 
