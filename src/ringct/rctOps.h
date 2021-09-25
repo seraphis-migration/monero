@@ -151,7 +151,7 @@ namespace rct {
 
     //aA + bB + ... + pP
     // optimization: checks if a privkey == 1 if 'has_mul1_terms' is set
-    void multiExp_ge_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &privkeys, const bool has_mul1_terms = false);
+    void multiExp_ge_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &privkeys);
 
     //AB = A - B where A, B are curve points
     void subKeys(key &AB, const key &A, const  key &B);
