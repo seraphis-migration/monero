@@ -74,7 +74,7 @@ bool test_plain_grootle(const std::size_t N_proofs,
     }
 
     // Verify batch
-    if (!sp::grootle_verify(proof_ptrs, M, proof_offsets, n, m, proof_messages))
+    if (!sp::grootle_verify(proof_ptrs, M, proof_offsets, n, m, proof_messages, 4))
         return false;
 
     return true;

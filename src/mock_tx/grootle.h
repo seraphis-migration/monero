@@ -94,7 +94,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     const rct::keyV &privkeys,  // privkeys of commitments to zero in 'M[l] - C_offsets'
     const std::size_t n,        // decomp input set: n^m
     const std::size_t m,
-    const rct::key &message)    // message to insert in Fiat-Shamir transform hash
+    const rct::key &message);    // message to insert in Fiat-Shamir transform hash
 
 /// create a concise grootle proof
 ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
@@ -112,7 +112,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const std::size_t n,
     const std::size_t m,
     const rct::keyV &messages,
-    const std::size_t small_weighting_size)
+    const std::size_t small_weighting_size);
 
 /// verify a batch of concise grootle proofs that share a reference set
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
