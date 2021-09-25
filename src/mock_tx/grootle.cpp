@@ -372,7 +372,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
         {
             proof.X[alpha][j] = rct::scalarmultKey(proof.X[alpha][j], rct::INV_EIGHT);
         }
-        CHECK_AND_ASSERT_THROW_MES(proof.X[alpha].size() == num_keys, "Proof coefficient vector is unexpected size!");
+        CHECK_AND_ASSERT_THROW_MES(proof.X[alpha].size() == m, "Proof coefficient vector is unexpected size!");
     }
     CHECK_AND_ASSERT_THROW_MES(proof.X.size() == num_keys, "Proof coefficient vector is unexpected size!");
 
@@ -410,6 +410,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
 
     // z[alpha] = privkeys[alpha]*xi^m -
     //            rho[alpha][0]*xi^0 - ... - rho[alpha][m - 1]*xi^(m - 1)
+    proof.z.resize(num_keys);
     for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
     {
         sc_mul(proof.z[alpha].bytes, privkeys[alpha].bytes, xi_pow[m].bytes);  //z = privkeys[alpha]*xi^m
@@ -537,7 +538,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     // - set first to zero since all other indices will be separated from it by their own weights
     rct::keyV sw;
     sw.resize(num_keys, ZERO);
-    sw.push_back(ONE);
+    sw[0] = ONE;
 
     for (std::size_t alpha = 1; alpha < num_keys; ++alpha)
     {
