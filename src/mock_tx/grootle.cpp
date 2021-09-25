@@ -551,10 +551,18 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     // M_agg[k] = sum_{alpha}( sw[alpha]*M[k][alpha] )
     // - with 'small weight' aggregation of M-keys at each row of the matrix (for faster verification)
     ge_p3 M_agg_temp;
+    std::vector<rct::MultiexpData> Magg_data;
+    Magg_data.resize(num_keys);
+
     for (std::size_t k = 0; k < N; ++k)
     {
-        multiExp_ge_p3(M_agg_temp, M[k], sw);  //TODO: update function to return-by-reference
+        for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+        {
+        //    Magg_data[alpha] = {sw[alpha], M[k][alpha]};
+        }
+        multiExp_ge_p3(M_agg_temp, M[k], sw);
 
+        //data[m*n + (1 + k)] = {ZERO, rct::straus_ge_p3(Magg_data)};
         data[m*n + (1 + k)] = {ZERO, M_agg_temp};
     }
 
@@ -708,9 +716,10 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
         //      w3*[ ... ] == 0
         // M_agg[k]: w3*t_k
         rct::key sum_t = ZERO;
+        rct::key t_k;
         for (std::size_t k = 0; k < N; ++k)
         {
-            rct::key t_k = ONE;
+            t_k = ONE;
             std::vector<std::size_t> decomp_k;
             decomp_k.resize(m);
             decompose(decomp_k, k, n, m);
@@ -731,6 +740,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
         // 
         // proof_offsets[i_proofs][alpha]: -sum_t*w3_sw[alpha]
         sc_mul(temp.bytes, MINUS_ONE.bytes, sum_t.bytes);  //-sum_t
+        rct::key shuttle;
 
         for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
         {
@@ -741,7 +751,6 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
                 continue;
             }
 
-            rct::key shuttle;
             sc_mul(shuttle.bytes, temp.bytes, w3_sw[alpha].bytes);  //-sum_t*w3_sw[alpha]
             data.push_back({shuttle, proof_offsets[i_proofs][alpha]});
         }
@@ -776,7 +785,8 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 
 
     /// Verify all elements sum to zero
-    if (!(rct::pippenger(data, cache, m*n, rct::get_pippenger_c(data.size())) == IDENTITY))
+    ge_p3 result = rct::pippenger_ge_p3(data, cache, m*n, rct::get_pippenger_c(data.size()));
+    if (ge_p3_is_point_at_infinity(&result) == 0)
     {
         MERROR("Grootle proof: verification failed!");
         return false;

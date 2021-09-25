@@ -678,9 +678,10 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         //      w3*[ sum(...) + z G ] == 0
         // M[k][alpha]: w3*t_k*mu^alpha
         rct::key sum_t = ZERO;
+        rct::key t_k;
         for (std::size_t k = 0; k < N; ++k)
         {
-            rct::key t_k = ONE;
+            t_k = ONE;
             std::vector<std::size_t> decomp_k;
             decomp_k.resize(m);
             decompose(decomp_k, k, n, m);
@@ -697,8 +698,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
             for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
-                temp = t_k;
-                sc_mul(temp.bytes, temp.bytes, mu_pow[alpha].bytes);  // w3*t_k*mu^alpha
+                sc_mul(temp.bytes, t_k.bytes, mu_pow[alpha].bytes);  // w3*t_k*mu^alpha
                 sc_add(data[m*n + (1 + alpha + k*num_keys)].scalar.bytes,
                     data[m*n + (1 + alpha + k*num_keys)].scalar.bytes,
                     temp.bytes);  // w3*t_k*M[k][alpha]
@@ -711,6 +711,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         // proof_offsets[i_proofs][alpha]: -w3*sum_t*mu^alpha
         sc_mul(temp.bytes, MINUS_ONE.bytes, w3.bytes);
         sc_mul(temp.bytes, temp.bytes, sum_t.bytes);  //-w3*sum_t
+        rct::key shuttle;
 
         for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
         {
@@ -721,7 +722,6 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
                 continue;
             }
 
-            rct::key shuttle;
             sc_mul(shuttle.bytes, temp.bytes, mu_pow[alpha].bytes);  //-w3*sum_t*mu^alpha
             data.push_back({shuttle, proof_offsets[i_proofs][alpha]});
         }
@@ -750,7 +750,8 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
 
     /// Verify all elements sum to zero
-    if (!(rct::pippenger(data, cache, m*n, rct::get_pippenger_c(data.size())) == IDENTITY))
+    ge_p3 result = rct::pippenger_ge_p3(data, cache, m*n, rct::get_pippenger_c(data.size()));
+    if (ge_p3_is_point_at_infinity(&result) == 0)
     {
         MERROR("Concise Grootle proof: verification failed!");
         return false;

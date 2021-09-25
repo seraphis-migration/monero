@@ -443,7 +443,7 @@ size_t straus_get_cache_size(const std::shared_ptr<straus_cached_data> &cache)
   return sz;
 }
 
-rct::key straus(const std::vector<MultiexpData> &data, const std::shared_ptr<straus_cached_data> &cache, size_t STEP)
+ge_p3 straus_ge_p3(const std::vector<MultiexpData> &data, const std::shared_ptr<straus_cached_data> &cache, size_t STEP)
 {
   CHECK_AND_ASSERT_THROW_MES(cache == NULL || cache->size >= data.size(), "Cache is too small");
   MULTIEXP_PERF(PERF_TIMER_UNIT(straus, 1000000));
@@ -554,7 +554,13 @@ skipfirst:
     ge_p1p1_to_p3(&res_p3, &p1);
   }
 
+  return res_p3;
+}
+
+rct::key straus(const std::vector<MultiexpData> &data, const std::shared_ptr<straus_cached_data> &cache, size_t STEP)
+{
   rct::key res;
+  ge_p3 res_p3 = straus_ge_p3(data, cache, STEP);
   ge_p3_tobytes(res.bytes, &res_p3);
   return res;
 }
@@ -603,7 +609,7 @@ size_t pippenger_get_cache_size(const std::shared_ptr<pippenger_cached_data> &ca
   return cache->size * sizeof(*cache->cached);
 }
 
-rct::key pippenger(const std::vector<MultiexpData> &data, const std::shared_ptr<pippenger_cached_data> &cache, size_t cache_size, size_t c)
+ge_p3 pippenger_ge_p3(const std::vector<MultiexpData> &data, const std::shared_ptr<pippenger_cached_data> &cache, size_t cache_size, size_t c)
 {
   if (cache != NULL && cache_size == 0)
     cache_size = cache->size;
@@ -700,8 +706,14 @@ rct::key pippenger(const std::vector<MultiexpData> &data, const std::shared_ptr<
     }
   }
 
+  return result;
+}
+
+rct::key pippenger(const std::vector<MultiexpData> &data, const std::shared_ptr<pippenger_cached_data> &cache, size_t cache_size, size_t c)
+{
   rct::key res;
-  ge_p3_tobytes(res.bytes, &result);
+  ge_p3 result_p3 = pippenger_ge_p3(data, cache, cache_size, c);
+  ge_p3_tobytes(res.bytes, &result_p3);
   return res;
 }
 
