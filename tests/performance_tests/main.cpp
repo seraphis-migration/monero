@@ -67,9 +67,9 @@
 #include "sig_mlsag.h"
 #include "sig_clsag.h"
 #include "triptych.h"
-#include "triptych_proof.h"
 #include "mock_tx.h"
 #include "grootle.h"
+#include "grootle_concise.h"
 
 namespace po = boost::program_options;
 
@@ -165,6 +165,33 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 16, 16);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 16, 16);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 16, 16);
+
+
+  // test groth/bootle proofs
+  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 2, 1, 2, true);
+  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 3, 1, 2, true);
+  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 4, 1, 2, true);
+  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 5, 1, 2, true);
+  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 6, 1, 2, true);
+  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 7, 1, 2, true);
+  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 8, 1, 2, true);
+
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 2, 2, 2, 0, 4);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 3, 2, 2, 0, 4);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 4, 2, 2, 0, 4);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 5, 2, 2, 0, 4);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 0, 4);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 7, 2, 2, 0, 4);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 8, 2, 2, 0, 4);
+
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 2, 2, 2, 0);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 3, 2, 2, 0);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 4, 2, 2, 0);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 5, 2, 2, 0);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 6, 2, 2, 0);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 7, 2, 2, 0);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 8, 2, 2, 0);
+
   /*
 
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 1, false);

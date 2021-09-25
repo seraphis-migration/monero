@@ -36,7 +36,7 @@
 
 using namespace rct;
 
-template<size_t a_n, size_t a_m, size_t a_T, size_t a_w>
+template<size_t a_n, size_t a_m, size_t a_T, size_t a_w, bool skip_balance_ckeck = false>
 class test_triptych
 {
     public:
@@ -57,9 +57,12 @@ class test_triptych
             a = keyV(w);
             s = keyV(w);
 
-            Q = keyV(T); // Q[j] = Com(b[j],t[j])
-            b = keyV(T);
-            t = keyV(T);
+            if (!skip_balance_ckeck)
+            {
+                Q = keyV(T); // Q[j] = Com(b[j],t[j])
+                b = keyV(T);
+                t = keyV(T);    
+            }
 
             // Random keys
             key temp;
@@ -94,21 +97,24 @@ class test_triptych
             }
 
             // Outputs
-            key b_sum = zero();
-            key t_sum = zero();
-            for (size_t j = 0; j < T-1; j++)
+            if (!skip_balance_ckeck)
             {
-                b[j] = skGen(); // Q[j] = Com(b[j],t[j])
-                t[j] = skGen();
-                addKeys2(Q[j],t[j],b[j],H);
+                key b_sum = zero();
+                key t_sum = zero();
+                for (size_t j = 0; j < T-1; j++)
+                {
+                    b[j] = skGen(); // Q[j] = Com(b[j],t[j])
+                    t[j] = skGen();
+                    addKeys2(Q[j],t[j],b[j],H);
 
-                sc_add(b_sum.bytes,b_sum.bytes,b[j].bytes);
-                sc_add(t_sum.bytes,t_sum.bytes,t[j].bytes);
+                    sc_add(b_sum.bytes,b_sum.bytes,b[j].bytes);
+                    sc_add(t_sum.bytes,t_sum.bytes,t[j].bytes);
+                }
+                // Value/mask balance for Q[T-1]
+                sc_sub(b[T-1].bytes,a_sum.bytes,b_sum.bytes);
+                sc_sub(t[T-1].bytes,s1_sum.bytes,t_sum.bytes);
+                addKeys2(Q[T-1],t[T-1],b[T-1],H);
             }
-            // Value/mask balance for Q[T-1]
-            sc_sub(b[T-1].bytes,a_sum.bytes,b_sum.bytes);
-            sc_sub(t[T-1].bytes,s1_sum.bytes,t_sum.bytes);
-            addKeys2(Q[T-1],t[T-1],b[T-1],H);
 
             // Build proofs
             p.reserve(w);
@@ -137,24 +143,27 @@ class test_triptych
             }
 
             // Check balance
-            std::vector<MultiexpData> balance;
-            balance.reserve(w + T);
-            balance.resize(0);
-            key ZERO = zero();
-            key ONE = identity();
-            key MINUS_ONE;
-            sc_sub(MINUS_ONE.bytes,ZERO.bytes,ONE.bytes);
-            for (size_t u = 0; u < w; u++)
+            if (!skip_balance_ckeck)
             {
-                balance.push_back({ONE,C_offsets[u]});
-            }
-            for (size_t j = 0; j < T; j++)
-            {
-                balance.push_back({MINUS_ONE,Q[j]});
-            }
-            if (!(straus(balance) == ONE)) // group identity
-            {
-                return false;
+                std::vector<MultiexpData> balance;
+                balance.reserve(w + T);
+                balance.resize(0);
+                key ZERO = zero();
+                key ONE = identity();
+                key MINUS_ONE;
+                sc_sub(MINUS_ONE.bytes,ZERO.bytes,ONE.bytes);
+                for (size_t u = 0; u < w; u++)
+                {
+                    balance.push_back({ONE,C_offsets[u]});
+                }
+                for (size_t j = 0; j < T; j++)
+                {
+                    balance.push_back({MINUS_ONE,Q[j]});
+                }
+                if (!(straus(balance) == ONE)) // group identity
+                {
+                    return false;
+                }
             }
 
             return true;
