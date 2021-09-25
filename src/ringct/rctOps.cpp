@@ -539,7 +539,7 @@ namespace rct {
       CHECK_AND_ASSERT_THROW_MES_L1(pubkeys.size() == privkeys.size(), "Input vectors don't match!");
       if (pubkeys.empty())
       {
-        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&result, rct::identity().bytes), "ge_frombytes_vartime failed at "+boost::lexical_cast<std::string>(__LINE__));
+        result = ge_p3_identity;
         return;
       }
 
