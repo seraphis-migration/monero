@@ -87,6 +87,14 @@ struct ConciseGrootleProof
     rct::key zA, zC, z;
 };
 
+/// Generate a Grootle proof
+GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
+    const std::size_t l,        // secret index into {{M}}
+    const rct::keyV &C_offsets,  // offsets for commitment to zero at index l
+    const rct::keyV &privkeys,  // privkeys of commitments to zero in 'M[l] - C_offsets'
+    const std::size_t n,        // decomp input set: n^m
+    const std::size_t m,
+    const rct::key &message)    // message to insert in Fiat-Shamir transform hash
 
 /// create a concise grootle proof
 ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
@@ -97,7 +105,16 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     const std::size_t m,
     const rct::key &message);    // message to insert in Fiat-Shamir transform hash
 
-/// verify a set of concise grootle proofs that share a reference set
+/// Verify a batch of Grootle proofs with common input keys
+bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
+    const rct::keyM &M,
+    const std::vector<rct::keyV> &proof_offsets,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::keyV &messages,
+    const std::size_t small_weighting_size)
+
+/// verify a batch of concise grootle proofs that share a reference set
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
     const rct::keyM &M,   //shared
     const std::vector<rct::keyV> &proof_offsets, //per-proof
