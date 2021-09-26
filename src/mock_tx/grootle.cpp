@@ -562,7 +562,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
         }
         multiExp_ge_p3(M_agg_temp, M[k], sw);
 
-        //data[m*n + (1 + k)] = {ZERO, rct::straus_ge_p3(Magg_data)};
+        //data[m*n + (1 + k)] = {ZERO, rct::straus_p3(Magg_data)};
         data[m*n + (1 + k)] = {ZERO, M_agg_temp};
     }
 
@@ -785,7 +785,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 
 
     /// Verify all elements sum to zero
-    ge_p3 result = rct::pippenger_ge_p3(data, cache, m*n, rct::get_pippenger_c(data.size()));
+    ge_p3 result = rct::pippenger_p3(data, cache, m*n, rct::get_pippenger_c(data.size()));
     if (ge_p3_is_point_at_infinity(&result) == 0)
     {
         MERROR("Grootle proof: verification failed!");
