@@ -815,7 +815,7 @@ namespace rct
 
         // Final check
         CHECK_AND_ASSERT_THROW_MES(data.size() == (m*n + 1) + (2*N + 2) + N_proofs*(2*m + 7), "Final proof data is incorrect size!");
-        ge_p3 result = pippenger_ge_p3(data,cache,m*n,get_pippenger_c(data.size()));
+        ge_p3 result = pippenger_p3(data,cache,m*n,get_pippenger_c(data.size()));
         if (ge_p3_is_point_at_infinity(&result) == 0)
         {
             MERROR("Triptych verification failed!");

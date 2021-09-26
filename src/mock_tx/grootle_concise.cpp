@@ -750,7 +750,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
 
     /// Verify all elements sum to zero
-    ge_p3 result = rct::pippenger_ge_p3(data, cache, m*n, rct::get_pippenger_c(data.size()));
+    ge_p3 result = rct::pippenger_p3(data, cache, m*n, rct::get_pippenger_c(data.size()));
     if (ge_p3_is_point_at_infinity(&result) == 0)
     {
         MERROR("Concise Grootle proof: verification failed!");
