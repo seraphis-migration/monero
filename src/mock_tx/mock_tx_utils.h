@@ -65,6 +65,8 @@ namespace mock_tx
 * param: ref_set_decomp_n -
 * param: ref_set_decomp_m -
 * return: n^m
+* 
+* note: use this instead of std::pow() for better control over error states
 */
 std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const std::size_t ref_set_decomp_m);
 /**

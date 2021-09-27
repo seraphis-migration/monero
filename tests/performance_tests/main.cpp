@@ -178,9 +178,12 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE5(filter, p, test_triptych, 3, 4, 1, 2, true);
   TEST_PERFORMANCE5(filter, p, test_triptych, 3, 5, 1, 2, true);
 
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 3, 2, 1, 1, 4);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 1, 1, 4);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 1, 1, 16);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 4, 2, 2, 1, 4);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 4, 2, 2, 1, 16);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 4, 2, 2, 1, 32);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 5, 2, 2, 1, 4);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 4);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 7, 2, 2, 1, 4);
@@ -190,6 +193,7 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE6(filter, p, test_grootle, 3, 4, 2, 2, 1, 4);
   TEST_PERFORMANCE6(filter, p, test_grootle, 3, 5, 2, 2, 1, 4);
 
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 3, 2, 1, 1);
   TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 6, 2, 1, 1);
   TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 4, 2, 2, 1);
   TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 5, 2, 2, 1);

@@ -81,6 +81,7 @@ set(unit_tests_sources
   rolling_median.cpp
   scaling_2021.cpp
   serialization.cpp
+  seraphis.cpp
   sha256.cpp
   slow_memmem.cpp
   subaddress.cpp
