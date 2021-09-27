@@ -80,6 +80,7 @@ set(unit_tests_sources
   random.cpp
   rolling_median.cpp
   serialization.cpp
+  seraphis.cpp
   sha256.cpp
   slow_memmem.cpp
   subaddress.cpp

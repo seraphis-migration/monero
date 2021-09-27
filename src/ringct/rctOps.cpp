@@ -529,44 +529,6 @@ namespace rct {
         ge_tobytes(aAbBcC.bytes, &rv);
     }
 
-    // multiExp_ge_p3
-    // computes aA + bB + ... + pP
-    void multiExp_ge_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &privkeys) {
-      ge_p3 temp_pP, temp_ge_p3;
-      ge_cached temp_cache;
-      ge_p1p1 temp_p1p1;
-
-      CHECK_AND_ASSERT_THROW_MES_L1(pubkeys.size() == privkeys.size(), "Input vectors don't match!");
-      if (pubkeys.empty())
-      {
-        result = ge_p3_identity;
-        return;
-      }
-
-      for (std::size_t i = 0; i < pubkeys.size(); ++i)
-      {
-        // p*P
-        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&temp_ge_p3, pubkeys[i].bytes) == 0, "ge_frombytes_vartime failed at "+boost::lexical_cast<std::string>(__LINE__));
-
-        if (privkeys[i].bytes[0] == 1 && privkeys[i] == rct::identity())  // short-circuit if first byte != 1
-          temp_pP = temp_ge_p3;  // 1*P
-        else
-          ge_scalarmult_p3(&temp_pP, privkeys[i].bytes, &temp_ge_p3);  // p*P
-
-        if (i > 0)
-        {
-          // P[i-1] + P[i]
-          ge_p3_to_cached(&temp_cache, &temp_pP);
-          ge_add(&temp_p1p1, &result, &temp_cache);   // P[i-1] + P[i]
-          ge_p1p1_to_p3(&result, &temp_p1p1);
-        }
-        else
-        {
-          result = temp_pP;
-        }
-      }
-    }
-
     //subtract Keys (subtracts curve points)
     //AB = A - B where A, B are curve points
     void subKeys(key & AB, const key &A, const key &B) {

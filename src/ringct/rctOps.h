@@ -149,10 +149,6 @@ namespace rct {
     void addKeys_aGbBcC(key &aGbBcC, const key &a, const key &b, const ge_dsmp B, const key &c, const ge_dsmp C);
     void addKeys_aAbBcC(key &aAbBcC, const key &a, const ge_dsmp A, const key &b, const ge_dsmp B, const key &c, const ge_dsmp C);
 
-    //aA + bB + ... + pP
-    // optimization: checks if a privkey == 1 if 'has_mul1_terms' is set
-    void multiExp_ge_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &privkeys);
-
     //AB = A - B where A, B are curve points
     void subKeys(key &AB, const key &A, const  key &B);
     //checks if A, B are equal as curve points

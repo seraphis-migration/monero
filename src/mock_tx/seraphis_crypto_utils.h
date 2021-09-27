@@ -115,4 +115,10 @@ rct::keyV powers_of_key(const rct::key &key, const std::size_t num_pows, const b
 ///
 rct::key small_scalar_gen(const std::size_t size_bytes);
 
+////
+// aA + bB + ... + pP
+// optimization: if a privkey == 1, skips the scalar mul operation
+///
+void multiExp_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &privkeys);
+
 } //namespace sp
