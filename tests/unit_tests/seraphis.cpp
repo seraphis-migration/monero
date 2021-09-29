@@ -38,7 +38,7 @@ extern "C"
 #include "gtest/gtest.h"
 
 
-TEST(seraphis, multiexp_p3)
+TEST(seraphis, multi_exp_p3)
 {
     ge_p3 test;
     rct::key test_key;
@@ -64,7 +64,7 @@ TEST(seraphis, multiexp_p3)
             rct::addKeys(check, check, temp);
         }
 
-        sp::multiExp_p3(test, pubkeys, privkeys);
+        sp::multi_exp_p3(test, pubkeys, privkeys);
         ge_p3_tobytes(test_key.bytes, &test);
 
         EXPECT_TRUE(test_key == check);
@@ -93,7 +93,7 @@ TEST(seraphis, multiexp_p3)
             rct::addKeys(check, check, temp);
         }
 
-        sp::multiExp_p3(test, pubkeys, privkeys);
+        sp::multi_exp_p3(test, pubkeys, privkeys);
         ge_p3_tobytes(test_key.bytes, &test);
 
         EXPECT_TRUE(test_key == check);

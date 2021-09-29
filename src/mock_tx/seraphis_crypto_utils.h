@@ -104,9 +104,9 @@ rct::key delta(const std::size_t x, const std::size_t y);
 rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m);
 
 ////
-// return: (negate ? -1 : 1)*([key^0], [key^1], ..., [key^{num_pows - 1}])
+// return: (negate ? -1 : 1)*([scalar^0], [scalar^1], ..., [scalar^{num_pows - 1}])
 ///
-rct::keyV powers_of_key(const rct::key &key, const std::size_t num_pows, const bool negate_all = false);
+rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows, const bool negate_all = false);
 
 ////
 // Generate a curve scalar of arbitrary size (in bytes).
@@ -119,6 +119,6 @@ rct::key small_scalar_gen(const std::size_t size_bytes);
 // aA + bB + ... + pP
 // optimization: if a privkey == 1, skips the scalar mul operation
 ///
-void multiExp_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &privkeys);
+void multi_exp_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &privkeys);
 
 } //namespace sp

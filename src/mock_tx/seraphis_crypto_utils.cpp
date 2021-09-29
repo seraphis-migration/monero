@@ -329,9 +329,9 @@ rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m)
 }
 
 ////
-// return: (negate ? -1 : 1)*([key^0], [key^1], ..., [key^{num_pows - 1}])
+// return: (negate ? -1 : 1)*([scalar^0], [scalar^1], ..., [scalar^{num_pows - 1}])
 ///
-rct::keyV powers_of_key(const rct::key &key, const std::size_t num_pows, const bool negate_all)
+rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows, const bool negate_all)
 {
     if (num_pows == 0)
         return rct::keyV{};
@@ -346,7 +346,7 @@ rct::keyV powers_of_key(const rct::key &key, const std::size_t num_pows, const b
 
     for (std::size_t i = 1; i < num_pows; ++i)
     {
-        sc_mul(pows[i].bytes, pows[i - 1].bytes, key.bytes);
+        sc_mul(pows[i].bytes, pows[i - 1].bytes, scalar.bytes);
     }
 
     return pows;
@@ -377,7 +377,7 @@ rct::key small_scalar_gen(const std::size_t size_bytes)
 // multiExp_p3
 // computes aA + bB + ... + pP
 ///
-void multiExp_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &privkeys)
+void multi_exp_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &privkeys)
 {
     ge_p3 temp_pP, temp_ge_p3;
     ge_cached temp_cache;
