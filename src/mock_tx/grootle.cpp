@@ -383,7 +383,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     const rct::key xi{compute_challenge(message, M, C_offsets, proof.A, proof.B, proof.C, proof.D, proof.X)};
 
     // xi^j: challenge powers
-    rct::keyV xi_pow = powers_of_key(xi, m + 1);
+    rct::keyV xi_pow = powers_of_scalar(xi, m + 1);
 
 
     /// grootle proof final components/responses
@@ -560,7 +560,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
         {
             //Magg_data[alpha] = {sw[alpha], M[k][alpha]};
         }
-        multiExp_p3(M_agg_temp, M[k], sw);
+        multi_exp_p3(M_agg_temp, M[k], sw);
 
         //data[m*n + (1 + k)] = {ZERO, rct::straus_p3(Magg_data)};
         data[m*n + (1 + k)] = {ZERO, M_agg_temp};
@@ -614,7 +614,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
             };
 
         // Challenge powers (negated)
-        rct::keyV minus_xi_pow = powers_of_key(xi, m, true);
+        rct::keyV minus_xi_pow = powers_of_scalar(xi, m, true);
 
         // Recover proof elements
         ge_p3 A_p3;

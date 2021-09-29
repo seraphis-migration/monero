@@ -354,7 +354,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
         };
 
     // mu^alpha: concise prefix powers
-    rct::keyV mu_pow = powers_of_key(mu, num_keys);
+    rct::keyV mu_pow = powers_of_scalar(mu, num_keys);
 
     // {X}: 'encodings' of [p] (i.e. of the real signing index 'l' in the referenced tuple set)
     proof.X = rct::keyV(m);
@@ -378,7 +378,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
 
         // X[j] += rho[j]*G
         // note: addKeys1(X, rho, P) -> X = rho*G + P
-        addKeys1(proof.X[j], rho[j], rct::straus(data_X));
+        rct::addKeys1(proof.X[j], rho[j], rct::straus(data_X));
         CHECK_AND_ASSERT_THROW_MES(!(proof.X[j] == IDENTITY), "Proof coefficient element should not be zero!");
     }
 
@@ -396,7 +396,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     const rct::key xi{compute_challenge(mu, proof.X)};
 
     // xi^j: challenge powers
-    rct::keyV xi_pow = powers_of_key(xi, m + 1);
+    rct::keyV xi_pow = powers_of_scalar(xi, m + 1);
 
 
     /// concise grootle proof final components/responses
@@ -578,10 +578,10 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         const rct::key xi{compute_challenge(mu, proof.X)};
 
         // Prefix powers
-        rct::keyV mu_pow = powers_of_key(mu, num_keys);
+        rct::keyV mu_pow = powers_of_scalar(mu, num_keys);
 
         // Challenge powers (negated)
-        rct::keyV minus_xi_pow = powers_of_key(xi, m, true);
+        rct::keyV minus_xi_pow = powers_of_scalar(xi, m, true);
 
         // Recover proof elements
         ge_p3 A_p3;
