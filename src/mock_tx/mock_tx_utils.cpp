@@ -46,7 +46,7 @@
 
 namespace mock_tx
 {
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const std::size_t ref_set_decomp_m)
 {
     // ref set size = n^m
@@ -67,7 +67,7 @@ std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const s
 
     return ref_set_size;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t compute_rangeproof_grouping_size(const std::size_t num_amounts, const std::size_t max_num_splits)
 {
     // if there are 'n' amounts, split them into power-of-2 groups up to 'max num splits' times
@@ -109,13 +109,13 @@ std::size_t compute_rangeproof_grouping_size(const std::size_t num_amounts, cons
 
     return split_size;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2)
 {
     // balance check method chosen from perf test: tests/performance_tests/balance_check.h
     return rct::equalKeys(rct::addKeys(commitment_set1), rct::addKeys(commitment_set2));
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
     const std::size_t max_rangeproof_splits,
@@ -159,7 +159,7 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
             rct::bulletproof_plus_PROVE(amounts_group, amount_commitment_blinding_factors_group));
     }
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool balance_check_in_out_amnts(const std::vector<rct::xmr_amount> &input_amounts,
     const std::vector<rct::xmr_amount> &output_amounts)
 {
@@ -175,5 +175,5 @@ bool balance_check_in_out_amnts(const std::vector<rct::xmr_amount> &input_amount
 
     return input_sum == output_sum;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx

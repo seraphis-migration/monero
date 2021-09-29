@@ -26,6 +26,8 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// NOT FOR PRODUCTION
+
 //paired header
 #include "seraphis_crypto_utils.h"
 
@@ -77,10 +79,10 @@ static const rct::key MINUS_ONE = { {0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0
 static boost::mutex init_mutex;
 
 
-////
+//-------------------------------------------------------------------------------------------------------------------
 // Helper function for scalar inversion
 // return: x*(y^2^n)
-///
+//-------------------------------------------------------------------------------------------------------------------
 static rct::key sm(rct::key y, int n, const rct::key &x)
 {
     while (n--)
@@ -88,11 +90,7 @@ static rct::key sm(rct::key y, int n, const rct::key &x)
     sc_mul(y.bytes, y.bytes, x.bytes);
     return y;
 }
-
-////
-// Invert a nonzero scalar
-// return: (1/x) mod l
-///
+//-------------------------------------------------------------------------------------------------------------------
 rct::key invert(const rct::key &x)
 {
     CHECK_AND_ASSERT_THROW_MES(!(x == ZERO), "Cannot invert zero!");
@@ -147,9 +145,10 @@ rct::key invert(const rct::key &x)
 
     return inv;
 }
-
-/// Make generators, but only once
-void init_sp_gens()
+//-------------------------------------------------------------------------------------------------------------------
+// Make generators, but only once
+//-------------------------------------------------------------------------------------------------------------------
+static void init_sp_gens()
 {
     boost::lock_guard<boost::mutex> lock(init_mutex);
 
@@ -185,50 +184,56 @@ void init_sp_gens()
 
     init_done = true;
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 ge_p3 get_grootle_Hi_p3_gen(const std::size_t i)
 {
     init_sp_gens();
 
     return grootle_Hi_p3[i];
 }
+//-------------------------------------------------------------------------------------------------------------------
 ge_p3 get_G_p3_gen()
 {
     init_sp_gens();
 
     return G_p3;
 }
+//-------------------------------------------------------------------------------------------------------------------
 ge_p3 get_H_p3_gen()
 {
     init_sp_gens();
 
     return H_p3;
 }
+//-------------------------------------------------------------------------------------------------------------------
 ge_p3 get_U_p3_gen()
 {
     init_sp_gens();
 
     return U_p3;
 }
+//-------------------------------------------------------------------------------------------------------------------
 ge_p3 get_X_p3_gen()
 {
     init_sp_gens();
 
     return X_p3;
 }
+//-------------------------------------------------------------------------------------------------------------------
 rct::key get_U_gen()
 {
     init_sp_gens();
 
     return U;
 }
+//-------------------------------------------------------------------------------------------------------------------
 rct::key get_X_gen()
 {
     init_sp_gens();
 
     return X;
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 std::shared_ptr<rct::pippenger_cached_data> get_grootle_Hi_pippinger_cache_init()
 {
     init_sp_gens();
@@ -244,55 +249,41 @@ std::shared_ptr<rct::pippenger_cached_data> get_grootle_Hi_pippinger_cache_init(
     // initialize multiexponentiation cache
     return rct::pippenger_init_cache(data, 0, 0);
 }
-
-////
-// Decompose an integer with a fixed base and size
-// val -> [_, _, ... ,_]
-// - num slots = 'size'
-// - numeric base = 'base'
-// e.g. if base = 2 then convert val to binary, if base = 10 then put its decimal digits into the return vector
-// r = decomposed val (little endian)
-///
-void decompose(std::vector<std::size_t> &r, const std::size_t val, const std::size_t base, const std::size_t size)
+//-------------------------------------------------------------------------------------------------------------------
+void decompose(const std::size_t val, const std::size_t base, const std::size_t size, std::vector<std::size_t> &r_out)
 {
     CHECK_AND_ASSERT_THROW_MES(base > 1, "Bad decomposition parameters!");
     CHECK_AND_ASSERT_THROW_MES(size > 0, "Bad decomposition parameters!");
-    CHECK_AND_ASSERT_THROW_MES(r.size() >= size, "Bad decomposition result vector size!");
+    CHECK_AND_ASSERT_THROW_MES(r_out.size() >= size, "Bad decomposition result vector size!");
 
     std::size_t temp = val;
 
     for (std::size_t i = 0; i < size; ++i)
     {
         std::size_t slot = std::pow(base, size - i - 1);
-        r[size - i - 1] = temp/slot;
-        temp -= slot*r[size - i - 1];
+        r_out[size - i - 1] = temp/slot;
+        temp -= slot*r_out[size - i - 1];
     }
 }
-
-////
-// Commit to a scalar matrix
-// vector commitment for values a_{1,1}, ..., a_{1,n} ..., a_{m,n} and blinding factor x
-// C = x G + a_{1,1} H_{1,1} + a_{1,2} H_{1,2} + ... + a_{m,n} H_{m,n}
-///
-void com_matrix(std::vector<rct::MultiexpData> &data, const rct::keyM &M, const rct::key &x)
+//-------------------------------------------------------------------------------------------------------------------
+void com_matrix(const rct::keyM &M_priv, const rct::key &x, std::vector<rct::MultiexpData> &data_out)
 {
-    const std::size_t m = M.size();
+    const std::size_t m = M_priv.size();
     CHECK_AND_ASSERT_THROW_MES(m > 0, "Bad matrix size!");
-    const std::size_t n = M[0].size();
+    const std::size_t n = M_priv[0].size();
     CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "Bad matrix commitment parameters!");
-    CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Bad matrix commitment result vector size!");
+    CHECK_AND_ASSERT_THROW_MES(data_out.size() == m*n + 1, "Bad matrix commitment result vector size!");
 
     for (std::size_t j = 0; j < m; ++j)
     {
         for (std::size_t i = 0; i < n; ++i)
         {
-            data[j*n + i] = {M[j][i], grootle_Hi_p3[j*n + i]};
+            data_out[j*n + i] = {M_priv[j][i], grootle_Hi_p3[j*n + i]};
         }
     }
-    data[m*n] = {x, G_p3}; // mask
+    data_out[m*n] = {x, G_p3}; // mask
 }
-
-/// Kronecker delta
+//-------------------------------------------------------------------------------------------------------------------
 rct::key delta(const std::size_t x, const std::size_t y)
 {
     if (x == y)
@@ -300,13 +291,7 @@ rct::key delta(const std::size_t x, const std::size_t y)
     else
         return ZERO;
 }
-
-////
-// Compute a convolution with a degree-one polynomial
-// x: x_1, x_2, ..., x_m
-// y: a, b
-// return: [a*x_1], [b*x_1 + a*x_2], ..., [b*x_{m - 2} + a*x_{m - 1}], [b*x_m]
-///
+//-------------------------------------------------------------------------------------------------------------------
 rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m)
 {
     CHECK_AND_ASSERT_THROW_MES(x.size() >= m, "Bad convolution parameters!");
@@ -327,10 +312,7 @@ rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m)
 
     return result;
 }
-
-////
-// return: (negate ? -1 : 1)*([scalar^0], [scalar^1], ..., [scalar^{num_pows - 1}])
-///
+//-------------------------------------------------------------------------------------------------------------------
 rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows, const bool negate_all)
 {
     if (num_pows == 0)
@@ -351,12 +333,9 @@ rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows, c
 
     return pows;
 }
-
-////
-// Generate a curve scalar of arbitrary size (in bytes).
-//
+//-------------------------------------------------------------------------------------------------------------------
 // WARNING: NOT FOR USE WITH CRYPTOGRAPHIC SECRETS
-///
+//-------------------------------------------------------------------------------------------------------------------
 rct::key small_scalar_gen(const std::size_t size_bytes)
 {
     if (size_bytes == 0)
@@ -372,12 +351,8 @@ rct::key small_scalar_gen(const std::size_t size_bytes)
 
     return result;
 }
-
-////
-// multiExp_p3
-// computes aA + bB + ... + pP
-///
-void multi_exp_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &privkeys)
+//-------------------------------------------------------------------------------------------------------------------
+void multi_exp_p3(const rct::keyV &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out)
 {
     ge_p3 temp_pP, temp_ge_p3;
     ge_cached temp_cache;
@@ -386,7 +361,7 @@ void multi_exp_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &priv
     CHECK_AND_ASSERT_THROW_MES_L1(pubkeys.size() == privkeys.size(), "Input vectors don't match!");
     if (pubkeys.empty())
     {
-        result = ge_p3_identity;
+        result_out = ge_p3_identity;
         return;
     }
 
@@ -405,14 +380,14 @@ void multi_exp_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &priv
         {
             // P[i-1] + P[i]
             ge_p3_to_cached(&temp_cache, &temp_pP);
-            ge_add(&temp_p1p1, &result, &temp_cache);   // P[i-1] + P[i]
-            ge_p1p1_to_p3(&result, &temp_p1p1);
+            ge_add(&temp_p1p1, &result_out, &temp_cache);   // P[i-1] + P[i]
+            ge_p1p1_to_p3(&result_out, &temp_p1p1);
         }
         else
         {
-            result = temp_pP;
+            result_out = temp_pP;
         }
     }
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

@@ -26,6 +26,8 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// NOT FOR PRODUCTION
+
 //paired header
 #include "grootle.h"
 
@@ -73,7 +75,9 @@ static std::shared_ptr<rct::pippenger_cached_data> cache;
 static boost::mutex init_mutex;
 
 
-/// Make generators, but only once
+//-------------------------------------------------------------------------------------------------------------------
+// Make generators, but only once
+//-------------------------------------------------------------------------------------------------------------------
 static void init_gens()
 {
     boost::lock_guard<boost::mutex> lock(init_mutex);
@@ -95,18 +99,18 @@ static void init_gens()
 
     init_done = true;
 }
-
-/// Initialize transcript
+//-------------------------------------------------------------------------------------------------------------------
+// Initialize transcript
+//-------------------------------------------------------------------------------------------------------------------
 static void transcript_init(rct::key &transcript)
 {
     std::string salt(config::HASH_KEY_CONCISE_GROOTLE_TRANSCRIPT);
     rct::hash_to_scalar(transcript, salt.data(), salt.size());
 }
-
-////
+//-------------------------------------------------------------------------------------------------------------------
 // Prefix for concise structure
 // mu = H(H("domain-sep"), message, {{M}}, {C_offsets}, A, B, C, D)
-///
+//-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_concise_prefix(const rct::key &message,
     const rct::keyM &M,
     const rct::keyV &C_offsets,
@@ -149,14 +153,13 @@ static rct::key compute_concise_prefix(const rct::key &message,
 
     return challenge;
 }
-
-////
+//-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge
 // c = H(message, {X})
 //
 // note: in practice, this extends the concise structure prefix (i.e. message = mu)
 // note2: in Triptych notation, c == xi
-///
+//-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
 {
     rct::key challenge;
@@ -174,8 +177,7 @@ static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
 
     return challenge;
 }
-
-/// Generate a concise Grootle proof
+//-------------------------------------------------------------------------------------------------------------------
 ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     const std::size_t l,        // secret index into {{M}}
     const rct::keyV &C_offsets,  // offsets for commitment to zero at index l
@@ -244,7 +246,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
             sc_sub(a[j][0].bytes, a[j][0].bytes, a[j][i].bytes);
         }
     }
-    com_matrix(data, a, rA);
+    com_matrix(a, rA, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.A = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.A == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -252,7 +254,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     // B: commit to decomposition bits
     std::vector<std::size_t> decomp_l;
     decomp_l.resize(m);
-    decompose(decomp_l, l, n, m);
+    decompose(l, n, m, decomp_l);
 
     rct::keyM sigma = rct::keyMInit(n, m);
     CHECK_AND_ASSERT_THROW_MES(sigma.size() == m, "Bad matrix size!");
@@ -264,7 +266,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
             sigma[j][i] = delta(decomp_l[j], i);
         }
     }
-    com_matrix(data, sigma, rB);
+    com_matrix(sigma, rB, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.B = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.B == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -282,7 +284,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
             sc_mul(a_sigma[j][i].bytes, a_sigma[j][i].bytes, a[j][i].bytes);
         }
     }
-    com_matrix(data, a_sigma, rC);
+    com_matrix(a_sigma, rC, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.C = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.C == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -297,7 +299,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
             sc_mul(a_sq[j][i].bytes, MINUS_ONE.bytes, a_sq[j][i].bytes);
         }
     }
-    com_matrix(data, a_sq, rD);
+    com_matrix(a_sq, rD, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.D = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.D == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -317,7 +319,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     {
         std::vector<std::size_t> decomp_k;
         decomp_k.resize(m);
-        decompose(decomp_k, k, n, m);
+        decompose(k, n, m, decomp_k);
 
         for (std::size_t j = 0; j < m+1; ++j)
         {
@@ -450,8 +452,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
 
     return proof;
 }
-
-/// Verify a batch of concise Grootle proofs with common input keys
+//-------------------------------------------------------------------------------------------------------------------
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
     const rct::keyM &M,
     const std::vector<rct::keyV> &proof_offsets,
@@ -684,7 +685,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
             t_k = ONE;
             std::vector<std::size_t> decomp_k;
             decomp_k.resize(m);
-            decompose(decomp_k, k, n, m);
+            decompose(k, n, m, decomp_k);
 
             for (std::size_t j = 0; j < m; ++j)
             {
@@ -759,5 +760,5 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
     return true;
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp
