@@ -29,10 +29,9 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_rct_base.h"
+#include "seraphis_composition_proof.h"
 
 //local headers
-#include "crypto/crypto.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -43,42 +42,52 @@
 #include <vector>
 
 
-namespace mock_tx
+namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void MockENoteRct::make_base(const crypto::secret_key &onetime_privkey,
-    const crypto::secret_key &amount_blinding_factor,
-    const rct::xmr_amount amount)
+SpCompositionProof sp_composition_prove(const rct::keyV &K,
+    const rct::keyV &x,
+    const rct::keyV &y,
+    const rct::keyV &z,
+    const rct::key &message)
 {
-    // Ko = ko G
-    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(onetime_privkey, m_onetime_address),
-        "Failed to derive public key");
 
-    // C = x G + a H
-    m_amount_commitment = rct::rct2pk(rct::commit(amount, rct::sk2rct(amount_blinding_factor)));
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockENoteRct::gen_base()
+bool sp_composition_verify(const SpCompositionProof &proof,
+    const rct::keyV &K,
+    const rct::keyV &KI,
+    const rct::key &message)
 {
-    // all random
-    m_onetime_address = rct::rct2pk(rct::pkGen());
-    m_amount_commitment = rct::rct2pk(rct::pkGen());
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockDestRct::gen_base(const rct::xmr_amount amount)
-{
-    // all random except amount
-    m_onetime_address = rct::rct2pk(rct::pkGen());
-    m_amount_blinding_factor = rct::rct2sk(rct::skGen());
-    m_amount = amount;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockDestRct::to_enote_rct_base(MockENoteRct &enote_inout) const
-{
-    enote_inout.m_onetime_address = m_onetime_address;
 
-    // C = x G + a H
-    enote_inout.m_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(m_amount_blinding_factor)));
 }
 //-------------------------------------------------------------------------------------------------------------------
-} //namespace mock_tx
+SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::keyV &KI,
+    const rct::keyV &K,
+    const rct::key &message)
+{
+
+}
+//-------------------------------------------------------------------------------------------------------------------
+SpCompositionProofMultisigPrep sp_composition_multisig_init()
+{
+
+}
+//-------------------------------------------------------------------------------------------------------------------
+SpCompositionProofMultisigPartial sp_composition_multisig_response(const SpCompositionProofMultisigProposal &proposal,
+    const rct::keyV &x,
+    const rct::keyV &y,
+    const rct::keyV &z_e,
+    const rct::keyV &signer_openings,
+    const rct::key &local_opening_priv,
+    const rct::key &message)
+{
+
+}
+//-------------------------------------------------------------------------------------------------------------------
+SpCompositionProof sp_composition_prove_multisig_final(const std::vector<SpCompositionProofMultisigPartial> &partial_sigs)
+{
+
+}
+//-------------------------------------------------------------------------------------------------------------------
+} //namespace sp

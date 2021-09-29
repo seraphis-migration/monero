@@ -26,6 +26,8 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// NOT FOR PRODUCTION
+
 ////
 // Grootle proof: Groth/Bootle parallel one-of-many proof of commitments
 // - given a set of equal-sized tuples of EC points S
@@ -68,7 +70,13 @@ namespace sp
 constexpr std::size_t GROOTLE_MAX_MN{128};
 
 
-/// Grootle proof
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////// Types ////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////
+// Grootle proof
+///
 struct GrootleProof
 {
     rct::key A, B, C, D;
@@ -78,7 +86,9 @@ struct GrootleProof
     rct::keyV z;
 };
 
-/// concise Grootle proof (using the concise approach described in Triptych)
+////
+// concise Grootle proof (using the concise approach described in Triptych)
+///
 struct ConciseGrootleProof
 {
     rct::key A, B, C, D;
@@ -87,25 +97,59 @@ struct ConciseGrootleProof
     rct::key zA, zC, z;
 };
 
-/// Generate a Grootle proof
-GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
-    const std::size_t l,        // secret index into {{M}}
-    const rct::keyV &C_offsets,  // offsets for commitment to zero at index l
-    const rct::keyV &privkeys,  // privkeys of commitments to zero in 'M[l] - C_offsets'
-    const std::size_t n,        // decomp input set: n^m
-    const std::size_t m,
-    const rct::key &message);    // message to insert in Fiat-Shamir transform hash
 
-/// create a concise grootle proof
-ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
-    const std::size_t l,        // secret index into {{M}}
-    const rct::keyV &C_offsets,  // offsets for commitment to zero at index l
-    const rct::keyV &privkeys,  // privkeys of commitments to zero in 'M[l] - C_offsets'
-    const std::size_t n,        // decomp input set: n^m
-    const std::size_t m,
-    const rct::key &message);    // message to insert in Fiat-Shamir transform hash
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////// Handle Proofs /////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Verify a batch of Grootle proofs with common input keys
+/**
+* brief: grootle_prove - create a Grootle proof
+* param: M - [vec<tuple of commitments>]
+* param: l - secret index into {{M}}
+* param: C_offsets - offsets for commitment to zero at index l
+* param: privkeys - privkeys of commitments to zero in 'M[l] - C_offsets'
+* param: n - decomp input set: n^m
+* param: m - ...
+* param: message - message to insert in Fiat-Shamir transform hash
+* return: Grootle proof
+*/
+GrootleProof grootle_prove(const rct::keyM &M,
+    const std::size_t l,
+    const rct::keyV &C_offsets,
+    const rct::keyV &privkeys,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::key &message);
+/**
+* brief: concise_grootle_prove - create a concise grootle proof
+* param: M - [vec<tuple of commitments>]
+* param: l - secret index into {{M}}
+* param: C_offsets - offsets for commitment to zero at index l
+* param: privkeys - privkeys of commitments to zero in 'M[l] - C_offsets'
+* param: n - decomp input set: n^m
+* param: m - ...
+* param: message - message to insert in Fiat-Shamir transform hash
+* return: Grootle proof
+*/
+ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
+    const std::size_t l,
+    const rct::keyV &C_offsets,
+    const rct::keyV &privkeys,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::key &message);
+/**
+* brief: grootle_verify - verify a batch of Grootle proofs with common input keys
+* param: proofs - batch of proofs to verify
+* param: M - (shared) [vec<tuple of commitments>]
+* param: proof_offsets - (per-proof) offsets for commitments to zero at unknown indices in each proof
+* param: n - decomp input set: n^m
+* param: m - ...
+* param: message - (per-proof) message to insert in Fiat-Shamir transform hash
+* param: small_weighting_size - size of weighting factor for small-scalar optimization
+*   (combining elements across proofs for multiexp)
+* return: true/false on verification result
+*/
 bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const rct::keyM &M,
     const std::vector<rct::keyV> &proof_offsets,
@@ -113,13 +157,21 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const std::size_t m,
     const rct::keyV &messages,
     const std::size_t small_weighting_size);
-
-/// verify a batch of concise grootle proofs that share a reference set
+/**
+* brief: concise_grootle_verify - verify a batch of concise grootle proofs that share a reference set
+* param: proofs - batch of proofs to verify
+* param: M - (shared) [vec<tuple of commitments>]
+* param: proof_offsets - (per-proof) offsets for commitments to zero at unknown indices in each proof
+* param: n - decomp input set: n^m
+* param: m - ...
+* param: message - (per-proof) message to insert in Fiat-Shamir transform hash
+* return: true/false on verification result
+*/
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
-    const rct::keyM &M,   //shared
-    const std::vector<rct::keyV> &proof_offsets, //per-proof
+    const rct::keyM &M,
+    const std::vector<rct::keyV> &proof_offsets,
     const std::size_t n,
     const std::size_t m,
-    const rct::keyV &messages); //per-proof
+    const rct::keyV &messages);
 
 } //namespace sp

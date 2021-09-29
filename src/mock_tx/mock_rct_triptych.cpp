@@ -49,7 +49,7 @@
 
 namespace mock_tx
 {
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool MockTxTriptych::validate_tx_semantics() const
 {
     // validate component counts (num inputs/outputs/etc.)
@@ -77,7 +77,7 @@ bool MockTxTriptych::validate_tx_semantics() const
 
     return true;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool MockTxTriptych::validate_tx_linking_tags() const
 {
     if (!validate_mock_tx_rct_linking_tags_v2(m_tx_proofs, m_input_images))
@@ -85,7 +85,7 @@ bool MockTxTriptych::validate_tx_linking_tags() const
 
     return true;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool MockTxTriptych::validate_tx_amount_balance(const bool defer_batchable) const
 {
     if (!validate_mock_tx_rct_amount_balance_v1(m_input_images, m_outputs, m_balance_proof, defer_batchable))
@@ -93,7 +93,7 @@ bool MockTxTriptych::validate_tx_amount_balance(const bool defer_batchable) cons
 
     return true;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool MockTxTriptych::validate_tx_input_proofs(const bool defer_batchable) const
 {
     if (!validate_mock_tx_rct_proofs_v2(m_tx_proofs))
@@ -101,7 +101,7 @@ bool MockTxTriptych::validate_tx_input_proofs(const bool defer_batchable) const
 
     return true;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t MockTxTriptych::get_size_bytes() const
 {
     // doesn't include (compared to a real tx):
@@ -130,7 +130,7 @@ std::size_t MockTxTriptych::get_size_bytes() const
 
     return size;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 template <>
 std::shared_ptr<MockTxTriptych> make_mock_tx<MockTxTriptych>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
@@ -182,7 +182,7 @@ std::shared_ptr<MockTxTriptych> make_mock_tx<MockTxTriptych>(const MockTxParamPa
 
     return std::make_shared<MockTxTriptych>(input_images, outputs, balance_proof, tx_proofs);
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 template <>
 bool validate_mock_txs<MockTxTriptych>(const std::vector<std::shared_ptr<MockTxTriptych>> &txs_to_validate)
 {
@@ -214,5 +214,5 @@ bool validate_mock_txs<MockTxTriptych>(const std::vector<std::shared_ptr<MockTxT
 
     return true;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx

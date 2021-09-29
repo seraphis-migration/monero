@@ -49,7 +49,7 @@
 
 namespace mock_tx
 {
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool MockTxCLSAG::validate_tx_semantics() const
 {
     // validate component counts (num inputs/outputs/etc.)
@@ -75,7 +75,7 @@ bool MockTxCLSAG::validate_tx_semantics() const
 
     return true;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool MockTxCLSAG::validate_tx_linking_tags() const
 {
     if (!validate_mock_tx_rct_linking_tags_v1(m_tx_proofs, m_input_images))
@@ -83,7 +83,7 @@ bool MockTxCLSAG::validate_tx_linking_tags() const
 
     return true;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool MockTxCLSAG::validate_tx_amount_balance(const bool defer_batchable) const
 {
     if (!validate_mock_tx_rct_amount_balance_v1(m_input_images, m_outputs, m_balance_proof, defer_batchable))
@@ -91,7 +91,7 @@ bool MockTxCLSAG::validate_tx_amount_balance(const bool defer_batchable) const
 
     return true;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool MockTxCLSAG::validate_tx_input_proofs(const bool defer_batchable) const
 {
     if (!validate_mock_tx_rct_proofs_v1(m_tx_proofs, m_input_images))
@@ -99,7 +99,7 @@ bool MockTxCLSAG::validate_tx_input_proofs(const bool defer_batchable) const
 
     return true;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t MockTxCLSAG::get_size_bytes() const
 {
     // doesn't include (compared to a real tx):
@@ -129,7 +129,7 @@ std::size_t MockTxCLSAG::get_size_bytes() const
 
     return size;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 template <>
 std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
@@ -178,7 +178,7 @@ std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &pa
 
     return std::make_shared<MockTxCLSAG>(input_images, outputs, balance_proof, tx_proofs);
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 template <>
 bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
 {
@@ -210,5 +210,5 @@ bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSA
 
     return true;
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx

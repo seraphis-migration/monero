@@ -26,6 +26,8 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// NOT FOR PRODUCTION
+
 ////
 // Schnorr-like composition proof for a set of keys of the form K_i = x_i*G + y_i*X + z_i*U
 // - demonstrates knowledge of all x_i, y_i, z_i
@@ -55,6 +57,7 @@
 //third party headers
 
 //standard headers
+#include <vector>
 
 //forward declarations
 
@@ -186,9 +189,14 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 
 /**
 * brief: sp_composition_multisig_proposal - propose to make a multisig Seraphis composition proof
+* param: KI - key images KI
+* param: K - main proof keys K
+* param: message - message to insert in the proof's Fiat-Shamir transform hash
 * return: Seraphis composition proof multisig proposal
 */
-SpCompositionProofMultisigProposal sp_composition_multisig_proposal();
+SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::keyV &KI,
+    const rct::keyV &K,
+    const rct::key &message);
 /**
 * brief: sp_composition_multisig_init - prepare for making a multisig Seraphis composition proof
 * return: multisig participant's prep work for a Seraphis composition proof

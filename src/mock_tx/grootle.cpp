@@ -26,6 +26,8 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// NOT FOR PRODUCTION
+
 //paired header
 #include "grootle.h"
 
@@ -73,7 +75,9 @@ static std::shared_ptr<rct::pippenger_cached_data> cache;
 static boost::mutex init_mutex;
 
 
-/// Make generators, but only once
+//-------------------------------------------------------------------------------------------------------------------
+// Make generators, but only once
+//-------------------------------------------------------------------------------------------------------------------
 static void init_gens()
 {
     boost::lock_guard<boost::mutex> lock(init_mutex);
@@ -95,20 +99,20 @@ static void init_gens()
 
     init_done = true;
 }
-
-/// Initialize transcript
+//-------------------------------------------------------------------------------------------------------------------
+// Initialize transcript
+//-------------------------------------------------------------------------------------------------------------------
 static void transcript_init(rct::key &transcript)
 {
     std::string salt(config::HASH_KEY_GROOTLE_TRANSCRIPT);
     rct::hash_to_scalar(transcript, salt.data(), salt.size());
 }
-
-////
+//-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge
 // c = H(H("domain-sep"), message, {{M}}, {C_offsets}, A, B, C, D, {{X}})
 //
 // note: in Triptych notation, c == xi
-///
+//-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge(const rct::key &message,
     const rct::keyM &M,
     const rct::keyV &C_offsets,
@@ -162,8 +166,7 @@ static rct::key compute_challenge(const rct::key &message,
 
     return challenge;
 }
-
-/// Generate a Grootle proof
+//-------------------------------------------------------------------------------------------------------------------
 GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     const std::size_t l,        // secret index into {{M}}
     const rct::keyV &C_offsets,  // offsets for commitment to zero at index l
@@ -232,7 +235,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
             sc_sub(a[j][0].bytes, a[j][0].bytes, a[j][i].bytes);
         }
     }
-    com_matrix(data, a, rA);
+    com_matrix(a, rA, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.A = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.A == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -240,7 +243,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     // B: commit to decomposition bits
     std::vector<std::size_t> decomp_l;
     decomp_l.resize(m);
-    decompose(decomp_l, l, n, m);
+    decompose(l, n, m, decomp_l);
 
     rct::keyM sigma = rct::keyMInit(n, m);
     CHECK_AND_ASSERT_THROW_MES(sigma.size() == m, "Bad matrix size!");
@@ -252,7 +255,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
             sigma[j][i] = delta(decomp_l[j], i);
         }
     }
-    com_matrix(data, sigma, rB);
+    com_matrix(sigma, rB, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.B = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.B == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -270,7 +273,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
             sc_mul(a_sigma[j][i].bytes, a_sigma[j][i].bytes, a[j][i].bytes);
         }
     }
-    com_matrix(data, a_sigma, rC);
+    com_matrix(a_sigma, rC, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.C = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.C == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -285,7 +288,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
             sc_mul(a_sq[j][i].bytes, MINUS_ONE.bytes, a_sq[j][i].bytes);
         }
     }
-    com_matrix(data, a_sq, rD);
+    com_matrix(a_sq, rD, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.D = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.D == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -305,7 +308,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     {
         std::vector<std::size_t> decomp_k;
         decomp_k.resize(m);
-        decompose(decomp_k, k, n, m);
+        decompose(k, n, m, decomp_k);
 
         for (std::size_t j = 0; j < m+1; ++j)
         {
@@ -439,8 +442,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
 
     return proof;
 }
-
-/// Verify a batch of Grootle proofs with common input keys
+//-------------------------------------------------------------------------------------------------------------------
 bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const rct::keyM &M,
     const std::vector<rct::keyV> &proof_offsets,
@@ -560,7 +562,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
         {
             //Magg_data[alpha] = {sw[alpha], M[k][alpha]};
         }
-        multi_exp_p3(M_agg_temp, M[k], sw);
+        multi_exp_p3(M[k], sw, M_agg_temp);
 
         //data[m*n + (1 + k)] = {ZERO, rct::straus_p3(Magg_data)};
         data[m*n + (1 + k)] = {ZERO, M_agg_temp};
@@ -722,7 +724,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
             t_k = ONE;
             std::vector<std::size_t> decomp_k;
             decomp_k.resize(m);
-            decompose(decomp_k, k, n, m);
+            decompose(k, n, m, decomp_k);
 
             for (std::size_t j = 0; j < m; ++j)
             {
@@ -794,5 +796,5 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 
     return true;
 }
-
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

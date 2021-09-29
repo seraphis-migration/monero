@@ -64,7 +64,7 @@ TEST(seraphis, multi_exp_p3)
             rct::addKeys(check, check, temp);
         }
 
-        sp::multi_exp_p3(test, pubkeys, privkeys);
+        sp::multi_exp_p3(pubkeys, privkeys, test);
         ge_p3_tobytes(test_key.bytes, &test);
 
         EXPECT_TRUE(test_key == check);
@@ -93,7 +93,7 @@ TEST(seraphis, multi_exp_p3)
             rct::addKeys(check, check, temp);
         }
 
-        sp::multi_exp_p3(test, pubkeys, privkeys);
+        sp::multi_exp_p3(pubkeys, privkeys, test);
         ge_p3_tobytes(test_key.bytes, &test);
 
         EXPECT_TRUE(test_key == check);
