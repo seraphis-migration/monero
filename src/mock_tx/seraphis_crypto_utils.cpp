@@ -396,7 +396,7 @@ void multi_exp_p3(ge_p3 &result, const rct::keyV &pubkeys, const rct::keyV &priv
         CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&temp_ge_p3, pubkeys[i].bytes) == 0,
             "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
 
-        if (privkeys[i].bytes[0] == 1 && privkeys[i] == rct::identity())  // short-circuit if first byte != 1
+        if (privkeys[i].bytes[0] == 1 && privkeys[i] == IDENTITY)  // short-circuit if first byte != 1
             temp_pP = temp_ge_p3;  // 1*P
         else
             ge_scalarmult_p3(&temp_pP, privkeys[i].bytes, &temp_ge_p3);  // p*P
