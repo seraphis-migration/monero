@@ -58,13 +58,7 @@ namespace sp
 {
 
 /**
-* brief: invert - Invert a nonzero scalar
-* param: x - scalar to invert
-* return: (1/x) mod l
-*/
-rct::key invert(const rct::key &x);
-/**
-* brief: Get generators
+* brief: get generators
 */
 ge_p3 get_grootle_Hi_p3_gen(const std::size_t i);  // get i'th Hi generator
 ge_p3 get_G_p3_gen();
@@ -74,12 +68,18 @@ ge_p3 get_X_p3_gen();
 rct::key get_U_gen();
 rct::key get_X_gen();
 /**
+* brief: invert - invert a nonzero scalar
+* param: x - scalar to invert
+* return: (1/x) mod l
+*/
+rct::key invert(const rct::key &x);
+/**
 * brief: get_grootle_Hi_pippinger_cache_init - get initial cache for pippinger multiexp in Grootle proofs
 * return: initialized pippinger cache
 */
 std::shared_ptr<rct::pippenger_cached_data> get_grootle_Hi_pippinger_cache_init();
 /**
-* brief: invert - Decompose an integer with a fixed base and size
+* brief: invert - decompose an integer with a fixed base and size
 *   val -> [_, _, ... ,_]
 *   - num slots = 'size'
 *   - numeric base = 'base'
@@ -91,7 +91,7 @@ std::shared_ptr<rct::pippenger_cached_data> get_grootle_Hi_pippinger_cache_init(
 */
 void decompose(const std::size_t val, const std::size_t base, const std::size_t size, std::vector<std::size_t> &r_out);
 /**
-* brief: com_matrix - Commit to a scalar matrix
+* brief: com_matrix - commit to a scalar matrix
 *   vector commitment for values a_{1,1}, ..., a_{1,n} ..., a_{m,n} and blinding factor x
 *   C = x G + a_{1,1} H_{1,1} + a_{1,2} H_{1,2} + ... + a_{m,n} H_{m,n}
 * param: M_priv - matrix of private keys to commit to
@@ -107,7 +107,7 @@ void com_matrix(const rct::keyM &M_priv, const rct::key &x, std::vector<rct::Mul
 */
 rct::key delta(const std::size_t x, const std::size_t y);
 /**
-* brief: convolve - Compute a convolution with a degree-one polynomial
+* brief: convolve - compute a convolution with a degree-one polynomial
 * param: x - x_1, x_2, ..., x_m
 * param: y - a, b
 * param: m - number of elements to look at from x (only access up to x[m-1] in case x.size() > m)
@@ -130,12 +130,21 @@ rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows, c
 */
 rct::key small_scalar_gen(const std::size_t size_bytes);
 /**
+* brief: generate_proof_alpha - generate a random scalar and corresponding pubkey for use in a Schnorr-like signature opening
+* param: base - base EC pubkey for the alpha term
+* outparam: alpha_out - private key 'alpha'
+* outparam: alpha_pub_out - public key 'alpha * base'
+*/
+void generate_proof_alpha(const rct::key &base, rct::key &alpha_out, rct::key &alpha_pub_out);
+/**
 * brief: multi_exp_p3 - EC multiexp operation with arbitrary element count
-*   optimization: if a privkey == 1, skips the scalar mul operation
-* param: pubkeys - A, B, ..., N
-* param: privkeys - a, b, ..., n
-* outparam: result_out - aA + bB + ... + nN
+*   - optimization: if a privkey == 1, skips the scalar mul operation
+*   - optimization2: if privkeys.size() > pubkeys.size(), the trailing privkeys will all be 'p * G'
+* param: pubkeys - A, B, ..., M
+* param: privkeys - a, b, ..., m, ..., n
+* outparam: result_out - aA + bB + ... + mM + ... + n*G
 */
 void multi_exp_p3(const rct::keyV &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out);
+void multi_exp_p3(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out);
 
 } //namespace sp

@@ -91,61 +91,6 @@ static rct::key sm(rct::key y, int n, const rct::key &x)
     return y;
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::key invert(const rct::key &x)
-{
-    CHECK_AND_ASSERT_THROW_MES(!(x == ZERO), "Cannot invert zero!");
-
-    rct::key _1, _10, _100, _11, _101, _111, _1001, _1011, _1111;
-
-    _1 = x;
-    sc_mul(_10.bytes, _1.bytes, _1.bytes);
-    sc_mul(_100.bytes, _10.bytes, _10.bytes);
-    sc_mul(_11.bytes, _10.bytes, _1.bytes);
-    sc_mul(_101.bytes, _10.bytes, _11.bytes);
-    sc_mul(_111.bytes, _10.bytes, _101.bytes);
-    sc_mul(_1001.bytes, _10.bytes, _111.bytes);
-    sc_mul(_1011.bytes, _10.bytes, _1001.bytes);
-    sc_mul(_1111.bytes, _100.bytes, _1011.bytes);
-
-    rct::key inv;
-    sc_mul(inv.bytes, _1111.bytes, _1.bytes);
-
-    inv = sm(inv, 123 + 3, _101);
-    inv = sm(inv, 2 + 2, _11);
-    inv = sm(inv, 1 + 4, _1111);
-    inv = sm(inv, 1 + 4, _1111);
-    inv = sm(inv, 4, _1001);
-    inv = sm(inv, 2, _11);
-    inv = sm(inv, 1 + 4, _1111);
-    inv = sm(inv, 1 + 3, _101);
-    inv = sm(inv, 3 + 3, _101);
-    inv = sm(inv, 3, _111);
-    inv = sm(inv, 1 + 4, _1111);
-    inv = sm(inv, 2 + 3, _111);
-    inv = sm(inv, 2 + 2, _11);
-    inv = sm(inv, 1 + 4, _1011);
-    inv = sm(inv, 2 + 4, _1011);
-    inv = sm(inv, 6 + 4, _1001);
-    inv = sm(inv, 2 + 2, _11);
-    inv = sm(inv, 3 + 2, _11);
-    inv = sm(inv, 3 + 2, _11);
-    inv = sm(inv, 1 + 4, _1001);
-    inv = sm(inv, 1 + 3, _111);
-    inv = sm(inv, 2 + 4, _1111);
-    inv = sm(inv, 1 + 4, _1011);
-    inv = sm(inv, 3, _101);
-    inv = sm(inv, 2 + 4, _1111);
-    inv = sm(inv, 3, _101);
-    inv = sm(inv, 1 + 2, _11);
-
-    // Confirm inversion
-    rct::key temp;
-    sc_mul(temp.bytes, x.bytes, inv.bytes);
-    CHECK_AND_ASSERT_THROW_MES(temp == ONE, "Scalar inversion failed!");
-
-    return inv;
-}
-//-------------------------------------------------------------------------------------------------------------------
 // Make generators, but only once
 //-------------------------------------------------------------------------------------------------------------------
 static void init_sp_gens()
@@ -250,6 +195,61 @@ std::shared_ptr<rct::pippenger_cached_data> get_grootle_Hi_pippinger_cache_init(
     return rct::pippenger_init_cache(data, 0, 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
+rct::key invert(const rct::key &x)
+{
+    CHECK_AND_ASSERT_THROW_MES(!(x == ZERO), "Cannot invert zero!");
+
+    rct::key _1, _10, _100, _11, _101, _111, _1001, _1011, _1111;
+
+    _1 = x;
+    sc_mul(_10.bytes, _1.bytes, _1.bytes);
+    sc_mul(_100.bytes, _10.bytes, _10.bytes);
+    sc_mul(_11.bytes, _10.bytes, _1.bytes);
+    sc_mul(_101.bytes, _10.bytes, _11.bytes);
+    sc_mul(_111.bytes, _10.bytes, _101.bytes);
+    sc_mul(_1001.bytes, _10.bytes, _111.bytes);
+    sc_mul(_1011.bytes, _10.bytes, _1001.bytes);
+    sc_mul(_1111.bytes, _100.bytes, _1011.bytes);
+
+    rct::key inv;
+    sc_mul(inv.bytes, _1111.bytes, _1.bytes);
+
+    inv = sm(inv, 123 + 3, _101);
+    inv = sm(inv, 2 + 2, _11);
+    inv = sm(inv, 1 + 4, _1111);
+    inv = sm(inv, 1 + 4, _1111);
+    inv = sm(inv, 4, _1001);
+    inv = sm(inv, 2, _11);
+    inv = sm(inv, 1 + 4, _1111);
+    inv = sm(inv, 1 + 3, _101);
+    inv = sm(inv, 3 + 3, _101);
+    inv = sm(inv, 3, _111);
+    inv = sm(inv, 1 + 4, _1111);
+    inv = sm(inv, 2 + 3, _111);
+    inv = sm(inv, 2 + 2, _11);
+    inv = sm(inv, 1 + 4, _1011);
+    inv = sm(inv, 2 + 4, _1011);
+    inv = sm(inv, 6 + 4, _1001);
+    inv = sm(inv, 2 + 2, _11);
+    inv = sm(inv, 3 + 2, _11);
+    inv = sm(inv, 3 + 2, _11);
+    inv = sm(inv, 1 + 4, _1001);
+    inv = sm(inv, 1 + 3, _111);
+    inv = sm(inv, 2 + 4, _1111);
+    inv = sm(inv, 1 + 4, _1011);
+    inv = sm(inv, 3, _101);
+    inv = sm(inv, 2 + 4, _1111);
+    inv = sm(inv, 3, _101);
+    inv = sm(inv, 1 + 2, _11);
+
+    // Confirm inversion
+    rct::key temp;
+    sc_mul(temp.bytes, x.bytes, inv.bytes);
+    CHECK_AND_ASSERT_THROW_MES(temp == ONE, "Scalar inversion failed!");
+
+    return inv;
+}
+//-------------------------------------------------------------------------------------------------------------------
 void decompose(const std::size_t val, const std::size_t base, const std::size_t size, std::vector<std::size_t> &r_out)
 {
     CHECK_AND_ASSERT_THROW_MES(base > 1, "Bad decomposition parameters!");
@@ -341,44 +341,118 @@ rct::key small_scalar_gen(const std::size_t size_bytes)
     if (size_bytes == 0)
         return rct::zero();
 
-    rct::key result{rct::skGen()};
+    rct::key result{ZERO};
 
-    // clear all bytes above size desired
-    for (std::size_t byte_index = size_bytes; byte_index < 32; ++byte_index)
+    while (result == ZERO)
     {
-        result.bytes[byte_index] = 0x00;
+        result = rct::skGen();
+
+        // clear all bytes above size desired
+        for (std::size_t byte_index = size_bytes; byte_index < 32; ++byte_index)
+        {
+            result.bytes[byte_index] = 0x00;
+        }
     }
 
     return result;
 }
 //-------------------------------------------------------------------------------------------------------------------
+void generate_proof_alpha(const rct::key &base, rct::key &alpha_out, rct::key &alpha_pub_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(base != rct::identity(), "Bad base for generating proof alpha!");
+
+    alpha_out = ZERO;
+
+    while (alpha_out == ZERO || alpha_pub_out == rct::identity())
+    {
+        alpha_out = rct::skGen();
+        rct::scalarmultKey(alpha_pub_out, base, alpha_out);
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 void multi_exp_p3(const rct::keyV &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out)
+{
+    std::vector<ge_p3> pubkeys_p3;
+    pubkeys_p3.resize(pubkeys.size());
+
+    for (std::size_t i = 0; i < pubkeys.size(); ++i)
+    {
+        /// convert key P to ge_p3
+        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&pubkeys_p3[i], pubkeys[i].bytes) == 0,
+            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+    }
+
+    multi_exp_p3(pubkeys_p3, privkeys, result_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void multi_exp_p3(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out)
 {
     ge_p3 temp_pP, temp_ge_p3;
     ge_cached temp_cache;
     ge_p1p1 temp_p1p1;
+    rct::key temp_rct;
 
-    CHECK_AND_ASSERT_THROW_MES_L1(pubkeys.size() == privkeys.size(), "Input vectors don't match!");
-    if (pubkeys.empty())
+    CHECK_AND_ASSERT_THROW_MES_L1(pubkeys.size() <= privkeys.size(), "Too many input pubkeys!");
+    if (privkeys.empty())
     {
         result_out = ge_p3_identity;
         return;
     }
 
+    // first keys are p*P
     for (std::size_t i = 0; i < pubkeys.size(); ++i)
     {
-        // p*P
-        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&temp_ge_p3, pubkeys[i].bytes) == 0,
-            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+        /// p*P
 
+        // optimize for 1*P
         if (privkeys[i].bytes[0] == 1 && privkeys[i] == IDENTITY)  // short-circuit if first byte != 1
-            temp_pP = temp_ge_p3;  // 1*P
+        {
+            temp_pP = pubkeys[i];  // 1*P
+        }
         else
-            ge_scalarmult_p3(&temp_pP, privkeys[i].bytes, &temp_ge_p3);  // p*P
+        {
+            ge_scalarmult_p3(&temp_pP, privkeys[i].bytes, &pubkeys[i]);  // p*P
+        }
 
+
+        /// add p*P into result
+
+        // P[i-1] + P[i]
         if (i > 0)
         {
-            // P[i-1] + P[i]
+            ge_p3_to_cached(&temp_cache, &temp_pP);
+            ge_add(&temp_p1p1, &result_out, &temp_cache);   // P[i-1] + P[i]
+            ge_p1p1_to_p3(&result_out, &temp_p1p1);
+        }
+        else
+        {
+            result_out = temp_pP;
+        }
+    }
+
+    // last keys are p*G
+    for (std::size_t i = pubkeys.size(); i < privkeys.size(); ++i)
+    {
+        /// p*G
+
+        // optimize for 1*P
+        if (privkeys[i].bytes[0] == 1 && privkeys[i] == IDENTITY)  // short-circuit if first byte != 1
+        {
+            temp_pP = G_p3;  // 1*P
+        }
+        // optimize for P == G
+        else
+        {
+            sc_reduce32copy(temp_rct.bytes, privkeys[i].bytes); //do this beforehand
+            ge_scalarmult_base(&temp_pP, temp_rct.bytes);
+        }
+
+
+        /// add p*G into result
+
+        // P[i-1] + P[i]
+        if (i > 0)
+        {
             ge_p3_to_cached(&temp_cache, &temp_pP);
             ge_add(&temp_p1p1, &result_out, &temp_cache);   // P[i-1] + P[i]
             ge_p1p1_to_p3(&result_out, &temp_p1p1);

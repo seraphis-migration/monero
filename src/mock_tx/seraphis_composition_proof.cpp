@@ -46,28 +46,248 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
+// Initialize transcript
+//-------------------------------------------------------------------------------------------------------------------
+static void transcript_init(rct::key &transcript)
+{
+    std::string salt(config::HASH_KEY_SP_COMPOSITION_PROOF_TRANSCRIPT);
+    rct::hash_to_scalar(transcript, salt.data(), salt.size());
+}
+//-------------------------------------------------------------------------------------------------------------------
+// Prefix 'a' for concise structure
+// - K_t2 = K_t1 - X - KI
+//   - X is a generator
+//   - embedding {K_t1}, {KI} in the prefix implicitly embeds K_t2
+//
+// mu_a = H(H("domain-sep"), message, {K_t1}, {KI})
+//-------------------------------------------------------------------------------------------------------------------
+static rct::key compute_concise_prefix_a(const rct::key &message,
+    const rct::keyV &K_t1,
+    const rct::keyV &KI)
+{
+    CHECK_AND_ASSERT_THROW_MES(K_t1.size() == KI.size(), "Transcript challenge inputs have incorrect size!");
+
+    // initialize transcript message
+    rct::key challenge;
+    transcript_init(challenge);
+
+    // collect challenge string
+    std::string hash;
+    hash.reserve((2*(K_t1.size()) + 2)*sizeof(rct::key));
+    hash = std::string((const char*) challenge.bytes, sizeof(challenge));
+    hash += std::string((const char*) message.bytes, sizeof(message));
+    for (const auto &Kt1 : K_t1)
+    {
+        hash += std::string((const char*) Kt1.bytes, sizeof(Kt1));
+    }
+    for (const auto &Ki : KI)
+    {
+        hash += std::string((const char*) Ki.bytes, sizeof(Ki));
+    }
+    CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
+
+    // challenge
+    rct::hash_to_scalar(challenge, hash.data(), hash.size());
+
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge), "Transcript challenge must be nonzero!");
+
+    return challenge;
+}
+//-------------------------------------------------------------------------------------------------------------------
+// Prefix 'b' for concise structure
+// - {KI} is embedded in mu_a, so it is sufficient to separate mu_a and mu_b with a single hash
+//
+// mu_b = H(mu_a)
+//-------------------------------------------------------------------------------------------------------------------
+static rct::key compute_concise_prefix_b(const rct::key &mu_a)
+{
+    rct::key challenge;
+    std::string hash;
+    hash.reserve(1*sizeof(rct::key));
+    hash = std::string((const char*) mu_a.bytes, sizeof(mu_a));
+    CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
+    rct::hash_to_scalar(challenge, hash.data(), hash.size());
+
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge), "Transcript challenge must be nonzero!");
+
+    return challenge;
+}
+//-------------------------------------------------------------------------------------------------------------------
+// Fiat-Shamir challenge message
+// m = H(message, {K})
+//
+// note: in practice, this extends the concise structure prefix (i.e. message = mu_b)
+//-------------------------------------------------------------------------------------------------------------------
+static rct::key compute_challenge_message(const rct::key &message, const rct::keyV &K)
+{
+    rct::key challenge;
+    std::string hash;
+    hash.reserve((K.size() + 1)*sizeof(rct::key));
+    hash = std::string((const char*) message.bytes, sizeof(message));
+    for (std::size_t i = 0; i < K.size(); ++i)
+    {
+        hash += std::string((const char*) K[i].bytes, sizeof(K[i]));
+    }
+    CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
+    rct::hash_to_scalar(challenge, hash.data(), hash.size());
+
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge), "Transcript challenge must be nonzero!");
+
+    return challenge;
+}
+//-------------------------------------------------------------------------------------------------------------------
+// Fiat-Shamir challenge
+// c = H(message, [K_t2 proof key], [KI proof key], {[K_t1 proof key]})
+//-------------------------------------------------------------------------------------------------------------------
+static rct::key compute_challenge(const rct::key &message,
+    const rct::key &K_t2_proofkey,
+    const rct::key &KI_proofkey,
+    const rct::keyV &K_t1_proofkeys)
+{
+    rct::key challenge;
+    std::string hash;
+    hash.reserve((K_t1_proofkeys.size() + 3)*sizeof(rct::key));
+    hash = std::string((const char*) message.bytes, sizeof(message));
+    hash += std::string((const char*) K_t2_proofkey.bytes, sizeof(K_t2_proofkey));
+    hash += std::string((const char*) KI_proofkey.bytes, sizeof(KI_proofkey));
+    for (std::size_t i = 0; i < K_t1_proofkeys.size(); ++i)
+    {
+        hash += std::string((const char*) K_t1_proofkeys[i].bytes, sizeof(K_t1_proofkeys[i]));
+    }
+    CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
+    rct::hash_to_scalar(challenge, hash.data(), hash.size());
+
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge), "Transcript challenge must be nonzero!");
+
+    return challenge;
+}
+//-------------------------------------------------------------------------------------------------------------------
 SpCompositionProof sp_composition_prove(const rct::keyV &K,
     const rct::keyV &x,
     const rct::keyV &y,
     const rct::keyV &z,
     const rct::key &message)
 {
-    CHECK_AND_ASSERT_THROW_MES(K.size() > 0, "Not enough keys to make a proof!");
-    CHECK_AND_ASSERT_THROW_MES(K.size() == x.size(), "Input key sets not the same size (K ?= x)!");
-    CHECK_AND_ASSERT_THROW_MES(K.size() == y.size(), "Input key sets not the same size (K ?= y)!");
-    CHECK_AND_ASSERT_THROW_MES(K.size() == z.size(), "Input key sets not the same size (K ?= z)!");
+    /// input checks and initialization
+    const std::size_t num_keys{K.size()};
 
-    for (std::size_t i{0}; i < K.size(); ++i)
+    CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Not enough keys to make a proof!");
+    CHECK_AND_ASSERT_THROW_MES(num_keys == x.size(), "Input key sets not the same size (K ?= x)!");
+    CHECK_AND_ASSERT_THROW_MES(num_keys == y.size(), "Input key sets not the same size (K ?= y)!");
+    CHECK_AND_ASSERT_THROW_MES(num_keys == z.size(), "Input key sets not the same size (K ?= z)!");
+
+    for (std::size_t i{0}; i < num_keys; ++i)
     {
         CHECK_AND_ASSERT_THROW_MES(K[i] != rct::identity(), "Bad proof key (K[i] identity)!");
 
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(x[i].bytes) == 0, "Bad private key (x[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(x[i].bytes), "Bad private key (x[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(x[i].bytes) == 0, "Bad private key (x[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y[i].bytes) == 0, "Bad private key (y[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y[i].bytes), "Bad private key (y[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(y[i].bytes) == 0, "Bad private key (y[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(z[i].bytes) == 0, "Bad private key (z[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(z[i].bytes), "Bad private key (z[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(z[i].bytes) == 0, "Bad private key (z[i])!");
     }
+
+    rct::key U_gen{get_U_gen()};
+
+    SpCompositionProof proof;
+
+    // make K_t1 and KI
+    rct::keyV KI;
+    rct::key privkey_temp;
+    proof.K_t1.resize(num_keys);
+    KI.resize(num_keys);
+
+    for (std::size_t i{0}; i < num_keys; ++i)
+    {
+        // K_t1_i = (1/y_i) * K_i
+        privkey_temp = invert(y[i]);
+        rct::scalarmultKey(proof.K_t1[i], K[i], privkey_temp);
+
+        // KI = (z_i / y_i) * U
+        sc_mul(privkey_temp.bytes, privkey_temp.bytes, z[i].bytes);
+        rct::scalarmultKey(KI[i], U_gen, privkey_temp);
+    }
+
+
+    /// signature openers
+
+    // alpha_a * G
+    rct::key alpha_a;
+    rct::key alpha_a_pub;
+
+    generate_proof_alpha(rct::G, alpha_a, alpha_a_pub);
+
+    // alpha_b * U
+    rct::key alpha_b;
+    rct::key alpha_b_pub;
+
+    generate_proof_alpha(U_gen, alpha_b, alpha_b_pub);
+
+    // alpha_i[i] * K_i
+    rct::keyV alpha_i;
+    rct::keyV alpha_i_pub;
+
+    for (std::size_t i{0}; i < num_keys; ++i)
+    {
+        generate_proof_alpha(K[i], alpha_i[i], alpha_i_pub[i]);
+    }
+
+
+    /// challenge message and concise prefixes
+    rct::key mu_a = compute_concise_prefix_a(message, K_t1, KI);
+    rct::keyV mu_a_pows = powers_of_scalar(mu_a, num_keys);
+
+    rct::key mu_b = compute_concise_prefix_b(mu_a);
+    rct::keyV mu_b_pows = powers_of_scalar(mu_b, num_keys);
+
+    rct::key m = compute_challenge_message(mu_b, K);
+
+
+    /// compute proof challenge
+    proof.c = compute_challenge(m, alpha_a_pub, alpha_b_pub, alpha_i_pub);
+
+
+    /// responses
+    rct::key r_temp;
+    rct::key r_sum_temp;
+
+    // r_a = alpha_a - c * sum_i(mu_a^i * (x_i / y_i))
+    rct::key r_a;
+    r_sum_temp = rct::zero();
+    for (std::size_t i{0}; i < num_keys; ++i)
+    {
+        r_temp = invert(y[i]);  // 1 / y_i
+        sc_mul(r_temp.bytes, r_temp.bytes, mu_a_pows[i].bytes);  // mu_a^i / y_i
+        sc_mul(r_temp.bytes, r_temp.bytes, x[i].bytes);  // x_i * mu_a^i / y_i
+        sc_add(r_sum_temp.bytes, r_sum_temp.bytes, r_temp.bytes);  // sum_i(...)
+    }
+    sc_mulsub(proof.r_a.bytes, proof.c.bytes, r_sum_temp.bytes, alpha_a.bytes);  // alpha_a - c * sum_i(...)
+
+    // r_b = alpha_b - c * sum_i(mu_b^i * (z_i / y_i))
+    rct::key r_b;
+    r_sum_temp = rct::zero();
+    for (std::size_t i{0}; i < num_keys; ++i)
+    {
+        r_temp = invert(y[i]);  // 1 / y_i
+        sc_mul(r_temp.bytes, r_temp.bytes, mu_b_pows[i].bytes);  // mu_b^i / y_i
+        sc_mul(r_temp.bytes, r_temp.bytes, z[i].bytes);  // z_i * mu_b^i / y_i
+        sc_add(r_sum_temp.bytes, r_sum_temp.bytes, r_temp.bytes);  // sum_i(...)
+    }
+    sc_mulsub(proof.r_b.bytes, proof.c.bytes, r_sum_temp.bytes, alpha_b.bytes);  // alpha_b - c * sum_i(...)
+
+    // r_i = alpha_i - c * (1 / y_i)
+    rct::key r_i;
+    r_i.resize(num_keys);
+    for (std::size_t i{0}; i < num_keys; ++i)
+    {
+        r_temp = invert(y[i]);  // 1 / y_i
+        sc_mulsub(proof.r_i[i].bytes, proof.c.bytes, r_temp.bytes, alpha_i[i].bytes);  // alpha_i - c * (1 / y_i)
+    }
+
+
+    /// done
+    return proof;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool sp_composition_verify(const SpCompositionProof &proof,
