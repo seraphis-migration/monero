@@ -71,7 +71,6 @@ TEST(seraphis, multi_exp_p3)
     }
 
     // privkey == 1 optimization works
-
     for (std::size_t i = 1; i < 5; ++i)
     {
         check = rct::identity();
@@ -90,6 +89,40 @@ TEST(seraphis, multi_exp_p3)
                 privkeys.push_back(rct::skGen());
 
             rct::scalarmultKey(temp, pubkeys.back(), privkeys.back());
+            rct::addKeys(check, check, temp);
+        }
+
+        sp::multi_exp_p3(pubkeys, privkeys, test);
+        ge_p3_tobytes(test_key.bytes, &test);
+
+        EXPECT_TRUE(test_key == check);
+    }
+
+    // pubkey = G optimization works
+    for (std::size_t i = 1; i < 5; ++i)
+    {
+        check = rct::identity();
+
+        rct::keyV pubkeys;
+        rct::keyV privkeys;
+        pubkeys.reserve(i);
+        privkeys.reserve(i);
+
+        for (std::size_t j = 0; j < i; ++j)
+        {
+            privkeys.push_back(rct::skGen());
+
+            if (j < i/2)
+            {
+                pubkeys.push_back(rct::pkGen());
+                rct::scalarmultKey(temp, pubkeys.back(), privkeys.back());
+            }
+            // for j >= i/2 it will be privkey*G
+            else
+            {
+                rct::scalarmultBase(temp, privkeys.back());
+            }
+
             rct::addKeys(check, check, temp);
         }
 

@@ -79,7 +79,7 @@ struct SpCompositionProof
     // condensed responses
     rct::key r_a, r_b;
     // un-condensible responses
-    rct::keyV r;
+    rct::keyV r_i;
     // intermediate proof keys
     rct::keyV K_t1;
     // key images KI: not stored with proof
@@ -129,7 +129,7 @@ struct SpCompositionProofMultisigPrep
 ////
 // Multisig partially signed composition proof
 // - multisig assumes only proof component KI is subject to multisig signing (keys z_i split between signers)
-// - store signature opening for KI component
+// - store signature opening for KI component (response r_b)
 ///
 struct SpCompositionProofMultisigPartial
 {
@@ -138,7 +138,7 @@ struct SpCompositionProofMultisigPartial
     // condensed response r_a
     rct::key r_a;
     // un-condensible responses
-    rct::keyV r;
+    rct::keyV r_i;
     // intermediate proof keys
     rct::keyV K_t1;
     // key images KI
