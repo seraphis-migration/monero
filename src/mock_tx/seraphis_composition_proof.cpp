@@ -258,8 +258,8 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     for (std::size_t i{0}; i < num_keys; ++i)
     {
         r_temp = invert(y[i]);  // 1 / y_i
-        sc_mul(r_temp.bytes, r_temp.bytes, mu_a_pows[i].bytes);  // mu_a^i / y_i
-        sc_mul(r_temp.bytes, r_temp.bytes, x[i].bytes);  // x_i * mu_a^i / y_i
+        sc_mul(r_temp.bytes, r_temp.bytes, x[i].bytes);  // x_i / y_i
+        sc_mul(r_temp.bytes, r_temp.bytes, mu_a_pows[i].bytes);  // mu_a^i * x_i / y_i
         sc_add(r_sum_temp.bytes, r_sum_temp.bytes, r_temp.bytes);  // sum_i(...)
     }
     sc_mulsub(proof.r_a.bytes, proof.c.bytes, r_sum_temp.bytes, alpha_a.bytes);  // alpha_a - c * sum_i(...)
@@ -270,8 +270,8 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     for (std::size_t i{0}; i < num_keys; ++i)
     {
         r_temp = invert(y[i]);  // 1 / y_i
-        sc_mul(r_temp.bytes, r_temp.bytes, mu_b_pows[i].bytes);  // mu_b^i / y_i
-        sc_mul(r_temp.bytes, r_temp.bytes, z[i].bytes);  // z_i * mu_b^i / y_i
+        sc_mul(r_temp.bytes, r_temp.bytes, z[i].bytes);  // z_i / y_i
+        sc_mul(r_temp.bytes, r_temp.bytes, mu_b_pows[i].bytes);  // mu_b^i * z_i / y_i
         sc_add(r_sum_temp.bytes, r_sum_temp.bytes, r_temp.bytes);  // sum_i(...)
     }
     sc_mulsub(proof.r_b.bytes, proof.c.bytes, r_sum_temp.bytes, alpha_b.bytes);  // alpha_b - c * sum_i(...)
@@ -286,6 +286,12 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     }
 
 
+    /// cleanup: clear secret prover data
+    memwipe(&alpha_a, sizeof(rct::key));
+    memwipe(&alpha_b, sizeof(rct::key));
+    memwipe(alpha_i.data(), alpha_i.size()*sizeof(rct::key));
+
+
     /// done
     return proof;
 }
@@ -295,7 +301,130 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     const rct::keyV &KI,
     const rct::key &message)
 {
+    /// input checks and initialization
+    const std::size_t num_keys{K.size()};
 
+    CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Proof has no keys!");
+    CHECK_AND_ASSERT_THROW_MES(num_keys == KI.size(), "Input key sets not the same size (KI)!");
+    CHECK_AND_ASSERT_THROW_MES(num_keys == proof.K_t1.size(), "Input key sets not the same size (K_t1)!");
+    CHECK_AND_ASSERT_THROW_MES(num_keys == proof.r.size(), "Insufficient proof responses!");
+
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(proof.r_a.bytes), "Bad response (r_a zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_a.bytes) == 0, "Bad resonse (r_a)!");
+
+    for (std::size_t i{0}; i < num_keys; ++i)
+    {
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(proof.r[i].bytes), "Bad response (r[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r[i].bytes) == 0, "Bad resonse (r[i])!");
+    }
+
+    /// challenge message and concise prefixes
+    rct::key mu_a = compute_concise_prefix_a(message, proof.K_t1, KI);
+    rct::keyV mu_a_pows = powers_of_scalar(mu_a, num_keys);
+
+    rct::key mu_b = compute_concise_prefix_b(mu_a);
+    rct::keyV mu_b_pows = powers_of_scalar(mu_b, num_keys);
+
+    rct::key m = compute_challenge_message(mu_b, K);
+
+
+    /// challenge pieces
+
+    // K_t2 part: [r_a * G + c * sum_i(mu_a^i * K_t2[i])]
+    // KI part:   [r_b * U + c * sum_i(mu_b^i * KI[i]  )]
+    // K_t1[i] parts: [r[i] * K[i] + c * K_t1[i]]
+    rct::keyV K_t2_privkeys;
+    rct::keyV KI_privkeys;
+    rct::keyV K_t1_privkeys;
+    std::vector<ge_p3> K_t2_p3;
+    std::vector<ge_p3> KI_part_p3;
+    std::vector<ge_p3> K_t1_p3;
+    rct::keyV challenge_parts_i;
+    ge_p3 temp_p3;
+    ge_cached temp_cache;
+    ge_cached X_cache;
+    ge_p1p1 temp_p1p1;
+    K_t2_privkeys.reserve(num_keys + 1);
+    KI_privkeys.reserve(num_keys + 1)
+    K_t1_privkeys.resize(2);
+    K_t2_p3.resize(num_keys);   // note: no '+ 1' because G is implied
+    KI_part_p3.resize(num_keys + 1);
+    K_t1_p3.resize(2);
+
+    ge_p3_to_cached(&X_cache, &get_X_p3_gen()); // cache X for use below
+    K_t1_privkeys[1] = proof.c; // prep outside loop
+
+    for (std::size_t i{0}; i < num_keys; ++i)
+    {
+        // c * mu_a^i
+        K_t2_privkeys.push_back(mu_a_pows[i]);
+        sc_mul(K_t2_privkeys.back(), K_t2_privkeys.back(), proof.c);
+
+        // c * mu_b^i
+        KI_privkeys.push_back(mu_b_pows[i]);
+        sc_mul(KI_privkeys.back(), KI_privkeys.back(), proof.c);
+
+        // get K_t1
+        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&K_t1_p3[1], proof.K_t1[i].bytes) == 0,
+            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+
+        // get KI
+        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&KI_part_p3[i], KI[i].bytes) == 0,
+            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+
+        // get K
+        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&K_t1_p3[0], K[i].bytes) == 0,
+            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+
+        // temp: K_t1 - KI
+        ge_p3_to_cached(&temp_cache, &KI_part_p3[i]);
+        ge_sub(&temp_p1p1, &K_t1_p3[1], &temp_cache);
+        ge_p1p1_to_p3(&temp_p3, &temp_p1p1);
+
+        // K_t2 = (K_t1 - KI) - X
+        ge_sub(&temp_p1p1, &temp_p3, &X_cache);
+        ge_p1p1_to_p3(&K_t2_p3[i], &temp_p1p1);
+
+        // privkey for K_t1 part
+        K_t1_privkeys[0] = proof.r[i];
+
+        // compute 'K_t1[i]' piece
+        multi_exp_p3(K_t1_p3, K_t1_privkeys, temp_p3);
+        ge_p3_tobytes(challenge_parts_i[i].bytes, &temp_p3);
+    }
+
+    // K_t2: r_a * G + ...
+    K_t2_privkeys.push_back(proof.r_a);
+    //G implied, not stored in 'K_t2_p3'
+
+    // KI: r_b * U + ...
+    KI_privkeys.push_back(proof.r_b);
+    KI_part_p3[num_keys] = get_U_p3_gen();
+
+    // compute 'a' piece
+    rct::key challenge_part_a;
+    multi_exp_p3(K_t2_p3, K_t2_privkeys, temp_p3);
+    ge_p3_tobytes(challenge_part_a.bytes, &temp_p3);
+
+    // compute 'b' piece
+    rct::key challenge_part_b;
+    multi_exp_p3(KI_part_p3, KI_privkeys, temp_p3);
+    ge_p3_tobytes(challenge_part_b.bytes, &temp_p3);
+
+
+    /// compute nominal challenge
+    rct::key challenge_nom{compute_challenge(message, challenge_part_a, challenge_part_b, challenge_parts_i)};
+
+
+    /// validate proof
+    if (!(challenge_nom == proof.c))
+    {
+        MERROR("Seraphis composition proof verification failed!");
+
+        return false;
+    }
+
+    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::keyV &KI,
