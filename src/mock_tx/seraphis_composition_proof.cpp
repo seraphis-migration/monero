@@ -35,6 +35,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "seraphis_crypto_utils.h"
 
 //third party headers
 
@@ -51,7 +52,22 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     const rct::keyV &z,
     const rct::key &message)
 {
+    CHECK_AND_ASSERT_THROW_MES(K.size() > 0, "Not enough keys to make a proof!");
+    CHECK_AND_ASSERT_THROW_MES(K.size() == x.size(), "Input key sets not the same size (K ?= x)!");
+    CHECK_AND_ASSERT_THROW_MES(K.size() == y.size(), "Input key sets not the same size (K ?= y)!");
+    CHECK_AND_ASSERT_THROW_MES(K.size() == z.size(), "Input key sets not the same size (K ?= z)!");
 
+    for (std::size_t i{0}; i < K.size(); ++i)
+    {
+        CHECK_AND_ASSERT_THROW_MES(K[i] != rct::identity(), "Bad proof key (K[i] identity)!");
+
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(x[i].bytes) == 0, "Bad private key (x[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(x[i].bytes) == 0, "Bad private key (x[i])!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y[i].bytes) == 0, "Bad private key (y[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(y[i].bytes) == 0, "Bad private key (y[i])!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(z[i].bytes) == 0, "Bad private key (z[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(z[i].bytes) == 0, "Bad private key (z[i])!");
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool sp_composition_verify(const SpCompositionProof &proof,
