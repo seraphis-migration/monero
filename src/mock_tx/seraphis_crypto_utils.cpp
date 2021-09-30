@@ -359,7 +359,7 @@ rct::key small_scalar_gen(const std::size_t size_bytes)
 //-------------------------------------------------------------------------------------------------------------------
 void generate_proof_alpha(const rct::key &base, rct::key &alpha_out, rct::key &alpha_pub_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(base != rct::identity(), "Bad base for generating proof alpha!");
+    CHECK_AND_ASSERT_THROW_MES(!(base == rct::identity()), "Bad base for generating proof alpha!");
 
     alpha_out = ZERO;
 
@@ -368,6 +368,20 @@ void generate_proof_alpha(const rct::key &base, rct::key &alpha_out, rct::key &a
         alpha_out = rct::skGen();
         rct::scalarmultKey(alpha_pub_out, base, alpha_out);
     }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void multi_exp(const rct::keyV &pubkeys, const rct::keyV &privkeys, rct::key &result_out)
+{
+    ge_p3 result_p3;
+    multi_exp_p3(pubkeys, privkeys, result_p3);
+    ge_p3_tobytes(result_out.bytes, &result_p3);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void multi_exp(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, rct::key &result_out)
+{
+    ge_p3 result_p3;
+    multi_exp_p3(pubkeys, privkeys, result_p3);
+    ge_p3_tobytes(result_out.bytes, &result_p3);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void multi_exp_p3(const rct::keyV &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out)
@@ -387,7 +401,7 @@ void multi_exp_p3(const rct::keyV &pubkeys, const rct::keyV &privkeys, ge_p3 &re
 //-------------------------------------------------------------------------------------------------------------------
 void multi_exp_p3(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out)
 {
-    ge_p3 temp_pP, temp_ge_p3;
+    ge_p3 temp_pP;
     ge_cached temp_cache;
     ge_p1p1 temp_p1p1;
     rct::key temp_rct;

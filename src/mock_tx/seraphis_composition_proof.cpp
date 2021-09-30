@@ -32,12 +32,18 @@
 #include "seraphis_composition_proof.h"
 
 //local headers
+extern "C"
+{
+#include "crypto/crypto-ops.h"
+}
+#include "cryptonote_config.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_crypto_utils.h"
 
 //third party headers
+#include <boost/lexical_cast.hpp>
 
 //standard headers
 #include <vector>
@@ -89,7 +95,7 @@ static rct::key compute_concise_prefix_a(const rct::key &message,
     // challenge
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
 
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge), "Transcript challenge must be nonzero!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
 
     return challenge;
 }
@@ -108,7 +114,7 @@ static rct::key compute_concise_prefix_b(const rct::key &mu_a)
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
 
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge), "Transcript challenge must be nonzero!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
 
     return challenge;
 }
@@ -131,7 +137,7 @@ static rct::key compute_challenge_message(const rct::key &message, const rct::ke
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
 
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge), "Transcript challenge must be nonzero!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
 
     return challenge;
 }
@@ -157,7 +163,7 @@ static rct::key compute_challenge(const rct::key &message,
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
 
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge), "Transcript challenge must be nonzero!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
 
     return challenge;
 }
@@ -178,7 +184,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
 
     for (std::size_t i{0}; i < num_keys; ++i)
     {
-        CHECK_AND_ASSERT_THROW_MES(K[i] != rct::identity(), "Bad proof key (K[i] identity)!");
+        CHECK_AND_ASSERT_THROW_MES(!(K[i] == rct::identity()), "Bad proof key (K[i] identity)!");
 
         CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(x[i].bytes), "Bad private key (x[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(x[i].bytes) == 0, "Bad private key (x[i])!");
@@ -235,7 +241,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
 
 
     /// challenge message and concise prefixes
-    rct::key mu_a = compute_concise_prefix_a(message, K_t1, KI);
+    rct::key mu_a = compute_concise_prefix_a(message, proof.K_t1, KI);
     rct::keyV mu_a_pows = powers_of_scalar(mu_a, num_keys);
 
     rct::key mu_b = compute_concise_prefix_b(mu_a);
@@ -253,7 +259,6 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     rct::key r_sum_temp;
 
     // r_a = alpha_a - c * sum_i(mu_a^i * (x_i / y_i))
-    rct::key r_a;
     r_sum_temp = rct::zero();
     for (std::size_t i{0}; i < num_keys; ++i)
     {
@@ -265,7 +270,6 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     sc_mulsub(proof.r_a.bytes, proof.c.bytes, r_sum_temp.bytes, alpha_a.bytes);  // alpha_a - c * sum_i(...)
 
     // r_b = alpha_b - c * sum_i(mu_b^i * (z_i / y_i))
-    rct::key r_b;
     r_sum_temp = rct::zero();
     for (std::size_t i{0}; i < num_keys; ++i)
     {
@@ -277,8 +281,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     sc_mulsub(proof.r_b.bytes, proof.c.bytes, r_sum_temp.bytes, alpha_b.bytes);  // alpha_b - c * sum_i(...)
 
     // r_i = alpha_i - c * (1 / y_i)
-    rct::key r_i;
-    r_i.resize(num_keys);
+    proof.r_i.resize(num_keys);
     for (std::size_t i{0}; i < num_keys; ++i)
     {
         r_temp = invert(y[i]);  // 1 / y_i
@@ -307,15 +310,15 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Proof has no keys!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == KI.size(), "Input key sets not the same size (KI)!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == proof.K_t1.size(), "Input key sets not the same size (K_t1)!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == proof.r.size(), "Insufficient proof responses!");
+    CHECK_AND_ASSERT_THROW_MES(num_keys == proof.r_i.size(), "Insufficient proof responses!");
 
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(proof.r_a.bytes), "Bad response (r_a zero)!");
     CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_a.bytes) == 0, "Bad resonse (r_a)!");
 
     for (std::size_t i{0}; i < num_keys; ++i)
     {
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(proof.r[i].bytes), "Bad response (r[i] zero)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r[i].bytes) == 0, "Bad resonse (r[i])!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(proof.r_i[i].bytes), "Bad response (r[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_i[i].bytes) == 0, "Bad resonse (r[i])!");
     }
 
     /// challenge message and concise prefixes
@@ -345,36 +348,37 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     ge_cached X_cache;
     ge_p1p1 temp_p1p1;
     K_t2_privkeys.reserve(num_keys + 1);
-    KI_privkeys.reserve(num_keys + 1)
+    KI_privkeys.reserve(num_keys + 1);
     K_t1_privkeys.resize(2);
     K_t2_p3.resize(num_keys);   // note: no '+ 1' because G is implied
     KI_part_p3.resize(num_keys + 1);
     K_t1_p3.resize(2);
 
-    ge_p3_to_cached(&X_cache, &get_X_p3_gen()); // cache X for use below
+    temp_p3 = get_X_p3_gen();
+    ge_p3_to_cached(&X_cache, &temp_p3); // cache X for use below
     K_t1_privkeys[1] = proof.c; // prep outside loop
 
     for (std::size_t i{0}; i < num_keys; ++i)
     {
         // c * mu_a^i
         K_t2_privkeys.push_back(mu_a_pows[i]);
-        sc_mul(K_t2_privkeys.back(), K_t2_privkeys.back(), proof.c);
+        sc_mul(K_t2_privkeys.back().bytes, K_t2_privkeys.back().bytes, proof.c.bytes);
 
         // c * mu_b^i
         KI_privkeys.push_back(mu_b_pows[i]);
-        sc_mul(KI_privkeys.back(), KI_privkeys.back(), proof.c);
+        sc_mul(KI_privkeys.back().bytes, KI_privkeys.back().bytes, proof.c.bytes);
 
         // get K_t1
-        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&K_t1_p3[1], proof.K_t1[i].bytes) == 0,
-            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+        CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&K_t1_p3[1], proof.K_t1[i].bytes) == 0,
+            "ge_frombytes_vartime failed!");
 
         // get KI
-        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&KI_part_p3[i], KI[i].bytes) == 0,
-            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+        CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&KI_part_p3[i], KI[i].bytes) == 0,
+            "ge_frombytes_vartime failed!");
 
         // get K
-        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&K_t1_p3[0], K[i].bytes) == 0,
-            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+        CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&K_t1_p3[0], K[i].bytes) == 0,
+            "ge_frombytes_vartime failed!");
 
         // temp: K_t1 - KI
         ge_p3_to_cached(&temp_cache, &KI_part_p3[i]);
@@ -386,11 +390,10 @@ bool sp_composition_verify(const SpCompositionProof &proof,
         ge_p1p1_to_p3(&K_t2_p3[i], &temp_p1p1);
 
         // privkey for K_t1 part
-        K_t1_privkeys[0] = proof.r[i];
+        K_t1_privkeys[0] = proof.r_i[i];
 
         // compute 'K_t1[i]' piece
-        multi_exp_p3(K_t1_p3, K_t1_privkeys, temp_p3);
-        ge_p3_tobytes(challenge_parts_i[i].bytes, &temp_p3);
+        multi_exp(K_t1_p3, K_t1_privkeys, challenge_parts_i[i]);
     }
 
     // K_t2: r_a * G + ...
@@ -403,29 +406,21 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 
     // compute 'a' piece
     rct::key challenge_part_a;
-    multi_exp_p3(K_t2_p3, K_t2_privkeys, temp_p3);
-    ge_p3_tobytes(challenge_part_a.bytes, &temp_p3);
+    multi_exp(K_t2_p3, K_t2_privkeys, challenge_part_a);
 
     // compute 'b' piece
     rct::key challenge_part_b;
-    multi_exp_p3(KI_part_p3, KI_privkeys, temp_p3);
-    ge_p3_tobytes(challenge_part_b.bytes, &temp_p3);
+    multi_exp(KI_part_p3, KI_privkeys, challenge_part_b);
 
 
     /// compute nominal challenge
-    rct::key challenge_nom{compute_challenge(message, challenge_part_a, challenge_part_b, challenge_parts_i)};
+    rct::key challenge_nom{compute_challenge(m, challenge_part_a, challenge_part_b, challenge_parts_i)};
 
 
     /// validate proof
-    if (!(challenge_nom == proof.c))
-    {
-        MERROR("Seraphis composition proof verification failed!");
-
-        return false;
-    }
-
-    return true;
+    return challenge_nom == proof.c;
 }
+/*
 //-------------------------------------------------------------------------------------------------------------------
 SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::keyV &KI,
     const rct::keyV &K,
@@ -455,4 +450,5 @@ SpCompositionProof sp_composition_prove_multisig_final(const std::vector<SpCompo
 
 }
 //-------------------------------------------------------------------------------------------------------------------
+*/
 } //namespace sp
