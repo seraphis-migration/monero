@@ -35,7 +35,8 @@ set(mock_tx_sources
   mock_rct_components.cpp
   mock_rct_clsag.cpp
   mock_rct_triptych.cpp
-  seraphis_crypto_utils.cpp)
+  seraphis_crypto_utils.cpp
+  seraphis_composition_proof.cpp)
 
 monero_find_all_headers(mock_tx_headers, "${CMAKE_CURRENT_SOURCE_DIR}")
 

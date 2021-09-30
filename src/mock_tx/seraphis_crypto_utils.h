@@ -144,6 +144,8 @@ void generate_proof_alpha(const rct::key &base, rct::key &alpha_out, rct::key &a
 * param: privkeys - a, b, ..., m, ..., n
 * outparam: result_out - aA + bB + ... + mM + ... + n*G
 */
+void multi_exp(const rct::keyV &pubkeys, const rct::keyV &privkeys, rct::key &result_out);
+void multi_exp(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, rct::key &result_out);
 void multi_exp_p3(const rct::keyV &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out);
 void multi_exp_p3(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out);
 
