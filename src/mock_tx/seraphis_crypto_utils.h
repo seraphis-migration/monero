@@ -148,5 +148,21 @@ void multi_exp(const rct::keyV &pubkeys, const rct::keyV &privkeys, rct::key &re
 void multi_exp(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, rct::key &result_out);
 void multi_exp_p3(const rct::keyV &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out);
 void multi_exp_p3(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out);
+/**
+* brief: seraphis_key_image_from_privkeys - create a Seraphis key image from private keys
+*   KI = (z/y)*U
+* param: z - private key 'z' (the private spend key 'ks')
+* param: y - private key 'y' (created from private view key secrets)
+* outparam: key_image_out - KI
+*/
+void seraphis_key_image_from_privkeys(const rct::key &z, const rct::key &y, rct::key &key_image_out);
+/**
+* brief: seraphis_key_image_from_spendbase - create a Seraphis key image from 'y' and spend key base 'zU'
+*   KI = (1/y) * z U
+* param: zU - pubkey z U (the base spend key 'ks U')
+* param: y - private key 'y' (created from private view key secrets)
+* outparam: key_image_out - KI
+*/
+void seraphis_key_image_from_spendbase(const rct::key &zU, const rct::key &y, rct::key &key_image_out);
 
 } //namespace sp

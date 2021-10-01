@@ -31,6 +31,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "device/device.hpp"
+#include "mock_tx/seraphis_composition_proof.h"
 #include "mock_tx/seraphis_crypto_utils.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -38,9 +39,40 @@ extern "C"
 #include "gtest/gtest.h"
 
 
-TEST(seraphis, multi_exp_p3)
+static void make_fake_sp_masked_address(rct::key &mask, rct::key &view_stuff, rct::key &spendkey, rct::key &masked_address)
 {
-    ge_p3 test;
+    mask = rct::zero();
+    view_stuff = rct::zero();
+    spendkey = rct::zero();
+
+    while (mask == rct::zero())
+        mask = rct::skGen();
+
+    while (view_stuff == rct::zero())
+        view_stuff = rct::skGen();
+
+    while (spendkey == rct::zero())
+        spendkey = rct::skGen();
+
+    rct::keyV privkeys;
+    rct::keyV pubkeys;
+    privkeys.reserve(3);
+    pubkeys.reserve(2);
+
+    privkeys.push_back(view_stuff);
+    pubkeys.push_back(sp::get_X_gen());
+    privkeys.push_back(spendkey);
+    pubkeys.push_back(sp::get_U_gen());
+    privkeys.push_back(mask);
+    //G implicit
+
+    // K' = x G + kv_stuff X + ks U
+    sp::multi_exp(pubkeys, privkeys, masked_address);
+}
+
+
+TEST(seraphis, multi_exp)
+{
     rct::key test_key;
     rct::key check;
     rct::key temp;
@@ -64,8 +96,7 @@ TEST(seraphis, multi_exp_p3)
             rct::addKeys(check, check, temp);
         }
 
-        sp::multi_exp_p3(pubkeys, privkeys, test);
-        ge_p3_tobytes(test_key.bytes, &test);
+        sp::multi_exp(pubkeys, privkeys, test_key);
 
         EXPECT_TRUE(test_key == check);
     }
@@ -92,8 +123,7 @@ TEST(seraphis, multi_exp_p3)
             rct::addKeys(check, check, temp);
         }
 
-        sp::multi_exp_p3(pubkeys, privkeys, test);
-        ge_p3_tobytes(test_key.bytes, &test);
+        sp::multi_exp(pubkeys, privkeys, test_key);
 
         EXPECT_TRUE(test_key == check);
     }
@@ -126,9 +156,100 @@ TEST(seraphis, multi_exp_p3)
             rct::addKeys(check, check, temp);
         }
 
-        sp::multi_exp_p3(pubkeys, privkeys, test);
-        ge_p3_tobytes(test_key.bytes, &test);
+        sp::multi_exp(pubkeys, privkeys, test_key);
 
         EXPECT_TRUE(test_key == check);
+    }
+}
+
+TEST(seraphis, composition_proof)
+{
+    rct::keyV K, KI, x, y, z;
+    rct::key message{rct::zero()};
+    sp::SpCompositionProof proof;
+
+    // degenerate case works (1 key)
+    // normal cases work (>1 key)
+    for (std::size_t num_keys{1}; num_keys < 5; ++num_keys)
+    {
+        K.resize(num_keys);
+        KI.resize(num_keys);
+        x.resize(num_keys);
+        y.resize(num_keys);
+        z.resize(num_keys);
+
+        for (std::size_t i{0}; i < num_keys; ++i)
+        {
+            make_fake_sp_masked_address(x[i], y[i], z[i], K[i]);
+            sp::seraphis_key_image_from_privkeys(z[i], y[i], KI[i]);
+        }
+
+        proof = sp::sp_composition_prove(K, x, y, z, message);
+
+        EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
+    }
+
+    // works even if x = 0
+    {
+        K.resize(1);
+        KI.resize(1);
+        x.resize(1);
+        y.resize(1);
+        z.resize(1);
+
+        make_fake_sp_masked_address(x[0], y[0], z[0], K[0]);
+
+        rct::key xG;
+        rct::scalarmultBase(xG, x[0]);
+        rct::subKeys(K[0], K[0], xG);   // kludge: remove x part manually
+        x[0] = rct::zero();
+
+        sp::seraphis_key_image_from_privkeys(z[0], y[0], KI[0]);
+
+        proof = sp::sp_composition_prove(K, x, y, z, message);
+
+        EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
+    }
+
+    // fails if y = 0
+    {
+        K.resize(1);
+        KI.resize(1);
+        x.resize(1);
+        y.resize(1);
+        z.resize(1);
+
+        make_fake_sp_masked_address(x[0], y[0], z[0], K[0]);
+
+        rct::key yX;
+        rct::scalarmultKey(yX, sp::get_X_gen(), y[0]);
+        rct::subKeys(K[0], K[0], yX);   // kludge: remove y part manually
+        y[0] = rct::zero();
+
+        sp::seraphis_key_image_from_privkeys(z[0], y[0], KI[0]);
+
+        EXPECT_ANY_THROW(proof = sp::sp_composition_prove(K, x, y, z, message));
+    }
+
+    // fails if z = 0
+    {
+        K.resize(1);
+        KI.resize(1);
+        x.resize(1);
+        y.resize(1);
+        z.resize(1);
+
+        make_fake_sp_masked_address(x[0], y[0], z[0], K[0]);
+
+        rct::key zU;
+        rct::scalarmultKey(zU, sp::get_U_gen(), z[0]);
+        rct::subKeys(K[0], K[0], zU);   // kludge: remove z part manually
+        z[0] = rct::zero();
+
+        sp::seraphis_key_image_from_privkeys(z[0], y[0], KI[0]);
+
+        proof = sp::sp_composition_prove(K, x, y, z, message);
+
+        EXPECT_ANY_THROW(sp::sp_composition_verify(proof, K, KI, message));
     }
 }
