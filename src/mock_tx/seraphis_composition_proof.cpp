@@ -188,9 +188,9 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
 
         // x == 0 is allowed
         CHECK_AND_ASSERT_THROW_MES(sc_check(x[i].bytes) == 0, "Bad private key (x[i])!");
-        //CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y[i].bytes), "Bad private key (y[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y[i].bytes), "Bad private key (y[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(y[i].bytes) == 0, "Bad private key (y[i])!");
-        //CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(z[i].bytes), "Bad private key (z[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(z[i].bytes), "Bad private key (z[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(z[i].bytes) == 0, "Bad private key (z[i])!");
     }
 
@@ -233,6 +233,8 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     // alpha_i[i] * K_i
     rct::keyV alpha_i;
     rct::keyV alpha_i_pub;
+    alpha_i.resize(num_keys);
+    alpha_i_pub.resize(num_keys);
 
     for (std::size_t i{0}; i < num_keys; ++i)
     {
@@ -356,6 +358,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     K_t2_p3.resize(num_keys);   // note: no '+ 1' because G is implied
     KI_part_p3.resize(num_keys + 1);
     K_t1_p3.resize(2);
+    challenge_parts_i.resize(num_keys);
 
     temp_p3 = get_X_p3_gen();
     ge_p3_to_cached(&X_cache, &temp_p3); // cache X for use below

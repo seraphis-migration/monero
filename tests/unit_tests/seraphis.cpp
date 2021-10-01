@@ -210,46 +210,4 @@ TEST(seraphis, composition_proof)
 
         EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
     }
-
-    // fails if y = 0
-    {
-        K.resize(1);
-        KI.resize(1);
-        x.resize(1);
-        y.resize(1);
-        z.resize(1);
-
-        make_fake_sp_masked_address(x[0], y[0], z[0], K[0]);
-
-        rct::key yX;
-        rct::scalarmultKey(yX, sp::get_X_gen(), y[0]);
-        rct::subKeys(K[0], K[0], yX);   // kludge: remove y part manually
-        y[0] = rct::zero();
-
-        sp::seraphis_key_image_from_privkeys(z[0], y[0], KI[0]);
-
-        EXPECT_ANY_THROW(proof = sp::sp_composition_prove(K, x, y, z, message));
-    }
-
-    // fails if z = 0
-    {
-        K.resize(1);
-        KI.resize(1);
-        x.resize(1);
-        y.resize(1);
-        z.resize(1);
-
-        make_fake_sp_masked_address(x[0], y[0], z[0], K[0]);
-
-        rct::key zU;
-        rct::scalarmultKey(zU, sp::get_U_gen(), z[0]);
-        rct::subKeys(K[0], K[0], zU);   // kludge: remove z part manually
-        z[0] = rct::zero();
-
-        sp::seraphis_key_image_from_privkeys(z[0], y[0], KI[0]);
-
-        proof = sp::sp_composition_prove(K, x, y, z, message);
-
-        EXPECT_ANY_THROW(sp::sp_composition_verify(proof, K, KI, message));
-    }
 }
