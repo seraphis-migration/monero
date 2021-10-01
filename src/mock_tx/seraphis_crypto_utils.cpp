@@ -478,4 +478,23 @@ void multi_exp_p3(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, 
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void seraphis_key_image_from_privkeys(const rct::key &z, const rct::key &y, rct::key &key_image_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y.bytes), "y must be nonzero for making a key image!");
+
+    // KI = (z/y)*U
+    rct::key temp = invert(y); // 1/y
+    sc_mul(temp.bytes, z.bytes, temp.bytes); // z*(1/y)
+    rct::scalarmultKey(key_image_out, U, temp); // (z/y)*U
+}
+//-------------------------------------------------------------------------------------------------------------------
+void seraphis_key_image_from_spendbase(const rct::key &zU, const rct::key &y, rct::key &key_image_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y.bytes), "y must be nonzero for making a key image!");
+
+    // KI = (z/y)*U
+    rct::key temp = invert(y); // 1/y
+    rct::scalarmultKey(key_image_out, zU, temp); // (z/y)*U
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

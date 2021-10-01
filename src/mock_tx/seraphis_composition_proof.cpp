@@ -186,11 +186,11 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     {
         CHECK_AND_ASSERT_THROW_MES(!(K[i] == rct::identity()), "Bad proof key (K[i] identity)!");
 
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(x[i].bytes), "Bad private key (x[i] zero)!");
+        // x == 0 is allowed
         CHECK_AND_ASSERT_THROW_MES(sc_check(x[i].bytes) == 0, "Bad private key (x[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y[i].bytes), "Bad private key (y[i] zero)!");
+        //CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y[i].bytes), "Bad private key (y[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(y[i].bytes) == 0, "Bad private key (y[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(z[i].bytes), "Bad private key (z[i] zero)!");
+        //CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(z[i].bytes), "Bad private key (z[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(z[i].bytes) == 0, "Bad private key (z[i])!");
     }
 
@@ -319,6 +319,9 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     {
         CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(proof.r_i[i].bytes), "Bad response (r[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_i[i].bytes) == 0, "Bad resonse (r[i])!");
+
+        CHECK_AND_ASSERT_THROW_MES(!(KI[i] == rct::identity()), "Invalid key image!");
+        CHECK_AND_ASSERT_THROW_MES(!(proof.K_t1[i] == rct::identity()), "Invalid proof element K_t1!");
     }
 
     /// challenge message and concise prefixes
