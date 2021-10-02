@@ -194,7 +194,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
         CHECK_AND_ASSERT_THROW_MES(sc_check(z[i].bytes) == 0, "Bad private key (z[i])!");
     }
 
-    rct::key U_gen{get_U_gen()};
+    const rct::key U_gen{get_U_gen()};
 
     SpCompositionProof proof;
 
@@ -292,6 +292,9 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
 
 
     /// cleanup: clear secret prover data
+    memwipe(&privkey_temp, sizeof(rct::key));
+    memwipe(&r_temp, sizeof(rct::key));
+    memwipe(&r_sum_temp, sizeof(rct::key));
     memwipe(&alpha_a, sizeof(rct::key));
     memwipe(&alpha_b, sizeof(rct::key));
     memwipe(alpha_i.data(), alpha_i.size()*sizeof(rct::key));
