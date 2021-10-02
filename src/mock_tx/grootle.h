@@ -38,7 +38,7 @@
 // note: to prove DL of a point in S with respect to G directly, set its offset equal to the identity element I
 //
 // - variant 1 (large, fast): grootle         (uses fast verification technique from Lelantus-Spark)
-// - variant 2 (small, slow): concise grootle (uses size reduction technique from Triptych)
+// - variant 2 (small, slow): concise grootle (uses 'aggregation coefficients' size reduction technique from Triptych)
 //
 // note: variant 1 = variant 2 if S-tuples have only 1 key
 //
@@ -87,7 +87,7 @@ struct GrootleProof
 };
 
 ////
-// concise Grootle proof (using the concise approach described in Triptych)
+// concise Grootle proof (using the aggregation coefficients described in Triptych)
 ///
 struct ConciseGrootleProof
 {
@@ -139,7 +139,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
     const std::size_t m,
     const rct::key &message);
 /**
-* brief: grootle_verify - verify a batch of Grootle proofs with common input keys
+* brief: grootle_verify - verify a batch of grootle proofs that share a reference set
 * param: proofs - batch of proofs to verify
 * param: M - (shared) [vec<tuple of commitments>]
 * param: proof_offsets - (per-proof) offsets for commitments to zero at unknown indices in each proof

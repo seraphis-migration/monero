@@ -108,10 +108,10 @@ static void transcript_init(rct::key &transcript)
     rct::hash_to_scalar(transcript, salt.data(), salt.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Prefix for concise structure
+// Base aggregation coefficient for concise structure
 // mu = H(H("domain-sep"), message, {{M}}, {C_offsets}, A, B, C, D)
 //-------------------------------------------------------------------------------------------------------------------
-static rct::key compute_concise_prefix(const rct::key &message,
+static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     const rct::keyM &M,
     const rct::keyV &C_offsets,
     const rct::key &A,
@@ -157,7 +157,7 @@ static rct::key compute_concise_prefix(const rct::key &message,
 // Fiat-Shamir challenge
 // c = H(message, {X})
 //
-// note: in practice, this extends the concise structure prefix (i.e. message = mu)
+// note: in practice, this extends the concise structure's aggregation coefficient (i.e. message = mu)
 // note2: in Triptych notation, c == xi
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
@@ -263,7 +263,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     {
         for (std::size_t i = 0; i < n; ++i)
         {
-            sigma[j][i] = delta(decomp_l[j], i);
+            sigma[j][i] = kronecker_delta(decomp_l[j], i);
         }
     }
     com_matrix(sigma, rB, data);
@@ -326,14 +326,14 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
             p[k][j] = ZERO;
         }
         p[k][0] = a[0][decomp_k[0]];
-        p[k][1] = delta(decomp_l[0], decomp_k[0]);
+        p[k][1] = kronecker_delta(decomp_l[0], decomp_k[0]);
 
         for (std::size_t j = 1; j < m; ++j)
         {
             rct::keyV temp;
             temp.resize(2);
             temp[0] = a[j][decomp_k[j]];
-            temp[1] = delta(decomp_l[j], decomp_k[j]);
+            temp[1] = kronecker_delta(decomp_l[j], decomp_k[j]);
 
             p[k] = convolve(p[k], temp, m);
         }
@@ -350,12 +350,12 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
         rho.push_back(rct::skGen());
     }
 
-    // mu: concise prefix
+    // mu: base aggregation coefficient
     const rct::key mu{
-            compute_concise_prefix(message, M, C_offsets, proof.A, proof.B, proof.C, proof.D)
+            compute_base_aggregation_coefficient(message, M, C_offsets, proof.A, proof.B, proof.C, proof.D)
         };
 
-    // mu^alpha: concise prefix powers
+    // mu^alpha: powers of the aggregation coefficient
     rct::keyV mu_pow = powers_of_scalar(mu, num_keys);
 
     // {X}: 'encodings' of [p] (i.e. of the real signing index 'l' in the referenced tuple set)
@@ -372,8 +372,8 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
             // X[j] += p[k][j] * sum_{alpha}( mu^alpha * (M[k][alpha] - C_offset[alpha]) )
             for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
-                sc_mul(c_zero_nominal_prefix_temp.bytes, mu_pow[alpha].bytes, p[k][j].bytes);
-                rct::subKeys(C_zero_nominal_temp, M[k][alpha], C_offsets[alpha]);
+                sc_mul(c_zero_nominal_prefix_temp.bytes, mu_pow[alpha].bytes, p[k][j].bytes); // p[k][j] * mu^alpha
+                rct::subKeys(C_zero_nominal_temp, M[k][alpha], C_offsets[alpha]); // M[k][alpha] - C_offset[alpha]
                 data_X.push_back({c_zero_nominal_prefix_temp, C_zero_nominal_temp});
             }
         }
@@ -568,7 +568,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
         // Transcript challenges
         const rct::key mu{
-                compute_concise_prefix(messages[i_proofs],
+                compute_base_aggregation_coefficient(messages[i_proofs],
                     M,
                     proof_offsets[i_proofs],
                     proof.A,
@@ -578,7 +578,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
             };
         const rct::key xi{compute_challenge(mu, proof.X)};
 
-        // Prefix powers
+        // Aggregation coefficient powers
         rct::keyV mu_pow = powers_of_scalar(mu, num_keys);
 
         // Challenge powers (negated)

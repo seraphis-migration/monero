@@ -102,7 +102,7 @@ static void init_sp_gens()
 
     // Build Hi generators
     // H_i = keccak_to_pt("grootle Hi", i)
-    static const std::string Hi_salt(config::HASH_KEY_GROOTLE_Hi);
+    const std::string Hi_salt(config::HASH_KEY_GROOTLE_Hi);
     for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
     {
         std::string hash = Hi_salt + tools::get_varint_data(i);
@@ -111,13 +111,13 @@ static void init_sp_gens()
 
     // Build U
     // U = keccak_to_pt("seraphis U")
-    static const std::string U_salt(config::HASH_KEY_SERAPHIS_U);
+    const std::string U_salt(config::HASH_KEY_SERAPHIS_U);
     hash_to_p3(U_p3, rct::hash2rct(crypto::cn_fast_hash(U_salt.data(), U_salt.size())));
     ge_p3_tobytes(U.bytes, &U_p3);
 
     // Build X
     // X = keccak_to_pt("seraphis X")
-    static const std::string X_salt(config::HASH_KEY_SERAPHIS_X);
+    const std::string X_salt(config::HASH_KEY_SERAPHIS_X);
     hash_to_p3(X_p3, rct::hash2rct(crypto::cn_fast_hash(X_salt.data(), X_salt.size())));
     ge_p3_tobytes(X.bytes, &X_p3);
 
@@ -284,7 +284,7 @@ void com_matrix(const rct::keyM &M_priv, const rct::key &x, std::vector<rct::Mul
     data_out[m*n] = {x, G_p3}; // mask
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::key delta(const std::size_t x, const std::size_t y)
+rct::key kronecker_delta(const std::size_t x, const std::size_t y)
 {
     if (x == y)
         return ONE;
