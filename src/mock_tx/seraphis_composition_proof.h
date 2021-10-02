@@ -35,7 +35,7 @@
 //   - y_i, z_i > 0
 // - shows that key images KI_i = (z_i/y_i)*U
 // 
-// note: uses 'concise' technique for smaller proofs, with the powers-of-challenge prefixing approach from Triptych
+// note: uses 'concise' technique for smaller proofs, with the powers-of-aggregation coefficient approach from Triptych
 // note2: G_0 = G, G_1 = X, G_2 = U (for Seraphis paper notation)
 // note3: in practice, K_i are masked addresses from Seraphis e-note-images, and KI_i are the corresponding linking tags
 //
