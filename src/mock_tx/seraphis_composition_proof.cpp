@@ -60,14 +60,14 @@ static void transcript_init(rct::key &transcript)
     rct::hash_to_scalar(transcript, salt.data(), salt.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Prefix 'a' for concise structure
+// Aggregation coefficient 'a' for concise structure
 // - K_t2 = K_t1 - X - KI
 //   - X is a generator
-//   - embedding {K_t1}, {KI} in the prefix implicitly embeds K_t2
+//   - embedding {K_t1}, {KI} in the coefficient implicitly embeds K_t2
 //
 // mu_a = H(H("domain-sep"), message, {K_t1}, {KI})
 //-------------------------------------------------------------------------------------------------------------------
-static rct::key compute_concise_prefix_a(const rct::key &message,
+static rct::key compute_base_aggregation_coefficient_a(const rct::key &message,
     const rct::keyV &K_t1,
     const rct::keyV &KI)
 {
@@ -100,12 +100,12 @@ static rct::key compute_concise_prefix_a(const rct::key &message,
     return challenge;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Prefix 'b' for concise structure
+// Aggregation coefficient 'b' for concise structure
 // - {KI} is embedded in mu_a, so it is sufficient to separate mu_a and mu_b with a single hash
 //
 // mu_b = H(mu_a)
 //-------------------------------------------------------------------------------------------------------------------
-static rct::key compute_concise_prefix_b(const rct::key &mu_a)
+static rct::key compute_base_aggregation_coefficient_b(const rct::key &mu_a)
 {
     rct::key challenge;
     std::string hash;
@@ -122,7 +122,7 @@ static rct::key compute_concise_prefix_b(const rct::key &mu_a)
 // Fiat-Shamir challenge message
 // m = H(message, {K})
 //
-// note: in practice, this extends the concise structure prefix (i.e. message = mu_b)
+// note: in practice, this extends the aggregation coefficients (i.e. message = mu_b)
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge_message(const rct::key &message, const rct::keyV &K)
 {
@@ -242,11 +242,11 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     }
 
 
-    /// challenge message and concise prefixes
-    rct::key mu_a = compute_concise_prefix_a(message, proof.K_t1, KI);
+    /// challenge message and aggregation coefficients
+    rct::key mu_a = compute_base_aggregation_coefficient_a(message, proof.K_t1, KI);
     rct::keyV mu_a_pows = powers_of_scalar(mu_a, num_keys);
 
-    rct::key mu_b = compute_concise_prefix_b(mu_a);
+    rct::key mu_b = compute_base_aggregation_coefficient_b(mu_a);
     rct::keyV mu_b_pows = powers_of_scalar(mu_b, num_keys);
 
     rct::key m = compute_challenge_message(mu_b, K);
@@ -326,11 +326,11 @@ bool sp_composition_verify(const SpCompositionProof &proof,
         CHECK_AND_ASSERT_THROW_MES(!(proof.K_t1[i] == rct::identity()), "Invalid proof element K_t1!");
     }
 
-    /// challenge message and concise prefixes
-    rct::key mu_a = compute_concise_prefix_a(message, proof.K_t1, KI);
+    /// challenge message and aggregation coefficients
+    rct::key mu_a = compute_base_aggregation_coefficient_a(message, proof.K_t1, KI);
     rct::keyV mu_a_pows = powers_of_scalar(mu_a, num_keys);
 
-    rct::key mu_b = compute_concise_prefix_b(mu_a);
+    rct::key mu_b = compute_base_aggregation_coefficient_b(mu_a);
     rct::keyV mu_b_pows = powers_of_scalar(mu_b, num_keys);
 
     rct::key m = compute_challenge_message(mu_b, K);
