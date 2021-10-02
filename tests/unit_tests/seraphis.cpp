@@ -178,15 +178,22 @@ TEST(seraphis, composition_proof)
         y.resize(num_keys);
         z.resize(num_keys);
 
-        for (std::size_t i{0}; i < num_keys; ++i)
+        try
         {
-            make_fake_sp_masked_address(x[i], y[i], z[i], K[i]);
-            sp::seraphis_key_image_from_privkeys(z[i], y[i], KI[i]);
+            for (std::size_t i{0}; i < num_keys; ++i)
+            {
+                make_fake_sp_masked_address(x[i], y[i], z[i], K[i]);
+                sp::seraphis_key_image_from_privkeys(z[i], y[i], KI[i]);
+            }
+
+            proof = sp::sp_composition_prove(K, x, y, z, message);
+
+            EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
         }
-
-        proof = sp::sp_composition_prove(K, x, y, z, message);
-
-        EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
+        catch (...)
+        {
+            EXPECT_TRUE(false);
+        }
     }
 
     // works even if x = 0
@@ -197,17 +204,24 @@ TEST(seraphis, composition_proof)
         y.resize(1);
         z.resize(1);
 
-        make_fake_sp_masked_address(x[0], y[0], z[0], K[0]);
+        try
+        {
+            make_fake_sp_masked_address(x[0], y[0], z[0], K[0]);
 
-        rct::key xG;
-        rct::scalarmultBase(xG, x[0]);
-        rct::subKeys(K[0], K[0], xG);   // kludge: remove x part manually
-        x[0] = rct::zero();
+            rct::key xG;
+            rct::scalarmultBase(xG, x[0]);
+            rct::subKeys(K[0], K[0], xG);   // kludge: remove x part manually
+            x[0] = rct::zero();
 
-        sp::seraphis_key_image_from_privkeys(z[0], y[0], KI[0]);
+            sp::seraphis_key_image_from_privkeys(z[0], y[0], KI[0]);
 
-        proof = sp::sp_composition_prove(K, x, y, z, message);
+            proof = sp::sp_composition_prove(K, x, y, z, message);
 
-        EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
+            EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
+        }
+        catch (...)
+        {
+            EXPECT_TRUE(false);
+        }
     }
 }
