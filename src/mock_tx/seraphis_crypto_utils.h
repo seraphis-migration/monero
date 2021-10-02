@@ -105,7 +105,7 @@ void com_matrix(const rct::keyM &M_priv, const rct::key &x, std::vector<rct::Mul
 * param: y - second integer
 * return: 1 if x == y, else 0
 */
-rct::key delta(const std::size_t x, const std::size_t y);
+rct::key kronecker_delta(const std::size_t x, const std::size_t y);
 /**
 * brief: convolve - compute a convolution with a degree-one polynomial
 * param: x - x_1, x_2, ..., x_m

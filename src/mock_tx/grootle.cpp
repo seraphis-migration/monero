@@ -252,7 +252,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     {
         for (std::size_t i = 0; i < n; ++i)
         {
-            sigma[j][i] = delta(decomp_l[j], i);
+            sigma[j][i] = kronecker_delta(decomp_l[j], i);
         }
     }
     com_matrix(sigma, rB, data);
@@ -315,14 +315,14 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
             p[k][j] = ZERO;
         }
         p[k][0] = a[0][decomp_k[0]];
-        p[k][1] = delta(decomp_l[0], decomp_k[0]);
+        p[k][1] = kronecker_delta(decomp_l[0], decomp_k[0]);
 
         for (std::size_t j = 1; j < m; ++j)
         {
             rct::keyV temp;
             temp.resize(2);
             temp[0] = a[j][decomp_k[j]];
-            temp[1] = delta(decomp_l[j], decomp_k[j]);
+            temp[1] = kronecker_delta(decomp_l[j], decomp_k[j]);
 
             p[k] = convolve(p[k], temp, m);
         }
