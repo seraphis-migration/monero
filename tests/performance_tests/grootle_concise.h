@@ -101,18 +101,26 @@ class test_concise_grootle
             proofs.reserve(N_proofs);
             proof_ptrs.reserve(N_proofs);
 
-            for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
+            try
             {
-                proofs.push_back(
-                    sp::concise_grootle_prove(M,
-                        proof_i,
-                        proof_offsets[proof_i],
-                        proof_privkeys[proof_i],
-                        n,
-                        m,
-                        proof_messages[proof_i])
-                    );
+                for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
+                {
+                    proofs.push_back(
+                        sp::concise_grootle_prove(M,
+                            proof_i,
+                            proof_offsets[proof_i],
+                            proof_privkeys[proof_i],
+                            n,
+                            m,
+                            proof_messages[proof_i])
+                        );
+                }
             }
+            catch (...)
+            {
+                return false;
+            }
+
             for (sp::ConciseGrootleProof &proof: proofs)
             {
                 proof_ptrs.push_back(&proof);
@@ -124,8 +132,15 @@ class test_concise_grootle
         bool test()
         {
             // Verify batch
-            if (!sp::concise_grootle_verify(proof_ptrs, M, proof_offsets, n, m, proof_messages))
+            try
+            {
+                if (!sp::concise_grootle_verify(proof_ptrs, M, proof_offsets, n, m, proof_messages))
+                    return false;
+            }
+            catch (...)
+            {
                 return false;
+            }
 
             return true;
         }
