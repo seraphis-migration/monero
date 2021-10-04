@@ -562,7 +562,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
         {
             //Magg_data[alpha] = {sw[alpha], M[k][alpha]};
         }
-        multi_exp_p3(M[k], sw, M_agg_temp);
+        multi_exp_p3(sw, M[k], M_agg_temp);
 
         //data[m*n + (1 + k)] = {ZERO, rct::straus_p3(Magg_data)};
         data[m*n + (1 + k)] = {ZERO, M_agg_temp};

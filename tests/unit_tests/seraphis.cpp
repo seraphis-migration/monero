@@ -67,7 +67,7 @@ static void make_fake_sp_masked_address(rct::key &mask, rct::key &view_stuff, rc
     //G implicit
 
     // K' = x G + kv_stuff X + ks U
-    sp::multi_exp(pubkeys, privkeys, masked_address);
+    sp::multi_exp(privkeys, pubkeys, masked_address);
 }
 
 
@@ -96,7 +96,7 @@ TEST(seraphis, multi_exp)
             rct::addKeys(check, check, temp);
         }
 
-        sp::multi_exp(pubkeys, privkeys, test_key);
+        sp::multi_exp(privkeys, pubkeys, test_key);
 
         EXPECT_TRUE(test_key == check);
     }
@@ -123,7 +123,7 @@ TEST(seraphis, multi_exp)
             rct::addKeys(check, check, temp);
         }
 
-        sp::multi_exp(pubkeys, privkeys, test_key);
+        sp::multi_exp(privkeys, pubkeys, test_key);
 
         EXPECT_TRUE(test_key == check);
     }
@@ -156,7 +156,7 @@ TEST(seraphis, multi_exp)
             rct::addKeys(check, check, temp);
         }
 
-        sp::multi_exp(pubkeys, privkeys, test_key);
+        sp::multi_exp(privkeys, pubkeys, test_key);
 
         EXPECT_TRUE(test_key == check);
     }
