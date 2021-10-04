@@ -38,6 +38,11 @@
 // note: uses 'concise' technique for smaller proofs, with the powers-of-aggregation coefficient approach from Triptych
 // note2: G_0 = G, G_1 = X, G_2 = U (for Seraphis paper notation)
 // note3: in practice, K_i are masked addresses from Seraphis e-note-images, and KI_i are the corresponding linking tags
+// note4: assume key images KI are in the prime subgroup (canonical bytes)
+//   - WARNING: the caller must validate KI
+//     - 1) l*KI == identity
+//     - 2) store (1/8)*KI with proof material (e.g. in a transaction); pass 8*[(1/8)*KI] as input to composition proof
+//          validation
 //
 // multisig notation: alpha_{e,b}
 // - e: multisig signer index

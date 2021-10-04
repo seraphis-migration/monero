@@ -207,10 +207,13 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     for (std::size_t i{0}; i < num_keys; ++i)
     {
         // K_t1_i = (1/y_i) * K_i
+        // store (and use in all byte-aware contexts like hashes): (1/8)*K_t1_i
         privkey_temp = invert(y[i]);
         rct::scalarmultKey(proof.K_t1[i], K[i], privkey_temp);
+        rct::scalarmultKey(proof.K_t1[i], proof.K_t1[i], rct::INV_EIGHT);
 
         // KI = (z_i / y_i) * U
+        // note: plain KI is used in all byte-aware contexts
         sc_mul(privkey_temp.bytes, privkey_temp.bytes, z[i].bytes);
         rct::scalarmultKey(KI[i], U_gen, privkey_temp);
     }
@@ -326,8 +329,8 @@ bool sp_composition_verify(const SpCompositionProof &proof,
         CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_i[i].bytes) == 0, "Bad resonse (r[i])!");
 
         CHECK_AND_ASSERT_THROW_MES(!(KI[i] == rct::identity()), "Invalid key image!");
-        CHECK_AND_ASSERT_THROW_MES(!(proof.K_t1[i] == rct::identity()), "Invalid proof element K_t1!");
     }
+
 
     /// challenge message and aggregation coefficients
     rct::key mu_a = compute_base_aggregation_coefficient_a(message, proof.K_t1, KI);
@@ -344,7 +347,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     // K_t2 part: [r_a * G + c * sum_i(mu_a^i * K_t2[i])]
     // KI part:   [r_b * U + c * sum_i(mu_b^i * KI[i]  )]
     // K_t1[i] parts: [r[i] * K[i] + c * K_t1[i]]
-    rct::keyV K_t2_privkeys;
+    rct::keyV K_t2_coeff;
     rct::keyV KI_privkeys;
     rct::keyV K_t1_privkeys;
     std::vector<ge_p3> K_t2_p3;
@@ -355,7 +358,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     ge_cached temp_cache;
     ge_cached X_cache;
     ge_p1p1 temp_p1p1;
-    K_t2_privkeys.reserve(num_keys + 1);
+    K_t2_coeff.reserve(num_keys + 1);
     KI_privkeys.reserve(num_keys + 1);
     K_t1_privkeys.resize(2);
     K_t2_p3.resize(num_keys);   // note: no '+ 1' because G is implied
@@ -370,16 +373,16 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     for (std::size_t i{0}; i < num_keys; ++i)
     {
         // c * mu_a^i
-        K_t2_privkeys.push_back(mu_a_pows[i]);
-        sc_mul(K_t2_privkeys.back().bytes, K_t2_privkeys.back().bytes, proof.c.bytes);
+        K_t2_coeff.push_back(mu_a_pows[i]);
+        sc_mul(K_t2_coeff.back().bytes, K_t2_coeff.back().bytes, proof.c.bytes);
 
         // c * mu_b^i
         KI_privkeys.push_back(mu_b_pows[i]);
         sc_mul(KI_privkeys.back().bytes, KI_privkeys.back().bytes, proof.c.bytes);
 
-        // get K_t1
-        CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&K_t1_p3[1], proof.K_t1[i].bytes) == 0,
-            "ge_frombytes_vartime failed!");
+        // get K_t1, convert to the prime subgroup, and check it is non-identity
+        rct::scalarmult8(K_t1_p3[1], proof.K_t1[i]);
+        CHECK_AND_ASSERT_THROW_MES(!(ge_p3_is_point_at_infinity(&K_t1_p3[1])), "Invalid proof element K_t1!");
 
         // get KI
         CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&KI_part_p3[i], KI[i].bytes) == 0,
@@ -406,7 +409,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     }
 
     // K_t2: r_a * G + ...
-    K_t2_privkeys.push_back(proof.r_a);
+    K_t2_coeff.push_back(proof.r_a);
     //G implied, not stored in 'K_t2_p3'
 
     // KI: r_b * U + ...
@@ -415,7 +418,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 
     // compute 'a' piece
     rct::key challenge_part_a;
-    multi_exp(K_t2_p3, K_t2_privkeys, challenge_part_a);
+    multi_exp(K_t2_p3, K_t2_coeff, challenge_part_a);
 
     // compute 'b' piece
     rct::key challenge_part_b;
