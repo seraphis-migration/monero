@@ -34,7 +34,7 @@
 //   - x_i >= 0
 //   - y_i, z_i > 0
 // - shows that key images KI_i = (z_i/y_i)*U
-// 
+//
 // note: uses 'concise' technique for smaller proofs, with the powers-of-aggregation coefficient approach from Triptych
 // note2: G_0 = G, G_1 = X, G_2 = U (for Seraphis paper notation)
 // note3: in practice, K_i are masked addresses from Seraphis e-note-images, and KI_i are the corresponding linking tags
@@ -85,7 +85,7 @@ struct SpCompositionProof
     rct::key r_a, r_b;
     // un-condensible responses
     rct::keyV r_i;
-    // intermediate proof keys
+    // intermediate proof keys (stored as (1/8)*KI)
     rct::keyV K_t1;
     // key images KI: not stored with proof
     // main proof keys K: not stored with proof
@@ -94,7 +94,7 @@ struct SpCompositionProof
 
 ////
 // Multisig signature proposal
-// - all parts required to make signature, other than part (KI component) split between multisig participants
+// - all parts required to make signature, other than the (KI component) split between multisig participants
 //
 // WARNING: must only use a 'proposal' to make ONE 'signature',
 //          after that the opening privkeys should be deleted immediately
@@ -108,17 +108,17 @@ struct SpCompositionProofMultisigProposal
     // message
     rct::key message;
 
-    // signature opening privkey: alpha_{e,a}
-    rct::key signature_opening_K_t2_priv;
-    // signature opening privkeys: alpha_{e,i}
-    rct::keyV signature_opening_K_t1_privs;
+    // signature opening: alpha_{e,a}
+    rct::key signature_opening_K_t2;
+    // signature openings: alpha_{e,i}
+    rct::keyV signature_openings_K_t1;
 };
 
 ////
 // Multisig prep struct
-// - store signature opening for KI component
+// - store multisig participant's signature opening for KI component
 //   - multisig assumes only proof component KI is subject to multisig signing (keys z_i split between signers)
-// 
+//
 // WARNING: must only use a 'prep' to make ONE 'partial signature',
 //          after that the opening privkey should be deleted immediately
 // WARNING2: the privkey is for local storage, only the pubkey should be transmitted to other multisig participants
@@ -132,7 +132,7 @@ struct SpCompositionProofMultisigPrep
 };
 
 ////
-// Multisig partially signed composition proof
+// Multisig partially signed composition proof (from one multisig participant)
 // - multisig assumes only proof component KI is subject to multisig signing (keys z_i split between signers)
 // - store signature opening for KI component (response r_b)
 ///
@@ -208,7 +208,8 @@ SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::k
 */
 SpCompositionProofMultisigPrep sp_composition_multisig_init();
 /**
-* brief: sp_composition_multisig_response - make local multisig signer's partial signature for a Seraphis composition proof
+* brief: sp_composition_multisig_partial_sig - make local multisig signer's partial signature for a Seraphis composition
+*        proof
 *   - caller must validate 'proposal'
 *       - are key images well-made?
 *       - are main keys legitimate?
@@ -219,16 +220,14 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init();
 * param: z_e - secret keys of multisig signer (z_{e,i})
 * param: signer_openings - signature opening pubkeys alpha_{e,b}*U from all signers
 * param: local_opening_priv - alpha_{e,b} for local signer
-* param: message - message to insert in Fiat-Shamir transform hash
 * return: partially signed Seraphis composition proof
 */
-SpCompositionProofMultisigPartial sp_composition_multisig_response(const SpCompositionProofMultisigProposal &proposal,
+SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCompositionProofMultisigProposal &proposal,
     const rct::keyV &x,
     const rct::keyV &y,
     const rct::keyV &z_e,
     const rct::keyV &signer_openings,
-    const rct::key &local_opening_priv,
-    const rct::key &message);
+    const rct::key &local_opening_priv);
 /**
 * brief: sp_composition_prove_multisig_final - create a Seraphis composition proof from multisig partial signatures
 * param: partial_sigs - partial signatures from enough multisig participants to complete a full proof

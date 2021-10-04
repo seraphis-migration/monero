@@ -137,17 +137,17 @@ rct::key small_scalar_gen(const std::size_t size_bytes);
 */
 void generate_proof_alpha(const rct::key &base, rct::key &alpha_out, rct::key &alpha_pub_out);
 /**
-* brief: multi_exp_p3 - EC multiexp operation with arbitrary element count
+* brief: multi_exp/multi_exp_p3 - EC multiexp operation with arbitrary element count
 *   - optimization: if a privkey == 1, skips the scalar mul operation
 *   - optimization2: if privkeys.size() > pubkeys.size(), the trailing privkeys will all be 'p * G'
-* param: pubkeys - A, B, ..., M
 * param: privkeys - a, b, ..., m, ..., n
+* param: pubkeys - A, B, ..., M
 * outparam: result_out - aA + bB + ... + mM + ... + n*G
 */
-void multi_exp(const rct::keyV &pubkeys, const rct::keyV &privkeys, rct::key &result_out);
-void multi_exp(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, rct::key &result_out);
-void multi_exp_p3(const rct::keyV &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out);
-void multi_exp_p3(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out);
+void multi_exp(const rct::keyV &privkeys, const rct::keyV &pubkeys, rct::key &result_out);
+void multi_exp(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, rct::key &result_out);
+void multi_exp_p3(const rct::keyV &privkeys, const rct::keyV &pubkeys, ge_p3 &result_out);
+void multi_exp_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, ge_p3 &result_out);
 /**
 * brief: seraphis_key_image_from_privkeys - create a Seraphis key image from private keys
 *   KI = (z/y)*U

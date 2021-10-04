@@ -370,21 +370,21 @@ void generate_proof_alpha(const rct::key &base, rct::key &alpha_out, rct::key &a
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void multi_exp(const rct::keyV &pubkeys, const rct::keyV &privkeys, rct::key &result_out)
+void multi_exp(const rct::keyV &privkeys, const rct::keyV &pubkeys, rct::key &result_out)
 {
     ge_p3 result_p3;
-    multi_exp_p3(pubkeys, privkeys, result_p3);
+    multi_exp_p3(privkeys, pubkeys, result_p3);
     ge_p3_tobytes(result_out.bytes, &result_p3);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void multi_exp(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, rct::key &result_out)
+void multi_exp(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, rct::key &result_out)
 {
     ge_p3 result_p3;
-    multi_exp_p3(pubkeys, privkeys, result_p3);
+    multi_exp_p3(privkeys, pubkeys, result_p3);
     ge_p3_tobytes(result_out.bytes, &result_p3);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void multi_exp_p3(const rct::keyV &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out)
+void multi_exp_p3(const rct::keyV &privkeys, const rct::keyV &pubkeys, ge_p3 &result_out)
 {
     std::vector<ge_p3> pubkeys_p3;
     pubkeys_p3.resize(pubkeys.size());
@@ -396,10 +396,10 @@ void multi_exp_p3(const rct::keyV &pubkeys, const rct::keyV &privkeys, ge_p3 &re
             "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
     }
 
-    multi_exp_p3(pubkeys_p3, privkeys, result_out);
+    multi_exp_p3(privkeys, pubkeys_p3, result_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void multi_exp_p3(const std::vector<ge_p3> &pubkeys, const rct::keyV &privkeys, ge_p3 &result_out)
+void multi_exp_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, ge_p3 &result_out)
 {
     ge_p3 temp_pP;
     ge_cached temp_cache;
