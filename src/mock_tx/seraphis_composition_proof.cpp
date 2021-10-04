@@ -59,7 +59,7 @@ static void transcript_init(rct::key &transcript)
     rct::hash_to_scalar(transcript, salt.data(), salt.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Aggregation coefficient 'a' for concise structure
+// Aggregation coefficient 'mu_a' for concise structure
 // - K_t2 = K_t1 - X - KI
 //   - X is a generator
 //   - embedding {K_t1}, {KI} in the coefficient implicitly embeds K_t2
@@ -99,7 +99,7 @@ static rct::key compute_base_aggregation_coefficient_a(const rct::key &message,
     return challenge;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Aggregation coefficient 'b' for concise structure
+// Aggregation coefficient 'mu_b' for concise structure
 // - {KI} is embedded in mu_a, so it is sufficient to separate mu_a and mu_b with a single hash
 //
 // mu_b = H(mu_a)
@@ -194,8 +194,6 @@ static void compute_responses(const rct::keyV &x,
     CHECK_AND_ASSERT_THROW_MES(num_keys == mu_b_pows.size(), "Not enough keys!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == alpha_i.size(), "Not enough keys!");
 
-    r_i_out.resize(num_keys);
-
 
     /// compute responses
     rct::key r_temp;
@@ -224,6 +222,8 @@ static void compute_responses(const rct::keyV &x,
     sc_mulsub(r_b_out.bytes, challenge.bytes, r_sum_temp.bytes, alpha_b.bytes);  // alpha_b - c * sum_i(...)
 
     // r_i = alpha_i - c * (1 / y_i)
+    r_i_out.resize(num_keys);
+
     for (std::size_t i{0}; i < num_keys; ++i)
     {
         r_temp = invert(y[i]);  // 1 / y_i
@@ -245,7 +245,7 @@ static void compute_K_t1_for_proof(const rct::key &y_i,
     const rct::key &K_i,
     rct::key &K_t1_out)
 {
-    K_t1_out = invert(y_i);  // borrow variable
+    K_t1_out = invert(y_i);  // borrow the variable
     sc_mul(K_t1_out.bytes, K_t1_out.bytes, rct::INV_EIGHT.bytes);
     rct::scalarmultKey(K_t1_out, K_i, K_t1_out);
 }
@@ -547,6 +547,23 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
     const rct::key U_gen{get_U_gen()};
 
+    // check that the local signer's signature opening is in the input set of opening pubkeys
+    rct::key local_opening_pub;
+    bool found_local_opening{false};
+    rct::scalarmultKey(local_opening_pub, U_gen, local_opening_priv);
+
+    for (const auto &opening : signer_openings)
+    {
+        if (local_opening_pub == opening)
+        {
+            found_local_opening = true;
+            break;
+        }
+    }
+    CHECK_AND_ASSERT_THROW_MES(found_local_opening, "Local signer's opening key not in input set!");
+
+
+    /// prepare partial signature
     SpCompositionProofMultisigPartial partial_sig;
 
     // make K_t1
@@ -558,13 +575,9 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
         compute_K_t1_for_proof(y[i], proposal.K[i], partial_sig.K_t1[i]);
     }
 
-    // set KI
+    // set partial sig pieces
     partial_sig.KI = proposal.KI;
-
-    // set K
     partial_sig.K = proposal.K;
-
-    // set message
     partial_sig.message = proposal.message;
 
 
@@ -577,7 +590,6 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     // alpha_b * U
     // - sum of components from all multisig participants
     rct::key alpha_b_pub;
-    rct::scalarmultKey(alpha_b_pub, U_gen, local_opening_priv);
 
     for (const auto &opening : signer_openings)
     {
