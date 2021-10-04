@@ -218,7 +218,7 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init();
 * param: x - secret keys (x_i)
 * param: y - secret keys (y_i)
 * param: z_e - secret keys of multisig signer (z_{e,i})
-* param: signer_openings - signature opening pubkeys alpha_{e,b}*U from all signers
+* param: signer_openings - signature opening pubkeys alpha_{e,b}*U from all signers (including local signer)
 * param: local_opening_priv - alpha_{e,b} for local signer
 * return: partially signed Seraphis composition proof
 */
