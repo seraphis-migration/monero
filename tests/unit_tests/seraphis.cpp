@@ -265,10 +265,10 @@ TEST(seraphis, composition_proof_multisig)
         KI.resize(num_keys);
         x.resize(num_keys);
         y.resize(num_keys);
-        z_pieces_temp.resize(num_keys);
 
         for (std::size_t num_signers{1}; num_signers < 4; ++num_signers)
         {
+            z_pieces_temp.resize(num_signers);
             z_pieces.resize(num_signers);
             for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
             {
@@ -292,9 +292,9 @@ TEST(seraphis, composition_proof_multisig)
                         z_pieces[signer_index][i] = z_pieces_temp[signer_index];
                     }
 
-                    // add all z pieces together to build the key image
+                    // add z pieces together from all signers to build the key image
                     rct::key z{rct::zero()};
-                    for (const auto &z_piece : z_pieces[i])
+                    for (const auto &z_piece : z_pieces_temp)
                         sc_add(z.bytes, z.bytes, z_piece.bytes);
 
                     sp::seraphis_key_image_from_privkeys(z, y[i], KI[i]);

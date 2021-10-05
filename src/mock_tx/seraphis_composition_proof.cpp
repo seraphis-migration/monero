@@ -497,6 +497,7 @@ SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::k
     rct::key dummy;
     generate_proof_alpha(rct::G, proposal.signature_opening_K_t2, dummy);
 
+    proposal.signature_openings_K_t1.resize(num_keys);
     for (std::size_t i{0}; i < num_keys; ++i)
     {
         generate_proof_alpha(K[i], proposal.signature_openings_K_t1[i], dummy);
@@ -528,6 +529,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
     CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Not enough keys to make a proof!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == proposal.KI.size(), "Input key sets not the same size (K ?= KI)!");
+    CHECK_AND_ASSERT_THROW_MES(num_keys == proposal.signature_openings_K_t1.size(), "Input key sets not the same size (K ?= KI)!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == x.size(), "Input key sets not the same size (K ?= x)!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == y.size(), "Input key sets not the same size (K ?= y)!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == z_e.size(), "Input key sets not the same size (K ?= z)!");
@@ -589,7 +591,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
     // alpha_b * U
     // - sum of components from all multisig participants
-    rct::key alpha_b_pub;
+    rct::key alpha_b_pub{rct::identity()};
 
     for (const auto &opening : signer_openings)
     {
