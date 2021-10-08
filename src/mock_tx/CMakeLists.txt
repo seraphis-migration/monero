@@ -29,6 +29,7 @@
 set(mock_tx_sources
   grootle.cpp
   grootle_concise.cpp
+  mock_ledger_context.cpp
   mock_tx.cpp
   mock_tx_utils.cpp
   mock_rct_base.cpp

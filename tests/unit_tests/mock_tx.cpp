@@ -27,6 +27,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "crypto/crypto.h"
+#include "mock_tx/mock_ledger_context.h"
 #include "mock_tx/mock_tx.h"
 #include "mock_tx/mock_rct_clsag.h"
 #include "mock_tx/mock_rct_triptych.h"
@@ -68,6 +69,8 @@ static void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
 {
   static_assert(std::is_base_of<mock_tx::MockTx, MockTxType>::value, "Invalid mock tx type.");
 
+  std::shared_ptr<mock_tx::MockLedgerContext> ledger_context = std::make_shared<mock_tx::MockLedgerContext>();
+
   for (const auto &gen : gen_data)
   {
     try
@@ -80,11 +83,13 @@ static void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
       tx_params.ref_set_decomp_m = gen.ref_set_decomp_m;
 
       // make tx
-      std::shared_ptr<MockTxType> tx{mock_tx::make_mock_tx<MockTxType>(tx_params, gen.input_amounts, gen.output_amounts)};
+      std::shared_ptr<MockTxType> tx{
+          mock_tx::make_mock_tx<MockTxType>(tx_params, gen.input_amounts, gen.output_amounts, ledger_context)
+        };
       EXPECT_TRUE(tx.get() != nullptr);
 
       // validate tx
-      EXPECT_TRUE(tx->validate());
+      EXPECT_TRUE(tx->validate(ledger_context));
     }
     catch (...)
     {
@@ -96,6 +101,9 @@ static void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
 template <typename MockTxType>
 static void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
 {
+  static_assert(std::is_base_of<mock_tx::MockTx, MockTxType>::value, "Invalid mock tx type.");
+
+  std::shared_ptr<mock_tx::MockLedgerContext> ledger_context = std::make_shared<mock_tx::MockLedgerContext>();
   std::vector<std::shared_ptr<MockTxType>> txs_to_verify;
   txs_to_verify.reserve(gen_data.size());
   TestType expected_result = TestType::ExpectTrue;
@@ -116,7 +124,7 @@ static void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
 
       // make tx
       txs_to_verify.push_back(
-          mock_tx::make_mock_tx<MockTxType>(tx_params, gen.input_amounts, gen.output_amounts)
+          mock_tx::make_mock_tx<MockTxType>(tx_params, gen.input_amounts, gen.output_amounts, ledger_context)
         );
 
       // sanity check that rangeproof split is actually splitting the rangeproof
@@ -135,7 +143,7 @@ static void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
   try
   {
     // validate tx
-    EXPECT_TRUE(mock_tx::validate_mock_txs<MockTxType>(txs_to_verify));
+    EXPECT_TRUE(mock_tx::validate_mock_txs<MockTxType>(txs_to_verify, ledger_context));
   }
   catch (...)
   {

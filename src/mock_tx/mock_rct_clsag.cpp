@@ -32,7 +32,9 @@
 #include "mock_rct_clsag.h"
 
 //local headers
+#include "ledger_context.h"
 #include "misc_log_ex.h"
+#include "mock_ledger_context.h"
 #include "mock_rct_base.h"
 #include "mock_rct_components.h"
 #include "mock_tx_utils.h"
@@ -76,7 +78,7 @@ bool MockTxCLSAG::validate_tx_semantics() const
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_linking_tags() const
+bool MockTxCLSAG::validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const
 {
     if (!validate_mock_tx_rct_linking_tags_v1(m_tx_proofs, m_input_images))
         return false;
@@ -92,7 +94,8 @@ bool MockTxCLSAG::validate_tx_amount_balance(const bool defer_batchable) const
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxCLSAG::validate_tx_input_proofs(const bool defer_batchable) const
+bool MockTxCLSAG::validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
+    const bool defer_batchable) const
 {
     if (!validate_mock_tx_rct_proofs_v1(m_tx_proofs, m_input_images))
         return false;
@@ -133,7 +136,8 @@ std::size_t MockTxCLSAG::get_size_bytes() const
 template <>
 std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts)
+    const std::vector<rct::xmr_amount> &out_amounts,
+    std::shared_ptr<MockLedgerContext> ledger_context)
 {
     CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "Tried to make tx without any outputs.");
@@ -180,7 +184,8 @@ std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &pa
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate)
+bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate,
+    const std::shared_ptr<const LedgerContext> ledger_context)
 {
     std::vector<const rct::BulletproofPlus*> range_proofs;
     range_proofs.reserve(txs_to_validate.size()*10);
@@ -191,7 +196,7 @@ bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSA
             return false;
 
         // validate unbatchable parts of tx
-        if (!tx->validate(true))
+        if (!tx->validate(ledger_context, true))
             return false;
 
         // gather range proofs

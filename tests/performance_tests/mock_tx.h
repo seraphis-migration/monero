@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "mock_tx/mock_ledger_context.h"
 #include "mock_tx/mock_rct_clsag.h"
 #include "mock_tx/mock_rct_triptych.h"
 #include "mock_tx/mock_tx_utils.h"
@@ -273,6 +274,9 @@ class test_mock_tx
 
             m_txs.reserve(params.batch_size);
 
+            // fresh mock ledger context
+            m_ledger_contex = std::make_shared<mock_tx::MockLedgerContext>();
+
             // divide max amount into equal-size chunks to distribute among more numerous of inputs vs outputs
             if (params.in_count == 0 || params.out_count == 0)
                 return false;
@@ -308,7 +312,7 @@ class test_mock_tx
 
                     // make tx
                     m_txs.push_back(
-                            mock_tx::make_mock_tx<MockTxType>(tx_params, input_amounts, output_amounts)
+                            mock_tx::make_mock_tx<MockTxType>(tx_params, input_amounts, output_amounts, m_ledger_contex)
                         );
                 }
                 catch (...)
@@ -337,7 +341,7 @@ class test_mock_tx
         {
             try
             {
-                return mock_tx::validate_mock_txs<MockTxType>(m_txs);
+                return mock_tx::validate_mock_txs<MockTxType>(m_txs, m_ledger_contex);
             }
             catch (...)
             {
@@ -347,4 +351,5 @@ class test_mock_tx
 
     private:
         std::vector<std::shared_ptr<MockTxType>> m_txs;
+        std::shared_ptr<mock_tx::MockLedgerContext> m_ledger_contex;
 };
