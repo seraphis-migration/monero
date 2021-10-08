@@ -229,4 +229,3 @@ TEST(grootle, random)
         EXPECT_TRUE(test_grootle_proof(3, 3, 3, 3, type));
     }
 }
-

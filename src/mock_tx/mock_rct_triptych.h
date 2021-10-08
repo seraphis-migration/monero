@@ -150,11 +150,3 @@ bool validate_mock_txs<MockTxTriptych>(const std::vector<std::shared_ptr<MockTxT
     const std::shared_ptr<const LedgerContext> ledger_context);
 
 } //namespace mock_tx
-
-
-
-
-
-
-
-

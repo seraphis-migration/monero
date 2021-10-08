@@ -125,11 +125,3 @@ bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxType>> &txs_to_va
     const std::shared_ptr<const LedgerContext> ledger_context);
 
 } //namespace mock_tx
-
-
-
-
-
-
-
-

@@ -209,11 +209,3 @@ template <>
 bool validate_mock_txs<MockTxSpConcise>(const std::vector<std::shared_ptr<MockTxSpConcise>> &txs_to_validate);
 
 } //namespace mock_tx
-
-
-
-
-
-
-
-

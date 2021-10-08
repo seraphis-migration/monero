@@ -533,10 +533,3 @@ TEST(mock_tx_batching, triptych)
   run_mock_tx_test_batch<mock_tx::MockTxTriptych>(gen_data);
   run_mock_tx_test_batch<mock_tx::MockTxTriptych>(gen_data_split);
 }
-
-
-
-
-
-
-

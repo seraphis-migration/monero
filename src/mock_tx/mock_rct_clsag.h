@@ -143,11 +143,3 @@ bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSA
     const std::shared_ptr<const LedgerContext> ledger_context);
 
 } //namespace mock_tx
-
-
-
-
-
-
-
-

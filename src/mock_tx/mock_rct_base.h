@@ -118,11 +118,3 @@ struct MockDestRct
 };
 
 } //namespace mock_tx
-
-
-
-
-
-
-
-

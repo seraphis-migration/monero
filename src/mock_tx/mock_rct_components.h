@@ -384,13 +384,3 @@ bool validate_mock_tx_rct_proofs_v1(const std::vector<MockRctProofV1> &proofs,
 bool validate_mock_tx_rct_proofs_v2(const std::vector<MockRctProofV2> &proofs);
 
 } //namespace mock_tx
-
-
-
-
-
-
-
-
-
-
