@@ -525,9 +525,9 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     // 0            m*n-1    Hi[i]
     // m*n          G        (zA*G, zC*G, {z}*G)
     // m*n+1        m*n+N    {M_agg}
-    // ... then per-proof data (A, B, C, D, {C_offsets}, {{X}})
+    // ... then per-proof data (A, B, C, D, {C_offsets_agg}, {{X}})
     std::vector<rct::MultiexpData> data;
-    data.reserve((m*n + 1) + N + N_proofs*(num_keys*(m + 1) + 4));
+    data.reserve((m*n + 1) + N + N_proofs*(num_keys*m + 5));
     data.resize((m*n + 1) + N); // set up for all common elements
 
     // prep terms: {Hi}, G
@@ -552,7 +552,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     // prep terms: {M_agg}
     // M_agg[k] = sum_{alpha}( sw[alpha]*M[k][alpha] )
     // - with 'small weight' aggregation of M-keys at each row of the matrix (for faster verification)
-    ge_p3 M_agg_temp;
+    ge_p3 Key_agg_temp;
     std::vector<rct::MultiexpData> Magg_data;
     Magg_data.resize(num_keys);
 
@@ -562,15 +562,15 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
         {
             //Magg_data[alpha] = {sw[alpha], M[k][alpha]};
         }
-        multi_exp_vartime_p3(sw, M[k], M_agg_temp);
+        multi_exp_vartime_p3(sw, M[k], Key_agg_temp);
 
         //data[m*n + (1 + k)] = {ZERO, rct::straus_p3(Magg_data)};
-        data[m*n + (1 + k)] = {ZERO, M_agg_temp};
+        data[m*n + (1 + k)] = {ZERO, Key_agg_temp};
     }
 
 
     /// per-proof data assembly
-    std::size_t skipped_offsets{0};
+    std::size_t skipped_offset_sets{0};
 
     for (std::size_t i_proofs = 0; i_proofs < N_proofs; ++i_proofs)
     {
@@ -740,22 +740,41 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
         // {C_offsets}
         //   ... - w3*sum_k( t_k )*sum_{alpha}(sw[alpha]*C_offsets[alpha]) ...
         // 
-        // proof_offsets[i_proofs][alpha]: -sum_t*w3_sw[alpha]
-        sc_mul(temp.bytes, MINUS_ONE.bytes, sum_t.bytes);  //-sum_t
-        rct::key shuttle;
-
+        // proof_offsets[i_proofs]_agg = sum_{alpha}(sw[alpha]*C_offsets[alpha])
+        // proof_offsets[i_proofs]_agg: -sum_t*w3
+        std::size_t skippable_offsets{0};
         for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
         {
             // optimization: skip if offset == identity
             if (proof_offsets[i_proofs][alpha] == rct::identity())
+                ++skippable_offsets;
+        }
+
+        if (skippable_offsets < num_keys)
+        {
+            rct::key shuttle;
+            rct::keyV temp_sw, temp_offsets;
+            temp_sw.reserve(sw.size() - skippable_offsets);
+            temp_offsets.reserve(sw.size() - skippable_offsets);
+
+            for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
-                ++skipped_offsets;
-                continue;
+                // optimization: skip if offset == identity
+                if (proof_offsets[i_proofs][alpha] == rct::identity())
+                    continue;
+
+                temp_sw.push_back(sw[alpha]);
+                temp_offsets.push_back(proof_offsets[i_proofs][alpha]);
             }
 
-            sc_mul(shuttle.bytes, temp.bytes, w3_sw[alpha].bytes);  //-sum_t*w3_sw[alpha]
-            data.push_back({shuttle, proof_offsets[i_proofs][alpha]});
+            multi_exp_vartime_p3(temp_sw, temp_offsets, Key_agg_temp);
+
+            sc_mul(temp.bytes, MINUS_ONE.bytes, sum_t.bytes);  //-sum_t
+            sc_mul(shuttle.bytes, temp.bytes, w3.bytes);  //-sum_t*w3
+            data.push_back({shuttle, Key_agg_temp});
         }
+        else if (skippable_offsets > 0)
+            ++skipped_offset_sets;
 
         // {{X}}
         //   w3*[ ... - sum_{alpha}( sw[alpha]*( sum_j( xi^j*X[alpha][j] ) - z[alpha] G ) ) ] == 0
@@ -782,7 +801,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 
 
     /// Final check
-    CHECK_AND_ASSERT_THROW_MES(data.size() == (m*n + 1) + N + N_proofs*(num_keys*(m + 1) + 4) - skipped_offsets,
+    CHECK_AND_ASSERT_THROW_MES(data.size() == (m*n + 1) + N + N_proofs*(num_keys*m + 5) - skipped_offset_sets,
         "Final proof data is incorrect size!");
 
 
