@@ -165,3 +165,9 @@ void fe_tobytes(unsigned char *, const fe);
 void fe_invert(fe out, const fe z);
 
 int ge_p3_is_point_at_infinity_vartime(const ge_p3 *p);
+
+// miscellaneous
+void slide(signed char *r, const unsigned char *a);
+void ge_p2_0(ge_p2 *);
+void ge_madd(ge_p1p1 *, const ge_p3 *, const ge_precomp *);
+void ge_msub(ge_p1p1 *, const ge_p3 *, const ge_precomp *);
