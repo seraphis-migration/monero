@@ -111,11 +111,3 @@ bool balance_check_in_out_amnts(const std::vector<rct::xmr_amount> &input_amount
     const std::vector<rct::xmr_amount> &output_amounts);
 
 } //namespace mock_tx
-
-
-
-
-
-
-
-

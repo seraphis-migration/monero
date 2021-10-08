@@ -50,13 +50,3 @@ struct MockENoteSpV1
 {};
 
 } //namespace mock_tx
-
-
-
-
-
-
-
-
-
-
