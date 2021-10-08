@@ -752,7 +752,6 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 
         if (skippable_offsets < num_keys)
         {
-            rct::key shuttle;
             rct::keyV temp_sw, temp_offsets;
             temp_sw.reserve(sw.size() - skippable_offsets);
             temp_offsets.reserve(sw.size() - skippable_offsets);
@@ -767,11 +766,20 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
                 temp_offsets.push_back(proof_offsets[i_proofs][alpha]);
             }
 
-            multi_exp_vartime_p3(temp_sw, temp_offsets, Key_agg_temp);
-
             sc_mul(temp.bytes, MINUS_ONE.bytes, sum_t.bytes);  //-sum_t
-            sc_mul(shuttle.bytes, temp.bytes, w3.bytes);  //-sum_t*w3
-            data.push_back({shuttle, Key_agg_temp});
+            sc_mul(temp.bytes, temp.bytes, w3.bytes);  //-sum_t*w3
+
+            // optimization: only call multi_exp if there are multiple offsets to combine
+            if (temp_sw.size() == 1)
+            {
+                sc_mul(temp.bytes, temp.bytes, temp_sw[0].bytes);  //-sum_t*w3*sw[whatever it is]
+                data.push_back({temp, temp_offsets[0]});
+            }
+            else
+            {
+                multi_exp_vartime_p3(temp_sw, temp_offsets, Key_agg_temp);
+                data.push_back({temp, Key_agg_temp});
+            }
         }
         else if (skippable_offsets > 0)
             ++skipped_offset_sets;
