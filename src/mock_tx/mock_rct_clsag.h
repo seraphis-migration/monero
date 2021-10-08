@@ -47,6 +47,11 @@
 #include <vector>
 
 //forward declarations
+namespace mock_tx
+{
+    class LedgerContext;
+    class MockLedgerContext;
+}
 
 
 namespace mock_tx
@@ -79,10 +84,11 @@ public:
 
 //member functions
     /// validate tx
-    bool validate(const bool defer_batchable = false) const override
+    bool validate(const std::shared_ptr<const LedgerContext> ledger_context,
+        const bool defer_batchable = false) const override
     {
         // punt to the parent class
-        return this->MockTx::validate(defer_batchable);
+        return this->MockTx::validate(ledger_context, defer_batchable);
     }
 
     /// get size of tx
@@ -99,9 +105,10 @@ public:
 private:
     /// validate pieces of the tx
     bool validate_tx_semantics() const override;
-    bool validate_tx_linking_tags() const override;
+    bool validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const override;
     bool validate_tx_amount_balance(const bool defer_batchable) const override;
-    bool validate_tx_input_proofs(const bool defer_batchable) const override;
+    bool validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
+        const bool defer_batchable) const override;
 
 //member variables
     /// tx input images  (spent e-notes)
@@ -124,14 +131,16 @@ private:
 template <>
 std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts);
+    const std::vector<rct::xmr_amount> &out_amounts,
+    std::shared_ptr<MockLedgerContext> ledger_context);
 /**
 * brief: validate_mock_txs - validate a set of MockTxCLSAG transactions (function specialization)
 * param: txs_to_validate -
 * return: true/false on validation result
 */
 template <>
-bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate);
+bool validate_mock_txs<MockTxCLSAG>(const std::vector<std::shared_ptr<MockTxCLSAG>> &txs_to_validate,
+    const std::shared_ptr<const LedgerContext> ledger_context);
 
 } //namespace mock_tx
 

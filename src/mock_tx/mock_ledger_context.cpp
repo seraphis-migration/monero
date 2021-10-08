@@ -29,34 +29,41 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_tx.h"
+#include "mock_ledger_context.h"
 
 //local headers
-#include "ledger_context.h"
+#include "misc_log_ex.h"
+#include "mock_sp_component_types.h"
+#include "ringct/rctTypes.h"
 
 //third party headers
 
 //standard headers
+#include <memory>
+#include <vector>
 
 
 namespace mock_tx
 {
-//-----------------------------------------------------------------
-bool MockTx::validate(const std::shared_ptr<const LedgerContext> ledger_context, const bool defer_batchable) const
+//-------------------------------------------------------------------------------------------------------------------
+bool MockLedgerContext::linking_tag_exists_sp_v1(const rct::key &linking_tag) const
 {
-    if (!validate_tx_semantics())
-        return false;
-
-    if (!validate_tx_linking_tags(ledger_context))
-        return false;
-
-    if (!validate_tx_amount_balance(defer_batchable))
-        return false;
-
-    if (!validate_tx_input_proofs(ledger_context, defer_batchable))
-        return false;
-
-    return true;
+    return m_sp_linking_tags.find(linking_tag) != m_sp_linking_tags.end();
 }
-//-----------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+void MockLedgerContext::get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
+    std::vector<MockENoteSpV1> &enotes_out) const
+{
+    std::vector<MockENoteSpV1> enotes_temp;
+    enotes_temp.reserve(indices.size());
+
+    for (const std::size_t index : indices)
+    {
+        CHECK_AND_ASSERT_THROW_MES(index < m_sp_enotes.size(), "Tried to get enote that doesn't exist.");
+        enotes_temp.push_back(m_sp_enotes[index]);
+    }
+
+    enotes_out = std::move(enotes_temp);
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx

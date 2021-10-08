@@ -42,6 +42,11 @@
 #include <vector>
 
 //forward declarations
+namespace mock_tx
+{
+    class LedgerContext;
+    class MockLedgerContext;
+}
 
 
 namespace mock_tx
@@ -74,7 +79,8 @@ public:
     // validate the transaction
     // - if 'defer_batchable' is set, then batchable validation steps shouldn't be executed
     ///
-    virtual bool validate(const bool defer_batchable = false) const;
+    virtual bool validate(const std::shared_ptr<const LedgerContext> ledger_context,
+        const bool defer_batchable = false) const;
 
     /// get size of tx
     virtual std::size_t get_size_bytes() const = 0;
@@ -86,11 +92,12 @@ public:
 
 private:
     virtual bool validate_tx_semantics() const = 0;
-    virtual bool validate_tx_linking_tags() const = 0;
+    virtual bool validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const = 0;
     // e.g. sum(inputs) == sum(outputs), range proofs
     virtual bool validate_tx_amount_balance(const bool defer_batchable) const = 0;
     // e.g. membership, ownership, unspentness proofs
-    virtual bool validate_tx_input_proofs(const bool defer_batchable) const = 0;
+    virtual bool validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
+        const bool defer_batchable) const = 0;
 //member variables
 };
 
@@ -105,7 +112,8 @@ private:
 template <typename MockTxType>
 std::shared_ptr<MockTxType> make_mock_tx(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts);
+    const std::vector<rct::xmr_amount> &out_amounts,
+    std::shared_ptr<MockLedgerContext> ledger_context = nullptr);
 /**
 * brief: validate_mock_txs - validate a set of mock tx (use batching if possible)
 * type: MockTxType - 
@@ -113,7 +121,8 @@ std::shared_ptr<MockTxType> make_mock_tx(const MockTxParamPack &params,
 * return: true/false on verification result
 */
 template <typename MockTxType>
-bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxType>> &txs_to_validate);
+bool validate_mock_txs(const std::vector<std::shared_ptr<MockTxType>> &txs_to_validate,
+    const std::shared_ptr<const LedgerContext> ledger_context);
 
 } //namespace mock_tx
 

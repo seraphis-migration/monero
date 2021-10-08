@@ -78,7 +78,7 @@ bool MockTxTriptych::validate_tx_semantics() const
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxTriptych::validate_tx_linking_tags() const
+bool MockTxTriptych::validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const
 {
     if (!validate_mock_tx_rct_linking_tags_v2(m_tx_proofs, m_input_images))
         return false;
@@ -94,7 +94,8 @@ bool MockTxTriptych::validate_tx_amount_balance(const bool defer_batchable) cons
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxTriptych::validate_tx_input_proofs(const bool defer_batchable) const
+bool MockTxTriptych::validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
+    const bool defer_batchable) const
 {
     if (!validate_mock_tx_rct_proofs_v2(m_tx_proofs))
         return false;
@@ -134,7 +135,8 @@ std::size_t MockTxTriptych::get_size_bytes() const
 template <>
 std::shared_ptr<MockTxTriptych> make_mock_tx<MockTxTriptych>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts)
+    const std::vector<rct::xmr_amount> &out_amounts,
+    std::shared_ptr<MockLedgerContext> ledger_context)
 {
     CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "Tried to make tx without any outputs.");
@@ -184,7 +186,8 @@ std::shared_ptr<MockTxTriptych> make_mock_tx<MockTxTriptych>(const MockTxParamPa
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-bool validate_mock_txs<MockTxTriptych>(const std::vector<std::shared_ptr<MockTxTriptych>> &txs_to_validate)
+bool validate_mock_txs<MockTxTriptych>(const std::vector<std::shared_ptr<MockTxTriptych>> &txs_to_validate,
+    const std::shared_ptr<const LedgerContext> ledger_context)
 {
     std::vector<const rct::BulletproofPlus*> range_proofs;
     range_proofs.reserve(txs_to_validate.size()*10);
@@ -195,7 +198,7 @@ bool validate_mock_txs<MockTxTriptych>(const std::vector<std::shared_ptr<MockTxT
             return false;
 
         // validate unbatchable parts of tx
-        if (!tx->validate(true))
+        if (!tx->validate(ledger_context, true))
             return false;
 
         // gather range proofs

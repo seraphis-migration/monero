@@ -26,37 +26,42 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// Interface for interacting with a ledger when validating a tx.
 // NOT FOR PRODUCTION
 
-//paired header
-#include "mock_tx.h"
+#pragma once
 
 //local headers
-#include "ledger_context.h"
+#include "ringct/rctTypes.h"
 
 //third party headers
 
 //standard headers
+#include <vector>
+
+//forward declarations
+namespace mock_tx { struct MockENoteSpV1; }
 
 
 namespace mock_tx
 {
-//-----------------------------------------------------------------
-bool MockTx::validate(const std::shared_ptr<const LedgerContext> ledger_context, const bool defer_batchable) const
+
+class LedgerContext
 {
-    if (!validate_tx_semantics())
-        return false;
+public:
+    /**
+    * brief: linking_tag_exists_sp_v1 - checks if a Seraphis linking tag exists in the ledger
+    * param: linking_tag -
+    * return: true/false on check result
+    */
+    virtual bool linking_tag_exists_sp_v1(const rct::key &linking_tag) const = 0;
+    /**
+    * brief: get_reference_set_sp_v1 - gets Seraphis enotes stored in the ledger
+    * param: indices -
+    * outparam: enotes_out - 
+    */
+    virtual void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
+        std::vector<MockENoteSpV1> &enotes_out) const = 0;
+};
 
-    if (!validate_tx_linking_tags(ledger_context))
-        return false;
-
-    if (!validate_tx_amount_balance(defer_batchable))
-        return false;
-
-    if (!validate_tx_input_proofs(ledger_context, defer_batchable))
-        return false;
-
-    return true;
-}
-//-----------------------------------------------------------------
 } //namespace mock_tx
