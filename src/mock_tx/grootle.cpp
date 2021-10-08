@@ -560,12 +560,12 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     {
         for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
         {
-            Magg_data[alpha] = {sw[alpha], M[k][alpha]};
+            //Magg_data[alpha] = {sw[alpha], M[k][alpha]};
         }
-        //multi_exp_vartime_p3(sw, M[k], M_agg_temp);
+        multi_exp_vartime_p3(sw, M[k], M_agg_temp);
 
-        data[m*n + (1 + k)] = {ZERO, rct::straus_p3(Magg_data)};
-        //data[m*n + (1 + k)] = {ZERO, M_agg_temp};
+        //data[m*n + (1 + k)] = {ZERO, rct::straus_p3(Magg_data)};
+        data[m*n + (1 + k)] = {ZERO, M_agg_temp};
     }
 
 
