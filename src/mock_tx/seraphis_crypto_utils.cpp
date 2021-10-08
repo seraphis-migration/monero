@@ -421,7 +421,7 @@ void multi_exp_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, 
         /// p*P
 
         // optimize for 1*P
-        if (privkeys[i].bytes[0] == 1 && privkeys[i] == IDENTITY)  // short-circuit if first byte != 1
+        if (privkeys[i] == IDENTITY)
         {
             temp_pP = pubkeys[i];  // 1*P
         }
@@ -447,7 +447,7 @@ void multi_exp_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, 
     }
 
     // last keys are p*G
-    rct::key base_privkey{rct::zero()};
+    rct::key base_privkey{ZERO};
 
     for (std::size_t i = pubkeys.size(); i < privkeys.size(); ++i)
     {
@@ -458,10 +458,10 @@ void multi_exp_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, 
     {
         /// p_sum*G
 
-        // optimize for 1*P
+        // optimize for 1*G
         if (base_privkey == IDENTITY)
         {
-            temp_pP = G_p3;  // 1*P
+            temp_pP = G_p3;  // 1*G
         }
         // optimize for P == G
         else
@@ -540,7 +540,10 @@ void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &p
 
     for (std::size_t privkey_index{pubkeys.size()}; privkey_index < privkeys.size(); ++privkey_index)
     {
-        sc_add(base_privkey.bytes, base_privkey.bytes, privkeys[privkey_index].bytes);
+        if (privkey_index == pubkeys.size())
+            base_privkey = privkeys[privkey_index];
+        else
+            sc_add(base_privkey.bytes, base_privkey.bytes, privkeys[privkey_index].bytes);
     }
 
     // find how many elements have scalar = 1
@@ -566,11 +569,11 @@ void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &p
     precomps.resize(pubkeys.size() - unary_scalar_count);
 
     if (unaries.size() > unary_scalar_count)
-        scalar_slides.resize(precomps.size());
+        scalar_slides.resize(precomps.size());  // in p*G, p = 1
     else if (privkeys.size() > pubkeys.size() && !(base_privkey == ZERO))
         scalar_slides.resize(precomps.size() + 1);  // an extra scalar for p*G, with p > 1
     else
-        scalar_slides.resize(precomps.size());
+        scalar_slides.resize(precomps.size());  // p = 0
 
     std::size_t precomp_index{0};
     std::size_t slides_index{0};
@@ -590,7 +593,7 @@ void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &p
 
     if (scalar_slides.size() > precomps.size())
     {
-        slide(scalar_slides.back().data(), base_privkey.bytes);
+        slide(scalar_slides.back().data(), base_privkey.bytes); // for p*G, p > 1
     }
 
     // add all elements with scalar = 1
@@ -623,7 +626,13 @@ void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &p
     }
 
     if (!found_nonzero_scalar)
+    {
+        // return identity if no scalars > 0 mod l
+        if (unaries.size() == 0)
+            result_out = ge_p3_identity;
+
         return;
+    }
 
     for (i = max_i; i >= 0; --i)
     {
@@ -662,7 +671,7 @@ void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &p
         // prep for next step
         if (i == 0)
         {
-            // we are done, prepare final result
+            // we are done, set final result
             if (unaries.size() > 0)
             {
                 // combine scalar = 1 and scalar > 1 parts
