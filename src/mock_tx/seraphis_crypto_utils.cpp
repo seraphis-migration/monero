@@ -49,7 +49,9 @@ extern "C"
 #include <boost/thread/mutex.hpp>
 
 //standard headers
+#include <array>
 #include <cmath>
+#include <vector>
 
 
 #define CHECK_AND_ASSERT_THROW_MES_L1(expr, message) {if(!(expr)) {MWARNING(message); throw std::runtime_error(message);}}
@@ -445,27 +447,34 @@ void multi_exp_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, 
     }
 
     // last keys are p*G
+    rct::key base_privkey{rct::zero()};
+
     for (std::size_t i = pubkeys.size(); i < privkeys.size(); ++i)
     {
-        /// p*G
+        sc_add(base_privkey.bytes, base_privkey.bytes, privkeys[i].bytes);
+    }
+    
+    if (pubkeys.size() < privkeys.size())
+    {
+        /// p_sum*G
 
         // optimize for 1*P
-        if (privkeys[i].bytes[0] == 1 && privkeys[i] == IDENTITY)  // short-circuit if first byte != 1
+        if (base_privkey == IDENTITY)
         {
             temp_pP = G_p3;  // 1*P
         }
         // optimize for P == G
         else
         {
-            sc_reduce32copy(temp_rct.bytes, privkeys[i].bytes); //do this beforehand
+            sc_reduce32copy(temp_rct.bytes, base_privkey.bytes); //do this beforehand
             ge_scalarmult_base(&temp_pP, temp_rct.bytes);
         }
 
 
-        /// add p*G into result
+        /// add p_sum*G into result
 
         // P[i-1] + P[i]
-        if (i > 0)
+        if (pubkeys.size() > 0)
         {
             ge_p3_to_cached(&temp_cache, &temp_pP);
             ge_add(&temp_p1p1, &result_out, &temp_cache);   // P[i-1] + P[i]
@@ -475,6 +484,204 @@ void multi_exp_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, 
         {
             result_out = temp_pP;
         }
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void multi_exp_vartime(const rct::keyV &privkeys, const rct::keyV &pubkeys, rct::key &result_out)
+{
+    ge_p3 result_p3;
+    multi_exp_vartime_p3(privkeys, pubkeys, result_p3);
+    ge_p3_tobytes(result_out.bytes, &result_p3);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void multi_exp_vartime(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, rct::key &result_out)
+{
+    ge_p3 result_p3;
+    multi_exp_vartime_p3(privkeys, pubkeys, result_p3);
+    ge_p3_tobytes(result_out.bytes, &result_p3);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void multi_exp_vartime_p3(const rct::keyV &privkeys, const rct::keyV &pubkeys, ge_p3 &result_out)
+{
+    std::vector<ge_p3> pubkeys_p3;
+    pubkeys_p3.resize(pubkeys.size());
+
+    for (std::size_t i = 0; i < pubkeys.size(); ++i)
+    {
+        /// convert key P to ge_p3
+        CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&pubkeys_p3[i], pubkeys[i].bytes) == 0,
+            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+    }
+
+    multi_exp_vartime_p3(privkeys, pubkeys_p3, result_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, ge_p3 &result_out)
+{
+    // initialize
+    std::vector<std::array<signed char, 256>> scalar_slides;
+    std::vector<std::array<ge_cached, 8>> precomps;
+    ge_p1p1 t;
+    ge_p3 u;
+    ge_p2 r;
+    int i;
+    std::size_t unary_scalar_count{0};
+
+    // check
+    CHECK_AND_ASSERT_THROW_MES_L1(pubkeys.size() <= privkeys.size(), "Too many input pubkeys!");
+    if (privkeys.empty())
+    {
+        result_out = ge_p3_identity;
+        return;
+    }
+
+    // set 'p' (in pG)
+    rct::key base_privkey{ZERO};
+
+    for (std::size_t privkey_index{pubkeys.size()}; privkey_index < privkeys.size(); ++privkey_index)
+    {
+        sc_add(base_privkey.bytes, base_privkey.bytes, privkeys[privkey_index].bytes);
+    }
+
+    // find how many elements have scalar = 1
+    if (base_privkey == IDENTITY)
+        ++unary_scalar_count;
+
+    for (std::size_t pubkey_index{0}; pubkey_index < pubkeys.size(); ++pubkey_index)
+    {
+        if (privkeys[pubkey_index] == IDENTITY)
+            ++unary_scalar_count;
+    }
+
+    rct::keyV unaries;
+    unaries.resize(unary_scalar_count, IDENTITY);
+
+    if (base_privkey == IDENTITY)
+        --unary_scalar_count;
+
+    // separate elements with scalar = 1, and prepare for vartime multi exp for other elements
+    std::vector<ge_p3> unary_pubkeys;
+    unary_pubkeys.reserve(unary_scalar_count);
+
+    precomps.resize(pubkeys.size() - unary_scalar_count);
+
+    if (unaries.size() > unary_scalar_count)
+        scalar_slides.resize(precomps.size());
+    else if (privkeys.size() > pubkeys.size() && !(base_privkey == ZERO))
+        scalar_slides.resize(precomps.size() + 1);  // an extra scalar for p*G, with p > 1
+    else
+        scalar_slides.resize(precomps.size());
+
+    std::size_t precomp_index{0};
+    std::size_t slides_index{0};
+
+    for (std::size_t pubkey_index{0}; pubkey_index < pubkeys.size(); ++pubkey_index)
+    {
+        if (privkeys[pubkey_index] == IDENTITY)
+            unary_pubkeys.push_back(pubkeys[pubkey_index]);
+        else
+        {
+            ge_dsm_precomp(precomps[precomp_index].data(), &pubkeys[pubkey_index]);
+            slide(scalar_slides[slides_index].data(), privkeys[pubkey_index].bytes);
+            ++precomp_index;
+            ++slides_index;
+        }
+    }
+
+    if (scalar_slides.size() > precomps.size())
+    {
+        slide(scalar_slides.back().data(), base_privkey.bytes);
+    }
+
+    // add all elements with scalar = 1
+    if (unaries.size() > 0)
+        multi_exp_p3(unaries, unary_pubkeys, result_out);
+
+    // leave early if we are done
+    if (scalar_slides.size() == 0)
+        return;
+
+    // perform multi exp for elements with scalar > 0
+    ge_p2_0(&r);
+    int max_i{0};
+    bool found_nonzero_scalar{false};
+
+    for (std::size_t slides_index{0}; slides_index < scalar_slides.size(); ++slides_index)
+    {
+        if (max_i < 0)
+            max_i = 0;
+
+        for (i = 255; i >= max_i; --i)
+        {
+            if (scalar_slides[slides_index][i])
+            {
+                max_i = i;
+                found_nonzero_scalar = true;
+                break;
+            }
+        }
+    }
+
+    if (!found_nonzero_scalar)
+        return;
+
+    for (i = max_i; i >= 0; --i)
+    {
+        ge_p2_dbl(&t, &r);
+
+        // add all non-G components if they exist
+        for (std::size_t precomp_index{0}; precomp_index < precomps.size(); ++precomp_index)
+        {
+            if (scalar_slides[precomp_index][i] > 0)
+            {
+                ge_p1p1_to_p3(&u, &t);
+                ge_add(&t, &u, &precomps[precomp_index][scalar_slides[precomp_index][i]/2]);
+            }
+            else if (scalar_slides[precomp_index][i] < 0)
+            {
+                ge_p1p1_to_p3(&u, &t);
+                ge_sub(&t, &u, &precomps[precomp_index][(-scalar_slides[precomp_index][i])/2]);
+            }
+        }
+
+        // add base point 'G' component if it exists
+        if (scalar_slides.size() > precomps.size())
+        {
+            if (scalar_slides.back()[i] > 0)
+            {
+                ge_p1p1_to_p3(&u, &t);
+                ge_madd(&t, &u, &ge_Bi[scalar_slides.back()[i]/2]);
+            }
+            else if (scalar_slides.back()[i] < 0)
+            {
+                ge_p1p1_to_p3(&u, &t);
+                ge_msub(&t, &u, &ge_Bi[(-scalar_slides.back()[i])/2]);
+            }
+        }
+
+        // prep for next step
+        if (i == 0)
+        {
+            // we are done, prepare final result
+            if (unaries.size() > 0)
+            {
+                // combine scalar = 1 and scalar > 1 parts
+                ge_cached temp_cache;
+                ge_p1p1 temp_p1p1;
+
+                ge_p1p1_to_p3(&u, &t);
+                ge_p3_to_cached(&temp_cache, &u);
+                ge_add(&temp_p1p1, &result_out, &temp_cache);
+                ge_p1p1_to_p3(&result_out, &temp_p1p1);
+            }
+            else
+            {
+                // no scalar = 1 part, get result directly
+                ge_p1p1_to_p3(&result_out, &t);
+            }
+        }
+        else
+            ge_p1p1_to_p2(&r, &t);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------

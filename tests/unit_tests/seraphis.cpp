@@ -111,12 +111,13 @@ TEST(seraphis, multi_exp)
         }
 
         sp::multi_exp(privkeys, pubkeys, test_key);
-
+        EXPECT_TRUE(test_key == check);
+        sp::multi_exp_vartime(privkeys, pubkeys, test_key);
         EXPECT_TRUE(test_key == check);
     }
 
     // privkey == 1 optimization works
-    for (std::size_t i = 1; i < 5; ++i)
+    for (std::size_t i = 4; i < 7; ++i)
     {
         check = rct::identity();
 
@@ -138,7 +139,8 @@ TEST(seraphis, multi_exp)
         }
 
         sp::multi_exp(privkeys, pubkeys, test_key);
-
+        EXPECT_TRUE(test_key == check);
+        sp::multi_exp_vartime(privkeys, pubkeys, test_key);
         EXPECT_TRUE(test_key == check);
     }
 
@@ -171,7 +173,8 @@ TEST(seraphis, multi_exp)
         }
 
         sp::multi_exp(privkeys, pubkeys, test_key);
-
+        EXPECT_TRUE(test_key == check);
+        sp::multi_exp_vartime(privkeys, pubkeys, test_key);
         EXPECT_TRUE(test_key == check);
     }
 }

@@ -448,7 +448,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
         K_t1_privkeys[0] = proof.r_i[i];
 
         // compute 'K_t1[i]' piece
-        multi_exp(K_t1_privkeys, K_t1_p3, challenge_parts_i[i]);
+        multi_exp_vartime(K_t1_privkeys, K_t1_p3, challenge_parts_i[i]);
     }
 
     // K_t2: r_a * G + ...
@@ -461,11 +461,11 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 
     // compute 'a' piece
     rct::key challenge_part_a;
-    multi_exp(K_t2_coeff, K_t2_p3, challenge_part_a);
+    multi_exp_vartime(K_t2_coeff, K_t2_p3, challenge_part_a);
 
     // compute 'b' piece
     rct::key challenge_part_b;
-    multi_exp(KI_privkeys, KI_part_p3, challenge_part_b);
+    multi_exp_vartime(KI_privkeys, KI_part_p3, challenge_part_b);
 
 
     /// compute nominal challenge
