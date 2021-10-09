@@ -26,7 +26,7 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Mock tx: plain RingCT base components (types/functions)
+// Mock tx: plain RingCT base types
 // NOT FOR PRODUCTION
 
 #pragma once

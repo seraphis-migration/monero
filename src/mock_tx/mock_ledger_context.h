@@ -39,6 +39,7 @@
 //third party headers
 
 //standard headers
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -64,11 +65,23 @@ public:
     */
     void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
         std::vector<MockENoteSpV1> &enotes_out) const override;
+    /**
+    * brief: add_linking_tag_sp_v1 - add a Seraphis linking tag to the ledger
+    * param: linking_tag -
+    */
+    void add_linking_tag_sp_v1(const rct::key &linking_tag);
+    /**
+    * brief: add_enote_sp_v1 - add a Seraphis v1 enote to the ledger
+    * param: enote -
+    * return: index in the ledger of the enote just added
+    */
+    std::size_t add_enote_sp_v1(const MockENoteSpV1 &enote);
 
+private:
     /// Seraphis linking tags
     std::unordered_set<rct::key> m_sp_linking_tags;
     /// Seraphis v1 ENotes
-    std::vector<MockENoteSpV1> m_sp_enotes;
+    std::unordered_map<std::size_t, MockENoteSpV1> m_sp_enotes;
 };
 
 } //namespace mock_tx

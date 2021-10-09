@@ -32,6 +32,7 @@
 #include "mock_rct_clsag.h"
 
 //local headers
+#include "crypto/crypto.h"
 #include "ledger_context.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
@@ -39,7 +40,6 @@
 #include "mock_rct_components.h"
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
-#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -151,6 +151,7 @@ std::shared_ptr<MockTxCLSAG> make_mock_tx<MockTxCLSAG>(const MockTxParamPack &pa
 
     // make mock destinations
     std::vector<MockDestRctV1> destinations{gen_mock_rct_dests_v1(out_amounts)};
+
 
     /// make tx
     // tx components

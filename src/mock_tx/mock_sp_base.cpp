@@ -29,11 +29,12 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_ledger_context.h"
+#include "mock_sp_base.h"
 
 //local headers
+#include "crypto/crypto.h"
 #include "misc_log_ex.h"
-#include "mock_sp_component_types.h"
+#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -45,36 +46,39 @@
 namespace mock_tx
 {
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::linking_tag_exists_sp_v1(const rct::key &linking_tag) const
+void MockENoteRct::make_base(const crypto::secret_key &onetime_privkey,
+    const crypto::secret_key &amount_blinding_factor,
+    const rct::xmr_amount amount)
 {
-    return m_sp_linking_tags.find(linking_tag) != m_sp_linking_tags.end();
+    // Ko = ko G
+    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(onetime_privkey, m_onetime_address),
+        "Failed to derive public key");
+
+    // C = x G + a H
+    m_amount_commitment = rct::rct2pk(rct::commit(amount, rct::sk2rct(amount_blinding_factor)));
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
-    std::vector<MockENoteSpV1> &enotes_out) const
+void MockENoteRct::gen_base()
 {
-    std::vector<MockENoteSpV1> enotes_temp;
-    enotes_temp.reserve(indices.size());
-
-    for (const std::size_t index : indices)
-    {
-        CHECK_AND_ASSERT_THROW_MES(index < m_sp_enotes.size(), "Tried to get enote that doesn't exist.");
-        enotes_temp.push_back(m_sp_enotes.at(index));
-    }
-
-    enotes_out = std::move(enotes_temp);
+    // all random
+    m_onetime_address = rct::rct2pk(rct::pkGen());
+    m_amount_commitment = rct::rct2pk(rct::pkGen());
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::add_linking_tag_sp_v1(const rct::key &linking_tag)
+void MockDestRct::gen_base(const rct::xmr_amount amount)
 {
-    m_sp_linking_tags.insert(linking_tag);
+    // all random except amount
+    m_onetime_address = rct::rct2pk(rct::pkGen());
+    m_amount_blinding_factor = rct::rct2sk(rct::skGen());
+    m_amount = amount;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t MockLedgerContext::add_enote_sp_v1(const MockENoteSpV1 &enote)
+void MockDestRct::to_enote_rct_base(MockENoteRct &enote_inout) const
 {
-    m_sp_enotes[m_sp_enotes.size()] = enote;
+    enote_inout.m_onetime_address = m_onetime_address;
 
-    return m_sp_enotes.size() - 1;
+    // C = x G + a H
+    enote_inout.m_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(m_amount_blinding_factor)));
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx

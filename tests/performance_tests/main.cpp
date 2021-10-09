@@ -182,10 +182,11 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 1, 1, 4);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 1, 1, 16);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 4, 2, 2, 1, 4);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 4, 2, 2, 1, 16);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 4, 2, 2, 1, 32);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 5, 2, 2, 1, 4);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 3);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 4);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 16);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 32);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 7, 2, 2, 1, 4);
   TEST_PERFORMANCE6(filter, p, test_grootle, 2, 8, 2, 2, 1, 4);
 

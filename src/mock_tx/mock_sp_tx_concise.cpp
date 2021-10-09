@@ -29,16 +29,18 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_rct_triptych.h"
+#include "mock_sp_tx_concise.h"
 
 //local headers
-#include "crypto/crypto.h"
+#include "ledger_context.h"
 #include "misc_log_ex.h"
-#include "mock_rct_base.h"
-#include "mock_rct_components.h"
+#include "mock_ledger_context.h"
+#include "mock_sp_base.h"
+#include "mock_sp_component_builders.h"
+#include "mock_sp_component_types.h"
+#include "mock_sp_validators.h"
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
-#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -51,10 +53,11 @@
 namespace mock_tx
 {
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxTriptych::validate_tx_semantics() const
+bool MockTxSpConcise::validate_tx_semantics() const
 {
     // validate component counts (num inputs/outputs/etc.)
-    if (!validate_mock_tx_rct_semantics_component_counts_v1(m_tx_proofs.size(),
+    if (!validate_mock_tx_sp_semantics_component_counts_v1(m_membership_proofs.size(),
+        m_image_proofs.size(),
         m_input_images.size(),
         m_outputs.size(),
         m_balance_proof))
@@ -62,16 +65,14 @@ bool MockTxTriptych::validate_tx_semantics() const
         return false;
     }
 
-    // validate input proof reference sets (size and decomposition)
-    if (!validate_mock_tx_rct_semantics_ref_set_size_v2(m_tx_proofs,
-        m_tx_proofs[0].m_ref_set_decomp_n,
-        m_tx_proofs[0].m_ref_set_decomp_m))
+    // validate input proof reference set sizes
+    if (!validate_mock_tx_sp_semantics_ref_set_size_v1(m_membership_proofs))
     {
         return false;
     }
 
     // validate linking tag semantics
-    if (!validate_mock_tx_rct_semantics_linking_tags_v2(m_input_images, m_tx_proofs))
+    if (!validate_mock_tx_sp_semantics_linking_tags_v1(m_input_images))
     {
         return false;
     }
@@ -79,36 +80,52 @@ bool MockTxTriptych::validate_tx_semantics() const
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxTriptych::validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const
+bool MockTxSpConcise::validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const
 {
-    if (!validate_mock_tx_rct_linking_tags_v2(m_tx_proofs, m_input_images))
+    if (!validate_mock_tx_sp_linking_tags_v1(m_input_images, ledger_context))
         return false;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxTriptych::validate_tx_amount_balance(const bool defer_batchable) const
+bool MockTxSpConcise::validate_tx_amount_balance(const bool defer_batchable) const
 {
-    if (!validate_mock_tx_rct_amount_balance_v1(m_input_images, m_outputs, m_balance_proof, defer_batchable))
+    if (!validate_mock_tx_sp_amount_balance_v1(m_input_images, m_outputs, m_balance_proof, defer_batchable))
         return false;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxTriptych::validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
+bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
     const bool defer_batchable) const
 {
-    if (!validate_mock_tx_rct_proofs_v2(m_tx_proofs))
+    // membership proofs
+    if (!validate_mock_tx_sp_membership_proofs_v1(m_membership_proofs,
+            m_input_images,
+            get_tx_membership_proof_message_sp_v1(),
+            ledger_context))
+    {
         return false;
+    }
+
+    // ownership/unspentness proofs
+    if (!validate_mock_tx_sp_composition_proofs_v1(m_image_proofs,
+            m_input_images,
+            get_tx_image_proof_message_sp_v1(m_outputs),
+            ledger_context))
+    {
+        return false;
+    }
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t MockTxTriptych::get_size_bytes() const
+std::size_t MockTxSpConcise::get_size_bytes() const
 {
     // doesn't include (compared to a real tx):
     // - ring member references (e.g. indices or explicit copies)
     // - tx fees
+    // - memos
     // - miscellaneous serialization bytes
 
     // assumes
@@ -117,24 +134,30 @@ std::size_t MockTxTriptych::get_size_bytes() const
     std::size_t size{0};
 
     // input images
-    size += m_input_images.size() * MockENoteImageRctV1::get_size_bytes();
+    size += m_input_images.size() * MockENoteImageSpV1::get_size_bytes();
 
     // outputs
-    size += m_outputs.size() * MockENoteRctV1::get_size_bytes();
-
-    // input proofs
-    if (m_tx_proofs.size())
-        size += m_tx_proofs.size() * m_tx_proofs[0].get_size_bytes();
+    size += m_outputs.size() * MockENoteSpV1::get_size_bytes();
 
     // balance proof
     if (m_balance_proof.get() != nullptr)
         size += m_balance_proof->get_size_bytes();
 
+    // membership proofs
+    // - assumes all have the same size
+    if (m_membership_proofs.size())
+        size += m_membership_proofs.size() * m_membership_proofs[0].get_size_bytes();
+
+    // ownership/unspentness proofs
+    // - assumes all have the same size
+    if (m_image_proofs.size())
+        size += m_image_proofs.size() * m_image_proofs[0].get_size_bytes();
+
     return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-std::shared_ptr<MockTxTriptych> make_mock_tx<MockTxTriptych>(const MockTxParamPack &params,
+std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
     std::shared_ptr<MockLedgerContext> ledger_context)
@@ -147,48 +170,63 @@ std::shared_ptr<MockTxTriptych> make_mock_tx<MockTxTriptych>(const MockTxParamPa
     std::size_t ref_set_size{ref_set_size_from_decomp(params.ref_set_decomp_n, params.ref_set_decomp_m)};
 
     // make mock inputs
-    std::vector<MockInputRctV1> inputs_to_spend{gen_mock_rct_inputs_v1(in_amounts, ref_set_size)};
+    // enote, ks, view key stuff, amount, amount blinding factor
+    std::vector<MockInputSpV1> inputs_to_spend{gen_mock_sp_inputs_v1(in_amounts, ledger_context)};
+    std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets{
+            gen_mock_sp_membership_ref_sets_v1(inputs_to_spend,
+                params.ref_set_decomp_n,
+                params.ref_set_decomp_m,
+                ledger_context)
+        };
 
     // make mock destinations
-    std::vector<MockDestRctV1> destinations{gen_mock_rct_dests_v1(out_amounts)};
+    std::vector<MockDestSpV1> destinations{gen_mock_sp_dests_v1(out_amounts)};
 
 
     /// make tx
     // tx components
-    std::vector<MockENoteImageRctV1> input_images;
-    std::vector<MockENoteRctV1> outputs;
-    std::shared_ptr<MockRctBalanceProofV1> balance_proof;
-    std::vector<MockRctProofV2> tx_proofs;
+    std::vector<MockENoteImageSpV1> input_images;
+    std::vector<MockENoteSpV1> outputs;
+    std::shared_ptr<MockBalanceProofSpV1> balance_proof;
+    std::vector<MockImageProofSpV1> tx_image_proofs;
+    std::vector<MockMembershipProofSpV1> tx_membership_proofs;
 
     // info shuttles for making components
     std::vector<rct::xmr_amount> output_amounts;
     std::vector<rct::key> output_amount_commitment_blinding_factors;
-    std::vector<crypto::secret_key> pseudo_blinding_factors;
+    std::vector<rct::key> image_address_masks;
+    std::vector<rct::key> image_amount_masks;
 
-    make_v1_tx_outputs_rct_v1(destinations,
+    make_v1_tx_outputs_sp_v1(destinations, //tx supplement: for 2-out tx, need special treatment for change dest
         outputs,
         output_amounts,
         output_amount_commitment_blinding_factors);
-    make_v1_tx_images_rct_v2(inputs_to_spend,
+    make_v1_tx_images_sp_v1(inputs_to_spend, //internally: make all but last (one at a time), make last
         output_amount_commitment_blinding_factors,
         input_images,
-        pseudo_blinding_factors);
-    make_v2_tx_input_proofs_rct_v1(inputs_to_spend,
+        image_address_masks,
+        image_amount_masks);
+    make_v1_tx_image_proofs_sp_v1(inputs_to_spend, //internally: make proofs one at a time
         input_images,
-        pseudo_blinding_factors,
-        params.ref_set_decomp_n,
-        params.ref_set_decomp_m,
-        tx_proofs);
+        image_address_masks,
+        image_amount_masks,
+        get_tx_image_proof_message_sp_v1(outputs),
+        tx_image_proofs);
     make_v1_tx_balance_proof_rct_v1(output_amounts,
         output_amount_commitment_blinding_factors,
         params.max_rangeproof_splits,
         balance_proof);
+    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, //internally: make proofs one at a time
+        image_address_masks,
+        image_amount_masks,
+        get_tx_membership_proof_message_sp_v1(),
+        tx_membership_proofs);
 
-    return std::make_shared<MockTxTriptych>(input_images, outputs, balance_proof, tx_proofs);
+    return std::make_shared<MockTxSpConcise>(input_images, outputs, balance_proof, tx_image_proofs, tx_membership_proofs);
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-bool validate_mock_txs<MockTxTriptych>(const std::vector<std::shared_ptr<MockTxTriptych>> &txs_to_validate,
+bool validate_mock_txs<MockTxSpConcise>(const std::vector<std::shared_ptr<MockTxSpConcise>> &txs_to_validate,
     const std::shared_ptr<const LedgerContext> ledger_context)
 {
     std::vector<const rct::BulletproofPlus*> range_proofs;

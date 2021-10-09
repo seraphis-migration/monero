@@ -54,29 +54,6 @@ namespace mock_tx
 {
 
 ////
-// Interface for interacting with a ledger when validating a tx.
-///
-class LedgerContext
-{
-    virtual bool linking_tag_exists_sp_v1(const rct::key &linking_tag) const = 0;
-    virtual void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
-        std::vector<MockENoteSpV1> &enotes_out) const = 0;
-};
-
-////
-// Mock ledger context for testing
-///
-class MockLedgerContext final : public LedgerContext
-{
-    bool linking_tag_exists_sp_v1(const rct::key &linking_tag) const override;
-    void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
-        std::vector<MockENoteSpV1> &enotes_out) const override;
-
-    std::unordered_set<rct::key> m_sp_linking_tags;
-    std::vector<MockENoteSpV1> m_sp_enotes;
-};
-
-////
 // Tx proposal: outputs and memos
 ///
 class MockTxProposalSpV1 final
@@ -94,7 +71,7 @@ class MockTxProposalSpV1 final
 ///
 class MockTxInputPartialSpV1 final //need InputSetPartial for merged composition proofs
 {
-    //vec<InputImage> get_input_images();
+    vec<InputImage> get_input_images();
 };
 
 ////
@@ -106,7 +83,7 @@ class MockTxInputPartialSpV1 final //need InputSetPartial for merged composition
 ///
 class MockTxMultisigProposalSpV1 final
 {
-    //MockTxProposalSpV1 core_proposal;
+    MockTxProposalSpV1 core_proposal;
 };
 
 ////
@@ -114,8 +91,8 @@ class MockTxMultisigProposalSpV1 final
 ///
 class MockTxPartialSpV1 final
 {
-    //MockTxPartialSpV1(MockTxProposalSpV1 &proposal, vec<MockTxInputPartialSpV1> &inputs, BalanceProof)
-    //MockTxPartialSpV1(MockTxMultisigProposalSpV1 &proposal, vec<MockTxInputPartialSpV1> &extra_inputs, BalanceProof)
+    MockTxPartialSpV1(MockTxProposalSpV1 &proposal, vec<MockTxInputPartialSpV1> &inputs, BalanceProof);
+    MockTxPartialSpV1(MockTxMultisigProposalSpV1 &proposal, vec<MockTxInputPartialSpV1> &extra_inputs, BalanceProof);
 };
 
 ////
@@ -164,7 +141,7 @@ public:
     std::string get_descriptor() const override { return "Sp-Concise"; }
 
     /// get balance proof
-    const std::shared_ptr<MockBalanceProofSpV1> get_balance_proof() const { return m_balance_proof; }
+    const std::shared_ptr<const MockBalanceProofSpV1> get_balance_proof() const { return m_balance_proof; }
 
     //get_tx_byte_blob()
 
