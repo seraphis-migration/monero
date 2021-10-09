@@ -36,6 +36,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "seraphis_crypto_utils.h"
 
 //third party headers
 
@@ -46,19 +47,43 @@
 namespace mock_tx
 {
 //-------------------------------------------------------------------------------------------------------------------
-void MockENoteRct::make_base(const crypto::secret_key &onetime_privkey,
-    const crypto::secret_key &amount_blinding_factor,
-    const rct::xmr_amount amount)
+void MockENoteSp::make_base_from_privkeys(const crypto::secret_key &enote_view_privkey,
+        const crypto::secret_key &spendbase_privkey,
+        const crypto::secret_key &amount_blinding_factor,
+        const rct::xmr_amount amount)
 {
-    // Ko = ko G
-    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(onetime_privkey, m_onetime_address),
-        "Failed to derive public key");
+    // spendbase = k_{b, recipient} U
+    crypto::public_key spendbase;
+    make_sp_spendbase(spendbase, spendbase_privkey);
+
+    rct::key U_gen{sp::get_U_gen()};
+
+    rct::scalarmultKey(spendbase, U_gen, rct::sk2rct(spendbase_privkey));
+
+    make_base_from_spendbase(enote_view_privkey, spendbase, amount_blinding_factor, amount);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void MockENoteSp::make_base_from_spendbase(const crypto::secret_key &enote_view_privkey,
+        const crypto::public_key &spendbase_pubkey,
+        const crypto::secret_key &amount_blinding_factor,
+        const rct::xmr_amount amount)
+{
+    // Ko = (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
+    make_sp_onetime_address(enote_view_privkey, spendbase_pubkey, m_onetime_address);
+
+    rct::key X_gen{sp::get_X_gen()};
+    rct::key address_temp;
+
+    rct::scalarmultKey(address_temp, X_gen, rct::sk2rct(enote_view_privkey));
+    rct::addKeys(address_temp, address_temp, rct::pk2rct(spendbase_pubkey));
+
+    m_onetime_address = rct::rct2pk(address_temp);
 
     // C = x G + a H
     m_amount_commitment = rct::rct2pk(rct::commit(amount, rct::sk2rct(amount_blinding_factor)));
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockENoteRct::gen_base()
+void MockENoteSp::gen_base()
 {
     // all random
     m_onetime_address = rct::rct2pk(rct::pkGen());
@@ -73,7 +98,7 @@ void MockDestRct::gen_base(const rct::xmr_amount amount)
     m_amount = amount;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockDestRct::to_enote_rct_base(MockENoteRct &enote_inout) const
+void MockDestRct::to_enote_rct_base(MockENoteSp &enote_inout) const
 {
     enote_inout.m_onetime_address = m_onetime_address;
 
