@@ -51,7 +51,7 @@ namespace mock_tx
 ///
 struct MockENoteSp
 {
-    /// K = (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
+    /// Ko = (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
     crypto::public_key m_onetime_address;
     /// C = x G + a H
     crypto::public_key m_amount_commitment;
@@ -91,7 +91,7 @@ struct MockENoteSp
 ///
 struct MockENoteImageSp
 {
-    /// K' = t_k G + (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
+    /// Ko' = t_k G + (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
     crypto::public_key m_masked_address;
     /// C' = (t_c + x) G + a H
     crypto::public_key m_masked_commitment;
