@@ -57,6 +57,7 @@
 #pragma once
 
 //local headers
+#include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -102,7 +103,7 @@ struct SpCompositionProof
 struct SpCompositionProofMultisigProposal
 {
     // key images KI
-    rct::keyV KI;
+    std::vector<crypto::key_image> KI;
     // main proof keys K
     rct::keyV K;
     // message
@@ -147,7 +148,7 @@ struct SpCompositionProofMultisigPartial
     // intermediate proof keys
     rct::keyV K_t1;
     // key images KI
-    rct::keyV KI;
+    std::vector<crypto::key_image> KI;
     // main proof keys K
     rct::keyV K;
     // message
@@ -171,9 +172,9 @@ struct SpCompositionProofMultisigPartial
 * return: Seraphis composition proof
 */
 SpCompositionProof sp_composition_prove(const rct::keyV &K,
-    const rct::keyV &x,
-    const rct::keyV &y,
-    const rct::keyV &z,
+    const std::vector<crypto::secret_key> &x,
+    const std::vector<crypto::secret_key> &y,
+    const std::vector<crypto::secret_key> &z,
     const rct::key &message);
 /**
 * brief: sp_composition_verify - verify a Seraphis composition proof
@@ -185,7 +186,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
 */
 bool sp_composition_verify(const SpCompositionProof &proof,
     const rct::keyV &K,
-    const rct::keyV &KI,
+    const std::vector<crypto::key_image> &KI,
     const rct::key &message);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -199,7 +200,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 * param: message - message to insert in the proof's Fiat-Shamir transform hash
 * return: Seraphis composition proof multisig proposal
 */
-SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::keyV &KI,
+SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const std::vector<crypto::key_image> &KI,
     const rct::keyV &K,
     const rct::key &message);
 /**
@@ -223,9 +224,9 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init();
 * return: partially signed Seraphis composition proof
 */
 SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCompositionProofMultisigProposal &proposal,
-    const rct::keyV &x,
-    const rct::keyV &y,
-    const rct::keyV &z_e,
+    const std::vector<crypto::secret_key> &x,
+    const std::vector<crypto::secret_key> &y,
+    const std::vector<crypto::secret_key> &z_e,
     const rct::keyV &signer_openings,
     const rct::key &local_opening_priv);
 /**

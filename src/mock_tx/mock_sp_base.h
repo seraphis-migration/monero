@@ -34,10 +34,12 @@
 //local headers
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
+#include "seraphis_crypto_utils.h"
 
 //third party headers
 
 //standard headers
+#include <type_traits>
 #include <vector>
 
 //forward declarations
@@ -52,9 +54,9 @@ namespace mock_tx
 struct MockENoteSp
 {
     /// Ko = (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
-    crypto::public_key m_onetime_address;
+    rct::key m_onetime_address;
     /// C = x G + a H
-    crypto::public_key m_amount_commitment;
+    rct::key m_amount_commitment;
 
     static std::size_t get_size_bytes_base() {return 32*2;}
 
@@ -77,7 +79,7 @@ struct MockENoteSp
     * param: amount -
     */
     virtual void make_base_from_spendbase(const crypto::secret_key &enote_view_privkey,
-        const crypto::public_key &spendbase_pubkey,
+        const rct::key &spendbase_pubkey,
         const crypto::secret_key &amount_blinding_factor,
         const rct::xmr_amount amount) final;
     /**
@@ -92,9 +94,9 @@ struct MockENoteSp
 struct MockENoteImageSp
 {
     /// Ko' = t_k G + (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
-    crypto::public_key m_masked_address;
+    rct::key m_masked_address;
     /// C' = (t_c + x) G + a H
-    crypto::public_key m_masked_commitment;
+    rct::key m_masked_commitment;
     /// KI = (k_{b, recipient} / (k_{a, sender} + k_{a, recipient})) U
     crypto::key_image m_key_image;
 
@@ -103,7 +105,7 @@ struct MockENoteImageSp
 
 ////
 // MockInputSp - Seraphis Input base
-// - inputs reference a set of enotes, so this is parameterized by the enote type
+// - a tx input is an enote, so this is parameterized by the enote type
 ///
 template <typename MockENoteType>
 struct MockInputSp
@@ -113,7 +115,7 @@ struct MockInputSp
     /// k_{a, sender} + k_{a, recipient}
     crypto::secret_key m_enote_view_privkey;
     /// k_{b, recipient} U
-    crypto::public_key m_spendbase_pubkey;
+    rct::key m_spendbase_pubkey;
     /// x
     crypto::secret_key m_amount_blinding_factor;
     /// a
@@ -127,7 +129,17 @@ struct MockInputSp
     */
     virtual void to_enote_image_base(const crypto::secret_key &address_mask,
         const crypto::secret_key &commitment_mask,
-        MockENoteImageSp &image_inout) const final;
+        MockENoteImageSp &image_inout) const final
+    {
+        static_assert(std::is_base_of<MockENoteType, MockENoteSp>::value, "Invalid MockENote type.");
+
+        // Ko' = t_k G + Ko
+        sp::mask_key(address_mask, m_enote_to_spend.m_onetime_address, image_inout.m_masked_address);
+        // C' = t_c + C
+        sp::mask_key(commitment_mask, m_enote_to_spend.m_amount_commitment, image_inout.m_masked_commitment);
+        // KI = k_a X + k_a U
+        sp::make_seraphis_key_image(m_enote_view_privkey, m_spendbase_pubkey, image_inout.m_key_image);
+    }
 };
 
 ////
@@ -136,18 +148,21 @@ struct MockInputSp
 ///
 struct MockDestSp
 {
-    crypto::public_key m_onetime_address;
+    rct::key m_onetime_address;
     crypto::secret_key m_amount_blinding_factor;
     rct::xmr_amount m_amount;
-
-    /// convert this destination into an e-note
-    virtual void to_enote_sp_base(MockENoteSp &enote_inout) const final;
 
     /**
     * brief: gen_base - generate a Seraphis Destination (all random)
     * param: amount -
     */
     virtual void gen_base(const rct::xmr_amount amount) final;
+
+    /**
+    * brief: to_enote_sp_base - convert this destination into an e-note
+    * inoutparam: enote_inout -
+    */
+    virtual void to_enote_sp_base(MockENoteSp &enote_inout) const final;
 };
 
 } //namespace mock_tx

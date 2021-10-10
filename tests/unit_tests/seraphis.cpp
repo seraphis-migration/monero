@@ -26,10 +26,12 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "crypto/crypto.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "mock_tx/mock_tx_utils.h"
 #include "mock_tx/seraphis_composition_proof.h"
 #include "mock_tx/seraphis_crypto_utils.h"
 #include "ringct/rctOps.h"
@@ -37,35 +39,37 @@ extern "C"
 
 #include "gtest/gtest.h"
 
+#include <vector>
+
 
 //-------------------------------------------------------------------------------------------------------------------
-static void make_fake_sp_masked_address(rct::key &mask,
-    rct::key &view_stuff,
-    rct::keyV &spendkeys,
+static void make_fake_sp_masked_address(crypto::secret_key &mask,
+    crypto::secret_key &view_stuff,
+    std::vector<crypto::secret_key> &spendkeys,
     rct::key &masked_address)
 {
     const std::size_t num_signers{spendkeys.size()};
     EXPECT_TRUE(num_signers > 0);
 
-    mask = rct::zero();
-    view_stuff = rct::zero();
+    mask = rct::rct2sk(rct::zero());
+    view_stuff = rct::rct2sk(rct::zero());
 
-    while (mask == rct::zero())
-        mask = rct::skGen();
+    while (mask == rct::rct2sk(rct::zero()))
+        mask = rct::rct2sk(rct::skGen());
 
-    while (view_stuff == rct::zero())
-        view_stuff = rct::skGen();
+    while (view_stuff == rct::rct2sk(rct::zero()))
+        view_stuff = rct::rct2sk(rct::skGen());
 
     // for multisig, there can be multiple signers
-    rct::key spendkey_sum{rct::zero()};
+    crypto::secret_key spendkey_sum{rct::rct2sk(rct::zero())};
     for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
     {
-        spendkeys[signer_index] = rct::zero();
+        spendkeys[signer_index] = rct::rct2sk(rct::zero());
 
-        while (spendkeys[signer_index] == rct::zero())
-            spendkeys[signer_index] = rct::skGen();
+        while (spendkeys[signer_index] == rct::rct2sk(rct::zero()))
+            spendkeys[signer_index] = rct::rct2sk(rct::skGen());
 
-        sc_add(spendkey_sum.bytes, spendkey_sum.bytes, spendkeys[signer_index].bytes);
+        sc_add(&spendkey_sum, &spendkey_sum, &spendkeys[signer_index]);
     }
 
     rct::keyV privkeys;
@@ -73,11 +77,11 @@ static void make_fake_sp_masked_address(rct::key &mask,
     privkeys.reserve(3);
     pubkeys.reserve(2);
 
-    privkeys.push_back(view_stuff);
+    privkeys.push_back(rct::sk2rct(view_stuff));
     pubkeys.push_back(sp::get_X_gen());
-    privkeys.push_back(spendkey_sum);
+    privkeys.push_back(rct::sk2rct(spendkey_sum));
     pubkeys.push_back(sp::get_U_gen());
-    privkeys.push_back(mask);
+    privkeys.push_back(rct::sk2rct(mask));
     //G implicit
 
     // K' = x G + kv_stuff X + ks U
@@ -181,7 +185,9 @@ TEST(seraphis, multi_exp)
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, composition_proof)
 {
-    rct::keyV K, KI, x, y, z;
+    rct::keyV K;
+    std::vector<crypto::key_image> KI;
+    std::vector<crypto::secret_key> x, y, z;
     rct::key message{rct::zero()};
     sp::SpCompositionProof proof;
 
@@ -199,10 +205,10 @@ TEST(seraphis, composition_proof)
         {
             for (std::size_t i{0}; i < num_keys; ++i)
             {
-                rct::keyV temp_z = {z[i]};
+                std::vector<crypto::secret_key> temp_z = {z[i]};
                 make_fake_sp_masked_address(x[i], y[i], temp_z, K[i]);
                 z[i] = temp_z[0];
-                sp::seraphis_key_image_from_privkeys(z[i], y[i], KI[i]);
+                sp::make_seraphis_key_image(y[i], z[i], KI[i]);
             }
 
             proof = sp::sp_composition_prove(K, x, y, z, message);
@@ -225,16 +231,16 @@ TEST(seraphis, composition_proof)
 
         try
         {
-            rct::keyV temp_z = {z[0]};
+            std::vector<crypto::secret_key> temp_z = {z[0]};
             make_fake_sp_masked_address(x[0], y[0], temp_z, K[0]);
             z[0] = temp_z[0];
 
             rct::key xG;
-            rct::scalarmultBase(xG, x[0]);
+            rct::scalarmultBase(xG, rct::sk2rct(x[0]));
             rct::subKeys(K[0], K[0], xG);   // kludge: remove x part manually
-            x[0] = rct::zero();
+            x[0] = rct::rct2sk(rct::zero());
 
-            sp::seraphis_key_image_from_privkeys(z[0], y[0], KI[0]);
+            sp::make_seraphis_key_image(y[0], z[0], KI[0]);
 
             proof = sp::sp_composition_prove(K, x, y, z, message);
 
@@ -249,8 +255,10 @@ TEST(seraphis, composition_proof)
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, composition_proof_multisig)
 {
-    rct::keyV K, KI, x, y, signer_openers_pubs, z_pieces_temp;;
-    rct::keyM z_pieces;
+    rct::keyV K, signer_openers_pubs;
+    std::vector<crypto::key_image> KI;
+    std::vector<crypto::secret_key> x, y, z_pieces_temp;
+    std::vector<std::vector<crypto::secret_key>> z_pieces;
     rct::key message{rct::zero()};
     std::vector<sp::SpCompositionProofMultisigPrep> signer_preps;
     std::vector<sp::SpCompositionProofMultisigPartial> partial_sigs;
@@ -296,20 +304,20 @@ TEST(seraphis, composition_proof_multisig)
                     }
 
                     // add z pieces together from all signers to build the key image
-                    rct::key z{rct::zero()};
+                    crypto::secret_key z{rct::rct2sk(rct::zero())};
                     for (const auto &z_piece : z_pieces_temp)
-                        sc_add(z.bytes, z.bytes, z_piece.bytes);
+                        sc_add(&z, &z, &z_piece);
 
-                    sp::seraphis_key_image_from_privkeys(z, y[i], KI[i]);
+                    sp::make_seraphis_key_image(y[i], z, KI[i]);
                 }
 
                 // kludge test: remove x component
                 if (test_x_0)
                 {
                     rct::key xG;
-                    rct::scalarmultBase(xG, x[0]);
+                    rct::scalarmultBase(xG, rct::sk2rct(x[0]));
                     rct::subKeys(K[0], K[0], xG);
-                    x[0] = rct::zero();
+                    x[0] = rct::rct2sk(rct::zero());
                 }
 
                 // tx proposer: make proposal
