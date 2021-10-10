@@ -153,20 +153,58 @@ void multi_exp_vartime(const rct::keyV &privkeys, const std::vector<ge_p3> &pubk
 void multi_exp_vartime_p3(const rct::keyV &privkeys, const rct::keyV &pubkeys, ge_p3 &result_out);
 void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, ge_p3 &result_out);
 /**
-* brief: seraphis_key_image_from_privkeys - create a Seraphis key image from private keys
-*   KI = (z/y)*U
-* param: z - private key 'z' (the private spend key 'ks')
-* param: y - private key 'y' (created from private view key secrets)
-* outparam: key_image_out - KI
+* brief: mask_key - commit to an EC key
+*   K' = mask G + K
+* param: mask - commitment mask/blinding factor
+* param: key - EC key to commit to
+* outparam: masked_key_out - K', the masked key
 */
-void seraphis_key_image_from_privkeys(const rct::key &z, const rct::key &y, rct::key &key_image_out);
+void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &masked_key_out);
 /**
-* brief: seraphis_key_image_from_spendbase - create a Seraphis key image from 'y' and spend key base 'zU'
-*   KI = (1/y) * z U
-* param: zU - pubkey z U (the base spend key 'ks U')
-* param: y - private key 'y' (created from private view key secrets)
+* brief: make_seraphis_key_image - create a Seraphis key image from private keys 'y' and 'z'
+*   KI = (z/y)*U
+*      = (k_{b, recipient} / (k_{a, sender} + k_{a, recipient}))*U
+* param: y - private key '(k_{a, sender} + k_{a, recipient}))' (e.g. created from private view key secrets)
+* param: z - private key 'k_{b, recipient}' (e.g. the private spend key 'ks')
 * outparam: key_image_out - KI
 */
-void seraphis_key_image_from_spendbase(const rct::key &zU, const rct::key &y, rct::key &key_image_out);
+void make_seraphis_key_image(const crypto::secret_key &y,
+    const crypto::secret_key &z,
+    crypto::key_image &key_image_out);
+/**
+* brief: make_seraphis_key_image - create a Seraphis key image from 'y' and spend key base 'zU'
+*   KI = (1/y) * z U
+* param: y - private key 'y' (e.g created from private view key secrets)
+* param: zU - pubkey z U (e.g. the base spend key 'ks U')
+* outparam: key_image_out - KI
+*/
+void make_seraphis_key_image(const crypto::secret_key &y,
+    const rct::key &zU,
+    crypto::key_image &key_image_out);
+/**
+* brief: make_seraphis_onetime_address_spendbase - create the spendbase part of a Seraphis address
+*   spendbase = k_{b, recipient} U
+* param: spendbase_privkey - k_{b, recipient}
+* outparam: spendbase_pubkey_out - k_{b, recipient} U
+*/
+void make_seraphis_address_spendbase(const crypto::secret_key &spendbase_privkey, rct::key &spendbase_pubkey_out);
+/**
+* brief: make_seraphis_address - create a Seraphis address (or onetime address)
+*   K = k_a X + k_b U
+* param: view_privkey - k_a
+* param: spendbase_privkey - k_b
+* outparam: address_out - k_a X + k_b U
+*/
+void make_seraphis_address(const crypto::secret_key &k_a,
+        const crypto::secret_key &k_b,
+        rct::key &address_out);
+/**
+* brief: make_seraphis_address_extend - extend/create a Seraphis address (or onetime address)
+*   K = k_a_extender X + K_original
+* param: k_a_extender - extends the existing pubkey
+* inoutparam: address_inout - [in: K_original] [out: k_a_extender X + K_original]
+*/
+void extend_seraphis_address(const crypto::secret_key &k_a_extender,
+        rct::key &address_inout);
 
 } //namespace sp

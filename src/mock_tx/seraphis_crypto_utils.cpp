@@ -39,6 +39,7 @@ extern "C"
 #include "cryptonote_config.h"
 #include "grootle.h"
 #include "misc_log_ex.h"
+#include "mock_tx_utils.h"
 #include "ringct/multiexp.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -694,23 +695,65 @@ void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &p
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void seraphis_key_image_from_privkeys(const rct::key &z, const rct::key &y, rct::key &key_image_out)
+void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &masked_key_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y.bytes), "y must be nonzero for making a key image!");
-
-    // KI = (z/y)*U
-    rct::key temp = invert(y); // 1/y
-    sc_mul(temp.bytes, z.bytes, temp.bytes); // z*(1/y)
-    rct::scalarmultKey(key_image_out, U, temp); // (z/y)*U
+    // K' = mask G + K
+    rct::addKeys1(masked_key_out, rct::sk2rct(mask), key);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void seraphis_key_image_from_spendbase(const rct::key &zU, const rct::key &y, rct::key &key_image_out)
+void make_seraphis_key_image(const crypto::secret_key &y,
+    const crypto::secret_key &z,
+    crypto::key_image &key_image_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y.bytes), "y must be nonzero for making a key image!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "y must be nonzero for making a key image!");
 
     // KI = (z/y)*U
-    rct::key temp = invert(y); // 1/y
-    rct::scalarmultKey(key_image_out, zU, temp); // (z/y)*U
+    rct::key temp = invert(rct::sk2rct(y)); // 1/y
+    sc_mul(temp.bytes, &z, temp.bytes); // z*(1/y)
+    rct::scalarmultKey(temp, U, temp); // (z/y)*U
+
+    key_image_out = rct::rct2ki(temp);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_key_image(const crypto::secret_key &y,
+    const rct::key &zU,
+    crypto::key_image &key_image_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "y must be nonzero for making a key image!");
+
+    // KI = (z/y)*U
+    rct::key temp = invert(rct::sk2rct(y)); // 1/y
+    rct::scalarmultKey(temp, zU, temp); // (z/y)*U
+
+    key_image_out = rct::rct2ki(temp);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_address_spendbase(const crypto::secret_key &spendbase_privkey, rct::key &spendbase_pubkey_out)
+{
+    // spendbase = k_{b, recipient} U
+    rct::scalarmultKey(spendbase_pubkey_out, U, rct::sk2rct(spendbase_privkey));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_address(const crypto::secret_key &k_a,
+        const crypto::secret_key &k_b,
+        rct::key &address_out)
+{
+    // K = k_a X + k_b U
+    make_seraphis_address_spendbase(k_b, address_out);
+
+    // finish address
+    extend_seraphis_address(k_a, address_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void extend_seraphis_address(const crypto::secret_key &k_a_extender,
+        rct::key &address_inout)
+{
+    // K = k_a_extender X + K_original
+    rct::key X_gen{sp::get_X_gen()};
+    rct::key address_temp;
+
+    rct::scalarmultKey(address_temp, X_gen, rct::sk2rct(k_a_extender));
+    rct::addKeys(address_inout, address_temp, address_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

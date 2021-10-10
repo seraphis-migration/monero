@@ -36,6 +36,7 @@ set(mock_tx_sources
   mock_rct_components.cpp
   mock_rct_clsag.cpp
   mock_rct_triptych.cpp
+  mock_sp_base.h
   seraphis_crypto_utils.cpp
   seraphis_composition_proof.cpp)
 

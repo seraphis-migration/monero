@@ -32,12 +32,14 @@
 #include "seraphis_composition_proof.h"
 
 //local headers
+#include "crypto/crypto.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
 #include "misc_log_ex.h"
+#include "mock_tx_utils.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_crypto_utils.h"
@@ -68,7 +70,7 @@ static void transcript_init(rct::key &transcript)
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_base_aggregation_coefficient_a(const rct::key &message,
     const rct::keyV &K_t1,
-    const rct::keyV &KI)
+    const std::vector<crypto::key_image> &KI)
 {
     CHECK_AND_ASSERT_THROW_MES(K_t1.size() == KI.size(), "Transcript challenge inputs have incorrect size!");
 
@@ -87,7 +89,7 @@ static rct::key compute_base_aggregation_coefficient_a(const rct::key &message,
     }
     for (const auto &Ki : KI)
     {
-        hash += std::string((const char*) Ki.bytes, sizeof(Ki));
+        hash += std::string((const char*) &Ki, sizeof(Ki));
     }
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
 
@@ -172,9 +174,9 @@ static rct::key compute_challenge(const rct::key &message,
 // r_b = alpha_b - c * sum_i(mu_b^i * (z_i / y_i))
 // r_i = alpha_i - c * (1 / y_i)
 //-------------------------------------------------------------------------------------------------------------------
-static void compute_responses(const rct::keyV &x,
-    const rct::keyV &y,
-    const rct::keyV &z,
+static void compute_responses(const std::vector<crypto::secret_key> &x,
+    const std::vector<crypto::secret_key> &y,
+    const std::vector<crypto::secret_key> &z,
     const rct::keyV &mu_a_pows,
     const rct::keyV &mu_b_pows,
     const rct::key &alpha_a,
@@ -203,8 +205,8 @@ static void compute_responses(const rct::keyV &x,
     r_sum_temp = rct::zero();
     for (std::size_t i{0}; i < num_keys; ++i)
     {
-        r_temp = invert(y[i]);  // 1 / y_i
-        sc_mul(r_temp.bytes, r_temp.bytes, x[i].bytes);  // x_i / y_i
+        r_temp = invert(rct::sk2rct(y[i]));  // 1 / y_i
+        sc_mul(r_temp.bytes, r_temp.bytes, &x[i]);  // x_i / y_i
         sc_mul(r_temp.bytes, r_temp.bytes, mu_a_pows[i].bytes);  // mu_a^i * x_i / y_i
         sc_add(r_sum_temp.bytes, r_sum_temp.bytes, r_temp.bytes);  // sum_i(...)
     }
@@ -214,8 +216,8 @@ static void compute_responses(const rct::keyV &x,
     r_sum_temp = rct::zero();
     for (std::size_t i{0}; i < num_keys; ++i)
     {
-        r_temp = invert(y[i]);  // 1 / y_i
-        sc_mul(r_temp.bytes, r_temp.bytes, z[i].bytes);  // z_i / y_i
+        r_temp = invert(rct::sk2rct(y[i]));  // 1 / y_i
+        sc_mul(r_temp.bytes, r_temp.bytes, &z[i]);  // z_i / y_i
         sc_mul(r_temp.bytes, r_temp.bytes, mu_b_pows[i].bytes);  // mu_b^i * z_i / y_i
         sc_add(r_sum_temp.bytes, r_sum_temp.bytes, r_temp.bytes);  // sum_i(...)
     }
@@ -226,7 +228,7 @@ static void compute_responses(const rct::keyV &x,
 
     for (std::size_t i{0}; i < num_keys; ++i)
     {
-        r_temp = invert(y[i]);  // 1 / y_i
+        r_temp = invert(rct::sk2rct(y[i]));  // 1 / y_i
         sc_mulsub(r_i_out[i].bytes, challenge.bytes, r_temp.bytes, alpha_i[i].bytes);  // alpha_i - c * (1 / y_i)
     }
 
@@ -241,19 +243,19 @@ static void compute_responses(const rct::keyV &x,
 // K_t1_i = (1/y_i) * K_i
 // return: (1/8)*K_t1_i
 //-------------------------------------------------------------------------------------------------------------------
-static void compute_K_t1_for_proof(const rct::key &y_i,
+static void compute_K_t1_for_proof(const crypto::secret_key &y_i,
     const rct::key &K_i,
     rct::key &K_t1_out)
 {
-    K_t1_out = invert(y_i);  // borrow the variable
+    K_t1_out = invert(rct::sk2rct(y_i));  // borrow the variable
     sc_mul(K_t1_out.bytes, K_t1_out.bytes, rct::INV_EIGHT.bytes);
     rct::scalarmultKey(K_t1_out, K_i, K_t1_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 SpCompositionProof sp_composition_prove(const rct::keyV &K,
-    const rct::keyV &x,
-    const rct::keyV &y,
-    const rct::keyV &z,
+    const std::vector<crypto::secret_key> &x,
+    const std::vector<crypto::secret_key> &y,
+    const std::vector<crypto::secret_key> &z,
     const rct::key &message)
 {
     /// input checks and initialization
@@ -269,11 +271,11 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
         CHECK_AND_ASSERT_THROW_MES(!(K[i] == rct::identity()), "Bad proof key (K[i] identity)!");
 
         // x == 0 is allowed
-        CHECK_AND_ASSERT_THROW_MES(sc_check(x[i].bytes) == 0, "Bad private key (x[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y[i].bytes), "Bad private key (y[i] zero)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(y[i].bytes) == 0, "Bad private key (y[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(z[i].bytes), "Bad private key (z[i] zero)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(z[i].bytes) == 0, "Bad private key (z[i])!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(&x[i]) == 0, "Bad private key (x[i])!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y[i]), "Bad private key (y[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(&y[i]) == 0, "Bad private key (y[i])!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z[i]), "Bad private key (z[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(&z[i]) == 0, "Bad private key (z[i])!");
     }
 
     const rct::key U_gen{get_U_gen()};
@@ -281,7 +283,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     SpCompositionProof proof;
 
     // make K_t1 and KI
-    rct::keyV KI;
+    std::vector<crypto::key_image> KI;
     proof.K_t1.resize(num_keys);
     KI.resize(num_keys);
 
@@ -292,7 +294,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
 
         // KI = (z_i / y_i) * U
         // note: plain KI is used in all byte-aware contexts
-        seraphis_key_image_from_privkeys(z[i], y[i], KI[i]);
+        make_seraphis_key_image(y[i], z[i], KI[i]);
     }
 
 
@@ -352,7 +354,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
 //-------------------------------------------------------------------------------------------------------------------
 bool sp_composition_verify(const SpCompositionProof &proof,
     const rct::keyV &K,
-    const rct::keyV &KI,
+    const std::vector<crypto::key_image> &KI,
     const rct::key &message)
 {
     /// input checks and initialization
@@ -371,7 +373,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
         CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(proof.r_i[i].bytes), "Bad response (r[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_i[i].bytes) == 0, "Bad resonse (r[i])!");
 
-        CHECK_AND_ASSERT_THROW_MES(!(KI[i] == rct::identity()), "Invalid key image!");
+        CHECK_AND_ASSERT_THROW_MES(!(rct::ki2rct(KI[i]) == rct::identity()), "Invalid key image!");
     }
 
 
@@ -428,7 +430,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
         CHECK_AND_ASSERT_THROW_MES(!(ge_p3_is_point_at_infinity(&K_t1_p3[1])), "Invalid proof element K_t1!");
 
         // get KI
-        CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&KI_part_p3[i], KI[i].bytes) == 0,
+        CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&KI_part_p3[i], rct::ki2rct(KI[i]).bytes) == 0,
             "ge_frombytes_vartime failed!");
 
         // get K
@@ -476,7 +478,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     return challenge_nom == proof.c;
 }
 //-------------------------------------------------------------------------------------------------------------------
-SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::keyV &KI,
+SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const std::vector<crypto::key_image> &KI,
     const rct::keyV &K,
     const rct::key &message)
 {
@@ -518,9 +520,9 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init()
 }
 //-------------------------------------------------------------------------------------------------------------------
 SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCompositionProofMultisigProposal &proposal,
-    const rct::keyV &x,
-    const rct::keyV &y,
-    const rct::keyV &z_e,
+    const std::vector<crypto::secret_key> &x,
+    const std::vector<crypto::secret_key> &y,
+    const std::vector<crypto::secret_key> &z_e,
     const rct::keyV &signer_openings,
     const rct::key &local_opening_priv)
 {
@@ -537,14 +539,14 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     for (std::size_t i{0}; i < num_keys; ++i)
     {
         CHECK_AND_ASSERT_THROW_MES(!(proposal.K[i] == rct::identity()), "Bad proof key (K[i] identity)!");
-        CHECK_AND_ASSERT_THROW_MES(!(proposal.KI[i] == rct::identity()), "Bad proof key (KI[i] identity)!");
+        CHECK_AND_ASSERT_THROW_MES(!(rct::ki2rct(proposal.KI[i]) == rct::identity()), "Bad proof key (KI[i] identity)!");
 
         // x == 0 is allowed
-        CHECK_AND_ASSERT_THROW_MES(sc_check(x[i].bytes) == 0, "Bad private key (x[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(y[i].bytes), "Bad private key (y[i] zero)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(y[i].bytes) == 0, "Bad private key (y[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(z_e[i].bytes), "Bad private key (z[i] zero)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(z_e[i].bytes) == 0, "Bad private key (z[i])!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(&x[i]) == 0, "Bad private key (x[i])!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y[i]), "Bad private key (y[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(&y[i]) == 0, "Bad private key (y[i])!");
+        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z_e[i]), "Bad private key (z[i] zero)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(&z_e[i]) == 0, "Bad private key (z[i])!");
     }
 
     const rct::key U_gen{get_U_gen()};
