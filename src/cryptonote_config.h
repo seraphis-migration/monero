@@ -246,6 +246,11 @@ namespace config
   const char HASH_KEY_GROOTLE_Hi[] = "grootle Hi";
   const char HASH_KEY_SERAPHIS_U[] = "seraphis U";
   const char HASH_KEY_SERAPHIS_X[] = "seraphis X";
+  const char HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET[] = "seraphis sender-receiver secret";
+  const char HASH_KEY_SERAPHIS_SENDER_ADDRESS_EXTENSION[] = "seraphis sender address extension";
+  const char HASH_KEY_SERAPHIS_AMOUNT_COMMITMENT_BLINDING_FACTOR[] = "seraphis enote amount commitment blinding factor";
+  const char HASH_KEY_SERAPHIS_VIEW_TAG[] = "seraphis enote view tag";
+  const char HASH_KEY_SERAPHIS_AMOUNT_ENC[] = "seraphis enote amount encoding";
 
   namespace testnet
   {

@@ -31,6 +31,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "mock_tx/mock_sp_core.h"
 #include "mock_tx/mock_tx_utils.h"
 #include "mock_tx/seraphis_composition_proof.h"
 #include "mock_tx/seraphis_crypto_utils.h"
@@ -208,7 +209,7 @@ TEST(seraphis, composition_proof)
                 std::vector<crypto::secret_key> temp_z = {z[i]};
                 make_fake_sp_masked_address(x[i], y[i], temp_z, K[i]);
                 z[i] = temp_z[0];
-                sp::make_seraphis_key_image(y[i], z[i], KI[i]);
+                mock_tx::make_seraphis_key_image(y[i], z[i], KI[i]);
             }
 
             proof = sp::sp_composition_prove(K, x, y, z, message);
@@ -240,7 +241,7 @@ TEST(seraphis, composition_proof)
             rct::subKeys(K[0], K[0], xG);   // kludge: remove x part manually
             x[0] = rct::rct2sk(rct::zero());
 
-            sp::make_seraphis_key_image(y[0], z[0], KI[0]);
+            mock_tx::make_seraphis_key_image(y[0], z[0], KI[0]);
 
             proof = sp::sp_composition_prove(K, x, y, z, message);
 
@@ -308,7 +309,7 @@ TEST(seraphis, composition_proof_multisig)
                     for (const auto &z_piece : z_pieces_temp)
                         sc_add(&z, &z, &z_piece);
 
-                    sp::make_seraphis_key_image(y[i], z, KI[i]);
+                    mock_tx::make_seraphis_key_image(y[i], z, KI[i]);
                 }
 
                 // kludge test: remove x component
