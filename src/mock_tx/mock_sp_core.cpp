@@ -219,4 +219,4 @@ bool try_get_seraphis_amount(const crypto::secret_key &sender_receiver_secret,
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-} //namespace sp
+} //namespace mock_tx
