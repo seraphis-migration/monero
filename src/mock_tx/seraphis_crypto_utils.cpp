@@ -699,7 +699,7 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
     rct::addKeys1(masked_key_out, rct::sk2rct(mask), key);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void domain_separate_rct_hash(const rct::key &rct_key, const std::string &domain_separator, crypto::secret_key &hash_result_out)
+void domain_separate_rct_hash(const std::string &domain_separator, const rct::key &rct_key, crypto::secret_key &hash_result_out)
 {
     std::string hash;
     hash.reserve(domain_separator.size() + sizeof(rct::key));

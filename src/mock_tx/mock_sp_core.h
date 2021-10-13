@@ -163,4 +163,4 @@ bool try_get_seraphis_amount(const crypto::secret_key &sender_receiver_secret,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out);
 
-} //namespace sp
+} //namespace mock_tx
