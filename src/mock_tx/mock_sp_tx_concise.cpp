@@ -111,7 +111,7 @@ bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const Ledge
     // ownership/unspentness proofs
     if (!validate_mock_tx_sp_composition_proofs_v1(m_image_proofs,
             m_input_images,
-            get_tx_image_proof_message_sp_v1(m_outputs),
+            get_tx_image_proof_message_sp_v1(m_outputs, m_supplement),
             ledger_context))
     {
         return false;
@@ -190,6 +190,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     std::shared_ptr<MockBalanceProofSpV1> balance_proof;
     std::vector<MockImageProofSpV1> tx_image_proofs;
     std::vector<MockMembershipProofSpV1> tx_membership_proofs;
+    MockSupplementSpV1 tx_supplement;
 
     // info shuttles for making components
     std::vector<rct::xmr_amount> output_amounts;
@@ -200,7 +201,8 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     make_v1_tx_outputs_sp_v1(destinations, //tx supplement: for 2-out tx, need special treatment for change dest
         outputs,
         output_amounts,
-        output_amount_commitment_blinding_factors);
+        output_amount_commitment_blinding_factors,
+        tx_supplement);
     make_v1_tx_images_sp_v1(inputs_to_spend, //internally: make all but last (one at a time), make last
         output_amount_commitment_blinding_factors,
         input_images,
@@ -210,7 +212,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
         input_images,
         image_address_masks,
         image_amount_masks,
-        get_tx_image_proof_message_sp_v1(outputs),
+        get_tx_image_proof_message_sp_v1(outputs, tx_supplement),
         tx_image_proofs);
     make_v1_tx_balance_proof_rct_v1(output_amounts,
         output_amount_commitment_blinding_factors,
@@ -222,7 +224,8 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
         get_tx_membership_proof_message_sp_v1(),
         tx_membership_proofs);
 
-    return std::make_shared<MockTxSpConcise>(input_images, outputs, balance_proof, tx_image_proofs, tx_membership_proofs);
+    return std::make_shared<MockTxSpConcise>(input_images,outputs, balance_proof, tx_image_proofs,
+        tx_membership_proofs, tx_supplement);
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>

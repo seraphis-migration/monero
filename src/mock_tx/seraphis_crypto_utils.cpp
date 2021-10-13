@@ -75,8 +75,6 @@ static rct::key X;
 static const rct::key ZERO = rct::zero();
 static const rct::key ONE = rct::identity();
 static const rct::key IDENTITY = rct::identity();
-static const rct::key MINUS_ONE = { {0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9,
-    0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10} };
 
 // misc
 static boost::mutex init_mutex;
@@ -701,59 +699,15 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
     rct::addKeys1(masked_key_out, rct::sk2rct(mask), key);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_key_image(const crypto::secret_key &y,
-    const crypto::secret_key &z,
-    crypto::key_image &key_image_out)
+void domain_separate_rct_hash(const rct::key &rct_key, const std::string &domain_separator, crypto::secret_key &hash_result_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "y must be nonzero for making a key image!");
+    std::string hash;
+    hash.reserve(domain_separator.size() + sizeof(rct::key));
+    hash = domain_separator;
+    hash += std::string((const char*) rct_key.bytes, sizeof(rct_key));
 
-    // KI = (z/y)*U
-    rct::key temp = invert(rct::sk2rct(y)); // 1/y
-    sc_mul(temp.bytes, &z, temp.bytes); // z*(1/y)
-    rct::scalarmultKey(temp, U, temp); // (z/y)*U
-
-    key_image_out = rct::rct2ki(temp);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_key_image(const crypto::secret_key &y,
-    const rct::key &zU,
-    crypto::key_image &key_image_out)
-{
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "y must be nonzero for making a key image!");
-
-    // KI = (z/y)*U
-    rct::key temp = invert(rct::sk2rct(y)); // 1/y
-    rct::scalarmultKey(temp, zU, temp); // (z/y)*U
-
-    key_image_out = rct::rct2ki(temp);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_address_spendbase(const crypto::secret_key &spendbase_privkey, rct::key &spendbase_pubkey_out)
-{
-    // spendbase = k_{b, recipient} U
-    rct::scalarmultKey(spendbase_pubkey_out, U, rct::sk2rct(spendbase_privkey));
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_address(const crypto::secret_key &k_a,
-        const crypto::secret_key &k_b,
-        rct::key &address_out)
-{
-    // K = k_a X + k_b U
-    make_seraphis_address_spendbase(k_b, address_out);
-
-    // finish address
-    extend_seraphis_address(k_a, address_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void extend_seraphis_address(const crypto::secret_key &k_a_extender,
-        rct::key &address_inout)
-{
-    // K = k_a_extender X + K_original
-    rct::key X_gen{sp::get_X_gen()};
-    rct::key address_temp;
-
-    rct::scalarmultKey(address_temp, X_gen, rct::sk2rct(k_a_extender));
-    rct::addKeys(address_inout, address_temp, address_inout);
+    //TODO: is this inefficient use of hash_to_scalar? e.g. ringct has various seemingly optimized calls into keccak()
+    crypto::hash_to_scalar(hash.data(), hash.size(), hash_result_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

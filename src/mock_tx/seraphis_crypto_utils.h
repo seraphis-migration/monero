@@ -57,6 +57,10 @@ struct MultiexpData;
 namespace sp
 {
 
+/// scalar: -1 mod l
+static const rct::key MINUS_ONE = { {0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9,
+    0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10} };
+
 /**
 * brief: get generators
 */
@@ -161,50 +165,12 @@ void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &p
 */
 void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &masked_key_out);
 /**
-* brief: make_seraphis_key_image - create a Seraphis key image from private keys 'y' and 'z'
-*   KI = (z/y)*U
-*      = (k_{b, recipient} / (k_{a, sender} + k_{a, recipient}))*U
-* param: y - private key '(k_{a, sender} + k_{a, recipient}))' (e.g. created from private view key secrets)
-* param: z - private key 'k_{b, recipient}' (e.g. the private spend key 'ks')
-* outparam: key_image_out - KI
+* brief: domain_separate_rct_hash - hash a key, with domaind separation
+*   H("domain-sep", key)
+* param: domain_separator - domain separator
+* param: rct_key - rct key to hash with domain separator (can be privkey or pubkey)
+* outparam: hash_result_out - H("domain-sep", key)
 */
-void make_seraphis_key_image(const crypto::secret_key &y,
-    const crypto::secret_key &z,
-    crypto::key_image &key_image_out);
-/**
-* brief: make_seraphis_key_image - create a Seraphis key image from 'y' and spend key base 'zU'
-*   KI = (1/y) * z U
-* param: y - private key 'y' (e.g created from private view key secrets)
-* param: zU - pubkey z U (e.g. the base spend key 'ks U')
-* outparam: key_image_out - KI
-*/
-void make_seraphis_key_image(const crypto::secret_key &y,
-    const rct::key &zU,
-    crypto::key_image &key_image_out);
-/**
-* brief: make_seraphis_onetime_address_spendbase - create the spendbase part of a Seraphis address
-*   spendbase = k_{b, recipient} U
-* param: spendbase_privkey - k_{b, recipient}
-* outparam: spendbase_pubkey_out - k_{b, recipient} U
-*/
-void make_seraphis_address_spendbase(const crypto::secret_key &spendbase_privkey, rct::key &spendbase_pubkey_out);
-/**
-* brief: make_seraphis_address - create a Seraphis address (or onetime address)
-*   K = k_a X + k_b U
-* param: view_privkey - k_a
-* param: spendbase_privkey - k_b
-* outparam: address_out - k_a X + k_b U
-*/
-void make_seraphis_address(const crypto::secret_key &k_a,
-        const crypto::secret_key &k_b,
-        rct::key &address_out);
-/**
-* brief: make_seraphis_address_extend - extend/create a Seraphis address (or onetime address)
-*   K = k_a_extender X + K_original
-* param: k_a_extender - extends the existing pubkey
-* inoutparam: address_inout - [in: K_original] [out: k_a_extender X + K_original]
-*/
-void extend_seraphis_address(const crypto::secret_key &k_a_extender,
-        rct::key &address_inout);
+void domain_separate_rct_hash(const std::string &domain_separator, const rct::key &rct_key, crypto::secret_key &hash_result_out);
 
 } //namespace sp

@@ -34,6 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "misc_log_ex.h"
+#include "mock_sp_core.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_crypto_utils.h"
@@ -54,20 +55,20 @@ void MockENoteSp::make_base_from_privkeys(const crypto::secret_key &enote_view_p
 {
     // spendbase = k_{b, recipient} U
     rct::key spendbase;
-    sp::make_seraphis_address_spendbase(spendbase_privkey, spendbase);
+    make_seraphis_address_spendbase(spendbase_privkey, spendbase);
 
     // finish making enote base
-    make_base_from_spendbase(enote_view_privkey, spendbase, amount_blinding_factor, amount);
+    this->make_base_with_address_extension(enote_view_privkey, spendbase, amount_blinding_factor, amount);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockENoteSp::make_base_from_spendbase(const crypto::secret_key &enote_view_privkey,
-        const rct::key &spendbase_pubkey,
+void MockENoteSp::make_base_with_address_extension(const crypto::secret_key &extension_privkey,
+        const rct::key &initial_address,
         const crypto::secret_key &amount_blinding_factor,
         const rct::xmr_amount amount)
 {
-    // Ko = (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
-    m_onetime_address = spendbase_pubkey;
-    sp::extend_seraphis_address(enote_view_privkey, m_onetime_address);
+    // Ko = k_m_address_extension X + K
+    m_onetime_address = initial_address;
+    extend_seraphis_address(extension_privkey, m_onetime_address);
 
     // C = x G + a H
     m_amount_commitment = rct::commit(amount, rct::sk2rct(amount_blinding_factor));

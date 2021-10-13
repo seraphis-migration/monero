@@ -33,6 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "mock_sp_core.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_crypto_utils.h"
 
@@ -58,8 +59,6 @@ struct MockENoteSp
     /// C = x G + a H
     rct::key m_amount_commitment;
 
-    static std::size_t get_size_bytes_base() {return 32*2;}
-
     /**
     * brief: make_base_from_privkeys - make a Seraphis ENote when all secrets are known
     * param: enote_view_privkey -
@@ -72,20 +71,22 @@ struct MockENoteSp
         const crypto::secret_key &amount_blinding_factor,
         const rct::xmr_amount amount) final;
     /**
-    * brief: make_base_from_spendbase - make a Seraphis ENote from base public spend key
-    * param: enote_view_privkey -
-    * param: spendbase_pubkey -
+    * brief: make_base_with_address_extension - make a Seraphis ENote by extending an existing address
+    * param: extension_privkey -
+    * param: initial_address -
     * param: amount_blinding_factor -
     * param: amount -
     */
-    virtual void make_base_from_spendbase(const crypto::secret_key &enote_view_privkey,
-        const rct::key &spendbase_pubkey,
+    virtual void make_base_with_address_extension(const crypto::secret_key &extension_privkey,
+        const rct::key &initial_address,
         const crypto::secret_key &amount_blinding_factor,
         const rct::xmr_amount amount) final;
     /**
     * brief: gen_base - generate a Seraphis ENote (all random)
     */
     virtual void gen_base() final;
+
+    static std::size_t get_size_bytes_base() {return 32*2;}
 };
 
 ////
@@ -138,7 +139,7 @@ struct MockInputSp
         // C' = t_c + C
         sp::mask_key(commitment_mask, m_enote_to_spend.m_amount_commitment, image_inout.m_masked_commitment);
         // KI = k_a X + k_a U
-        sp::make_seraphis_key_image(m_enote_view_privkey, m_spendbase_pubkey, image_inout.m_key_image);
+        make_seraphis_key_image(m_enote_view_privkey, m_spendbase_pubkey, image_inout.m_key_image);
     }
 };
 

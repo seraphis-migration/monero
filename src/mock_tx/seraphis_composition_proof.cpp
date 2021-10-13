@@ -39,6 +39,7 @@ extern "C"
 }
 #include "cryptonote_config.h"
 #include "misc_log_ex.h"
+#include "mock_sp_core.h"
 #include "mock_tx_utils.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -294,7 +295,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
 
         // KI = (z_i / y_i) * U
         // note: plain KI is used in all byte-aware contexts
-        make_seraphis_key_image(y[i], z[i], KI[i]);
+        mock_tx::make_seraphis_key_image(y[i], z[i], KI[i]);
     }
 
 
@@ -425,7 +426,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
         KI_privkeys.push_back(mu_b_pows[i]);
         sc_mul(KI_privkeys.back().bytes, KI_privkeys.back().bytes, proof.c.bytes);
 
-        // get K_t1, convert to the prime subgroup, and check it is non-identity
+        // get K_t1, multiply by cofactor as part of deserialization, and check it is non-identity
         rct::scalarmult8(K_t1_p3[1], proof.K_t1[i]);
         CHECK_AND_ASSERT_THROW_MES(!(ge_p3_is_point_at_infinity(&K_t1_p3[1])), "Invalid proof element K_t1!");
 

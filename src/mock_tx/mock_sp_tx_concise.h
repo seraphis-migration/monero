@@ -110,12 +110,14 @@ public:
         std::vector<MockENoteSpV1> &outputs,
         std::shared_ptr<MockBalanceProofSpV1> &balance_proof,
         std::vector<MockImageProofSpV1> &image_proofs,
-        std::vector<MockMembershipProofSpV1> &membership_proofs) :
+        std::vector<MockMembershipProofSpV1> &membership_proofs,
+        MockSupplementSpV1 &tx_supplement) :
             m_input_images{std::move(input_images)},
             m_outputs{std::move(outputs)},
             m_balance_proof{std::move(balance_proof)},
             m_image_proofs{std::move(image_proofs)},
-            m_membership_proofs{std::move(membership_proofs)}
+            m_membership_proofs{std::move(membership_proofs)},
+            m_supplement{std::move(tx_supplement)}
         {
             CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble MockTxSpConcise.");
         }
@@ -164,6 +166,8 @@ private:
     std::vector<MockImageProofSpV1> m_image_proofs;
     /// concise Grootle proofs: membership for each input
     std::vector<MockMembershipProofSpV1> m_membership_proofs;
+    /// supplemental data for tx
+    MockSupplementSpV1 m_supplement;
 };
 
 /**
