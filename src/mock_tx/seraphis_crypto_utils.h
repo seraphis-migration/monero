@@ -44,6 +44,7 @@ extern "C"
 //third party headers
 
 //standard headers
+#include <string>
 #include <vector>
 
 //forward declarations

@@ -50,6 +50,7 @@ monero_add_library(mock_tx
 
 target_link_libraries(mock_tx
   PUBLIC
+    epee
     ringct
     cncrypto
     device

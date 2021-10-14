@@ -31,6 +31,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "mock_tx/mock_sp_component_types.h"
 #include "mock_tx/mock_sp_core.h"
 #include "mock_tx/mock_tx_utils.h"
 #include "mock_tx/seraphis_composition_proof.h"
@@ -44,6 +45,22 @@ extern "C"
 
 
 //-------------------------------------------------------------------------------------------------------------------
+static void make_secret_key(crypto::secret_key &skey_out)
+{
+    skey_out = rct::rct2sk(rct::zero());
+
+    while (skey_out == rct::rct2sk(rct::zero()))
+        skey_out = rct::rct2sk(rct::skGen());
+}
+//-------------------------------------------------------------------------------------------------------------------
+static void make_pubkey(rct::key &pkey_out)
+{
+    pkey_out = rct::identity();
+
+    while (pkey_out == rct::identity())
+        pkey_out = rct::pkGen();
+}
+//-------------------------------------------------------------------------------------------------------------------
 static void make_fake_sp_masked_address(crypto::secret_key &mask,
     crypto::secret_key &view_stuff,
     std::vector<crypto::secret_key> &spendkeys,
@@ -52,23 +69,14 @@ static void make_fake_sp_masked_address(crypto::secret_key &mask,
     const std::size_t num_signers{spendkeys.size()};
     EXPECT_TRUE(num_signers > 0);
 
-    mask = rct::rct2sk(rct::zero());
-    view_stuff = rct::rct2sk(rct::zero());
-
-    while (mask == rct::rct2sk(rct::zero()))
-        mask = rct::rct2sk(rct::skGen());
-
-    while (view_stuff == rct::rct2sk(rct::zero()))
-        view_stuff = rct::rct2sk(rct::skGen());
+    make_secret_key(mask);
+    make_secret_key(view_stuff);
 
     // for multisig, there can be multiple signers
     crypto::secret_key spendkey_sum{rct::rct2sk(rct::zero())};
     for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
     {
-        spendkeys[signer_index] = rct::rct2sk(rct::zero());
-
-        while (spendkeys[signer_index] == rct::rct2sk(rct::zero()))
-            spendkeys[signer_index] = rct::rct2sk(rct::skGen());
+        make_secret_key(spendkeys[signer_index]);
 
         sc_add(&spendkey_sum, &spendkey_sum, &spendkeys[signer_index]);
     }
@@ -87,6 +95,15 @@ static void make_fake_sp_masked_address(crypto::secret_key &mask,
 
     // K' = x G + kv_stuff X + ks U
     sp::multi_exp(privkeys, pubkeys, masked_address);
+}
+//-------------------------------------------------------------------------------------------------------------------
+static void make_fake_sp_user_keys(rct::key &recipient_DH_base_out,
+    crypto::secret_key &recipient_view_privkey_out,
+    crypto::secret_key &recipient_spendbase_privkey_out)
+{
+    make_pubkey(recipient_DH_base_out);
+    make_secret_key(recipient_view_privkey_out);
+    make_secret_key(recipient_spendbase_privkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -357,5 +374,92 @@ TEST(seraphis, composition_proof_multisig)
         }
     }
     }
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis, information_recovery_pieces)
+{
+    // different methods for making key images all have same results
+    crypto::secret_key y, z, k_a_sender, k_a_recipient;
+    rct::key zU, k_bU;
+    crypto::key_image key_image1, key_image2, key_image3;
+
+    make_secret_key(y);
+    k_a_sender = y;
+    k_a_recipient = y;
+    sc_add(&y, &y, &y);
+    make_secret_key(z);
+    mock_tx::make_seraphis_address_spendbase(z, zU);
+    mock_tx::make_seraphis_address_spendbase(z, k_bU);
+
+    mock_tx::make_seraphis_key_image(y, z, key_image1);
+    mock_tx::make_seraphis_key_image(y, zU, key_image2);
+    mock_tx::make_seraphis_key_image_from_parts(k_a_sender, k_a_recipient, k_bU, key_image3);
+
+    EXPECT_TRUE(key_image1 == key_image2);
+    EXPECT_TRUE(key_image2 == key_image3);
+
+    // encoding/decoding amounts succeeds
+    crypto::secret_key sender_receiver_secret = rct::rct2sk(rct::identity());
+    while (sender_receiver_secret == rct::rct2sk(rct::identity()))
+        sender_receiver_secret = rct::rct2sk(rct::skGen());
+
+    rct::xmr_amount amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+    rct::xmr_amount encoded_amount{mock_tx::enc_dec_seraphis_amount(sender_receiver_secret, amount)};
+    rct::xmr_amount decoded_amount{mock_tx::enc_dec_seraphis_amount(sender_receiver_secret, encoded_amount)};
+
+    EXPECT_TRUE(encoded_amount != amount);
+    EXPECT_TRUE(decoded_amount == amount);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis, enote_v1_information_recovery)
+{
+    // prepare to make enote
+    rct::key recipient_DH_base;
+    crypto::secret_key recipient_view_privkey;
+    rct::key recipient_view_key;
+    crypto::secret_key recipient_spendbase_privkey;
+    rct::key recipient_spend_key;
+    rct::xmr_amount amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+    std::size_t enote_index = static_cast<std::size_t>(rct::randXmrAmount(rct::xmr_amount{16}));
+
+    make_fake_sp_user_keys(recipient_DH_base, recipient_view_privkey, recipient_spendbase_privkey);  // {K^DH, k^vr, k^s}
+    rct::scalarmultKey(recipient_view_key, recipient_DH_base, rct::sk2rct(recipient_view_privkey));  // K^vr
+    mock_tx::make_seraphis_address(recipient_view_privkey, recipient_spendbase_privkey, recipient_spend_key);  // K^s
+
+    // make enote
+    crypto::secret_key enote_privkey = rct::rct2sk(rct::identity());
+    while (enote_privkey == rct::rct2sk(rct::identity()))
+        enote_privkey = rct::rct2sk(rct::skGen());
+
+    rct::key enote_pubkey;
+    mock_tx::MockENoteSpV1 enote;
+
+    enote.make(enote_privkey,
+        recipient_DH_base,
+        recipient_view_key,
+        recipient_spend_key,
+        amount,
+        enote_index,
+        enote_pubkey);
+
+    // recover information
+    rct::key nominal_recipient_spendkey;
+    rct::xmr_amount amount_recovered;
+    crypto::secret_key sender_receiver_secret;
+
+    mock_tx::make_seraphis_sender_receiver_secret(recipient_view_privkey, enote_pubkey, enote_index, sender_receiver_secret);
+
+    EXPECT_TRUE(mock_tx::try_get_seraphis_nominal_spend_key(sender_receiver_secret,
+            enote.m_onetime_address,
+            enote.m_view_tag,
+            nominal_recipient_spendkey)
+        );
+    EXPECT_TRUE(nominal_recipient_spendkey == recipient_spend_key);
+    EXPECT_TRUE(mock_tx::try_get_seraphis_amount(sender_receiver_secret,
+            enote.m_amount_commitment,
+            enote.m_encoded_amount,
+            amount_recovered)
+        );
+    EXPECT_TRUE(amount_recovered == amount);
 }
 //-------------------------------------------------------------------------------------------------------------------

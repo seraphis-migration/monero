@@ -43,6 +43,7 @@ extern "C"
 #include "ringct/multiexp.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "wipeable_string.h"
 
 //third party headers
 #include <boost/lexical_cast.hpp>
@@ -701,13 +702,17 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
 //-------------------------------------------------------------------------------------------------------------------
 void domain_separate_rct_hash(const std::string &domain_separator, const rct::key &rct_key, crypto::secret_key &hash_result_out)
 {
-    std::string hash;
+    // H("domain-sep", rct_key)
+    epee::wipeable_string hash{};
     hash.reserve(domain_separator.size() + sizeof(rct::key));
-    hash = domain_separator;
-    hash += std::string((const char*) rct_key.bytes, sizeof(rct_key));
+    hash += domain_separator;
+    hash.append((const char*) rct_key.bytes, sizeof(rct_key));
 
     //TODO: is this inefficient use of hash_to_scalar? e.g. ringct has various seemingly optimized calls into keccak()
     crypto::hash_to_scalar(hash.data(), hash.size(), hash_result_out);
+
+    // clear the string in case the key is a secret
+    hash.wipe();
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp
