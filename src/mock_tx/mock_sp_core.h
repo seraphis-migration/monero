@@ -63,11 +63,23 @@ void make_seraphis_key_image(const crypto::secret_key &y, const crypto::secret_k
 /**
 * brief: make_seraphis_key_image - create a Seraphis key image from 'y' and spend key base 'zU'
 *   KI = (1/y) * z U
-* param: y - private key 'y' (e.g created from private view key secrets)
+* param: y - private key 'y' (e.g. created from private view key secrets)
 * param: zU - pubkey z U (e.g. the base spend key 'ks U')
 * outparam: key_image_out - KI
 */
 void make_seraphis_key_image(const crypto::secret_key &y, const rct::key &zU, crypto::key_image &key_image_out);
+/**
+* brief: make_seraphis_key_image - create a Seraphis key image from sender/recipient pieces
+*   KI = (k_{b. recipient} / (k_{a, sender} + k_{a, recipient})) * U
+* param: k_a_sender - private key derived from sender (e.g. created from sender-recipient secret q_t)
+* param: k_a_recipient - private key provided by recipient (e.g. based on the private view key)
+* param: k_bU - recipient's spendbase pubkey
+* outparam: key_image_out - KI
+*/
+void make_seraphis_key_image_from_parts(const crypto::secret_key &k_a_sender,
+    const crypto::secret_key &k_a_recipient,
+    const rct::key &k_bU,
+    crypto::key_image &key_image_out);
 /**
 * brief: make_seraphis_onetime_address_spendbase - create the spendbase part of a Seraphis address
 *   spendbase = k_{b, recipient} U

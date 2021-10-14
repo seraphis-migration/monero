@@ -46,6 +46,7 @@ extern "C"
 //third party headers
 
 //standard headers
+#include <string>
 #include <vector>
 
 
@@ -76,6 +77,18 @@ void make_seraphis_key_image(const crypto::secret_key &y, const rct::key &zU, cr
     rct::scalarmultKey(temp, zU, temp); // (z/y)*U
 
     key_image_out = rct::rct2ki(temp);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_key_image_from_parts(const crypto::secret_key &k_a_sender,
+    const crypto::secret_key &k_a_recipient,
+    const rct::key &k_bU,
+    crypto::key_image &key_image_out)
+{
+    // KI = (k_b/(k_a_sender + k_a_recipient))*U
+    crypto::secret_key k_a_combined;
+    sc_add(&k_a_combined, &k_a_sender, &k_a_recipient);
+
+    make_seraphis_key_image(k_a_combined, k_bU, key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_address_spendbase(const crypto::secret_key &spendbase_privkey, rct::key &spendbase_pubkey_out)
@@ -156,15 +169,16 @@ rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receive
     std::string salt(config::HASH_KEY_SERAPHIS_AMOUNT_ENC);
     sp::domain_separate_rct_hash(salt, rct::sk2rct(sender_receiver_secret), hash_result);
 
-    rct::xmr_amount enc_dec_amount{0};
+    rct::xmr_amount mask{0};
+    rct::xmr_amount temp{0};
 
-    for (int i = 7; i >= 0; --i)
+    for (int i = 0; i < 8; ++i)
     {
-        enc_dec_amount ^= (original >> i*8) ^ hash_result.data[i];
-        enc_dec_amount = enc_dec_amount << 8*(i > 0 ? 1 : 0);
+        temp = hash_result.data[i];
+        mask ^= (temp << i*8);
     }
 
-    return enc_dec_amount;
+    return original ^ mask;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_amount_commitment_mask(const crypto::secret_key &sender_receiver_secret, crypto::secret_key &mask_out)
