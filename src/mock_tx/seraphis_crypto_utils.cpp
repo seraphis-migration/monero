@@ -361,14 +361,21 @@ rct::key small_scalar_gen(const std::size_t size_bytes)
 //-------------------------------------------------------------------------------------------------------------------
 void generate_proof_alpha(const rct::key &base, rct::key &alpha_out, rct::key &alpha_pub_out)
 {
+    crypto::secret_key temp;
+    generate_proof_alpha(base, temp, alpha_pub_out);
+    alpha_out = rct::sk2rct(temp);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void generate_proof_alpha(const rct::key &base, crypto::secret_key &alpha_out, rct::key &alpha_pub_out)
+{
     CHECK_AND_ASSERT_THROW_MES(!(base == rct::identity()), "Bad base for generating proof alpha!");
 
-    alpha_out = ZERO;
+    alpha_out = rct::rct2sk(ZERO);
 
-    while (alpha_out == ZERO || alpha_pub_out == rct::identity())
+    while (alpha_out == rct::rct2sk(ZERO) || alpha_pub_out == rct::identity())
     {
-        alpha_out = rct::skGen();
-        rct::scalarmultKey(alpha_pub_out, base, alpha_out);
+        alpha_out = rct::rct2sk(rct::skGen());
+        rct::scalarmultKey(alpha_pub_out, base, rct::sk2rct(alpha_out));
     }
 }
 //-------------------------------------------------------------------------------------------------------------------

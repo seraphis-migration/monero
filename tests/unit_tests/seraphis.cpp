@@ -273,7 +273,7 @@ TEST(seraphis, composition_proof)
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, composition_proof_multisig)
 {
-    rct::keyV K, signer_openers_pubs;
+    rct::keyV K, signer_openers_1_pubs, signer_openers_2_pubs;
     std::vector<crypto::key_image> KI;
     std::vector<crypto::secret_key> x, y, z_pieces_temp;
     std::vector<std::vector<crypto::secret_key>> z_pieces;
@@ -304,7 +304,8 @@ TEST(seraphis, composition_proof_multisig)
                 z_pieces[signer_index].resize(num_keys);
             }
             signer_preps.resize(num_signers);
-            signer_openers_pubs.resize(num_signers);
+            signer_openers_1_pubs.resize(num_signers);
+            signer_openers_2_pubs.resize(num_signers);
             partial_sigs.resize(num_signers);
 
             try
@@ -345,7 +346,8 @@ TEST(seraphis, composition_proof_multisig)
                 for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
                 {
                     signer_preps[signer_index] = sp::sp_composition_multisig_init();
-                    signer_openers_pubs[signer_index] = signer_preps[signer_index].signature_opening_KI_pub;
+                    signer_openers_1_pubs[signer_index] = signer_preps[signer_index].signature_opening_1_KI_pub;
+                    signer_openers_2_pubs[signer_index] = signer_preps[signer_index].signature_opening_2_KI_pub;
                 }
 
                 // all participants: respond
@@ -356,8 +358,10 @@ TEST(seraphis, composition_proof_multisig)
                             x,
                             y,
                             z_pieces[signer_index],
-                            signer_openers_pubs,
-                            signer_preps[signer_index].signature_opening_KI_priv
+                            signer_openers_1_pubs,
+                            signer_openers_2_pubs,
+                            signer_preps[signer_index].signature_opening_1_KI_priv,
+                            signer_preps[signer_index].signature_opening_2_KI_priv
                         );
                 }
 
