@@ -141,6 +141,7 @@ rct::key small_scalar_gen(const std::size_t size_bytes);
 * outparam: alpha_pub_out - public key 'alpha * base'
 */
 void generate_proof_alpha(const rct::key &base, rct::key &alpha_out, rct::key &alpha_pub_out);
+void generate_proof_alpha(const rct::key &base, crypto::secret_key &alpha_out, rct::key &alpha_pub_out);
 /**
 * brief: multi_exp/multi_exp_p3 - EC multiexp operation with arbitrary element count
 *   - optimization: if a privkey == 1, skips the scalar mul operation
