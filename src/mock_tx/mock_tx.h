@@ -88,6 +88,14 @@ public:
     /// get a short description of the tx type
     virtual std::string get_descriptor() const = 0;
 
+    /// get the tx version string: era | format | validation rules
+    virtual void get_versioning_string(std::string &version_string) const final
+    {
+        version_string += static_cast<char>(m_tx_era_version);
+        version_string += static_cast<char>(m_tx_format_version);
+        version_string += static_cast<char>(m_tx_validation_rules_version);
+    }
+
     //get_tx_byte_blob()
 
 private:
@@ -99,6 +107,13 @@ private:
     virtual bool validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
         const bool defer_batchable) const = 0;
 //member variables
+protected:
+    /// era of the tx (e.g. CryptoNote/RingCT/Seraphis)
+    unsigned char m_tx_era_version;
+    /// format version of the tx within its era
+    unsigned char m_tx_format_version;
+    /// a tx format's validation rules version
+    unsigned char m_tx_validation_rules_version;
 };
 
 /**

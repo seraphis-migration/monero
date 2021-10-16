@@ -33,10 +33,6 @@
 
 //local headers
 #include "crypto/crypto.h"
-extern "C"
-{
-#include "crypto/crypto-ops.h"
-}
 #include "misc_log_ex.h"
 #include "mock_sp_core.h"
 #include "ringct/rctOps.h"
@@ -97,14 +93,6 @@ void MockENoteSpV1::gen()
     m_view_tag = 0;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockInputSpV1::gen_v1(const rct::xmr_amount amount)
-{
-    m_enote_view_privkey = rct::rct2sk(rct::skGen());
-    m_spendbase_privkey = rct::rct2sk(rct::skGen());
-    m_amount_blinding_factor = rct::rct2sk(rct::skGen());
-    m_amount = amount;
-}
-//-------------------------------------------------------------------------------------------------------------------
 MockENoteSpV1 MockDestSpV1::to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const
 {
     MockENoteSpV1 enote;
@@ -127,21 +115,25 @@ void MockDestSpV1::gen_v1(const rct::xmr_amount amount)
 
     m_enote_privkey = rct::rct2sk(rct::skGen());
 }
-#if 0
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t MockRctProofV1::get_size_bytes() const
+std::size_t MockMembershipProofSpV1::get_size_bytes() const
 {
-    // note: ignore the key image stored in the clsag, it is double counted by the input's enote image struct
-    return 32 * (2 + m_clsag_proof.s.size());
+    std::size_t num_elements = m_concise_grootle_proof.X.size();  // X
+
+    if (m_concise_grootle_proof.f.size() > 0)
+        num_elements += num_elements * m_concise_grootle_proof.f[0].size();  // f
+
+    num_elements += 7;  // A, B, C, D, zA, zC, z
+
+    return 32 * num_elements;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t MockRctProofV2::get_size_bytes() const
+std::size_t MockImageProofSpV1::get_size_bytes() const
 {
-    // note: ignore the key image stored in the Triptych proof, it is double counted by the input's enote image struct
-    return 32 * (8 + m_triptych_proof.X.size() + m_triptych_proof.Y.size() + m_ref_set_decomp_n * m_ref_set_decomp_m);
+    return 32 * (3 + m_composition_proof.r_i.size() + m_composition_proof.K_t1.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t MockRctBalanceProofV1::get_size_bytes() const
+std::size_t MockBalanceProofSpV1::get_size_bytes() const
 {
     // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
     std::size_t size{0};
@@ -151,6 +143,10 @@ std::size_t MockRctBalanceProofV1::get_size_bytes() const
 
     return size;
 }
-#endif
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t MockSupplementSpV1::get_size_bytes() const
+{
+    return 32 * m_output_enote_pubkeys.size();
+}
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx

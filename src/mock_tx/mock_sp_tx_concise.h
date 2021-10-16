@@ -101,6 +101,14 @@ class MockTxPartialSpV1 final
 class MockTxSpConcise final : public MockTx
 {
 public:
+//member types
+    enum ValidationRulesVersion : unsigned char
+    {
+        MIN = 1,
+        ONE = 1,
+        MAX = 1
+    };
+
 //constructors
     /// default constructor
     MockTxSpConcise() = default;
@@ -111,7 +119,8 @@ public:
         std::shared_ptr<MockBalanceProofSpV1> &balance_proof,
         std::vector<MockImageProofSpV1> &image_proofs,
         std::vector<MockMembershipProofSpV1> &membership_proofs,
-        MockSupplementSpV1 &tx_supplement) :
+        MockSupplementSpV1 &tx_supplement,
+        ValidationRulesVersion validation_rules_version) :
             m_input_images{std::move(input_images)},
             m_outputs{std::move(outputs)},
             m_balance_proof{std::move(balance_proof)},
@@ -120,6 +129,12 @@ public:
             m_supplement{std::move(tx_supplement)}
         {
             CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble MockTxSpConcise.");
+            CHECK_AND_ASSERT_THROW_MES(validation_rules_version >= ValidationRulesVersion::MIN &&
+                validation_rules_version <= ValidationRulesVersion::MAX, "Invalid validation rules version.");
+
+            m_tx_era_version = TxGenerationSp;
+            m_tx_format_version = TxStructureVersionSp::TxTypeSpConciseGrootle1;
+            m_tx_validation_rules_version = validation_rules_version;
         }
 
     /// normal constructor: from existing tx byte blob

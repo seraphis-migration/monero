@@ -101,18 +101,22 @@ bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const Ledge
 {
     // membership proofs
     if (!validate_mock_tx_sp_membership_proofs_v1(m_membership_proofs,
-            m_input_images,
-            get_tx_membership_proof_message_sp_v1(),
-            ledger_context))
+        m_input_images,
+        get_tx_membership_proof_message_sp_v1(),
+        ledger_context))
     {
         return false;
     }
 
     // ownership/unspentness proofs
+    std::string version_string;
+    version_string.reserve(3);
+    this->get_versioning_string(version_string);
+
     if (!validate_mock_tx_sp_composition_proofs_v1(m_image_proofs,
-            m_input_images,
-            get_tx_image_proof_message_sp_v1(m_outputs, m_supplement),
-            ledger_context))
+        m_input_images,
+        get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_supplement),
+        ledger_context))
     {
         return false;
     }
@@ -127,10 +131,6 @@ std::size_t MockTxSpConcise::get_size_bytes() const
     // - tx fees
     // - memos
     // - miscellaneous serialization bytes
-
-    // assumes
-    // - each output has its own enote pub key
-
     std::size_t size{0};
 
     // input images
@@ -153,6 +153,8 @@ std::size_t MockTxSpConcise::get_size_bytes() const
     if (m_image_proofs.size())
         size += m_image_proofs.size() * m_image_proofs[0].get_size_bytes();
 
+    size += m_supplement.get_size_bytes();
+
     return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -167,8 +169,6 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts),
         "Tried to make tx with unbalanced amounts.");
 
-    std::size_t ref_set_size{ref_set_size_from_decomp(params.ref_set_decomp_n, params.ref_set_decomp_m)};
-
     // make mock inputs
     // enote, ks, view key stuff, amount, amount blinding factor
     std::vector<MockInputSpV1> inputs_to_spend{gen_mock_sp_inputs_v1(in_amounts, ledger_context)};
@@ -181,6 +181,11 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
 
     // make mock destinations
     std::vector<MockDestSpV1> destinations{gen_mock_sp_dests_v1(out_amounts)};
+
+    // versioning
+    std::string version_string;
+    version_string.reserve(3);
+    this->get_versioning_string(version_string);
 
 
     /// make tx
@@ -212,7 +217,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
         input_images,
         image_address_masks,
         image_amount_masks,
-        get_tx_image_proof_message_sp_v1(outputs, tx_supplement),
+        get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement),
         tx_image_proofs);
     make_v1_tx_balance_proof_rct_v1(output_amounts,
         output_amount_commitment_blinding_factors,
@@ -225,7 +230,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
         tx_membership_proofs);
 
     return std::make_shared<MockTxSpConcise>(input_images,outputs, balance_proof, tx_image_proofs,
-        tx_membership_proofs, tx_supplement);
+        tx_membership_proofs, tx_supplement, MockTxSpConcise::ValidationRulesVersion::ONE);
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
