@@ -35,6 +35,7 @@
 #include "crypto/crypto.h"
 #include "mock_sp_base.h"
 #include "ringct/rctTypes.h"
+#include "seraphis_composition_proof.h"
 
 //third party headers
 
@@ -97,13 +98,7 @@ struct MockENoteImageSpV1 final : public MockENoteImageSp
 // MockInputSpV1 - Input V1
 ///
 struct MockInputSpV1 final : public MockInputSp<MockENoteSpV1>
-{
-    /**
-    * brief: gen_v1 - generate a V1 Input (random)
-    * param: amount -
-    */
-    void gen_v1(const rct::xmr_amount amount);
-};
+{};
 
 ////
 // MockMembershipReferenceSetSpV1 - Records info about a membership reference set
@@ -134,36 +129,18 @@ struct MockDestSpV1 final : public MockDestSp
     */
     void gen_v1(const rct::xmr_amount amount);
 };
-#if 0
-////
-// MockRctProofV1 - Input Proof V1
-// - CLSAG
-///
-struct MockRctProofV1 final
-{
-    /// a CLSAG proof
-    rct::clsag m_clsag_proof;
-    /// vector of pairs <Ko_i, C_i> for referenced enotes
-    rct::ctkeyV m_referenced_enotes_converted;
-
-    std::size_t get_size_bytes() const;
-};
 
 ////
-// MockRctProofV2 - Input Proof V2
-// - Triptych
+// MockMembershipProofSpV1 - Membership Proof V1
+// - Concise Grootle
 ///
-struct MockRctProofV2 final
+struct MockMembershipProofSpV1 final
 {
-    /// the Triptych proof
-    rct::TriptychProof m_triptych_proof;
-    /// onetime addresses Ko
-    rct::keyV m_onetime_addresses;
-    /// output commitments C
-    rct::keyV m_commitments;
-    /// pseudo-output commitment C'
-    rct::key m_pseudo_amount_commitment;
-    /// decomposition n^m
+    /// a concise grootle proof
+    sp::ConciseGrootleProof m_concise_grootle_proof;
+    /// ledger indices of enotes referenced by the proof
+    std::vector<std::size_t> m_ledger_enote_indices;
+    /// no consensus rules in mockup, store decomp 'ref set size = n^m' explicitly
     std::size_t m_ref_set_decomp_n;
     std::size_t m_ref_set_decomp_m;
 
@@ -171,16 +148,44 @@ struct MockRctProofV2 final
 };
 
 ////
-// MockRctBalanceProofV1 - Balance Proof V1
+// MockImageProofSpV1 - ENote Image Proof V1: ownership and unspentness (legitimacy of key image)
+// - Seraphis composition proof
+///
+struct MockImageProofSpV1 final
+{
+    /// a seraphis composition proof
+    sp::SpCompositionProof m_composition_proof;
+
+    std::size_t get_size_bytes() const;
+};
+
+////
+// MockBalanceProofSpV1 - Balance Proof V1
 // - balance proof: implicit [sum(inputs) == sum(outputs)]
 // - range proof: Bulletproofs+
 ///
-struct MockRctBalanceProofV1 final
+struct MockBalanceProofSpV1 final
 {
     /// a set of BP+ proofs
     std::vector<rct::BulletproofPlus> m_bpp_proofs;
 
     std::size_t get_size_bytes() const;
 };
-#endif
+
+////
+// MockSupplementSpV1 - supplementary info about a tx
+// - enote pubkeys: may not line up 1:1 with output enotes, so store in separate field
+// - tx memo
+// - tx fee
+///
+struct MockSupplementSpV1 final
+{
+    /// R_t: enote pubkeys for outputs
+    std::vector<rct::key> m_output_enote_pubkeys;
+    /// tx memo: none in mockup
+    /// fee: none in mockup
+
+    std::size_t get_size_bytes() const;
+};
+
 } //namespace mock_tx

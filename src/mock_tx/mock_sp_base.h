@@ -34,6 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "mock_sp_core.h"
+#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_crypto_utils.h"
 
@@ -48,6 +49,20 @@
 
 namespace mock_tx
 {
+
+//// Versioning
+
+/// Transaction protocol generation: following CryptoNote (1) and RingCT (2)
+const unsigned char TxGenerationSp = 3;
+
+/// Transaction structure types
+enum TxStructureVersionSp : unsigned char
+{
+    /// mining transaction (TODO)
+    TxTypeSpMining = 0,
+    TxTypeSpConciseGrootle1 = 1
+};
+
 
 ////
 // MockENoteSp - Seraphis ENote base
@@ -140,6 +155,18 @@ struct MockInputSp
         sp::mask_key(commitment_mask, m_enote_to_spend.m_amount_commitment, image_inout.m_masked_commitment);
         // KI = k_a X + k_a U
         make_seraphis_key_image(m_enote_view_privkey, m_spendbase_privkey, image_inout.m_key_image);
+    }
+
+    /**
+    * brief: gen_base - generate a Seraphis Input (all random)
+    * param: amount -
+    */
+    virtual void gen_base(const rct::xmr_amount amount) final
+    {
+        m_enote_view_privkey = rct::rct2sk(rct::skGen());
+        m_spendbase_privkey = rct::rct2sk(rct::skGen());
+        m_amount_blinding_factor = rct::rct2sk(rct::skGen());
+        m_amount = amount;
     }
 };
 
