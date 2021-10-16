@@ -392,8 +392,8 @@ TEST(seraphis, information_recovery_pieces)
     k_a_recipient = y;
     sc_add(&y, &y, &y);
     make_secret_key(z);
-    mock_tx::make_seraphis_address_spendbase(z, zU);
-    mock_tx::make_seraphis_address_spendbase(z, k_bU);
+    mock_tx::make_seraphis_spendbase(z, zU);
+    mock_tx::make_seraphis_spendbase(z, k_bU);
 
     mock_tx::make_seraphis_key_image(y, z, key_image1);
     mock_tx::make_seraphis_key_image(y, zU, key_image2);
@@ -428,7 +428,7 @@ TEST(seraphis, enote_v1_information_recovery)
 
     make_fake_sp_user_keys(recipient_DH_base, recipient_view_privkey, recipient_spendbase_privkey);  // {K^DH, k^vr, k^s}
     rct::scalarmultKey(recipient_view_key, recipient_DH_base, rct::sk2rct(recipient_view_privkey));  // K^vr
-    mock_tx::make_seraphis_address(recipient_view_privkey, recipient_spendbase_privkey, recipient_spend_key);  // K^s
+    mock_tx::make_seraphis_spendkey(recipient_view_privkey, recipient_spendbase_privkey, recipient_spend_key);  // K^s
 
     // make enote
     crypto::secret_key enote_privkey = rct::rct2sk(rct::identity());

@@ -46,7 +46,7 @@
 //
 // multisig notation: alpha_{b,n,e}
 // - b: indicates which part of the proof this is for
-// - n: for Frost-style bi-nonce signing, alpha_{b,1,e} is nonce 'D', alpha_{b,2,e} is nonce 'E' (in their notation)
+// - n: for FROST-style bi-nonce signing, alpha_{b,1,e} is nonce 'D', alpha_{b,2,e} is nonce 'E' (in their notation)
 // - e: multisig signer index
 //
 // References:
@@ -58,6 +58,8 @@
 // - Multisig/threshold security (Crites): https://eprint.iacr.org/2021/1375.pdf
 // - MRL-0009 (Brandon Goodell and Sarang Noether): https://web.getmonero.org/resources/research-lab/pubs/MRL-0009.pdf
 // - Zero to Monero: 2nd Edition Chapter 9 (UkoeHB): https://web.getmonero.org/library/Zero-to-Monero-2-0-0.pdf
+// - (Technical Note) Multisig - Defeating Drijvers with Bi-Nonce Signing (UkoeHB):
+//     https://github.com/UkoeHB/drijvers-multisig-tech-note
 ///
 
 

@@ -122,9 +122,10 @@ static rct::key compute_base_aggregation_coefficient_b(const rct::key &mu_a)
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge message
-// m = H(message, {K})
+// challenge_message = H(message, {K})
 //
 // note: in practice, this extends the aggregation coefficients (i.e. message = mu_b)
+// challenge_message = H(H(H(H("domain-sep"), m, {K_t1}, {KI}), {K}))
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge_message(const rct::key &message, const rct::keyV &K)
 {
@@ -145,7 +146,7 @@ static rct::key compute_challenge_message(const rct::key &message, const rct::ke
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge
-// c = H(message, [K_t2 proof key], [KI proof key], {[K_t1 proof key]})
+// c = H(challenge_message, [K_t2 proof key], [KI proof key], {[K_t1 proof key]})
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge(const rct::key &message,
     const rct::key &K_t2_proofkey,
@@ -253,8 +254,8 @@ static void compute_K_t1_for_proof(const crypto::secret_key &y_i,
     rct::scalarmultKey(K_t1_out, K_i, K_t1_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-// FROST-style bi-nonce signing
-// nonce merge factor = H("domain-sep", e, m, alpha_1_1, alpha_2_1, ..., alpha_1_N, alpha_2_N)
+// FROST-style bi-nonce signing merge factor
+// rho_e = H("domain-sep", e, m, alpha_1_1, alpha_2_1, ..., alpha_1_N, alpha_2_N)
 //-------------------------------------------------------------------------------------------------------------------
 static void multisig_binonce_merge_factor(const std::size_t e,
     const rct::key &message,
@@ -326,6 +327,7 @@ static void multisig_binonce_merge_priv(const std::size_t e,
     sc_mul(&alpha_e_priv, &alpha_e_priv, merge_factor_e.bytes);  // rho_e*alpha_2_e
     sc_add(&alpha_e_priv, &alpha_e_priv, &nonce_1_e_priv);  // alpha_1_e + rho_e*alpha_2_e
 }
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 SpCompositionProof sp_composition_prove(const rct::keyV &K,
     const std::vector<crypto::secret_key> &x,

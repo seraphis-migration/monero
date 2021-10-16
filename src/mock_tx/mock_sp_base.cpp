@@ -55,7 +55,7 @@ void MockENoteSp::make_base_from_privkeys(const crypto::secret_key &enote_view_p
 {
     // spendbase = k_{b, recipient} U
     rct::key spendbase;
-    make_seraphis_address_spendbase(spendbase_privkey, spendbase);
+    make_seraphis_spendbase(spendbase_privkey, spendbase);
 
     // finish making enote base
     this->make_base_with_address_extension(enote_view_privkey, spendbase, amount_blinding_factor, amount);
@@ -68,7 +68,7 @@ void MockENoteSp::make_base_with_address_extension(const crypto::secret_key &ext
 {
     // Ko = k_m_address_extension X + K
     m_onetime_address = initial_address;
-    extend_seraphis_address(extension_privkey, m_onetime_address);
+    extend_seraphis_spendkey(extension_privkey, m_onetime_address);
 
     // C = x G + a H
     m_amount_commitment = rct::commit(amount, rct::sk2rct(amount_blinding_factor));
@@ -84,17 +84,11 @@ void MockENoteSp::gen_base()
 void MockDestSp::gen_base(const rct::xmr_amount amount)
 {
     // all random except amount
-    m_onetime_address = rct::pkGen();
-    m_amount_blinding_factor = rct::rct2sk(rct::skGen());
-    m_amount = amount;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockDestSp::to_enote_sp_base(MockENoteSp &enote_inout) const
-{
-    enote_inout.m_onetime_address = m_onetime_address;
+    m_recipient_DHkey = rct::pkGen();
+    m_recipient_viewkey = rct::pkGen();
+    m_recipient_spendkey = rct::pkGen();
 
-    // C = x G + a H
-    enote_inout.m_amount_commitment = rct::commit(m_amount, rct::sk2rct(m_amount_blinding_factor));
+    m_amount = amount;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx

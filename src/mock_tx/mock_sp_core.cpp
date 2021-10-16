@@ -61,8 +61,7 @@ void make_seraphis_key_image(const crypto::secret_key &y, const crypto::secret_k
     // KI = (z/y)*U
     rct::key temp = sp::invert(rct::sk2rct(y)); // 1/y
     sc_mul(temp.bytes, &z, temp.bytes); // z*(1/y)
-    rct::key U_gen{sp::get_U_gen()};
-    rct::scalarmultKey(temp, U_gen, temp); // (z/y)*U
+    rct::scalarmultKey(temp, sp::get_U_gen(), temp); // (z/y)*U
 
     key_image_out = rct::rct2ki(temp);
 }
@@ -91,29 +90,28 @@ void make_seraphis_key_image_from_parts(const crypto::secret_key &k_a_sender,
     make_seraphis_key_image(k_a_combined, k_bU, key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_address_spendbase(const crypto::secret_key &spendbase_privkey, rct::key &spendbase_pubkey_out)
+void make_seraphis_spendbase(const crypto::secret_key &spendbase_privkey, rct::key &spendbase_pubkey_out)
 {
     // spendbase = k_{b, recipient} U
     rct::scalarmultKey(spendbase_pubkey_out, sp::get_U_gen(), rct::sk2rct(spendbase_privkey));
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_address(const crypto::secret_key &k_a, const crypto::secret_key &k_b, rct::key &address_out)
+void make_seraphis_spendkey(const crypto::secret_key &k_a, const crypto::secret_key &k_b, rct::key &spendkey_out)
 {
     // K = k_a X + k_b U
-    make_seraphis_address_spendbase(k_b, address_out);
+    make_seraphis_spendbase(k_b, spendkey_out);
 
     // finish address
-    extend_seraphis_address(k_a, address_out);
+    extend_seraphis_spendkey(k_a, spendkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void extend_seraphis_address(const crypto::secret_key &k_a_extender, rct::key &address_inout)
+void extend_seraphis_spendkey(const crypto::secret_key &k_a_extender, rct::key &spendkey_inout)
 {
     // K = k_a_extender X + K_original
-    rct::key X_gen{sp::get_X_gen()};
     rct::key address_temp;
 
-    rct::scalarmultKey(address_temp, X_gen, rct::sk2rct(k_a_extender));
-    rct::addKeys(address_inout, address_temp, address_inout);
+    rct::scalarmultKey(address_temp, sp::get_X_gen(), rct::sk2rct(k_a_extender));
+    rct::addKeys(spendkey_inout, address_temp, spendkey_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_enote_pubkey(const crypto::secret_key &enote_privkey, const rct::key &DH_base, rct::key &enote_pubkey_out)
@@ -205,7 +203,7 @@ bool try_get_seraphis_nominal_spend_key(const crypto::secret_key &sender_receive
     make_seraphis_sender_address_extension(sender_receiver_secret, k_a_extender);  // H(q_t)
     sc_mul(&k_a_extender, sp::MINUS_ONE.bytes, &k_a_extender);  // -H(q_t)
     nominal_spend_key_out = onetime_address;  // Ko_t
-    extend_seraphis_address(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
+    extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
 
     return true;
 }

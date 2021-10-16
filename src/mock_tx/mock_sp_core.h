@@ -81,27 +81,27 @@ void make_seraphis_key_image_from_parts(const crypto::secret_key &k_a_sender,
     const rct::key &k_bU,
     crypto::key_image &key_image_out);
 /**
-* brief: make_seraphis_onetime_address_spendbase - create the spendbase part of a Seraphis address
+* brief: make_seraphis_spendbase - create the base part of a Seraphis spendkey
 *   spendbase = k_{b, recipient} U
 * param: spendbase_privkey - k_{b, recipient}
 * outparam: spendbase_pubkey_out - k_{b, recipient} U
 */
-void make_seraphis_address_spendbase(const crypto::secret_key &spendbase_privkey, rct::key &spendbase_pubkey_out);
+void make_seraphis_spendbase(const crypto::secret_key &spendbase_privkey, rct::key &spendbase_pubkey_out);
 /**
-* brief: make_seraphis_address - create a Seraphis address (or onetime address)
+* brief: make_seraphis_spendkey - create a Seraphis spendkey (or onetime address)
 *   K = k_a X + k_b U
 * param: view_privkey - k_a
 * param: spendbase_privkey - k_b
-* outparam: address_out - k_a X + k_b U
+* outparam: spendkey_out - k_a X + k_b U
 */
-void make_seraphis_address(const crypto::secret_key &k_a, const crypto::secret_key &k_b, rct::key &address_out);
+void make_seraphis_spendkey(const crypto::secret_key &k_a, const crypto::secret_key &k_b, rct::key &spendkey_out);
 /**
-* brief: make_seraphis_address_extend - extend/create a Seraphis address (or onetime address)
+* brief: extend_seraphis_spendkey - extend/create a Seraphis spendkey (or onetime address)
 *   K = k_a_extender X + K_original
 * param: k_a_extender - extends the existing pubkey
-* inoutparam: address_inout - [in: K_original] [out: k_a_extender X + K_original]
+* inoutparam: spendkey_inout - [in: K_original] [out: k_a_extender X + K_original]
 */
-void extend_seraphis_address(const crypto::secret_key &k_a_extender, rct::key &address_inout);
+void extend_seraphis_spendkey(const crypto::secret_key &k_a_extender, rct::key &spendkey_inout);
 /**
 * brief: make_seraphis_enote_pubkey - enote pubkey R_t
 *   R_t = r_t K^{DH}_recipient
@@ -123,7 +123,7 @@ void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     const std::size_t enote_index,
     crypto::secret_key &sender_receiver_secret_out);
 /**
-* brief: make_seraphis_sender_address_extension - extension for transforming a recipient address into an enote one-time address
+* brief: make_seraphis_sender_address_extension - extension for transforming a recipient spendkey into an enote one-time address
 *    k_{a, sender} = H("domain-sep", q_t)
 * param: sender_receiver_secret - q_t
 * outparam: sender_address_extension_out - k_{a, sender}

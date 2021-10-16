@@ -84,11 +84,11 @@ struct MockENoteSpV1 final : public MockENoteSp
 
     static std::size_t get_size_bytes() { return get_size_bytes_base() + 8 + 1; }
 };
-#if 0
+
 ////
 // MockENoteImageSpV1 - ENote Image V1
 ///
-struct MockENoteImageSpV1 final : public MockENoteImageRct
+struct MockENoteImageSpV1 final : public MockENoteImageSp
 {
     static std::size_t get_size_bytes() { return get_size_bytes_base(); }
 };
@@ -96,33 +96,37 @@ struct MockENoteImageSpV1 final : public MockENoteImageRct
 ////
 // MockInputSpV1 - Input V1
 ///
-struct MockInputSpV1 final : public MockInputRct<MockENoteSpV1>
+struct MockInputSpV1 final : public MockInputSp<MockENoteSpV1>
 {
-    /// convert this input to an e-note-image (CryptoNote style)
-    MockENoteImageSpV1 to_enote_image_v1(const crypto::secret_key &pseudo_blinding_factor) const;
-
-    /// convert this input to an e-note-image (Triptych style)
-    MockENoteImageSpV1 to_enote_image_v2(const crypto::secret_key &pseudo_blinding_factor) const;
-
     /**
     * brief: gen_v1 - generate a V1 Input (random)
     * param: amount -
-    * param: ref_set_size -
     */
-    void gen_v1(const rct::xmr_amount amount, const std::size_t ref_set_size);
+    void gen_v1(const rct::xmr_amount amount);
+};
+
+////
+// MockMembershipReferenceSetSpV1 - Records info about a membership reference set
+///
+struct MockMembershipReferenceSetSpV1 final
+{
+    std::size_t m_ref_set_decomp_n;
+    std::size_t m_ref_set_decomp_m;
+    std::vector<std::size_t> m_enote_ledger_indices;
+    std::vector<MockENoteSpV1> m_referenced_enotes;
+    std::size_t m_real_spend_index_in_set;
 };
 
 ////
 // MockDestSpV1 - Destination V1
 ///
-struct MockDestSpV1 final : public MockDestRct
+struct MockDestSpV1 final : public MockDestSp
 {
-    /// memo
-    crypto::public_key m_enote_pubkey;
-    rct::xmr_amount m_encoded_amount;
+    /// r_t
+    crypto::secret_key m_enote_privkey;
 
     /// convert this destination into a v1 enote
-    MockENoteSpV1 to_enote_v1() const;
+    MockENoteSpV1 to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const;
 
     /**
     * brief: gen_mock_tx_rct_dest_v1 - generate a V1 Destination (random)
@@ -130,7 +134,7 @@ struct MockDestSpV1 final : public MockDestRct
     */
     void gen_v1(const rct::xmr_amount amount);
 };
-
+#if 0
 ////
 // MockRctProofV1 - Input Proof V1
 // - CLSAG
