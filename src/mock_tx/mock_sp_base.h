@@ -115,8 +115,8 @@ struct MockInputSp
 
     /// k_{a, sender} + k_{a, recipient}
     crypto::secret_key m_enote_view_privkey;
-    /// k_{b, recipient} U
-    rct::key m_spendbase_pubkey;
+    /// k_{b, recipient}
+    crypto::secret_key m_spendbase_privkey;
     /// x
     crypto::secret_key m_amount_blinding_factor;
     /// a
@@ -139,7 +139,7 @@ struct MockInputSp
         // C' = t_c + C
         sp::mask_key(commitment_mask, m_enote_to_spend.m_amount_commitment, image_inout.m_masked_commitment);
         // KI = k_a X + k_a U
-        make_seraphis_key_image(m_enote_view_privkey, m_spendbase_pubkey, image_inout.m_key_image);
+        make_seraphis_key_image(m_enote_view_privkey, m_spendbase_privkey, image_inout.m_key_image);
     }
 };
 
@@ -149,8 +149,9 @@ struct MockInputSp
 ///
 struct MockDestSp
 {
-    rct::key m_onetime_address;
-    crypto::secret_key m_amount_blinding_factor;
+    rct::key m_recipient_DHkey;
+    rct::key m_recipient_viewkey;
+    rct::key m_recipient_spendkey;
     rct::xmr_amount m_amount;
 
     /**
@@ -158,12 +159,6 @@ struct MockDestSp
     * param: amount -
     */
     virtual void gen_base(const rct::xmr_amount amount) final;
-
-    /**
-    * brief: to_enote_sp_base - convert this destination into an e-note
-    * inoutparam: enote_inout -
-    */
-    virtual void to_enote_sp_base(MockENoteSp &enote_inout) const final;
 };
 
 } //namespace mock_tx

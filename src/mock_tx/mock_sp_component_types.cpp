@@ -60,28 +60,30 @@ void MockENoteSpV1::make(const crypto::secret_key &enote_privkey,
     const std::size_t enote_index,
     rct::key &enote_pubkey_out)
 {
-    // sender-receiver shared secret
+    // note: t = enote_index
+
+    // r_t: sender-receiver shared secret
     crypto::secret_key sender_receiver_secret;
     make_seraphis_sender_receiver_secret(enote_privkey, recipient_view_key, enote_index, sender_receiver_secret);
 
-    // amount commitment mask (blinding factor)
+    // x_t: amount commitment mask (blinding factor)
     crypto::secret_key amount_mask;
     make_seraphis_amount_commitment_mask(sender_receiver_secret, amount_mask);
 
-    // extension to add to user's spend key
+    // k_{a, sender, t}: extension to add to user's spend key
     crypto::secret_key k_a_extender;
     make_seraphis_sender_address_extension(sender_receiver_secret, k_a_extender);
 
-    // make the base of the enote
+    // make the base of the enote (Ko_t, C_t)
     this->make_base_with_address_extension(k_a_extender, recipient_spend_key, amount_mask, amount);
 
-    // encoded amount
+    // enc(a_t): encoded amount
     m_encoded_amount = enc_dec_seraphis_amount(sender_receiver_secret, amount);
 
-    // view tag
+    // view_tag_t: view tag
     m_view_tag = make_seraphis_view_tag(sender_receiver_secret);
 
-    // enote pubkey to send back to caller
+    // R_t: enote pubkey to send back to caller
     make_seraphis_enote_pubkey(enote_privkey, recipient_DH_base, enote_pubkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -94,97 +96,38 @@ void MockENoteSpV1::gen()
     m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
     m_view_tag = 0;
 }
-#if 0
 //-------------------------------------------------------------------------------------------------------------------
-MockENoteImageRctV1 MockInputRctV1::to_enote_image_v1(const crypto::secret_key &pseudo_blinding_factor) const
+void MockInputSpV1::gen_v1(const rct::xmr_amount amount)
 {
-    MockENoteImageRctV1 image;
-
-    // C' = x' G + a H
-    image.m_pseudo_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(pseudo_blinding_factor)));
-
-    // KI = ko * Hp(Ko)
-    crypto::public_key pubkey;
-    CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_onetime_privkey, pubkey), "Failed to derive public key");
-    crypto::generate_key_image(pubkey, m_onetime_privkey, image.m_key_image);
-
-    // KI_stored = (1/8)*KI
-    // - for efficiently checking that the key image is in the prime subgroup during tx verification
-    rct::key storable_ki;
-    rct::scalarmultKey(storable_ki, rct::ki2rct(image.m_key_image), rct::INV_EIGHT);
-    image.m_key_image = rct::rct2ki(storable_ki);
-
-    return image;
-}
-MockENoteImageRctV1 MockInputRctV1::to_enote_image_v2(const crypto::secret_key &pseudo_blinding_factor) const
-{
-    MockENoteImageRctV1 image;
-
-    // C' = x' G + a H
-    image.m_pseudo_amount_commitment = rct::rct2pk(rct::commit(m_amount, rct::sk2rct(pseudo_blinding_factor)));
-
-    // KI = 1/ko * U
-    rct::key inv_ko{rct::invert(rct::sk2rct(m_onetime_privkey))};
-    rct::key key_image{rct::scalarmultKey(rct::get_gen_U(), inv_ko)};
-
-    // KI_stored = (1/8)*KI
-    // - for efficiently checking that the key image is in the prime subgroup during tx verification
-    rct::key storable_ki;
-    rct::scalarmultKey(storable_ki, key_image, rct::INV_EIGHT);
-    image.m_key_image = rct::rct2ki(storable_ki);
-
-    return image;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockInputRctV1::gen_v1(const rct::xmr_amount amount, const std::size_t ref_set_size)
-{
-    // \pi = rand()
-    m_input_ref_set_real_index = crypto::rand_idx(ref_set_size);
-
-    // prep real input
-    m_onetime_privkey = rct::rct2sk(rct::skGen());
+    m_enote_view_privkey = rct::rct2sk(rct::skGen());
+    m_spendbase_privkey = rct::rct2sk(rct::skGen());
     m_amount_blinding_factor = rct::rct2sk(rct::skGen());
     m_amount = amount;
-
-    // construct reference set
-    m_input_ref_set.resize(ref_set_size);
-
-    for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
-    {
-        // insert real input at \pi
-        if (ref_index == m_input_ref_set_real_index)
-        {
-            // make an enote at m_input_ref_set[ref_index]
-            m_input_ref_set[ref_index].make_v1(m_onetime_privkey,
-                    m_amount_blinding_factor,
-                    m_amount);
-        }
-        // add random enote
-        else
-        {
-            // generate a random enote at m_input_ref_set[ref_index]
-            m_input_ref_set[ref_index].gen_v1();
-        }
-    }
 }
 //-------------------------------------------------------------------------------------------------------------------
-MockENoteSpV1 MockDestRctV1::to_enote_v1() const
+MockENoteSpV1 MockDestSpV1::to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const
 {
     MockENoteSpV1 enote;
-    MockDestRct::to_enote_rct_base(enote);
+
+    enote.make(m_enote_privkey,
+        m_recipient_DHkey,
+        m_recipient_viewkey,
+        m_recipient_spendkey,
+        m_amount,
+        output_index,
+        enote_pubkey_out);
 
     return enote;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockDestRctV1::gen_v1(const rct::xmr_amount amount)
+void MockDestSpV1::gen_v1(const rct::xmr_amount amount)
 {
-    // gen base of dest
+    // gen base of destination
     this->gen_base(amount);
 
-    // memo parts: random
-    m_enote_pubkey = rct::rct2pk(rct::pkGen());
-    m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+    m_enote_privkey = rct::rct2sk(rct::skGen());
 }
+#if 0
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t MockRctProofV1::get_size_bytes() const
 {
