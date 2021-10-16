@@ -624,7 +624,6 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     /// input checks and initialization
     const std::size_t num_keys{proposal.K.size()};
     const std::size_t num_signers{signer_openings_1.size()};
-    std::size_t local_signer_index;
 
     CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Not enough keys to make a proof!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == proposal.KI.size(), "Input key sets not the same size (K ?= KI)!");
@@ -665,13 +664,13 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
             }
         );
 
-
     const rct::key U_gen{get_U_gen()};
 
     // check that the local signer's signature opening is in the input set of opening nonces
+    std::size_t local_signer_index;
+    bool found_local_opening{false};
     rct::key local_opening_1_pub;
     rct::key local_opening_2_pub;
-    bool found_local_opening{false};
     rct::scalarmultKey(local_opening_1_pub, U_gen, rct::sk2rct(local_opening_1_priv));
     rct::scalarmultKey(local_opening_2_pub, U_gen, rct::sk2rct(local_opening_2_priv));
 

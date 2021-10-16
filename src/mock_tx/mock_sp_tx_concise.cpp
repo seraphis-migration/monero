@@ -47,6 +47,7 @@
 
 //standard headers
 #include <memory>
+#include <string>
 #include <vector>
 
 
@@ -76,6 +77,14 @@ bool MockTxSpConcise::validate_tx_semantics() const
     {
         return false;
     }
+
+    // validate input images are sorted
+    if (!validate_mock_tx_sp_semantics_input_images_sorting_v1(m_input_images))
+    {
+        return false;
+    }
+
+    // validate memo semantics: none for mockup
 
     return true;
 }
@@ -113,9 +122,11 @@ bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const Ledge
     version_string.reserve(3);
     this->get_versioning_string(version_string);
 
+    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_supplement)};
+
     if (!validate_mock_tx_sp_composition_proofs_v1(m_image_proofs,
         m_input_images,
-        get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_supplement),
+        image_proofs_message,
         ledger_context))
     {
         return false;
@@ -171,7 +182,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
 
     // make mock inputs
     // enote, ks, view key stuff, amount, amount blinding factor
-    std::vector<MockInputSpV1> inputs_to_spend{gen_mock_sp_inputs_v1(in_amounts, ledger_context)};
+    std::vector<MockInputSpV1> inputs_to_spend{gen_mock_sp_inputs_v1(in_amounts)};
     std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets{
             gen_mock_sp_membership_ref_sets_v1(inputs_to_spend,
                 params.ref_set_decomp_n,
@@ -199,13 +210,16 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
 
     // info shuttles for making components
     std::vector<rct::xmr_amount> output_amounts;
-    std::vector<rct::key> output_amount_commitment_blinding_factors;
-    std::vector<rct::key> image_address_masks;
-    std::vector<rct::key> image_amount_masks;
+    std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
+    std::vector<crypto::secret_key> image_address_masks;
+    std::vector<crypto::secret_key> image_amount_masks;
+
+    // prep
+    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
 
     make_v1_tx_outputs_sp_v1(destinations, //tx supplement: for 2-out tx, need special treatment for change dest
         outputs,
-        output_amounts,
+        output_amounts,  //slightly redundant here with 'out_amounts', but added to demonstrate API
         output_amount_commitment_blinding_factors,
         tx_supplement);
     make_v1_tx_images_sp_v1(inputs_to_spend, //internally: make all but last (one at a time), make last
@@ -217,7 +231,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
         input_images,
         image_address_masks,
         image_amount_masks,
-        get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement),
+        image_proofs_message,
         tx_image_proofs);
     make_v1_tx_balance_proof_rct_v1(output_amounts,
         output_amount_commitment_blinding_factors,

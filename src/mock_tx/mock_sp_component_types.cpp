@@ -136,6 +136,7 @@ std::size_t MockImageProofSpV1::get_size_bytes() const
 std::size_t MockBalanceProofSpV1::get_size_bytes() const
 {
     // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
+    //TODO? don't store amount commitment set in range proofs at all
     std::size_t size{0};
 
     for (const auto &proof : m_bpp_proofs)
