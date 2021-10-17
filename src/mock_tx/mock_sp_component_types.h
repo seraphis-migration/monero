@@ -75,10 +75,11 @@ struct MockENoteSpV1 final : public MockENoteSp
         const std::size_t enote_index,
         rct::key &enote_pubkey_out);
     /**
-    * brief: get_hash - get a hash of the v1 enote
-    * return: H(enote contents)
+    * brief: append_to_string - convert enote to a string and append to existing string
+    *   str += Ko | C | enc(a) | view_tag
+    * inoutparam: str_inout - enote contents concatenated to a string
     */
-    rct::key get_hash() const;
+    void append_to_string(std::string &str_inout) const override;
 
     /// generate a v1 enote (all random)
     void gen();
@@ -181,7 +182,7 @@ struct MockBalanceProofSpV1 final
 struct MockSupplementSpV1 final
 {
     /// R_t: enote pubkeys for outputs
-    std::vector<rct::key> m_output_enote_pubkeys;
+    rct::keyV m_output_enote_pubkeys;
     /// tx memo: none in mockup
     /// fee: none in mockup
 

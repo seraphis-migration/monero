@@ -112,7 +112,7 @@ void extend_seraphis_spendkey(const crypto::secret_key &k_a_extender, rct::key &
 void make_seraphis_enote_pubkey(const crypto::secret_key &enote_privkey, const rct::key &DH_base, rct::key &enote_pubkey_out);
 /**
 * brief: make_seraphis_sender_receiver_secret - sender-receiver secret q_t for an output at index 't' in the tx that created it
-*    q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", enote_index, privkey * DH_key)
+*    q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, enote_index)
 * param: privkey - [sender: r_t] [recipient: k^{vr}]
 * param: DH_key - [sender: K^{vr}] [sender-change-2out: k^{vr}*K^{DH}_other] [recipient: R_t]
 * param: enote_index - t (index of the enote within its tx)

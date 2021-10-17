@@ -32,6 +32,7 @@
 #include "seraphis_composition_proof.h"
 
 //local headers
+#include "common/varint.h"
 #include "crypto/crypto.h"
 extern "C"
 {
@@ -262,26 +263,12 @@ static void multisig_binonce_merge_factor(const std::size_t e,
     const std::vector<std::pair<rct::key, rct::key>> &nonce_pairs,
     rct::key &merge_factor_out)
 {
-    // number of bytes to represent e
-    const std::size_t b{1};
-    int i;
-    for (i = sizeof(e)*8 - 1; i >= 0; --i)
-    {
-        if ((b << i) & e)
-            break;
-    }
-
-    int num_bytes = (i <= 0 ? 1 : (i/8 + (i%8 > 0 ? 1 : 0)));
-
     // build hash
     std::string hash;
-    hash.reserve(sizeof(config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR) + num_bytes + 1 + 2*nonce_pairs.size());
+    hash.reserve(sizeof(config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR) +
+        ((sizeof(std::size_t) * 8 + 6) / 7) + 1 + 2*nonce_pairs.size());
     hash = config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR;
-    while (num_bytes)
-    {
-        hash += static_cast<char>(e >> (num_bytes-1)*8);  // "domain sep" | enote_index
-        --num_bytes;
-    }
+    hash += tools::get_varint_data(e);
     hash.append((const char*) message.bytes, sizeof(message));
     for (const auto &nonce_pair : nonce_pairs)
     {

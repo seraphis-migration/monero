@@ -32,6 +32,7 @@
 #include "seraphis_crypto_utils.h"
 
 //local headers
+#include "common/varint.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
