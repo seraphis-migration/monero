@@ -50,10 +50,11 @@ monero_add_library(mock_tx
 
 target_link_libraries(mock_tx
   PUBLIC
+    cncrypto
+    common
+    device
     epee
     ringct
-    cncrypto
-    device
   PRIVATE
     ${EXTRA_LIBRARIES})
 

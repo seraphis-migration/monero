@@ -93,6 +93,17 @@ void MockENoteSpV1::gen()
     m_view_tag = 0;
 }
 //-------------------------------------------------------------------------------------------------------------------
+void MockENoteSpV1::append_to_string(std::string &str_inout) const
+{
+    str_inout.append((const char*) m_onetime_address.bytes, sizeof(rct::key));
+    str_inout.append((const char*) m_amount_commitment.bytes, sizeof(rct::key));
+    for (int i{7}; i >= 0; --i)
+    {
+        str_inout += static_cast<char>(m_encoded_amount >> i*8);
+    }
+    str_inout += static_cast<char>(m_view_tag);
+}
+//-------------------------------------------------------------------------------------------------------------------
 MockENoteSpV1 MockDestSpV1::to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const
 {
     MockENoteSpV1 enote;

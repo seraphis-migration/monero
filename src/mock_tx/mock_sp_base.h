@@ -101,6 +101,12 @@ struct MockENoteSp
     */
     virtual void gen_base() final;
 
+    /**
+    * brief: append_to_string - convert enote to a string and append to existing string
+    * inoutparam: str_inout - enote contents concatenated to a string
+    */
+    virtual void append_to_string(std::string &str_inout) const = 0;
+
     static std::size_t get_size_bytes_base() {return 32*2;}
 };
 

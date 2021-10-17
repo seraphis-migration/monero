@@ -32,6 +32,7 @@
 #include "mock_sp_core.h"
 
 //local headers
+#include "common/varint.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
@@ -125,21 +126,25 @@ void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     const std::size_t enote_index,
     crypto::secret_key &sender_receiver_secret_out)
 {
-    // ASSUMPTION: max index < 256 (unlikely to ever change, but check just in case)
-    CHECK_AND_ASSERT_THROW_MES(enote_index < 256, "Enote index exceeds maximum expected value (255)!");
-
-    // q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", enote_index, privkey * DH_key)
+    // q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, enote_index)
     rct::key derivation;
     rct::scalarmultKey(derivation, DH_key, rct::sk2rct(privkey));  // privkey * DH_key
 
-    // just append the index to the salt for simplicity
-    std::string salt;
-    salt.reserve(sizeof(config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET) + 1);
-    salt = config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET;
-    salt += static_cast<char>(enote_index);  // "domain sep" | enote_index
+    epee::wipeable_string hash;
+    hash.reserve(sizeof(config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET) + sizeof(rct::key) +
+        ((sizeof(std::size_t) * 8 + 6) / 7));
+    hash = config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET;
+    hash.append((const char*) derivation.bytes, sizeof(rct::key));
+    char* end = hash.data() + hash.size();
+    tools::write_varint(end, enote_index);
+    assert(end <= hash.data() + hash.size() + ((sizeof(std::size_t) * 8 + 6) / 7));
 
     // q_t
-    sp::domain_separate_rct_hash(salt, derivation, sender_receiver_secret_out);
+    //TODO: is this inefficient use of hash_to_scalar? e.g. ringct has various seemingly optimized calls into keccak()
+    crypto::hash_to_scalar(hash.data(), end - hash.data(), sender_receiver_secret_out);
+
+    // clear the DH key
+    hash.wipe();
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_sender_address_extension(const crypto::secret_key &sender_receiver_secret,
