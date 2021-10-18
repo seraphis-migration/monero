@@ -41,7 +41,8 @@ extern "C"
 #include "device/device.hpp"
 #include "grootle.h"
 #include "misc_log_ex.h"
-#include "mock_sp_base.h"
+#include "mock_ledger_context.h"
+#include "mock_sp_component_types.h"
 #include "mock_sp_core.h"
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
@@ -98,7 +99,15 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<MockInputSpV1> gen_mock_sp_inputs_v1(const std::vector<rct::xmr_amount> in_amounts)
 {
+    std::vector<MockInputSpV1> inputs;
+    inputs.resize(in_amounts.size());
 
+    for (std::size_t input_index{0}; input_index < in_amounts.size(); ++input_index)
+    {
+        inputs[input_index].gen(in_amounts[input_index]);
+    }
+
+    return inputs;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(const std::vector<MockInputSpV1> &inputs,
@@ -106,7 +115,39 @@ std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(c
     const std::size_t ref_set_decomp_m,
     std::shared_ptr<MockLedgerContext> ledger_context_inout)
 {
+    std::vector<MockMembershipReferenceSetSpV1> reference_sets;
+    reference_sets.resize(inputs.size());
 
+    std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};  // n^m
+
+    for (std::size_t input_index{0}; input_index < inputs.size(); ++input_index)
+    {
+        reference_sets[input_index].m_ref_set_decomp_n = ref_set_decomp_n;
+        reference_sets[input_index].m_ref_set_decomp_m = ref_set_decomp_m;
+        reference_sets[input_index].m_real_spend_index_in_set = crypto::rand_idx(ref_set_size);  // pi
+
+        reference_sets[input_index].m_enote_ledger_indices.resize(ref_set_size);
+        reference_sets[input_index].m_referenced_enotes.resize(ref_set_size);
+
+        for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
+        {
+            // add real input at pi
+            if (ref_index == reference_sets[input_index].m_real_spend_index_in_set)
+            {
+                reference_sets[input_index].m_referenced_enotes[ref_index] = inputs[input_index].m_enote;
+            }
+            // add dummy enote
+            else
+            {
+                reference_sets[input_index].m_referenced_enotes[ref_index].gen();
+            }
+
+            // insert referenced enote into mock ledger
+            // note: in a real context, you would instead 'get' the enote's index from the ledger, and error if not found
+            reference_sets[input_index].m_enote_ledger_indices[ref_index] =
+                ledger_context_inout->add_enote_sp_v1(reference_sets[input_index].m_referenced_enotes[ref_index]);
+        }
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<MockDestSpV1> gen_mock_sp_dests_v1(const std::vector<rct::xmr_amount> &out_amounts)

@@ -122,7 +122,7 @@ bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const Ledge
     version_string.reserve(3);
     this->get_versioning_string(version_string);
 
-    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_balance_proof m_supplement)};
+    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_balance_proof, m_supplement)};
 
     if (!validate_mock_tx_sp_composition_proofs_v1(m_image_proofs,
         m_input_images,

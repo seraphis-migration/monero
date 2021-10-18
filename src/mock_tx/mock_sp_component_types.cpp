@@ -34,6 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "misc_log_ex.h"
+#include "mock_sp_base.h"
 #include "mock_sp_core.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -85,12 +86,14 @@ void MockENoteSpV1::make(const crypto::secret_key &enote_privkey,
 //-------------------------------------------------------------------------------------------------------------------
 void MockENoteSpV1::gen()
 {
+    // generate a dummy enote: random pieces, completely unspendable
+
     // gen base of enote
     this->gen_base();
 
     // memo
     m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-    m_view_tag = 0;
+    m_view_tag = crypto::rand_idx(static_cast<unsigned char>(-1));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockENoteSpV1::append_to_string(std::string &str_inout) const
@@ -104,6 +107,26 @@ void MockENoteSpV1::append_to_string(std::string &str_inout) const
         str_inout += static_cast<char>(m_encoded_amount >> i*8);
     }
     str_inout += static_cast<char>(m_view_tag);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void MockInputSpV1::gen(const rct::xmr_amount amount)
+{
+    // generate a tx input: random secrets, random memo pieces (does not support info recovery)
+
+    // input secrets
+    this->gen_base(amount);
+
+    // enote pubkey (these are stored separate from enotes)
+    m_enote_pubkey = rct::pkGen();
+
+    // enote
+    rct::key recipient_spendbase;
+    make_seraphis_spendbase(m_spendbase_privkey, recipient_spendbase);
+
+    m_enote.make_base_with_address_extension(m_enote_view_privkey, recipient_spendbase, m_amount_blinding_factor, m_amount);
+
+    m_enote.m_view_tag = crypto::rand_idx(static_cast<unsigned char>(-1));
+    m_enote.m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
 }
 //-------------------------------------------------------------------------------------------------------------------
 MockENoteSpV1 MockDestSpV1::to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const
@@ -121,7 +144,7 @@ MockENoteSpV1 MockDestSpV1::to_enote_v1(const std::size_t output_index, rct::key
     return enote;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockDestSpV1::gen_v1(const rct::xmr_amount amount)
+void MockDestSpV1::gen(const rct::xmr_amount amount)
 {
     // gen base of destination
     this->gen_base(amount);

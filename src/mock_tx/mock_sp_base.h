@@ -33,15 +33,11 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "mock_sp_core.h"
-#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "seraphis_crypto_utils.h"
 
 //third party headers
 
 //standard headers
-#include <type_traits>
 #include <vector>
 
 //forward declarations
@@ -129,11 +125,8 @@ struct MockENoteImageSp
 // MockInputSp - Seraphis Input base
 // - a tx input is an enote, so this is parameterized by the enote type
 ///
-template <typename MockENoteType>
 struct MockInputSp
 {
-    MockENoteType m_enote_to_spend;
-
     /// k_{a, sender} + k_{a, recipient}
     crypto::secret_key m_enote_view_privkey;
     /// k_{b, recipient}
@@ -151,29 +144,17 @@ struct MockInputSp
     */
     virtual void to_enote_image_base(const crypto::secret_key &address_mask,
         const crypto::secret_key &commitment_mask,
-        MockENoteImageSp &image_inout) const final
-    {
-        static_assert(std::is_base_of<MockENoteType, MockENoteSp>::value, "Invalid MockENote type.");
-
-        // Ko' = t_k G + Ko
-        sp::mask_key(address_mask, m_enote_to_spend.m_onetime_address, image_inout.m_masked_address);
-        // C' = t_c + C
-        sp::mask_key(commitment_mask, m_enote_to_spend.m_amount_commitment, image_inout.m_masked_commitment);
-        // KI = k_a X + k_a U
-        make_seraphis_key_image(m_enote_view_privkey, m_spendbase_privkey, image_inout.m_key_image);
-    }
+        MockENoteImageSp &image_inout) const final;
 
     /**
     * brief: gen_base - generate a Seraphis Input (all random)
     * param: amount -
     */
-    virtual void gen_base(const rct::xmr_amount amount) final
-    {
-        m_enote_view_privkey = rct::rct2sk(rct::skGen());
-        m_spendbase_privkey = rct::rct2sk(rct::skGen());
-        m_amount_blinding_factor = rct::rct2sk(rct::skGen());
-        m_amount = amount;
-    }
+    virtual void gen_base(const rct::xmr_amount amount) final;
+
+protected:
+    /// inheritor should store the enote this input is trying to spend
+    virtual const MockENoteSp& get_enote_base() const = 0;
 };
 
 ////
