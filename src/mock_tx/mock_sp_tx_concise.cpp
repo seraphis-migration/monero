@@ -221,12 +221,12 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
         output_amounts,  //slightly redundant here with 'out_amounts', but added to demonstrate API
         output_amount_commitment_blinding_factors,
         tx_supplement);
-    make_v1_tx_images_sp_v1(inputs_to_spend, //internally: make all but last (one at a time), make last
+    make_v1_tx_images_sp_v1(inputs_to_spend,
         output_amount_commitment_blinding_factors,
         input_images,
         image_address_masks,
         image_amount_masks);
-    make_v1_tx_balance_proof_rct_v1(output_amounts, //note: independent of inputs (just range proof output commitments)
+    make_v1_tx_balance_proof_rct_v1(output_amounts, //note: independent of inputs (just range proofs output commitments)
         output_amount_commitment_blinding_factors,
         params.max_rangeproof_splits,
         balance_proof);

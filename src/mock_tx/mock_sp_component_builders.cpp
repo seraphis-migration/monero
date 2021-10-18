@@ -38,7 +38,6 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
-#include "device/device.hpp"
 #include "grootle.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
@@ -49,6 +48,7 @@ extern "C"
 #include "ringct/rctOps.h"
 #include "ringct/rctSigs.h"
 #include "ringct/rctTypes.h"
+#include "seraphis_crypto_utils.h"
 
 //third party headers
 
@@ -147,7 +147,7 @@ std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(c
         reference_sets[input_index].m_ref_set_decomp_m = ref_set_decomp_m;
         reference_sets[input_index].m_real_spend_index_in_set = crypto::rand_idx(ref_set_size);  // pi
 
-        reference_sets[input_index].m_enote_ledger_indices.resize(ref_set_size);
+        reference_sets[input_index].m_ledger_enote_indices.resize(ref_set_size);
         reference_sets[input_index].m_referenced_enotes.resize(ref_set_size);
 
         for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
@@ -165,7 +165,7 @@ std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(c
 
             // insert referenced enote into mock ledger
             // note: in a real context, you would instead 'get' the enote's index from the ledger, and error if not found
-            reference_sets[input_index].m_enote_ledger_indices[ref_index] =
+            reference_sets[input_index].m_ledger_enote_indices[ref_index] =
                 ledger_context_inout->add_enote_sp_v1(reference_sets[input_index].m_referenced_enotes[ref_index]);
         }
     }
@@ -343,7 +343,89 @@ void make_v1_tx_balance_proof_rct_v1(const std::vector<rct::xmr_amount> &output_
     const std::size_t max_rangeproof_splits,
     std::shared_ptr<MockBalanceProofSpV1> &balance_proof_out)
 {
+    if (balance_proof_out.get() == nullptr)
+        balance_proof_out = std::make_shared<MockBalanceProofSpV1>();
 
+    // make range proofs
+    std::vector<rct::BulletproofPlus> range_proofs;
+
+    rct::keyV amount_commitment_blinding_factors;
+    amount_commitment_blinding_factors.reserve(output_amount_commitment_blinding_factors.size());
+
+    for (const auto &factor : output_amount_commitment_blinding_factors)
+        amount_commitment_blinding_factors.emplace_back(rct::sk2rct(factor));
+
+    make_bpp_rangeproofs(output_amounts,
+        amount_commitment_blinding_factors,
+        max_rangeproof_splits,
+        range_proofs);
+
+    balance_proof_out->m_bpp_proofs = std::move(range_proofs);
+
+    memwipe(amount_commitment_blinding_factors.data(), amount_commitment_blinding_factors.size()*sizeof(rct::key));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
+    const crypto::secret_key &image_address_mask,
+    const crypto::secret_key &image_amount_mask,
+    const rct::key &message,
+    MockMembershipProofSpV1 &tx_membership_proof_out)
+{
+    /// initial checks
+    std::size_t ref_set_size{
+            ref_set_size_from_decomp(membership_ref_set.m_ref_set_decomp_n, membership_ref_set.m_ref_set_decomp_m)
+        };
+
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_set.m_referenced_enotes.size() == ref_set_size,
+        "Ref set size doesn't match number of referenced enotes");
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_set.m_ledger_enote_indices.size() == ref_set_size,
+        "Ref set size doesn't match number of referenced enotes' ledger indices");
+
+
+    /// miscellaneous components
+    tx_membership_proof_out.m_ledger_enote_indices = membership_ref_set.m_ledger_enote_indices;
+    tx_membership_proof_out.m_ref_set_decomp_n = membership_ref_set.m_ref_set_decomp_n;
+    tx_membership_proof_out.m_ref_set_decomp_m = membership_ref_set.m_ref_set_decomp_m;
+
+
+    /// prepare to make proof
+
+    // public keys referenced by proof
+    rct::keyM referenced_enotes;
+    referenced_enotes.resize(ref_set_size, rct::keyV(2));
+
+    for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ ref_index)
+    {
+        referenced_enotes[ref_index][0] = membership_ref_set.m_referenced_enotes[ref_index].m_onetime_address;
+        referenced_enotes[ref_index][1] = membership_ref_set.m_referenced_enotes[ref_index].m_amount_commitment;
+    }
+
+    // proof offsets
+    rct::keyV image_offsets;
+    image_offsets.resize(2);
+
+    // K'
+    sp::mask_key(image_address_mask, referenced_enotes[membership_ref_set.m_real_spend_index_in_set][0], image_offsets[0]);
+    // C'
+    sp::mask_key(image_amount_mask, referenced_enotes[membership_ref_set.m_real_spend_index_in_set][1], image_offsets[1]);
+
+    // secret key of (K[l] - K') and (C[l] - C')
+    std::vector<crypto::secret_key> image_masks;
+    image_masks.reserve(2);
+    image_masks.emplace_back(image_address_mask);  // t_k
+    image_masks.emplace_back(image_amount_mask);  // t_c
+    sc_mul(&(image_masks[0]), &(image_masks[0]), sp::MINUS_ONE);  // -t_k
+    sc_mul(&(image_masks[1]), &(image_masks[1]), sp::MINUS_ONE);  // -t_k
+
+
+    /// make concise grootle proof
+    tx_membership_proof_out.m_concise_grootle_proof = sp::concise_grootle_prove(referenced_enotes,
+        membership_ref_set.m_real_spend_index_in_set,
+        image_offsets,
+        image_masks,
+        membership_ref_set.m_ref_set_decomp_n,
+        membership_ref_set.m_ref_set_decomp_m,
+        message);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
@@ -352,7 +434,19 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenc
     const rct::key &message,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out)
 {
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_address_masks.size(), "Input components size mismatch");
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_amount_masks.size(), "Input components size mismatch");
 
+    tx_membership_proofs_out.resize(membership_ref_sets.size());
+
+    for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
+    {
+        make_v1_tx_membership_proof_sp_v1(membership_ref_sets[input_index],
+            image_address_masks[input_index],
+            image_amount_masks[input_index],
+            message,
+            tx_membership_proofs_out[input_index]);
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 void sort_tx_inputs_sp_v1(std::vector<MockENoteImageSpV1> &input_images_inout,

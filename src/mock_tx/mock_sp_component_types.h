@@ -118,7 +118,7 @@ struct MockMembershipReferenceSetSpV1 final
 {
     std::size_t m_ref_set_decomp_n;
     std::size_t m_ref_set_decomp_m;
-    std::vector<std::size_t> m_enote_ledger_indices;
+    std::vector<std::size_t> m_ledger_enote_indices;
     std::vector<MockENoteSpV1> m_referenced_enotes;
     std::size_t m_real_spend_index_in_set;
 };

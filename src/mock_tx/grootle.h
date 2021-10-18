@@ -116,7 +116,7 @@ struct ConciseGrootleProof
 GrootleProof grootle_prove(const rct::keyM &M,
     const std::size_t l,
     const rct::keyV &C_offsets,
-    const rct::keyV &privkeys,
+    const std::vector<crypto::secret_key> &privkeys,
     const std::size_t n,
     const std::size_t m,
     const rct::key &message);
@@ -134,7 +134,7 @@ GrootleProof grootle_prove(const rct::keyM &M,
 ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
     const std::size_t l,
     const rct::keyV &C_offsets,
-    const rct::keyV &privkeys,
+    const std::vector<crypto::secret_key> &privkeys,
     const std::size_t n,
     const std::size_t m,
     const rct::key &message);

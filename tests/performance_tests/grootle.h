@@ -28,7 +28,9 @@
 
 #pragma once
 
+#include "crypto/crypto.h"
 #include "mock_tx/grootle.h"
+#include "mock_tx/mock_tx_utils.h"
 #include "ringct/rctTypes.h"
 
 #include <vector>
@@ -60,8 +62,8 @@ class test_grootle
 
             // Build key vectors
             M.resize(N, keyV(num_keys));
-            keyM proof_privkeys;            // privkey tuple per-proof (at secret indices in M)
-            proof_privkeys.resize(N_proofs, keyV(num_keys));
+            std::vector<std::vector<crypto::secret_key>> proof_privkeys;// privkey tuple per-proof (at secret indices in M)
+            proof_privkeys.resize(N_proofs, std::vector<crypto::secret_key>(num_keys));
             proof_messages = keyV(N_proofs);  // message per-proof
             proof_offsets.resize(N_proofs, keyV(num_keys));
 
@@ -90,12 +92,12 @@ class test_grootle
                     if (alpha + 1 > num_ident_offsets)
                     {
                         skpkGen(offset_privkey, proof_offsets[proof_i][alpha]);  //c_{alpha} * G
-                        sc_sub(proof_privkeys[proof_i][alpha].bytes, privkey.bytes, offset_privkey.bytes); //m - c [commitment to zero]
+                        sc_sub(&(proof_privkeys[proof_i][alpha]), privkey.bytes, offset_privkey.bytes); //m - c [commitment to zero]
                     }
                     else
                     {
                         proof_offsets[proof_i][alpha] = identity();
-                        proof_privkeys[proof_i][alpha] = privkey;
+                        proof_privkeys[proof_i][alpha] = rct::rct2sk(privkey);
                     }
                 }
             }

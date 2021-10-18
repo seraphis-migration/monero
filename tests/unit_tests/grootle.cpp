@@ -26,8 +26,10 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "crypto/crypto.h"
 #include "ringct/rctOps.h"
 #include "mock_tx/grootle.h"
+#include "mock_tx/mock_tx_utils.h"
 
 #include "gtest/gtest.h"
 
@@ -48,7 +50,7 @@ bool test_plain_grootle(const std::size_t N_proofs,
     const std::size_t m,
     const keyM &M,
     const keyM &proof_offsets,
-    const keyM &proof_privkeys,
+    const std::vector<std::vector<crypto::secret_key>> &proof_privkeys,
     const keyV &proof_messages)
 {
     std::vector<sp::GrootleProof> proofs;
@@ -85,7 +87,7 @@ bool test_concise_grootle(const std::size_t N_proofs,
     const std::size_t m,
     const keyM &M,
     const keyM &proof_offsets,
-    const keyM &proof_privkeys,
+    const std::vector<std::vector<crypto::secret_key>> &proof_privkeys,
     const keyV &proof_messages)
 {
     std::vector<sp::ConciseGrootleProof> proofs;
@@ -133,8 +135,8 @@ bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
         // Build key vectors
         keyM M;                         // ref set (common)
         M.resize(N, keyV(num_keys));
-        keyM proof_privkeys;            // privkey tuple per-proof (at secret indices in M)
-        proof_privkeys.resize(N_proofs, keyV(num_keys));
+        std::vector<std::vector<crypto::secret_key>> proof_privkeys;// privkey tuple per-proof (at secret indices in M)
+        proof_privkeys.resize(N_proofs, std::vector<crypto::secret_key>(num_keys));
         keyV proof_messages = keyV(N_proofs); // message per-proof
         keyM proof_offsets;             // commitment offset tuple per-proof
         proof_offsets.resize(N_proofs, keyV(num_keys));
@@ -164,12 +166,12 @@ bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
                 if (alpha + 1 > num_ident_offsets)
                 {
                     skpkGen(offset_privkey, proof_offsets[proof_i][alpha]);  //c_{alpha} * G
-                    sc_sub(proof_privkeys[proof_i][alpha].bytes, privkey.bytes, offset_privkey.bytes); //m - c [commitment to zero]
+                    sc_sub(&(proof_privkeys[proof_i][alpha]), privkey.bytes, offset_privkey.bytes); //m - c [commitment to zero]
                 }
                 else
                 {
                     proof_offsets[proof_i][alpha] = identity();
-                    proof_privkeys[proof_i][alpha] = privkey;
+                    proof_privkeys[proof_i][alpha] = rct::rct2sk(privkey);
                 }
             }
         }
