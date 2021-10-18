@@ -49,6 +49,7 @@ extern "C"
 //third party headers
 
 //standard headers
+#include <algorithm>
 #include <vector>
 
 
