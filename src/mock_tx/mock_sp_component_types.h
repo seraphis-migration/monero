@@ -33,6 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "grootle.h"
 #include "mock_sp_base.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_composition_proof.h"
@@ -81,7 +82,7 @@ struct MockENoteSpV1 final : public MockENoteSp
     */
     void append_to_string(std::string &str_inout) const override;
 
-    /// generate a v1 enote (all random)
+    /// generate a dummy v1 enote (all random; completely unspendable)
     void gen();
 
     static std::size_t get_size_bytes() { return get_size_bytes_base() + 8 + 1; }
@@ -98,8 +99,17 @@ struct MockENoteImageSpV1 final : public MockENoteImageSp
 ////
 // MockInputSpV1 - Input V1
 ///
-struct MockInputSpV1 final : public MockInputSp<MockENoteSpV1>
-{};
+struct MockInputSpV1 final : public MockInputSp
+{
+    MockENoteSpV1 m_enote;
+    rct::key m_enote_pubkey;
+
+    /// generate a v1 input (all random; does not support info recovery)
+    void gen(const rct::xmr_amount amount);
+
+protected:
+    virtual const MockENoteSp& get_enote_base() const { return m_enote; }
+};
 
 ////
 // MockMembershipReferenceSetSpV1 - Records info about a membership reference set
@@ -125,10 +135,10 @@ struct MockDestSpV1 final : public MockDestSp
     MockENoteSpV1 to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const;
 
     /**
-    * brief: gen_mock_tx_rct_dest_v1 - generate a V1 Destination (random)
+    * brief: gen - generate a V1 Destination (random)
     * param: amount -
     */
-    void gen_v1(const rct::xmr_amount amount);
+    void gen(const rct::xmr_amount amount);
 };
 
 ////
