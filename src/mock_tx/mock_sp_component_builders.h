@@ -52,21 +52,23 @@ namespace mock_tx
 
 /**
 * brief: get_tx_membership_proof_message_sp_v1 - message for membership proofs
-*   - empty 32 bytes: membership proof doesn't need to attest to anything other than proof transcript
+*   - H(crypto project name)
 * return: empty message for a membership proof
 */
 rct::key get_tx_membership_proof_message_sp_v1();
 /**
 * brief: get_tx_image_proof_message_sp_v1 - message for tx image proofs
-*   - H(version string, output enotes, enote pubkeys)
+*   - H(crypto project name, version string, output enotes, range proofs, enote pubkeys)
 * param: version_string -
 * param: output_enotes -
+* param: balance_proof -
 * param: tx_supplement -
 * return: message to insert in a tx image proof
 */
 rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
-    const std::vector<MockENoteSpV1> output_enotes,
-    const MockSupplementSpV1 tx_supplement);
+    const std::vector<MockENoteSpV1> &output_enotes,
+    const MockBalanceProofSpV1 &balance_proof,
+    const MockSupplementSpV1 &tx_supplement);
 /**
 * brief: gen_mock_sp_inputs_v1 - create random mock inputs
 * param: in_amounts -

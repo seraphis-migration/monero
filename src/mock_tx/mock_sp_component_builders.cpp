@@ -37,6 +37,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "cryptonote_config.h"
 #include "device/device.hpp"
 #include "grootle.h"
 #include "misc_log_ex.h"
@@ -68,19 +69,23 @@ rct::key get_tx_membership_proof_message_sp_v1()
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
-    const std::vector<MockENoteSpV1> output_enotes,
-    const MockSupplementSpV1 tx_supplement)
+    const std::vector<MockENoteSpV1> &output_enotes,
+    const MockBalanceProofSpV1 &balance_proof,
+    const MockSupplementSpV1 &tx_supplement)
 {
     rct::key hash_result;
-    std::string hash{CRYPTONOTE_NAME};
-    hash.reserve(hash.size() +
+    std::string hash;
+    hash.reserve(sizeof(CRYPTONOTE_NAME) +
         version_string.size() +
         output_enotes.size()*MockENoteSpV1::get_size_bytes() +
+        balance_proof.get_size_bytes() +
         tx_supplement.m_output_enote_pubkeys.size());
+    hash += CRYPTONOTE_NAME;
     for (const auto &output_enote : output_enotes)
     {
         output_enote.append_to_string(hash);
     }
+    balance_proof.append_to_string(false, hash);  // don't append amount commitments here (they were appended by enotes)
     for (const auto &enote_pubkey : tx_supplement.m_output_enote_pubkeys)
     {
         hash.append((const char*) enote_pubkey.bytes, sizeof(enote_pubkey));

@@ -170,7 +170,15 @@ struct MockBalanceProofSpV1 final
     /// a set of BP+ proofs
     std::vector<rct::BulletproofPlus> m_bpp_proofs;
 
-    std::size_t get_size_bytes() const;
+    /**
+    * brief: append_to_string - convert bpp proofs to a string and append to existing string
+    *   str += {BP1}
+    * param: include_commitments - if false, do not append amount commitments to string
+    * inoutparam: str_inout - proofs' contents concatenated to a string
+    */
+    void append_to_string(const bool include_commitments, std::string &str_inout) const;
+
+    std::size_t get_size_bytes(const bool include_commitments = false) const;
 };
 
 ////
