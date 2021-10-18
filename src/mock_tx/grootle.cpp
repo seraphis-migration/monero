@@ -32,12 +32,14 @@
 #include "grootle.h"
 
 //local headers
+#include "crypto/crypto.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
 #include "misc_log_ex.h"
+#include "mock_tx_utils.h"
 #include "ringct/multiexp.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -168,7 +170,7 @@ static rct::key compute_challenge(const rct::key &message,
 GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     const std::size_t l,        // secret index into {{M}}
     const rct::keyV &C_offsets,  // offsets for commitment to zero at index l
-    const rct::keyV &privkeys,  // privkeys of commitments to zero in 'M[l] - C_offsets'
+    const std::vector<crypto::secret_key> &privkeys,  // privkeys of commitments to zero in 'M[l] - C_offsets'
     const std::size_t n,        // decomp input set: n^m
     const std::size_t m,
     const rct::key &message)    // message to insert in Fiat-Shamir transform hash
@@ -199,7 +201,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
         // verify: commitment to zero C_zero = M - C_offset = k*G
         rct::key C_zero_temp;
         rct::subKeys(C_zero_temp, M[l][alpha], C_offsets[alpha]);
-        CHECK_AND_ASSERT_THROW_MES(rct::scalarmultBase(privkeys[alpha]) == C_zero_temp, "Bad commitment key!");
+        CHECK_AND_ASSERT_THROW_MES(rct::scalarmultBase(rct::sk2rct(privkeys[alpha])) == C_zero_temp, "Bad commitment key!");
     }
 
     // statically initialize Grootle proof generators
@@ -414,7 +416,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     proof.z.resize(num_keys);
     for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
     {
-        sc_mul(proof.z[alpha].bytes, privkeys[alpha].bytes, xi_pow[m].bytes);  //z = privkeys[alpha]*xi^m
+        sc_mul(proof.z[alpha].bytes, &(privkeys[alpha]), xi_pow[m].bytes);  //z = privkeys[alpha]*xi^m
 
         for (std::size_t j = 0; j < m; ++j)
         {

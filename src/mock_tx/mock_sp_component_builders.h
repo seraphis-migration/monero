@@ -176,6 +176,19 @@ void make_v1_tx_balance_proof_rct_v1(const std::vector<rct::xmr_amount> &output_
     const std::size_t max_rangeproof_splits,
     std::shared_ptr<MockBalanceProofSpV1> &balance_proof_out);
 /**
+* brief: make_v1_tx_membership_proof_sp_v1 - make a v1 membership proof (concise grootle)
+* param: membership_ref_set -
+* param: image_address_mask -
+* param: image_amount_mask -
+* param: message -
+* outparam: tx_membership_proof_out -
+*/
+void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
+    const crypto::secret_key &image_address_mask,
+    const crypto::secret_key &image_amount_mask,
+    const rct::key &message,
+    MockMembershipProofSpV1 &tx_membership_proof_out);
+/**
 * brief: make_v1_tx_membership_proofs_sp_v1 - make v1 membership proofs (concise grootle: 1 per input)
 * param: membership_ref_sets -
 * param: image_address_masks -
