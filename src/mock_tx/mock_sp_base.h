@@ -137,6 +137,12 @@ struct MockInputSp
     rct::xmr_amount m_amount;
 
     /**
+    * brief: get_key_image - get this input's key image
+    * outparam: key_image_out - KI
+    */
+    virtual void get_key_image(crypto::key_image &key_image_out) const final;
+
+    /**
     * brief: to_enote_image - convert this input to an enote image
     * param: address_mask - t_k
     * param: commitment_mask - t_c

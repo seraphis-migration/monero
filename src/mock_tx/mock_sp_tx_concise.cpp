@@ -182,6 +182,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
 
     // make mock inputs
     // enote, ks, view key stuff, amount, amount blinding factor
+    // - note: inputs are pre-sorted; TODO: a real implementation needs to sort input images (and index-map membership proofs)
     std::vector<MockInputSpV1> inputs_to_spend{gen_mock_sp_inputs_v1(in_amounts)};
     std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets{
             gen_mock_sp_membership_ref_sets_v1(inputs_to_spend,
@@ -191,6 +192,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
         };
 
     // make mock destinations
+    // - (in practice) for 2-out tx, need special treatment when making change/dummy destination
     std::vector<MockDestSpV1> destinations{gen_mock_sp_dests_v1(out_amounts)};
 
     // versioning
@@ -214,7 +216,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     std::vector<crypto::secret_key> image_address_masks;
     std::vector<crypto::secret_key> image_amount_masks;
 
-    make_v1_tx_outputs_sp_v1(destinations, //tx supplement: for 2-out tx, need special treatment for change dest
+    make_v1_tx_outputs_sp_v1(destinations,
         outputs,
         output_amounts,  //slightly redundant here with 'out_amounts', but added to demonstrate API
         output_amount_commitment_blinding_factors,
@@ -240,8 +242,9 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
         image_amount_masks,
         get_tx_membership_proof_message_sp_v1(),
         tx_membership_proofs);
+    sort_tx_inputs_sp_v1(input_images, tx_image_proofs, tx_membership_proofs);
 
-    return std::make_shared<MockTxSpConcise>(input_images,outputs, balance_proof, tx_image_proofs,
+    return std::make_shared<MockTxSpConcise>(input_images, outputs, balance_proof, tx_image_proofs,
         tx_membership_proofs, tx_supplement, MockTxSpConcise::ValidationRulesVersion::ONE);
 }
 //-------------------------------------------------------------------------------------------------------------------

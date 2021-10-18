@@ -81,6 +81,12 @@ void MockENoteSp::gen_base()
     m_amount_commitment = rct::pkGen();
 }
 //-------------------------------------------------------------------------------------------------------------------
+void MockInputSp::get_key_image(crypto::key_image &key_image_out) const
+{
+    // KI = k_a X + k_a U
+    make_seraphis_key_image(m_enote_view_privkey, m_spendbase_privkey, key_image_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void MockInputSp::to_enote_image_base(const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     MockENoteImageSp &image_inout) const
@@ -90,7 +96,7 @@ void MockInputSp::to_enote_image_base(const crypto::secret_key &address_mask,
     // C' = t_c G + C
     sp::mask_key(commitment_mask, get_enote_base().m_amount_commitment, image_inout.m_masked_commitment);
     // KI = k_a X + k_a U
-    make_seraphis_key_image(m_enote_view_privkey, m_spendbase_privkey, image_inout.m_key_image);
+    this->get_key_image(image_inout.m_key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockInputSp::gen_base(const rct::xmr_amount amount)

@@ -104,12 +104,40 @@ std::vector<MockDestSpV1> gen_mock_sp_dests_v1(const std::vector<rct::xmr_amount
 * inoutparam: tx_supplement_inout -
 */
 void make_v1_tx_outputs_sp_v1(const std::vector<MockDestSpV1> &destinations,
-        std::vector<MockENoteSpV1> &outputs_out,
-        std::vector<rct::xmr_amount> &output_amounts_out,
-        std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
-        MockSupplementSpV1 &tx_supplement_inout);
+    std::vector<MockENoteSpV1> &outputs_out,
+    std::vector<rct::xmr_amount> &output_amounts_out,
+    std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
+    MockSupplementSpV1 &tx_supplement_inout);
 /**
-* brief: make_v1_tx_images_sp_v1 - make v1 tx input images
+* brief: make_v1_tx_image_sp_v1 - make all v1 input images for a tx EXCEPT LAST
+* param: input_to_spend -
+* outparam: input_image_out -
+* outparam: image_address_mask_out -
+* outparam: image_amount_mask_out -
+*/
+void make_v1_tx_image_sp_v1(const MockInputSpV1 &input_to_spend,
+    MockENoteImageSpV1 &input_image_out,
+    crypto::secret_key &image_address_mask_out,
+    crypto::secret_key &image_amount_mask_out);
+/**
+* brief: make_v1_tx_image_last_sp_v1 - make LAST v1 input image for a tx
+*   - last amount commitment total blinding factor (v_c) equals sum of output amount blinding factors (y_t)
+*      minus sum input blinding factors (v_c_except_last)
+* param: input_to_spend -
+* param: output_amount_commitment_blinding_factors -
+* param: input_amount_blinding_factors -
+* outparam: input_image_out -
+* outparam: image_address_mask_out -
+* outparam: image_amount_mask_out -
+*/
+void make_v1_tx_image_last_sp_v1(const MockInputSpV1 &input_to_spend,
+    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
+    const std::vector<crypto::secret_key> &input_amount_blinding_factors,
+    MockENoteImageSpV1 &input_image_out,
+    crypto::secret_key &image_address_mask_out,
+    crypto::secret_key &image_amount_mask_out);
+/**
+* brief: make_v1_tx_images_sp_v1 - make all v1 input images for a tx
 * param: inputs_to_spend -
 * param: output_amount_commitment_blinding_factors -
 * outparam: input_images_out -
@@ -160,5 +188,15 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenc
     const std::vector<crypto::secret_key> &image_amount_masks,
     const rct::key &message,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out);
+/**
+* brief: sort_tx_inputs_sp_v1 - sort tx inputs
+*   sort order: key images ascending with byte-wise comparisons
+* inoutparam: input_images_inout -
+* inoutparam: tx_image_proofs_inout -
+* inoutparam: tx_membership_proofs_inout -
+*/
+void sort_tx_inputs_sp_v1(std::vector<MockENoteImageSpV1> &input_images_inout,
+    std::vector<MockImageProofSpV1> &tx_image_proofs_inout,
+    std::vector<MockMembershipProofSpV1> &tx_membership_proofs_inout);
 
 } //namespace mock_tx

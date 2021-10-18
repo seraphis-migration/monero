@@ -131,6 +131,9 @@ struct MockDestSpV1 final : public MockDestSp
     /// r_t
     crypto::secret_key m_enote_privkey;
 
+    /// get the amount blinding factor
+    void get_amount_blinding_factor(const std::size_t output_index, crypto::secret_key &amount_blinding_factor) const;
+
     /// convert this destination into a v1 enote
     MockENoteSpV1 to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const;
 

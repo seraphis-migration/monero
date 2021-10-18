@@ -53,12 +53,32 @@ extern "C"
 //third party headers
 
 //standard headers
+#include <algorithm>
 #include <memory>
 #include <vector>
 
 
 namespace mock_tx
 {
+//-------------------------------------------------------------------------------------------------------------------
+// v_c_last = sum(y_t) - sum_except_last(v_c_j)
+//-------------------------------------------------------------------------------------------------------------------
+static void get_last_sp_image_amount_blinding_factor_v1(
+    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
+    const std::vector<crypto::secret_key> &initial_image_amount_blinding_factors,
+    crypto::secret_key &last_image_amount_blinding_factor)
+{
+    // add together output blinding factors
+    last_image_amount_blinding_factor = rct::rct2sk(rct::zero());
+
+    for (const auto &y : output_amount_commitment_blinding_factors)
+        sc_add(&last_image_amount_blinding_factor, &last_image_amount_blinding_factor, &y);
+
+    // subtract image blinding factors from sum
+    for (const auto &v_c : initial_image_amount_blinding_factors)
+        sc_sub(&last_image_amount_blinding_factor, &last_image_amount_blinding_factor, &v_c);
+}
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 rct::key get_tx_membership_proof_message_sp_v1()
 {
@@ -99,6 +119,7 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<MockInputSpV1> gen_mock_sp_inputs_v1(const std::vector<rct::xmr_amount> in_amounts)
 {
+    // generate random inputs
     std::vector<MockInputSpV1> inputs;
     inputs.resize(in_amounts.size());
 
@@ -148,20 +169,122 @@ std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(c
                 ledger_context_inout->add_enote_sp_v1(reference_sets[input_index].m_referenced_enotes[ref_index]);
         }
     }
+
+    return reference_sets;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<MockDestSpV1> gen_mock_sp_dests_v1(const std::vector<rct::xmr_amount> &out_amounts)
 {
+    // randomize destination order
+    std::vector<rct::xmr_amount> randomized_out_amounts{out_amounts};
+    std::shuffle(randomized_out_amounts.begin(), randomized_out_amounts.end(), crypto::random_device{});
 
+    // generate random destinations
+    std::vector<MockDestSpV1> destinations;
+    destinations.resize(randomized_out_amounts.size());
+
+    for (std::size_t dest_index{0}; dest_index < randomized_out_amounts.size(); ++dest_index)
+    {
+        destinations[dest_index].gen(randomized_out_amounts[dest_index]);
+    }
+
+    return destinations;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_outputs_sp_v1(const std::vector<MockDestSpV1> &destinations,
-        std::vector<MockENoteSpV1> &outputs_out,
-        std::vector<rct::xmr_amount> &output_amounts_out,
-        std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
-        MockSupplementSpV1 &tx_supplement_inout)
+    std::vector<MockENoteSpV1> &outputs_out,
+    std::vector<rct::xmr_amount> &output_amounts_out,
+    std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
+    MockSupplementSpV1 &tx_supplement_inout)
 {
+    rct::keyV temp_enote_pubkeys;
+    temp_enote_pubkeys.resize(destinations.size());
+    outputs_out.clear();
+    outputs_out.reserve(destinations.size());
+    output_amounts_out.clear();
+    output_amounts_out.reserve(destinations.size());
+    output_amount_commitment_blinding_factors_out.resize(destinations.size());
 
+    for (std::size_t dest_index{0}; dest_index < destinations.size(); ++dest_index)
+    {
+        // build output set
+        outputs_out.emplace_back(destinations[dest_index].to_enote_v1(dest_index, temp_enote_pubkeys[dest_index]));
+
+        // prepare for range proofs
+        output_amounts_out.emplace_back(destinations[dest_index].m_amount);
+        destinations[dest_index].get_amount_blinding_factor(dest_index,
+            output_amount_commitment_blinding_factors_out[dest_index]);
+    }
+
+    // copy non-duplicate enote pubkeys to tx supplement
+    tx_supplement_inout.m_output_enote_pubkeys.clear();
+    tx_supplement_inout.m_output_enote_pubkeys.reserve(destinations.size());
+
+    for (const auto &enote_pubkey : temp_enote_pubkeys)
+    {
+        if (std::find(tx_supplement_inout.m_output_enote_pubkeys.begin(), tx_supplement_inout.m_output_enote_pubkeys.end(),
+            enote_pubkey) == tx_supplement_inout.m_output_enote_pubkeys.end())
+        {
+            tx_supplement_inout.m_output_enote_pubkeys.emplace_back(enote_pubkey);
+        }
+    }
+
+    // should be either 1 enote pubkey for entire destination set, or 1:1 per destination
+    CHECK_AND_ASSERT_THROW_MES(tx_supplement_inout.m_output_enote_pubkeys.size() == 1 ||
+        tx_supplement_inout.m_output_enote_pubkeys.size() == destinations.size(), "Invalid number of enote pubkeys in destination set.");
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_image_sp_v1(const MockInputSpV1 &input_to_spend,
+    MockENoteImageSpV1 &input_image_out,
+    crypto::secret_key &image_address_mask_out,
+    crypto::secret_key &image_amount_mask_out)
+{
+    image_address_mask_out = rct::rct2sk(rct::zero());
+    image_amount_mask_out = rct::rct2sk(rct::zero());
+
+    // t_k
+    while (image_address_mask_out == rct::rct2sk(rct::zero()))
+        image_address_mask_out = rct::rct2sk(rct::skGen());
+
+    // t_c
+    while (image_amount_mask_out == rct::rct2sk(rct::zero()))
+        image_amount_mask_out = rct::rct2sk(rct::skGen());
+
+    // enote image
+    input_to_spend.to_enote_image_base(image_address_mask_out, image_amount_mask_out, input_image_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_image_last_sp_v1(const MockInputSpV1 &input_to_spend,
+    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
+    const std::vector<crypto::secret_key> &input_amount_blinding_factors,
+    MockENoteImageSpV1 &input_image_out,
+    crypto::secret_key &image_address_mask_out,
+    crypto::secret_key &image_amount_mask_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(output_amount_commitment_blinding_factors.size() > 0,
+        "Tried to finalize tx input image set without any output blinding factors.");
+
+    image_address_mask_out = rct::rct2sk(rct::zero());
+    image_amount_mask_out = rct::rct2sk(rct::zero());
+
+    // t_k
+    while (image_amount_mask_out == rct::rct2sk(rct::zero()))
+            image_amount_mask_out = rct::rct2sk(rct::skGen());
+
+    // get total blinding factor of last input image masked amount commitment
+    // v_c = t_c + x
+    crypto::secret_key last_image_amount_blinding_factor;
+    get_last_sp_image_amount_blinding_factor_v1(output_amount_commitment_blinding_factors,
+        input_amount_blinding_factors,
+        last_image_amount_blinding_factor);
+
+    // t_c = v_c - x
+    sc_sub(&image_address_mask_out,
+        &last_image_amount_blinding_factor,  // v_c
+        &input_to_spend.m_amount_blinding_factor);  // x
+
+    // enote image
+    input_to_spend.to_enote_image_base(image_amount_mask_out, image_address_mask_out, input_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_images_sp_v1(const std::vector<MockInputSpV1> &inputs_to_spend,
@@ -170,7 +293,39 @@ void make_v1_tx_images_sp_v1(const std::vector<MockInputSpV1> &inputs_to_spend,
     std::vector<crypto::secret_key> &image_address_masks_out,
     std::vector<crypto::secret_key> &image_amount_masks_out)
 {
+    CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() > 0, "Tried to make tx input image set without any inputs.");
+    CHECK_AND_ASSERT_THROW_MES(output_amount_commitment_blinding_factors.size() > 0,
+        "Tried to make tx input image set without any output blinding factors.");
 
+    std::vector<crypto::secret_key> input_amount_blinding_factors;
+
+    input_images_out.resize(inputs_to_spend.size());
+    image_address_masks_out.resize(inputs_to_spend.size());
+    image_amount_masks_out.resize(inputs_to_spend.size());
+    input_amount_blinding_factors.resize(inputs_to_spend.size() - 1);
+
+    // make initial set of input images (all but last)
+    for (std::size_t input_index{0}; input_index < inputs_to_spend.size() - 1; ++input_index)
+    {
+        make_v1_tx_image_sp_v1(inputs_to_spend[input_index],
+            input_images_out[input_index],
+            image_address_masks_out[input_index],
+            image_amount_masks_out[input_index]);
+
+        // store total blinding factor of input image masked amount commitment
+        // v_c = t_c + x
+        sc_add(&(input_amount_blinding_factors[input_index]),
+            &(image_amount_masks_out[input_index]),  // t_c
+            &(inputs_to_spend[input_index].m_amount_blinding_factor));  // x
+    }
+
+    // make last input image
+    make_v1_tx_image_last_sp_v1(inputs_to_spend.back(),
+        output_amount_commitment_blinding_factors,
+        input_amount_blinding_factors,
+        input_images_out.back(),
+        image_address_masks_out.back(),
+        image_amount_masks_out.back());
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proofs_sp_v1(const std::vector<MockInputSpV1> &inputs_to_spend,
@@ -198,6 +353,49 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenc
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out)
 {
 
+}
+//-------------------------------------------------------------------------------------------------------------------
+void sort_tx_inputs_sp_v1(std::vector<MockENoteImageSpV1> &input_images_inout,
+    std::vector<MockImageProofSpV1> &tx_image_proofs_inout,
+    std::vector<MockMembershipProofSpV1> &tx_membership_proofs_inout)
+{
+    CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == tx_image_proofs_inout.size(), "Input components size mismatch");
+    CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == tx_membership_proofs_inout.size(), "Input components size mismatch");
+
+    std::vector<std::size_t> original_indices;
+    original_indices.resize(input_images_inout.size());
+
+    for (std::size_t input_index{0}; input_index < input_images_inout.size(); ++input_index)
+        original_indices[input_index] = input_index;
+
+    // sort: key images ascending with byte-wise comparisons
+    std::sort(original_indices.begin(), original_indices.end(),
+            [&input_images_inout](const std::size_t input_index_1, const std::size_t input_index_2) -> bool
+            {
+                return memcmp(&(input_images_inout[input_index_1].m_key_image),
+                    &(input_images_inout[input_index_2].m_key_image), sizeof(crypto::key_image)) < 0;
+            }
+        );
+
+    // move all input pieces into sorted positions
+    std::vector<MockENoteImageSpV1> input_images_sorted;
+    std::vector<MockImageProofSpV1> tx_image_proofs_sorted;
+    std::vector<MockMembershipProofSpV1> tx_membership_proofs_sorted;
+    input_images_sorted.reserve(input_images_inout.size());
+    tx_image_proofs_sorted.reserve(input_images_inout.size());
+    tx_membership_proofs_sorted.reserve(input_images_inout.size());
+
+    for (const auto old_index : original_indices)
+    {
+        input_images_sorted.emplace_back(std::move(input_images_inout[old_index]));
+        tx_image_proofs_sorted.emplace_back(std::move(tx_image_proofs_inout[old_index]));
+        tx_membership_proofs_sorted.emplace_back(std::move(tx_membership_proofs_inout[old_index]));
+    }
+
+    // update inputs
+    input_images_inout = std::move(input_images_sorted);
+    tx_image_proofs_inout = std::move(tx_image_proofs_sorted);
+    tx_membership_proofs_inout = std::move(tx_membership_proofs_sorted);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx
