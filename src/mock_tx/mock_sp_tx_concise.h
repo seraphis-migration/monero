@@ -52,7 +52,7 @@
 
 namespace mock_tx
 {
-
+#if 0
 ////
 // Tx proposal: outputs and memos
 ///
@@ -94,7 +94,7 @@ class MockTxPartialSpV1 final
     MockTxPartialSpV1(MockTxProposalSpV1 &proposal, vec<MockTxInputPartialSpV1> &inputs, BalanceProof);
     MockTxPartialSpV1(MockTxMultisigProposalSpV1 &proposal, vec<MockTxInputPartialSpV1> &extra_inputs, BalanceProof);
 };
-
+#endif
 ////
 // Complete tx
 ///
@@ -157,6 +157,15 @@ public:
     /// get a short description of the tx type
     std::string get_descriptor() const override { return "Sp-Concise"; }
 
+    /// get the tx version string: era | format | validation rules
+    static void get_versioning_string(const unsigned char tx_validation_rules_version,
+        std::string &version_string)
+    {
+        version_string += static_cast<char>(TxGenerationSp);
+        version_string += static_cast<char>(TxStructureVersionSp::TxTypeSpConciseGrootle1);
+        version_string += static_cast<char>(tx_validation_rules_version);
+    }
+
     /// get balance proof
     const std::shared_ptr<const MockBalanceProofSpV1> get_balance_proof() const { return m_balance_proof; }
 
@@ -190,18 +199,22 @@ private:
 * param: params -
 * param: in_amounts -
 * param: out_amounts -
+* inoutparam: ledger_context_inout -
 * return: a MockTxSpConcise tx
 */
 template <>
 std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts);
+    const std::vector<rct::xmr_amount> &out_amounts,
+    std::shared_ptr<MockLedgerContext> ledger_context_inout);
 /**
 * brief: validate_mock_txs - validate a set of MockTxSpConcise transactions (function specialization)
 * param: txs_to_validate -
+* param: ledger_context -
 * return: true/false on validation result
 */
 template <>
-bool validate_mock_txs<MockTxSpConcise>(const std::vector<std::shared_ptr<MockTxSpConcise>> &txs_to_validate);
+bool validate_mock_txs<MockTxSpConcise>(const std::vector<std::shared_ptr<MockTxSpConcise>> &txs_to_validate,
+    const std::shared_ptr<const LedgerContext> ledger_context);
 
 } //namespace mock_tx

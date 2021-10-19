@@ -61,6 +61,7 @@ bool MockTxSpConcise::validate_tx_semantics() const
         m_image_proofs.size(),
         m_input_images.size(),
         m_outputs.size(),
+        m_supplement.m_output_enote_pubkeys.size(),
         m_balance_proof))
     {
         return false;
@@ -78,8 +79,8 @@ bool MockTxSpConcise::validate_tx_semantics() const
         return false;
     }
 
-    // validate input images are sorted
-    if (!validate_mock_tx_sp_semantics_input_images_sorting_v1(m_input_images))
+    // validate membershio proof ref sets and input images are sorted
+    if (!validate_mock_tx_sp_semantics_sorting_v1(m_membership_proofs, m_input_images))
     {
         return false;
     }
@@ -111,7 +112,6 @@ bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const Ledge
     // membership proofs
     if (!validate_mock_tx_sp_membership_proofs_v1(m_membership_proofs,
         m_input_images,
-        get_tx_membership_proof_message_sp_v1(),
         ledger_context))
     {
         return false;
@@ -120,7 +120,7 @@ bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const Ledge
     // ownership/unspentness proofs
     std::string version_string;
     version_string.reserve(3);
-    this->get_versioning_string(version_string);
+    this->MockTx::get_versioning_string(version_string);
 
     rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_balance_proof, m_supplement)};
 
@@ -173,7 +173,7 @@ template <>
 std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    std::shared_ptr<MockLedgerContext> ledger_context)
+    std::shared_ptr<MockLedgerContext> ledger_context_inout)
 {
     CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "Tried to make tx without any outputs.");
@@ -188,7 +188,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
             gen_mock_sp_membership_ref_sets_v1(inputs_to_spend,
                 params.ref_set_decomp_n,
                 params.ref_set_decomp_m,
-                ledger_context)
+                ledger_context_inout)
         };
 
     // make mock destinations
@@ -198,7 +198,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     // versioning
     std::string version_string;
     version_string.reserve(3);
-    this->get_versioning_string(version_string);
+    MockTxSpConcise::get_versioning_string(MockTxSpConcise::ValidationRulesVersion::ONE, version_string);
 
 
     /// make tx
@@ -239,7 +239,6 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, //internally: make proofs one at a time
         image_address_masks,
         image_amount_masks,
-        get_tx_membership_proof_message_sp_v1(),
         tx_membership_proofs);
     sort_tx_inputs_sp_v1(input_images, tx_image_proofs, tx_membership_proofs);
 
@@ -264,7 +263,7 @@ bool validate_mock_txs<MockTxSpConcise>(const std::vector<std::shared_ptr<MockTx
             return false;
 
         // gather range proofs
-        const std::shared_ptr<MockRctBalanceProofV1> balance_proof{tx->get_balance_proof()};
+        const std::shared_ptr<const MockBalanceProofSpV1> balance_proof{tx->get_balance_proof()};
 
         if (balance_proof.get() == nullptr)
             return false;

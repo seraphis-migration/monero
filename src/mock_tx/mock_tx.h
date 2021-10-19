@@ -89,11 +89,18 @@ public:
     virtual std::string get_descriptor() const = 0;
 
     /// get the tx version string: era | format | validation rules
+    static void get_versioning_string(const unsigned char tx_era_version,
+        const unsigned char tx_format_version,
+        const unsigned char tx_validation_rules_version,
+        std::string &version_string)
+    {
+        version_string += static_cast<char>(tx_era_version);
+        version_string += static_cast<char>(tx_format_version);
+        version_string += static_cast<char>(tx_validation_rules_version);
+    }
     virtual void get_versioning_string(std::string &version_string) const final
     {
-        version_string += static_cast<char>(m_tx_era_version);
-        version_string += static_cast<char>(m_tx_format_version);
-        version_string += static_cast<char>(m_tx_validation_rules_version);
+        get_versioning_string(m_tx_era_version, m_tx_format_version, m_tx_validation_rules_version, version_string);
     }
 
     //get_tx_byte_blob()
