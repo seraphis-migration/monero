@@ -150,18 +150,29 @@ void make_v1_tx_images_sp_v1(const std::vector<MockInputSpV1> &inputs_to_spend,
     std::vector<crypto::secret_key> &image_address_masks_out,
     std::vector<crypto::secret_key> &image_amount_masks_out);
 /**
+* brief: make_v1_tx_image_proof_sp_v1 - make a v1 tx input image proof (seraphis composition proof)
+* param: input_to_spend -
+* param: input_image -
+* param: image_address_mask -
+* param: message -
+* outparam: tx_image_proof_out -
+*/
+void make_v1_tx_image_proof_sp_v1(const MockInputSpV1 &input_to_spend,
+    const MockENoteImageSpV1 &input_image,
+    const crypto::secret_key &image_address_mask,
+    const rct::key &message,
+    MockImageProofSpV1 &tx_image_proof_out);
+/**
 * brief: make_v1_tx_image_proofs_sp_v1 - make v1 tx input image proofs (seraphis composition proofs: 1 per input)
 * param: inputs_to_spend -
 * param: input_images -
 * param: image_address_masks -
-* param: image_amount_masks -
 * param: message -
 * outparam: tx_image_proofs_out -
 */
 void make_v1_tx_image_proofs_sp_v1(const std::vector<MockInputSpV1> &inputs_to_spend,
     const std::vector<MockENoteImageSpV1> &input_images,
     const std::vector<crypto::secret_key> &image_address_masks,
-    const std::vector<crypto::secret_key> &image_amount_masks,
     const rct::key &message,
     std::vector<MockImageProofSpV1> &tx_image_proofs_out);
 /**
