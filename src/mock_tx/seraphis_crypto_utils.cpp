@@ -33,6 +33,7 @@
 
 //local headers
 #include "common/varint.h"
+#include "crypto/crypto.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
@@ -721,6 +722,17 @@ void domain_separate_rct_hash(const std::string &domain_separator, const rct::ke
 
     // clear the string in case the key is a secret
     hash.wipe();
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool key_domain_is_prime_subgroup(const rct::key &check_key)
+{
+    // l*K ?= identity
+    ge_p3 check_key_p3;
+    CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&check_key_p3, check_key.bytes) == 0,
+            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+    ge_scalarmult_p3(&check_key_p3, rct::curveOrder().bytes, &check_key_p3);
+
+    return (ge_p3_is_point_at_infinity(&check_key_p3) != 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

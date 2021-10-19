@@ -174,5 +174,12 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
 * outparam: hash_result_out - H("domain-sep", key)
 */
 void domain_separate_rct_hash(const std::string &domain_separator, const rct::key &rct_key, crypto::secret_key &hash_result_out);
+/**
+* brief: key_domain_is_prime_subgroup - check that input key is in prime order EC subgroup
+*   l*K ?= identity
+* param: check_key - key to check
+* result: true if input key is in prime order EC subgroup
+*/
+bool key_domain_is_prime_subgroup(const rct::key &check_key);
 
 } //namespace sp

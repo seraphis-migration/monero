@@ -30,8 +30,6 @@ set(mock_tx_sources
   grootle.cpp
   grootle_concise.cpp
   mock_ledger_context.cpp
-  mock_tx.cpp
-  mock_tx_utils.cpp
   mock_rct_base.cpp
   mock_rct_components.cpp
   mock_rct_clsag.cpp
@@ -40,8 +38,12 @@ set(mock_tx_sources
   mock_sp_component_builders.cpp
   mock_sp_component_types.cpp
   mock_sp_core.cpp
-  seraphis_crypto_utils.cpp
-  seraphis_composition_proof.cpp)
+  mock_sp_tx_concise.cpp
+  mock_sp_validators.cpp
+  mock_tx.cpp
+  mock_tx_utils.cpp
+  seraphis_composition_proof.cpp
+  seraphis_crypto_utils.cpp)
 
 monero_find_all_headers(mock_tx_headers, "${CMAKE_CURRENT_SOURCE_DIR}")
 

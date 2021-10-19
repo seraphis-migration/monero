@@ -57,9 +57,9 @@ namespace mock_tx
 bool MockTxSpConcise::validate_tx_semantics() const
 {
     // validate component counts (num inputs/outputs/etc.)
-    if (!validate_mock_tx_sp_semantics_component_counts_v1(m_membership_proofs.size(),
+    if (!validate_mock_tx_sp_semantics_component_counts_v1(m_input_images.size(),
+        m_membership_proofs.size(),
         m_image_proofs.size(),
-        m_input_images.size(),
         m_outputs.size(),
         m_supplement.m_output_enote_pubkeys.size(),
         m_balance_proof))
@@ -74,7 +74,7 @@ bool MockTxSpConcise::validate_tx_semantics() const
     }
 
     // validate linking tag semantics
-    if (!validate_mock_tx_sp_semantics_linking_tags_v1(m_input_images))
+    if (!validate_mock_tx_sp_semantics_input_images_v1(m_input_images))
     {
         return false;
     }
@@ -92,6 +92,7 @@ bool MockTxSpConcise::validate_tx_semantics() const
 //-------------------------------------------------------------------------------------------------------------------
 bool MockTxSpConcise::validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const
 {
+    // unspentness proof (key images not in ledger)
     if (!validate_mock_tx_sp_linking_tags_v1(m_input_images, ledger_context))
         return false;
 
@@ -117,17 +118,18 @@ bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const Ledge
         return false;
     }
 
-    // ownership/unspentness proofs
+    // ownership proof (and proof that key images are well-formed)
     std::string version_string;
     version_string.reserve(3);
     this->MockTx::get_versioning_string(version_string);
 
-    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_balance_proof, m_supplement)};
+    rct::key image_proofs_message{
+            get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_balance_proof, m_supplement)
+        };
 
     if (!validate_mock_tx_sp_composition_proofs_v1(m_image_proofs,
         m_input_images,
-        image_proofs_message,
-        ledger_context))
+        image_proofs_message))
     {
         return false;
     }

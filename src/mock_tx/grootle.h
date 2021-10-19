@@ -152,7 +152,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
 */
 bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const rct::keyM &M,
-    const std::vector<rct::keyV> &proof_offsets,
+    const rct::keyM &proof_offsets,
     const std::size_t n,
     const std::size_t m,
     const rct::keyV &messages,
@@ -169,7 +169,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 */
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
     const rct::keyM &M,
-    const std::vector<rct::keyV> &proof_offsets,
+    const rct::keyM &proof_offsets,
     const std::size_t n,
     const std::size_t m,
     const rct::keyV &messages);
