@@ -32,6 +32,7 @@
 #include "mock_sp_component_builders.h"
 
 //local headers
+#include "common/varint.h"
 #include "crypto/crypto.h"
 extern "C"
 {
@@ -49,6 +50,7 @@ extern "C"
 #include "ringct/rctSigs.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_crypto_utils.h"
+#include "wipeable_string.h"
 
 //third party headers
 
@@ -80,18 +82,28 @@ static void get_last_sp_image_amount_blinding_factor_v1(
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-rct::key get_tx_membership_proof_message_sp_v1()
+rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &enote_ledger_indices)
 {
     rct::key hash_result;
-    std::string hash{CRYPTONOTE_NAME};
-    rct::hash_to_scalar(hash_result, hash.data(), hash.size());
+    epee::wipeable_string hash;
+    hash.reserve(sizeof(CRYPTONOTE_NAME) + enote_ledger_indices.size()*((sizeof(std::size_t) * 8 + 6) / 7));
+    hash = CRYPTONOTE_NAME;
+    char* end = hash.data() + hash.size();
+    for (const std::size_t index : enote_ledger_indices)
+    {
+        // TODO: append real ledger references
+        tools::write_varint(end, index);
+        assert(end <= hash.data() + hash.size() + ((sizeof(std::size_t) * 8 + 6) / 7));
+    }
+
+    rct::hash_to_scalar(hash_result, hash.data(), end - hash.data());
 
     return hash_result;
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     const std::vector<MockENoteSpV1> &output_enotes,
-    const MockBalanceProofSpV1 &balance_proof,
+    const std::shared_ptr<const MockBalanceProofSpV1> &balance_proof,
     const MockSupplementSpV1 &tx_supplement)
 {
     rct::key hash_result;
@@ -99,14 +111,14 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     hash.reserve(sizeof(CRYPTONOTE_NAME) +
         version_string.size() +
         output_enotes.size()*MockENoteSpV1::get_size_bytes() +
-        balance_proof.get_size_bytes() +
+        balance_proof->get_size_bytes() +
         tx_supplement.m_output_enote_pubkeys.size());
     hash += CRYPTONOTE_NAME;
     for (const auto &output_enote : output_enotes)
     {
         output_enote.append_to_string(hash);
     }
-    balance_proof.append_to_string(false, hash);  // don't append amount commitments here (they were appended by enotes)
+    balance_proof->append_to_string(false, hash);  // don't append amount commitments here (they were appended by enotes)
     for (const auto &enote_pubkey : tx_supplement.m_output_enote_pubkeys)
     {
         hash.append((const char*) enote_pubkey.bytes, sizeof(enote_pubkey));
@@ -400,7 +412,6 @@ void make_v1_tx_balance_proof_rct_v1(const std::vector<rct::xmr_amount> &output_
 void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
-    const rct::key &message,
     MockMembershipProofSpV1 &tx_membership_proof_out)
 {
     /// initial checks
@@ -449,6 +460,9 @@ void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &mem
     sc_mul(&(image_masks[0]), &(image_masks[0]), sp::MINUS_ONE.bytes);  // -t_k
     sc_mul(&(image_masks[1]), &(image_masks[1]), sp::MINUS_ONE.bytes);  // -t_k
 
+    // proof message
+    rct::key message{get_tx_membership_proof_message_sp_v1(membership_ref_set.m_ledger_enote_indices)};
+
 
     /// make concise grootle proof
     tx_membership_proof_out.m_concise_grootle_proof = sp::concise_grootle_prove(referenced_enotes,
@@ -463,7 +477,6 @@ void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &mem
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
-    const rct::key &message,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out)
 {
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_address_masks.size(), "Input components size mismatch");
@@ -476,7 +489,6 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenc
         make_v1_tx_membership_proof_sp_v1(membership_ref_sets[input_index],
             image_address_masks[input_index],
             image_amount_masks[input_index],
-            message,
             tx_membership_proofs_out[input_index]);
     }
 }

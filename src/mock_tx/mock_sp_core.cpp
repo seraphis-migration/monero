@@ -43,6 +43,7 @@ extern "C"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_crypto_utils.h"
+#include "wipeable_string.h"
 
 //third party headers
 

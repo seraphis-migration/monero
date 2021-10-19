@@ -26,7 +26,7 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Mock tx: RingCT component implementations
+// Mock tx: Seraphis component implementations
 // NOT FOR PRODUCTION
 
 #pragma once
@@ -52,10 +52,12 @@ namespace mock_tx
 
 /**
 * brief: get_tx_membership_proof_message_sp_v1 - message for membership proofs
-*   - H(crypto project name)
+*   - H(crypto project name, enote ledger references)
+* TODO: use a real reference system instead of plain indices
+* param - enote_ledger_indices
 * return: empty message for a membership proof
 */
-rct::key get_tx_membership_proof_message_sp_v1();
+rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &enote_ledger_indices);
 /**
 * brief: get_tx_image_proof_message_sp_v1 - message for tx image proofs
 *   - H(crypto project name, version string, output enotes, range proofs, enote pubkeys)
@@ -67,7 +69,7 @@ rct::key get_tx_membership_proof_message_sp_v1();
 */
 rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     const std::vector<MockENoteSpV1> &output_enotes,
-    const MockBalanceProofSpV1 &balance_proof,
+    const std::shared_ptr<const MockBalanceProofSpV1> &balance_proof,
     const MockSupplementSpV1 &tx_supplement);
 /**
 * brief: gen_mock_sp_inputs_v1 - create random mock inputs
@@ -191,26 +193,22 @@ void make_v1_tx_balance_proof_rct_v1(const std::vector<rct::xmr_amount> &output_
 * param: membership_ref_set -
 * param: image_address_mask -
 * param: image_amount_mask -
-* param: message -
 * outparam: tx_membership_proof_out -
 */
 void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
-    const rct::key &message,
     MockMembershipProofSpV1 &tx_membership_proof_out);
 /**
 * brief: make_v1_tx_membership_proofs_sp_v1 - make v1 membership proofs (concise grootle: 1 per input)
 * param: membership_ref_sets -
 * param: image_address_masks -
 * param: image_amount_masks -
-* param: message -
 * outparam: tx_membership_proofs_out -
 */
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
-    const rct::key &message,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out);
 /**
 * brief: sort_tx_inputs_sp_v1 - sort tx inputs
