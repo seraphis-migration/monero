@@ -32,6 +32,7 @@
 #include "mock_ledger_context.h"
 
 //local headers
+#include "crypto/crypto.h"
 #include "misc_log_ex.h"
 #include "mock_sp_component_types.h"
 #include "ringct/rctTypes.h"
@@ -45,7 +46,7 @@
 namespace mock_tx
 {
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::linking_tag_exists_sp_v1(const rct::key &linking_tag) const
+bool MockLedgerContext::linking_tag_exists_sp_v1(const crypto::key_image &linking_tag) const
 {
     return m_sp_linking_tags.find(linking_tag) != m_sp_linking_tags.end();
 }
@@ -65,7 +66,24 @@ void MockLedgerContext::get_reference_set_sp_v1(const std::vector<std::size_t> &
     enotes_out = std::move(enotes_temp);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::add_linking_tag_sp_v1(const rct::key &linking_tag)
+void MockLedgerContext::get_reference_set_components_sp_v1(const std::vector<std::size_t> &indices,
+    rct::keyM &referenced_enotes_components_out) const
+{
+    rct::keyM referenced_enotes_components_temp;
+    referenced_enotes_components_temp.reserve(indices.size());
+
+    for (const std::size_t index : indices)
+    {
+        CHECK_AND_ASSERT_THROW_MES(index < m_sp_enotes.size(), "Tried to get components of enote that doesn't exist.");
+        referenced_enotes_components_temp.emplace_back(
+                rct::keyV{m_sp_enotes.at(index).m_onetime_address, m_sp_enotes.at(index).m_amount_commitment}
+            );
+    }
+
+    referenced_enotes_components_out = std::move(referenced_enotes_components_temp);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void MockLedgerContext::add_linking_tag_sp_v1(const crypto::key_image &linking_tag)
 {
     m_sp_linking_tags.insert(linking_tag);
 }

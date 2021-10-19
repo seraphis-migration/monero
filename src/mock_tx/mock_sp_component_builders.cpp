@@ -43,12 +43,11 @@ extern "C"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
 #include "mock_sp_component_types.h"
-#include "mock_sp_core.h"
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
-#include "ringct/rctSigs.h"
 #include "ringct/rctTypes.h"
+#include "seraphis_composition_proof.h"
 #include "seraphis_crypto_utils.h"
 #include "wipeable_string.h"
 
@@ -114,6 +113,7 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
         balance_proof->get_size_bytes() +
         tx_supplement.m_output_enote_pubkeys.size());
     hash += CRYPTONOTE_NAME;
+    hash += version_string;
     for (const auto &output_enote : output_enotes)
     {
         output_enote.append_to_string(hash);

@@ -32,6 +32,7 @@
 #pragma once
 
 //local headers
+#include "crypto/crypto.h"
 #include "ledger_context.h"
 #include "mock_sp_component_types.h"
 #include "ringct/rctTypes.h"
@@ -57,7 +58,7 @@ public:
     * param: linking_tag -
     * return: true/false on check result
     */
-    bool linking_tag_exists_sp_v1(const rct::key &linking_tag) const override;
+    bool linking_tag_exists_sp_v1(const crypto::key_image &linking_tag) const override;
     /**
     * brief: get_reference_set_sp_v1 - gets Seraphis enotes stored in the ledger
     * param: indices -
@@ -66,10 +67,17 @@ public:
     void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
         std::vector<MockENoteSpV1> &enotes_out) const override;
     /**
+    * brief: get_reference_set_components_sp_v1 - gets components of Seraphis enotes stored in the ledger
+    * param: indices -
+    * outparam: referenced_enotes_components - {enote address, enote amount commitment}
+    */
+    void get_reference_set_components_sp_v1(const std::vector<std::size_t> &indices,
+        rct::keyM &referenced_enotes_components) const override;
+    /**
     * brief: add_linking_tag_sp_v1 - add a Seraphis linking tag to the ledger
     * param: linking_tag -
     */
-    void add_linking_tag_sp_v1(const rct::key &linking_tag);
+    void add_linking_tag_sp_v1(const crypto::key_image &linking_tag);
     /**
     * brief: add_enote_sp_v1 - add a Seraphis v1 enote to the ledger
     * param: enote -
@@ -79,7 +87,7 @@ public:
 
 private:
     /// Seraphis linking tags
-    std::unordered_set<rct::key> m_sp_linking_tags;
+    std::unordered_set<crypto::key_image> m_sp_linking_tags;
     /// Seraphis v1 ENotes
     std::unordered_map<std::size_t, MockENoteSpV1> m_sp_enotes;
 };

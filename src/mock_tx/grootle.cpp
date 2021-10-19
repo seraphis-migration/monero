@@ -445,7 +445,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
 //-------------------------------------------------------------------------------------------------------------------
 bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const rct::keyM &M,
-    const std::vector<rct::keyV> &proof_offsets,
+    const rct::keyM &proof_offsets,
     const std::size_t n,
     const std::size_t m,
     const rct::keyV &messages,

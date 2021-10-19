@@ -32,6 +32,7 @@
 #pragma once
 
 //local headers
+#include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -54,7 +55,7 @@ public:
     * param: linking_tag -
     * return: true/false on check result
     */
-    virtual bool linking_tag_exists_sp_v1(const rct::key &linking_tag) const = 0;
+    virtual bool linking_tag_exists_sp_v1(const crypto::key_image &linking_tag) const = 0;
     /**
     * brief: get_reference_set_sp_v1 - gets Seraphis enotes stored in the ledger
     * param: indices -
@@ -62,6 +63,13 @@ public:
     */
     virtual void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
         std::vector<MockENoteSpV1> &enotes_out) const = 0;
+    /**
+    * brief: get_reference_set_components_sp_v1 - gets components of Seraphis enotes stored in the ledger
+    * param: indices -
+    * outparam: referenced_enotes_components - {enote address, enote amount commitment}
+    */
+    virtual void get_reference_set_components_sp_v1(const std::vector<std::size_t> &indices,
+        rct::keyM &referenced_enotes_components) const = 0;
 };
 
 } //namespace mock_tx
