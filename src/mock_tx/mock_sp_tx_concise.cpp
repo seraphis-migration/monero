@@ -234,7 +234,6 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     make_v1_tx_image_proofs_sp_v1(inputs_to_spend, //internally: make proofs one at a time
         input_images,
         image_address_masks,
-        image_amount_masks,
         image_proofs_message,
         tx_image_proofs);
     make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, //internally: make proofs one at a time

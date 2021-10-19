@@ -328,14 +328,46 @@ void make_v1_tx_images_sp_v1(const std::vector<MockInputSpV1> &inputs_to_spend,
         image_amount_masks_out.back());
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_image_proof_sp_v1(const MockInputSpV1 &input_to_spend,
+    const MockENoteImageSpV1 &input_image,
+    const crypto::secret_key &image_address_mask,
+    const rct::key &message,
+    MockImageProofSpV1 &tx_image_proof_out)
+{
+    // prepare for proof
+    rct::keyV proof_K;
+    std::vector<crypto::secret_key> x, y, z;
+
+    proof_K.resize(1);
+    sp::mask_key(image_address_mask, input_to_spend.m_enote.m_onetime_address, proof_K[0]);
+
+    x.emplace_back(image_address_mask);
+    y.emplace_back(input_to_spend.m_enote_view_privkey);
+    z.emplace_back(input_to_spend.m_spendbase_privkey);
+
+    // make seraphis composition proof
+    tx_image_proof_out.m_composition_proof = sp::sp_composition_prove(proof_K, x, y, z, message);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proofs_sp_v1(const std::vector<MockInputSpV1> &inputs_to_spend,
     const std::vector<MockENoteImageSpV1> &input_images,
     const std::vector<crypto::secret_key> &image_address_masks,
-    const std::vector<crypto::secret_key> &image_amount_masks,
     const rct::key &message,
     std::vector<MockImageProofSpV1> &tx_image_proofs_out)
 {
+    CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() == input_images.size(), "Input components size mismatch");
+    CHECK_AND_ASSERT_THROW_MES(inputs_to_spend.size() == image_address_masks.size(), "Input components size mismatch");
 
+    tx_image_proofs_out.resize(inputs_to_spend.size());
+
+    for (std::size_t input_index{0}; input_index < inputs_to_spend.size(); ++input_index)
+    {
+        make_v1_tx_image_proof_sp_v1(inputs_to_spend[input_index],
+            input_images[input_index],
+            image_address_masks[input_index],
+            message,
+            tx_image_proofs_out[input_index]);
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_balance_proof_rct_v1(const std::vector<rct::xmr_amount> &output_amounts,
@@ -414,8 +446,8 @@ void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &mem
     image_masks.reserve(2);
     image_masks.emplace_back(image_address_mask);  // t_k
     image_masks.emplace_back(image_amount_mask);  // t_c
-    sc_mul(&(image_masks[0]), &(image_masks[0]), sp::MINUS_ONE);  // -t_k
-    sc_mul(&(image_masks[1]), &(image_masks[1]), sp::MINUS_ONE);  // -t_k
+    sc_mul(&(image_masks[0]), &(image_masks[0]), sp::MINUS_ONE.bytes);  // -t_k
+    sc_mul(&(image_masks[1]), &(image_masks[1]), sp::MINUS_ONE.bytes);  // -t_k
 
 
     /// make concise grootle proof
