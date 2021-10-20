@@ -77,7 +77,7 @@ public:
     * brief: add_linking_tag_sp_v1 - add a Seraphis linking tag to the ledger
     * param: linking_tag -
     */
-    void add_linking_tag_sp_v1(const crypto::key_image &linking_tag);
+    void add_linking_tag_sp_v1(const crypto::key_image &linking_tag) override;
     /**
     * brief: add_enote_sp_v1 - add a Seraphis v1 enote to the ledger
     * param: enote -

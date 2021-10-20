@@ -137,6 +137,15 @@ bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const Ledge
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+void MockTxSpConcise::add_key_images_to_ledger(std::shared_ptr<LedgerContext> ledger_context) const
+{
+    if (ledger_context.get() == nullptr)
+        return;
+
+    for (const auto &input_image : m_input_images)
+        ledger_context->add_linking_tag_sp_v1(input_image.m_key_image);
+}
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t MockTxSpConcise::get_size_bytes() const
 {
     // doesn't include (compared to a real tx):
