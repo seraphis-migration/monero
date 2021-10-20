@@ -70,6 +70,11 @@ public:
     */
     virtual void get_reference_set_components_sp_v1(const std::vector<std::size_t> &indices,
         rct::keyM &referenced_enotes_components) const = 0;
+    /**
+    * brief: add_linking_tag_sp_v1 - add a Seraphis linking tag to the ledger
+    * param: linking_tag -
+    */
+    virtual void add_linking_tag_sp_v1(const crypto::key_image &linking_tag) = 0;
 };
 
 } //namespace mock_tx

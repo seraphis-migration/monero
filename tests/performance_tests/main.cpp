@@ -122,6 +122,7 @@ int main(int argc, char** argv)
   ParamsShuttleMockTx p_mock_tx;
   p_mock_tx.core_params = p.core_params;
 
+  /*
   incrementer = {
       {1, 2, 4, 7, 11, 25}, //batch sizes
       {1, 2, 4, 7, 12, 16}, //in counts
@@ -146,6 +147,29 @@ int main(int argc, char** argv)
     }
 
     if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
+    {
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConcise);
+    }
+  }
+  */
+
+  incrementer = {
+      {1, 2, 4, 7, 11, 25}, //batch sizes
+      {1, 2, 4, 7, 12, 16}, //in counts
+      {1, 2, 4}, //out counts
+      {0}, //rangeproof splits
+      {2}, //decomp n
+      {8} //decomp m limits
+    };
+
+  while (incrementer.next(p_mock_tx))
+  {
+    if (p_mock_tx.num_rangeproof_splits > p_mock_tx.out_count/2)
+    // if squashed model, test (out_count + in_count)/2
+      continue;
+
+    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 8)
     {
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConcise);

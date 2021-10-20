@@ -323,17 +323,14 @@ class test_mock_tx
             }
 
             // report tx info
-            if (params.batch_size == 1)
-            {
-                std::cout << m_txs.back()->get_descriptor() << " || "
-                          << "Size (bytes): " << m_txs.back()->get_size_bytes() << " || "
-                          << "batch size: " << params.batch_size << " || "
-                          << "inputs: " << params.in_count << " || "
-                          << "outputs: " << params.out_count << " || "
-                          << "rangeproof split: " << params.num_rangeproof_splits << " || "
-                          << "ref set size (" << params.n << "^" << params.m << "): " <<
-                            mock_tx::ref_set_size_from_decomp(params.n, params.m) << '\n';
-            }
+            std::cout << m_txs.back()->get_descriptor() << " || "
+                        << "Size (bytes): " << m_txs.back()->get_size_bytes() << " || "
+                        << "batch size: " << params.batch_size << " || "
+                        << "inputs: " << params.in_count << " || "
+                        << "outputs: " << params.out_count << " || "
+                        << "rangeproof split: " << params.num_rangeproof_splits << " || "
+                        << "ref set size (" << params.n << "^" << params.m << "): " <<
+                        mock_tx::ref_set_size_from_decomp(params.n, params.m) << '\n';
 
             return true;
         }

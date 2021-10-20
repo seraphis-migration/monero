@@ -57,6 +57,7 @@ struct MockTxGenData
   std::vector<rct::xmr_amount> output_amounts;
   std::size_t num_rangeproof_splits{0};
   TestType expected_result{TestType::ExpectTrue};
+  bool test_double_spend{false};
 };
 
 template <typename MockTxType>
@@ -85,6 +86,16 @@ static void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
 
       // validate tx
       EXPECT_TRUE(tx->validate(ledger_context));
+
+      if (gen.test_double_spend)
+      {
+        // add key images once validated
+        tx->add_key_images_to_ledger(ledger_context);
+
+        // re-validate tx
+        // - should fail now that key images were added to the ledger
+        EXPECT_FALSE(tx->validate(ledger_context));
+      }
     }
     catch (...)
     {
@@ -547,6 +558,7 @@ TEST(mock_tx, seraphis_concise)
     temp.output_amounts.push_back(1);
     temp.ref_set_decomp_n = 2;
     temp.ref_set_decomp_m = 3;
+    temp.test_double_spend = true;
 
     gen_data.push_back(temp);
   }
@@ -560,6 +572,7 @@ TEST(mock_tx, seraphis_concise)
     temp.output_amounts.push_back(1);
     temp.ref_set_decomp_n = 2;
     temp.ref_set_decomp_m = 3;
+    temp.test_double_spend = true;
 
     gen_data.push_back(temp);
   }
@@ -573,6 +586,7 @@ TEST(mock_tx, seraphis_concise)
     temp.output_amounts.push_back(2);
     temp.ref_set_decomp_n = 2;
     temp.ref_set_decomp_m = 3;
+    temp.test_double_spend = true;
 
     gen_data.push_back(temp);
   }
@@ -588,6 +602,7 @@ TEST(mock_tx, seraphis_concise)
       temp.input_amounts.push_back(1);
       temp.output_amounts.push_back(1);
     }
+    temp.test_double_spend = true;
 
     gen_data.push_back(temp);
   }
@@ -603,6 +618,7 @@ TEST(mock_tx, seraphis_concise)
       temp.input_amounts.push_back(1);
       temp.output_amounts.push_back(1);
     }
+    temp.test_double_spend = true;
 
     gen_data.push_back(temp);
   }
@@ -618,6 +634,7 @@ TEST(mock_tx, seraphis_concise)
       temp.input_amounts.push_back(1);
       temp.output_amounts.push_back(1);
     }
+    temp.test_double_spend = true;
 
     gen_data.push_back(temp);
   }
@@ -633,6 +650,7 @@ TEST(mock_tx, seraphis_concise)
       temp.input_amounts.push_back(0);
       temp.output_amounts.push_back(0);
     }
+    temp.test_double_spend = true;
 
     gen_data.push_back(temp);
   }

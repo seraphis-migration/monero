@@ -103,6 +103,9 @@ public:
         get_versioning_string(m_tx_era_version, m_tx_format_version, m_tx_validation_rules_version, version_string);
     }
 
+    /// add key images to ledger context
+    virtual void add_key_images_to_ledger(std::shared_ptr<LedgerContext> ledger_context) const = 0;
+
     //get_tx_byte_blob()
 
 private:
