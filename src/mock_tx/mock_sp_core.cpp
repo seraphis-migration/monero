@@ -134,18 +134,20 @@ void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     epee::wipeable_string hash;
     hash.reserve(sizeof(config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET) + sizeof(rct::key) +
         ((sizeof(std::size_t) * 8 + 6) / 7));
+    // "domain-sep"
     hash = config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET;
+    // privkey*DH_key
     hash.append((const char*) derivation.bytes, sizeof(rct::key));
-    char* end = hash.data() + hash.size();
+    // enote_index
+    char converted_index[(sizeof(size_t) * 8 + 6) / 7];
+    char* end = converted_index;
     tools::write_varint(end, enote_index);
-    assert(end <= hash.data() + hash.size() + ((sizeof(std::size_t) * 8 + 6) / 7));
+    assert(end <= converted_index + sizeof(converted_index));
+    hash.append(converted_index, end - converted_index);
 
     // q_t
     //TODO: is this inefficient use of hash_to_scalar? e.g. ringct has various seemingly optimized calls into keccak()
-    crypto::hash_to_scalar(hash.data(), end - hash.data(), sender_receiver_secret_out);
-
-    // clear the DH key
-    hash.wipe();
+    crypto::hash_to_scalar(hash.data(), hash.size(), sender_receiver_secret_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_sender_address_extension(const crypto::secret_key &sender_receiver_secret,

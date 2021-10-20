@@ -31,6 +31,7 @@
 #include "mock_tx/mock_tx.h"
 #include "mock_tx/mock_rct_clsag.h"
 #include "mock_tx/mock_rct_triptych.h"
+#include "mock_tx/mock_sp_tx_concise.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
@@ -46,12 +47,6 @@ enum class TestType
 {
   ExpectTrue,
   ExpectAnyThrow
-};
-
-enum class TxType
-{
-  CLSAG,
-  Triptych
 };
 
 struct MockTxGenData
@@ -532,4 +527,202 @@ TEST(mock_tx_batching, triptych)
   /// run tests
   run_mock_tx_test_batch<mock_tx::MockTxTriptych>(gen_data);
   run_mock_tx_test_batch<mock_tx::MockTxTriptych>(gen_data_split);
+}
+
+/////////////////////////////////////////////////////////////////////
+///////////////////////// Seraphis Concise //////////////////////////
+/////////////////////////////////////////////////////////////////////
+
+TEST(mock_tx, seraphis_concise)
+{
+  /// success cases
+  std::vector<MockTxGenData> gen_data;
+  gen_data.reserve(20);
+
+  // 1-in/1-out
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.input_amounts.push_back(1);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+  // 1-in/2-out
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.input_amounts.push_back(2);
+    temp.output_amounts.push_back(1);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+  // 2-in/1-out
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.input_amounts.push_back(1);
+    temp.input_amounts.push_back(1);
+    temp.output_amounts.push_back(2);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+  // 16-in/16-out; ref set 8
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(1);
+      temp.output_amounts.push_back(1);
+    }
+
+    gen_data.push_back(temp);
+  }
+
+  // 16-in/16-out; ref set 27
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 3;
+    temp.ref_set_decomp_m = 3;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(1);
+      temp.output_amounts.push_back(1);
+    }
+
+    gen_data.push_back(temp);
+  }
+
+  // 16-in/16-out; ref set 64
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 4;
+    temp.ref_set_decomp_m = 3;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(1);
+      temp.output_amounts.push_back(1);
+    }
+
+    gen_data.push_back(temp);
+  }
+
+  // 16-in/16-out + amounts 0
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectTrue;
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+    for (std::size_t i{0}; i < 16; ++i)
+    {
+      temp.input_amounts.push_back(0);
+      temp.output_amounts.push_back(0);
+    }
+
+    gen_data.push_back(temp);
+  }
+
+  /// failure cases
+
+  // no inputs
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.output_amounts.push_back(0);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+  // no outputs
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.input_amounts.push_back(0);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+  // no ref set size
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.input_amounts.push_back(1);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 0;
+
+    gen_data.push_back(temp);
+  }
+
+  // amounts don't balance
+  {
+    MockTxGenData temp;
+    temp.expected_result = TestType::ExpectAnyThrow;
+    temp.input_amounts.push_back(2);
+    temp.output_amounts.push_back(1);
+    temp.ref_set_decomp_n = 2;
+    temp.ref_set_decomp_m = 3;
+
+    gen_data.push_back(temp);
+  }
+
+
+  /// run tests
+  run_mock_tx_test<mock_tx::MockTxSpConcise>(gen_data);
+}
+
+TEST(mock_tx_batching, seraphis_concise)
+{
+  /// a batch of 3 tx
+  std::vector<MockTxGenData> gen_data;
+  gen_data.resize(3);
+
+  for (auto &gen : gen_data)
+  {
+    gen.input_amounts.push_back(2);
+    gen.input_amounts.push_back(1);
+    gen.output_amounts.push_back(2);
+    gen.output_amounts.push_back(1);
+    gen.ref_set_decomp_n = 2;
+    gen.ref_set_decomp_m = 3;
+  }
+
+  /// 3 tx, 11 inputs/outputs each, range proofs split x3
+  std::vector<MockTxGenData> gen_data_split;
+  gen_data_split.resize(3);
+
+  for (auto &gen : gen_data_split)
+  {
+    for (int i{0}; i < 11; ++i)
+    {
+      gen.input_amounts.push_back(2);
+      gen.output_amounts.push_back(2);
+    }
+
+    gen.ref_set_decomp_n = 2;
+    gen.ref_set_decomp_m = 3;
+    gen.num_rangeproof_splits = 3;
+  }
+
+  /// run tests
+  run_mock_tx_test_batch<mock_tx::MockTxSpConcise>(gen_data);
+  run_mock_tx_test_batch<mock_tx::MockTxSpConcise>(gen_data_split);
 }

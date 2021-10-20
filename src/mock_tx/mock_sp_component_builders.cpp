@@ -49,13 +49,13 @@ extern "C"
 #include "ringct/rctTypes.h"
 #include "seraphis_composition_proof.h"
 #include "seraphis_crypto_utils.h"
-#include "wipeable_string.h"
 
 //third party headers
 
 //standard headers
 #include <algorithm>
 #include <memory>
+#include <string>
 #include <vector>
 
 
@@ -84,18 +84,23 @@ static void get_last_sp_image_amount_blinding_factor_v1(
 rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &enote_ledger_indices)
 {
     rct::key hash_result;
-    epee::wipeable_string hash;
+    std::string hash;
     hash.reserve(sizeof(CRYPTONOTE_NAME) + enote_ledger_indices.size()*((sizeof(std::size_t) * 8 + 6) / 7));
+    // project name
     hash = CRYPTONOTE_NAME;
-    char* end = hash.data() + hash.size();
+    // all referenced enote ledger indices
+    char converted_index[(sizeof(size_t) * 8 + 6) / 7];
+    char* end;
     for (const std::size_t index : enote_ledger_indices)
     {
         // TODO: append real ledger references
+        end = converted_index;
         tools::write_varint(end, index);
-        assert(end <= hash.data() + hash.size() + ((sizeof(std::size_t) * 8 + 6) / 7));
+        assert(end <= converted_index + sizeof(converted_index));
+        hash.append(converted_index, end - converted_index);
     }
 
-    rct::hash_to_scalar(hash_result, hash.data(), end - hash.data());
+    rct::hash_to_scalar(hash_result, hash.data(), hash.size());
 
     return hash_result;
 }
@@ -281,7 +286,7 @@ void make_v1_tx_image_last_sp_v1(const MockInputSpV1 &input_to_spend,
 
     // t_k
     while (image_amount_mask_out == rct::rct2sk(rct::zero()))
-            image_amount_mask_out = rct::rct2sk(rct::skGen());
+        image_amount_mask_out = rct::rct2sk(rct::skGen());
 
     // get total blinding factor of last input image masked amount commitment
     // v_c = t_c + x
@@ -437,7 +442,7 @@ void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &mem
     rct::keyM referenced_enotes;
     referenced_enotes.resize(ref_set_size, rct::keyV(2));
 
-    for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ ref_index)
+    for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
     {
         referenced_enotes[ref_index][0] = membership_ref_set.m_referenced_enotes[ref_index].m_onetime_address;
         referenced_enotes[ref_index][1] = membership_ref_set.m_referenced_enotes[ref_index].m_amount_commitment;
