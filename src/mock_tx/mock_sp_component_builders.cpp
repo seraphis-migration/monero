@@ -117,7 +117,7 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
         output_enotes.size()*MockENoteSpV1::get_size_bytes() +
         balance_proof->get_size_bytes() +
         tx_supplement.m_output_enote_pubkeys.size());
-    hash += CRYPTONOTE_NAME;
+    hash = CRYPTONOTE_NAME;
     hash += version_string;
     for (const auto &output_enote : output_enotes)
     {
@@ -285,8 +285,8 @@ void make_v1_tx_image_last_sp_v1(const MockInputSpV1 &input_to_spend,
     image_amount_mask_out = rct::rct2sk(rct::zero());
 
     // t_k
-    while (image_amount_mask_out == rct::rct2sk(rct::zero()))
-        image_amount_mask_out = rct::rct2sk(rct::skGen());
+    while (image_address_mask_out == rct::rct2sk(rct::zero()))
+        image_address_mask_out = rct::rct2sk(rct::skGen());
 
     // get total blinding factor of last input image masked amount commitment
     // v_c = t_c + x
@@ -296,12 +296,12 @@ void make_v1_tx_image_last_sp_v1(const MockInputSpV1 &input_to_spend,
         last_image_amount_blinding_factor);
 
     // t_c = v_c - x
-    sc_sub(&image_address_mask_out,
+    sc_sub(&image_amount_mask_out,
         &last_image_amount_blinding_factor,  // v_c
         &input_to_spend.m_amount_blinding_factor);  // x
 
     // enote image
-    input_to_spend.to_enote_image_base(image_amount_mask_out, image_address_mask_out, input_image_out);
+    input_to_spend.to_enote_image_base(image_address_mask_out, image_amount_mask_out, input_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_images_sp_v1(const std::vector<MockInputSpV1> &inputs_to_spend,
