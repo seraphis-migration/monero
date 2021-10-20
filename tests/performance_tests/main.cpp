@@ -148,10 +148,11 @@ int main(int argc, char** argv)
     if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
     {
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConcise);
     }
   }
 
-
+  /*
 
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpSub, 1, 1);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 1, 1);
@@ -206,7 +207,7 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE5(filter, p, test_concise_grootle, 3, 4, 2, 2, 1);
   TEST_PERFORMANCE5(filter, p, test_concise_grootle, 3, 5, 2, 2, 1);
 
-  /*
+
 
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 1, false);
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 2, false);
@@ -346,6 +347,7 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE1(filter, p, test_range_proof, false);
   */
 
+  /*
   // 16 amounts
   // 1 proof - 16 amounts
   TEST_PERFORMANCE2(filter, p, test_bulletproof_plus, true, 16);
@@ -420,7 +422,8 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, false, 2, 1, 1, 0, 64);
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 2, 1, 1, 0, 64); // 64 proof, each with 2 amounts
 
-  /*
+
+
   TEST_PERFORMANCE1(filter, p, test_crypto_ops, op_sc_add);
   TEST_PERFORMANCE1(filter, p, test_crypto_ops, op_sc_sub);
   TEST_PERFORMANCE1(filter, p, test_crypto_ops, op_sc_mul);
