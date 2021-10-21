@@ -536,12 +536,12 @@ SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const std::v
     proposal.message = message;
 
     rct::key dummy;
-    generate_proof_alpha(rct::G, proposal.signature_opening_K_t2, dummy);
+    generate_proof_alpha(rct::G, proposal.signature_nonce_K_t2, dummy);
 
-    proposal.signature_openings_K_t1.resize(num_keys);
+    proposal.signature_nonces_K_t1.resize(num_keys);
     for (std::size_t i{0}; i < num_keys; ++i)
     {
-        generate_proof_alpha(K[i], proposal.signature_openings_K_t1[i], dummy);
+        generate_proof_alpha(K[i], proposal.signature_nonces_K_t1[i], dummy);
     }
 
     return proposal;
@@ -554,13 +554,13 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init()
     // alpha_{b,1,e}*U
     // store with (1/8)
     rct::key U{get_U_gen()};
-    generate_proof_alpha(U, prep.signature_opening_1_KI_priv, prep.signature_opening_1_KI_pub);
-    rct::scalarmultKey(prep.signature_opening_1_KI_pub, prep.signature_opening_1_KI_pub, rct::INV_EIGHT);
+    generate_proof_alpha(U, prep.signature_nonce_1_KI_priv, prep.signature_nonce_1_KI_pub);
+    rct::scalarmultKey(prep.signature_nonce_1_KI_pub, prep.signature_nonce_1_KI_pub, rct::INV_EIGHT);
 
     // alpha_{b,2,e}*U
     // store with (1/8)
-    generate_proof_alpha(U, prep.signature_opening_2_KI_priv, prep.signature_opening_2_KI_pub);
-    rct::scalarmultKey(prep.signature_opening_2_KI_pub, prep.signature_opening_2_KI_pub, rct::INV_EIGHT);
+    generate_proof_alpha(U, prep.signature_nonce_2_KI_priv, prep.signature_nonce_2_KI_pub);
+    rct::scalarmultKey(prep.signature_nonce_2_KI_pub, prep.signature_nonce_2_KI_pub, rct::INV_EIGHT);
 
     return prep;
 }
@@ -569,18 +569,18 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     const std::vector<crypto::secret_key> &x,
     const std::vector<crypto::secret_key> &y,
     const std::vector<crypto::secret_key> &z_e,
-    const rct::keyV &signer_openings_1,
-    const rct::keyV &signer_openings_2,
-    const crypto::secret_key &local_opening_1_priv,
-    const crypto::secret_key &local_opening_2_priv)
+    const rct::keyV &signer_nonces_pub_1,
+    const rct::keyV &signer_nonces_pub_2,
+    const crypto::secret_key &local_nonce_1_priv,
+    const crypto::secret_key &local_nonce_2_priv)
 {
     /// input checks and initialization
     const std::size_t num_keys{proposal.K.size()};
-    const std::size_t num_signers{signer_openings_1.size()};
+    const std::size_t num_signers{signer_nonces_pub_1.size()};
 
     CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Not enough keys to make a proof!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == proposal.KI.size(), "Input key sets not the same size (K ?= KI)!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == proposal.signature_openings_K_t1.size(), "Input key sets not the same size (K ?= KI)!");
+    CHECK_AND_ASSERT_THROW_MES(num_keys == proposal.signature_nonces_K_t1.size(), "Input key sets not the same size (K ?= KI)!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == x.size(), "Input key sets not the same size (K ?= x)!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == y.size(), "Input key sets not the same size (K ?= y)!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == z_e.size(), "Input key sets not the same size (K ?= z)!");
@@ -599,68 +599,68 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     }
 
     // prepare participant nonces
-    rct::keyV signer_openings_1_mul8;
-    rct::keyV signer_openings_2_mul8;
-    signer_openings_1_mul8.reserve(num_signers);
-    signer_openings_2_mul8.reserve(num_signers);
+    rct::keyV signer_nonces_pub_1_mul8;
+    rct::keyV signer_nonces_pub_2_mul8;
+    signer_nonces_pub_1_mul8.reserve(num_signers);
+    signer_nonces_pub_2_mul8.reserve(num_signers);
 
     for (std::size_t e{0}; e < num_signers; ++e)
     {
-        signer_openings_1_mul8.emplace_back(rct::scalarmult8(signer_openings_1[e]));
-        signer_openings_2_mul8.emplace_back(rct::scalarmult8(signer_openings_2[e]));
-        CHECK_AND_ASSERT_THROW_MES(!(signer_openings_1_mul8.back() == rct::identity()), "Bad signer nonce (alpha_1 identity)!");
-        CHECK_AND_ASSERT_THROW_MES(!(signer_openings_2_mul8.back() == rct::identity()), "Bad signer nonce (alpha_2 identity)!");
+        signer_nonces_pub_1_mul8.emplace_back(rct::scalarmult8(signer_nonces_pub_1[e]));
+        signer_nonces_pub_2_mul8.emplace_back(rct::scalarmult8(signer_nonces_pub_2[e]));
+        CHECK_AND_ASSERT_THROW_MES(!(signer_nonces_pub_1_mul8.back() == rct::identity()), "Bad signer nonce (alpha_1 identity)!");
+        CHECK_AND_ASSERT_THROW_MES(!(signer_nonces_pub_2_mul8.back() == rct::identity()), "Bad signer nonce (alpha_2 identity)!");
     }
 
-    // sort participant nonces so results are deterministic
-    std::vector<std::size_t> signer_openings_original_indices;
-    signer_openings_original_indices.resize(num_signers);
+    // sort participant nonces so binonce merge factor is deterministic
+    std::vector<std::size_t> signer_nonces_pub_original_indices;
+    signer_nonces_pub_original_indices.resize(num_signers);
 
     for (std::size_t e{0}; e < num_signers; ++e)
     {
-        signer_openings_original_indices[e] = e;
+        signer_nonces_pub_original_indices[e] = e;
     }
 
-    std::sort(signer_openings_original_indices.begin(), signer_openings_original_indices.end(),
-            [&signer_openings_1_mul8](const std::size_t &index_1, const std::size_t &index_2) -> bool
+    std::sort(signer_nonces_pub_original_indices.begin(), signer_nonces_pub_original_indices.end(),
+            [&signer_nonces_pub_1_mul8](const std::size_t &index_1, const std::size_t &index_2) -> bool
             {
-                return memcmp(signer_openings_1_mul8[index_1].bytes, signer_openings_1_mul8[index_2].bytes,
+                return memcmp(signer_nonces_pub_1_mul8[index_1].bytes, signer_nonces_pub_1_mul8[index_2].bytes,
                     sizeof(rct::key)) < 0;
             }
         );
 
-    rct::keyV signer_openings_1_mul8_temp{std::move(signer_openings_1_mul8)};
-    rct::keyV signer_openings_2_mul8_temp{std::move(signer_openings_2_mul8)};
-    signer_openings_1_mul8.clear();
-    signer_openings_2_mul8.clear();
-    signer_openings_1_mul8.reserve(num_signers);
-    signer_openings_2_mul8.reserve(num_signers);
+    rct::keyV signer_nonces_pub_1_mul8_temp{std::move(signer_nonces_pub_1_mul8)};
+    rct::keyV signer_nonces_pub_2_mul8_temp{std::move(signer_nonces_pub_2_mul8)};
+    signer_nonces_pub_1_mul8.clear();
+    signer_nonces_pub_2_mul8.clear();
+    signer_nonces_pub_1_mul8.reserve(num_signers);
+    signer_nonces_pub_2_mul8.reserve(num_signers);
 
     for (std::size_t e{0}; e < num_signers; ++e)
     {
-        signer_openings_1_mul8.emplace_back(signer_openings_1_mul8_temp[signer_openings_original_indices[e]]);
-        signer_openings_2_mul8.emplace_back(signer_openings_2_mul8_temp[signer_openings_original_indices[e]]);
+        signer_nonces_pub_1_mul8.emplace_back(signer_nonces_pub_1_mul8_temp[signer_nonces_pub_original_indices[e]]);
+        signer_nonces_pub_2_mul8.emplace_back(signer_nonces_pub_2_mul8_temp[signer_nonces_pub_original_indices[e]]);
     }
 
     const rct::key U_gen{get_U_gen()};
 
     // check that the local signer's signature opening is in the input set of opening nonces
-    bool found_local_opening{false};
-    rct::key local_opening_1_pub;
-    rct::key local_opening_2_pub;
-    rct::scalarmultKey(local_opening_1_pub, U_gen, rct::sk2rct(local_opening_1_priv));
-    rct::scalarmultKey(local_opening_2_pub, U_gen, rct::sk2rct(local_opening_2_priv));
+    bool found_local_nonce{false};
+    rct::key local_nonce_1_pub;
+    rct::key local_nonce_2_pub;
+    rct::scalarmultKey(local_nonce_1_pub, U_gen, rct::sk2rct(local_nonce_1_priv));
+    rct::scalarmultKey(local_nonce_2_pub, U_gen, rct::sk2rct(local_nonce_2_priv));
 
     for (std::size_t e{0}; e < num_signers; ++e)
     {
-        if (local_opening_1_pub == signer_openings_1_mul8[e] &&
-            local_opening_2_pub == signer_openings_2_mul8[e])
+        if (local_nonce_1_pub == signer_nonces_pub_1_mul8[e] &&
+            local_nonce_2_pub == signer_nonces_pub_2_mul8[e])
         {
-            found_local_opening = true;
+            found_local_nonce = true;
             break;
         }
     }
-    CHECK_AND_ASSERT_THROW_MES(found_local_opening, "Local signer's opening nonces not in input set!");
+    CHECK_AND_ASSERT_THROW_MES(found_local_nonce, "Local signer's opening nonces not in input set!");
 
 
     /// prepare partial signature
@@ -691,24 +691,24 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     rct::key m = compute_challenge_message(mu_b, partial_sig.K);
 
     rct::key binonce_merge_factor;  // rho
-    multisig_binonce_merge_factor(m, signer_openings_1_mul8, signer_openings_2_mul8, binonce_merge_factor);
+    multisig_binonce_merge_factor(m, signer_nonces_pub_1_mul8, signer_nonces_pub_2_mul8, binonce_merge_factor);
 
 
     /// signature openers
 
     // alpha_a * G
     rct::key alpha_a_pub;
-    rct::scalarmultKey(alpha_a_pub, rct::G, proposal.signature_opening_K_t2);
+    rct::scalarmultKey(alpha_a_pub, rct::G, proposal.signature_nonce_K_t2);
 
     // alpha_b * U
     // - MuSig2-style merged nonces from all multisig participants
 
     // alpha_b_1 = sum(alpha_b_1_e * U)
-    rct::key alpha_b_pub{rct::addKeys(signer_openings_1_mul8)};
+    rct::key alpha_b_pub{rct::addKeys(signer_nonces_pub_1_mul8)};
 
     // alpha_b_2 * U = rho * sum(alpha_b_2_e * U)
     // rho = H(m, {alpha_b_1_e * U}, {alpha_b_2_e * U})
-    rct::key alpha_b_2_pub{rct::addKeys(signer_openings_2_mul8)};
+    rct::key alpha_b_2_pub{rct::addKeys(signer_nonces_pub_2_mul8)};
     rct::scalarmultKey(alpha_b_2_pub, alpha_b_2_pub, binonce_merge_factor);
 
     // alpha_b * U = alpha_b_1 + alpha_b_2
@@ -720,7 +720,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
     for (std::size_t i{0}; i < num_keys; ++i)
     {
-        rct::scalarmultKey(alpha_i_pub[i], partial_sig.K[i], proposal.signature_openings_K_t1[i]);
+        rct::scalarmultKey(alpha_i_pub[i], partial_sig.K[i], proposal.signature_nonces_K_t1[i]);
     }
 
 
@@ -729,17 +729,17 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
 
     /// responses
-    crypto::secret_key merged_opening_KI_priv;  // alpha_1_local + rho * alpha_2_local
-    sc_muladd(&merged_opening_KI_priv, &local_opening_2_priv, binonce_merge_factor.bytes, &local_opening_1_priv);
+    crypto::secret_key merged_nonce_KI_priv;  // alpha_1_local + rho * alpha_2_local
+    sc_muladd(&merged_nonce_KI_priv, &local_nonce_2_priv, binonce_merge_factor.bytes, &local_nonce_1_priv);
 
     compute_responses(x,
             y,
             z_e,  // for partial signature
             mu_a_pows,
             mu_b_pows,
-            proposal.signature_opening_K_t2,
-            rct::sk2rct(merged_opening_KI_priv),  // for partial signature
-            proposal.signature_openings_K_t1,
+            proposal.signature_nonce_K_t2,
+            rct::sk2rct(merged_nonce_KI_priv),  // for partial signature
+            proposal.signature_nonces_K_t1,
             partial_sig.c,
             partial_sig.r_a,
             partial_sig.r_b_partial,  // partial response

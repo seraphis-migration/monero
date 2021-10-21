@@ -119,31 +119,31 @@ struct SpCompositionProofMultisigProposal
     // message
     rct::key message;
 
-    // signature opening: alpha_{e,a}
-    rct::key signature_opening_K_t2;
-    // signature openings: alpha_{e,i}
-    rct::keyV signature_openings_K_t1;
+    // signature nonce: alpha_{e,a}
+    rct::key signature_nonce_K_t2;
+    // signature nonce: alpha_{e,i}
+    rct::keyV signature_nonces_K_t1;
 };
 
 ////
 // Multisig prep struct
-// - store multisig participant's FROST-style signature opening nonces for KI component
+// - store multisig participant's MuSig2-style signature opening nonces for KI component
 //   - multisig assumes only proof component KI is subject to multisig signing (keys z_i split between signers)
 //
 // WARNING: must only use a 'prep' to make ONE 'partial signature',
-//          after that the opening privkey should be deleted immediately
-// WARNING2: the privkey is for local storage, only the pubkey should be transmitted to other multisig participants
+//          after that the opening nonce privkeys should be deleted immediately
+// WARNING2: the nonce privkeys are for local storage, only the pubkeys should be transmitted to other multisig participants
 ///
 struct SpCompositionProofMultisigPrep
 {
-    // signature opening privkey: alpha_{b,1,e}
-    crypto::secret_key signature_opening_1_KI_priv;
-    // signature opening pubkey: alpha_{b,1,e}*U
-    rct::key signature_opening_1_KI_pub;
-    // signature opening privkey: alpha_{b,2,e}
-    crypto::secret_key signature_opening_2_KI_priv;
-    // signature opening pubkey: alpha_{b,2,e}*U
-    rct::key signature_opening_2_KI_pub;
+    // signature nonce privkey: alpha_{b,1,e}
+    crypto::secret_key signature_nonce_1_KI_priv;
+    // signature nonce pubkey: alpha_{b,1,e}*U
+    rct::key signature_nonce_1_KI_pub;
+    // signature nonce privkey: alpha_{b,2,e}
+    crypto::secret_key signature_nonce_2_KI_priv;
+    // signature nonce pubkey: alpha_{b,2,e}*U
+    rct::key signature_nonce_2_KI_pub;
 };
 
 ////
@@ -233,20 +233,20 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init();
 * param: x - secret keys (x_i)
 * param: y - secret keys (y_i)
 * param: z_e - secret keys of multisig signer (z_{e,i})
-* param: signer_openings_1 - signature opening pubkeys alpha_{b,1,e}*U from all signers (including local signer)
-* param: signer_openings_2 - signature opening pubkeys alpha_{b,2,e}*U from all signers (including local signer)
-* param: local_opening_1_priv - alpha_{b,1,e} for local signer
-* param: local_opening_2_priv - alpha_{b,2,e} for local signer
+* param: signer_nonces_pub_1 - signature nonce pubkeys alpha_{b,1,e}*U from all signers (including local signer)
+* param: signer_nonces_pub_2 - signature nonce pubkeys alpha_{b,2,e}*U from all signers (including local signer)
+* param: local_nonce_1_priv - alpha_{b,1,e} for local signer
+* param: local_nonce_2_priv - alpha_{b,2,e} for local signer
 * return: partially signed Seraphis composition proof
 */
 SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCompositionProofMultisigProposal &proposal,
     const std::vector<crypto::secret_key> &x,
     const std::vector<crypto::secret_key> &y,
     const std::vector<crypto::secret_key> &z_e,
-    const rct::keyV &signer_openings_1,
-    const rct::keyV &signer_openings_2,
-    const crypto::secret_key &local_opening_1_priv,
-    const crypto::secret_key &local_opening_2_priv);
+    const rct::keyV &signer_nonces_pub_1,
+    const rct::keyV &signer_nonces_pub_2,
+    const crypto::secret_key &local_nonce_1_priv,
+    const crypto::secret_key &local_nonce_2_priv);
 /**
 * brief: sp_composition_prove_multisig_final - create a Seraphis composition proof from multisig partial signatures
 * param: partial_sigs - partial signatures from enough multisig participants to complete a full proof
