@@ -107,7 +107,7 @@ struct SpCompositionProof
 // Multisig signature proposal
 // - all parts required to make signature, other than the (KI component) split between multisig participants
 //
-// WARNING: must only use a 'proposal' to make ONE 'signature',
+// WARNING: must only use a 'proposal' to make ONE 'signature' (or signature attempt),
 //          after that the opening privkeys should be deleted immediately
 ///
 struct SpCompositionProofMultisigProposal
