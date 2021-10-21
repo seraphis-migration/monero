@@ -206,6 +206,7 @@ struct MockSupplementSpV1 final
     rct::keyV m_output_enote_pubkeys;
     /// tx memo: none in mockup
     /// fee: none in mockup
+    /// encoded payment ID: none in mockup
 
     std::size_t get_size_bytes() const;
 };

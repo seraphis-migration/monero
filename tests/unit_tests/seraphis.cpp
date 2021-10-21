@@ -370,6 +370,36 @@ TEST(seraphis, composition_proof_multisig)
 
                 // verify tx
                 EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
+
+
+                /// test: rearranging nonces between signers makes a valid proof
+
+                // all participants: respond
+                for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
+                {
+                    if (signer_index == 1)
+                    {
+                        std::swap(signer_openers_1_pubs[0], signer_openers_1_pubs[1]);
+                        std::swap(signer_openers_2_pubs[0], signer_openers_2_pubs[1]);
+                    }
+
+                    partial_sigs[signer_index] = sp::sp_composition_multisig_partial_sig(
+                            proposal,
+                            x,
+                            y,
+                            z_pieces[signer_index],
+                            signer_openers_1_pubs,
+                            signer_openers_2_pubs,
+                            signer_preps[signer_index].signature_opening_1_KI_priv,
+                            signer_preps[signer_index].signature_opening_2_KI_priv
+                        );
+                }
+
+                // assemble tx again
+                proof = sp::sp_composition_prove_multisig_final(partial_sigs);
+
+                // verify tx again
+                EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
             }
             catch (...)
             {

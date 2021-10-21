@@ -46,7 +46,7 @@
 //
 // multisig notation: alpha_{b,n,e}
 // - b: indicates which part of the proof this is for
-// - n: for FROST-style bi-nonce signing, alpha_{b,1,e} is nonce 'D', alpha_{b,2,e} is nonce 'E' (in their notation)
+// - n: for MuSig2-style bi-nonce signing, alpha_{b,1,e} is nonce 'D', alpha_{b,2,e} is nonce 'E' (in their notation)
 // - e: multisig signer index
 //
 // References:
@@ -54,6 +54,7 @@
 // - Triptych (Sarang Noether): https://eprint.iacr.org/2020/018
 //
 // Multisig references:
+// - MuSig2 (Nick): https://eprint.iacr.org/2020/1261
 // - FROST (Komlo): https://eprint.iacr.org/2020/852.pdf
 // - Multisig/threshold security (Crites): https://eprint.iacr.org/2021/1375.pdf
 // - MRL-0009 (Brandon Goodell and Sarang Noether): https://web.getmonero.org/resources/research-lab/pubs/MRL-0009.pdf
