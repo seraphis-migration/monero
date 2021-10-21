@@ -259,11 +259,12 @@ static void compute_K_t1_for_proof(const crypto::secret_key &y_i,
 // MuSig2--style bi-nonce signing merge factor
 // rho_e = H("domain-sep", m, alpha_1_1, ..., alpha_1_N, alpha_2_1, ..., alpha_2_N)
 //-------------------------------------------------------------------------------------------------------------------
-static void multisig_binonce_merge_factor(const rct::key &message,
+static rct::key multisig_binonce_merge_factor(const rct::key &message,
     const rct::keyV &nonces_1,
-    const rct::keyV &nonces_2,
-    rct::key &merge_factor_out)
+    const rct::keyV &nonces_2)
 {
+    rct::key merge_factor;
+
     // build hash
     std::string hash;
     hash.reserve(sizeof(config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR) + 1 + nonces_1.size() + nonces_2.size());
@@ -278,7 +279,9 @@ static void multisig_binonce_merge_factor(const rct::key &message,
         hash.append((const char*) nonce_2.bytes, sizeof(rct::key));
     }
 
-    rct::hash_to_scalar(merge_factor_out, hash.data(), hash.size());
+    rct::hash_to_scalar(merge_factor, hash.data(), hash.size());
+
+    return merge_factor;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -682,16 +685,15 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
 
     /// challenge message and aggregation coefficients
-    rct::key mu_a = compute_base_aggregation_coefficient_a(partial_sig.message, partial_sig.K_t1, partial_sig.KI);
-    rct::keyV mu_a_pows = powers_of_scalar(mu_a, num_keys);
+    rct::key mu_a{compute_base_aggregation_coefficient_a(partial_sig.message, partial_sig.K_t1, partial_sig.KI)};
+    rct::keyV mu_a_pows{powers_of_scalar(mu_a, num_keys)};
 
-    rct::key mu_b = compute_base_aggregation_coefficient_b(mu_a);
-    rct::keyV mu_b_pows = powers_of_scalar(mu_b, num_keys);
+    rct::key mu_b{compute_base_aggregation_coefficient_b(mu_a)};
+    rct::keyV mu_b_pows{powers_of_scalar(mu_b, num_keys)};
 
-    rct::key m = compute_challenge_message(mu_b, partial_sig.K);
+    rct::key m{compute_challenge_message(mu_b, partial_sig.K)};
 
-    rct::key binonce_merge_factor;  // rho
-    multisig_binonce_merge_factor(m, signer_nonces_pub_1_mul8, signer_nonces_pub_2_mul8, binonce_merge_factor);
+    rct::key binonce_merge_factor{multisig_binonce_merge_factor(m, signer_nonces_pub_1_mul8, signer_nonces_pub_2_mul8)};
 
 
     /// signature openers
