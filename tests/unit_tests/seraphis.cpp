@@ -32,7 +32,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "mock_tx/mock_sp_component_types.h"
-#include "mock_tx/mock_sp_core.h"
+#include "mock_tx/mock_sp_core_utils.h"
 #include "mock_tx/mock_tx_utils.h"
 #include "mock_tx/seraphis_composition_proof.h"
 #include "mock_tx/seraphis_crypto_utils.h"
