@@ -34,7 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "mock_ledger_context.h"
-#include "mock_sp_base.h"
+#include "mock_sp_base_types.h"
 #include "mock_sp_component_types.h"
 #include "ringct/rctTypes.h"
 

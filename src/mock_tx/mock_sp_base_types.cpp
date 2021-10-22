@@ -29,12 +29,12 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_sp_base.h"
+#include "mock_sp_base_types.h"
 
 //local headers
 #include "crypto/crypto.h"
 #include "misc_log_ex.h"
-#include "mock_sp_core.h"
+#include "mock_sp_core_utils.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_crypto_utils.h"

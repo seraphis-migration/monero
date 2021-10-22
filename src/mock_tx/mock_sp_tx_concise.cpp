@@ -35,7 +35,7 @@
 #include "ledger_context.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
-#include "mock_sp_base.h"
+#include "mock_sp_base_types.h"
 #include "mock_sp_component_builders.h"
 #include "mock_sp_component_types.h"
 #include "mock_sp_validators.h"
@@ -242,12 +242,12 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
         params.max_rangeproof_splits,
         balance_proof);
     rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, balance_proof, tx_supplement)};
-    make_v1_tx_image_proofs_sp_v1(inputs_to_spend, //internally: make proofs one at a time
+    make_v1_tx_image_proofs_sp_v1(inputs_to_spend,
         input_images,
         image_address_masks,
         image_proofs_message,
         tx_image_proofs);
-    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, //internally: make proofs one at a time
+    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets,
         image_address_masks,
         image_amount_masks,
         tx_membership_proofs);

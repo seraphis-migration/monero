@@ -40,7 +40,7 @@ extern "C"
 }
 #include "cryptonote_config.h"
 #include "misc_log_ex.h"
-#include "mock_sp_core.h"
+#include "mock_sp_core_utils.h"
 #include "mock_tx_utils.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"

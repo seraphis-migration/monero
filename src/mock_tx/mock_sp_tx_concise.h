@@ -36,7 +36,7 @@
 #include "crypto/crypto.h"
 #include "misc_log_ex.h"
 #include "mock_tx.h"
-#include "mock_sp_base.h"
+#include "mock_sp_base_types.h"
 #include "mock_sp_component_types.h"
 #include "ringct/rctTypes.h"
 
@@ -53,48 +53,52 @@
 namespace mock_tx
 {
 #if 0
+// destinations
+
 ////
-// Tx proposal: outputs and memos
+// Tx proposal: outputs and memos (set of destinations)
+// - need to cache output amount blinding factors separately (for balance proof)
 ///
 class MockTxProposalSpV1 final
 {
     /// hash of proposal
-    std::string get_proposal_prefix();
+    std::string get_proposal_prefix();  // composition proof msg
+    get_outputs();
+    get_tx_supplement();
 };
+
+// input proposals
 
 ////
 // Partial tx input
 // - input spent
-// - cached blinding factors
-// - composition proof
+// - cached amount and amount blinding factor, image masks
+// - composition proof for input
 // - proposal prefix (composition proof msg) [for consistency checks when handling this struct]
+//
+// - make last input: sets amount commitment mask to satisfy balance proof (caller should determine amount to satisfy fee)
 ///
-class MockTxInputPartialSpV1 final //need InputSetPartial for merged composition proofs
+class MockTxInputPartialSpV1 final //needs to be InputSetPartial for merged composition proofs
 {
     vec<InputImage> get_input_images();
 };
 
-////
-// Multisig tx proposal
-// - outputs and memos
-// - some/all inputs + cached blinding factors
-// - multisig composition proof proposal(s) for input images
-// - proposer's multisig openers (pubkeys only)
-///
-class MockTxMultisigProposalSpV1 final
-{
-    MockTxProposalSpV1 core_proposal;
-};
+// make balance proof from proposal and partial inputs
 
 ////
-// Partial tx: no membership proof
+// Partial tx: no membership proofs
+// - from multisig: multisigproposal.txproposal, multisig inputs + extra inputs, balance proof
 ///
 class MockTxPartialSpV1 final
 {
     MockTxPartialSpV1(MockTxProposalSpV1 &proposal, vec<MockTxInputPartialSpV1> &inputs, BalanceProof);
-    MockTxPartialSpV1(MockTxMultisigProposalSpV1 &proposal, vec<MockTxInputPartialSpV1> &extra_inputs, BalanceProof);
 };
+
+// complete membership proofs
+
+// assemble full tx
 #endif
+
 ////
 // Complete tx
 ///

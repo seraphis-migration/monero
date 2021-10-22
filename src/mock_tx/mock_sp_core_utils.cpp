@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_sp_core.h"
+#include "mock_sp_core_utils.h"
 
 //local headers
 #include "common/varint.h"
