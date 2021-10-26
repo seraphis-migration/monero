@@ -38,6 +38,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
+#include "device/device.hpp"
 #include "misc_log_ex.h"
 #include "mock_tx_utils.h"
 #include "ringct/rctOps.h"
@@ -125,11 +126,12 @@ void make_seraphis_enote_pubkey(const crypto::secret_key &enote_privkey, const r
 void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     const rct::key &DH_key,
     const std::size_t enote_index,
+    hw::device &hwdev,
     crypto::secret_key &sender_receiver_secret_out)
 {
     // q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, enote_index)
-    rct::key derivation;
-    rct::scalarmultKey(derivation, DH_key, rct::sk2rct(privkey));  // privkey * DH_key
+    crypto::key_derivation derivation;
+    hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);  // privkey * DH_key
 
     epee::wipeable_string hash;
     hash.reserve(sizeof(config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET) + sizeof(rct::key) +
@@ -137,7 +139,7 @@ void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     // "domain-sep"
     hash = config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET;
     // privkey*DH_key
-    hash.append((const char*) derivation.bytes, sizeof(rct::key));
+    hash.append((const char*) &derivation, sizeof(rct::key));
     // enote_index
     char converted_index[(sizeof(size_t) * 8 + 6) / 7];
     char* end = converted_index;
@@ -161,11 +163,15 @@ void make_seraphis_sender_address_extension(const crypto::secret_key &sender_rec
 unsigned char make_seraphis_view_tag(const crypto::secret_key &sender_receiver_secret)
 {
     // tag_t = H("domain-sep", q_t)
-    crypto::secret_key hash_result;
-    std::string salt(config::HASH_KEY_SERAPHIS_VIEW_TAG);
-    sp::domain_separate_rct_hash(salt, rct::sk2rct(sender_receiver_secret), hash_result);
+    //crypto::secret_key hash_result;
+    //std::string salt(config::HASH_KEY_SERAPHIS_VIEW_TAG);
+    //sp::domain_separate_rct_hash(salt, rct::sk2rct(sender_receiver_secret), hash_result);
 
-    return static_cast<unsigned char>(hash_result.data[0]);
+    //return static_cast<unsigned char>(hash_result.data[0]);
+
+    // TODO: performance tests showed this is ~2.5% faster than hashing; is this acceptable?
+    return static_cast<unsigned char>(sender_receiver_secret.data[0]) ^
+        static_cast<unsigned char>(sender_receiver_secret.data[1]);
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receiver_secret, const rct::xmr_amount original)

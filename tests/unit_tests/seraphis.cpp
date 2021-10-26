@@ -31,6 +31,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "device/device.hpp"
 #include "mock_tx/mock_sp_component_types.h"
 #include "mock_tx/mock_sp_core_utils.h"
 #include "mock_tx/mock_tx_utils.h"
@@ -481,7 +482,11 @@ TEST(seraphis, enote_v1_information_recovery)
     rct::xmr_amount amount_recovered;
     crypto::secret_key sender_receiver_secret;
 
-    mock_tx::make_seraphis_sender_receiver_secret(recipient_view_privkey, enote_pubkey, enote_index, sender_receiver_secret);
+    mock_tx::make_seraphis_sender_receiver_secret(recipient_view_privkey,
+        enote_pubkey,
+        enote_index,
+        hw::get_device("default"),
+        sender_receiver_secret);
 
     EXPECT_TRUE(mock_tx::try_get_seraphis_nominal_spend_key(sender_receiver_secret,
             enote.m_onetime_address,
