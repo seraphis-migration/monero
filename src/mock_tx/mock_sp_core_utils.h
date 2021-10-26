@@ -38,6 +38,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "device/device.hpp"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -116,11 +117,13 @@ void make_seraphis_enote_pubkey(const crypto::secret_key &enote_privkey, const r
 * param: privkey - [sender: r_t] [recipient: k^{vr}]
 * param: DH_key - [sender: K^{vr}] [sender-change-2out: k^{vr}*K^{DH}_other] [recipient: R_t]
 * param: enote_index - t (index of the enote within its tx)
+* param: hwdev - abstract reference to a hardware-specific implemention of crypto ops
 * outparam: sender_receiver_secret_out - q_t
 */
 void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     const rct::key &DH_key,
     const std::size_t enote_index,
+    hw::device &hwdev,
     crypto::secret_key &sender_receiver_secret_out);
 /**
 * brief: make_seraphis_sender_address_extension - extension for transforming a recipient spendkey into an enote one-time address

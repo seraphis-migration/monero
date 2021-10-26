@@ -171,7 +171,11 @@ public:
     bool test()
     {
         crypto::secret_key sender_receiver_secret;
-        mock_tx::make_seraphis_sender_receiver_secret(m_recipient_view_privkey, m_enote_pubkey, 0, sender_receiver_secret);
+        mock_tx::make_seraphis_sender_receiver_secret(m_recipient_view_privkey,
+            m_enote_pubkey,
+            0,
+            hw::get_device("default"),
+            sender_receiver_secret);
 
         rct::key nominal_recipient_spendkey;
 

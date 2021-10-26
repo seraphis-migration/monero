@@ -33,6 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "device/device.hpp"
 #include "misc_log_ex.h"
 #include "mock_sp_base_types.h"
 #include "mock_sp_core_utils.h"
@@ -61,7 +62,11 @@ void MockENoteSpV1::make(const crypto::secret_key &enote_privkey,
 
     // r_t: sender-receiver shared secret
     crypto::secret_key sender_receiver_secret;
-    make_seraphis_sender_receiver_secret(enote_privkey, recipient_view_key, enote_index, sender_receiver_secret);
+    make_seraphis_sender_receiver_secret(enote_privkey,
+        recipient_view_key,
+        enote_index,
+        hw::get_device("default"),
+        sender_receiver_secret);
 
     // x_t: amount commitment mask (blinding factor)
     crypto::secret_key amount_mask;
@@ -133,7 +138,11 @@ void MockDestSpV1::get_amount_blinding_factor(const std::size_t enote_index, cry
 {
     // r_t: sender-receiver shared secret
     crypto::secret_key sender_receiver_secret;
-    make_seraphis_sender_receiver_secret(m_enote_privkey, m_recipient_viewkey, enote_index, sender_receiver_secret);
+    make_seraphis_sender_receiver_secret(m_enote_privkey,
+        m_recipient_viewkey,
+        enote_index,
+        hw::get_device("default"),
+        sender_receiver_secret);
 
     // x_t: amount commitment mask (blinding factor)
     make_seraphis_amount_commitment_mask(sender_receiver_secret, amount_blinding_factor);
