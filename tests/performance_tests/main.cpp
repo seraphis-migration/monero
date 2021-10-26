@@ -70,6 +70,7 @@
 #include "mock_tx.h"
 #include "grootle.h"
 #include "grootle_concise.h"
+#include "view_scan.h"
 
 namespace po = boost::program_options;
 
@@ -152,7 +153,7 @@ int main(int argc, char** argv)
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConcise);
     }
   }
-  */
+
 
   incrementer = {
       {1, 2, 4, 7, 11, 25}, //batch sizes
@@ -175,6 +176,17 @@ int main(int argc, char** argv)
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConcise);
     }
   }
+  */
+
+
+  TEST_PERFORMANCE0(filter, p, test_view_scan_cn);
+  TEST_PERFORMANCE0(filter, p, test_view_scan_cn_opt);
+
+  ParamsShuttleViewScan p_view_scan;
+  p_view_scan.core_params = p.core_params;
+  TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_sp);
+  p_view_scan.test_view_tag_check = true;
+  TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_sp);
 
   /*
 
