@@ -167,13 +167,25 @@ void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &p
 */
 void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &masked_key_out);
 /**
-* brief: domain_separate_rct_hash - hash a key, with domaind separation
+* brief: domain_separate_rct_hash - hash a key, with domain separation
 *   H("domain-sep", key)
 * param: domain_separator - domain separator
 * param: rct_key - rct key to hash with domain separator (can be privkey or pubkey)
 * outparam: hash_result_out - H("domain-sep", key)
 */
 void domain_separate_rct_hash(const std::string &domain_separator, const rct::key &rct_key, crypto::secret_key &hash_result_out);
+/**
+* brief: domain_separate_derivation_hash - hash a Diffie-Hellman derivation and index, with domain separation
+*   H("domain-sep", derivation, index)
+* param: domain_separator - domain separator
+* param: derivation - Diffie-Hellman derived key to hash
+* param: index - index to append to hash digest as varint
+* outparam: hash_result_out - H("domain-sep", derivation, index)
+*/
+void domain_separate_derivation_hash(const std::string &domain_separator,
+    const crypto::key_derivation &derivation,
+    const std::size_t index,
+    crypto::secret_key &hash_result_out);
 /**
 * brief: key_domain_is_prime_subgroup - check that input key is in prime order EC subgroup
 *   l*K ?= identity

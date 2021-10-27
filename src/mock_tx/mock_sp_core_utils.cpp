@@ -125,60 +125,81 @@ void make_seraphis_enote_pubkey(const crypto::secret_key &enote_privkey, const r
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     const rct::key &DH_key,
-    const std::size_t enote_index,
+    const std::size_t output_index,
     hw::device &hwdev,
     crypto::secret_key &sender_receiver_secret_out)
 {
-    // q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, enote_index)
+    // privkey * DH_key
     crypto::key_derivation derivation;
-    hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);  // privkey * DH_key
+    hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);
 
-    epee::wipeable_string hash;
-    hash.reserve(sizeof(config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET) + sizeof(rct::key) +
-        ((sizeof(std::size_t) * 8 + 6) / 7));
-    // "domain-sep"
-    hash = config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET;
-    // privkey*DH_key
-    hash.append((const char*) &derivation, sizeof(rct::key));
-    // enote_index
-    char converted_index[(sizeof(size_t) * 8 + 6) / 7];
-    char* end = converted_index;
-    tools::write_varint(end, enote_index);
-    assert(end <= converted_index + sizeof(converted_index));
-    hash.append(converted_index, end - converted_index);
+    // q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, output_index)
+    make_seraphis_sender_receiver_secret(derivation, output_index, sender_receiver_secret_out);
 
-    // q_t
-    //TODO: is this inefficient use of hash_to_scalar? e.g. ringct has various seemingly optimized calls into keccak()
-    crypto::hash_to_scalar(hash.data(), hash.size(), sender_receiver_secret_out);
+    memwipe(&derivation, sizeof(derivation));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_sender_receiver_secret(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const std::size_t output_index,
+    crypto::secret_key &sender_receiver_secret_out)
+{
+    static std::string salt{config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET};
+
+    // q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, output_index)
+    sp::domain_separate_derivation_hash(salt,
+        sender_receiver_DH_derivation,
+        output_index,
+        sender_receiver_secret_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_sender_address_extension(const crypto::secret_key &sender_receiver_secret,
     crypto::secret_key &sender_address_extension_out)
 {
+    static std::string salt{config::HASH_KEY_SERAPHIS_SENDER_ADDRESS_EXTENSION};
+
     // k_{a, sender} = H("domain-sep", q_t)
-    std::string salt(config::HASH_KEY_SERAPHIS_SENDER_ADDRESS_EXTENSION);
     sp::domain_separate_rct_hash(salt, rct::sk2rct(sender_receiver_secret), sender_address_extension_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-unsigned char make_seraphis_view_tag(const crypto::secret_key &sender_receiver_secret)
+unsigned char make_seraphis_view_tag(const crypto::secret_key &privkey,
+    const rct::key &DH_key,
+    const std::size_t output_index,
+    hw::device &hwdev)
 {
-    // tag_t = H("domain-sep", q_t)
-    //crypto::secret_key hash_result;
-    //std::string salt(config::HASH_KEY_SERAPHIS_VIEW_TAG);
-    //sp::domain_separate_rct_hash(salt, rct::sk2rct(sender_receiver_secret), hash_result);
+    // privkey * DH_key
+    crypto::key_derivation derivation;
+    hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);
 
-    //return static_cast<unsigned char>(hash_result.data[0]);
+    // tag_t = H("domain-sep", derivation, t)
+    unsigned char view_tag{make_seraphis_view_tag(derivation, output_index)};
 
-    // TODO: performance tests showed this is ~2.5% faster than hashing; is this acceptable?
-    return static_cast<unsigned char>(sender_receiver_secret.data[0]) ^
-        static_cast<unsigned char>(sender_receiver_secret.data[1]);
+    memwipe(&derivation, sizeof(derivation));
+
+    return view_tag;
+}
+//-------------------------------------------------------------------------------------------------------------------
+unsigned char make_seraphis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const std::size_t output_index)
+{
+    static std::string salt{config::HASH_KEY_SERAPHIS_VIEW_TAG};
+
+    // tag_t = H("domain-sep", derivation, t)
+    crypto::secret_key view_tag_scalar;
+
+    sp::domain_separate_derivation_hash(salt,
+        sender_receiver_DH_derivation,
+        output_index,
+        view_tag_scalar);
+
+    return static_cast<unsigned char>(view_tag_scalar.data[0]);
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receiver_secret, const rct::xmr_amount original)
 {
+    static std::string salt{config::HASH_KEY_SERAPHIS_AMOUNT_ENC};
+
     // ret = H("domain-sep", q_t) XOR_64 original
     crypto::secret_key hash_result;
-    std::string salt(config::HASH_KEY_SERAPHIS_AMOUNT_ENC);
     sp::domain_separate_rct_hash(salt, rct::sk2rct(sender_receiver_secret), hash_result);
 
     rct::xmr_amount mask{0};
@@ -195,26 +216,35 @@ rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receive
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_amount_commitment_mask(const crypto::secret_key &sender_receiver_secret, crypto::secret_key &mask_out)
 {
+    static std::string salt{config::HASH_KEY_SERAPHIS_AMOUNT_COMMITMENT_BLINDING_FACTOR};
+
     // x_t = H("domain-sep", q_t)
-    std::string salt(config::HASH_KEY_SERAPHIS_AMOUNT_COMMITMENT_BLINDING_FACTOR);
     sp::domain_separate_rct_hash(salt, rct::sk2rct(sender_receiver_secret), mask_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_seraphis_nominal_spend_key(const crypto::secret_key &sender_receiver_secret,
+bool try_get_seraphis_nominal_spend_key(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const std::size_t output_index,
     const rct::key &onetime_address,
     const unsigned char view_tag,
+    crypto::secret_key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out)
 {
     // tag'_t = H(q_t)
-    unsigned char nominal_view_tag{make_seraphis_view_tag(sender_receiver_secret)};
+    unsigned char nominal_view_tag{make_seraphis_view_tag(sender_receiver_DH_derivation, output_index)};
 
     // check that recomputed tag matches original tag; short-circuit on failure
     if (nominal_view_tag != view_tag)
         return false;
 
+    // q_t
+    // note: computing this after view tag check is an optimization
+    make_seraphis_sender_receiver_secret(sender_receiver_DH_derivation,
+        output_index,
+        sender_receiver_secret_out);
+
     // K'^s_t = Ko_t - H(q_t) X
     crypto::secret_key k_a_extender;
-    make_seraphis_sender_address_extension(sender_receiver_secret, k_a_extender);  // H(q_t)
+    make_seraphis_sender_address_extension(sender_receiver_secret_out, k_a_extender);  // H(q_t)
     sc_mul(&k_a_extender, sp::MINUS_ONE.bytes, &k_a_extender);  // -H(q_t)
     nominal_spend_key_out = onetime_address;  // Ko_t
     extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
