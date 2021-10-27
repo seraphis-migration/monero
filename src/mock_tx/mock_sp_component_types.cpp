@@ -83,7 +83,10 @@ void MockENoteSpV1::make(const crypto::secret_key &enote_privkey,
     m_encoded_amount = enc_dec_seraphis_amount(sender_receiver_secret, amount);
 
     // view_tag_t: view tag
-    m_view_tag = make_seraphis_view_tag(sender_receiver_secret);
+    m_view_tag = make_seraphis_view_tag(enote_privkey,
+        recipient_view_key,
+        enote_index,
+        hw::get_device("default"));
 
     // R_t: enote pubkey to send back to caller
     make_seraphis_enote_pubkey(enote_privkey, recipient_DH_base, enote_pubkey_out);

@@ -113,17 +113,26 @@ void extend_seraphis_spendkey(const crypto::secret_key &k_a_extender, rct::key &
 void make_seraphis_enote_pubkey(const crypto::secret_key &enote_privkey, const rct::key &DH_base, rct::key &enote_pubkey_out);
 /**
 * brief: make_seraphis_sender_receiver_secret - sender-receiver secret q_t for an output at index 't' in the tx that created it
-*    q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, enote_index)
+*    q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, output_index)
 * param: privkey - [sender: r_t] [recipient: k^{vr}]
 * param: DH_key - [sender: K^{vr}] [sender-change-2out: k^{vr}*K^{DH}_other] [recipient: R_t]
-* param: enote_index - t (index of the enote within its tx)
+* param: output_index - t (index of the enote within its tx)
 * param: hwdev - abstract reference to a hardware-specific implemention of crypto ops
 * outparam: sender_receiver_secret_out - q_t
 */
 void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     const rct::key &DH_key,
-    const std::size_t enote_index,
+    const std::size_t output_index,
     hw::device &hwdev,
+    crypto::secret_key &sender_receiver_secret_out);
+/**
+* brief: make_seraphis_sender_receiver_secret - overload in case the derivation was already computed by caller
+* param: sender_receiver_DH_derivation - privkey * DH_key
+* param: output_index - t (index of the enote within its tx)
+* outparam: sender_receiver_secret_out - q_t
+*/
+void make_seraphis_sender_receiver_secret(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const std::size_t output_index,
     crypto::secret_key &sender_receiver_secret_out);
 /**
 * brief: make_seraphis_sender_address_extension - extension for transforming a recipient spendkey into an enote one-time address
@@ -135,11 +144,26 @@ void make_seraphis_sender_address_extension(const crypto::secret_key &sender_rec
     crypto::secret_key &sender_address_extension_out);
 /**
 * brief: make_seraphis_view_tag - view tag for optimized identification of owned enotes
-*    tag_t = H("domain-sep", q_t)
-* param: sender_receiver_secret - q_t
+*    tag_t = H("domain-sep", privkey * DH_key, t)
+* param: privkey - [sender: r_t] [recipient: k^{vr}]
+* param: DH_key - [sender: K^{vr}] [sender-change-2out: k^{vr}*K^{DH}_other] [recipient: R_t]
+* param: output_index - t (index of the enote within its tx)
+* param: hwdev - abstract reference to a hardware-specific implemention of crypto ops
 * return: tag_t
 */
-unsigned char make_seraphis_view_tag(const crypto::secret_key &sender_receiver_secret);
+unsigned char make_seraphis_view_tag(const crypto::secret_key &privkey,
+    const rct::key &DH_key,
+    const std::size_t output_index,
+    hw::device &hwdev);
+/**
+* brief: make_seraphis_view_tag - overload for when the derivation is known by caller
+*    tag_t = H("domain-sep", privkey * DH_key, t)
+* param: sender_receiver_DH_derivation - privkey * DH_key
+* param: output_index - t
+* return: tag_t
+*/
+unsigned char make_seraphis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const std::size_t output_index);
 /**
 * brief: enc_dec_seraphis_amount - encode/decode an amount
 * param: sender_receiver_secret - q_t
@@ -155,15 +179,20 @@ rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receive
 void make_seraphis_amount_commitment_mask(const crypto::secret_key &sender_receiver_secret, crypto::secret_key &mask_out);
 /**
 * brief: try_get_seraphis_nominal_spend_key - test view tag; if it passes, compute and return the nominal spend key
-* param: sender_receiver_secret - q_t
+*    and sender-receiver secret
+* param: sender_receiver_DH_derivation - privkey * DH_key
+* param: output_index - t
 * param: onetime_address - Ko_t
 * param: view_tag - tag_t
+* outparam: sender_receiver_secret_out - q_t
 * outparam: nominal_spend_key_out - K'^s_t = Ko_t - H(q_t) X
 * return: true if successfully recomputed the view tag
 */
-bool try_get_seraphis_nominal_spend_key(const crypto::secret_key &sender_receiver_secret,
+bool try_get_seraphis_nominal_spend_key(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const std::size_t output_index,
     const rct::key &onetime_address,
     const unsigned char view_tag,
+    crypto::secret_key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out);
 /**
 * brief: try_get_seraphis_amount - test recreating the amount commitment; if it is recreate-able, return the amount

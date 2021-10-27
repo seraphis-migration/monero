@@ -709,19 +709,42 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
     rct::addKeys1(masked_key_out, rct::sk2rct(mask), key);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void domain_separate_rct_hash(const std::string &domain_separator, const rct::key &rct_key, crypto::secret_key &hash_result_out)
+void domain_separate_rct_hash(const std::string &domain_separator,
+    const rct::key &rct_key,
+    crypto::secret_key &hash_result_out)
 {
     // H("domain-sep", rct_key)
-    epee::wipeable_string hash{};
+    epee::wipeable_string hash;
     hash.reserve(domain_separator.size() + sizeof(rct::key));
     hash += domain_separator;
     hash.append((const char*) rct_key.bytes, sizeof(rct_key));
 
-    //TODO: is this inefficient use of hash_to_scalar? e.g. ringct has various seemingly optimized calls into keccak()
+    // hash to the result
     crypto::hash_to_scalar(hash.data(), hash.size(), hash_result_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void domain_separate_derivation_hash(const std::string &domain_separator,
+    const crypto::key_derivation &derivation,
+    const std::size_t index,
+    crypto::secret_key &hash_result_out)
+{
+    // derivation_hash = H("domain-sep", derivation, index)
+    epee::wipeable_string hash;
+    hash.reserve(sizeof(domain_separator) + sizeof(rct::key) +
+        ((sizeof(std::size_t) * 8 + 6) / 7));
+    // "domain-sep"
+    hash = domain_separator;
+    // derivation (e.g. a DH shared key)
+    hash.append((const char*) &derivation, sizeof(rct::key));
+    // index
+    char converted_index[(sizeof(size_t) * 8 + 6) / 7];
+    char* end = converted_index;
+    tools::write_varint(end, index);
+    assert(end <= converted_index + sizeof(converted_index));
+    hash.append(converted_index, end - converted_index);
 
-    // clear the string in case the key is a secret
-    hash.wipe();
+    // hash to the result
+    crypto::hash_to_scalar(hash.data(), hash.size(), hash_result_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool key_domain_is_prime_subgroup(const rct::key &check_key)

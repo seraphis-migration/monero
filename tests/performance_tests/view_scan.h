@@ -170,22 +170,24 @@ public:
 
     bool test()
     {
-        crypto::secret_key sender_receiver_secret;
-        mock_tx::make_seraphis_sender_receiver_secret(m_recipient_view_privkey,
-            m_enote_pubkey,
-            0,
-            hw::get_device("default"),
-            sender_receiver_secret);
+        crypto::secret_key sender_receiver_secret_dummy;
+        crypto::key_derivation derivation;
+
+        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_pubkey), m_recipient_view_privkey, derivation);
 
         rct::key nominal_recipient_spendkey;
 
-        if (!mock_tx::try_get_seraphis_nominal_spend_key(sender_receiver_secret,
+        if (!mock_tx::try_get_seraphis_nominal_spend_key(derivation,
+            0,
             m_enote.m_onetime_address,
             m_enote.m_view_tag,
+            sender_receiver_secret_dummy,  //outparam not used
             nominal_recipient_spendkey))
         {
             return m_test_view_tag_check;  // only valid if trying to trigger view tag check
         }
+
+        memwipe(&derivation, sizeof(derivation));
 
         return nominal_recipient_spendkey == m_recipient_spend_key;
     }
