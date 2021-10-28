@@ -122,10 +122,10 @@ struct MockENoteImageSp
 };
 
 ////
-// MockInputSp - Seraphis Input base
+// MockInputProposalSp - Seraphis Input Proposal base
 // - a tx input is an enote, so this is parameterized by the enote type
 ///
-struct MockInputSp
+struct MockInputProposalSp
 {
     /// k_{a, sender} + k_{a, recipient}
     crypto::secret_key m_enote_view_privkey;
@@ -164,10 +164,10 @@ protected:
 };
 
 ////
-// MockDestSp - Seraphis Destination base
+// MockDestinationSp - Seraphis Destination base
 // - for creating an e-note to send an amount to someone
 ///
-struct MockDestSp
+struct MockDestinationSp
 {
     rct::key m_recipient_DHkey;
     rct::key m_recipient_viewkey;

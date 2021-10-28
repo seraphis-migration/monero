@@ -184,6 +184,7 @@ unsigned char make_seraphis_view_tag(const crypto::key_derivation &sender_receiv
     static std::string salt{config::HASH_KEY_SERAPHIS_VIEW_TAG};
 
     // tag_t = H("domain-sep", derivation, t)
+    // TODO: consider using a simpler/cheaper hash function for view tags
     crypto::secret_key view_tag_scalar;
 
     sp::domain_separate_derivation_hash(salt,

@@ -54,26 +54,34 @@ namespace mock_tx
 {
 #if 0
 // destinations
+MockDestinationSpV1
 
 ////
-// Tx proposal: outputs and memos (set of destinations)
-// - need to cache output amount blinding factors separately (for balance proof)
+// Tx proposal: set of destinations (and miscellaneous memos)
 ///
 class MockTxProposalSpV1 final
 {
-    /// hash of proposal
+    MockTxProposalSpV1() = default;
+
+    // randomly sort destinations, validate semantics?
+    MockTxProposalSpV1(std::vector<MockDestinationSpV1> destinations);
+
     std::string get_proposal_prefix();  // composition proof msg
-    get_outputs();
-    get_tx_supplement();
+    void get_outputs(std::vector<MockENoteSpV1> &outputs_out);
+    void get_tx_supplement(MockSupplementSpV1 &supplement_out);
+
+    std::vector<MockDestinationSpV1> m_destinations;
+    //TODO: miscellaneous memo(s)
 };
 
 // input proposals
+MockInputProposalSpV1
 
 ////
 // Partial tx input
-// - input spent
+// - enote spent
 // - cached amount and amount blinding factor, image masks
-// - composition proof for input
+// - composition proof for input (MockImageProofSpV1)
 // - proposal prefix (composition proof msg) [for consistency checks when handling this struct]
 //
 // - make last input: sets amount commitment mask to satisfy balance proof (caller should determine amount to satisfy fee)
@@ -84,6 +92,7 @@ class MockTxInputPartialSpV1 final //needs to be InputSetPartial for merged comp
 };
 
 // make balance proof from proposal and partial inputs
+MockTxProposalSpV1 + vec<MockTxInputPartialSpV1> -> MockBalanceProofSpV1
 
 ////
 // Partial tx: no membership proofs
@@ -95,6 +104,7 @@ class MockTxPartialSpV1 final
 };
 
 // complete membership proofs
+MockTxInputPartialSpV1 + MockMembershipReferenceSetSpV1 -> MockMembershipProofSpV1
 
 // assemble full tx
 #endif

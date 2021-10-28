@@ -81,13 +81,13 @@ void MockENoteSp::gen_base()
     m_amount_commitment = rct::pkGen();
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockInputSp::get_key_image(crypto::key_image &key_image_out) const
+void MockInputProposalSp::get_key_image(crypto::key_image &key_image_out) const
 {
     // KI = k_a X + k_a U
     make_seraphis_key_image(m_enote_view_privkey, m_spendbase_privkey, key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockInputSp::to_enote_image_base(const crypto::secret_key &address_mask,
+void MockInputProposalSp::to_enote_image_base(const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     MockENoteImageSp &image_inout) const
 {
@@ -99,7 +99,7 @@ void MockInputSp::to_enote_image_base(const crypto::secret_key &address_mask,
     this->get_key_image(image_inout.m_key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockInputSp::gen_base(const rct::xmr_amount amount)
+void MockInputProposalSp::gen_base(const rct::xmr_amount amount)
 {
     m_enote_view_privkey = rct::rct2sk(rct::skGen());
     m_spendbase_privkey = rct::rct2sk(rct::skGen());
@@ -107,7 +107,7 @@ void MockInputSp::gen_base(const rct::xmr_amount amount)
     m_amount = amount;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockDestSp::gen_base(const rct::xmr_amount amount)
+void MockDestinationSp::gen_base(const rct::xmr_amount amount)
 {
     // all random except amount
     m_recipient_DHkey = rct::pkGen();
