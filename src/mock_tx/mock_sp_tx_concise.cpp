@@ -194,7 +194,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     // make mock inputs
     // enote, ks, view key stuff, amount, amount blinding factor
     // - note: inputs are pre-sorted; TODO: a real implementation needs to sort input images (and index-map membership proofs)
-    std::vector<MockInputSpV1> inputs_to_spend{gen_mock_sp_inputs_v1(in_amounts)};
+    std::vector<MockInputProposalSpV1> inputs_to_spend{gen_mock_sp_inputs_v1(in_amounts)};
     std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets{
             gen_mock_sp_membership_ref_sets_v1(inputs_to_spend,
                 params.ref_set_decomp_n,
@@ -204,7 +204,7 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
 
     // make mock destinations
     // - (in practice) for 2-out tx, need special treatment when making change/dummy destination
-    std::vector<MockDestSpV1> destinations{gen_mock_sp_dests_v1(out_amounts)};
+    std::vector<MockDestinationSpV1> destinations{gen_mock_sp_dests_v1(out_amounts)};
 
     // versioning
     std::string version_string;
