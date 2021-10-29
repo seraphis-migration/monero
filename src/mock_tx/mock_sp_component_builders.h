@@ -48,9 +48,9 @@
 //forward declarations
 namespace mock_tx
 { 
-    class MockTxPartialSpV1;
     class MockTxProposalSpV1;
     class MockTxPartialInputSpV1;
+    class MockTxPartialSpV1;
 }
 
 

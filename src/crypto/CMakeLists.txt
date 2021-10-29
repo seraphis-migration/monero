@@ -44,6 +44,7 @@ set(crypto_sources
   keccak.c
   oaes_lib.c
   random.c
+  siphash.c
   skein.c
   slow-hash.c
   rx-slow-hash.c
@@ -75,6 +76,7 @@ set(crypto_private_headers
   oaes_config.h
   oaes_lib.h
   random.h
+  siphash.h
   skein.h
   skein_port.h
   CryptonightR_JIT.h
