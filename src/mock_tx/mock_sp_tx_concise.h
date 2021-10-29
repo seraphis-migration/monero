@@ -37,7 +37,8 @@
 #include "misc_log_ex.h"
 #include "mock_tx.h"
 #include "mock_sp_base_types.h"
-#include "mock_sp_component_types.h"
+#include "mock_sp_transaction_builder_types.h"
+#include "mock_sp_transaction_component_types.h"
 #include "ringct/rctTypes.h"
 
 //third party headers

@@ -35,7 +35,8 @@
 #include "crypto/crypto.h"
 #include "mock_ledger_context.h"
 #include "mock_sp_base_types.h"
-#include "mock_sp_component_types.h"
+#include "mock_sp_transaction_builder_types.h"
+#include "mock_sp_transaction_component_types.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -46,12 +47,6 @@
 #include <vector>
 
 //forward declarations
-namespace mock_tx
-{ 
-    class MockTxProposalSpV1;
-    class MockTxPartialInputSpV1;
-    class MockTxPartialSpV1;
-}
 
 
 namespace mock_tx
@@ -220,5 +215,36 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<MockInputProposalSpV1> &i
     const rct::key &proposal_prefix,
     const MockTxProposalSpV1 &tx_proposal,
     std::vector<MockTxPartialInputSpV1> &partial_inputs_out);
+/**
+* brief: gen_mock_sp_input_proposals_v1 - create random mock inputs
+* param: in_amounts -
+* return: set of transaction inputs ready to spend
+*/
+std::vector<MockInputProposalSpV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts);
+/**
+* brief: gen_mock_sp_membership_ref_sets_v1 - create random reference sets for tx inputs, with real spend at a random index,
+*   and update mock ledger to include all members of the reference set
+* param: input_proposals -
+* param: ref_set_decomp_n -
+* param: ref_set_decomp_m -
+* inoutparam: ledger_context_inout -
+* return: set of membership proof reference sets
+*/
+std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
+    const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    std::shared_ptr<MockLedgerContext> ledger_context_inout);
+std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
+    const std::vector<MockENoteSpV1> &input_enotes,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    std::shared_ptr<MockLedgerContext> ledger_context_inout);
+/**
+* brief: gen_mock_sp_dests_v1 - create random mock destinations
+* param: out_amounts -
+* return: set of generated destinations
+*/
+std::vector<MockDestinationSpV1> gen_mock_sp_dests_v1(const std::vector<rct::xmr_amount> &out_amounts);
 
 } //namespace mock_tx

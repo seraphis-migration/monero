@@ -29,14 +29,13 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_sp_component_types.h"
+#include "mock_sp_transaction_component_types.h"
 
 //local headers
 #include "crypto/crypto.h"
 #include "device/device.hpp"
 #include "misc_log_ex.h"
 #include "mock_sp_base_types.h"
-#include "mock_sp_component_builders.h"
 #include "mock_sp_core_utils.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"

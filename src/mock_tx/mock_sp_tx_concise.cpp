@@ -36,9 +36,9 @@
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
 #include "mock_sp_base_types.h"
-#include "mock_sp_component_builders.h"
-#include "mock_sp_component_types.h"
-#include "mock_sp_transaction_builders.h"
+#include "mock_sp_transaction_builder_types.h"
+#include "mock_sp_transaction_component_types.h"
+#include "mock_sp_transaction_utils.h"
 #include "mock_sp_validators.h"
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
@@ -216,20 +216,21 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, tx_proposal, partial_inputs);
 
     // partial tx
-    MockTxPartialSpV1 partial_tx{tx_proposal, partial_inputs};
+    MockTxPartialSpV1 partial_tx{tx_proposal, partial_inputs, version_string};
 
     // membership proofs
     std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets{
-            gen_mock_sp_membership_ref_sets_v1(partial_tx,
+            gen_mock_sp_membership_ref_sets_v1(partial_tx.m_input_enotes,
                 params.ref_set_decomp_n,
                 params.ref_set_decomp_m,
                 ledger_context_inout)
         };
 
+    std::vector<MockMembershipProofSpV1> tx_membership_proofs;
     make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_tx, tx_membership_proofs);
 
     // assemble tx
-    return std::make_shared<MockTxSpConcise>(std::move(partial_tx), std::move(tx_membership_proof)s,
+    return std::make_shared<MockTxSpConcise>(std::move(partial_tx), std::move(tx_membership_proofs),
         MockTxSpConcise::ValidationRulesVersion::ONE);
 
 /*

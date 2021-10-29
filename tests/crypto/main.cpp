@@ -66,10 +66,6 @@ int main(int argc, char *argv[]) {
   size_t test = 0;
   bool error = false;
   setup_random();
-  if (argc != 2) {
-    cerr << "invalid arguments" << endl;
-    return 1;
-  }
   input.open(argv[1], ios_base::in);
   for (;;) {
     ++test;

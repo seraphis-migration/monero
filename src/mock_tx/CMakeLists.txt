@@ -35,10 +35,10 @@ set(mock_tx_sources
   mock_rct_clsag.cpp
   mock_rct_triptych.cpp
   mock_sp_base_types.cpp
-  mock_sp_component_builders.cpp
-  mock_sp_component_types.cpp
   mock_sp_core_utils.cpp
-  mock_sp_transaction_builders.cpp
+  mock_sp_transaction_builder_types.cpp
+  mock_sp_transaction_component_types.cpp
+  mock_sp_transaction_utils.cpp
   mock_sp_tx_concise.cpp
   mock_sp_validators.cpp
   mock_tx.cpp

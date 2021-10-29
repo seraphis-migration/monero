@@ -37,6 +37,7 @@ extern "C" {
 #endif
 
 void setup_random(void);
+int siphash_test(void);
 
 #if defined(__cplusplus)
 }

@@ -34,7 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "mock_sp_base_types.h"
-#include "mock_sp_component_types.h"
+#include "mock_sp_transaction_component_types.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -112,19 +112,19 @@ public:
 
 //member functions
     /// message to be signed by input spend proofs
-    rct::key get_proposal_prefix(const std::string &version_string);
+    rct::key get_proposal_prefix(const std::string &version_string) const;
 
     /// stored destinations
-    const std::vector<MockDestinationSpV1>& get_destinations() { return m_destinations; }
+    const std::vector<MockDestinationSpV1>& get_destinations() const { return m_destinations; }
 
     /// proposed outputs
-    const std::vector<MockENoteSpV1>& get_outputs() { return m_outputs; }
+    const std::vector<MockENoteSpV1>& get_outputs() const { return m_outputs; }
 
     /// proposed tx supplement
-    const MockSupplementSpV1& get_tx_supplement() { return m_tx_supplement; }
+    const MockSupplementSpV1& get_tx_supplement() const { return m_tx_supplement; }
 
     /// proposed balance proof
-    const std::shared_ptr<const MockBalanceProofSpV1> get_balance_proof() { return m_balance_proof; }
+    const std::shared_ptr<MockBalanceProofSpV1> get_balance_proof() const { return m_balance_proof; }
 
 //member variables
 private:
@@ -163,25 +163,25 @@ public:
 
 //member functions
     /// the input's image
-    const MockENoteImageSpV1& get_input_image() { return m_input_image; }
+    const MockENoteImageSpV1& get_input_image() const { return m_input_image; }
 
     /// the input's image
-    const MockImageProofSpV1& get_image_proof() { return m_image_proof; }
+    const MockImageProofSpV1& get_image_proof() const { return m_image_proof; }
 
     /// the input's image
-    const crypto::secret_key& get_image_address_mask() { return m_image_address_mask; }
+    const crypto::secret_key& get_image_address_mask() const { return m_image_address_mask; }
 
     /// the input's image
-    const crypto::secret_key& get_image_amount_mask() { return m_image_amount_mask; }
+    const crypto::secret_key& get_image_amount_mask() const { return m_image_amount_mask; }
 
     /// the input's image
-    const rct::key& get_proposal_prefix() { return m_proposal_prefix; }
+    const rct::key& get_proposal_prefix() const { return m_proposal_prefix; }
 
     /// the input's image
-    const MockENoteSpV1& get_input_enote() { return m_input_enote; }
+    const MockENoteSpV1& get_input_enote() const { return m_input_enote; }
 
     /// the input's image
-    rct::xmr_amount get_input_amount() { return m_input_amount; }
+    rct::xmr_amount get_input_amount() const { return m_input_amount; }
 
 //member variables
 private:
@@ -210,7 +210,8 @@ struct MockTxPartialSpV1 final
 
     /// normal constructor: standard assembly
     MockTxPartialSpV1(const MockTxProposalSpV1 &proposal,
-        const std::vector<MockTxPartialInputSpV1> &inputs);
+        const std::vector<MockTxPartialInputSpV1> &inputs,
+        const std::string &version_string);
 
     /// normal constructor (TODO): assembly from multisig pieces
 
@@ -232,37 +233,5 @@ struct MockTxPartialSpV1 final
     std::vector<crypto::secret_key> m_image_address_masks;
     std::vector<crypto::secret_key> m_image_amount_masks;
 };
-
-/**
-* brief: gen_mock_sp_input_proposals_v1 - create random mock inputs
-* param: in_amounts -
-* return: set of transaction inputs ready to spend
-*/
-std::vector<MockInputProposalSpV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts);
-/**
-* brief: gen_mock_sp_membership_ref_sets_v1 - create random reference sets for tx inputs, with real spend at a random index,
-*   and update mock ledger to include all members of the reference set
-* param: input_proposals -
-* param: ref_set_decomp_n -
-* param: ref_set_decomp_m -
-* inoutparam: ledger_context_inout -
-* return: set of membership proof reference sets
-*/
-std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
-    const std::vector<MockInputProposalSpV1> &input_proposals,
-    const std::size_t ref_set_decomp_n,
-    const std::size_t ref_set_decomp_m,
-    std::shared_ptr<MockLedgerContext> ledger_context_inout);
-std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
-    const std::vector<MockENoteSpV1> &input_enotes,
-    const std::size_t ref_set_decomp_n,
-    const std::size_t ref_set_decomp_m,
-    std::shared_ptr<MockLedgerContext> ledger_context_inout)
-/**
-* brief: gen_mock_sp_dests_v1 - create random mock destinations
-* param: out_amounts -
-* return: set of generated destinations
-*/
-std::vector<MockDestinationSpV1> gen_mock_sp_dests_v1(const std::vector<rct::xmr_amount> &out_amounts);
 
 } //namespace mock_tx

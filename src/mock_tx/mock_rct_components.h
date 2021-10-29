@@ -166,7 +166,7 @@ struct MockRctProofV2 final
 struct MockRctBalanceProofV1 final
 {
     /// a set of BP+ proofs
-    std::vector<rct::BulletproofPlus> m_bpp_proofs;
+    std::vector<const rct::BulletproofPlus> m_bpp_proofs;
 
     std::size_t get_size_bytes() const;
 };
