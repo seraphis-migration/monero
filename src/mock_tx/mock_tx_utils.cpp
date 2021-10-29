@@ -170,7 +170,7 @@ bool balance_check_in_out_amnts(const std::vector<rct::xmr_amount> &input_amount
     for (const auto amnt : input_amounts)
         input_sum += amnt;
 
-    for (const auto &amnt : output_amounts)
+    for (const auto amnt : output_amounts)
         output_sum += amnt;
 
     return input_sum == output_sum;

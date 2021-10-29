@@ -202,6 +202,9 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenc
     const std::vector<crypto::secret_key> &image_amount_masks,
     std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_out);
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
+    const std::vector<MockTxPartialInputSpV1> &partial_inputs,
+    std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_out);
+void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
     const MockTxPartialSpV1 &partial_tx,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out);
 /**

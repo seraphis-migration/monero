@@ -47,6 +47,7 @@
 //third party headers
 
 //standard headers
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -54,6 +55,84 @@
 
 namespace mock_tx
 {
+//-------------------------------------------------------------------------------------------------------------------
+MockTxSpConcise::MockTxSpConcise(const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::size_t max_rangeproof_splits,
+    const std::vector<MockDestinationSpV1> &destinations,
+    const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
+    const ValidationRulesVersion validation_rules_version)
+{
+    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
+    CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any outputs.");
+    
+    std::vector<rct::xmr_amount> in_amounts;
+    std::vector<rct::xmr_amount> out_amounts;
+    in_amounts.reserve(input_proposals.size());
+    out_amounts.reserve(destinations.size());
+
+    for (const auto &input_proposal : input_proposals)
+    {
+        in_amounts.emplace_back(input_proposal.m_amount);
+    }
+    for (const auto &destination : destinations)
+    {
+        out_amounts.emplace_back(destination.m_amount);
+    }
+
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts),
+        "Tried to make tx with unbalanced amounts.");
+
+    // versioning
+    std::string version_string;
+    version_string.reserve(3);
+    MockTxSpConcise::get_versioning_string(validation_rules_version, version_string);
+
+
+    /// make tx
+    // tx proposal
+    MockTxProposalSpV1 tx_proposal{destinations, max_rangeproof_splits};
+    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
+
+    // partial inputs
+    std::vector<MockTxPartialInputSpV1> partial_inputs;
+    make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, tx_proposal, partial_inputs);
+
+    // partial tx
+    MockTxPartialSpV1 partial_tx{tx_proposal, partial_inputs, version_string};
+
+    // membership proofs
+    std::vector<MockMembershipProofSortableSpV1> tx_membership_proofs_sortable;
+    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
+
+    CHECK_AND_ASSERT_THROW_MES(partial_tx.m_input_images.size() == tx_membership_proofs_sortable.size(),
+        "Unexpected size mismatch between input images and sortable membership proofs.");
+
+    // sort the membership proofs so they line up with input images
+    std::vector<MockMembershipProofSpV1> tx_membership_proofs;
+    tx_membership_proofs.reserve(tx_membership_proofs_sortable.size());
+
+    for (std::size_t input_index{0}; input_index < partial_tx.m_input_images.size(); ++input_index)
+    {
+        // find the membership proof that matches with the input image at this index
+        auto ordered_membership_proof{
+                std::find_if(tx_membership_proofs_sortable.begin(), tx_membership_proofs_sortable.end(),
+                        [&](const MockMembershipProofSortableSpV1 &sortable_proof) -> bool
+                        {
+                            return partial_tx.m_input_images[input_index].m_masked_address ==
+                                sortable_proof.m_masked_address;
+                        }
+                    )
+            };
+
+        CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_sortable.end(),
+            "Could not find input image to match with a sortable membership proof.");
+
+        tx_membership_proofs.emplace_back(std::move(ordered_membership_proof->m_membership_proof));
+    }
+
+    // assemble tx
+    *this = MockTxSpConcise{std::move(partial_tx), std::move(tx_membership_proofs), validation_rules_version};
+}
 //-------------------------------------------------------------------------------------------------------------------
 bool MockTxSpConcise::validate_tx_semantics() const
 {
@@ -200,38 +279,24 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     // - (in practice) for 2-out tx, need special treatment when making change/dummy destination
     std::vector<MockDestinationSpV1> destinations{gen_mock_sp_dests_v1(out_amounts)};
 
-    // versioning
-    std::string version_string;
-    version_string.reserve(3);
-    MockTxSpConcise::get_versioning_string(MockTxSpConcise::ValidationRulesVersion::ONE, version_string);
+    // membership proof ref sets
+    std::vector<MockENoteSpV1> input_enotes;
+    input_enotes.reserve(input_proposals.size());
 
+    for (const auto &input_proposal : input_proposals)
+        input_enotes.emplace_back(input_proposal.m_enote);
 
-    /// make tx
-    // tx proposal
-    MockTxProposalSpV1 tx_proposal{destinations, params.max_rangeproof_splits};
-    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
-
-    // partial inputs
-    std::vector<MockTxPartialInputSpV1> partial_inputs;
-    make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, tx_proposal, partial_inputs);
-
-    // partial tx
-    MockTxPartialSpV1 partial_tx{tx_proposal, partial_inputs, version_string};
-
-    // membership proofs
     std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets{
-            gen_mock_sp_membership_ref_sets_v1(partial_tx.m_input_enotes,
+            gen_mock_sp_membership_ref_sets_v1(input_enotes,
                 params.ref_set_decomp_n,
                 params.ref_set_decomp_m,
                 ledger_context_inout)
         };
 
-    std::vector<MockMembershipProofSpV1> tx_membership_proofs;
-    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_tx, tx_membership_proofs);
+    // make tx
+    return std::make_shared<MockTxSpConcise>(input_proposals, params.max_rangeproof_splits, destinations,
+        membership_ref_sets, MockTxSpConcise::ValidationRulesVersion::ONE);
 
-    // assemble tx
-    return std::make_shared<MockTxSpConcise>(std::move(partial_tx), std::move(tx_membership_proofs),
-        MockTxSpConcise::ValidationRulesVersion::ONE);
 
 /*
     /// make tx

@@ -72,14 +72,14 @@ public:
     /// default constructor
     MockTxSpConcise() = default;
 
-    /// normal constructor: new tx
+    /// normal constructor: new tx from pieces
     MockTxSpConcise(std::vector<MockENoteImageSpV1> input_images,
         std::vector<MockENoteSpV1> outputs,
         std::shared_ptr<MockBalanceProofSpV1> balance_proof,
         std::vector<MockImageProofSpV1> image_proofs,
         std::vector<MockMembershipProofSpV1> membership_proofs,
         MockSupplementSpV1 tx_supplement,
-        ValidationRulesVersion validation_rules_version) :
+        const ValidationRulesVersion validation_rules_version) :
             m_input_images{std::move(input_images)},
             m_outputs{std::move(outputs)},
             m_balance_proof{std::move(balance_proof)},
@@ -96,10 +96,10 @@ public:
             m_tx_validation_rules_version = validation_rules_version;
         }
 
-    /// normal constructor: overload
+    /// normal constructor: finalize from a partial tx
     MockTxSpConcise(MockTxPartialSpV1 partial_tx,
         std::vector<MockMembershipProofSpV1> membership_proofs,
-        ValidationRulesVersion validation_rules_version) :
+        const ValidationRulesVersion validation_rules_version) :
             MockTxSpConcise{
                 std::move(partial_tx.m_input_images),
                 std::move(partial_tx.m_outputs),
@@ -110,6 +110,13 @@ public:
                 validation_rules_version
             }
     {}
+
+    /// normal constructor: simple when tx builder is monolothic (can complete tx in one step)
+    MockTxSpConcise(const std::vector<MockInputProposalSpV1> &input_proposals,
+        const std::size_t max_rangeproof_splits,
+        const std::vector<MockDestinationSpV1> &destinations,
+        const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
+        const ValidationRulesVersion validation_rules_version);
 
     /// normal constructor: from existing tx byte blob
     //mock tx doesn't do this
