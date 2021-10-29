@@ -488,6 +488,28 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenc
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
+    const std::vector<MockTxPartialInputSpV1> &partial_inputs,
+    std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_inputs.size(), "Input components size mismatch");
+
+    tx_membership_proofs_out.resize(membership_ref_sets.size());
+
+    for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
+    {
+        CHECK_AND_ASSERT_THROW_MES(membership_ref_sets[input_index].
+                m_referenced_enotes[membership_ref_sets[input_index].m_real_spend_index_in_set].m_onetime_address ==
+            partial_inputs[input_index].get_input_enote().m_onetime_address, 
+            "Membership ref set real spend doesn't match partial input's enote.");
+
+        make_v1_tx_membership_proof_sp_v1(membership_ref_sets[input_index],
+            partial_inputs[input_index].get_image_address_mask(),
+            partial_inputs[input_index].get_image_amount_mask(),
+            tx_membership_proofs_out[input_index]);
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
     const MockTxPartialSpV1 &partial_tx,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out)
 {
