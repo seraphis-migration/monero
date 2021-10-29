@@ -29,9 +29,16 @@
 #pragma once
 
 #include "crypto/crypto.h"
+extern "C"
+{
+    #include "crypto/siphash.h"
+    #include "blake2_temp.h"  //copied from randomx lib
+}
 #include "device/device.hpp"
 #include "mock_tx/mock_sp_transaction_component_types.h"
 #include "mock_tx/mock_sp_core_utils.h"
+#include "mock_tx/mock_tx_utils.h"
+#include "mock_tx/seraphis_crypto_utils.h"
 #include "performance_tests.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -200,4 +207,390 @@ private:
     rct::key m_enote_pubkey;
 
     bool m_test_view_tag_check;
+};
+
+
+
+
+
+void domain_separate_derivation_hash_siphash(const std::string &domain_separator,
+    const crypto::key_derivation &derivation,
+    const std::size_t index,
+    crypto::secret_key &hash_result_out)
+{
+    // derivation_hash = H("domain-sep", derivation, index)
+    std::string hash;
+    hash.reserve(sizeof(domain_separator) + ((sizeof(std::size_t) * 8 + 6) / 7));
+    // "domain-sep"
+    hash = domain_separator;
+    // index
+    char converted_index[(sizeof(size_t) * 8 + 6) / 7];
+    char* end = converted_index;
+    tools::write_varint(end, index);
+    assert(end <= converted_index + sizeof(converted_index));
+    hash.append(converted_index, end - converted_index);
+
+    // siphash key
+    char siphash_key[16];
+    for (std::size_t i{0}; i < 16; ++i)
+        siphash_key[i] = derivation.data[i];
+
+    // hash to the result
+    siphash(hash.data(), hash.size(), siphash_key, &hash_result_out, 8);
+
+    memwipe(siphash_key, 16);
+}
+
+unsigned char make_seraphis_view_tag_siphash(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const std::size_t output_index)
+{
+    static std::string salt{config::HASH_KEY_SERAPHIS_VIEW_TAG};
+
+    // tag_t = H("domain-sep", derivation, t)
+    // TODO: consider using a simpler/cheaper hash function for view tags
+    crypto::secret_key view_tag_scalar;
+
+    domain_separate_derivation_hash_siphash(salt,
+        sender_receiver_DH_derivation,
+        output_index,
+        view_tag_scalar);
+
+    return static_cast<unsigned char>(view_tag_scalar.data[0]);
+}
+
+unsigned char make_seraphis_view_tag_siphash(const crypto::secret_key &privkey,
+    const rct::key &DH_key,
+    const std::size_t output_index,
+    hw::device &hwdev)
+{
+    // privkey * DH_key
+    crypto::key_derivation derivation;
+    hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);
+
+    // tag_t = H("domain-sep", derivation, t)
+    unsigned char view_tag{make_seraphis_view_tag_siphash(derivation, output_index)};
+
+    memwipe(&derivation, sizeof(derivation));
+
+    return view_tag;
+}
+
+bool try_get_seraphis_nominal_spend_key_siphash(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const std::size_t output_index,
+    const rct::key &onetime_address,
+    const unsigned char view_tag,
+    crypto::secret_key &sender_receiver_secret_out,
+    rct::key &nominal_spend_key_out)
+{
+    // tag'_t = H(q_t)
+    unsigned char nominal_view_tag{make_seraphis_view_tag_siphash(sender_receiver_DH_derivation, output_index)};
+
+    // check that recomputed tag matches original tag; short-circuit on failure
+    if (nominal_view_tag != view_tag)
+        return false;
+
+    // q_t
+    // note: computing this after view tag check is an optimization
+    mock_tx::make_seraphis_sender_receiver_secret(sender_receiver_DH_derivation,
+        output_index,
+        sender_receiver_secret_out);
+
+    // K'^s_t = Ko_t - H(q_t) X
+    crypto::secret_key k_a_extender;
+    mock_tx::make_seraphis_sender_address_extension(sender_receiver_secret_out, k_a_extender);  // H(q_t)
+    sc_mul(&k_a_extender, sp::MINUS_ONE.bytes, &k_a_extender);  // -H(q_t)
+    nominal_spend_key_out = onetime_address;  // Ko_t
+    mock_tx::extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
+
+    return true;
+}
+
+class test_view_scan_sp_siphash
+{
+public:
+    static const size_t loop_count = 1000;
+
+    bool init()
+    {
+        // user address
+        rct::key recipient_DH_base{rct::pkGen()};
+        m_recipient_view_privkey = rct::rct2sk(rct::skGen());
+        crypto::secret_key recipient_spendbase_privkey{rct::rct2sk(rct::skGen())};
+        rct::key recipient_view_key;
+
+        rct::scalarmultKey(recipient_view_key, recipient_DH_base, rct::sk2rct(m_recipient_view_privkey));
+        mock_tx::make_seraphis_spendkey(m_recipient_view_privkey, recipient_spendbase_privkey, m_recipient_spend_key);
+
+        // make enote
+        crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
+
+        m_enote.make(enote_privkey,
+            recipient_DH_base,
+            recipient_view_key,
+            m_recipient_spend_key,
+            0, // no amount
+            0, // 0 index
+            m_enote_pubkey);
+
+        // kludge: use siphash to make view tag
+        m_enote.m_view_tag = make_seraphis_view_tag_siphash(enote_privkey,
+            recipient_view_key,
+            0,
+            hw::get_device("default"));
+        // want view tag test to fail
+        ++m_enote.m_view_tag;
+
+        return true;
+    }
+
+    bool test()
+    {
+        crypto::secret_key sender_receiver_secret_dummy;
+        crypto::key_derivation derivation;
+
+        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_pubkey), m_recipient_view_privkey, derivation);
+
+        rct::key nominal_recipient_spendkey;
+
+        if (!try_get_seraphis_nominal_spend_key_siphash(derivation,
+            0,
+            m_enote.m_onetime_address,
+            m_enote.m_view_tag,
+            sender_receiver_secret_dummy,  //outparam not used
+            nominal_recipient_spendkey))
+        {
+            return true; //expect it to fail on view tag
+        }
+
+        memwipe(&derivation, sizeof(derivation));
+
+        return nominal_recipient_spendkey == m_recipient_spend_key;
+    }
+
+private:
+    rct::key m_recipient_spend_key;
+    crypto::secret_key m_recipient_view_privkey;
+
+    mock_tx::MockENoteSpV1 m_enote;
+    rct::key m_enote_pubkey;
+};
+
+
+
+
+
+struct ParamsShuttleViewHash final : public ParamsShuttle
+{
+    std::string domain_separator;
+};
+
+
+class test_view_scan_hash_siphash
+{
+public:
+    static const size_t loop_count = 1000;
+    static const size_t re_loop = 100;
+
+    bool init(const ParamsShuttleViewHash &params)
+    {
+        hw::get_device("default").generate_key_derivation(rct::rct2pk(rct::pkGen()),
+            rct::rct2sk(rct::skGen()),
+            m_derivation);
+
+        m_domain_separator = params.domain_separator;
+
+        return true;
+    }
+
+    bool test()
+    {
+        static std::size_t index{0};
+
+        for (std::size_t i{0}; i < re_loop; ++i)
+        {
+            // derivation_hash = H[derivation]("domain-sep", index)
+            std::string hash;
+            hash.reserve(sizeof(m_domain_separator) + ((sizeof(std::size_t) * 8 + 6) / 7));
+            // "domain-sep"
+            hash = m_domain_separator;
+            // index
+            char converted_index[(sizeof(size_t) * 8 + 6) / 7];
+            char* end = converted_index;
+            tools::write_varint(end, index);
+            assert(end <= converted_index + sizeof(converted_index));
+            hash.append(converted_index, end - converted_index);
+
+            // siphash key
+            char siphash_key[16];
+            for (std::size_t i{0}; i < 16; ++i)
+                siphash_key[i] = m_derivation.data[i];
+
+            // hash to the result
+            crypto::secret_key hash_result;
+            siphash(hash.data(), hash.size(), siphash_key, &hash_result, 8);
+        }
+
+        return true;
+    }
+
+private:
+    crypto::key_derivation m_derivation;
+    std::string m_domain_separator;
+};
+
+
+class test_view_scan_hash_halfsiphash
+{
+public:
+    static const size_t loop_count = 1000;
+    static const size_t re_loop = 100;
+
+    bool init(const ParamsShuttleViewHash &params)
+    {
+        hw::get_device("default").generate_key_derivation(rct::rct2pk(rct::pkGen()),
+            rct::rct2sk(rct::skGen()),
+            m_derivation);
+
+        m_domain_separator = params.domain_separator;
+
+        return true;
+    }
+
+    bool test()
+    {
+        static std::size_t index{0};
+
+        for (std::size_t i{0}; i < re_loop; ++i)
+        {
+            // derivation_hash = H[derivation]("domain-sep", index)
+            std::string hash;
+            hash.reserve(sizeof(m_domain_separator) + ((sizeof(std::size_t) * 8 + 6) / 7));
+            // "domain-sep"
+            hash = m_domain_separator;
+            // index
+            char converted_index[(sizeof(size_t) * 8 + 6) / 7];
+            char* end = converted_index;
+            tools::write_varint(end, index);
+            assert(end <= converted_index + sizeof(converted_index));
+            hash.append(converted_index, end - converted_index);
+
+            // siphash key
+            char siphash_key[8];
+            for (std::size_t i{0}; i < 8; ++i)
+                siphash_key[i] = m_derivation.data[i];
+
+            // hash to the result
+            crypto::secret_key hash_result;
+            halfsiphash(hash.data(), hash.size(), siphash_key, &hash_result, 4);
+        }
+
+        return true;
+    }
+
+private:
+    crypto::key_derivation m_derivation;
+    std::string m_domain_separator;
+};
+
+class test_view_scan_hash_cnhash
+{
+public:
+    static const size_t loop_count = 1000;
+    static const size_t re_loop = 100;
+
+    bool init(const ParamsShuttleViewHash &params)
+    {
+        hw::get_device("default").generate_key_derivation(rct::rct2pk(rct::pkGen()),
+            rct::rct2sk(rct::skGen()),
+            m_derivation);
+
+        m_domain_separator = params.domain_separator;
+
+        return true;
+    }
+
+    bool test()
+    {
+        static std::size_t index{0};
+
+        for (std::size_t i{0}; i < re_loop; ++i)
+        {
+            // derivation_hash = H("domain-sep", derivation, index)
+            std::string hash;
+            hash.reserve(sizeof(m_domain_separator) + sizeof(rct::key) +
+                ((sizeof(std::size_t) * 8 + 6) / 7));
+            // "domain-sep"
+            hash = m_domain_separator;
+            // derivation (e.g. a DH shared key)
+            hash.append((const char*) &m_derivation, sizeof(rct::key));
+            // index
+            char converted_index[(sizeof(size_t) * 8 + 6) / 7];
+            char* end = converted_index;
+            tools::write_varint(end, index);
+            assert(end <= converted_index + sizeof(converted_index));
+            hash.append(converted_index, end - converted_index);
+
+            // hash to the result
+            crypto::secret_key hash_result;
+            crypto::hash_to_scalar(hash.data(), hash.size(), hash_result);
+        }
+
+        return true;
+    }
+
+private:
+    crypto::key_derivation m_derivation;
+    std::string m_domain_separator;
+};
+
+
+class test_view_scan_hash_b2bhash
+{
+public:
+    static const size_t loop_count = 1000;
+    static const size_t re_loop = 100;
+
+    bool init(const ParamsShuttleViewHash &params)
+    {
+        hw::get_device("default").generate_key_derivation(rct::rct2pk(rct::pkGen()),
+            rct::rct2sk(rct::skGen()),
+            m_derivation);
+
+        m_domain_separator = params.domain_separator;
+
+        return true;
+    }
+
+    bool test()
+    {
+        static std::size_t index{0};
+
+        for (std::size_t i{0}; i < re_loop; ++i)
+        {
+            // derivation_hash = H("domain-sep", derivation, index)
+            std::string hash;
+            hash.reserve(sizeof(m_domain_separator) + sizeof(rct::key) +
+                ((sizeof(std::size_t) * 8 + 6) / 7));
+            // "domain-sep"
+            hash = m_domain_separator;
+            // derivation (e.g. a DH shared key)
+            hash.append((const char*) &m_derivation, sizeof(rct::key));
+            // index
+            char converted_index[(sizeof(size_t) * 8 + 6) / 7];
+            char* end = converted_index;
+            tools::write_varint(end, index);
+            assert(end <= converted_index + sizeof(converted_index));
+            hash.append(converted_index, end - converted_index);
+
+            // hash to the result
+            crypto::secret_key hash_result;
+            blake2b(&hash_result, 32, hash.data(), hash.size(), nullptr, 0);
+        }
+
+        return true;
+    }
+
+private:
+    crypto::key_derivation m_derivation;
+    std::string m_domain_separator;
 };
