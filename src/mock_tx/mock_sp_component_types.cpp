@@ -36,6 +36,7 @@
 #include "device/device.hpp"
 #include "misc_log_ex.h"
 #include "mock_sp_base_types.h"
+#include "mock_sp_component_builders.h"
 #include "mock_sp_core_utils.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -43,6 +44,7 @@
 //third party headers
 
 //standard headers
+#include <algorithm>
 #include <memory>
 #include <vector>
 
@@ -178,63 +180,6 @@ std::size_t MockBalanceProofSpV1::get_size_bytes(const bool include_commitments 
 std::size_t MockSupplementSpV1::get_size_bytes() const
 {
     return 32 * m_output_enote_pubkeys.size();
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockInputProposalSpV1::gen(const rct::xmr_amount amount)
-{
-    // generate a tx input: random secrets, random memo pieces (does not support info recovery)
-
-    // input secrets
-    this->gen_base(amount);
-
-    // enote pubkey (these are stored separate from enotes)
-    m_enote_pubkey = rct::pkGen();
-
-    // enote
-    rct::key recipient_spendbase;
-    make_seraphis_spendbase(m_spendbase_privkey, recipient_spendbase);
-
-    m_enote.make_base_with_address_extension(m_enote_view_privkey, recipient_spendbase, m_amount_blinding_factor, m_amount);
-
-    m_enote.m_view_tag = crypto::rand_idx(static_cast<unsigned char>(-1));
-    m_enote.m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockDestinationSpV1::get_amount_blinding_factor(const std::size_t enote_index, crypto::secret_key &amount_blinding_factor) const
-{
-    // r_t: sender-receiver shared secret
-    crypto::secret_key sender_receiver_secret;
-    make_seraphis_sender_receiver_secret(m_enote_privkey,
-        m_recipient_viewkey,
-        enote_index,
-        hw::get_device("default"),
-        sender_receiver_secret);
-
-    // x_t: amount commitment mask (blinding factor)
-    make_seraphis_amount_commitment_mask(sender_receiver_secret, amount_blinding_factor);
-}
-//-------------------------------------------------------------------------------------------------------------------
-MockENoteSpV1 MockDestinationSpV1::to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const
-{
-    MockENoteSpV1 enote;
-
-    enote.make(m_enote_privkey,
-        m_recipient_DHkey,
-        m_recipient_viewkey,
-        m_recipient_spendkey,
-        m_amount,
-        output_index,
-        enote_pubkey_out);
-
-    return enote;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockDestinationSpV1::gen(const rct::xmr_amount amount)
-{
-    // gen base of destination
-    this->gen_base(amount);
-
-    m_enote_privkey = rct::rct2sk(rct::skGen());
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx

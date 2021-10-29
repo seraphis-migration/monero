@@ -52,65 +52,9 @@
 
 namespace mock_tx
 {
-#if 0
-// destinations
-MockDestinationSpV1
 
 ////
-// Tx proposal: set of destinations (and miscellaneous memos)
-///
-class MockTxProposalSpV1 final
-{
-    MockTxProposalSpV1() = default;
-
-    // randomly sort destinations, validate semantics?
-    MockTxProposalSpV1(std::vector<MockDestinationSpV1> destinations);
-
-    std::string get_proposal_prefix();  // composition proof msg
-    void get_outputs(std::vector<MockENoteSpV1> &outputs_out);
-    void get_tx_supplement(MockSupplementSpV1 &supplement_out);
-
-    std::vector<MockDestinationSpV1> m_destinations;
-    //TODO: miscellaneous memo(s)
-};
-
-// input proposals
-MockInputProposalSpV1
-
-////
-// Partial tx input
-// - enote spent
-// - cached amount and amount blinding factor, image masks
-// - composition proof for input (MockImageProofSpV1)
-// - proposal prefix (composition proof msg) [for consistency checks when handling this struct]
-//
-// - make last input: sets amount commitment mask to satisfy balance proof (caller should determine amount to satisfy fee)
-///
-class MockTxInputPartialSpV1 final //needs to be InputSetPartial for merged composition proofs
-{
-    vec<InputImage> get_input_images();
-};
-
-// make balance proof from proposal and partial inputs
-MockTxProposalSpV1 + vec<MockTxInputPartialSpV1> -> MockBalanceProofSpV1
-
-////
-// Partial tx: no membership proofs
-// - from multisig: multisigproposal.txproposal, multisig inputs + extra inputs, balance proof
-///
-class MockTxPartialSpV1 final
-{
-    MockTxPartialSpV1(MockTxProposalSpV1 &proposal, vec<MockTxInputPartialSpV1> &inputs, BalanceProof);
-};
-
-// complete membership proofs
-MockTxInputPartialSpV1 + MockMembershipReferenceSetSpV1 -> MockMembershipProofSpV1
-
-// assemble full tx
-#endif
-
-////
-// Complete tx
+// Seraphis tx: based on concise grootle membership proofs
 ///
 class MockTxSpConcise final : public MockTx
 {
@@ -128,12 +72,12 @@ public:
     MockTxSpConcise() = default;
 
     /// normal constructor: new tx
-    MockTxSpConcise(std::vector<MockENoteImageSpV1> &input_images,
-        std::vector<MockENoteSpV1> &outputs,
-        std::shared_ptr<MockBalanceProofSpV1> &balance_proof,
-        std::vector<MockImageProofSpV1> &image_proofs,
-        std::vector<MockMembershipProofSpV1> &membership_proofs,
-        MockSupplementSpV1 &tx_supplement,
+    MockTxSpConcise(std::vector<MockENoteImageSpV1> input_images,
+        std::vector<MockENoteSpV1> outputs,
+        std::shared_ptr<MockBalanceProofSpV1> balance_proof,
+        std::vector<MockImageProofSpV1> image_proofs,
+        std::vector<MockMembershipProofSpV1> membership_proofs,
+        MockSupplementSpV1 tx_supplement,
         ValidationRulesVersion validation_rules_version) :
             m_input_images{std::move(input_images)},
             m_outputs{std::move(outputs)},
@@ -150,6 +94,21 @@ public:
             m_tx_format_version = TxStructureVersionSp::TxTypeSpConciseGrootle1;
             m_tx_validation_rules_version = validation_rules_version;
         }
+
+    /// normal constructor: overload
+    MockTxSpConcise(MockTxPartialSpV1 partial_tx,
+        std::vector<MockMembershipProofSpV1> membership_proofs,
+        ValidationRulesVersion validation_rules_version) :
+            MockTxSpConcise{
+                std::move(partial_tx.m_input_images),
+                std::move(partial_tx.m_outputs),
+                std::move(partial_tx.m_balance_proof),
+                std::move(partial_tx.m_image_proofs),
+                std::move(membership_proofs),
+                std::move(partial_tx.m_tx_supplement),
+                validation_rules_version
+            }
+    {}
 
     /// normal constructor: from existing tx byte blob
     //mock tx doesn't do this

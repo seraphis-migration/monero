@@ -41,10 +41,17 @@
 //third party headers
 
 //standard headers
+#include <memory>
 #include <string>
 #include <vector>
 
 //forward declarations
+namespace mock_tx
+{ 
+    class MockTxPartialSpV1;
+    class MockTxProposalSpV1;
+    class MockTxPartialInputSpV1;
+}
 
 
 namespace mock_tx
@@ -72,31 +79,15 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     const std::shared_ptr<const MockBalanceProofSpV1> &balance_proof,
     const MockSupplementSpV1 &tx_supplement);
 /**
-* brief: gen_mock_sp_inputs_v1 - create random mock inputs
-* param: in_amounts -
-* return: set of transaction inputs ready to spend
+* brief: sort_tx_inputs_sp_v1 - sort tx inputs
+*   sort order: key images ascending with byte-wise comparisons
+* inoutparam: input_images_inout -
+* inoutparam: tx_image_proofs_inout -
+* inoutparam: tx_membership_proofs_inout -
 */
-std::vector<MockInputProposalSpV1> gen_mock_sp_inputs_v1(const std::vector<rct::xmr_amount> in_amounts);
-/**
-* brief: gen_mock_sp_membership_ref_sets_v1 - create random reference sets for tx inputs, with real spend at a random index,
-*   and update mock ledger to include all members of the reference set
-* param: inputs -
-* param: ref_set_decomp_n -
-* param: ref_set_decomp_m -
-* inoutparam: ledger_context_inout -
-* return: set of membership proof reference sets
-*/
-std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
-    const std::vector<MockInputProposalSpV1> &inputs,
-    const std::size_t ref_set_decomp_n,
-    const std::size_t ref_set_decomp_m,
-    std::shared_ptr<MockLedgerContext> ledger_context_inout);
-/**
-* brief: gen_mock_sp_dests_v1 - create random mock destinations
-* param: out_amounts -
-* return: set of generated destinations
-*/
-std::vector<MockDestinationSpV1> gen_mock_sp_dests_v1(const std::vector<rct::xmr_amount> &out_amounts);
+void sort_tx_inputs_sp_v1(std::vector<MockENoteImageSpV1> &input_images_inout,
+    std::vector<MockImageProofSpV1> &tx_image_proofs_inout,
+    std::vector<MockMembershipProofSpV1> &tx_membership_proofs_inout);  //UNUSED?
 /**
 * brief: make_v1_tx_outputs_sp_v1 - make v1 tx outputs
 *   TODO: special treatment of change dest for 2-out tx (expect both outputs to have same enote pub key, only store 1)
@@ -113,12 +104,12 @@ void make_v1_tx_outputs_sp_v1(const std::vector<MockDestinationSpV1> &destinatio
     MockSupplementSpV1 &tx_supplement_inout);
 /**
 * brief: make_v1_tx_image_sp_v1 - make all v1 input images for a tx EXCEPT LAST
-* param: input_to_spend -
+* param: input_proposal -
 * outparam: input_image_out -
 * outparam: image_address_mask_out -
 * outparam: image_amount_mask_out -
 */
-void make_v1_tx_image_sp_v1(const MockInputProposalSpV1 &input_to_spend,
+void make_v1_tx_image_sp_v1(const MockInputProposalSpV1 &input_proposal,
     MockENoteImageSpV1 &input_image_out,
     crypto::secret_key &image_address_mask_out,
     crypto::secret_key &image_amount_mask_out);
@@ -126,14 +117,14 @@ void make_v1_tx_image_sp_v1(const MockInputProposalSpV1 &input_to_spend,
 * brief: make_v1_tx_image_last_sp_v1 - make LAST v1 input image for a tx
 *   - last amount commitment total blinding factor (v_c) equals sum of output amount blinding factors (y_t)
 *      minus sum input blinding factors (v_c_except_last)
-* param: input_to_spend -
+* param: input_proposal -
 * param: output_amount_commitment_blinding_factors -
 * param: input_amount_blinding_factors -
 * outparam: input_image_out -
 * outparam: image_address_mask_out -
 * outparam: image_amount_mask_out -
 */
-void make_v1_tx_image_last_sp_v1(const MockInputProposalSpV1 &input_to_spend,
+void make_v1_tx_image_last_sp_v1(const MockInputProposalSpV1 &input_proposal,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
     const std::vector<crypto::secret_key> &input_amount_blinding_factors,
     MockENoteImageSpV1 &input_image_out,
@@ -141,51 +132,51 @@ void make_v1_tx_image_last_sp_v1(const MockInputProposalSpV1 &input_to_spend,
     crypto::secret_key &image_amount_mask_out);
 /**
 * brief: make_v1_tx_images_sp_v1 - make all v1 input images for a tx
-* param: inputs_to_spend -
+* param: input_proposals -
 * param: output_amount_commitment_blinding_factors -
 * outparam: input_images_out -
 * outparam: image_address_masks_out -
 * outparam: image_amount_masks_out -
 */
-void make_v1_tx_images_sp_v1(const std::vector<MockInputProposalSpV1> &inputs_to_spend,
+void make_v1_tx_images_sp_v1(const std::vector<MockInputProposalSpV1> &input_proposals,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
     std::vector<MockENoteImageSpV1> &input_images_out,
     std::vector<crypto::secret_key> &image_address_masks_out,
-    std::vector<crypto::secret_key> &image_amount_masks_out);
+    std::vector<crypto::secret_key> &image_amount_masks_out);  //UNUSED?
 /**
 * brief: make_v1_tx_image_proof_sp_v1 - make a v1 tx input image proof (seraphis composition proof)
-* param: input_to_spend -
+* param: input_proposal -
 * param: input_image -
 * param: image_address_mask -
 * param: message -
 * outparam: tx_image_proof_out -
 */
-void make_v1_tx_image_proof_sp_v1(const MockInputProposalSpV1 &input_to_spend,
+void make_v1_tx_image_proof_sp_v1(const MockInputProposalSpV1 &input_proposal,
     const MockENoteImageSpV1 &input_image,
     const crypto::secret_key &image_address_mask,
     const rct::key &message,
     MockImageProofSpV1 &tx_image_proof_out);
 /**
 * brief: make_v1_tx_image_proofs_sp_v1 - make v1 tx input image proofs (seraphis composition proofs: 1 per input)
-* param: inputs_to_spend -
+* param: input_proposals -
 * param: input_images -
 * param: image_address_masks -
 * param: message -
 * outparam: tx_image_proofs_out -
 */
-void make_v1_tx_image_proofs_sp_v1(const std::vector<MockInputProposalSpV1> &inputs_to_spend,
+void make_v1_tx_image_proofs_sp_v1(const std::vector<MockInputProposalSpV1> &input_proposals,
     const std::vector<MockENoteImageSpV1> &input_images,
     const std::vector<crypto::secret_key> &image_address_masks,
     const rct::key &message,
-    std::vector<MockImageProofSpV1> &tx_image_proofs_out);
+    std::vector<MockImageProofSpV1> &tx_image_proofs_out);  //UNUSED?
 /**
-* brief: make_v1_tx_balance_proof_rct_v1 - make v1 tx balance proof (BP+ for range proofs; balance is implicit)
+* brief: make_v1_tx_balance_proof_sp_v1 - make v1 tx balance proof (BP+ for range proofs; balance is implicit)
 * param: output_amounts -
 * param: output_amount_commitment_blinding_factors -
 * param: max_rangeproof_splits -
 * outparam: balance_proof_out -
 */
-void make_v1_tx_balance_proof_rct_v1(const std::vector<rct::xmr_amount> &output_amounts,
+void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &output_amounts,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
     const std::size_t max_rangeproof_splits,
     std::shared_ptr<MockBalanceProofSpV1> &balance_proof_out);
@@ -196,6 +187,10 @@ void make_v1_tx_balance_proof_rct_v1(const std::vector<rct::xmr_amount> &output_
 * param: image_amount_mask -
 * outparam: tx_membership_proof_out -
 */
+void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
+    const crypto::secret_key &image_address_mask,
+    const crypto::secret_key &image_amount_mask,
+    MockMembershipProofSortableSpV1 &tx_membership_proof_out);
 void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
@@ -210,16 +205,20 @@ void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &mem
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
+    std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_out);
+void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
+    const MockTxPartialSpV1 &partial_tx,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out);
 /**
-* brief: sort_tx_inputs_sp_v1 - sort tx inputs
-*   sort order: key images ascending with byte-wise comparisons
-* inoutparam: input_images_inout -
-* inoutparam: tx_image_proofs_inout -
-* inoutparam: tx_membership_proofs_inout -
+* brief: make_v1_tx_partial_inputs_sp_v1 - make a full set of v1 partial inputs
+* param: input_proposals -
+* param: proposal_prefix -
+* param: tx_proposal -
+* outparam: partial_inputs_out -
 */
-void sort_tx_inputs_sp_v1(std::vector<MockENoteImageSpV1> &input_images_inout,
-    std::vector<MockImageProofSpV1> &tx_image_proofs_inout,
-    std::vector<MockMembershipProofSpV1> &tx_membership_proofs_inout);
+void make_v1_tx_partial_inputs_sp_v1(const std::vector<MockInputProposalSpV1> &input_proposals,
+    const rct::key &proposal_prefix,
+    const MockTxProposalSpV1 &tx_proposal,
+    std::vector<MockTxPartialInputSpV1> &partial_inputs_out);
 
 } //namespace mock_tx

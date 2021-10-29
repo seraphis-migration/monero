@@ -114,6 +114,19 @@ struct MockMembershipProofSpV1 final
 };
 
 ////
+// MockMembershipProofSortableSpV1 - Sortable Membership Proof V1
+// - not technically 'sortable', the masked address can be used to match this membership proof with its input image
+//   - note: matching can fail if a masked address is reused in a tx, but that is an implementation error!
+///
+struct MockMembershipProofSortableSpV1 final
+{
+    /// masked address used in the membership proof (for matching with actual input image)
+    rct::key m_masked_address;
+    /// the membership proof
+    MockMembershipProofSpV1 m_membership_proof;
+};
+
+////
 // MockImageProofSpV1 - ENote Image Proof V1: ownership and unspentness (legitimacy of key image)
 // - Seraphis composition proof
 ///
@@ -161,54 +174,6 @@ struct MockSupplementSpV1 final
     /// encoded payment ID: none in mockup
 
     std::size_t get_size_bytes() const;
-};
-
-////
-// MockInputProposalSpV1 - Input V1
-///
-struct MockInputProposalSpV1 final : public MockInputProposalSp
-{
-    MockENoteSpV1 m_enote;
-    rct::key m_enote_pubkey;
-
-    /// generate a v1 input (all random; does not support info recovery)
-    void gen(const rct::xmr_amount amount);
-
-protected:
-    virtual const MockENoteSp& get_enote_base() const { return m_enote; }
-};
-
-////
-// MockMembershipReferenceSetSpV1 - Records info about a membership reference set
-///
-struct MockMembershipReferenceSetSpV1 final
-{
-    std::size_t m_ref_set_decomp_n;
-    std::size_t m_ref_set_decomp_m;
-    std::vector<std::size_t> m_ledger_enote_indices;
-    std::vector<MockENoteSpV1> m_referenced_enotes;
-    std::size_t m_real_spend_index_in_set;
-};
-
-////
-// MockDestinationSpV1 - Destination V1
-///
-struct MockDestinationSpV1 final : public MockDestinationSp
-{
-    /// r_t
-    crypto::secret_key m_enote_privkey;
-
-    /// get the amount blinding factor
-    void get_amount_blinding_factor(const std::size_t output_index, crypto::secret_key &amount_blinding_factor) const;
-
-    /// convert this destination into a v1 enote
-    MockENoteSpV1 to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const;
-
-    /**
-    * brief: gen - generate a V1 Destination (random)
-    * param: amount -
-    */
-    void gen(const rct::xmr_amount amount);
 };
 
 } //namespace mock_tx

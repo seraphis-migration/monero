@@ -38,6 +38,7 @@ set(mock_tx_sources
   mock_sp_component_builders.cpp
   mock_sp_component_types.cpp
   mock_sp_core_utils.cpp
+  mock_sp_transaction_builders.cpp
   mock_sp_tx_concise.cpp
   mock_sp_validators.cpp
   mock_tx.cpp
