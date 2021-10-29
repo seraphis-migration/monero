@@ -368,7 +368,7 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &output_a
         balance_proof_out = std::make_shared<MockBalanceProofSpV1>();
 
     // make range proofs
-    std::vector<const rct::BulletproofPlus> range_proofs;
+    std::vector<rct::BulletproofPlus> range_proofs;
 
     rct::keyV amount_commitment_blinding_factors;
     amount_commitment_blinding_factors.reserve(output_amount_commitment_blinding_factors.size());

@@ -206,7 +206,7 @@ bool validate_mock_tx_sp_amount_balance_v1(const std::vector<MockENoteImageSpV1>
     if (balance_proof.get() == nullptr)
         return false;
 
-    const std::vector<const rct::BulletproofPlus> &range_proofs = balance_proof->m_bpp_proofs;
+    const std::vector<rct::BulletproofPlus> &range_proofs = balance_proof->m_bpp_proofs;
 
     // sanity check
     if (range_proofs.size() == 0)
