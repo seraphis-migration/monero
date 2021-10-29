@@ -30,7 +30,7 @@
 
 #include "crypto/crypto.h"
 #include "device/device.hpp"
-#include "mock_tx/mock_sp_component_types.h"
+#include "mock_tx/mock_sp_transaction_component_types.h"
 #include "mock_tx/mock_sp_core_utils.h"
 #include "performance_tests.h"
 #include "ringct/rctOps.h"

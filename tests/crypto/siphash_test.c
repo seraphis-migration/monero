@@ -13,6 +13,7 @@
  */
 
 #include "crypto/siphash.h"
+#include "crypto-tests.h"
 #include "siphash_test_vectors.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -42,7 +43,7 @@ const char *labels[4] = {
 
 size_t lengths[4] = {8, 16, 4, 8};
 
-int siphash_test() {
+int siphash_test(void) {
     uint8_t in[64], out[16], k[16];
     int i;
     bool any_failed = false;

@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_sp_component_builders.h"
+#include "mock_sp_transaction_utils.h"
 
 //local headers
 #include "common/varint.h"
@@ -42,8 +42,8 @@ extern "C"
 #include "grootle.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
-#include "mock_sp_component_types.h"
-#include "mock_sp_transaction_builders.h"
+#include "mock_sp_transaction_builder_types.h"
+#include "mock_sp_transaction_component_types.h"
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
@@ -368,7 +368,7 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &output_a
         balance_proof_out = std::make_shared<MockBalanceProofSpV1>();
 
     // make range proofs
-    std::vector<rct::BulletproofPlus> range_proofs;
+    std::vector<const rct::BulletproofPlus> range_proofs;
 
     rct::keyV amount_commitment_blinding_factors;
     amount_commitment_blinding_factors.reserve(output_amount_commitment_blinding_factors.size());
@@ -524,6 +524,98 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<MockInputProposalSpV1> &i
 
     // make last input
     partial_inputs_out.emplace_back(input_proposals.back(), proposal_prefix, tx_proposal, partial_inputs_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<MockInputProposalSpV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts)
+{
+    // generate random inputs
+    std::vector<MockInputProposalSpV1> input_proposals;
+    input_proposals.resize(in_amounts.size());
+
+    for (std::size_t input_index{0}; input_index < in_amounts.size(); ++input_index)
+    {
+        input_proposals[input_index].gen(in_amounts[input_index]);
+    }
+
+    return input_proposals;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
+    const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    std::shared_ptr<MockLedgerContext> ledger_context_inout)
+{
+    std::vector<MockENoteSpV1> input_enotes;
+    input_enotes.reserve(input_proposals.size());
+
+    for (const auto &input_proposal : input_proposals)
+    {
+        input_enotes.emplace_back(input_proposal.m_enote);
+    }
+
+    return gen_mock_sp_membership_ref_sets_v1(input_enotes, ref_set_decomp_n, ref_set_decomp_m, ledger_context_inout);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
+    const std::vector<MockENoteSpV1> &input_enotes,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    std::shared_ptr<MockLedgerContext> ledger_context_inout)
+{
+    std::vector<MockMembershipReferenceSetSpV1> reference_sets;
+    reference_sets.resize(input_enotes.size());
+
+    std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};  // n^m
+
+    for (std::size_t input_index{0}; input_index < input_enotes.size(); ++input_index)
+    {
+        reference_sets[input_index].m_ref_set_decomp_n = ref_set_decomp_n;
+        reference_sets[input_index].m_ref_set_decomp_m = ref_set_decomp_m;
+        reference_sets[input_index].m_real_spend_index_in_set = crypto::rand_idx(ref_set_size);  // pi
+
+        reference_sets[input_index].m_ledger_enote_indices.resize(ref_set_size);
+        reference_sets[input_index].m_referenced_enotes.resize(ref_set_size);
+
+        for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
+        {
+            // add real input at pi
+            if (ref_index == reference_sets[input_index].m_real_spend_index_in_set)
+            {
+                reference_sets[input_index].m_referenced_enotes[ref_index] = input_enotes[input_index];
+            }
+            // add dummy enote
+            else
+            {
+                reference_sets[input_index].m_referenced_enotes[ref_index].gen();
+            }
+
+            // insert referenced enote into mock ledger
+            // note: in a real context, you would instead 'get' the enote's index from the ledger, and error if not found
+            reference_sets[input_index].m_ledger_enote_indices[ref_index] =
+                ledger_context_inout->add_enote_sp_v1(reference_sets[input_index].m_referenced_enotes[ref_index]);
+        }
+    }
+
+    return reference_sets;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<MockDestinationSpV1> gen_mock_sp_dests_v1(const std::vector<rct::xmr_amount> &out_amounts)
+{
+    // randomize destination order
+    std::vector<rct::xmr_amount> randomized_out_amounts{out_amounts};
+    std::shuffle(randomized_out_amounts.begin(), randomized_out_amounts.end(), crypto::random_device{});
+
+    // generate random destinations
+    std::vector<MockDestinationSpV1> destinations;
+    destinations.resize(randomized_out_amounts.size());
+
+    for (std::size_t dest_index{0}; dest_index < randomized_out_amounts.size(); ++dest_index)
+    {
+        destinations[dest_index].gen(randomized_out_amounts[dest_index]);
+    }
+
+    return destinations;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx

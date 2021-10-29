@@ -32,7 +32,7 @@
 #pragma once
 
 //local headers
-#include "mock_sp_component_types.h"
+#include "mock_sp_transaction_component_types.h"
 #include "ringct/rctTypes.h"
 
 //third party headers

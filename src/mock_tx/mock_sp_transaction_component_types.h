@@ -146,7 +146,7 @@ struct MockImageProofSpV1 final
 struct MockBalanceProofSpV1 final
 {
     /// a set of BP+ proofs
-    std::vector<rct::BulletproofPlus> m_bpp_proofs;
+    std::vector<const rct::BulletproofPlus> m_bpp_proofs;
 
     /**
     * brief: append_to_string - convert bpp proofs to a string and append to existing string

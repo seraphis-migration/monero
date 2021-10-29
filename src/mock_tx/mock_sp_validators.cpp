@@ -35,8 +35,8 @@
 #include "crypto/crypto.h"
 #include "grootle.h"
 #include "ledger_context.h"
-#include "mock_sp_component_builders.h"
-#include "mock_sp_component_types.h"
+#include "mock_sp_transaction_component_types.h"
+#include "mock_sp_transaction_utils.h"
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
@@ -206,7 +206,7 @@ bool validate_mock_tx_sp_amount_balance_v1(const std::vector<MockENoteImageSpV1>
     if (balance_proof.get() == nullptr)
         return false;
 
-    const std::vector<rct::BulletproofPlus> &range_proofs = balance_proof->m_bpp_proofs;
+    const std::vector<const rct::BulletproofPlus> &range_proofs = balance_proof->m_bpp_proofs;
 
     // sanity check
     if (range_proofs.size() == 0)
