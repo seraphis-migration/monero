@@ -212,7 +212,6 @@ private:
 
 
 
-
 void domain_separate_derivation_hash_siphash(const std::string &domain_separator,
     const crypto::key_derivation &derivation,
     const std::size_t index,
@@ -305,6 +304,7 @@ bool try_get_seraphis_nominal_spend_key_siphash(const crypto::key_derivation &se
     return true;
 }
 
+// seraphis view-key scanning with siphash hsah function
 class test_view_scan_sp_siphash
 {
 public:
@@ -379,6 +379,12 @@ private:
 
 
 
+////
+// Plain perf test of hash functions eligible for making view tags
+// - cn_fast_hash
+// - siphash
+// - blake2b
+///
 struct ParamsShuttleViewHash final : public ParamsShuttle
 {
     std::string domain_separator;

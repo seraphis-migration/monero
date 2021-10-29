@@ -189,12 +189,13 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_cnhash);
   TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_b2bhash);
 
-  p_view_hash.domain_separator = "tag";
+  p_view_hash.domain_separator = "tag";  // test a smaller hash message
 
   TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_siphash);
   TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_halfsiphash);
   TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_cnhash);
   TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_b2bhash);
+
 
   // test view scan performance with view tags
   TEST_PERFORMANCE0(filter, p, test_view_scan_cn);
