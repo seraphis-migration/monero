@@ -119,7 +119,7 @@ bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &c
 void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
     const std::size_t max_rangeproof_splits,
-    std::vector<const rct::BulletproofPlus> &range_proofs_out)
+    std::vector<rct::BulletproofPlus> &range_proofs_out)
 {
     /// range proofs
     // - for output amount commitments

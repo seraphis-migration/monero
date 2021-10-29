@@ -446,7 +446,7 @@ void make_v1_tx_balance_proof_rct_v1(const std::vector<rct::xmr_amount> &output_
         balance_proof_out = std::make_shared<MockRctBalanceProofV1>();
 
     // make range proofs (punt to BP+ builder)
-    std::vector<const rct::BulletproofPlus> range_proofs;
+    std::vector<rct::BulletproofPlus> range_proofs;
 
     make_bpp_rangeproofs(output_amounts,
         amount_commitment_blinding_factors,
@@ -590,7 +590,7 @@ bool validate_mock_tx_rct_amount_balance_v1(const std::vector<MockENoteImageRctV
     if (balance_proof.get() == nullptr)
         return false;
 
-    const std::vector<const rct::BulletproofPlus> &range_proofs = balance_proof->m_bpp_proofs;
+    const std::vector<rct::BulletproofPlus> &range_proofs = balance_proof->m_bpp_proofs;
 
     // sanity check
     if (range_proofs.size() == 0)
