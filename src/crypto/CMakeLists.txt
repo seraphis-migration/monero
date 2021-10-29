@@ -44,6 +44,7 @@ set(crypto_sources
   keccak.c
   oaes_lib.c
   random.c
+  siphash.c
   skein.c
   slow-hash.c
   rx-slow-hash.c
