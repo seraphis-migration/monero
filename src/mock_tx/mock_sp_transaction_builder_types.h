@@ -52,7 +52,9 @@ namespace mock_tx
 ///
 struct MockInputProposalSpV1 final : public MockInputProposalSp
 {
+    /// the enote to spend (e.g. found in the ledger, or in a tx that has not been added to the ledger)
     MockENoteSpV1 m_enote;
+    /// the enote's pubkey (these are not stored in enotes directly)
     rct::key m_enote_pubkey;
 
     /// generate a v1 input (all random; does not support info recovery)
@@ -60,18 +62,6 @@ struct MockInputProposalSpV1 final : public MockInputProposalSp
 
 protected:
     virtual const MockENoteSp& get_enote_base() const { return m_enote; }
-};
-
-////
-// MockMembershipReferenceSetSpV1 - Records info about a membership reference set
-///
-struct MockMembershipReferenceSetSpV1 final
-{
-    std::size_t m_ref_set_decomp_n;
-    std::size_t m_ref_set_decomp_m;
-    std::vector<std::size_t> m_ledger_enote_indices;
-    std::vector<MockENoteSpV1> m_referenced_enotes;
-    std::size_t m_real_spend_index_in_set;
 };
 
 ////
@@ -93,6 +83,35 @@ struct MockDestinationSpV1 final : public MockDestinationSp
     * param: amount -
     */
     void gen(const rct::xmr_amount amount);
+};
+
+////
+// MockMembershipReferenceSetSpV1 - Records info about a membership reference set, for producing a membership proof
+///
+struct MockMembershipReferenceSetSpV1 final
+{
+    /// ref set size = n^m
+    std::size_t m_ref_set_decomp_n;
+    std::size_t m_ref_set_decomp_m;
+    /// locations in the ledger of the referenced enotes; only enotes in the ledger can have a membership proof
+    std::vector<std::size_t> m_ledger_enote_indices;
+    /// the referenced enotes
+    std::vector<MockENoteSpV1> m_referenced_enotes;
+    /// the index in the referenced enotes vector of the enote who will be proven a member of the ref set (via its image)
+    std::size_t m_real_spend_index_in_set;
+};
+
+////
+// MockMembershipProofSortableSpV1 - Sortable Membership Proof V1
+// - not technically 'sortable', the masked address can be used to match this membership proof with its input image
+//   - note: matching can fail if a masked address is reused in a tx, but that is almost definitely an implementation error!
+///
+struct MockMembershipProofSortableSpV1 final
+{
+    /// masked address used in the membership proof (for matching with actual input image)
+    rct::key m_masked_address;
+    /// the membership proof
+    MockMembershipProofSpV1 m_membership_proof;
 };
 
 ////
@@ -128,11 +147,15 @@ public:
 
 //member variables
 private:
+    /// proposed destinations
     std::vector<MockDestinationSpV1> m_destinations;
-    //TODO: miscellaneous memo(s)
+    /// proposed outputs (created from the destinations)
     std::vector<MockENoteSpV1> m_outputs;
+    /// proposed tx supplement
     MockSupplementSpV1 m_tx_supplement;
+    /// balance proof for the tx (i.e. range proofs for the new output enotes)
     std::shared_ptr<MockBalanceProofSpV1> m_balance_proof;
+    //TODO: miscellaneous memo(s)
 };
 
 ////
@@ -185,16 +208,23 @@ public:
 
 //member variables
 private:
+    /// input's image
     MockENoteImageSpV1 m_input_image;
+    /// input image's proof (demonstrates ownership of the underlying enote, and that the key image is correct)
     MockImageProofSpV1 m_image_proof;
+    /// image masks
     crypto::secret_key m_image_address_mask;
     crypto::secret_key m_image_amount_mask;
 
+    /// proposal prefix (represents the set of destinations and memos; image proofs must sign this)
     rct::key m_proposal_prefix;
 
+    /// the input enote (won't be recorded in the final tx)
     MockENoteSpV1 m_input_enote;
+    /// input amount
     rct::xmr_amount m_input_amount;
-    crypto::secret_key m_input_amount_blinding_factor;  // has no getter, it is only used for making the last input
+    /// input amount commitment's blinding factor; only used for making the last input in a tx
+    crypto::secret_key m_input_amount_blinding_factor;
 };
 
 ////
