@@ -32,8 +32,10 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "device/device.hpp"
-#include "mock_tx/mock_sp_transaction_component_types.h"
 #include "mock_tx/mock_sp_core_utils.h"
+#include "mock_tx/mock_sp_transaction_component_types.h"
+#include "mock_tx/mock_sp_transaction_utils.h"
+#include "mock_tx/mock_sp_tx_concise.h"
 #include "mock_tx/mock_tx_utils.h"
 #include "mock_tx/seraphis_composition_proof.h"
 #include "mock_tx/seraphis_crypto_utils.h"
@@ -105,6 +107,96 @@ static void make_fake_sp_user_keys(rct::key &recipient_DH_base_out,
     make_pubkey(recipient_DH_base_out);
     make_secret_key(recipient_view_privkey_out);
     make_secret_key(recipient_spendbase_privkey_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+static std::shared_ptr<mock_tx::MockTxSpConcise> make_sp_txtype_concise_v1(const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    const std::size_t max_rangeproof_splits,
+    const std::vector<rct::xmr_amount> &in_amounts,
+    const std::vector<rct::xmr_amount> &out_amounts,
+    const mock_tx::MockTxSpConcise::ValidationRulesVersion validation_rules_version,
+    std::shared_ptr<mock_tx::MockLedgerContext> ledger_context_inout)
+{
+    /// build a tx from base components
+    using namespace mock_tx;
+
+    CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "Tried to make tx without any inputs.");
+    CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "Tried to make tx without any outputs.");
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts),
+        "Tried to make tx with unbalanced amounts.");
+
+    // make mock inputs
+    // enote, ks, view key stuff, amount, amount blinding factor
+    std::vector<MockInputProposalSpV1> input_proposals{gen_mock_sp_input_proposals_v1(in_amounts)};
+
+    // make mock destinations
+    // - (in practice) for 2-out tx, need special treatment when making change/dummy destination
+    std::vector<MockDestinationSpV1> destinations{gen_mock_sp_dests_v1(out_amounts)};
+
+    // membership proof ref sets
+    std::vector<MockENoteSpV1> input_enotes;
+    input_enotes.reserve(input_proposals.size());
+
+    for (const auto &input_proposal : input_proposals)
+        input_enotes.emplace_back(input_proposal.m_enote);
+
+    std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets{
+            gen_mock_sp_membership_ref_sets_v1(input_enotes,
+                ref_set_decomp_n,
+                ref_set_decomp_m,
+                ledger_context_inout)
+        };
+
+    // versioning for proofs (v1)
+    std::string version_string;
+    version_string.reserve(3);
+    MockTxSpConcise::get_versioning_string(validation_rules_version, version_string);
+
+    /// make tx
+    // tx components
+    std::vector<MockENoteImageSpV1> input_images;
+    std::vector<MockENoteSpV1> outputs;
+    std::shared_ptr<MockBalanceProofSpV1> balance_proof;
+    std::vector<MockImageProofSpV1> tx_image_proofs;
+    std::vector<MockMembershipProofSortableSpV1> tx_membership_proofs_sortable;
+    std::vector<MockMembershipProofSpV1> tx_membership_proofs;
+    MockSupplementSpV1 tx_supplement;
+
+    // info shuttles for making components
+    std::vector<rct::xmr_amount> output_amounts;
+    std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
+    std::vector<crypto::secret_key> image_address_masks;
+    std::vector<crypto::secret_key> image_amount_masks;
+
+    make_v1_tx_outputs_sp_v1(destinations,
+        outputs,
+        output_amounts,  //slightly redundant here with 'out_amounts', but added to demonstrate API
+        output_amount_commitment_blinding_factors,
+        tx_supplement);
+    make_v1_tx_images_sp_v1(input_proposals,
+        output_amount_commitment_blinding_factors,
+        input_images,
+        image_address_masks,
+        image_amount_masks);
+    make_v1_tx_balance_proof_sp_v1(output_amounts, //note: independent of inputs (just range proofs output commitments)
+        output_amount_commitment_blinding_factors,
+        max_rangeproof_splits,
+        balance_proof);
+    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, balance_proof, tx_supplement)};
+    make_v1_tx_image_proofs_sp_v1(input_proposals,
+        input_images,
+        image_address_masks,
+        image_proofs_message,
+        tx_image_proofs);
+    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets,
+        image_address_masks,
+        image_amount_masks,
+        tx_membership_proofs_sortable);
+    sort_tx_inputs_sp_v1(tx_membership_proofs_sortable, tx_membership_proofs, input_images, tx_image_proofs);
+
+    return std::make_shared<MockTxSpConcise>(std::move(input_images), std::move(outputs),
+        std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),
+        std::move(tx_supplement), MockTxSpConcise::ValidationRulesVersion::ONE);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -511,5 +603,41 @@ TEST(seraphis, enote_v1_information_recovery)
         hw::get_device("default"),
         sender_receiver_secret2);
     EXPECT_TRUE(sender_receiver_secret2 == sender_receiver_secret);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis, sp_txtype_concise_v1)
+{
+    // fake ledger context for this test
+    std::shared_ptr<mock_tx::MockLedgerContext> ledger_context = std::make_shared<mock_tx::MockLedgerContext>();
+
+    // 3 tx, 11 inputs/outputs each, range proofs split x3
+    std::vector<std::shared_ptr<mock_tx::MockTxSpConcise>> txs;
+    txs.reserve(3);
+
+    std::vector<rct::xmr_amount> in_amounts;
+    std::vector<rct::xmr_amount> out_amounts;
+
+    for (int i{0}; i < 11; ++i)
+    {
+        in_amounts.push_back(2);
+        out_amounts.push_back(2);
+    }
+
+    for (std::size_t tx_index{0}; tx_index < 3; ++tx_index)
+    {
+        txs.emplace_back(
+                make_sp_txtype_concise_v1(2, 3, 3, in_amounts, out_amounts,
+                    mock_tx::MockTxSpConcise::ValidationRulesVersion::ONE, ledger_context)
+            );
+    }
+
+    EXPECT_TRUE(mock_tx::validate_mock_txs<mock_tx::MockTxSpConcise>(txs, ledger_context));
+
+    // insert key images to ledger
+    for (const auto &tx : txs)
+        tx->add_key_images_to_ledger(ledger_context);
+
+    // validation should fail due to double-spend
+    EXPECT_FALSE(mock_tx::validate_mock_txs<mock_tx::MockTxSpConcise>(txs, ledger_context));
 }
 //-------------------------------------------------------------------------------------------------------------------

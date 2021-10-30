@@ -257,54 +257,6 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
     // make tx
     return std::make_shared<MockTxSpConcise>(input_proposals, params.max_rangeproof_splits, destinations,
         membership_ref_sets, MockTxSpConcise::ValidationRulesVersion::ONE);
-
-
-/*
-    /// make tx
-    // tx components
-    std::vector<MockENoteImageSpV1> input_images;
-    std::vector<MockENoteSpV1> outputs;
-    std::shared_ptr<MockBalanceProofSpV1> balance_proof;
-    std::vector<MockImageProofSpV1> tx_image_proofs;
-    std::vector<MockMembershipProofSpV1> tx_membership_proofs;
-    MockSupplementSpV1 tx_supplement;
-
-    // info shuttles for making components
-    std::vector<rct::xmr_amount> output_amounts;
-    std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
-    std::vector<crypto::secret_key> image_address_masks;
-    std::vector<crypto::secret_key> image_amount_masks;
-
-    make_v1_tx_outputs_sp_v1(destinations,
-        outputs,
-        output_amounts,  //slightly redundant here with 'out_amounts', but added to demonstrate API
-        output_amount_commitment_blinding_factors,
-        tx_supplement);
-    make_v1_tx_images_sp_v1(input_proposals,
-        output_amount_commitment_blinding_factors,
-        input_images,
-        image_address_masks,
-        image_amount_masks);
-    make_v1_tx_balance_proof_sp_v1(output_amounts, //note: independent of inputs (just range proofs output commitments)
-        output_amount_commitment_blinding_factors,
-        params.max_rangeproof_splits,
-        balance_proof);
-    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, balance_proof, tx_supplement)};
-    make_v1_tx_image_proofs_sp_v1(input_proposals,
-        input_images,
-        image_address_masks,
-        image_proofs_message,
-        tx_image_proofs);
-    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets,
-        image_address_masks,
-        image_amount_masks,
-        tx_membership_proofs);
-    sort_tx_inputs_sp_v1(input_images, tx_image_proofs, tx_membership_proofs);
-
-    return std::make_shared<MockTxSpConcise>(std::move(input_images), std::move(outputs),
-        std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),
-        std::move(tx_supplement), MockTxSpConcise::ValidationRulesVersion::ONE);
-*/
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>

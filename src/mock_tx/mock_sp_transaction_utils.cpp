@@ -106,12 +106,13 @@ rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &e
     return hash_result;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void sort_tx_inputs_sp_v1(std::vector<MockENoteImageSpV1> &input_images_inout,
-    std::vector<MockImageProofSpV1> &tx_image_proofs_inout,
-    std::vector<MockMembershipProofSpV1> &tx_membership_proofs_inout)
+void sort_tx_inputs_sp_v1(const std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_sortable,
+    std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out,
+    std::vector<MockENoteImageSpV1> &input_images_inout,
+    std::vector<MockImageProofSpV1> &tx_image_proofs_inout)
 {
     CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == tx_image_proofs_inout.size(), "Input components size mismatch");
-    CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == tx_membership_proofs_inout.size(), "Input components size mismatch");
+    CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == tx_membership_proofs_sortable.size(), "Input components size mismatch");
 
     std::vector<std::size_t> original_indices;
     original_indices.resize(input_images_inout.size());
@@ -140,13 +141,13 @@ void sort_tx_inputs_sp_v1(std::vector<MockENoteImageSpV1> &input_images_inout,
     {
         input_images_sorted.emplace_back(std::move(input_images_inout[old_index]));
         tx_image_proofs_sorted.emplace_back(std::move(tx_image_proofs_inout[old_index]));
-        tx_membership_proofs_sorted.emplace_back(std::move(tx_membership_proofs_inout[old_index]));
+        tx_membership_proofs_sorted.emplace_back(std::move(tx_membership_proofs_sortable[old_index].m_membership_proof));
     }
 
     // update inputs
     input_images_inout = std::move(input_images_sorted);
     tx_image_proofs_inout = std::move(tx_image_proofs_sorted);
-    tx_membership_proofs_inout = std::move(tx_membership_proofs_sorted);
+    tx_membership_proofs_out = std::move(tx_membership_proofs_sorted);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void sort_v1_tx_membership_proofs_sp_v1(const MockTxPartialSpV1 &partial_tx,

@@ -76,13 +76,15 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
 /**
 * brief: sort_tx_inputs_sp_v1 - sort tx inputs
 *   sort order: key images ascending with byte-wise comparisons
+* param: tx_membership_proofs_sortable -
+* outparam: tx_membership_proofs_out -
 * inoutparam: input_images_inout -
 * inoutparam: tx_image_proofs_inout -
-* inoutparam: tx_membership_proofs_inout -
 */
-void sort_tx_inputs_sp_v1(std::vector<MockENoteImageSpV1> &input_images_inout,
-    std::vector<MockImageProofSpV1> &tx_image_proofs_inout,
-    std::vector<MockMembershipProofSpV1> &tx_membership_proofs_inout);  //UNUSED?
+void sort_tx_inputs_sp_v1(const std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_sortable,
+    std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out,
+    std::vector<MockENoteImageSpV1> &input_images_inout,
+    std::vector<MockImageProofSpV1> &tx_image_proofs_inout);
 /**
 * brief: sort_v1_tx_membership_proofs_sp_v1 - rearrange membership proofs so they line up with input images in a partial tx
 *   sort order: key images ascending with byte-wise comparisons
