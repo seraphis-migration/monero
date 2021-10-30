@@ -114,19 +114,6 @@ struct MockMembershipProofSpV1 final
 };
 
 ////
-// MockMembershipProofSortableSpV1 - Sortable Membership Proof V1
-// - not technically 'sortable', the masked address can be used to match this membership proof with its input image
-//   - note: matching can fail if a masked address is reused in a tx, but that is an implementation error!
-///
-struct MockMembershipProofSortableSpV1 final
-{
-    /// masked address used in the membership proof (for matching with actual input image)
-    rct::key m_masked_address;
-    /// the membership proof
-    MockMembershipProofSpV1 m_membership_proof;
-};
-
-////
 // MockImageProofSpV1 - ENote Image Proof V1: ownership and unspentness (legitimacy of key image)
 // - Seraphis composition proof
 ///
@@ -149,9 +136,10 @@ struct MockBalanceProofSpV1 final
     std::vector<rct::BulletproofPlus> m_bpp_proofs;
 
     /**
-    * brief: append_to_string - convert bpp proofs to a string and append to existing string
+    * brief: append_to_string - convert bpp proofs to a string and append to existing string (for proof transcripts)
     *   str += {BP1}
-    * param: include_commitments - if false, do not append amount commitments to string
+    * param: include_commitments - if false, do not append amount commitments to string (they may be inserted to proof
+    *   transcript by an output enote append_to_string() call)
     * inoutparam: str_inout - proofs' contents concatenated to a string
     */
     void append_to_string(const bool include_commitments, std::string &str_inout) const;
@@ -169,9 +157,9 @@ struct MockSupplementSpV1 final
 {
     /// R_t: enote pubkeys for outputs
     rct::keyV m_output_enote_pubkeys;
-    /// tx memo: none in mockup
-    /// fee: none in mockup
-    /// encoded payment ID: none in mockup
+    //TODO - tx memo: none in mockup
+    //TODO - fee: none in mockup
+    //TODO - encoded payment ID: none in mockup
 
     std::size_t get_size_bytes() const;
 };

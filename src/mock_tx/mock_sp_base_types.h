@@ -98,7 +98,7 @@ struct MockENoteSp
     virtual void gen_base() final;
 
     /**
-    * brief: append_to_string - convert enote to a string and append to existing string
+    * brief: append_to_string - convert enote to a string and append to existing string (for proof transcripts)
     * inoutparam: str_inout - enote contents concatenated to a string
     */
     virtual void append_to_string(std::string &str_inout) const = 0;
@@ -159,7 +159,7 @@ struct MockInputProposalSp
     virtual void gen_base(const rct::xmr_amount amount) final;
 
 protected:
-    /// inheritor should store the enote this input is trying to spend
+    /// inheritor needs to store the enote this input is trying to spend, then pass it back up to the base class here
     virtual const MockENoteSp& get_enote_base() const = 0;
 };
 
@@ -169,8 +169,11 @@ protected:
 ///
 struct MockDestinationSp
 {
+    /// K^{DH}
     rct::key m_recipient_DHkey;
+    /// K^{vr}
     rct::key m_recipient_viewkey;
+    /// K^s
     rct::key m_recipient_spendkey;
     rct::xmr_amount m_amount;
 

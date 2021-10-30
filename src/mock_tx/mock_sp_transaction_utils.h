@@ -235,7 +235,7 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<MockInputProposalSpV1> &i
 * return: true if amounts balance between inputs and outputs
 */
 bool balance_check_in_out_amnts_sp_v1(const std::vector<MockInputProposalSpV1> &input_proposals,
-    const std::vector<MockDestinationSpV1> &destinations)
+    const std::vector<MockDestinationSpV1> &destinations);
 /**
 * brief: gen_mock_sp_input_proposals_v1 - create random mock inputs
 * param: in_amounts -
