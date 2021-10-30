@@ -149,6 +149,36 @@ void sort_tx_inputs_sp_v1(std::vector<MockENoteImageSpV1> &input_images_inout,
     tx_membership_proofs_inout = std::move(tx_membership_proofs_sorted);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void sort_v1_tx_membership_proofs_sp_v1(const MockTxPartialSpV1 &partial_tx,
+    std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_sortable_in,
+    std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(tx_membership_proofs_sortable_in.size() == partial_tx.m_input_images.size(),
+        "Mismatch between sortable membership proof count and partial tx input image count.");
+
+    tx_membership_proofs_out.clear();
+    tx_membership_proofs_out.reserve(tx_membership_proofs_sortable_in.size());
+
+    for (std::size_t input_index{0}; input_index < partial_tx.m_input_images.size(); ++input_index)
+    {
+        // find the membership proof that matches with the input image at this index
+        auto ordered_membership_proof{
+                std::find_if(tx_membership_proofs_sortable_in.begin(), tx_membership_proofs_sortable_in.end(),
+                        [&](const MockMembershipProofSortableSpV1 &sortable_proof) -> bool
+                        {
+                            return partial_tx.m_input_images[input_index].m_masked_address ==
+                                sortable_proof.m_masked_address;
+                        }
+                    )
+            };
+
+        CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_sortable_in.end(),
+            "Could not find input image to match with a sortable membership proof.");
+
+        tx_membership_proofs_out.emplace_back(std::move(ordered_membership_proof->m_membership_proof));
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     const std::vector<MockENoteSpV1> &output_enotes,
     const std::shared_ptr<const MockBalanceProofSpV1> &balance_proof,
@@ -546,6 +576,26 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<MockInputProposalSpV1> &i
 
     // make last input
     partial_inputs_out.emplace_back(input_proposals.back(), proposal_prefix, tx_proposal, partial_inputs_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool balance_check_in_out_amnts_sp_v1(const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::vector<MockDestinationSpV1> &destinations)
+{
+    std::vector<rct::xmr_amount> in_amounts;
+    std::vector<rct::xmr_amount> out_amounts;
+    in_amounts.reserve(input_proposals.size());
+    out_amounts.reserve(destinations.size());
+
+    for (const auto &input_proposal : input_proposals)
+    {
+        in_amounts.emplace_back(input_proposal.m_amount);
+    }
+    for (const auto &destination : destinations)
+    {
+        out_amounts.emplace_back(destination.m_amount);
+    }
+
+    return balance_check_in_out_amnts(in_amounts, out_amounts);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<MockInputProposalSpV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts)
