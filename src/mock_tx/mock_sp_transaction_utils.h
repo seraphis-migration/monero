@@ -84,6 +84,16 @@ void sort_tx_inputs_sp_v1(std::vector<MockENoteImageSpV1> &input_images_inout,
     std::vector<MockImageProofSpV1> &tx_image_proofs_inout,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_inout);  //UNUSED?
 /**
+* brief: sort_v1_tx_membership_proofs_sp_v1 - rearrange membership proofs so they line up with input images in a partial tx
+*   sort order: key images ascending with byte-wise comparisons
+* param: partial_tx -
+* inparam: tx_membership_proofs_sortable_in -
+* outparam: tx_membership_proofs_out -
+*/
+void sort_v1_tx_membership_proofs_sp_v1(const MockTxPartialSpV1 &partial_tx,
+    std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_sortable_in,
+    std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out);
+/**
 * brief: make_v1_tx_outputs_sp_v1 - make v1 tx outputs
 *   TODO: special treatment of change dest for 2-out tx (expect both outputs to have same enote pub key, only store 1)
 * param: destinations -
@@ -218,6 +228,14 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<MockInputProposalSpV1> &i
     const rct::key &proposal_prefix,
     const MockTxProposalSpV1 &tx_proposal,
     std::vector<MockTxPartialInputSpV1> &partial_inputs_out);
+/**
+* brief: balance_check_in_out_amnts_sp_v1 - wrapper on balance_check_in_out_amnts()
+* param: input_proposals -
+* param: destinations -
+* return: true if amounts balance between inputs and outputs
+*/
+bool balance_check_in_out_amnts_sp_v1(const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::vector<MockDestinationSpV1> &destinations)
 /**
 * brief: gen_mock_sp_input_proposals_v1 - create random mock inputs
 * param: in_amounts -

@@ -64,31 +64,14 @@ MockTxSpConcise::MockTxSpConcise(const std::vector<MockInputProposalSpV1> &input
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any outputs.");
-    
-    std::vector<rct::xmr_amount> in_amounts;
-    std::vector<rct::xmr_amount> out_amounts;
-    in_amounts.reserve(input_proposals.size());
-    out_amounts.reserve(destinations.size());
-
-    for (const auto &input_proposal : input_proposals)
-    {
-        in_amounts.emplace_back(input_proposal.m_amount);
-    }
-    for (const auto &destination : destinations)
-    {
-        out_amounts.emplace_back(destination.m_amount);
-    }
-
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts),
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, destinations),
         "Tried to make tx with unbalanced amounts.");
 
-    // versioning
+    // versioning for proofs
     std::string version_string;
     version_string.reserve(3);
     MockTxSpConcise::get_versioning_string(validation_rules_version, version_string);
 
-
-    /// make tx
     // tx proposal
     MockTxProposalSpV1 tx_proposal{destinations, max_rangeproof_splits};
     rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
@@ -104,31 +87,9 @@ MockTxSpConcise::MockTxSpConcise(const std::vector<MockInputProposalSpV1> &input
     std::vector<MockMembershipProofSortableSpV1> tx_membership_proofs_sortable;
     make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
 
-    CHECK_AND_ASSERT_THROW_MES(partial_tx.m_input_images.size() == tx_membership_proofs_sortable.size(),
-        "Unexpected size mismatch between input images and sortable membership proofs.");
-
     // sort the membership proofs so they line up with input images
     std::vector<MockMembershipProofSpV1> tx_membership_proofs;
-    tx_membership_proofs.reserve(tx_membership_proofs_sortable.size());
-
-    for (std::size_t input_index{0}; input_index < partial_tx.m_input_images.size(); ++input_index)
-    {
-        // find the membership proof that matches with the input image at this index
-        auto ordered_membership_proof{
-                std::find_if(tx_membership_proofs_sortable.begin(), tx_membership_proofs_sortable.end(),
-                        [&](const MockMembershipProofSortableSpV1 &sortable_proof) -> bool
-                        {
-                            return partial_tx.m_input_images[input_index].m_masked_address ==
-                                sortable_proof.m_masked_address;
-                        }
-                    )
-            };
-
-        CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_sortable.end(),
-            "Could not find input image to match with a sortable membership proof.");
-
-        tx_membership_proofs.emplace_back(std::move(ordered_membership_proof->m_membership_proof));
-    }
+    sort_v1_tx_membership_proofs_sp_v1(partial_tx, tx_membership_proofs_sortable, tx_membership_proofs);
 
     // assemble tx
     *this = MockTxSpConcise{std::move(partial_tx), std::move(tx_membership_proofs), validation_rules_version};
