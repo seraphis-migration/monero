@@ -673,7 +673,7 @@ std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
     return reference_sets;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::vector<MockDestinationSpV1> gen_mock_sp_dests_v1(const std::vector<rct::xmr_amount> &out_amounts)
+std::vector<MockDestinationSpV1> gen_mock_sp_destinations_v1(const std::vector<rct::xmr_amount> &out_amounts)
 {
     // randomize destination order
     std::vector<rct::xmr_amount> randomized_out_amounts{out_amounts};

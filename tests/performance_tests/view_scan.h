@@ -426,14 +426,10 @@ public:
             assert(end <= converted_index + sizeof(converted_index));
             hash.append(converted_index, end - converted_index);
 
-            // siphash key
-            char siphash_key[16];
-            for (std::size_t i{0}; i < 16; ++i)
-                siphash_key[i] = m_derivation.data[i];
-
             // hash to the result
+            // note: only the first 16 bytes of 'm_derivation' is used for the siphash key
             crypto::secret_key hash_result;
-            siphash(hash.data(), hash.size(), siphash_key, &hash_result, 8);
+            siphash(hash.data(), hash.size(), &m_derivation, &hash_result, 8);
         }
 
         return true;
