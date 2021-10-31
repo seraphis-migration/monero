@@ -131,7 +131,7 @@ static std::shared_ptr<mock_tx::MockTxSpConcise> make_sp_txtype_concise_v1(const
 
     // make mock destinations
     // - (in practice) for 2-out tx, need special treatment when making change/dummy destination
-    std::vector<MockDestinationSpV1> destinations{gen_mock_sp_dests_v1(out_amounts)};
+    std::vector<MockDestinationSpV1> destinations{gen_mock_sp_destinations_v1(out_amounts)};
 
     // membership proof ref sets
     std::vector<MockENoteSpV1> input_enotes;

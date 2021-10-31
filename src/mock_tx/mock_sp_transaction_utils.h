@@ -264,10 +264,10 @@ std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
     const std::size_t ref_set_decomp_m,
     std::shared_ptr<MockLedgerContext> ledger_context_inout);
 /**
-* brief: gen_mock_sp_dests_v1 - create random mock destinations
+* brief: gen_mock_sp_destinations_v1 - create random mock destinations
 * param: out_amounts -
 * return: set of generated destinations
 */
-std::vector<MockDestinationSpV1> gen_mock_sp_dests_v1(const std::vector<rct::xmr_amount> &out_amounts);
+std::vector<MockDestinationSpV1> gen_mock_sp_destinations_v1(const std::vector<rct::xmr_amount> &out_amounts);
 
 } //namespace mock_tx
