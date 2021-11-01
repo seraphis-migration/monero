@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_sp_tx_concise.h"
+#include "mock_sp_txtype_concise_v1.h"
 
 //local headers
 #include "ledger_context.h"
@@ -65,7 +65,7 @@ MockTxSpConcise::MockTxSpConcise(const std::vector<MockInputProposalSpV1> &input
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any outputs.");
     CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, destinations),
-        "Tried to make tx with unbalanced amounts.");
+        "Tried to make tx with unbalanced amounts.");  //TODO: include fee in balance check
 
     // versioning for proofs
     std::string version_string;
@@ -180,8 +180,7 @@ bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const Ledge
 //-------------------------------------------------------------------------------------------------------------------
 void MockTxSpConcise::add_key_images_to_ledger(std::shared_ptr<LedgerContext> ledger_context) const
 {
-    if (ledger_context.get() == nullptr)
-        return;
+    CHECK_AND_ASSERT_THROW_MES(ledger_context.get() != nullptr, "Tried to add key images to non-existent ledger.");
 
     for (const auto &input_image : m_input_images)
         ledger_context->add_linking_tag_sp_v1(input_image.m_key_image);

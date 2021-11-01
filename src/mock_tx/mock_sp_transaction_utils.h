@@ -234,10 +234,12 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<MockInputProposalSpV1> &i
 * brief: balance_check_in_out_amnts_sp_v1 - wrapper on balance_check_in_out_amnts()
 * param: input_proposals -
 * param: destinations -
+* param: transaction_fee -
 * return: true if amounts balance between inputs and outputs
 */
 bool balance_check_in_out_amnts_sp_v1(const std::vector<MockInputProposalSpV1> &input_proposals,
-    const std::vector<MockDestinationSpV1> &destinations);
+    const std::vector<MockDestinationSpV1> &destinations,
+    const rct::xmr_amount transaction_fee = 0);
 /**
 * brief: gen_mock_sp_input_proposals_v1 - create random mock inputs
 * param: in_amounts -
