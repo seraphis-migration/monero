@@ -580,12 +580,13 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<MockInputProposalSpV1> &i
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool balance_check_in_out_amnts_sp_v1(const std::vector<MockInputProposalSpV1> &input_proposals,
-    const std::vector<MockDestinationSpV1> &destinations)
+    const std::vector<MockDestinationSpV1> &destinations,
+    const rct::xmr_amount transaction_fee)
 {
     std::vector<rct::xmr_amount> in_amounts;
     std::vector<rct::xmr_amount> out_amounts;
     in_amounts.reserve(input_proposals.size());
-    out_amounts.reserve(destinations.size());
+    out_amounts.reserve(destinations.size() + 1);
 
     for (const auto &input_proposal : input_proposals)
     {
@@ -595,6 +596,8 @@ bool balance_check_in_out_amnts_sp_v1(const std::vector<MockInputProposalSpV1> &
     {
         out_amounts.emplace_back(destination.m_amount);
     }
+
+    out_amounts.emplace_back(transaction_fee);
 
     return balance_check_in_out_amnts(in_amounts, out_amounts);
 }

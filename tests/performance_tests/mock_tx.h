@@ -31,7 +31,7 @@
 #include "mock_tx/mock_ledger_context.h"
 #include "mock_tx/mock_rct_clsag.h"
 #include "mock_tx/mock_rct_triptych.h"
-#include "mock_tx/mock_sp_tx_concise.h"
+#include "mock_tx/mock_sp_txtype_concise_v1.h"
 #include "mock_tx/mock_tx_utils.h"
 #include "performance_tests.h"
 #include "ringct/rctOps.h"

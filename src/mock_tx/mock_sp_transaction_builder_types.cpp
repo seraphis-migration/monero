@@ -263,6 +263,9 @@ MockTxPartialSpV1::MockTxPartialSpV1(const MockTxProposalSpV1 &proposal,
 
     for (std::size_t input_index{0}; input_index < partial_inputs.size(); ++input_index)
     {
+        CHECK_AND_ASSERT_THROW_MES(input_sort_order[input_index] < partial_inputs.size(),
+            "Invalid old index for input pieces.");
+
         m_input_images.emplace_back(partial_inputs[input_sort_order[input_index]].get_input_image());
         m_image_proofs.emplace_back(partial_inputs[input_sort_order[input_index]].get_image_proof());
         m_input_enotes.emplace_back(partial_inputs[input_sort_order[input_index]].get_input_enote());
