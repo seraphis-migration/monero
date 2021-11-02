@@ -474,13 +474,13 @@ void make_v1_tx_image_proofs_sp_v2(const std::vector<MockInputProposalSpV1> &inp
 
     for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
     {
-        sp::mask_key(image_address_mask[input_index],
-            input_proposal[input_index].m_enote.m_onetime_address,
-            proof_K[[input_index]]);
+        sp::mask_key(image_address_masks[input_index],
+            input_proposals[input_index].m_enote.m_onetime_address,
+            proof_K[input_index]);
 
-        x.emplace_back(image_address_mask[input_index]);
-        y.emplace_back(input_proposal[input_index].m_enote_view_privkey);
-        z.emplace_back(input_proposal[input_index].m_spendbase_privkey);
+        x.emplace_back(image_address_masks[input_index]);
+        y.emplace_back(input_proposals[input_index].m_enote_view_privkey);
+        z.emplace_back(input_proposals[input_index].m_spendbase_privkey);
     }
 
     // make merged seraphis composition proof for all input proposals

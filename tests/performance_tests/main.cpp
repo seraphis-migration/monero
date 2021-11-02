@@ -151,8 +151,10 @@ int main(int argc, char** argv)
     {
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConcise);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpMerge);
     }
   }
+  */
 
 
   incrementer = {
@@ -174,10 +176,12 @@ int main(int argc, char** argv)
     {
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConcise);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpMerge);
     }
   }
-  */
 
+
+  /*
 
   // test hash performance for view tags
   ParamsShuttleViewHash p_view_hash;
@@ -207,6 +211,8 @@ int main(int argc, char** argv)
   p_view_scan.test_view_tag_check = true;
   TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_sp);
   TEST_PERFORMANCE0(filter, p, test_view_scan_sp_siphash);
+
+  */
 
   /*
 

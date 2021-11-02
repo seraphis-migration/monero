@@ -79,7 +79,7 @@ public:
         MockImageProofSpV1 image_proof_merged,
         std::vector<MockMembershipProofSpV1> membership_proofs,
         MockSupplementSpV1 tx_supplement,
-        const ValidationRulesVersion validation_rules_version) :
+        const MockTxSpMerge::ValidationRulesVersion validation_rules_version) :
             m_input_images{std::move(input_images)},
             m_outputs{std::move(outputs)},
             m_balance_proof{std::move(balance_proof)},
@@ -92,7 +92,7 @@ public:
                 validation_rules_version <= ValidationRulesVersion::MAX, "Invalid validation rules version.");
 
             m_tx_era_version = TxGenerationSp;
-            m_tx_format_version = TxStructureVersionSp::TxTypeSpMergeGrootle1;
+            m_tx_format_version = TxStructureVersionSp::TxTypeSpMerge1;
             m_tx_validation_rules_version = validation_rules_version;
         }
 
@@ -124,14 +124,14 @@ public:
     std::size_t get_size_bytes() const override;
 
     /// get a short description of the tx type
-    std::string get_descriptor() const override { return "Sp-Concise"; }
+    std::string get_descriptor() const override { return "Sp-Merge"; }
 
     /// get the tx version string: era | format | validation rules
     static void get_versioning_string(const unsigned char tx_validation_rules_version,
         std::string &version_string)
     {
         version_string += static_cast<char>(TxGenerationSp);
-        version_string += static_cast<char>(TxStructureVersionSp::TxTypeSpMergeGrootle1);
+        version_string += static_cast<char>(TxStructureVersionSp::TxTypeSpMerge1);
         version_string += static_cast<char>(tx_validation_rules_version);
     }
 

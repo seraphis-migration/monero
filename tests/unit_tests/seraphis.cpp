@@ -607,6 +607,8 @@ TEST(seraphis, enote_v1_information_recovery)
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, sp_txtype_concise_v1)
 {
+    // demo making SpTxTypeConciseV1 with raw tx builder API
+
     // fake ledger context for this test
     std::shared_ptr<mock_tx::MockLedgerContext> ledger_context = std::make_shared<mock_tx::MockLedgerContext>();
 
