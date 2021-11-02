@@ -86,13 +86,28 @@ void sort_tx_inputs_sp_v1(const std::vector<MockMembershipProofSortableSpV1> &tx
     std::vector<MockENoteImageSpV1> &input_images_inout,
     std::vector<MockImageProofSpV1> &tx_image_proofs_inout);
 /**
-* brief: sort_v1_tx_membership_proofs_sp_v1 - rearrange membership proofs so they line up with input images in a partial tx
+* brief: sort_tx_inputs_sp_v2 - sort tx inputs BEFORE making any input proofs
+*   - designed for SpTxTypeMerge, where all input image proofs are merged into one structure (so sort order must be known)
 *   sort order: key images ascending with byte-wise comparisons
-* param: partial_tx -
+* inoutparam: input_images_inout -
+* inoutparam: image_address_masks_inout -
+* inoutparam: image_amount_masks_inout -
+* inoutparam: membership_ref_sets_inout -
+* inoutparam: input_proposals_inout -
+*/
+void sort_tx_inputs_sp_v2(std::vector<MockENoteImageSpV1> &input_images_inout,
+    std::vector<crypto::secret_key> &image_address_masks_inout,
+    std::vector<crypto::secret_key> &image_amount_masks_inout,
+    std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets_inout,
+    std::vector<MockInputProposalSpV1> &input_proposals_inout);
+/**
+* brief: sort_v1_tx_membership_proofs_sp_v1 - rearrange membership proofs so they line up with a set of input images
+*   sort order: key images ascending with byte-wise comparisons
+* param: input_images -
 * inparam: tx_membership_proofs_sortable_in -
 * outparam: tx_membership_proofs_out -
 */
-void sort_v1_tx_membership_proofs_sp_v1(const MockTxPartialSpV1 &partial_tx,
+void sort_v1_tx_membership_proofs_sp_v1(const std::vector<MockENoteImageSpV1> &input_images,
     std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_sortable_in,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out);
 /**
@@ -176,6 +191,20 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<MockInputProposalSpV1> &inp
     const std::vector<crypto::secret_key> &image_address_masks,
     const rct::key &message,
     std::vector<MockImageProofSpV1> &tx_image_proofs_out);  //UNUSED?
+/**
+* brief: make_v1_tx_image_proofs_sp_v2 - make v1 tx input image proof with merged seraphis composition proof for all inputs
+*   note: all inputs must be 'owned' by same signer, since all input image proof privkeys must be known to make a proof
+* param: input_proposals -
+* param: input_images -
+* param: image_address_masks -
+* param: message -
+* outparam: tx_image_proof_merged_out -
+*/
+void make_v1_tx_image_proofs_sp_v2(const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::vector<MockENoteImageSpV1> &input_images,
+    const std::vector<crypto::secret_key> &image_address_masks,
+    const rct::key &message,
+    MockImageProofSpV1 &tx_image_proof_merged_out);
 /**
 * brief: make_v1_tx_balance_proof_sp_v1 - make v1 tx balance proof (BP+ for range proofs; balance is implicit)
 * param: output_amounts -

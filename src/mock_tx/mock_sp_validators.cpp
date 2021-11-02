@@ -97,6 +97,51 @@ bool validate_mock_tx_sp_semantics_component_counts_v1(const std::size_t num_inp
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool validate_mock_tx_sp_semantics_component_counts_v2(const std::size_t num_input_images,
+    const std::size_t num_membership_proofs,
+    const std::size_t num_outputs,
+    const std::size_t num_enote_pubkeys,
+    const MockImageProofSpV1 &image_proof_merged,
+    const std::shared_ptr<const MockBalanceProofSpV1> balance_proof)
+{
+    // need at least one input
+    if (num_input_images < 1)
+        return false;
+
+    // input images and image proofs should be 1:1
+    // note: merged composition proofs have proof components that must be 1:1 with input images
+    if (num_input_images != image_proof_merged.m_composition_proof.r_i.size() ||
+        num_input_images != image_proof_merged.m_composition_proof.K_t1.size())
+        return false;
+
+    // input images and membership proofs should be 1:1
+    if (num_input_images != num_membership_proofs)
+        return false;
+
+    // need at least 1 output
+    if (num_outputs < 1)
+        return false;
+
+    // should be a balance proof
+    if (balance_proof.get() == nullptr)
+        return false;
+
+    // range proofs and outputs should be 1:1
+    std::size_t num_range_proofs{0};
+    for (const auto &proof : balance_proof->m_bpp_proofs)
+        num_range_proofs += proof.V.size();
+
+    if (num_range_proofs != num_outputs)
+        return false;
+
+    // outputs and enote pubkeys should be 1:1
+    // TODO: if (num(outputs) == 2), num(enote pubkeys) ?= 1
+    if (num_outputs != num_enote_pubkeys)
+        return false;
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool validate_mock_tx_sp_semantics_ref_set_size_v1(const std::vector<MockMembershipProofSpV1> &membership_proofs)
 {
     // sanity check
@@ -328,6 +373,28 @@ bool validate_mock_tx_sp_composition_proofs_v1(const std::vector<MockImageProofS
         if (!sp::sp_composition_verify(image_proofs[input_index].m_composition_proof, K, KI, image_proofs_message))
             return false;
     }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool validate_mock_tx_sp_composition_proof_merged_v1(const MockImageProofSpV1 &image_proof,
+    const std::vector<MockENoteImageSpV1> &input_images,
+    const rct::key &image_proofs_message)
+{
+    // validate the merged composition proof (one proof for all input images)
+    rct::keyV K;
+    std::vector<crypto::key_image> KI;
+    K.reserve(input_images.size());
+    KI.reserve(input_images.size());
+
+    for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
+    {
+        K.emplace_back(input_images[input_index].m_masked_address);
+        KI.emplace_back(input_images[input_index].m_key_image);
+    }
+
+    if (!sp::sp_composition_verify(image_proof.m_composition_proof, K, KI, image_proofs_message))
+            return false;
 
     return true;
 }
