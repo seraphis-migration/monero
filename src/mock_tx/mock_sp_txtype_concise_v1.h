@@ -57,7 +57,7 @@ namespace mock_tx
 ////
 // Seraphis tx: based on concise grootle membership proofs
 ///
-class MockTxSpConcise final : public MockTx
+class MockTxSpConcise final : public MockTx  //TODO: rename to SpTxTypeConciseV1
 {
 public:
 //member types
@@ -92,7 +92,7 @@ public:
                 validation_rules_version <= ValidationRulesVersion::MAX, "Invalid validation rules version.");
 
             m_tx_era_version = TxGenerationSp;
-            m_tx_format_version = TxStructureVersionSp::TxTypeSpConciseGrootle1;
+            m_tx_format_version = TxStructureVersionSp::TxTypeSpConcise1;
             m_tx_validation_rules_version = validation_rules_version;
         }
 
@@ -143,7 +143,7 @@ public:
         std::string &version_string)
     {
         version_string += static_cast<char>(TxGenerationSp);
-        version_string += static_cast<char>(TxStructureVersionSp::TxTypeSpConciseGrootle1);
+        version_string += static_cast<char>(TxStructureVersionSp::TxTypeSpConcise1);
         version_string += static_cast<char>(tx_validation_rules_version);
     }
 
@@ -170,7 +170,7 @@ private:
     std::vector<MockENoteSpV1> m_outputs;
     /// balance proof (balance proof and range proofs)
     std::shared_ptr<MockBalanceProofSpV1> m_balance_proof;
-    /// composition proofs: ownership/unspentness for each input
+    /// composition proofs: ownership/key-image-legitimacy for each input
     std::vector<MockImageProofSpV1> m_image_proofs;
     /// concise Grootle proofs: membership for each input
     std::vector<MockMembershipProofSpV1> m_membership_proofs;

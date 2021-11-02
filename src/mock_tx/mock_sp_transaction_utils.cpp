@@ -81,6 +81,28 @@ static void get_last_sp_image_amount_blinding_factor_v1(
         sc_sub(&last_image_amount_blinding_factor, &last_image_amount_blinding_factor, &v_c);
 }
 //-------------------------------------------------------------------------------------------------------------------
+// sort order: key images ascending with byte-wise comparisons
+//-------------------------------------------------------------------------------------------------------------------
+static std::vector<std::size_t> get_sort_order_for_sp_images_v1(const std::vector<MockENoteImageSpV1> &images)
+{
+    std::vector<std::size_t> original_indices;
+    original_indices.resize(images.size());
+
+    for (std::size_t input_index{0}; input_index < images.size(); ++input_index)
+        original_indices[input_index] = input_index;
+
+    // sort: key images ascending with byte-wise comparisons
+    std::sort(original_indices.begin(), original_indices.end(),
+            [&images](const std::size_t input_index_1, const std::size_t input_index_2) -> bool
+            {
+                return memcmp(&(images[input_index_1].m_key_image),
+                    &(images[input_index_2].m_key_image), sizeof(crypto::key_image)) < 0;
+            }
+        );
+
+    return original_indices;
+}
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &enote_ledger_indices)
 {
@@ -112,22 +134,11 @@ void sort_tx_inputs_sp_v1(const std::vector<MockMembershipProofSortableSpV1> &tx
     std::vector<MockImageProofSpV1> &tx_image_proofs_inout)
 {
     CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == tx_image_proofs_inout.size(), "Input components size mismatch");
-    CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == tx_membership_proofs_sortable.size(), "Input components size mismatch");
+    CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == tx_membership_proofs_sortable.size(),
+        "Input components size mismatch");
 
-    std::vector<std::size_t> original_indices;
-    original_indices.resize(input_images_inout.size());
-
-    for (std::size_t input_index{0}; input_index < input_images_inout.size(); ++input_index)
-        original_indices[input_index] = input_index;
-
-    // sort: key images ascending with byte-wise comparisons
-    std::sort(original_indices.begin(), original_indices.end(),
-            [&input_images_inout](const std::size_t input_index_1, const std::size_t input_index_2) -> bool
-            {
-                return memcmp(&(input_images_inout[input_index_1].m_key_image),
-                    &(input_images_inout[input_index_2].m_key_image), sizeof(crypto::key_image)) < 0;
-            }
-        );
+    std::vector<std::size_t> original_indices{get_sort_order_for_sp_images_v1(input_images_inout)};
+    CHECK_AND_ASSERT_THROW_MES(original_indices.size() == input_images_inout.size(), "Size mismatch getting sort order.");
 
     // move all input pieces into sorted positions
     std::vector<MockENoteImageSpV1> input_images_sorted;
@@ -139,6 +150,8 @@ void sort_tx_inputs_sp_v1(const std::vector<MockMembershipProofSortableSpV1> &tx
 
     for (const auto old_index : original_indices)
     {
+        CHECK_AND_ASSERT_THROW_MES(old_index < input_images_inout.size(), "Index from sorted indices out of bounds.");
+
         input_images_sorted.emplace_back(std::move(input_images_inout[old_index]));
         tx_image_proofs_sorted.emplace_back(std::move(tx_image_proofs_inout[old_index]));
         tx_membership_proofs_sorted.emplace_back(std::move(tx_membership_proofs_sortable[old_index].m_membership_proof));
@@ -150,24 +163,73 @@ void sort_tx_inputs_sp_v1(const std::vector<MockMembershipProofSortableSpV1> &tx
     tx_membership_proofs_out = std::move(tx_membership_proofs_sorted);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void sort_v1_tx_membership_proofs_sp_v1(const MockTxPartialSpV1 &partial_tx,
+void sort_tx_inputs_sp_v2(std::vector<MockENoteImageSpV1> &input_images_inout,
+    std::vector<crypto::secret_key> &image_address_masks_inout,
+    std::vector<crypto::secret_key> &image_amount_masks_inout,
+    std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets_inout,
+    std::vector<MockInputProposalSpV1> &input_proposals_inout)
+{
+    CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == image_address_masks_inout.size(),
+        "Input components size mismatch");
+    CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == image_amount_masks_inout.size(),
+        "Input components size mismatch");
+    CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == membership_ref_sets_inout.size(),
+        "Input components size mismatch");
+    CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == input_proposals_inout.size(),
+        "Input components size mismatch");
+
+    std::vector<std::size_t> original_indices{get_sort_order_for_sp_images_v1(input_images_inout)};
+    CHECK_AND_ASSERT_THROW_MES(original_indices.size() == input_images_inout.size(), "Size mismatch getting sort order.");
+
+    // move all input pieces into sorted positions
+    std::vector<MockENoteImageSpV1> input_images_sorted;
+    std::vector<crypto::secret_key> image_address_masks_sorted;
+    std::vector<crypto::secret_key> image_amount_masks_sorted;
+    std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets_sorted;
+    std::vector<MockInputProposalSpV1> input_proposals_sorted;
+    input_images_sorted.reserve(input_images_inout.size());
+    image_address_masks_sorted.reserve(input_images_inout.size());
+    image_amount_masks_sorted.reserve(input_images_inout.size());
+    membership_ref_sets_sorted.reserve(input_images_inout.size());
+    input_proposals_sorted.reserve(input_images_inout.size());
+
+    for (const auto old_index : original_indices)
+    {
+        CHECK_AND_ASSERT_THROW_MES(old_index < input_images_inout.size(), "Index from sorted indices out of bounds.");
+
+        input_images_sorted.emplace_back(std::move(input_images_inout[old_index]));
+        image_address_masks_sorted.emplace_back(std::move(image_address_masks_inout[old_index]));
+        image_amount_masks_sorted.emplace_back(std::move(image_amount_masks_inout[old_index]));
+        membership_ref_sets_sorted.emplace_back(std::move(membership_ref_sets_inout[old_index]));
+        input_proposals_sorted.emplace_back(std::move(input_proposals_inout[old_index]));
+    }
+
+    // update inputs
+    input_images_inout = std::move(input_images_sorted);
+    image_address_masks_inout = std::move(image_address_masks_sorted);
+    image_amount_masks_inout = std::move(image_amount_masks_sorted);
+    membership_ref_sets_inout = std::move(membership_ref_sets_sorted);
+    input_proposals_inout = std::move(input_proposals_sorted);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void sort_v1_tx_membership_proofs_sp_v1(const std::vector<MockENoteImageSpV1> &input_images,
     std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_sortable_in,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(tx_membership_proofs_sortable_in.size() == partial_tx.m_input_images.size(),
+    CHECK_AND_ASSERT_THROW_MES(tx_membership_proofs_sortable_in.size() == input_images.size(),
         "Mismatch between sortable membership proof count and partial tx input image count.");
 
     tx_membership_proofs_out.clear();
     tx_membership_proofs_out.reserve(tx_membership_proofs_sortable_in.size());
 
-    for (std::size_t input_index{0}; input_index < partial_tx.m_input_images.size(); ++input_index)
+    for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
     {
         // find the membership proof that matches with the input image at this index
         auto ordered_membership_proof{
                 std::find_if(tx_membership_proofs_sortable_in.begin(), tx_membership_proofs_sortable_in.end(),
                         [&](const MockMembershipProofSortableSpV1 &sortable_proof) -> bool
                         {
-                            return partial_tx.m_input_images[input_index].m_masked_address ==
+                            return input_images[input_index].m_masked_address ==
                                 sortable_proof.m_masked_address;
                         }
                     )
@@ -375,6 +437,7 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<MockInputProposalSpV1> &inp
     const rct::key &message,
     std::vector<MockImageProofSpV1> &tx_image_proofs_out)
 {
+    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make image proofs for 0 inputs.");
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == input_images.size(), "Input components size mismatch");
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == image_address_masks.size(), "Input components size mismatch");
 
@@ -388,6 +451,40 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<MockInputProposalSpV1> &inp
             message,
             tx_image_proofs_out[input_index]);
     }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_image_proofs_sp_v2(const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::vector<MockENoteImageSpV1> &input_images,
+    const std::vector<crypto::secret_key> &image_address_masks,
+    const rct::key &message,
+    MockImageProofSpV1 &tx_image_proof_merged_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make image proofs for 0 inputs.");
+    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == input_images.size(), "Input components size mismatch");
+    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == image_address_masks.size(), "Input components size mismatch");
+
+    // prepare for proof
+    rct::keyV proof_K;
+    std::vector<crypto::secret_key> x, y, z;
+    x.reserve(input_proposals.size());
+    y.reserve(input_proposals.size());
+    z.reserve(input_proposals.size());
+
+    proof_K.resize(input_proposals.size());
+
+    for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
+    {
+        sp::mask_key(image_address_mask[input_index],
+            input_proposal[input_index].m_enote.m_onetime_address,
+            proof_K[[input_index]]);
+
+        x.emplace_back(image_address_mask[input_index]);
+        y.emplace_back(input_proposal[input_index].m_enote_view_privkey);
+        z.emplace_back(input_proposal[input_index].m_spendbase_privkey);
+    }
+
+    // make merged seraphis composition proof for all input proposals
+    tx_image_proof_merged_out.m_composition_proof = sp::sp_composition_prove(proof_K, x, y, z, message);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &output_amounts,
