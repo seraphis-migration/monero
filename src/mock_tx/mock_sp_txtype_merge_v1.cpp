@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "mock_sp_txtype_concise_v1.h"
+#include "mock_sp_txtype_merge_v1.h"
 
 //local headers
 #include "ledger_context.h"
@@ -60,7 +60,7 @@ MockTxSpMerge::MockTxSpMerge(const std::vector<MockInputProposalSpV1> &input_pro
     const std::size_t max_rangeproof_splits,
     const std::vector<MockDestinationSpV1> &destinations,
     const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
-    const ValidationRulesVersion validation_rules_version)
+    const MockTxSpMerge::ValidationRulesVersion validation_rules_version)
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any outputs.");
@@ -103,13 +103,14 @@ MockTxSpMerge::MockTxSpMerge(const std::vector<MockInputProposalSpV1> &input_pro
         balance_proof);
     rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, balance_proof, tx_supplement)};
     // the API here around sorting is clumsy and not well thought-out (TODO: improve if this tx variant is to be used)
-    std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets_sorted{membership_ref_sets},
+    std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets_sorted{membership_ref_sets};
+    std::vector<MockInputProposalSpV1> input_proposals_sorted{input_proposals};
     sort_tx_inputs_sp_v2(input_images,
         image_address_masks,
         image_amount_masks,
         membership_ref_sets_sorted,
-        input_proposals);  //sort now so merged image proof is correct
-    make_v1_tx_image_proofs_sp_v2(input_proposals, //note: all inputs must be 'owned' by same signer, since proofs are merged
+        input_proposals_sorted);  //sort now so merged image proof is correct
+    make_v1_tx_image_proofs_sp_v2(input_proposals_sorted, //note: all inputs must be 'owned' by same signer, since proofs are merged
         input_images,
         image_address_masks,
         image_proofs_message,
@@ -120,9 +121,9 @@ MockTxSpMerge::MockTxSpMerge(const std::vector<MockInputProposalSpV1> &input_pro
         tx_membership_proofs_sortable);
     sort_v1_tx_membership_proofs_sp_v1(input_images, tx_membership_proofs_sortable, tx_membership_proofs);
 
-    return std::make_shared<MockTxSpMerge>(std::move(input_images), std::move(outputs),
+    *this = MockTxSpMerge{std::move(input_images), std::move(outputs),
         std::move(balance_proof), std::move(tx_image_proof_merged), std::move(tx_membership_proofs),
-        std::move(tx_supplement), MockTxSpMerge::ValidationRulesVersion::ONE);
+        std::move(tx_supplement), MockTxSpMerge::ValidationRulesVersion::ONE};
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockTxSpMerge::validate_tx_semantics() const

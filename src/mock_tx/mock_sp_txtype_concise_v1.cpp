@@ -60,7 +60,7 @@ MockTxSpConcise::MockTxSpConcise(const std::vector<MockInputProposalSpV1> &input
     const std::size_t max_rangeproof_splits,
     const std::vector<MockDestinationSpV1> &destinations,
     const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
-    const ValidationRulesVersion validation_rules_version)
+    const MockTxSpConcise::ValidationRulesVersion validation_rules_version)
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any outputs.");
