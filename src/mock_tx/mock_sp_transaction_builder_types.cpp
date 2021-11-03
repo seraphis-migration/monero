@@ -100,7 +100,7 @@ void MockDestinationSpV1::get_amount_blinding_factor(const std::size_t enote_ind
     crypto::secret_key &amount_blinding_factor) const
 {
     // r_t: sender-receiver shared secret
-    crypto::secret_key sender_receiver_secret;
+    rct::key sender_receiver_secret;
     make_seraphis_sender_receiver_secret(m_enote_privkey,
         m_recipient_viewkey,
         enote_index,
@@ -108,7 +108,9 @@ void MockDestinationSpV1::get_amount_blinding_factor(const std::size_t enote_ind
         sender_receiver_secret);
 
     // x_t: amount commitment mask (blinding factor)
-    make_seraphis_amount_commitment_mask(sender_receiver_secret, amount_blinding_factor);
+    make_seraphis_amount_commitment_mask(rct::rct2sk(sender_receiver_secret), amount_blinding_factor);
+
+    memwipe(&sender_receiver_secret, sizeof(rct::key));
 }
 //-------------------------------------------------------------------------------------------------------------------
 MockENoteSpV1 MockDestinationSpV1::to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const

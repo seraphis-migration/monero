@@ -123,7 +123,7 @@ int main(int argc, char** argv)
   ParamsShuttleMockTx p_mock_tx;
   p_mock_tx.core_params = p.core_params;
 
-  /*
+
   incrementer = {
       {1, 2, 4, 7, 11, 25}, //batch sizes
       {1, 2, 4, 7, 12, 16}, //in counts
@@ -155,7 +155,7 @@ int main(int argc, char** argv)
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
     }
   }
-  */
+  
 
 
   incrementer = {
@@ -183,7 +183,6 @@ int main(int argc, char** argv)
   }
 
 
-  /*
 
   // test hash performance for view tags
   ParamsShuttleViewHash p_view_hash;
@@ -214,7 +213,6 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_sp);
   TEST_PERFORMANCE0(filter, p, test_view_scan_sp_siphash);
 
-  */
 
   /*
 

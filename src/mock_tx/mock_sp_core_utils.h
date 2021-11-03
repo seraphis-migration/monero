@@ -149,21 +149,23 @@ void make_seraphis_enote_pubkey(const crypto::secret_key &enote_privkey, const r
 * param: output_index - t (index of the enote within its tx)
 * param: hwdev - abstract reference to a hardware-specific implemention of crypto ops
 * outparam: sender_receiver_secret_out - q_t
+*   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 */
 void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     const rct::key &DH_key,
     const std::size_t output_index,
     hw::device &hwdev,
-    crypto::secret_key &sender_receiver_secret_out);
+    rct::key &sender_receiver_secret_out);
 /**
 * brief: make_seraphis_sender_receiver_secret - overload in case the derivation was already computed by caller
 * param: sender_receiver_DH_derivation - privkey * DH_key
 * param: output_index - t (index of the enote within its tx)
 * outparam: sender_receiver_secret_out - q_t
+*   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 */
 void make_seraphis_sender_receiver_secret(const crypto::key_derivation &sender_receiver_DH_derivation,
     const std::size_t output_index,
-    crypto::secret_key &sender_receiver_secret_out);
+    rct::key &sender_receiver_secret_out);
 /**
 * brief: make_seraphis_sender_address_extension - extension for transforming a recipient spendkey into an enote one-time address
 *    k_{a, sender} = H("domain-sep", q_t)
@@ -215,6 +217,7 @@ void make_seraphis_amount_commitment_mask(const crypto::secret_key &sender_recei
 * param: onetime_address - Ko_t
 * param: view_tag - tag_t
 * outparam: sender_receiver_secret_out - q_t
+*   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 * outparam: nominal_spend_key_out - K'^s_t = Ko_t - H(q_t) X
 * return: true if successfully recomputed the view tag
 */
@@ -222,7 +225,7 @@ bool try_get_seraphis_nominal_spend_key(const crypto::key_derivation &sender_rec
     const std::size_t output_index,
     const rct::key &onetime_address,
     const unsigned char view_tag,
-    crypto::secret_key &sender_receiver_secret_out,
+    rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out);
 /**
 * brief: try_get_seraphis_amount - test recreating the amount commitment; if it is recreate-able, return the amount

@@ -726,11 +726,11 @@ void domain_separate_rct_hash(const std::string &domain_separator,
 void domain_separate_derivation_hash(const std::string &domain_separator,
     const crypto::key_derivation &derivation,
     const std::size_t index,
-    crypto::secret_key &hash_result_out)
+    rct::key &hash_result_out)
 {
     // derivation_hash = H("domain-sep", derivation, index)
     epee::wipeable_string hash;
-    hash.reserve(sizeof(domain_separator) + sizeof(rct::key) +
+    hash.reserve(domain_separator.size() + sizeof(rct::key) +
         ((sizeof(std::size_t) * 8 + 6) / 7));
     // "domain-sep"
     hash = domain_separator;
@@ -744,7 +744,7 @@ void domain_separate_derivation_hash(const std::string &domain_separator,
     hash.append(converted_index, end - converted_index);
 
     // hash to the result
-    crypto::hash_to_scalar(hash.data(), hash.size(), hash_result_out);
+    rct::hash_to_scalar(hash_result_out, hash.data(), hash.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool key_domain_is_prime_subgroup(const rct::key &check_key)
