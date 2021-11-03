@@ -185,7 +185,7 @@ void domain_separate_rct_hash(const std::string &domain_separator, const rct::ke
 void domain_separate_derivation_hash(const std::string &domain_separator,
     const crypto::key_derivation &derivation,
     const std::size_t index,
-    crypto::secret_key &hash_result_out);
+    rct::key &hash_result_out);
 /**
 * brief: key_domain_is_prime_subgroup - check that input key is in prime order EC subgroup
 *   l*K ?= identity

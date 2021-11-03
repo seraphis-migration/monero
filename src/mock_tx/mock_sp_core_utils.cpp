@@ -166,7 +166,7 @@ void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     const rct::key &DH_key,
     const std::size_t output_index,
     hw::device &hwdev,
-    crypto::secret_key &sender_receiver_secret_out)
+    rct::key &sender_receiver_secret_out)
 {
     // privkey * DH_key
     crypto::key_derivation derivation;
@@ -180,7 +180,7 @@ void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_sender_receiver_secret(const crypto::key_derivation &sender_receiver_DH_derivation,
     const std::size_t output_index,
-    crypto::secret_key &sender_receiver_secret_out)
+    rct::key &sender_receiver_secret_out)
 {
     static std::string salt{config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET};
 
@@ -223,15 +223,17 @@ unsigned char make_seraphis_view_tag(const crypto::key_derivation &sender_receiv
     static std::string salt{config::HASH_KEY_SERAPHIS_VIEW_TAG};
 
     // tag_t = H("domain-sep", derivation, t)
+    // note: the view tag is not a secret, so it doesn't need to be memory-safe (e.g. with crypto::secret_key)
+    //   - using crypto::secret_key can slow down view-key scanning if scanning is multithreaded (due to memlock)
     // TODO: consider using a simpler/cheaper hash function for view tags
-    crypto::secret_key view_tag_scalar;
+    rct::key view_tag_scalar;
 
     sp::domain_separate_derivation_hash(salt,
         sender_receiver_DH_derivation,
         output_index,
         view_tag_scalar);
 
-    return static_cast<unsigned char>(view_tag_scalar.data[0]);
+    return static_cast<unsigned char>(view_tag_scalar.bytes[0]);
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receiver_secret, const rct::xmr_amount original)
@@ -266,7 +268,7 @@ bool try_get_seraphis_nominal_spend_key(const crypto::key_derivation &sender_rec
     const std::size_t output_index,
     const rct::key &onetime_address,
     const unsigned char view_tag,
-    crypto::secret_key &sender_receiver_secret_out,
+    rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out)
 {
     // tag'_t = H(q_t)
@@ -284,7 +286,7 @@ bool try_get_seraphis_nominal_spend_key(const crypto::key_derivation &sender_rec
 
     // K'^s_t = Ko_t - H(q_t) X
     crypto::secret_key k_a_extender;
-    make_seraphis_sender_address_extension(sender_receiver_secret_out, k_a_extender);  // H(q_t)
+    make_seraphis_sender_address_extension(rct::rct2sk(sender_receiver_secret_out), k_a_extender);  // H(q_t)
     sc_mul(&k_a_extender, sp::MINUS_ONE.bytes, &k_a_extender);  // -H(q_t)
     nominal_spend_key_out = onetime_address;  // Ko_t
     extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t

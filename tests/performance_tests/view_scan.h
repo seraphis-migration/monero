@@ -177,7 +177,7 @@ public:
 
     bool test()
     {
-        crypto::secret_key sender_receiver_secret_dummy;
+        rct::key sender_receiver_secret_dummy;
         crypto::key_derivation derivation;
 
         hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_pubkey), m_recipient_view_privkey, derivation);
@@ -194,6 +194,7 @@ public:
             return m_test_view_tag_check;  // only valid if trying to trigger view tag check
         }
 
+        memwipe(&sender_receiver_secret_dummy, sizeof(rct::key));
         memwipe(&derivation, sizeof(derivation));
 
         return nominal_recipient_spendkey == m_recipient_spend_key;
@@ -211,15 +212,14 @@ private:
 
 
 
-
 void domain_separate_derivation_hash_siphash(const std::string &domain_separator,
     const crypto::key_derivation &derivation,
     const std::size_t index,
-    crypto::secret_key &hash_result_out)
+    rct::key &hash_result_out)
 {
     // derivation_hash = H("domain-sep", derivation, index)
     std::string hash;
-    hash.reserve(sizeof(domain_separator) + ((sizeof(std::size_t) * 8 + 6) / 7));
+    hash.reserve(domain_separator.size() + ((sizeof(std::size_t) * 8 + 6) / 7));
     // "domain-sep"
     hash = domain_separator;
     // index
@@ -235,7 +235,7 @@ void domain_separate_derivation_hash_siphash(const std::string &domain_separator
         siphash_key[i] = derivation.data[i];
 
     // hash to the result
-    siphash(hash.data(), hash.size(), siphash_key, &hash_result_out, 8);
+    siphash(hash.data(), hash.size(), siphash_key, hash_result_out.bytes, 8);
 
     memwipe(siphash_key, 16);
 }
@@ -247,14 +247,14 @@ unsigned char make_seraphis_view_tag_siphash(const crypto::key_derivation &sende
 
     // tag_t = H("domain-sep", derivation, t)
     // TODO: consider using a simpler/cheaper hash function for view tags
-    crypto::secret_key view_tag_scalar;
+    rct::key view_tag_scalar;
 
     domain_separate_derivation_hash_siphash(salt,
         sender_receiver_DH_derivation,
         output_index,
         view_tag_scalar);
 
-    return static_cast<unsigned char>(view_tag_scalar.data[0]);
+    return static_cast<unsigned char>(view_tag_scalar.bytes[0]);
 }
 
 unsigned char make_seraphis_view_tag_siphash(const crypto::secret_key &privkey,
@@ -278,7 +278,7 @@ bool try_get_seraphis_nominal_spend_key_siphash(const crypto::key_derivation &se
     const std::size_t output_index,
     const rct::key &onetime_address,
     const unsigned char view_tag,
-    crypto::secret_key &sender_receiver_secret_out,
+    rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out)
 {
     // tag'_t = H(q_t)
@@ -296,7 +296,7 @@ bool try_get_seraphis_nominal_spend_key_siphash(const crypto::key_derivation &se
 
     // K'^s_t = Ko_t - H(q_t) X
     crypto::secret_key k_a_extender;
-    mock_tx::make_seraphis_sender_address_extension(sender_receiver_secret_out, k_a_extender);  // H(q_t)
+    mock_tx::make_seraphis_sender_address_extension(rct::rct2sk(sender_receiver_secret_out), k_a_extender);  // H(q_t)
     sc_mul(&k_a_extender, sp::MINUS_ONE.bytes, &k_a_extender);  // -H(q_t)
     nominal_spend_key_out = onetime_address;  // Ko_t
     mock_tx::extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
@@ -345,7 +345,7 @@ public:
 
     bool test()
     {
-        crypto::secret_key sender_receiver_secret_dummy;
+        rct::key sender_receiver_secret_dummy;
         crypto::key_derivation derivation;
 
         hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_pubkey), m_recipient_view_privkey, derivation);
@@ -362,6 +362,7 @@ public:
             return true; //expect it to fail on view tag
         }
 
+        memwipe(&sender_receiver_secret_dummy, sizeof(rct::key));
         memwipe(&derivation, sizeof(derivation));
 
         return nominal_recipient_spendkey == m_recipient_spend_key;
@@ -428,8 +429,8 @@ public:
 
             // hash to the result
             // note: only the first 16 bytes of 'm_derivation' is used for the siphash key
-            crypto::secret_key hash_result;
-            siphash(hash.data(), hash.size(), &m_derivation, &hash_result, 8);
+            rct::key hash_result;
+            siphash(hash.data(), hash.size(), &m_derivation, hash_result.bytes, 8);
         }
 
         return true;
@@ -482,8 +483,8 @@ public:
                 siphash_key[i] = m_derivation.data[i];
 
             // hash to the result
-            crypto::secret_key hash_result;
-            halfsiphash(hash.data(), hash.size(), siphash_key, &hash_result, 4);
+            rct::key hash_result;
+            halfsiphash(hash.data(), hash.size(), siphash_key, hash_result.bytes, 4);
         }
 
         return true;
@@ -533,8 +534,8 @@ public:
             hash.append(converted_index, end - converted_index);
 
             // hash to the result
-            crypto::secret_key hash_result;
-            crypto::hash_to_scalar(hash.data(), hash.size(), hash_result);
+            rct::key hash_result;
+            rct::hash_to_scalar(hash_result, hash.data(), hash.size());
         }
 
         return true;
@@ -585,8 +586,8 @@ public:
             hash.append(converted_index, end - converted_index);
 
             // hash to the result
-            crypto::secret_key hash_result;
-            blake2b(&hash_result, 32, hash.data(), hash.size(), nullptr, 0);
+            rct::key hash_result;
+            blake2b(hash_result.bytes, 32, hash.data(), hash.size(), nullptr, 0);
         }
 
         return true;

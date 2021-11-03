@@ -62,7 +62,7 @@ void MockENoteSpV1::make(const crypto::secret_key &enote_privkey,
     // note: t = enote_index
 
     // r_t: sender-receiver shared secret
-    crypto::secret_key sender_receiver_secret;
+    rct::key sender_receiver_secret;
     make_seraphis_sender_receiver_secret(enote_privkey,
         recipient_view_key,
         enote_index,
@@ -71,17 +71,17 @@ void MockENoteSpV1::make(const crypto::secret_key &enote_privkey,
 
     // x_t: amount commitment mask (blinding factor)
     crypto::secret_key amount_mask;
-    make_seraphis_amount_commitment_mask(sender_receiver_secret, amount_mask);
+    make_seraphis_amount_commitment_mask(rct::rct2sk(sender_receiver_secret), amount_mask);
 
     // k_{a, sender, t}: extension to add to user's spend key
     crypto::secret_key k_a_extender;
-    make_seraphis_sender_address_extension(sender_receiver_secret, k_a_extender);
+    make_seraphis_sender_address_extension(rct::rct2sk(sender_receiver_secret), k_a_extender);
 
     // make the base of the enote (Ko_t, C_t)
     this->make_base_with_address_extension(k_a_extender, recipient_spend_key, amount_mask, amount);
 
     // enc(a_t): encoded amount
-    m_encoded_amount = enc_dec_seraphis_amount(sender_receiver_secret, amount);
+    m_encoded_amount = enc_dec_seraphis_amount(rct::rct2sk(sender_receiver_secret), amount);
 
     // view_tag_t: view tag
     m_view_tag = make_seraphis_view_tag(enote_privkey,
@@ -91,6 +91,8 @@ void MockENoteSpV1::make(const crypto::secret_key &enote_privkey,
 
     // R_t: enote pubkey to send back to caller
     make_seraphis_enote_pubkey(enote_privkey, recipient_DH_base, enote_pubkey_out);
+
+    memwipe(&sender_receiver_secret, sizeof(rct::key));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockENoteSpV1::gen()
