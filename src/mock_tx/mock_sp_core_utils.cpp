@@ -168,7 +168,7 @@ void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     hw::device &hwdev,
     rct::key &sender_receiver_secret_out)
 {
-    // privkey * DH_key
+    // 8 * privkey * DH_key
     crypto::key_derivation derivation;
     hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);
 
@@ -184,7 +184,7 @@ void make_seraphis_sender_receiver_secret(const crypto::key_derivation &sender_r
 {
     static std::string salt{config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET};
 
-    // q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, output_index)
+    // q_t = H(8 * r_t * k^{vr} * K^{DH}, t) => H("domain sep", 8 * privkey * DH_key, output_index)
     sp::domain_separate_derivation_hash(salt,
         sender_receiver_DH_derivation,
         output_index,
@@ -205,7 +205,7 @@ unsigned char make_seraphis_view_tag(const crypto::secret_key &privkey,
     const std::size_t output_index,
     hw::device &hwdev)
 {
-    // privkey * DH_key
+    // 8 * privkey * DH_key
     crypto::key_derivation derivation;
     hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);
 
@@ -271,7 +271,7 @@ bool try_get_seraphis_nominal_spend_key(const crypto::key_derivation &sender_rec
     rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out)
 {
-    // tag'_t = H(q_t)
+    // tag'_t
     unsigned char nominal_view_tag{make_seraphis_view_tag(sender_receiver_DH_derivation, output_index)};
 
     // check that recomputed tag matches original tag; short-circuit on failure

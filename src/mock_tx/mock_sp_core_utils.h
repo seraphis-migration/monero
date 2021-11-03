@@ -143,7 +143,7 @@ void seraphis_squashed_enote_Q(const rct::key &onetime_address,
 void make_seraphis_enote_pubkey(const crypto::secret_key &enote_privkey, const rct::key &DH_base, rct::key &enote_pubkey_out);
 /**
 * brief: make_seraphis_sender_receiver_secret - sender-receiver secret q_t for an output at index 't' in the tx that created it
-*    q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, output_index)
+*    q_t = H(8 * r_t * k^{vr} * K^{DH}, t) => H("domain sep", 8 * privkey * DH_key, output_index)
 * param: privkey - [sender: r_t] [recipient: k^{vr}]
 * param: DH_key - [sender: K^{vr}] [sender-change-2out: k^{vr}*K^{DH}_other] [recipient: R_t]
 * param: output_index - t (index of the enote within its tx)
@@ -158,7 +158,7 @@ void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
     rct::key &sender_receiver_secret_out);
 /**
 * brief: make_seraphis_sender_receiver_secret - overload in case the derivation was already computed by caller
-* param: sender_receiver_DH_derivation - privkey * DH_key
+* param: sender_receiver_DH_derivation - 8 * privkey * DH_key
 * param: output_index - t (index of the enote within its tx)
 * outparam: sender_receiver_secret_out - q_t
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
@@ -176,7 +176,7 @@ void make_seraphis_sender_address_extension(const crypto::secret_key &sender_rec
     crypto::secret_key &sender_address_extension_out);
 /**
 * brief: make_seraphis_view_tag - view tag for optimized identification of owned enotes
-*    tag_t = H("domain-sep", privkey * DH_key, t)
+*    tag_t = H("domain-sep", 8 * privkey * DH_key, t)
 * param: privkey - [sender: r_t] [recipient: k^{vr}]
 * param: DH_key - [sender: K^{vr}] [sender-change-2out: k^{vr}*K^{DH}_other] [recipient: R_t]
 * param: output_index - t (index of the enote within its tx)
@@ -189,7 +189,7 @@ unsigned char make_seraphis_view_tag(const crypto::secret_key &privkey,
     hw::device &hwdev);
 /**
 * brief: make_seraphis_view_tag - overload for when the derivation is known by caller
-*    tag_t = H("domain-sep", privkey * DH_key, t)
+*    tag_t = H("domain-sep", 8 * privkey * DH_key, t)
 * param: sender_receiver_DH_derivation - privkey * DH_key
 * param: output_index - t
 * return: tag_t
@@ -212,7 +212,7 @@ void make_seraphis_amount_commitment_mask(const crypto::secret_key &sender_recei
 /**
 * brief: try_get_seraphis_nominal_spend_key - test view tag; if it passes, compute and return the nominal spend key
 *    and sender-receiver secret
-* param: sender_receiver_DH_derivation - privkey * DH_key
+* param: sender_receiver_DH_derivation - 8 * privkey * DH_key
 * param: output_index - t
 * param: onetime_address - Ko_t
 * param: view_tag - tag_t
