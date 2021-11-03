@@ -57,9 +57,11 @@ enum TxStructureVersionSp : unsigned char
     /// mining transaction (TODO)
     TxTypeSpMining = 0,
     /// concise grootle + separate composition proofs
-    TxTypeSpConcise1 = 1,
+    TxTypeSpConciseV1 = 1,
     /// concise grootle + merged composition proof
-    TxTypeSpMerge1 = 2
+    TxTypeSpMergeV1 = 2,
+    /// concise grootle in the squashed enote model + separate composition proof
+    TxTypeSpSquashedV1 = 3
 };
 
 
@@ -146,12 +148,22 @@ struct MockInputProposalSp
     virtual void get_key_image(crypto::key_image &key_image_out) const final;
 
     /**
-    * brief: to_enote_image - convert this input to an enote image
+    * brief: to_enote_image_base - convert this input to an enote image
     * param: address_mask - t_k
     * param: commitment_mask - t_c
     * inoutparam: image_inout -
     */
     virtual void to_enote_image_base(const crypto::secret_key &address_mask,
+        const crypto::secret_key &commitment_mask,
+        MockENoteImageSp &image_inout) const final;
+
+    /**
+    * brief: to_enote_image_squashed_base - convert this input to an enote image in the squashed enote model
+    * param: address_mask - t_k
+    * param: commitment_mask - t_c
+    * inoutparam: image_inout -
+    */
+    virtual void to_enote_image_squashed_base(const crypto::secret_key &address_mask,
         const crypto::secret_key &commitment_mask,
         MockENoteImageSp &image_inout) const final;
 

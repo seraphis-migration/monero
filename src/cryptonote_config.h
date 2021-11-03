@@ -251,6 +251,7 @@ namespace config
   const char HASH_KEY_SERAPHIS_AMOUNT_COMMITMENT_BLINDING_FACTOR[] = "seraphis enote amount commitment blinding factor";
   const char HASH_KEY_SERAPHIS_VIEW_TAG[] = "seraphis enote view tag";
   const char HASH_KEY_SERAPHIS_AMOUNT_ENC[] = "seraphis enote amount encoding";
+  const char HASH_KEY_SERAPHIS_SQUASHED_ENOTE[] = "seraphis squashed enote";
   const char HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR[] = "multisig binonce merge factor";
 
   namespace testnet

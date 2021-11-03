@@ -33,6 +33,7 @@
 #include "mock_tx/mock_rct_triptych.h"
 #include "mock_tx/mock_sp_txtype_concise_v1.h"
 #include "mock_tx/mock_sp_txtype_merge_v1.h"
+#include "mock_tx/mock_sp_txtype_squashed_v1.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
@@ -566,13 +567,13 @@ TEST(mock_tx_batching, triptych)
 
 TEST(mock_tx, seraphis_concise)
 {
-    run_mock_tx_test<mock_tx::MockTxSpConcise>(get_mock_tx_gen_data_misc());
+    run_mock_tx_test<mock_tx::MockTxSpConciseV1>(get_mock_tx_gen_data_misc());
 }
 
 TEST(mock_tx_batching, seraphis_concise)
 {
-    run_mock_tx_test_batch<mock_tx::MockTxSpConcise>(get_mock_tx_gen_data_batching());
-    run_mock_tx_test_batch<mock_tx::MockTxSpConcise>(get_mock_tx_gen_data_batch_splitting());
+    run_mock_tx_test_batch<mock_tx::MockTxSpConciseV1>(get_mock_tx_gen_data_batching());
+    run_mock_tx_test_batch<mock_tx::MockTxSpConciseV1>(get_mock_tx_gen_data_batch_splitting());
 }
 
 /////////////////////////////////////////////////////////////////////
@@ -581,11 +582,26 @@ TEST(mock_tx_batching, seraphis_concise)
 
 TEST(mock_tx, seraphis_merge)
 {
-    run_mock_tx_test<mock_tx::MockTxSpMerge>(get_mock_tx_gen_data_misc());
+    run_mock_tx_test<mock_tx::MockTxSpMergeV1>(get_mock_tx_gen_data_misc());
 }
 
 TEST(mock_tx_batching, seraphis_merge)
 {
-    run_mock_tx_test_batch<mock_tx::MockTxSpMerge>(get_mock_tx_gen_data_batching());
-    run_mock_tx_test_batch<mock_tx::MockTxSpMerge>(get_mock_tx_gen_data_batch_splitting());
+    run_mock_tx_test_batch<mock_tx::MockTxSpMergeV1>(get_mock_tx_gen_data_batching());
+    run_mock_tx_test_batch<mock_tx::MockTxSpMergeV1>(get_mock_tx_gen_data_batch_splitting());
+}
+
+/////////////////////////////////////////////////////////////////////
+////////////////////////// Seraphis Squash //////////////////////////
+/////////////////////////////////////////////////////////////////////
+
+TEST(mock_tx, seraphis_squashed)
+{
+    run_mock_tx_test<mock_tx::MockTxSpSquashedV1>(get_mock_tx_gen_data_misc());
+}
+
+TEST(mock_tx_batching, seraphis_squashed)
+{
+    run_mock_tx_test_batch<mock_tx::MockTxSpSquashedV1>(get_mock_tx_gen_data_batching());
+    run_mock_tx_test_batch<mock_tx::MockTxSpSquashedV1>(get_mock_tx_gen_data_batch_splitting());
 }

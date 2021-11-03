@@ -57,7 +57,7 @@ namespace mock_tx
 ////
 // Seraphis tx: based on concise grootle membership proofs
 ///
-class MockTxSpConcise final : public MockTx  //TODO: rename to SpTxTypeConciseV1
+class MockTxSpConciseV1 final : public MockTx
 {
 public:
 //member types
@@ -70,10 +70,10 @@ public:
 
 //constructors
     /// default constructor
-    MockTxSpConcise() = default;
+    MockTxSpConciseV1() = default;
 
     /// normal constructor: new tx from pieces
-    MockTxSpConcise(std::vector<MockENoteImageSpV1> input_images,
+    MockTxSpConciseV1(std::vector<MockENoteImageSpV1> input_images,
         std::vector<MockENoteSpV1> outputs,
         std::shared_ptr<MockBalanceProofSpV1> balance_proof,
         std::vector<MockImageProofSpV1> image_proofs,
@@ -87,20 +87,20 @@ public:
             m_membership_proofs{std::move(membership_proofs)},
             m_supplement{std::move(tx_supplement)}
         {
-            CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble MockTxSpConcise.");
+            CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble MockTxSpConciseV1.");
             CHECK_AND_ASSERT_THROW_MES(validation_rules_version >= ValidationRulesVersion::MIN &&
                 validation_rules_version <= ValidationRulesVersion::MAX, "Invalid validation rules version.");
 
             m_tx_era_version = TxGenerationSp;
-            m_tx_format_version = TxStructureVersionSp::TxTypeSpConcise1;
+            m_tx_format_version = TxStructureVersionSp::TxTypeSpConciseV1;
             m_tx_validation_rules_version = validation_rules_version;
         }
 
     /// normal constructor: finalize from a partial tx
-    MockTxSpConcise(MockTxPartialSpV1 partial_tx,
+    MockTxSpConciseV1(MockTxPartialSpV1 partial_tx,
         std::vector<MockMembershipProofSpV1> membership_proofs,
         const ValidationRulesVersion validation_rules_version) :
-            MockTxSpConcise{
+            MockTxSpConciseV1{
                 std::move(partial_tx.m_input_images),
                 std::move(partial_tx.m_outputs),
                 std::move(partial_tx.m_balance_proof),
@@ -112,7 +112,7 @@ public:
     {}
 
     /// normal constructor: simple when tx builder is monolothic (can complete tx in one step)
-    MockTxSpConcise(const std::vector<MockInputProposalSpV1> &input_proposals,
+    MockTxSpConciseV1(const std::vector<MockInputProposalSpV1> &input_proposals,
         const std::size_t max_rangeproof_splits,
         const std::vector<MockDestinationSpV1> &destinations,
         const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
@@ -143,7 +143,7 @@ public:
         std::string &version_string)
     {
         version_string += static_cast<char>(TxGenerationSp);
-        version_string += static_cast<char>(TxStructureVersionSp::TxTypeSpConcise1);
+        version_string += static_cast<char>(TxStructureVersionSp::TxTypeSpConciseV1);
         version_string += static_cast<char>(tx_validation_rules_version);
     }
 
@@ -179,26 +179,26 @@ private:
 };
 
 /**
-* brief: make_mock_tx - make a MockTxSpConcise transaction (function specialization)
+* brief: make_mock_tx - make a MockTxSpConciseV1 transaction (function specialization)
 * param: params -
 * param: in_amounts -
 * param: out_amounts -
 * inoutparam: ledger_context_inout -
-* return: a MockTxSpConcise tx
+* return: a MockTxSpConciseV1 tx
 */
 template <>
-std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParamPack &params,
+std::shared_ptr<MockTxSpConciseV1> make_mock_tx<MockTxSpConciseV1>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
     std::shared_ptr<MockLedgerContext> ledger_context_inout);
 /**
-* brief: validate_mock_txs - validate a set of MockTxSpConcise transactions (function specialization)
+* brief: validate_mock_txs - validate a set of MockTxSpConciseV1 transactions (function specialization)
 * param: txs_to_validate -
 * param: ledger_context -
 * return: true/false on validation result
 */
 template <>
-bool validate_mock_txs<MockTxSpConcise>(const std::vector<std::shared_ptr<MockTxSpConcise>> &txs_to_validate,
+bool validate_mock_txs<MockTxSpConciseV1>(const std::vector<std::shared_ptr<MockTxSpConciseV1>> &txs_to_validate,
     const std::shared_ptr<const LedgerContext> ledger_context);
 
 } //namespace mock_tx

@@ -34,6 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "misc_log_ex.h"
+#include "mock_sp_core_utils.h"
 #include "mock_sp_transaction_component_types.h"
 #include "ringct/rctTypes.h"
 
@@ -74,9 +75,28 @@ void MockLedgerContext::get_reference_set_components_sp_v1(const std::vector<std
 
     for (const std::size_t index : indices)
     {
-        CHECK_AND_ASSERT_THROW_MES(index < m_sp_enotes.size(), "Tried to get components of enote that doesn't exist.");
+        CHECK_AND_ASSERT_THROW_MES(index < m_sp_enotes.size(), "Tried to get components of an enote that doesn't exist.");
         referenced_enotes_components_temp.emplace_back(
                 rct::keyV{m_sp_enotes.at(index).m_onetime_address, m_sp_enotes.at(index).m_amount_commitment}
+            );
+    }
+
+    referenced_enotes_components_out = std::move(referenced_enotes_components_temp);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void MockLedgerContext::get_reference_set_components_sp_v2(const std::vector<std::size_t> &indices,
+        rct::keyM &referenced_enotes_components_out) const
+{
+    // gets squashed enotes
+    rct::keyM referenced_enotes_components_temp;
+    referenced_enotes_components_temp.reserve(indices.size());
+
+    for (const std::size_t index : indices)
+    {
+        CHECK_AND_ASSERT_THROW_MES(m_sp_squashed_enotes.find(index) != m_sp_squashed_enotes.end(),
+            "Tried to get squashed enote that doesn't exist.");
+        referenced_enotes_components_temp.emplace_back(
+                rct::keyV{m_sp_squashed_enotes.at(index)}
             );
     }
 
@@ -91,6 +111,19 @@ void MockLedgerContext::add_linking_tag_sp_v1(const crypto::key_image &linking_t
 std::size_t MockLedgerContext::add_enote_sp_v1(const MockENoteSpV1 &enote)
 {
     m_sp_enotes[m_sp_enotes.size()] = enote;
+
+    return m_sp_enotes.size() - 1;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t MockLedgerContext::add_enote_sp_v2(const MockENoteSpV1 &enote)
+{
+    // add the enote
+    m_sp_enotes[m_sp_enotes.size()] = enote;
+
+    // add the squashed enote
+    seraphis_squashed_enote_Q(enote.m_onetime_address,
+        enote.m_amount_commitment,
+        m_sp_squashed_enotes[m_sp_enotes.size() - 1]);
 
     return m_sp_enotes.size() - 1;
 }
