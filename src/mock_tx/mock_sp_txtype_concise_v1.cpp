@@ -56,11 +56,11 @@
 namespace mock_tx
 {
 //-------------------------------------------------------------------------------------------------------------------
-MockTxSpConcise::MockTxSpConcise(const std::vector<MockInputProposalSpV1> &input_proposals,
+MockTxSpConciseV1::MockTxSpConciseV1(const std::vector<MockInputProposalSpV1> &input_proposals,
     const std::size_t max_rangeproof_splits,
     const std::vector<MockDestinationSpV1> &destinations,
     const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
-    const MockTxSpConcise::ValidationRulesVersion validation_rules_version)
+    const MockTxSpConciseV1::ValidationRulesVersion validation_rules_version)
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any outputs.");
@@ -70,7 +70,7 @@ MockTxSpConcise::MockTxSpConcise(const std::vector<MockInputProposalSpV1> &input
     // versioning for proofs
     std::string version_string;
     version_string.reserve(3);
-    MockTxSpConcise::get_versioning_string(validation_rules_version, version_string);
+    MockTxSpConciseV1::get_versioning_string(validation_rules_version, version_string);
 
     // tx proposal
     MockTxProposalSpV1 tx_proposal{destinations, max_rangeproof_splits};
@@ -92,10 +92,10 @@ MockTxSpConcise::MockTxSpConcise(const std::vector<MockInputProposalSpV1> &input
     sort_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images, tx_membership_proofs_sortable, tx_membership_proofs);
 
     // assemble tx
-    *this = MockTxSpConcise{std::move(partial_tx), std::move(tx_membership_proofs), validation_rules_version};
+    *this = MockTxSpConciseV1{std::move(partial_tx), std::move(tx_membership_proofs), validation_rules_version};
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxSpConcise::validate_tx_semantics() const
+bool MockTxSpConciseV1::validate_tx_semantics() const
 {
     // validate component counts (num inputs/outputs/etc.)
     if (!validate_mock_tx_sp_semantics_component_counts_v1(m_input_images.size(),
@@ -131,7 +131,7 @@ bool MockTxSpConcise::validate_tx_semantics() const
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxSpConcise::validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const
+bool MockTxSpConciseV1::validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const
 {
     // unspentness proof (key images not in ledger)
     if (!validate_mock_tx_sp_linking_tags_v1(m_input_images, ledger_context))
@@ -140,7 +140,7 @@ bool MockTxSpConcise::validate_tx_linking_tags(const std::shared_ptr<const Ledge
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxSpConcise::validate_tx_amount_balance(const bool defer_batchable) const
+bool MockTxSpConciseV1::validate_tx_amount_balance(const bool defer_batchable) const
 {
     if (!validate_mock_tx_sp_amount_balance_v1(m_input_images, m_outputs, m_balance_proof, defer_batchable))
         return false;
@@ -148,7 +148,7 @@ bool MockTxSpConcise::validate_tx_amount_balance(const bool defer_batchable) con
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
+bool MockTxSpConciseV1::validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
     const bool defer_batchable) const
 {
     // membership proofs
@@ -178,7 +178,7 @@ bool MockTxSpConcise::validate_tx_input_proofs(const std::shared_ptr<const Ledge
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockTxSpConcise::add_key_images_to_ledger(std::shared_ptr<LedgerContext> ledger_context) const
+void MockTxSpConciseV1::add_key_images_to_ledger(std::shared_ptr<LedgerContext> ledger_context) const
 {
     CHECK_AND_ASSERT_THROW_MES(ledger_context.get() != nullptr, "Tried to add key images to non-existent ledger.");
 
@@ -186,7 +186,7 @@ void MockTxSpConcise::add_key_images_to_ledger(std::shared_ptr<LedgerContext> le
         ledger_context->add_linking_tag_sp_v1(input_image.m_key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t MockTxSpConcise::get_size_bytes() const
+std::size_t MockTxSpConciseV1::get_size_bytes() const
 {
     // doesn't include (compared to a real tx):
     // - ring member references (e.g. indices or explicit copies)
@@ -222,7 +222,7 @@ std::size_t MockTxSpConcise::get_size_bytes() const
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParamPack &params,
+std::shared_ptr<MockTxSpConciseV1> make_mock_tx<MockTxSpConciseV1>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
     std::shared_ptr<MockLedgerContext> ledger_context_inout)
@@ -255,12 +255,12 @@ std::shared_ptr<MockTxSpConcise> make_mock_tx<MockTxSpConcise>(const MockTxParam
         };
 
     // make tx
-    return std::make_shared<MockTxSpConcise>(input_proposals, params.max_rangeproof_splits, destinations,
-        membership_ref_sets, MockTxSpConcise::ValidationRulesVersion::ONE);
+    return std::make_shared<MockTxSpConciseV1>(input_proposals, params.max_rangeproof_splits, destinations,
+        membership_ref_sets, MockTxSpConciseV1::ValidationRulesVersion::ONE);
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-bool validate_mock_txs<MockTxSpConcise>(const std::vector<std::shared_ptr<MockTxSpConcise>> &txs_to_validate,
+bool validate_mock_txs<MockTxSpConciseV1>(const std::vector<std::shared_ptr<MockTxSpConciseV1>> &txs_to_validate,
     const std::shared_ptr<const LedgerContext> ledger_context)
 {
     std::vector<const rct::BulletproofPlus*> range_proofs;

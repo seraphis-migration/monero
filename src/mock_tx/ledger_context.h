@@ -66,9 +66,16 @@ public:
     /**
     * brief: get_reference_set_components_sp_v1 - gets components of Seraphis enotes stored in the ledger
     * param: indices -
-    * outparam: referenced_enotes_components - {enote address, enote amount commitment}
+    * outparam: referenced_enotes_components - {{enote address, enote amount commitment}}
     */
     virtual void get_reference_set_components_sp_v1(const std::vector<std::size_t> &indices,
+        rct::keyM &referenced_enotes_components) const = 0;
+    /**
+    * brief: get_reference_set_components_sp_v2 - gets Seraphis squashed enotes stored in the ledger
+    * param: indices -
+    * outparam: referenced_enotes_components - {{squashed enote}}
+    */
+    virtual void get_reference_set_components_sp_v2(const std::vector<std::size_t> &indices,
         rct::keyM &referenced_enotes_components) const = 0;
     /**
     * brief: add_linking_tag_sp_v1 - add a Seraphis linking tag to the ledger

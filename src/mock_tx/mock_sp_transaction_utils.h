@@ -111,6 +111,19 @@ void sort_v1_tx_membership_proofs_sp_v1(const std::vector<MockENoteImageSpV1> &i
     std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_sortable_in,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out);
 /**
+* brief: prepare_input_commitment_factors_for_balance_proof_squashed_model_v1 - collect input amounts and
+*   input image amount commitment blinding factors (squashed enote model)
+* param: input_proposals -
+* param: image_address_masks -
+* outparam: input_amounts_out -
+* outparam: input_image_amount_commitment_blinding_factors_out -
+*/
+void prepare_input_commitment_factors_for_balance_proof_squashed_model_v1(
+    const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::vector<crypto::secret_key> &image_address_masks,
+    std::vector<rct::xmr_amount> &input_amounts_out,
+    std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors_out);
+/**
 * brief: make_v1_tx_outputs_sp_v1 - make v1 tx outputs
 *   TODO: special treatment of change dest for 2-out tx (expect both outputs to have same enote pub key, only store 1)
 * param: destinations -
@@ -136,6 +149,17 @@ void make_v1_tx_image_sp_v1(const MockInputProposalSpV1 &input_proposal,
     crypto::secret_key &image_address_mask_out,
     crypto::secret_key &image_amount_mask_out);
 /**
+* brief: make_v1_tx_image_sp_v2 - make all v1 input images for a tx EXCEPT LAST (squashed enote model)
+* param: input_proposal -
+* outparam: input_image_out -
+* outparam: image_address_mask_out -
+* outparam: image_amount_mask_out -
+*/
+void make_v1_tx_image_sp_v2(const MockInputProposalSpV1 &input_proposal,
+    MockENoteImageSpV1 &input_image_out,
+    crypto::secret_key &image_address_mask_out,
+    crypto::secret_key &image_amount_mask_out);
+/**
 * brief: make_v1_tx_image_last_sp_v1 - make LAST v1 input image for a tx
 *   - last amount commitment total blinding factor (v_c) equals sum of output amount blinding factors (y_t)
 *      minus sum input blinding factors (v_c_except_last)
@@ -153,6 +177,23 @@ void make_v1_tx_image_last_sp_v1(const MockInputProposalSpV1 &input_proposal,
     crypto::secret_key &image_address_mask_out,
     crypto::secret_key &image_amount_mask_out);
 /**
+* brief: make_v1_tx_image_last_sp_v2 - make LAST v1 input image for a tx (squashed enote model)
+*   - last amount commitment total blinding factor (v_c) equals sum of output amount blinding factors (y_t)
+*      minus sum input blinding factors (v_c_except_last)
+* param: input_proposal -
+* param: output_amount_commitment_blinding_factors -
+* param: input_amount_blinding_factors -
+* outparam: input_image_out -
+* outparam: image_address_mask_out -
+* outparam: image_amount_mask_out -
+*/
+void make_v1_tx_image_last_sp_v2(const MockInputProposalSpV1 &input_proposal,
+    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
+    const std::vector<crypto::secret_key> &input_amount_blinding_factors,
+    MockENoteImageSpV1 &input_image_out,
+    crypto::secret_key &image_address_mask_out,
+    crypto::secret_key &image_amount_mask_out);
+/**
 * brief: make_v1_tx_images_sp_v1 - make all v1 input images for a tx
 * param: input_proposals -
 * param: output_amount_commitment_blinding_factors -
@@ -164,7 +205,20 @@ void make_v1_tx_images_sp_v1(const std::vector<MockInputProposalSpV1> &input_pro
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
     std::vector<MockENoteImageSpV1> &input_images_out,
     std::vector<crypto::secret_key> &image_address_masks_out,
-    std::vector<crypto::secret_key> &image_amount_masks_out);  //UNUSED?
+    std::vector<crypto::secret_key> &image_amount_masks_out);
+/**
+* brief: make_v1_tx_images_sp_v2 - make all v1 input images for a tx (squashed enote model)
+* param: input_proposals -
+* param: output_amount_commitment_blinding_factors -
+* outparam: input_images_out -
+* outparam: image_address_masks_out -
+* outparam: image_amount_masks_out -
+*/
+void make_v1_tx_images_sp_v2(const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
+    std::vector<MockENoteImageSpV1> &input_images_out,
+    std::vector<crypto::secret_key> &image_address_masks_out,
+    std::vector<crypto::secret_key> &image_amount_masks_out);
 /**
 * brief: make_v1_tx_image_proof_sp_v1 - make a v1 tx input image proof (seraphis composition proof)
 * param: input_proposal -
@@ -174,6 +228,19 @@ void make_v1_tx_images_sp_v1(const std::vector<MockInputProposalSpV1> &input_pro
 * outparam: tx_image_proof_out -
 */
 void make_v1_tx_image_proof_sp_v1(const MockInputProposalSpV1 &input_proposal,
+    const MockENoteImageSpV1 &input_image,
+    const crypto::secret_key &image_address_mask,
+    const rct::key &message,
+    MockImageProofSpV1 &tx_image_proof_out);
+/**
+* brief: make_v1_tx_image_proof_sp_v2 - make a v1 tx input image proof (seraphis composition proof) (squashed enote model)
+* param: input_proposal -
+* param: input_image -
+* param: image_address_mask -
+* param: message -
+* outparam: tx_image_proof_out -
+*/
+void make_v1_tx_image_proof_sp_v2(const MockInputProposalSpV1 &input_proposal,
     const MockENoteImageSpV1 &input_image,
     const crypto::secret_key &image_address_mask,
     const rct::key &message,
@@ -190,7 +257,7 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<MockInputProposalSpV1> &inp
     const std::vector<MockENoteImageSpV1> &input_images,
     const std::vector<crypto::secret_key> &image_address_masks,
     const rct::key &message,
-    std::vector<MockImageProofSpV1> &tx_image_proofs_out);  //UNUSED?
+    std::vector<MockImageProofSpV1> &tx_image_proofs_out);
 /**
 * brief: make_v1_tx_image_proofs_sp_v2 - make v1 tx input image proof with merged seraphis composition proof for all inputs
 *   note: all inputs must be 'owned' by same signer, since all input image proof privkeys must be known to make a proof
@@ -206,6 +273,20 @@ void make_v1_tx_image_proofs_sp_v2(const std::vector<MockInputProposalSpV1> &inp
     const rct::key &message,
     MockImageProofSpV1 &tx_image_proof_merged_out);
 /**
+* brief: make_v1_tx_image_proofs_sp_v3 - make v1 tx input image proofs (seraphis composition proofs: 1 per input)
+*   (squashed enote model)
+* param: input_proposals -
+* param: input_images -
+* param: image_address_masks -
+* param: message -
+* outparam: tx_image_proofs_out -
+*/
+void make_v1_tx_image_proofs_sp_v3(const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::vector<MockENoteImageSpV1> &input_images,
+    const std::vector<crypto::secret_key> &image_address_masks,
+    const rct::key &message,
+    std::vector<MockImageProofSpV1> &tx_image_proofs_out);
+/**
 * brief: make_v1_tx_balance_proof_sp_v1 - make v1 tx balance proof (BP+ for range proofs; balance is implicit)
 * param: output_amounts -
 * param: output_amount_commitment_blinding_factors -
@@ -213,6 +294,22 @@ void make_v1_tx_image_proofs_sp_v2(const std::vector<MockInputProposalSpV1> &inp
 * outparam: balance_proof_out -
 */
 void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &output_amounts,
+    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
+    const std::size_t max_rangeproof_splits,
+    std::shared_ptr<MockBalanceProofSpV1> &balance_proof_out);
+/**
+* brief: make_v1_tx_balance_proof_sp_v2 - make v1 tx balance proof (BP+ for range proofs; balance is implicit)
+*   - range proofs for input image amount commitments and output commitments (squashed enote model)
+* param: input_amounts -
+* param: output_amounts -
+* param: input_image_amount_commitment_blinding_factors -
+* param: output_amount_commitment_blinding_factors -
+* param: max_rangeproof_splits -
+* outparam: balance_proof_out -
+*/
+void make_v1_tx_balance_proof_sp_v2(const std::vector<rct::xmr_amount> &input_amounts,
+    const std::vector<rct::xmr_amount> &output_amounts,
+    const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
     const std::size_t max_rangeproof_splits,
     std::shared_ptr<MockBalanceProofSpV1> &balance_proof_out);
@@ -228,6 +325,21 @@ void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &mem
     const crypto::secret_key &image_amount_mask,
     MockMembershipProofSortableSpV1 &tx_membership_proof_out);
 void make_v1_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
+    const crypto::secret_key &image_address_mask,
+    const crypto::secret_key &image_amount_mask,
+    MockMembershipProofSpV1 &tx_membership_proof_out);
+/**
+* brief: make_v1_tx_membership_proof_sp_v2 - make a v1 membership proof (concise grootle) (squashed enote model)
+* param: membership_ref_set -
+* param: image_address_mask -
+* param: image_amount_mask -
+* outparam: tx_membership_proof_out -
+*/
+void make_v1_tx_membership_proof_sp_v2(const MockMembershipReferenceSetSpV1 &membership_ref_set,
+    const crypto::secret_key &image_address_mask,
+    const crypto::secret_key &image_amount_mask,
+    MockMembershipProofSortableSpV1 &tx_membership_proof_out);
+void make_v1_tx_membership_proof_sp_v2(const MockMembershipReferenceSetSpV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
     MockMembershipProofSpV1 &tx_membership_proof_out);
@@ -248,6 +360,18 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenc
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
     const MockTxPartialSpV1 &partial_tx,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out);
+/**
+* brief: make_v1_tx_membership_proofs_sp_v2 - make v1 membership proofs (concise grootle: 1 per input)
+*   (squashed enote model)
+* param: membership_ref_sets -
+* param: image_address_masks -
+* param: image_amount_masks -
+* outparam: tx_membership_proofs_out -
+*/
+void make_v1_tx_membership_proofs_sp_v2(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
+    const std::vector<crypto::secret_key> &image_address_masks,
+    const std::vector<crypto::secret_key> &image_amount_masks,
+    std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_out);
 /**
 * brief: make_v1_tx_partial_inputs_sp_v1 - make a full set of v1 partial inputs
 * param: input_proposals -
@@ -290,6 +414,25 @@ std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
     const std::size_t ref_set_decomp_m,
     std::shared_ptr<MockLedgerContext> ledger_context_inout);
 std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v1(
+    const std::vector<MockENoteSpV1> &input_enotes,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    std::shared_ptr<MockLedgerContext> ledger_context_inout);
+/**
+* brief: gen_mock_sp_membership_ref_sets_v2 - create random reference sets for tx inputs, with real spend at a random index,
+*   and update mock ledger to include all members of the reference set (including squashed enotes)
+* param: input_proposals -
+* param: ref_set_decomp_n -
+* param: ref_set_decomp_m -
+* inoutparam: ledger_context_inout -
+* return: set of membership proof reference sets
+*/
+std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v2(
+    const std::vector<MockInputProposalSpV1> &input_proposals,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    std::shared_ptr<MockLedgerContext> ledger_context_inout);
+std::vector<MockMembershipReferenceSetSpV1> gen_mock_sp_membership_ref_sets_v2(
     const std::vector<MockENoteSpV1> &input_enotes,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,

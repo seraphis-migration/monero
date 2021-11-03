@@ -109,12 +109,12 @@ static void make_fake_sp_user_keys(rct::key &recipient_DH_base_out,
     make_secret_key(recipient_spendbase_privkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-static std::shared_ptr<mock_tx::MockTxSpConcise> make_sp_txtype_concise_v1(const std::size_t ref_set_decomp_n,
+static std::shared_ptr<mock_tx::MockTxSpConciseV1> make_sp_txtype_concise_v1(const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     const std::size_t max_rangeproof_splits,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    const mock_tx::MockTxSpConcise::ValidationRulesVersion validation_rules_version,
+    const mock_tx::MockTxSpConciseV1::ValidationRulesVersion validation_rules_version,
     std::shared_ptr<mock_tx::MockLedgerContext> ledger_context_inout)
 {
     /// build a tx from base components
@@ -150,7 +150,7 @@ static std::shared_ptr<mock_tx::MockTxSpConcise> make_sp_txtype_concise_v1(const
     // versioning for proofs (v1)
     std::string version_string;
     version_string.reserve(3);
-    MockTxSpConcise::get_versioning_string(validation_rules_version, version_string);
+    MockTxSpConciseV1::get_versioning_string(validation_rules_version, version_string);
 
     /// make tx
     // tx components
@@ -194,9 +194,9 @@ static std::shared_ptr<mock_tx::MockTxSpConcise> make_sp_txtype_concise_v1(const
         tx_membership_proofs_sortable);
     sort_tx_inputs_sp_v1(tx_membership_proofs_sortable, tx_membership_proofs, input_images, tx_image_proofs);
 
-    return std::make_shared<MockTxSpConcise>(std::move(input_images), std::move(outputs),
+    return std::make_shared<MockTxSpConciseV1>(std::move(input_images), std::move(outputs),
         std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),
-        std::move(tx_supplement), MockTxSpConcise::ValidationRulesVersion::ONE);
+        std::move(tx_supplement), MockTxSpConciseV1::ValidationRulesVersion::ONE);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -613,7 +613,7 @@ TEST(seraphis, sp_txtype_concise_v1)
     std::shared_ptr<mock_tx::MockLedgerContext> ledger_context = std::make_shared<mock_tx::MockLedgerContext>();
 
     // 3 tx, 11 inputs/outputs each, range proofs split x3
-    std::vector<std::shared_ptr<mock_tx::MockTxSpConcise>> txs;
+    std::vector<std::shared_ptr<mock_tx::MockTxSpConciseV1>> txs;
     txs.reserve(3);
 
     std::vector<rct::xmr_amount> in_amounts;
@@ -629,17 +629,17 @@ TEST(seraphis, sp_txtype_concise_v1)
     {
         txs.emplace_back(
                 make_sp_txtype_concise_v1(2, 3, 3, in_amounts, out_amounts,
-                    mock_tx::MockTxSpConcise::ValidationRulesVersion::ONE, ledger_context)
+                    mock_tx::MockTxSpConciseV1::ValidationRulesVersion::ONE, ledger_context)
             );
     }
 
-    EXPECT_TRUE(mock_tx::validate_mock_txs<mock_tx::MockTxSpConcise>(txs, ledger_context));
+    EXPECT_TRUE(mock_tx::validate_mock_txs<mock_tx::MockTxSpConciseV1>(txs, ledger_context));
 
     // insert key images to ledger
     for (const auto &tx : txs)
         tx->add_key_images_to_ledger(ledger_context);
 
     // validation should fail due to double-spend
-    EXPECT_FALSE(mock_tx::validate_mock_txs<mock_tx::MockTxSpConcise>(txs, ledger_context));
+    EXPECT_FALSE(mock_tx::validate_mock_txs<mock_tx::MockTxSpConciseV1>(txs, ledger_context));
 }
 //-------------------------------------------------------------------------------------------------------------------

@@ -717,7 +717,7 @@ void domain_separate_rct_hash(const std::string &domain_separator,
     epee::wipeable_string hash;
     hash.reserve(domain_separator.size() + sizeof(rct::key));
     hash += domain_separator;
-    hash.append((const char*) rct_key.bytes, sizeof(rct_key));
+    hash.append((const char*) rct_key.bytes, sizeof(rct::key));
 
     // hash to the result
     crypto::hash_to_scalar(hash.data(), hash.size(), hash_result_out);

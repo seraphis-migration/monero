@@ -57,7 +57,7 @@ namespace mock_tx
 ////
 // Seraphis tx: based on concise grootle membership proofs, with a merged composition proof for input images
 ///
-class MockTxSpMerge final : public MockTx
+class MockTxSpMergeV1 final : public MockTx
 {
 public:
 //member types
@@ -70,16 +70,16 @@ public:
 
 //constructors
     /// default constructor
-    MockTxSpMerge() = default;
+    MockTxSpMergeV1() = default;
 
     /// normal constructor: new tx from pieces
-    MockTxSpMerge(std::vector<MockENoteImageSpV1> input_images,
+    MockTxSpMergeV1(std::vector<MockENoteImageSpV1> input_images,
         std::vector<MockENoteSpV1> outputs,
         std::shared_ptr<MockBalanceProofSpV1> balance_proof,
         MockImageProofSpV1 image_proof_merged,
         std::vector<MockMembershipProofSpV1> membership_proofs,
         MockSupplementSpV1 tx_supplement,
-        const MockTxSpMerge::ValidationRulesVersion validation_rules_version) :
+        const MockTxSpMergeV1::ValidationRulesVersion validation_rules_version) :
             m_input_images{std::move(input_images)},
             m_outputs{std::move(outputs)},
             m_balance_proof{std::move(balance_proof)},
@@ -87,12 +87,12 @@ public:
             m_membership_proofs{std::move(membership_proofs)},
             m_supplement{std::move(tx_supplement)}
         {
-            CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble MockTxSpMerge.");
+            CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble MockTxSpMergeV1.");
             CHECK_AND_ASSERT_THROW_MES(validation_rules_version >= ValidationRulesVersion::MIN &&
                 validation_rules_version <= ValidationRulesVersion::MAX, "Invalid validation rules version.");
 
             m_tx_era_version = TxGenerationSp;
-            m_tx_format_version = TxStructureVersionSp::TxTypeSpMerge1;
+            m_tx_format_version = TxStructureVersionSp::TxTypeSpMergeV1;
             m_tx_validation_rules_version = validation_rules_version;
         }
 
@@ -100,7 +100,7 @@ public:
     //none for this mockup (see MockTxSpConcise for an example)
 
     /// normal constructor: simple when tx builder is monolothic (can complete tx in one step)
-    MockTxSpMerge(const std::vector<MockInputProposalSpV1> &input_proposals,
+    MockTxSpMergeV1(const std::vector<MockInputProposalSpV1> &input_proposals,
         const std::size_t max_rangeproof_splits,
         const std::vector<MockDestinationSpV1> &destinations,
         const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
@@ -131,7 +131,7 @@ public:
         std::string &version_string)
     {
         version_string += static_cast<char>(TxGenerationSp);
-        version_string += static_cast<char>(TxStructureVersionSp::TxTypeSpMerge1);
+        version_string += static_cast<char>(TxStructureVersionSp::TxTypeSpMergeV1);
         version_string += static_cast<char>(tx_validation_rules_version);
     }
 
@@ -167,26 +167,26 @@ private:
 };
 
 /**
-* brief: make_mock_tx - make a MockTxSpMerge transaction (function specialization)
+* brief: make_mock_tx - make a MockTxSpMergeV1 transaction (function specialization)
 * param: params -
 * param: in_amounts -
 * param: out_amounts -
 * inoutparam: ledger_context_inout -
-* return: a MockTxSpMerge tx
+* return: a MockTxSpMergeV1 tx
 */
 template <>
-std::shared_ptr<MockTxSpMerge> make_mock_tx<MockTxSpMerge>(const MockTxParamPack &params,
+std::shared_ptr<MockTxSpMergeV1> make_mock_tx<MockTxSpMergeV1>(const MockTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
     std::shared_ptr<MockLedgerContext> ledger_context_inout);
 /**
-* brief: validate_mock_txs - validate a set of MockTxSpMerge transactions (function specialization)
+* brief: validate_mock_txs - validate a set of MockTxSpMergeV1 transactions (function specialization)
 * param: txs_to_validate -
 * param: ledger_context -
 * return: true/false on validation result
 */
 template <>
-bool validate_mock_txs<MockTxSpMerge>(const std::vector<std::shared_ptr<MockTxSpMerge>> &txs_to_validate,
+bool validate_mock_txs<MockTxSpMergeV1>(const std::vector<std::shared_ptr<MockTxSpMergeV1>> &txs_to_validate,
     const std::shared_ptr<const LedgerContext> ledger_context);
 
 } //namespace mock_tx

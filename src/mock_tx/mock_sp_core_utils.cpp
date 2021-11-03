@@ -117,6 +117,45 @@ void extend_seraphis_spendkey(const crypto::secret_key &k_a_extender, rct::key &
     rct::addKeys(spendkey_inout, address_temp, spendkey_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_squash_prefix(const rct::key &onetime_address,
+    const rct::key &amount_commitment,
+    crypto::secret_key &squash_prefix_out)
+{
+    static std::string domain_separator{config::HASH_KEY_SERAPHIS_SQUASHED_ENOTE};
+
+    // H("domain-sep", Ko, C)
+    epee::wipeable_string hash;
+    hash.reserve(domain_separator.size() + 2*sizeof(rct::key));
+    hash += domain_separator;
+    hash.append((const char*) onetime_address.bytes, sizeof(rct::key));
+    hash.append((const char*) amount_commitment.bytes, sizeof(rct::key));
+
+    // hash to the result
+    crypto::hash_to_scalar(hash.data(), hash.size(), squash_prefix_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void squash_seraphis_address(const rct::key &onetime_address,
+    const rct::key &amount_commitment,
+    rct::key &squashed_address_out)
+{
+    // Ko^t = H(Ko,C) Ko
+    crypto::secret_key squash_prefix;
+    make_seraphis_squash_prefix(onetime_address, amount_commitment, squash_prefix);
+
+    rct::scalarmultKey(squashed_address_out, onetime_address, rct::sk2rct(squash_prefix));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void seraphis_squashed_enote_Q(const rct::key &onetime_address,
+    const rct::key &amount_commitment,
+    rct::key &squashed_enote_out)
+{
+    // Ko^t
+    squash_seraphis_address(onetime_address, amount_commitment, squashed_enote_out);
+
+    // Q = Ko^t + C^t
+    rct::addKeys(squashed_enote_out, squashed_enote_out, amount_commitment);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_enote_pubkey(const crypto::secret_key &enote_privkey, const rct::key &DH_base, rct::key &enote_pubkey_out)
 {
     // R_t = r_t K^{DH}_t

@@ -41,6 +41,7 @@ set(mock_tx_sources
   mock_sp_transaction_utils.cpp
   mock_sp_txtype_concise_v1.cpp
   mock_sp_txtype_merge_v1.cpp
+  mock_sp_txtype_squashed_v1.cpp
   mock_sp_validators.cpp
   mock_tx.cpp
   mock_tx_utils.cpp
