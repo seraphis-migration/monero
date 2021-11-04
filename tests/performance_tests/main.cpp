@@ -28,6 +28,8 @@
 // 
 // Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
+#include <memory>
+
 #include <boost/regex.hpp>
 
 #include "common/util.h"
@@ -109,7 +111,7 @@ int main(int argc, char** argv)
   const std::string timings_database = command_line::get_arg(vm, arg_timings_database);
   ParamsShuttle p;
   if (!timings_database.empty())
-    p.core_params.td = TimingsDatabase(timings_database);
+    p.core_params.td = std::make_shared<TimingsDatabase>(timings_database);
   p.core_params.verbose = command_line::get_arg(vm, arg_verbose);
   p.core_params.stats = command_line::get_arg(vm, arg_stats);
   p.core_params.loop_multiplier = command_line::get_arg(vm, arg_loop_multiplier);
@@ -154,9 +156,12 @@ int main(int argc, char** argv)
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpMergeV1);
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
     }
+    if (p.core_params.td.get())
+      p.core_params.td->save(false);
   }
-  
-
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(true);
 
   incrementer = {
       {1, 2, 4, 7, 11, 25}, //batch sizes
@@ -181,7 +186,9 @@ int main(int argc, char** argv)
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
     }
   }
-
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
 
 
   // test hash performance for view tags
@@ -201,6 +208,10 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_cnhash);
   TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_b2bhash);
 
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
 
   // test view scan performance with view tags
   TEST_PERFORMANCE0(filter, p, test_view_scan_cn);
@@ -212,6 +223,10 @@ int main(int argc, char** argv)
   p_view_scan.test_view_tag_check = true;
   TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_sp);
   TEST_PERFORMANCE0(filter, p, test_view_scan_sp_siphash);
+
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
 
 
   /*

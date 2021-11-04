@@ -31,6 +31,7 @@
 #pragma once
 
 #include <iostream>
+#include <memory>
 #include <type_traits>
 #include <stdint.h>
 
@@ -70,7 +71,7 @@ private:
 
 struct Params
 {
-  TimingsDatabase td;
+  std::shared_ptr<TimingsDatabase> td;
   bool verbose;
   bool stats;
   unsigned loop_multiplier;
@@ -240,8 +241,13 @@ void run_test(const std::string &filter, ParamsT &params_shuttle, const char* te
     double stddev = runner.get_stddev();
     double npskew = runner.get_non_parametric_skew();
 
-    std::vector<TimingsDatabase::instance> prev_instances = params.td.get(test_name);
-    params.td.add(test_name, {time(NULL), runner.get_size(), min, max, mean, med, stddev, npskew, quantiles});
+    //std::vector<TimingsDatabase::instance> prev_instances;
+    if (params.td.get() != nullptr)
+    {
+      //prev_instances = params.td->get(test_name);
+      params.td->add(test_name,
+        TimingsDatabase::instance{time(NULL), runner.get_size(), min, max, mean, med, stddev, npskew, quantiles});
+    }
 
     std::cout << (params.verbose ? "  time per call: " : " ") << time_per_call << " " << unit << "/call" << (params.verbose ? "\n" : "");
     if (params.stats)
@@ -251,6 +257,7 @@ void run_test(const std::string &filter, ParamsT &params_shuttle, const char* te
       uint64_t p95s = quantiles[9] / scale;
       uint64_t stddevs = stddev / scale;
       std::string cmp;
+      /*
       if (!prev_instances.empty())
       {
         const TimingsDatabase::instance &prev_instance = prev_instances.back();
@@ -259,8 +266,9 @@ void run_test(const std::string &filter, ParamsT &params_shuttle, const char* te
           double pc = fabs(100. * (prev_instance.mean - runner.get_mean()) / prev_instance.mean);
           cmp = ", " + std::to_string(pc) + "% " + (mean > prev_instance.mean ? "slower" : "faster");
         }
-cmp += "  -- " + std::to_string(prev_instance.mean);
+        cmp += "  -- " + std::to_string(prev_instance.mean);
       }
+      */
       std::cout << " (min " << mins << " " << unit << ", 90th " << p95s << " " << unit << ", median " << meds << " " << unit << ", std dev " << stddevs << " " << unit << ")" << cmp;
     }
     std::cout << std::endl;
