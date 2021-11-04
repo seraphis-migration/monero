@@ -1,9 +1,10 @@
 #pragma once
 
+#include <list>
 #include <stdint.h>
 #include <string>
+#include <utility>
 #include <vector>
-#include <map>
 
 class TimingsDatabase
 {
@@ -18,17 +19,17 @@ public:
 
 public:
   TimingsDatabase();
-  TimingsDatabase(const std::string &filename);
+  TimingsDatabase(const std::string &filename, const bool load_previous = false);
   ~TimingsDatabase();
 
-  std::vector<instance> get(const char *name) const;
+  //std::vector<instance> get(const char *name) const;  //changed to std::list from std::multimap... can't get range
   void add(const char *name, const instance &data);
+  bool save(const bool print_current_time = true);
 
 private:
   bool load();
-  bool save();
 
 private:
   std::string filename;
-  std::multimap<std::string, instance> instances;
+  std::list<std::pair<std::string, instance>> instances;
 };

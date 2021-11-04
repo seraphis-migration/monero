@@ -325,14 +325,25 @@ public:
         }
 
         // report tx info
-        std::cout << m_txs.back()->get_descriptor() << " || "
-                    << "Size (bytes): " << m_txs.back()->get_size_bytes() << " || "
-                    << "batch size: " << params.batch_size << " || "
-                    << "inputs: " << params.in_count << " || "
-                    << "outputs: " << params.out_count << " || "
-                    << "rangeproof split: " << params.num_rangeproof_splits << " || "
-                    << "ref set size (" << params.n << "^" << params.m << "): " <<
-                    mock_tx::ref_set_size_from_decomp(params.n, params.m) << '\n';
+        std::string report;
+        report += m_txs.back()->get_descriptor() + " || ";
+        report += std::string{"Size (bytes): "} + std::to_string(m_txs.back()->get_size_bytes()) + " || ";
+        report += std::string{"batch size: "} + std::to_string(params.batch_size) + " || ";
+        report += std::string{"inputs: "} + std::to_string(params.in_count) + " || ";
+        report += std::string{"outputs: "} + std::to_string(params.out_count) + " || ";
+        report += std::string{"rangeproof split: "} + std::to_string(params.num_rangeproof_splits) + " || ";
+        report += std::string{"ref set size ("} + std::to_string(params.n) + "^" + std::to_string(params.m) + "): ";
+        report += std::to_string(mock_tx::ref_set_size_from_decomp(params.n, params.m));
+
+        std::cout << report << '\n';
+
+        // add the info report to timings database so it is saved to file
+        if (params.core_params.td.get())
+        {
+            TimingsDatabase::instance null_instance;
+            null_instance.npoints = 0;
+            params.core_params.td->add(report.c_str(), null_instance);
+        }
 
         return true;
     }

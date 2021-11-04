@@ -12,10 +12,11 @@ TimingsDatabase::TimingsDatabase()
 {
 }
 
-TimingsDatabase::TimingsDatabase(const std::string &filename):
+TimingsDatabase::TimingsDatabase(const std::string &filename, const bool load_previous /*=false*/):
   filename(filename)
 {
-  load();
+  if (load_previous)
+    load();
 }
 
 TimingsDatabase::~TimingsDatabase()
@@ -73,42 +74,79 @@ bool TimingsDatabase::load()
     {
       i.deciles.push_back(atoi(fields[idx++].c_str()));
     }
-    instances.insert(std::make_pair(name, i));
+    instances.emplace_back(name, i);
   }
   fclose(f);
   return true;
 }
 
-bool TimingsDatabase::save()
+bool TimingsDatabase::save(const bool print_current_time /*=true*/)
 {
-  if (filename.empty())
+  if (filename.empty() || instances.empty())
     return true;
 
-  FILE *f = fopen(filename.c_str(), "w");
+  FILE *f = fopen(filename.c_str(), "a");  // append
   if (!f)
   {
     MERROR("Failed to write to file " << filename << ": " << strerror(errno));
     return false;
   }
+
+  if (print_current_time)
+  {
+    // print current time in readable format (UTC)
+    std::time_t sys_time{std::time(nullptr)};
+    std::tm *utc_time = std::gmtime(&sys_time);    //GMT /equiv UTC
+
+    // format: year-month-dayThour-minute-second_[ID_]ident.ext
+    std::string current_time{};
+    if (utc_time && sys_time != (std::time_t)(-1))
+    {
+        current_time += std::to_string(utc_time->tm_year + 1900) + '-';
+        current_time += std::to_string(utc_time->tm_mon + 1) + '-';
+        current_time += std::to_string(utc_time->tm_mday) + " : ";
+        current_time += std::to_string(utc_time->tm_hour) + '-';
+        current_time += std::to_string(utc_time->tm_min) + '-';
+        current_time += std::to_string(utc_time->tm_sec);
+    }
+    else
+    {
+        current_time += "TIME_ERROR_";
+    }
+    fputc('\n', f);  // add an extra line before each 'print time'
+    fprintf(f, "%s", current_time.c_str());
+    fputc('\n', f);
+  }
+
   for (const auto &i: instances)
   {
     fprintf(f, "%s", i.first.c_str());
-    fprintf(f, "\t%lu", (unsigned long)i.second.t);
-    fprintf(f, " %zu", i.second.npoints);
-    fprintf(f, " %f", i.second.min);
-    fprintf(f, " %f", i.second.max);
-    fprintf(f, " %f", i.second.mean);
-    fprintf(f, " %f", i.second.median);
-    fprintf(f, " %f", i.second.stddev);
-    fprintf(f, " %f", i.second.npskew);
-    for (uint64_t v: i.second.deciles)
-      fprintf(f, " %lu", (unsigned long)v);
+
+    if (i.second.npoints > 0)
+    {
+      fprintf(f, "\t%lu", (unsigned long)i.second.t);
+      fprintf(f, " %zu", i.second.npoints);
+      fprintf(f, " %f", i.second.min);
+      fprintf(f, " %f", i.second.max);
+      fprintf(f, " %f", i.second.mean);
+      fprintf(f, " %f", i.second.median);
+      fprintf(f, " %f", i.second.stddev);
+      fprintf(f, " %f", i.second.npskew);
+      for (uint64_t v: i.second.deciles)
+        fprintf(f, " %lu", (unsigned long)v);
+    }
+
     fputc('\n', f);
   }
   fclose(f);
+
+  // after saving, clear so next save does not append the same stuff over again
+  instances.clear();
+
   return true;
 }
 
+/*
 std::vector<TimingsDatabase::instance> TimingsDatabase::get(const char *name) const
 {
   std::vector<instance> ret;
@@ -118,8 +156,9 @@ std::vector<TimingsDatabase::instance> TimingsDatabase::get(const char *name) co
   std::sort(ret.begin(), ret.end(), [](const instance &e0, const instance &e1){ return e0.t < e1.t; });
   return ret;
 }
+*/
 
 void TimingsDatabase::add(const char *name, const instance &i)
 {
-  instances.insert(std::make_pair(name, i));
+  instances.emplace_back(name, i);
 }
