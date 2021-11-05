@@ -145,7 +145,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);  // true on very first test to get current timestamp in results file
+    p.core_params.td->save(true);
 
   // TEST 1.2: MockTxCLSAG {decomp 2-series}
   incrementer = {

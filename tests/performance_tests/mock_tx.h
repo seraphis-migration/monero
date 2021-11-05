@@ -80,32 +80,6 @@ public:
         init_decomp_m_current();
     }
 
-    // move constructor
-    MockTxPerfIncrementer(MockTxPerfIncrementer &&incrementer)
-    {
-        *this = std::move(incrementer);
-    }
-
-//overloaded operators
-    // move assignment operator
-    MockTxPerfIncrementer& operator=(MockTxPerfIncrementer &&incrementer)
-    {
-        // self-assignment check
-        if (this == &incrementer)
-            return *this;
-
-        // move members
-        m_is_done = incrementer.m_is_done;
-        m_batch_sizes = std::move(incrementer.m_batch_sizes);
-        m_in_counts = std::move(incrementer.m_in_counts);
-        m_out_counts = std::move(incrementer.m_out_counts);
-        m_rangeproof_splits = std::move(incrementer.m_rangeproof_splits);
-        m_ref_set_decomp_n = std::move(incrementer.m_ref_set_decomp_n);
-        m_ref_set_decomp_m_limit = std::move(incrementer.m_ref_set_decomp_m_limit);
-
-        return *this;
-    }
-
 //member functions
     bool is_done()
     {
@@ -161,7 +135,7 @@ public:
         {
             get_params(params);
             ++m_variations_requested;
-            
+
             return true;
         }
 
