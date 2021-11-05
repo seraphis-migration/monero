@@ -98,16 +98,21 @@ bool TimingsDatabase::save(const bool print_current_time /*=true*/)
     std::time_t sys_time{std::time(nullptr)};
     std::tm *utc_time = std::gmtime(&sys_time);    //GMT /equiv UTC
 
-    // format: year-month-dayThour-minute-second_[ID_]ident.ext
+    // format: year-month-day : hour:minute:second
     std::string current_time{};
     if (utc_time && sys_time != (std::time_t)(-1))
     {
         current_time += std::to_string(utc_time->tm_year + 1900) + '-';
-        current_time += std::to_string(utc_time->tm_mon + 1) + '-';
-        current_time += std::to_string(utc_time->tm_mday) + " : ";
-        current_time += std::to_string(utc_time->tm_hour) + '-';
-        current_time += std::to_string(utc_time->tm_min) + '-';
-        current_time += std::to_string(utc_time->tm_sec);
+        current_time += (std::to_string(utc_time->tm_mon + 1).size() == 1 ? std::string{'0'} : std::string{}) +
+          std::to_string(utc_time->tm_mon + 1) + '-';
+        current_time += (std::to_string(utc_time->tm_mday).size() == 1 ? std::string{'0'} : std::string{}) +
+          std::to_string(utc_time->tm_mday) + " : ";
+        current_time += (std::to_string(utc_time->tm_hour).size() == 1 ? std::string{'0'} : std::string{}) +
+          std::to_string(utc_time->tm_hour) + ':';
+        current_time += (std::to_string(utc_time->tm_min).size() == 1 ? std::string{'0'} : std::string{}) +
+          std::to_string(utc_time->tm_min) + ':';
+        current_time += (std::to_string(utc_time->tm_sec).size() == 1 ? std::string{'0'} : std::string{}) +
+          std::to_string(utc_time->tm_sec);
     }
     else
     {
