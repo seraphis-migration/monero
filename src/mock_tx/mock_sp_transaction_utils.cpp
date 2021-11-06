@@ -199,7 +199,7 @@ rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &e
     // project name
     hash = CRYPTONOTE_NAME;
     // all referenced enote ledger indices
-    char converted_index[(sizeof(size_t) * 8 + 6) / 7];
+    char converted_index[(sizeof(std::size_t) * 8 + 6) / 7];
     char* end;
     for (const std::size_t index : enote_ledger_indices)
     {
@@ -318,8 +318,7 @@ void sort_v1_tx_membership_proofs_sp_v1(const std::vector<MockENoteImageSpV1> &i
                 std::find_if(tx_membership_proofs_sortable_in.begin(), tx_membership_proofs_sortable_in.end(),
                         [&](const MockMembershipProofSortableSpV1 &sortable_proof) -> bool
                         {
-                            return input_images[input_index].m_masked_address ==
-                                sortable_proof.m_masked_address;
+                            return input_images[input_index].m_masked_address == sortable_proof.m_masked_address;
                         }
                     )
             };

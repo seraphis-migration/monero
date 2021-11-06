@@ -288,7 +288,7 @@ public:
                 tx_params.ref_set_decomp_m = params.m;
 
                 // make tx
-                m_txs.push_back(
+                m_txs.emplace_back(
                         mock_tx::make_mock_tx<MockTxType>(tx_params, input_amounts, output_amounts, m_ledger_contex)
                     );
             }
