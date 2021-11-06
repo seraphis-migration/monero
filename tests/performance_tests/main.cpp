@@ -127,7 +127,8 @@ int main(int argc, char** argv)
 
 
 
-  // TEST error cases found during perf testing
+  /*
+  // TEST error cases found during perf testing (NOTE: COULD NOT REPRODUCE DIRECTLY)
   // - MockTxSpSquashedV1 {outputs, BP+ splitting, tx batching}
 
   // Sp-Squashed || Size (bytes): 24223 || batch size: 1 || inputs: 16 || outputs: 7 || rangeproof split: 4 ||
@@ -268,7 +269,7 @@ int main(int argc, char** argv)
   // test done, save results
   if (p.core_params.td.get())
     p.core_params.td->save(true);
-
+  */
 
 
   /// TEST 1: MockTxCLSAG

@@ -124,7 +124,7 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
     static std::string domain_separator{config::HASH_KEY_SERAPHIS_SQUASHED_ENOTE};
 
     // H("domain-sep", Ko, C)
-    epee::wipeable_string hash;
+    std::string hash;
     hash.reserve(domain_separator.size() + 2*sizeof(rct::key));
     hash += domain_separator;
     hash.append((const char*) onetime_address.bytes, sizeof(rct::key));
