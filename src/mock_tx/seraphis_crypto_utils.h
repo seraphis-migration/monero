@@ -159,6 +159,14 @@ void multi_exp_vartime(const rct::keyV &privkeys, const std::vector<ge_p3> &pubk
 void multi_exp_vartime_p3(const rct::keyV &privkeys, const rct::keyV &pubkeys, ge_p3 &result_out);
 void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, ge_p3 &result_out);
 /**
+* brief: sub_keys_p3 - subtract two keys and get back a ge_p3 representation of the point
+*   A - B
+* param: A - key A
+* param: B - key B
+* outparam: result_out - 'A - B'
+*/
+void sub_keys_p3(const rct::key &A, const rct::key &B, ge_p3 &result_out);
+/**
 * brief: mask_key - commit to an EC key
 *   K' = mask G + K
 * param: mask - commitment mask/blinding factor

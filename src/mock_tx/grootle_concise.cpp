@@ -315,10 +315,12 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     rct::keyM p = rct::keyMInit(m + 1, N);
     CHECK_AND_ASSERT_THROW_MES(p.size() == N, "Bad matrix size!");
     CHECK_AND_ASSERT_THROW_MES(p[0].size() == m + 1, "Bad matrix size!");
+    std::vector<std::size_t> decomp_k;
+    rct::keyV pre_convolve_temp;
+    decomp_k.resize(m);
+    pre_convolve_temp.resize(2);
     for (std::size_t k = 0; k < N; ++k)
     {
-        std::vector<std::size_t> decomp_k;
-        decomp_k.resize(m);
         decompose(k, n, m, decomp_k);
 
         for (std::size_t j = 0; j < m+1; ++j)
@@ -330,12 +332,10 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
 
         for (std::size_t j = 1; j < m; ++j)
         {
-            rct::keyV temp;
-            temp.resize(2);
-            temp[0] = a[j][decomp_k[j]];
-            temp[1] = kronecker_delta(decomp_l[j], decomp_k[j]);
+            pre_convolve_temp[0] = a[j][decomp_k[j]];
+            pre_convolve_temp[1] = kronecker_delta(decomp_l[j], decomp_k[j]);
 
-            p[k] = convolve(p[k], temp, m);
+            p[k] = convolve(p[k], pre_convolve_temp, m);
         }
     }
 
@@ -361,7 +361,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     // {X}: 'encodings' of [p] (i.e. of the real signing index 'l' in the referenced tuple set)
     proof.X = rct::keyV(m);
     rct::key c_zero_nominal_prefix_temp;
-    rct::key C_zero_nominal_temp;
+    ge_p3 C_zero_nominal_temp_p3;
     for (std::size_t j = 0; j < m; ++j)
     {
         std::vector<rct::MultiexpData> data_X;
@@ -372,9 +372,9 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
             // X[j] += p[k][j] * sum_{alpha}( mu^alpha * (M[k][alpha] - C_offset[alpha]) )
             for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
-                sc_mul(c_zero_nominal_prefix_temp.bytes, mu_pow[alpha].bytes, p[k][j].bytes); // p[k][j] * mu^alpha
-                rct::subKeys(C_zero_nominal_temp, M[k][alpha], C_offsets[alpha]); // M[k][alpha] - C_offset[alpha]
-                data_X.push_back({c_zero_nominal_prefix_temp, C_zero_nominal_temp});
+                sc_mul(c_zero_nominal_prefix_temp.bytes, mu_pow[alpha].bytes, p[k][j].bytes);  // p[k][j] * mu^alpha
+                sp::sub_keys_p3(M[k][alpha], C_offsets[alpha], C_zero_nominal_temp_p3);  // M[k][alpha] - C_offset[alpha]
+                data_X.push_back({c_zero_nominal_prefix_temp, C_zero_nominal_temp_p3});
             }
         }
 
@@ -387,7 +387,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     // done: store (1/8)*X
     for (std::size_t j = 0; j < m; ++j)
     {
-        proof.X[j] = rct::scalarmultKey(proof.X[j], rct::INV_EIGHT);
+        rct::scalarmultKey(proof.X[j], proof.X[j], rct::INV_EIGHT);
     }
     CHECK_AND_ASSERT_THROW_MES(proof.X.size() == m, "Proof coefficient vector is unexpected size!");
 
