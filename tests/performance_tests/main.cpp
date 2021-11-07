@@ -308,7 +308,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
   // TEST 1.3: MockTxCLSAG {outputs, BP+ splitting, tx batching}
   incrementer = {
@@ -330,7 +330,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
 
 
@@ -353,7 +353,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
   // TEST 2.2: MockTxTriptych {decomp}
   incrementer = {
@@ -371,7 +371,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
 
 
@@ -394,7 +394,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
   // TEST 3.2: MockTxSpConciseV1 {decomp}
   incrementer = {
@@ -412,7 +412,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
   // TEST 3.3: MockTxSpConciseV1 {outputs, BP+ splitting, tx batching}
   incrementer = {
@@ -434,7 +434,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
 
 
@@ -457,7 +457,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
 
 
@@ -480,7 +480,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
   // TEST 5.2: MockTxSpSquashedV1 {decomp}
   incrementer = {
@@ -498,7 +498,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
   // TEST 5.3: MockTxSpSquashedV1 {outputs, BP+ splitting, tx batching}
   incrementer = {
@@ -521,7 +521,7 @@ int main(int argc, char** argv)
   }
   // test done, save results
   if (p.core_params.td.get())
-    p.core_params.td->save(true);
+    p.core_params.td->save(false);
 
 
 
