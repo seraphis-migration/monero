@@ -243,7 +243,7 @@ template <typename MockTxType>
 class test_mock_tx
 {
 public:
-    static const size_t loop_count = 50;
+    static const size_t loop_count = 1;
 
     bool init(const ParamsShuttleMockTx &params)
     {
@@ -316,7 +316,20 @@ public:
         {
             TimingsDatabase::instance null_instance;
             null_instance.npoints = 0;
-            params.core_params.td->add(report.c_str(), null_instance);
+
+            std::string report_csv;
+            std::string separator{','};
+            report_csv += m_txs.back()->get_descriptor() + separator;
+            report_csv += std::to_string(m_txs.back()->get_size_bytes()) + separator;
+            report_csv += std::to_string(params.batch_size) + separator;
+            report_csv += std::to_string(params.in_count) + separator;
+            report_csv += std::to_string(params.out_count) + separator;
+            report_csv += std::to_string(params.num_rangeproof_splits) + separator;
+            report_csv += std::to_string(params.n) + separator;
+            report_csv += std::to_string(params.m) + separator;
+            report_csv += std::to_string(mock_tx::ref_set_size_from_decomp(params.n, params.m));
+
+            params.core_params.td->add(report_csv.c_str(), null_instance);
         }
 
         return true;

@@ -125,23 +125,22 @@ bool TimingsDatabase::save(const bool print_current_time /*=true*/)
 
   for (const auto &i: instances)
   {
-    fprintf(f, "%s", i.first.c_str());
+    fprintf(f, "%s,", i.first.c_str());
 
     if (i.second.npoints > 0)
     {
-      fprintf(f, "\t%lu", (unsigned long)i.second.t);
-      fprintf(f, " %zu", i.second.npoints);
-      fprintf(f, " %f", i.second.min);
-      fprintf(f, " %f", i.second.max);
-      fprintf(f, " %f", i.second.mean);
-      fprintf(f, " %f", i.second.median);
-      fprintf(f, " %f", i.second.stddev);
-      fprintf(f, " %f", i.second.npskew);
+      fprintf(f, "%lu,", (unsigned long)i.second.t);
+      fprintf(f, "%zu,", i.second.npoints);
+      fprintf(f, "%f,", i.second.min);
+      fprintf(f, "%f,", i.second.max);
+      fprintf(f, "%f,", i.second.mean);
+      fprintf(f, "%f,", i.second.median);
+      fprintf(f, "%f,", i.second.stddev);
+      fprintf(f, "%f,", i.second.npskew);
       for (uint64_t v: i.second.deciles)
-        fprintf(f, " %lu", (unsigned long)v);
+        fprintf(f, "%lu,", (unsigned long)v);
+      fputc('\n', f);  // only add new line if there are points; assume that 'no points' means i.first is for prepending
     }
-
-    fputc('\n', f);
   }
   fclose(f);
 
