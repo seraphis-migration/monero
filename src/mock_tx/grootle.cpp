@@ -304,10 +304,12 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     rct::keyM p = rct::keyMInit(m + 1, N);
     CHECK_AND_ASSERT_THROW_MES(p.size() == N, "Bad matrix size!");
     CHECK_AND_ASSERT_THROW_MES(p[0].size() == m + 1, "Bad matrix size!");
+    std::vector<std::size_t> decomp_k;
+    rct::keyV pre_convolve_temp;
+    decomp_k.resize(m);
+    pre_convolve_temp.resize(2);
     for (std::size_t k = 0; k < N; ++k)
     {
-        std::vector<std::size_t> decomp_k;
-        decomp_k.resize(m);
         decompose(k, n, m, decomp_k);
 
         for (std::size_t j = 0; j < m+1; ++j)
@@ -319,12 +321,10 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
 
         for (std::size_t j = 1; j < m; ++j)
         {
-            rct::keyV temp;
-            temp.resize(2);
-            temp[0] = a[j][decomp_k[j]];
-            temp[1] = kronecker_delta(decomp_l[j], decomp_k[j]);
+            pre_convolve_temp[0] = a[j][decomp_k[j]];
+            pre_convolve_temp[1] = kronecker_delta(decomp_l[j], decomp_k[j]);
 
-            p[k] = convolve(p[k], temp, m);
+            p[k] = convolve(p[k], pre_convolve_temp, m);
         }
     }
 
@@ -346,7 +346,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
 
     // {{X}}: 'encodings' of [p] (i.e. of the real signing index 'l' in the referenced tuple set)
     proof.X.resize(num_keys, rct::keyV(m));
-    rct::key C_zero_nominal_temp;
+    ge_p3 C_zero_nominal_temp_p3;
     for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
     {
         for (std::size_t j = 0; j < m; ++j)
@@ -357,8 +357,8 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
             for (std::size_t k = 0; k < N; ++k)
             {
                 // X[alpha][j] += p[k][j] * ( M[k][alpha] - C_offset[alpha] )
-                rct::subKeys(C_zero_nominal_temp, M[k][alpha], C_offsets[alpha]);
-                data_X.push_back({p[k][j], C_zero_nominal_temp});
+                sp::sub_keys_p3(M[k][alpha], C_offsets[alpha], C_zero_nominal_temp_p3);
+                data_X.push_back({p[k][j], C_zero_nominal_temp_p3});
             }
 
             // X[alpha][j] += rho[alpha][j]*G
@@ -373,7 +373,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     {
         for (std::size_t j = 0; j < m; ++j)
         {
-            proof.X[alpha][j] = rct::scalarmultKey(proof.X[alpha][j], rct::INV_EIGHT);
+            rct::scalarmultKey(proof.X[alpha][j], proof.X[alpha][j], rct::INV_EIGHT);
         }
         CHECK_AND_ASSERT_THROW_MES(proof.X[alpha].size() == m, "Proof coefficient vector is unexpected size!");
     }

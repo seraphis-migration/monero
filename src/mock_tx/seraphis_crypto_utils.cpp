@@ -703,6 +703,21 @@ void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &p
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void sub_keys_p3(const rct::key &A, const rct::key &B, ge_p3 &result_out)
+{
+    ge_p3 B_p3;
+    ge_p1p1 temp_p1p1;
+    ge_cached temp_cache;
+    CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&result_out, A.bytes) == 0,
+        "ge_frombytes_vartime failed at "+boost::lexical_cast<std::string>(__LINE__));
+    CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&B_p3, B.bytes) == 0,
+        "ge_frombytes_vartime failed at "+boost::lexical_cast<std::string>(__LINE__));
+
+    ge_p3_to_cached(&temp_cache, &B_p3);
+    ge_sub(&temp_p1p1, &result_out, &temp_cache);  // A - B
+    ge_p1p1_to_p3(&result_out, &temp_p1p1);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &masked_key_out)
 {
     // K' = mask G + K
