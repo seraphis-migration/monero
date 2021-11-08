@@ -3828,14 +3828,20 @@ int sc_isnonzero(const unsigned char *s) {
 }
 
 int ge_p3_is_point_at_infinity(const ge_p3 *p) {
-  // X = 0 and Y == Z
-  int n;
+  // https://eprint.iacr.org/2008/522
+  // X == T == 0 and Y/Z == 1
+  int n, zero_Y_count;
+  zero_Y_count = 0;
   for (n = 0; n < 10; ++n)
   {
     if (p->X[n] | p->T[n])
       return 0;
     if (p->Y[n] != p->Z[n])
       return 0;
+    if (p->Y[n] == 0)
+      ++zero_Y_count;
   }
+  if (zero_Y_count == 10)  // Y == Z == 0
+    return 0;
   return 1;
 }
