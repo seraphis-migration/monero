@@ -115,13 +115,13 @@ public:
   {
   }
 
-  bool run()
+  int run()
   {
     static_assert(0 < T::loop_count, "T::loop_count must be greater than 0");
 
     T test;
     if (!init_test(test, m_params_shuttle))
-      return false;
+      return -1;
 
     performance_timer timer;
     timer.start();
@@ -135,14 +135,14 @@ public:
       if (m_core_params.stats)
         m_per_call_timers[i].resume();
       if (!test.test())
-        return false;
+        return i + 1;
       if (m_core_params.stats)
         m_per_call_timers[i].pause();
     }
     m_elapsed = timer.elapsed_ms();
     m_stats.reset(new Stats<tools::PerformanceTimer, uint64_t>(m_per_call_timers));
 
-    return true;
+    return 0;
   }
 
   int elapsed_time() const { return m_elapsed; }
@@ -202,7 +202,8 @@ void run_test(const std::string &filter, ParamsT &params_shuttle, const char* te
     return;
 
   test_runner<T, ParamsT> runner(params_shuttle);
-  if (runner.run())
+  int run_result{runner.run()};
+  if (run_result == 0)
   {
     if (params.verbose)
     {
@@ -273,9 +274,13 @@ void run_test(const std::string &filter, ParamsT &params_shuttle, const char* te
     }
     std::cout << std::endl;
   }
+  else if (run_result == -1)
+  {
+    std::cout << test_name << " - FAILED ON INIT" << std::endl;
+  }
   else
   {
-    std::cout << test_name << " - FAILED" << std::endl;
+    std::cout << test_name << " - FAILED ON TEST LOOP " << run_result << std::endl;
   }
 }
 
