@@ -192,14 +192,14 @@ private:
 };
 
 template <typename T, typename ParamsT>
-void run_test(const std::string &filter, ParamsT &params_shuttle, const char* test_name)
+bool run_test(const std::string &filter, ParamsT &params_shuttle, const char* test_name)
 {
   static_assert(std::is_base_of<ParamsShuttle, ParamsT>::value, "Must use a ParamsShuttle.");
   Params &params = params_shuttle.core_params;
 
   boost::smatch match;
   if (!filter.empty() && !boost::regex_match(std::string(test_name), match, boost::regex(filter)))
-    return;
+    return true;
 
   test_runner<T, ParamsT> runner(params_shuttle);
   int run_result{runner.run()};
@@ -277,11 +277,15 @@ void run_test(const std::string &filter, ParamsT &params_shuttle, const char* te
   else if (run_result == -1)
   {
     std::cout << test_name << " - FAILED ON INIT" << std::endl;
+    return false;
   }
   else
   {
     std::cout << test_name << " - FAILED ON TEST LOOP " << run_result << std::endl;
+    return false;
   }
+
+  return true;
 }
 
 #define QUOTEME(x) #x

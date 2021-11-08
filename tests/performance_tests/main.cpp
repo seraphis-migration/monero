@@ -73,6 +73,7 @@
 #include "grootle.h"
 #include "grootle_concise.h"
 #include "view_scan.h"
+#include "pippinger_failure.h"
 
 namespace po = boost::program_options;
 
@@ -80,8 +81,8 @@ int main(int argc, char** argv)
 {
   TRY_ENTRY();
   tools::on_startup();
-  set_process_affinity(1);
-  set_thread_high_priority();
+  //set_process_affinity(1);
+  //set_thread_high_priority();
 
   mlog_configure(mlog_get_default_log_path("performance_tests.log"), true);
 
@@ -120,156 +121,24 @@ int main(int argc, char** argv)
   timer.start();
 
 
+  // test for intermittent grootle verification failures
+  for (std::size_t i{0}; i < 100; ++i)
+  {
+    if (!(TEST_PERFORMANCE0(filter, p, test_ge_p3_identity_failure)))
+      std::cout << "FAILED P3 IDENT: " << i << '\n';
+    if (!(TEST_PERFORMANCE0(filter, p, test_ge_p3_identity_fix)))
+      std::cout << "FAILED P3 IDENT FIX: " << i << '\n';
+    if (!(TEST_PERFORMANCE0(filter, p, test_pippinger_failure)))
+      std::cout << "FAILED P3 PROOF: " << i << '\n';
+    if (!(TEST_PERFORMANCE0(filter, p, test_pippinger_failure_serialized)))
+      std::cout << "FAILED SERIALIZED PROOF: " << i << '\n';
+  }
+
+
   /// mock tx performance tests
   MockTxPerfIncrementer incrementer;
   ParamsShuttleMockTx p_mock_tx;
   p_mock_tx.core_params = p.core_params;
-
-
-
-  /*
-  // TEST error cases found during perf testing (NOTE: COULD NOT REPRODUCE DIRECTLY)
-  // - MockTxSpSquashedV1 {outputs, BP+ splitting, tx batching}
-
-  // Sp-Squashed || Size (bytes): 24223 || batch size: 1 || inputs: 16 || outputs: 7 || rangeproof split: 4 ||
-  //  ref set size (2^8): 256
-  incrementer = {
-      {1}, //batch sizes
-      {16}, //in counts
-      {7}, //out counts
-      {4}, //rangeproof splits
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(true);
-  // Sp-Squashed || Size (bytes): 17388 || batch size: 4 || inputs: 12 || outputs: 12 || rangeproof split: 3 ||
-  //   ref set size (2^8): 256
-  incrementer = {
-      {4}, //batch sizes
-      {12}, //in counts
-      {12}, //out counts
-      {3}, //rangeproof splits
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(true);
-  // Sp-Squashed || Size (bytes): 20624 || batch size: 4 || inputs: 16 || outputs: 16 || rangeproof split: 2 ||
-  //   ref set size (2^8): 256
-  incrementer = {
-      {4}, //batch sizes
-      {16}, //in counts
-      {16}, //out counts
-      {2}, //rangeproof splits
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(true);
-  // Sp-Squashed || Size (bytes): 9138 || batch size: 7 || inputs: 7 || outputs: 2 || rangeproof split: 2 ||
-  //  ref set size (2^8): 256
-  incrementer = {
-      {7}, //batch sizes
-      {7}, //in counts
-      {2}, //out counts
-      {2}, //rangeproof splits
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(true);
-  // Sp-Squashed || Size (bytes): 13860 || batch size: 11 || inputs: 12 || outputs: 4 || rangeproof split: 1 ||
-  //  ref set size (2^8): 256
-  incrementer = {
-      {11}, //batch sizes
-      {12}, //in counts
-      {4}, //out counts
-      {1}, //rangeproof splits
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(true);
-  // Sp-Squashed || Size (bytes): 14480 || batch size: 11 || inputs: 12 || outputs: 16 || rangeproof split: 0 ||
-  //  ref set size (2^8): 256
-  incrementer = {
-      {11}, //batch sizes
-      {12}, //in counts
-      {16}, //out counts
-      {0}, //rangeproof splits
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(true);
-  */
 
 
   /// TEST 1: MockTxCLSAG

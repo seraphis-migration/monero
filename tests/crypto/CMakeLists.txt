@@ -45,6 +45,7 @@ monero_add_minimal_executable(cncrypto-tests
 target_link_libraries(cncrypto-tests
   PRIVATE
     common
+    mock_tx
     ${Boost_SYSTEM_LIBRARY}
     ${EXTRA_LIBRARIES})
 set_property(TARGET cncrypto-tests

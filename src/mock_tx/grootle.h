@@ -138,6 +138,13 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
     const std::size_t n,
     const std::size_t m,
     const rct::key &message);
+ConciseGrootleProof concise_grootle_prove_fake(const rct::keyM &M,
+    const std::size_t l,
+    const rct::keyV &C_offsets,
+    const std::vector<crypto::secret_key> &privkeys,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::key &message);
 /**
 * brief: grootle_verify - verify a batch of grootle proofs that share a reference set
 * param: proofs - batch of proofs to verify
@@ -168,6 +175,12 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 * return: true/false on verification result
 */
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
+    const rct::keyM &M,
+    const rct::keyM &proof_offsets,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::keyV &messages);
+bool concise_grootle_verify_fake(const std::vector<const ConciseGrootleProof*> &proofs,
     const rct::keyM &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
