@@ -81,8 +81,8 @@ int main(int argc, char** argv)
 {
   TRY_ENTRY();
   tools::on_startup();
-  //set_process_affinity(1);
-  //set_thread_high_priority();
+  set_process_affinity(1);
+  set_thread_high_priority();
 
   mlog_configure(mlog_get_default_log_path("performance_tests.log"), true);
 
@@ -119,20 +119,6 @@ int main(int argc, char** argv)
 
   performance_timer timer;
   timer.start();
-
-
-  // test for intermittent grootle verification failures
-  for (std::size_t i{0}; i < 100; ++i)
-  {
-    if (!(TEST_PERFORMANCE0(filter, p, test_ge_p3_identity_failure)))
-      std::cout << "FAILED P3 IDENT: " << i << '\n';
-    if (!(TEST_PERFORMANCE0(filter, p, test_ge_p3_identity_fix)))
-      std::cout << "FAILED P3 IDENT FIX: " << i << '\n';
-    if (!(TEST_PERFORMANCE0(filter, p, test_pippinger_failure)))
-      std::cout << "FAILED P3 PROOF: " << i << '\n';
-    if (!(TEST_PERFORMANCE0(filter, p, test_pippinger_failure_serialized)))
-      std::cout << "FAILED SERIALIZED PROOF: " << i << '\n';
-  }
 
 
   /// mock tx performance tests
@@ -467,6 +453,18 @@ int main(int argc, char** argv)
 
 
 
+  // test for intermittent grootle verification failures
+  for (std::size_t i{0}; i < 100; ++i)
+  {
+    if (!(TEST_PERFORMANCE0(filter, p, test_ge_p3_identity_failure)))
+      std::cout << "FAILED P3 IDENT: " << i << '\n';
+    if (!(TEST_PERFORMANCE0(filter, p, test_ge_p3_identity_fix)))
+      std::cout << "FAILED P3 IDENT FIX: " << i << '\n';
+    if (!(TEST_PERFORMANCE0(filter, p, test_pippinger_failure)))
+      std::cout << "FAILED P3 PROOF: " << i << '\n';
+    if (!(TEST_PERFORMANCE0(filter, p, test_pippinger_failure_serialized)))
+      std::cout << "FAILED SERIALIZED PROOF: " << i << '\n';
+  }
 
 
   // test hash performance for view tags
