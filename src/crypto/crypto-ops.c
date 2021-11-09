@@ -3830,18 +3830,37 @@ int sc_isnonzero(const unsigned char *s) {
 int ge_p3_is_point_at_infinity(const ge_p3 *p) {
   // https://eprint.iacr.org/2008/522
   // X == T == 0 and Y/Z == 1
-  int n, zero_Y_count;
-  zero_Y_count = 0;
-  for (n = 0; n < 10; ++n)
+  // note: convert all pieces to canonical bytes in case rounding is required (i.e. an element is > q)
+  char result_X_bytes[32];
+  char result_Y_bytes[32];
+  char result_Z_bytes[32];
+  char result_T_bytes[32];
+  fe_tobytes((unsigned char*)&result_X_bytes, p->X);
+  fe_tobytes((unsigned char*)&result_Y_bytes, p->Y);
+  fe_tobytes((unsigned char*)&result_Z_bytes, p->Z);
+  fe_tobytes((unsigned char*)&result_T_bytes, p->T);
+
+  // X != 0 || T != 0
+  for (int i = 0; i < 32; ++i)
   {
-    if (p->X[n] | p->T[n])
+    if (result_X_bytes[i] | result_T_bytes[i])
       return 0;
-    if (p->Y[n] != p->Z[n])
-      return 0;
-    if (p->Y[n] == 0)
-      ++zero_Y_count;
   }
-  if (zero_Y_count == 10)  // Y == Z == 0
-    return 0;
-  return 1;
+
+  // Y/Z != 1
+  for (int i = 0; i < 32; ++i)
+  {
+    if (result_Y_bytes[i] != result_Z_bytes[i])
+      return 0;
+  }
+
+  // is Y nonzero? then Y/Z == 1
+  for (int i = 0; i < 32; ++i)
+  {
+    if (result_Y_bytes[i] != 0)
+      return 1;
+  }
+
+  // Y/Z = 0/0
+  return 0;
 }

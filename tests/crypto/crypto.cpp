@@ -50,12 +50,13 @@ static void get_ge_p3_for_identity_test(const crypto::public_key &point, crypto:
 
 static int ge_p3_is_point_at_infinity_bad(const crypto::ge_p3 *p) {
   // X = 0 and Y == Z
+  // bad: components of 'p' are not reduced mod q
   int n;
   for (n = 0; n < 10; ++n)
   {
     if (p->X[n] | p->T[n])
       return 0;
-    if (p->Y[n] != p->Z[n])  // bad: comparison of signed integers instead of bitwise comparison
+    if (p->Y[n] != p->Z[n])
       return 0;
   }
   return 1;
