@@ -132,9 +132,9 @@ int main(int argc, char** argv)
   // TEST 1.1: MockTxCLSAG {inputs}
   incrementer = {
       {1}, //batch sizes
+      {0}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {2}, //out counts
-      {0}, //rangeproof splits
       {2}, //decomp n
       {4} //decomp m limits
     };
@@ -151,9 +151,9 @@ int main(int argc, char** argv)
   // TEST 1.2: MockTxCLSAG {decomp 2-series}
   incrementer = {
       {1}, //batch sizes
+      {0}, //rangeproof splits
       {2}, //in counts
       {2}, //out counts
-      {0}, //rangeproof splits
       {2}, //decomp n
       {8} //decomp m limits
     };
@@ -168,9 +168,9 @@ int main(int argc, char** argv)
   // TEST 1.3: MockTxCLSAG {outputs, BP+ splitting, tx batching}
   incrementer = {
       {1, 2, 4, 7, 11, 25}, //batch sizes
+      {0, 1, 2, 3, 4}, //rangeproof splits
       {2}, //in counts
       {1, 2, 4, 7, 12, 16}, //out counts
-      {0, 1, 2, 3, 4}, //rangeproof splits
       {2}, //decomp n
       {4} //decomp m limits
     };
@@ -194,9 +194,9 @@ int main(int argc, char** argv)
   // TEST 2.1: MockTxTriptych {inputs}
   incrementer = {
       {1}, //batch sizes
+      {0}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {2}, //out counts
-      {0}, //rangeproof splits
       {2}, //decomp n
       {8} //decomp m limits
     };
@@ -213,9 +213,9 @@ int main(int argc, char** argv)
   // TEST 2.2: MockTxTriptych {decomp}
   incrementer = {
       {1}, //batch sizes
+      {0}, //rangeproof splits
       {2}, //in counts
       {2}, //out counts
-      {0}, //rangeproof splits
       {2, 3, 4, 6, 9}, //decomp n
       {12, 7, 6, 5, 4} //decomp m limits
     };
@@ -235,9 +235,9 @@ int main(int argc, char** argv)
   // TEST 3.1: MockTxSpConciseV1 {inputs}
   incrementer = {
       {1}, //batch sizes
+      {0}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {2}, //out counts
-      {0}, //rangeproof splits
       {2}, //decomp n
       {8} //decomp m limits
     };
@@ -254,9 +254,9 @@ int main(int argc, char** argv)
   // TEST 3.2: MockTxSpConciseV1 {decomp}
   incrementer = {
       {1}, //batch sizes
+      {0}, //rangeproof splits
       {2}, //in counts
       {2}, //out counts
-      {0}, //rangeproof splits
       {2, 3, 4, 6, 9}, //decomp n
       {12, 7, 6, 5, 4} //decomp m limits
     };
@@ -272,9 +272,9 @@ int main(int argc, char** argv)
   // TEST 3.3: MockTxSpConciseV1 {outputs, BP+ splitting, tx batching}
   incrementer = {
       {1, 2, 4, 7, 11, 25}, //batch sizes
+      {0, 1, 2, 3, 4}, //rangeproof splits
       {2}, //in counts
       {1, 2, 4, 7, 12, 16}, //out counts
-      {0, 1, 2, 3, 4}, //rangeproof splits
       {2}, //decomp n
       {8} //decomp m limits
     };
@@ -298,9 +298,9 @@ int main(int argc, char** argv)
   // TEST 4.1: MockTxSpMergeV1 {inputs}
   incrementer = {
       {1}, //batch sizes
+      {0}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {2}, //out counts
-      {0}, //rangeproof splits
       {2}, //decomp n
       {8} //decomp m limits
     };
@@ -321,9 +321,9 @@ int main(int argc, char** argv)
   // TEST 5.1: MockTxSpSquashedV1 {inputs}
   incrementer = {
       {1}, //batch sizes
+      {0}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {2}, //out counts
-      {0}, //rangeproof splits
       {2}, //decomp n
       {8} //decomp m limits
     };
@@ -340,9 +340,9 @@ int main(int argc, char** argv)
   // TEST 5.2: MockTxSpSquashedV1 {decomp}
   incrementer = {
       {1}, //batch sizes
+      {0}, //rangeproof splits
       {2}, //in counts
       {2}, //out counts
-      {0}, //rangeproof splits
       {2, 3, 4, 6, 9}, //decomp n
       {12, 7, 6, 5, 4} //decomp m limits
     };
@@ -358,9 +358,9 @@ int main(int argc, char** argv)
   // TEST 5.3: MockTxSpSquashedV1 {outputs, BP+ splitting, tx batching}
   incrementer = {
       {1, 2, 4, 7, 11, 25}, //batch sizes
+      {0, 1, 2, 3, 4}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {1, 2, 4, 7, 12, 16}, //out counts
-      {0, 1, 2, 3, 4}, //rangeproof splits
       {2}, //decomp n
       {8} //decomp m limits
     };
@@ -384,9 +384,9 @@ int main(int argc, char** argv)
   // sample tests...
   incrementer = {
       {1, 2, 4, 7, 11, 25}, //batch sizes
+      {0, 1, 2, 3, 4}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {1, 2, 4, 7, 12, 16}, //out counts
-      {0, 1, 2, 3, 4}, //rangeproof splits
       {2, 3, 4, 6, 9}, //decomp n
       {12, 7, 6, 5, 4} //decomp m limits
     };
@@ -421,9 +421,9 @@ int main(int argc, char** argv)
 
   incrementer = {
       {1, 2, 4, 7, 11, 25}, //batch sizes
+      {0}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {1, 2, 4}, //out counts
-      {0}, //rangeproof splits
       {2}, //decomp n
       {8} //decomp m limits
     };

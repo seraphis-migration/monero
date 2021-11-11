@@ -65,15 +65,15 @@ public:
 
     // normal constructor
     MockTxPerfIncrementer(std::vector<std::size_t> batch_sizes,
+        std::vector<std::size_t> rangeproof_splits,
         std::vector<std::size_t> in_counts,
         std::vector<std::size_t> out_counts,
-        std::vector<std::size_t> rangeproof_splits,
         std::vector<std::size_t> ref_set_decomp_n,
         std::vector<std::size_t> ref_set_decomp_m_limit) :
             m_batch_sizes{std::move(batch_sizes)},
+            m_rangeproof_splits{std::move(rangeproof_splits)},
             m_in_counts{std::move(in_counts)},
             m_out_counts{std::move(out_counts)},
-            m_rangeproof_splits{std::move(rangeproof_splits)},
             m_ref_set_decomp_n{std::move(ref_set_decomp_n)},
             m_ref_set_decomp_m_limit{std::move(ref_set_decomp_m_limit)}
     {
@@ -87,9 +87,9 @@ public:
             return true;
 
         if (m_batch_size_i >= m_batch_sizes.size() ||
+            m_rp_splits_i >= m_rangeproof_splits.size() ||
             m_in_i >= m_in_counts.size() ||
             m_out_i >= m_out_counts.size() ||
-            m_rp_splits_i >= m_rangeproof_splits.size() ||
             m_decomp_i >= m_ref_set_decomp_n.size() ||
             m_decomp_i >= m_ref_set_decomp_m_limit.size() ||
             m_decomp_m_current > m_ref_set_decomp_m_limit[m_decomp_i] ||
@@ -107,11 +107,11 @@ public:
             return;
 
         params.batch_size = m_batch_sizes[m_batch_size_i];
+        params.num_rangeproof_splits = m_rangeproof_splits[m_rp_splits_i];
         params.in_count = m_in_counts[m_in_i];
         params.out_count = m_out_counts[m_out_i];
         params.n = m_ref_set_decomp_n[m_decomp_i];
         params.m = m_decomp_m_current;
-        params.num_rangeproof_splits = m_rangeproof_splits[m_rp_splits_i];
     }
 
     void init_decomp_m_current()
@@ -141,9 +141,9 @@ public:
 
         // order:
         // - batch size
-        //  - in count
-        //   - out count
-        //    - rp splits
+        //  - rp splits
+        //   - in count
+        //    - out count
         //     - decomp n
         //      - decomp m
 
@@ -151,11 +151,11 @@ public:
         {
             if (m_decomp_i + 1 >= m_ref_set_decomp_n.size())
             {
-                if (m_rp_splits_i + 1 >= m_rangeproof_splits.size())
+                if (m_out_i + 1 >= m_out_counts.size())
                 {
-                    if (m_out_i + 1 >= m_out_counts.size())
+                    if (m_in_i + 1 >= m_in_counts.size())
                     {
-                        if (m_in_i + 1 >= m_in_counts.size())
+                        if (m_rp_splits_i + 1 >= m_rangeproof_splits.size())
                         {
                             if (m_batch_size_i + 1 >= m_batch_sizes.size())
                             {
@@ -167,25 +167,25 @@ public:
                                 ++m_batch_size_i;
                             }
 
-                            m_in_i = 0;
+                            m_rp_splits_i = 0;
                         }
                         else
                         {
-                            ++m_in_i;
+                            ++m_rp_splits_i;
                         }
 
-                        m_out_i = 0;
+                        m_in_i = 0;
                     }
                     else
                     {
-                        ++m_out_i;
+                        ++m_in_i;
                     }
 
-                    m_rp_splits_i = 0;
+                    m_out_i = 0;
                 }
                 else
                 {
-                    ++m_rp_splits_i;
+                    ++m_out_i;
                 }
 
                 m_decomp_i = 0;
@@ -220,6 +220,10 @@ private:
     std::vector<std::size_t> m_batch_sizes;
     std::size_t m_batch_size_i{0};
 
+    // range proof splitting
+    std::vector<std::size_t> m_rangeproof_splits;
+    std::size_t m_rp_splits_i{0};
+
     // input counts
     std::vector<std::size_t> m_in_counts;
     std::size_t m_in_i{0};
@@ -227,10 +231,6 @@ private:
     // output counts
     std::vector<std::size_t> m_out_counts;
     std::size_t m_out_i{0};
-
-    // range proof splitting
-    std::vector<std::size_t> m_rangeproof_splits;
-    std::size_t m_rp_splits_i{0};
 
     // ref set: n^m
     std::vector<std::size_t> m_ref_set_decomp_n;
@@ -303,9 +303,9 @@ public:
         report += m_txs.back()->get_descriptor() + " || ";
         report += std::string{"Size (bytes): "} + std::to_string(m_txs.back()->get_size_bytes()) + " || ";
         report += std::string{"batch size: "} + std::to_string(params.batch_size) + " || ";
+        report += std::string{"rangeproof split: "} + std::to_string(params.num_rangeproof_splits) + " || ";
         report += std::string{"inputs: "} + std::to_string(params.in_count) + " || ";
         report += std::string{"outputs: "} + std::to_string(params.out_count) + " || ";
-        report += std::string{"rangeproof split: "} + std::to_string(params.num_rangeproof_splits) + " || ";
         report += std::string{"ref set size ("} + std::to_string(params.n) + "^" + std::to_string(params.m) + "): ";
         report += std::to_string(mock_tx::ref_set_size_from_decomp(params.n, params.m));
 
@@ -322,9 +322,9 @@ public:
             report_csv += m_txs.back()->get_descriptor() + separator;
             report_csv += std::to_string(m_txs.back()->get_size_bytes()) + separator;
             report_csv += std::to_string(params.batch_size) + separator;
+            report_csv += std::to_string(params.num_rangeproof_splits) + separator;
             report_csv += std::to_string(params.in_count) + separator;
             report_csv += std::to_string(params.out_count) + separator;
-            report_csv += std::to_string(params.num_rangeproof_splits) + separator;
             report_csv += std::to_string(params.n) + separator;
             report_csv += std::to_string(params.m) + separator;
             report_csv += std::to_string(mock_tx::ref_set_size_from_decomp(params.n, params.m));

@@ -82,7 +82,7 @@ public:
     ge_p3 result;
     get_ge_p3_for_identity_test(k, result);
 
-    // ge_p3_is_point_at_infinity
+    // ge_p3_is_point_at_infinity_vartime
     // X = 0 and Y == Z
     for (int n{0}; n < 10; ++n)
     {
@@ -144,7 +144,7 @@ public:
     ge_p3 result;
     get_ge_p3_for_identity_test(k, result);
 
-    // ge_p3_is_point_at_infinity FIXED
+    // ge_p3_is_point_at_infinity_vartime FIXED
     // X = 0 and Y == Z
     rct::key result_Y_bytes;
     rct::key result_Z_bytes;
@@ -197,7 +197,7 @@ public:
 
     ge_p3 result{rct::pippenger_p3(data, cache, 2, rct::get_pippenger_c(data.size()))};
 
-    return ge_p3_is_point_at_infinity(&result) != 0;
+    return ge_p3_is_point_at_infinity_vartime(&result) != 0;
   }
 
 private:
