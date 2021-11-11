@@ -469,7 +469,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 
         // get K_t1, multiply by cofactor as part of deserialization, and check it is non-identity
         rct::scalarmult8(K_t1_p3[1], proof.K_t1[i]);
-        CHECK_AND_ASSERT_THROW_MES(!(ge_p3_is_point_at_infinity(&K_t1_p3[1])), "Invalid proof element K_t1!");
+        CHECK_AND_ASSERT_THROW_MES(!(ge_p3_is_point_at_infinity_vartime(&K_t1_p3[1])), "Invalid proof element K_t1!");
 
         // get KI
         CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&KI_part_p3[i], rct::ki2rct(KI[i]).bytes) == 0,

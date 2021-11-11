@@ -770,7 +770,7 @@ bool key_domain_is_prime_subgroup(const rct::key &check_key)
             "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
     ge_scalarmult_p3(&check_key_p3, rct::curveOrder().bytes, &check_key_p3);
 
-    return (ge_p3_is_point_at_infinity(&check_key_p3) != 0);
+    return (ge_p3_is_point_at_infinity_vartime(&check_key_p3) != 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

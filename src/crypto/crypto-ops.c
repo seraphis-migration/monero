@@ -3827,7 +3827,7 @@ int sc_isnonzero(const unsigned char *s) {
     s[27] | s[28] | s[29] | s[30] | s[31]) - 1) >> 8) + 1;
 }
 
-int ge_p3_is_point_at_infinity(const ge_p3 *p) {
+int ge_p3_is_point_at_infinity_vartime(const ge_p3 *p) {
   // https://eprint.iacr.org/2008/522
   // X == T == 0 and Y/Z == 1
   // note: convert all pieces to canonical bytes in case rounding is required (i.e. an element is > q)

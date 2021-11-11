@@ -48,7 +48,7 @@ static void get_ge_p3_for_identity_test(const crypto::public_key &point, crypto:
   crypto::ge_p1p1_to_p3(&result_out_p3, &temp_p1p1);
 }
 
-static int ge_p3_is_point_at_infinity_bad(const crypto::ge_p3 *p) {
+static int ge_p3_is_point_at_infinity_vartime_bad(const crypto::ge_p3 *p) {
   // X = 0 and Y == Z
   // bad: components of 'p' are not reduced mod q
   int n;
@@ -91,7 +91,7 @@ bool check_ge_p3_identity_failure(const crypto::public_key &point)
   crypto::ge_p3 ident_p3;
   get_ge_p3_for_identity_test(point, ident_p3);
 
-  return ge_p3_is_point_at_infinity_bad(&ident_p3) == 1;
+  return ge_p3_is_point_at_infinity_vartime_bad(&ident_p3) == 1;
 }
 
 bool check_ge_p3_identity_success(const crypto::public_key &point)
@@ -99,5 +99,5 @@ bool check_ge_p3_identity_success(const crypto::public_key &point)
   crypto::ge_p3 ident_p3;
   get_ge_p3_for_identity_test(point, ident_p3);
 
-  return crypto::ge_p3_is_point_at_infinity(&ident_p3) == 1;
+  return crypto::ge_p3_is_point_at_infinity_vartime(&ident_p3) == 1;
 }
