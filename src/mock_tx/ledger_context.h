@@ -41,7 +41,13 @@
 #include <vector>
 
 //forward declarations
-namespace mock_tx { struct MockENoteSpV1; }
+namespace mock_tx
+{
+    struct MockENoteSpV1;
+    class MockTxSpConciseV1;
+    class MockTxSpMergeV1;
+    class MockTxSpSquashedV1;
+}
 
 
 namespace mock_tx
@@ -78,10 +84,48 @@ public:
     virtual void get_reference_set_components_sp_v2(const std::vector<std::size_t> &indices,
         rct::keyM &referenced_enotes_components) const = 0;
     /**
-    * brief: add_linking_tag_sp_v1 - add a Seraphis linking tag to the ledger
-    * param: linking_tag -
+    * brief: add_transaction_sp_concise_v1 - add a MockTxSpConciseV1 transaction to the ledger
+    * param: tx_to_add -
     */
-    virtual void add_linking_tag_sp_v1(const crypto::key_image &linking_tag) = 0;
+    virtual void add_transaction_sp_concise_v1(const MockTxSpConciseV1 &tx_to_add) = 0;
+    /**
+    * brief: add_transaction_sp_merge_v1 - add a MockTxSpSquashedV1 transaction to the ledger
+    * param: tx_to_add -
+    */
+    virtual void add_transaction_sp_merge_v1(const MockTxSpMergeV1 &tx_to_add) = 0;
+    /**
+    * brief: add_transaction_sp_squashed_v1 - add a MockTxSpSquashedV1 transaction to the ledger
+    * param: tx_to_add -
+    */
+    virtual void add_transaction_sp_squashed_v1(const MockTxSpSquashedV1 &tx_to_add) = 0;
 };
+
+template<typename TxType>
+void add_tx_to_ledger(const std::shared_ptr<LedgerContext> &ledger_context, const TxType &tx_to_add)
+{}
+
+template<>
+inline void add_tx_to_ledger<MockTxSpConciseV1>(const std::shared_ptr<LedgerContext> &ledger_context,
+    const MockTxSpConciseV1 &tx_to_add)
+{
+    if (ledger_context.get() != nullptr)
+        ledger_context->add_transaction_sp_concise_v1(tx_to_add);
+}
+
+template<>
+inline void add_tx_to_ledger<MockTxSpMergeV1>(const std::shared_ptr<LedgerContext> &ledger_context,
+    const MockTxSpMergeV1 &tx_to_add)
+{
+    if (ledger_context.get() != nullptr)
+        ledger_context->add_transaction_sp_merge_v1(tx_to_add);
+}
+
+template<>
+inline void add_tx_to_ledger<MockTxSpSquashedV1>(const std::shared_ptr<LedgerContext> &ledger_context,
+    const MockTxSpSquashedV1 &tx_to_add)
+{
+    if (ledger_context.get() != nullptr)
+        ledger_context->add_transaction_sp_squashed_v1(tx_to_add);
+}
 
 } //namespace mock_tx

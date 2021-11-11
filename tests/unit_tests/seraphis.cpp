@@ -641,7 +641,7 @@ TEST(seraphis, sp_txtype_concise_v1)
 
     // insert key images to ledger
     for (const auto &tx : txs)
-        tx->add_key_images_to_ledger(ledger_context);
+        mock_tx::add_tx_to_ledger<mock_tx::MockTxSpConciseV1>(ledger_context, *tx);
 
     // validation should fail due to double-spend
     EXPECT_FALSE(mock_tx::validate_mock_txs<mock_tx::MockTxSpConciseV1>(txs, ledger_context));

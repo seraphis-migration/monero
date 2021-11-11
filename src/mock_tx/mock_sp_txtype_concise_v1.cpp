@@ -178,14 +178,6 @@ bool MockTxSpConciseV1::validate_tx_input_proofs(const std::shared_ptr<const Led
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockTxSpConciseV1::add_key_images_to_ledger(std::shared_ptr<LedgerContext> ledger_context) const
-{
-    CHECK_AND_ASSERT_THROW_MES(ledger_context.get() != nullptr, "Tried to add key images to non-existent ledger.");
-
-    for (const auto &input_image : m_input_images)
-        ledger_context->add_linking_tag_sp_v1(input_image.m_key_image);
-}
-//-------------------------------------------------------------------------------------------------------------------
 std::size_t MockTxSpConciseV1::get_size_bytes() const
 {
     // doesn't include (compared to a real tx):
