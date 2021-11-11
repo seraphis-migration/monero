@@ -27,6 +27,8 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // Mock ledger context: for testing
+// note: In a real ledger, new enotes and new linking tags from a tx must be committed in ONE atomic operation. Otherwise,
+//       the order of linking tags and enotes may be misaligned.
 // NOT FOR PRODUCTION
 
 #pragma once
@@ -40,11 +42,19 @@
 //third party headers
 
 //standard headers
+#include <mutex>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
 //forward declarations
+namespace mock_tx
+{
+    struct MockENoteSpV1;
+    class MockTxSpConciseV1;
+    class MockTxSpMergeV1;
+    class MockTxSpSquashedV1;
+}
 
 
 namespace mock_tx
@@ -81,10 +91,25 @@ public:
     void get_reference_set_components_sp_v2(const std::vector<std::size_t> &indices,
         rct::keyM &referenced_enotes_components_out) const override;
     /**
+    * brief: add_transaction_sp_concise_v1 - add a MockTxSpConciseV1 transaction to the ledger
+    * param: tx_to_add -
+    */
+    void add_transaction_sp_concise_v1(const MockTxSpConciseV1 &tx_to_add) override;
+    /**
+    * brief: add_transaction_sp_merge_v1 - add a MockTxSpSquashedV1 transaction to the ledger
+    * param: tx_to_add -
+    */
+    void add_transaction_sp_merge_v1(const MockTxSpMergeV1 &tx_to_add) override;
+    /**
+    * brief: add_transaction_sp_squashed_v1 - add a MockTxSpSquashedV1 transaction to the ledger
+    * param: tx_to_add -
+    */
+    void add_transaction_sp_squashed_v1(const MockTxSpSquashedV1 &tx_to_add) override;
+    /**
     * brief: add_linking_tag_sp_v1 - add a Seraphis linking tag to the ledger
     * param: linking_tag -
     */
-    void add_linking_tag_sp_v1(const crypto::key_image &linking_tag) override;
+    void add_linking_tag_sp_v1(const crypto::key_image &linking_tag);
     /**
     * brief: add_enote_sp_v1 - add a Seraphis v1 enote to the ledger
     * param: enote -
@@ -99,6 +124,15 @@ public:
     std::size_t add_enote_sp_v2(const MockENoteSpV1 &enote);
 
 private:
+    /// implementations of the above, without internally locking the ledger mutex
+    bool linking_tag_exists_sp_v1_impl(const crypto::key_image &linking_tag) const;
+    void add_linking_tag_sp_v1_impl(const crypto::key_image &linking_tag);
+    std::size_t add_enote_sp_v1_impl(const MockENoteSpV1 &enote);
+    std::size_t add_enote_sp_v2_impl(const MockENoteSpV1 &enote);
+
+    /// Ledger mutex (mutable for use in const member functions)
+    mutable std::mutex m_ledger_mutex;
+
     /// Seraphis linking tags
     std::unordered_set<crypto::key_image> m_sp_linking_tags;
     /// Seraphis v1 ENotes

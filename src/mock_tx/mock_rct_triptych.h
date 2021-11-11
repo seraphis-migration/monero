@@ -107,10 +107,6 @@ public:
     /// get balance proof
     const std::shared_ptr<MockRctBalanceProofV1> get_balance_proof() const { return m_balance_proof; }
 
-    /// add key images to ledger context
-    void add_key_images_to_ledger(std::shared_ptr<LedgerContext> ledger_context) const override
-    {}
-
     //get_tx_byte_blob()
 
 private:

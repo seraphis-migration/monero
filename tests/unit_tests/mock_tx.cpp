@@ -92,7 +92,7 @@ static void run_mock_tx_test(const std::vector<MockTxGenData> &gen_data)
             if (gen.test_double_spend)
             {
                 // add key images once validated
-                tx->add_key_images_to_ledger(ledger_context);
+                mock_tx::add_tx_to_ledger<MockTxType>(ledger_context, *tx);
 
                 // re-validate tx
                 // - should fail now that key images were added to the ledger
