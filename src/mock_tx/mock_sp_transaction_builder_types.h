@@ -119,42 +119,29 @@ struct MockMembershipProofSortableSpV1 final
 // - in this version, balance proofs are independent of inputs (the balance proof itself is implicit, only range proofs
 //   require storage), so a tx's balance proof can be stored in the tx proposal
 ///
-class MockTxProposalSpV1 final
+struct MockTxProposalSpV1 final
 {
-public:
 //constructors
     /// default constructor
     MockTxProposalSpV1() = default;
 
     /// normal constructor: make a tx proposal from destinations (a.k.a. outlays)
-    MockTxProposalSpV1(std::vector<MockDestinationSpV1> destinations, const std::size_t max_rangeproof_splits);
+    MockTxProposalSpV1(std::vector<MockDestinationSpV1> destinations);
 
 //member functions
     /// message to be signed by input spend proofs
     rct::key get_proposal_prefix(const std::string &version_string) const;
 
-    /// stored destinations
-    const std::vector<MockDestinationSpV1>& get_destinations() const { return m_destinations; }
-
-    /// proposed outputs
-    const std::vector<MockENoteSpV1>& get_outputs() const { return m_outputs; }
-
-    /// proposed tx supplement
-    const MockSupplementSpV1& get_tx_supplement() const { return m_tx_supplement; }
-
-    /// proposed balance proof
-    const std::shared_ptr<MockBalanceProofSpV1> get_balance_proof() const { return m_balance_proof; }
-
 //member variables
-private:
     /// proposed destinations
     std::vector<MockDestinationSpV1> m_destinations;
     /// proposed outputs (created from the destinations)
     std::vector<MockENoteSpV1> m_outputs;
     /// proposed tx supplement
     MockSupplementSpV1 m_tx_supplement;
-    /// balance proof for the tx (i.e. range proofs for the new output enotes)
-    std::shared_ptr<MockBalanceProofSpV1> m_balance_proof;
+    /// output amounts and blinding factors (for future balance proofs)
+    std::vector<rct::xmr_amount> m_output_amounts;
+    std::vector<crypto::secret_key> m_output_amount_commitment_blinding_factors;
     //TODO: miscellaneous memo(s)
 };
 
@@ -164,13 +151,9 @@ private:
 // - cached amount and amount blinding factor, image masks (for balance and membership proofs)
 // - spend proof for input (and proof the input's key image is properly constructed)
 // - proposal prefix (spend proof msg) [for consistency checks when handling this object]
-//
-// note: when making last input, need to set amount commitment mask to satisfy balance proof
-//   - caller may also need to choose the input's amount to satisfy tx fee (e.g. in collaborative funding)
 ///
-class MockTxPartialInputSpV1 final //needs to be InputSetPartial for merged composition proofs
+struct MockTxPartialInputSpV1 final //needs to be InputSetPartial for merged composition proofs
 {
-public:
 //constructors
     /// default constructor
     MockTxPartialInputSpV1() = default;
@@ -178,36 +161,9 @@ public:
     /// normal constructor: normal input
     MockTxPartialInputSpV1(const MockInputProposalSpV1 &input_proposal, const rct::key &proposal_prefix);
 
-    /// normal constructor: last input (amount commitment must complete the implicit balance proof)
-    MockTxPartialInputSpV1(const MockInputProposalSpV1 &input_proposal,
-        const rct::key &proposal_prefix,
-        const MockTxProposalSpV1 &tx_proposal,
-        const std::vector<MockTxPartialInputSpV1> &other_inputs);
-
 //member functions
-    /// the input's image
-    const MockENoteImageSpV1& get_input_image() const { return m_input_image; }
-
-    /// the input's image
-    const MockImageProofSpV1& get_image_proof() const { return m_image_proof; }
-
-    /// the input's image
-    const crypto::secret_key& get_image_address_mask() const { return m_image_address_mask; }
-
-    /// the input's image
-    const crypto::secret_key& get_image_amount_mask() const { return m_image_amount_mask; }
-
-    /// the input's image
-    const rct::key& get_proposal_prefix() const { return m_proposal_prefix; }
-
-    /// the input's image
-    const MockENoteSpV1& get_input_enote() const { return m_input_enote; }
-
-    /// the input's image
-    rct::xmr_amount get_input_amount() const { return m_input_amount; }
 
 //member variables
-private:
     /// input's image
     MockENoteImageSpV1 m_input_image;
     /// input image's proof (demonstrates ownership of the underlying enote, and that the key image is correct)
@@ -223,7 +179,7 @@ private:
     MockENoteSpV1 m_input_enote;
     /// input amount
     rct::xmr_amount m_input_amount;
-    /// input amount commitment's blinding factor; only used for making the last input in a tx
+    /// input amount commitment's blinding factor; only used for making the balance proof's remainder blinding factor
     crypto::secret_key m_input_amount_blinding_factor;
 };
 
@@ -241,6 +197,7 @@ struct MockTxPartialSpV1 final
     /// normal constructor: standard assembly
     MockTxPartialSpV1(const MockTxProposalSpV1 &proposal,
         const std::vector<MockTxPartialInputSpV1> &inputs,
+        const std::size_t max_rangeproof_splits,
         const std::string &version_string);
 
     /// normal constructor (TODO): assembly from multisig pieces

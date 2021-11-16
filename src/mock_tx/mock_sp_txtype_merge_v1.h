@@ -77,7 +77,7 @@ public:
     /// normal constructor: new tx from pieces
     MockTxSpMergeV1(std::vector<MockENoteImageSpV1> input_images,
         std::vector<MockENoteSpV1> outputs,
-        std::shared_ptr<MockBalanceProofSpV1> balance_proof,
+        std::shared_ptr<MockBalanceProofSpV2> balance_proof,
         MockImageProofSpV1 image_proof_merged,
         std::vector<MockMembershipProofSpV1> membership_proofs,
         MockSupplementSpV1 tx_supplement,
@@ -138,7 +138,7 @@ public:
     }
 
     /// get balance proof
-    const std::shared_ptr<const MockBalanceProofSpV1> get_balance_proof() const { return m_balance_proof; }
+    const std::shared_ptr<const MockBalanceProofSpV2> get_balance_proof() const { return m_balance_proof; }
 
     //get_tx_byte_blob()
 
@@ -156,7 +156,7 @@ private:
     /// tx outputs (new e-notes)
     std::vector<MockENoteSpV1> m_outputs;
     /// balance proof (balance proof and range proofs)
-    std::shared_ptr<MockBalanceProofSpV1> m_balance_proof;
+    std::shared_ptr<MockBalanceProofSpV2> m_balance_proof;
     /// merged composition proof: ownership/key-image-legitimacy for all inputs
     MockImageProofSpV1 m_image_proof_merged;
     /// concise Grootle proofs: membership for each input

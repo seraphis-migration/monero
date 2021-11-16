@@ -67,8 +67,8 @@ static std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<Moc
     std::sort(original_indices.begin(), original_indices.end(),
             [&partial_inputs](const std::size_t input_index_1, const std::size_t input_index_2) -> bool
             {
-                return memcmp(&(partial_inputs[input_index_1].get_input_image().m_key_image),
-                    &(partial_inputs[input_index_2].get_input_image().m_key_image), sizeof(crypto::key_image)) < 0;
+                return memcmp(&(partial_inputs[input_index_1].m_input_image.m_key_image),
+                    &(partial_inputs[input_index_2].m_input_image.m_key_image), sizeof(crypto::key_image)) < 0;
             }
         );
 
@@ -136,8 +136,7 @@ void MockDestinationSpV1::gen(const rct::xmr_amount amount)
     m_enote_privkey = rct::rct2sk(rct::skGen());
 }
 //-------------------------------------------------------------------------------------------------------------------
-MockTxProposalSpV1::MockTxProposalSpV1(std::vector<MockDestinationSpV1> destinations,
-    const std::size_t max_rangeproof_splits)
+MockTxProposalSpV1::MockTxProposalSpV1(std::vector<MockDestinationSpV1> destinations)
 {
     // destinations should be randomly ordered
     std::shuffle(destinations.begin(), destinations.end(), crypto::random_device{});
@@ -145,27 +144,19 @@ MockTxProposalSpV1::MockTxProposalSpV1(std::vector<MockDestinationSpV1> destinat
 
     // make outputs
     // make tx supplement
-    std::vector<rct::xmr_amount> output_amounts;
-    std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
-
+    // prepare for range proofs
     make_v1_tx_outputs_sp_v1(m_destinations,
         m_outputs,
-        output_amounts,
-        output_amount_commitment_blinding_factors,
+        m_output_amounts,
+        m_output_amount_commitment_blinding_factors,
         m_tx_supplement);
-
-    // make balance proof (i.e. just range proofs in v1)
-    make_v1_tx_balance_proof_sp_v1(output_amounts,
-        output_amount_commitment_blinding_factors,
-        max_rangeproof_splits,
-        m_balance_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key MockTxProposalSpV1::get_proposal_prefix(const std::string &version_string) const
 {
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to get proposal prefix for a tx proposal with no outputs!");
 
-    return get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_balance_proof, m_tx_supplement);
+    return get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_tx_supplement);
 }
 //-------------------------------------------------------------------------------------------------------------------
 MockTxPartialInputSpV1::MockTxPartialInputSpV1(const MockInputProposalSpV1 &input_proposal,
@@ -191,56 +182,9 @@ MockTxPartialInputSpV1::MockTxPartialInputSpV1(const MockInputProposalSpV1 &inpu
         m_image_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------
-MockTxPartialInputSpV1::MockTxPartialInputSpV1(const MockInputProposalSpV1 &input_proposal,
-        const rct::key &proposal_prefix,
-        const MockTxProposalSpV1 &tx_proposal,
-        const std::vector<MockTxPartialInputSpV1> &other_inputs)
-{
-    // record proposal info
-    m_input_enote = input_proposal.m_enote;
-    m_input_amount = input_proposal.m_amount;
-    m_input_amount_blinding_factor = input_proposal.m_amount_blinding_factor;
-    m_proposal_prefix = proposal_prefix;
-
-    // prepare last input image
-    std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
-    std::vector<crypto::secret_key> input_amount_blinding_factors;
-    output_amount_commitment_blinding_factors.resize(tx_proposal.get_destinations().size());
-    input_amount_blinding_factors.reserve(other_inputs.size());
-
-    for (std::size_t output_index{0}; output_index < tx_proposal.get_destinations().size(); ++output_index)
-    {
-        // y_t  (for index 't')
-        tx_proposal.get_destinations()[output_index].get_amount_blinding_factor(output_index,
-            output_amount_commitment_blinding_factors[output_index]);
-    }
-
-    for (const auto &other_input : other_inputs)
-    {
-        // v_c = x + t_c
-        input_amount_blinding_factors.emplace_back(other_input.m_input_amount_blinding_factor);  // x
-        sc_add(&(input_amount_blinding_factors.back()),
-            &(input_amount_blinding_factors.back()),
-            &(other_input.m_image_amount_mask));  // + t_c
-    }
-
-    make_v1_tx_image_last_sp_v1(input_proposal,
-        output_amount_commitment_blinding_factors,
-        input_amount_blinding_factors,
-        m_input_image,
-        m_image_address_mask,
-        m_image_amount_mask);
-
-    // construct image proof
-    make_v1_tx_image_proof_sp_v1(input_proposal,
-        m_input_image,
-        m_image_address_mask,
-        m_proposal_prefix,
-        m_image_proof);
-}
-//-------------------------------------------------------------------------------------------------------------------
 MockTxPartialSpV1::MockTxPartialSpV1(const MockTxProposalSpV1 &proposal,
         const std::vector<MockTxPartialInputSpV1> &partial_inputs,
+        const std::size_t max_rangeproof_splits,
         const std::string &version_string)
 {
     // inputs and proposal must be for the same tx
@@ -248,9 +192,20 @@ MockTxPartialSpV1::MockTxPartialSpV1(const MockTxProposalSpV1 &proposal,
 
     for (const auto &partial_input : partial_inputs)
     {
-        CHECK_AND_ASSERT_THROW_MES(proposal_prefix == partial_input.get_proposal_prefix(),
+        CHECK_AND_ASSERT_THROW_MES(proposal_prefix == partial_input.m_proposal_prefix,
             "Incompatible tx pieces when making partial tx.");
     }
+
+    // make balance proof
+    std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
+    prepare_input_commitment_factors_for_balance_proof_v2(partial_inputs,
+        input_image_amount_commitment_blinding_factors);
+
+    make_v1_tx_balance_proof_sp_v1(proposal.m_output_amounts,
+        input_image_amount_commitment_blinding_factors,
+        proposal.m_output_amount_commitment_blinding_factors,
+        max_rangeproof_splits,
+        m_balance_proof);
 
     // gather tx input parts (sorted)
     m_input_images.reserve(partial_inputs.size());
@@ -268,17 +223,16 @@ MockTxPartialSpV1::MockTxPartialSpV1(const MockTxProposalSpV1 &proposal,
         CHECK_AND_ASSERT_THROW_MES(input_sort_order[input_index] < partial_inputs.size(),
             "Invalid old index for input pieces.");
 
-        m_input_images.emplace_back(partial_inputs[input_sort_order[input_index]].get_input_image());
-        m_image_proofs.emplace_back(partial_inputs[input_sort_order[input_index]].get_image_proof());
-        m_input_enotes.emplace_back(partial_inputs[input_sort_order[input_index]].get_input_enote());
-        m_image_address_masks.emplace_back(partial_inputs[input_sort_order[input_index]].get_image_address_mask());
-        m_image_amount_masks.emplace_back(partial_inputs[input_sort_order[input_index]].get_image_amount_mask());
+        m_input_images.emplace_back(partial_inputs[input_sort_order[input_index]].m_input_image);
+        m_image_proofs.emplace_back(partial_inputs[input_sort_order[input_index]].m_image_proof);
+        m_input_enotes.emplace_back(partial_inputs[input_sort_order[input_index]].m_input_enote);
+        m_image_address_masks.emplace_back(partial_inputs[input_sort_order[input_index]].m_image_address_mask);
+        m_image_amount_masks.emplace_back(partial_inputs[input_sort_order[input_index]].m_image_amount_mask);
     }
 
     // gather the remaining tx parts
-    m_outputs = proposal.get_outputs();
-    m_tx_supplement = proposal.get_tx_supplement();
-    m_balance_proof = proposal.get_balance_proof();
+    m_outputs = proposal.m_outputs;
+    m_tx_supplement = proposal.m_tx_supplement;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace mock_tx

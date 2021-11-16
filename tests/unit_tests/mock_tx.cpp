@@ -159,7 +159,7 @@ static void run_mock_tx_test_batch(const std::vector<MockTxGenData> &gen_data)
     }
 }
 
-static std::vector<MockTxGenData> get_mock_tx_gen_data_misc()
+static std::vector<MockTxGenData> get_mock_tx_gen_data_misc(const bool test_double_spend)
 {
     /// success cases
     std::vector<MockTxGenData> gen_data;
@@ -173,7 +173,7 @@ static std::vector<MockTxGenData> get_mock_tx_gen_data_misc()
         temp.output_amounts.push_back(1);
         temp.ref_set_decomp_n = 2;
         temp.ref_set_decomp_m = 3;
-        temp.test_double_spend = true;
+        temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
     }
@@ -187,7 +187,7 @@ static std::vector<MockTxGenData> get_mock_tx_gen_data_misc()
         temp.output_amounts.push_back(1);
         temp.ref_set_decomp_n = 2;
         temp.ref_set_decomp_m = 3;
-        temp.test_double_spend = true;
+        temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
     }
@@ -201,7 +201,7 @@ static std::vector<MockTxGenData> get_mock_tx_gen_data_misc()
         temp.output_amounts.push_back(2);
         temp.ref_set_decomp_n = 2;
         temp.ref_set_decomp_m = 3;
-        temp.test_double_spend = true;
+        temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
     }
@@ -217,7 +217,7 @@ static std::vector<MockTxGenData> get_mock_tx_gen_data_misc()
             temp.input_amounts.push_back(1);
             temp.output_amounts.push_back(1);
         }
-        temp.test_double_spend = true;
+        temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
     }
@@ -233,7 +233,7 @@ static std::vector<MockTxGenData> get_mock_tx_gen_data_misc()
             temp.input_amounts.push_back(1);
             temp.output_amounts.push_back(1);
         }
-        temp.test_double_spend = true;
+        temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
     }
@@ -249,7 +249,7 @@ static std::vector<MockTxGenData> get_mock_tx_gen_data_misc()
             temp.input_amounts.push_back(1);
             temp.output_amounts.push_back(1);
         }
-        temp.test_double_spend = true;
+        temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
     }
@@ -265,7 +265,7 @@ static std::vector<MockTxGenData> get_mock_tx_gen_data_misc()
             temp.input_amounts.push_back(0);
             temp.output_amounts.push_back(0);
         }
-        temp.test_double_spend = true;
+        temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
     }
@@ -320,6 +320,25 @@ static std::vector<MockTxGenData> get_mock_tx_gen_data_misc()
     return gen_data;
 }
 
+static std::vector<MockTxGenData> get_mock_tx_gen_data_batching()
+{
+    /// a batch of 3 tx
+    std::vector<MockTxGenData> gen_data;
+    gen_data.resize(3);
+
+    for (auto &gen : gen_data)
+    {
+        gen.input_amounts.push_back(2);
+        gen.input_amounts.push_back(1);
+        gen.output_amounts.push_back(2);
+        gen.output_amounts.push_back(1);
+        gen.ref_set_decomp_n = 2;
+        gen.ref_set_decomp_m = 3;
+    }
+
+    return gen_data;
+}
+
 static std::vector<MockTxGenData> get_mock_tx_gen_data_batch_splitting()
 {
     /// 3 tx, 11 inputs/outputs each, range proofs split x3
@@ -341,26 +360,6 @@ static std::vector<MockTxGenData> get_mock_tx_gen_data_batch_splitting()
 
     return gen_data;
 }
-
-static std::vector<MockTxGenData> get_mock_tx_gen_data_batching()
-{
-    /// a batch of 3 tx
-    std::vector<MockTxGenData> gen_data;
-    gen_data.resize(3);
-
-    for (auto &gen : gen_data)
-    {
-        gen.input_amounts.push_back(2);
-        gen.input_amounts.push_back(1);
-        gen.output_amounts.push_back(2);
-        gen.output_amounts.push_back(1);
-        gen.ref_set_decomp_n = 2;
-        gen.ref_set_decomp_m = 3;
-    }
-
-    return gen_data;
-}
-
 
 
 /////////////////////////////////////////////////////////////////////
@@ -552,7 +551,8 @@ TEST(mock_tx_batching, clsag)
 
 TEST(mock_tx, triptych)
 {
-    run_mock_tx_test<mock_tx::MockTxTriptych>(get_mock_tx_gen_data_misc());
+    // don't do double-spend tests, since the mock ledger is not set up for Triptych mock txs
+    run_mock_tx_test<mock_tx::MockTxTriptych>(get_mock_tx_gen_data_misc(false));
 }
 
 TEST(mock_tx_batching, triptych)
@@ -567,7 +567,7 @@ TEST(mock_tx_batching, triptych)
 
 TEST(mock_tx, seraphis_concise)
 {
-    run_mock_tx_test<mock_tx::MockTxSpConciseV1>(get_mock_tx_gen_data_misc());
+    run_mock_tx_test<mock_tx::MockTxSpConciseV1>(get_mock_tx_gen_data_misc(true));
 }
 
 TEST(mock_tx_batching, seraphis_concise)
@@ -582,7 +582,7 @@ TEST(mock_tx_batching, seraphis_concise)
 
 TEST(mock_tx, seraphis_merge)
 {
-    run_mock_tx_test<mock_tx::MockTxSpMergeV1>(get_mock_tx_gen_data_misc());
+    run_mock_tx_test<mock_tx::MockTxSpMergeV1>(get_mock_tx_gen_data_misc(true));
 }
 
 TEST(mock_tx_batching, seraphis_merge)
@@ -597,7 +597,7 @@ TEST(mock_tx_batching, seraphis_merge)
 
 TEST(mock_tx, seraphis_squashed)
 {
-    run_mock_tx_test<mock_tx::MockTxSpSquashedV1>(get_mock_tx_gen_data_misc());
+    run_mock_tx_test<mock_tx::MockTxSpSquashedV1>(get_mock_tx_gen_data_misc(true));
 }
 
 TEST(mock_tx_batching, seraphis_squashed)

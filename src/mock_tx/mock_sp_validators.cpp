@@ -54,6 +54,97 @@
 namespace mock_tx
 {
 //-------------------------------------------------------------------------------------------------------------------
+// helper for validating v1, v2, v3 balance proofs (balance equality check)
+//-------------------------------------------------------------------------------------------------------------------
+static bool validate_mock_tx_sp_amount_balance_equality_check_v1_v2_v3(const std::vector<MockENoteImageSpV1> &input_images,
+    const std::vector<MockENoteSpV1> &outputs,
+    const rct::key &remainder_blinding_factor)
+{
+    rct::keyV input_image_amount_commitments;
+    rct::keyV output_commitments;
+    input_image_amount_commitments.reserve(input_images.size());
+    output_commitments.reserve(outputs.size() +
+        (remainder_blinding_factor == rct::zero() ? 0 : 1));
+
+    for (const auto &input_image : input_images)
+        input_image_amount_commitments.emplace_back(input_image.m_masked_commitment);
+
+    for (const auto &output : outputs)
+        output_commitments.emplace_back(output.m_amount_commitment);
+
+    if (!(remainder_blinding_factor == rct::zero()))
+        output_commitments.emplace_back(rct::scalarmultBase(remainder_blinding_factor));
+
+    // sum(input masked commitments) ?= sum(output commitments) + remainder_blinding_factor*G
+    if (!balance_check_equality(input_image_amount_commitments, output_commitments))
+    {
+std::cerr << "validation error: equality 1 2 3\n";
+        return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+// helper for validating v1 and v2 balance proofs
+// - the only difference between them is the presence of a 'remainder blinding factor' in v1 proofs
+//-------------------------------------------------------------------------------------------------------------------
+static bool validate_mock_tx_sp_amount_balance_v1_v2(const std::vector<MockENoteImageSpV1> &input_images,
+    const std::vector<MockENoteSpV1> &outputs,
+    const std::vector<rct::BulletproofPlus> &range_proofs,
+    const rct::key &remainder_blinding_factor,
+    const bool defer_batchable)
+{
+    // sanity check
+    if (range_proofs.size() == 0)
+        return false;
+
+    // check that amount commitments balance
+    if (!validate_mock_tx_sp_amount_balance_equality_check_v1_v2_v3(input_images,
+            outputs,
+            remainder_blinding_factor))
+        return false;
+
+    // check that commitments in range proofs line up with output commitments
+    std::size_t range_proof_index{0};
+    std::size_t range_proof_grouping_size = range_proofs[0].V.size();
+
+    for (std::size_t output_index{0}; output_index < outputs.size(); ++output_index)
+    {
+        // assume range proofs are partitioned into groups of size 'range_proof_grouping_size' (except last one)
+        if (range_proofs[range_proof_index].V.size() == output_index - range_proof_index*range_proof_grouping_size)
+            ++range_proof_index;
+
+        // sanity checks
+        if (range_proofs.size() <= range_proof_index)
+            return false;
+        if (range_proofs[range_proof_index].V.size() <= output_index - range_proof_index*range_proof_grouping_size)
+            return false;
+
+        // double check that the two stored copies of output commitments match
+        // TODO? don't store commitments in BP+ structure
+        if (outputs[output_index].m_amount_commitment !=
+                rct::rct2pk(rct::scalarmult8(range_proofs[range_proof_index].V[output_index -
+                    range_proof_index*range_proof_grouping_size])))
+            return false;
+    }
+
+    // range proofs must be valid
+    if (!defer_batchable)
+    {
+        std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
+        range_proof_ptrs.reserve(range_proofs.size());
+
+        for (const auto &range_proof : range_proofs)
+            range_proof_ptrs.push_back(&range_proof);
+
+        if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
+            return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool validate_mock_tx_sp_semantics_component_counts_v1(const std::size_t num_input_images,
     const std::size_t num_membership_proofs,
     const std::size_t num_image_proofs,
@@ -102,7 +193,7 @@ bool validate_mock_tx_sp_semantics_component_counts_v2(const std::size_t num_inp
     const std::size_t num_outputs,
     const std::size_t num_enote_pubkeys,
     const MockImageProofSpV1 &image_proof_merged,
-    const std::shared_ptr<const MockBalanceProofSpV1> balance_proof)
+    const std::shared_ptr<const MockBalanceProofSpV2> balance_proof)
 {
     // need at least one input
     if (num_input_images < 1)
@@ -294,71 +385,32 @@ bool validate_mock_tx_sp_amount_balance_v1(const std::vector<MockENoteImageSpV1>
     if (balance_proof.get() == nullptr)
         return false;
 
-    const std::vector<rct::BulletproofPlus> &range_proofs = balance_proof->m_bpp_proofs;
-
-    // sanity check
-    if (range_proofs.size() == 0)
-        return false;
-
-    // check that amount commitments balance
-    rct::keyV input_image_amount_commitments;
-    rct::keyV output_commitments;
-    input_image_amount_commitments.reserve(input_images.size());
-    output_commitments.reserve(outputs.size());
-
-    for (const auto &input_image : input_images)
-        input_image_amount_commitments.emplace_back(input_image.m_masked_commitment);
-
-    for (const auto &output : outputs)
-        output_commitments.emplace_back(output.m_amount_commitment);
-
-    // sum(pseudo output commitments) ?= sum(output commitments)
-    if (!balance_check_equality(input_image_amount_commitments, output_commitments))
-        return false;
-
-    // check that commitments in range proofs line up with output commitments
-    std::size_t range_proof_index{0};
-    std::size_t range_proof_grouping_size = range_proofs[0].V.size();
-
-    for (std::size_t output_index{0}; output_index < outputs.size(); ++output_index)
-    {
-        output_commitments.emplace_back(outputs[output_index].m_amount_commitment);
-
-        // assume range proofs are partitioned into groups of size 'range_proof_grouping_size' (except last one)
-        if (range_proofs[range_proof_index].V.size() == output_index - range_proof_index*range_proof_grouping_size)
-            ++range_proof_index;
-
-        // sanity checks
-        if (range_proofs.size() <= range_proof_index)
-            return false;
-        if (range_proofs[range_proof_index].V.size() <= output_index - range_proof_index*range_proof_grouping_size)
-            return false;
-
-        // double check that the two stored copies of output commitments match
-        // TODO? don't store commitments in BP+ structure
-        if (outputs[output_index].m_amount_commitment !=
-                rct::rct2pk(rct::scalarmult8(range_proofs[range_proof_index].V[output_index -
-                    range_proof_index*range_proof_grouping_size])))
-            return false;
-    }
-
-    // range proofs must be valid
-    if (!defer_batchable)
-    {
-        std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
-        range_proof_ptrs.reserve(range_proofs.size());
-
-        for (const auto &range_proof : range_proofs)
-            range_proof_ptrs.push_back(&range_proof);
-
-        if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
-            return false;
-    }
-
-    return true;
+    return validate_mock_tx_sp_amount_balance_v1_v2(input_images,
+        outputs,
+        balance_proof->m_bpp_proofs,
+        balance_proof->m_remainder_blinding_factor,
+        defer_batchable);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_mock_tx_sp_amount_balance_v2(const std::vector<MockENoteImageSpV1> &input_images,
+    const std::vector<MockENoteSpV1> &outputs,
+    const std::shared_ptr<const MockBalanceProofSpV2> balance_proof,
+    const bool defer_batchable)
+{
+    // sanity check
+    if (balance_proof.get() == nullptr)
+        return false;
+
+    rct::key remainder_blinding_factor{rct::zero()};  // no remainder in this balance proof type
+
+    return validate_mock_tx_sp_amount_balance_v1_v2(input_images,
+        outputs,
+        balance_proof->m_bpp_proofs,
+        remainder_blinding_factor,
+        defer_batchable);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool validate_mock_tx_sp_amount_balance_v3(const std::vector<MockENoteImageSpV1> &input_images,
     const std::vector<MockENoteSpV1> &outputs,
     const std::shared_ptr<const MockBalanceProofSpV1> balance_proof,
     const bool defer_batchable)
@@ -374,19 +426,9 @@ bool validate_mock_tx_sp_amount_balance_v2(const std::vector<MockENoteImageSpV1>
         return false;
 
     // check that amount commitments balance
-    rct::keyV input_image_amount_commitments;
-    rct::keyV output_commitments;
-    input_image_amount_commitments.reserve(input_images.size());
-    output_commitments.reserve(outputs.size());
-
-    for (const auto &input_image : input_images)
-        input_image_amount_commitments.emplace_back(input_image.m_masked_commitment);
-
-    for (const auto &output : outputs)
-        output_commitments.emplace_back(output.m_amount_commitment);
-
-    // sum(pseudo output commitments) ?= sum(output commitments)
-    if (!balance_check_equality(input_image_amount_commitments, output_commitments))
+    if (!validate_mock_tx_sp_amount_balance_equality_check_v1_v2_v3(input_images,
+        outputs,
+        balance_proof->m_remainder_blinding_factor))
         return false;
 
     // check that commitments in range proofs line up with input image and output commitments
