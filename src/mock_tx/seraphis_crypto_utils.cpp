@@ -718,6 +718,25 @@ void sub_keys_p3(const rct::key &A, const rct::key &B, ge_p3 &result_out)
     ge_p1p1_to_p3(&result_out, &temp_p1p1);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void subtract_secret_key_vectors(const std::vector<crypto::secret_key> &keys_A,
+    const std::vector<crypto::secret_key> &keys_B,
+    crypto::secret_key &result_out)
+{
+    result_out = rct::rct2sk(rct::zero());
+
+    // add keys_A
+    for (const auto &key_A : keys_A)
+    {
+        sc_add(&result_out, &result_out, &key_A);
+    }
+
+    // subtract keys_B
+    for (const auto &key_B : keys_B)
+    {
+        sc_sub(&result_out, &result_out, &key_B);
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &masked_key_out)
 {
     // K' = mask G + K

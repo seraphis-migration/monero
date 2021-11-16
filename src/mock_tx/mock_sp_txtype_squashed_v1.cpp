@@ -93,7 +93,6 @@ MockTxSpSquashedV1::MockTxSpSquashedV1(const std::vector<MockInputProposalSpV1> 
         output_amount_commitment_blinding_factors,
         tx_supplement);
     make_v1_tx_images_sp_v2(input_proposals,
-        output_amount_commitment_blinding_factors,
         input_images,
         image_address_masks,
         image_amount_masks);
@@ -107,17 +106,17 @@ MockTxSpSquashedV1::MockTxSpSquashedV1(const std::vector<MockInputProposalSpV1> 
         input_proposals_sorted);  //sort now so range proofs line up with input images
     std::vector<rct::xmr_amount> input_amounts;
     std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
-    prepare_input_commitment_factors_for_balance_proof_squashed_model_v1(input_proposals_sorted,
+    prepare_input_commitment_factors_for_balance_proof_v1(input_proposals_sorted,
         image_amount_masks,
         input_amounts,
         input_image_amount_commitment_blinding_factors);
-    make_v1_tx_balance_proof_sp_v2(input_amounts, //note: must range proof input image commitments in squashed enote model
+    make_v1_tx_balance_proof_sp_v3(input_amounts, //note: must range proof input image commitments in squashed enote model
         output_amounts,
         input_image_amount_commitment_blinding_factors,
         output_amount_commitment_blinding_factors,
         max_rangeproof_splits,
         balance_proof);
-    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, balance_proof, tx_supplement)};
+    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
     make_v1_tx_image_proofs_sp_v3(input_proposals_sorted,
         input_images,
         image_address_masks,
@@ -183,7 +182,7 @@ bool MockTxSpSquashedV1::validate_tx_linking_tags(const std::shared_ptr<const Le
 //-------------------------------------------------------------------------------------------------------------------
 bool MockTxSpSquashedV1::validate_tx_amount_balance(const bool defer_batchable) const
 {
-    if (!validate_mock_tx_sp_amount_balance_v2(m_input_images, m_outputs, m_balance_proof, defer_batchable))
+    if (!validate_mock_tx_sp_amount_balance_v3(m_input_images, m_outputs, m_balance_proof, defer_batchable))
     {
         return false;
     }
@@ -208,7 +207,7 @@ bool MockTxSpSquashedV1::validate_tx_input_proofs(const std::shared_ptr<const Le
     this->MockTx::get_versioning_string(version_string);
 
     rct::key image_proofs_message{
-            get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_balance_proof, m_supplement)
+            get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_supplement)
         };
 
     if (!validate_mock_tx_sp_composition_proofs_v1(m_image_proofs,

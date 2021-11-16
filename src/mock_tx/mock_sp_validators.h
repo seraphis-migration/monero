@@ -90,13 +90,16 @@ bool validate_mock_tx_sp_semantics_component_counts_v2(const std::size_t num_inp
     const std::size_t num_outputs,
     const std::size_t num_enote_pubkeys,
     const MockImageProofSpV1 &image_proof_merged,
-    const std::shared_ptr<const MockBalanceProofSpV1> balance_proof);
+    const std::shared_ptr<const MockBalanceProofSpV2> balance_proof);
 /**
 * brief: validate_mock_tx_sp_semantics_component_counts_v3 - check tx component counts are valid
 *   - num(membership proofs) == num(image proofs) == num(input images)
 *   - num(outputs) >= 1
 *   - num(range proofs) == num(input images) + num(outputs)
 *   - num(enote pubkeys) == num(outputs)  // TODO: if (num(outputs) == 2), num(enote pubkeys) ?= 1
+* 
+*   - differences from v1:
+*     - input image amount commitments also have range proofs
 * param: num_input_images -
 * param: num_membership_proofs -
 * param: num_image_proofs -
@@ -154,7 +157,7 @@ bool validate_mock_tx_sp_linking_tags_v1(const std::vector<MockENoteImageSpV1> &
 * brief: validate_mock_tx_sp_amount_balance_v1 - check that amounts balance in the tx (inputs = outputs)
 *   - check BP+ range proofs on output commitments
 *     - do not check these if 'defer_batchable' is set; BP+ range proofs can be batch-verified
-*   - check sum(input image masked commitments) == sum(output commitments)
+*   - check sum(input image masked commitments) == sum(output commitments) + remainder*G
 * param: input_images -
 * param: outputs -
 * param: balance_proof -
@@ -167,7 +170,7 @@ bool validate_mock_tx_sp_amount_balance_v1(const std::vector<MockENoteImageSpV1>
     const bool defer_batchable);
 /**
 * brief: validate_mock_tx_sp_amount_balance_v2 - check that amounts balance in the tx (inputs = outputs)
-*   - check BP+ range proofs on input image amount commitments and output commitments (e.g. for squashed enote model)
+*   - check BP+ range proofs on output commitments
 *     - do not check these if 'defer_batchable' is set; BP+ range proofs can be batch-verified
 *   - check sum(input image masked commitments) == sum(output commitments)
 * param: input_images -
@@ -177,6 +180,21 @@ bool validate_mock_tx_sp_amount_balance_v1(const std::vector<MockENoteImageSpV1>
 * return: true/false on validation result
 */
 bool validate_mock_tx_sp_amount_balance_v2(const std::vector<MockENoteImageSpV1> &input_images,
+    const std::vector<MockENoteSpV1> &outputs,
+    const std::shared_ptr<const MockBalanceProofSpV2> balance_proof,
+    const bool defer_batchable);
+/**
+* brief: validate_mock_tx_sp_amount_balance_v3 - check that amounts balance in the tx (inputs = outputs)
+*   - check BP+ range proofs on input image amount commitments and output commitments (e.g. for squashed enote model)
+*     - do not check these if 'defer_batchable' is set; BP+ range proofs can be batch-verified
+*   - check sum(input image masked commitments) == sum(output commitments) + remainder*G
+* param: input_images -
+* param: outputs -
+* param: balance_proof -
+* param: defer_batchable -
+* return: true/false on validation result
+*/
+bool validate_mock_tx_sp_amount_balance_v3(const std::vector<MockENoteImageSpV1> &input_images,
     const std::vector<MockENoteSpV1> &outputs,
     const std::shared_ptr<const MockBalanceProofSpV1> balance_proof,
     const bool defer_batchable);

@@ -73,7 +73,7 @@ MockTxSpConciseV1::MockTxSpConciseV1(const std::vector<MockInputProposalSpV1> &i
     MockTxSpConciseV1::get_versioning_string(validation_rules_version, version_string);
 
     // tx proposal
-    MockTxProposalSpV1 tx_proposal{destinations, max_rangeproof_splits};
+    MockTxProposalSpV1 tx_proposal{destinations};
     rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
 
     // partial inputs
@@ -81,7 +81,7 @@ MockTxSpConciseV1::MockTxSpConciseV1(const std::vector<MockInputProposalSpV1> &i
     make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, tx_proposal, partial_inputs);
 
     // partial tx
-    MockTxPartialSpV1 partial_tx{tx_proposal, partial_inputs, version_string};
+    MockTxPartialSpV1 partial_tx{tx_proposal, partial_inputs, max_rangeproof_splits, version_string};
 
     // membership proofs
     std::vector<MockMembershipProofSortableSpV1> tx_membership_proofs_sortable;
@@ -105,24 +105,28 @@ bool MockTxSpConciseV1::validate_tx_semantics() const
         m_supplement.m_output_enote_pubkeys.size(),
         m_balance_proof))
     {
+std::cerr << "validation error: counts\n";
         return false;
     }
 
     // validate input proof reference set sizes
     if (!validate_mock_tx_sp_semantics_ref_set_size_v1(m_membership_proofs))
     {
+std::cerr << "validation error: refsetsize\n";
         return false;
     }
 
     // validate linking tag semantics
     if (!validate_mock_tx_sp_semantics_input_images_v1(m_input_images))
     {
+std::cerr << "validation error: inputimages\n";
         return false;
     }
 
     // validate membershio proof ref sets and input images are sorted
     if (!validate_mock_tx_sp_semantics_sorting_v1(m_membership_proofs, m_input_images))
     {
+std::cerr << "validation error: sorting\n";
         return false;
     }
 
@@ -135,7 +139,10 @@ bool MockTxSpConciseV1::validate_tx_linking_tags(const std::shared_ptr<const Led
 {
     // unspentness proof (key images not in ledger)
     if (!validate_mock_tx_sp_linking_tags_v1(m_input_images, ledger_context))
+    {
+std::cerr << "validation error: linkingtags\n";
         return false;
+    }
 
     return true;
 }
@@ -143,7 +150,10 @@ bool MockTxSpConciseV1::validate_tx_linking_tags(const std::shared_ptr<const Led
 bool MockTxSpConciseV1::validate_tx_amount_balance(const bool defer_batchable) const
 {
     if (!validate_mock_tx_sp_amount_balance_v1(m_input_images, m_outputs, m_balance_proof, defer_batchable))
+    {
+std::cerr << "validation error: balance\n";
         return false;
+    }
 
     return true;
 }
@@ -156,6 +166,7 @@ bool MockTxSpConciseV1::validate_tx_input_proofs(const std::shared_ptr<const Led
         m_input_images,
         ledger_context))
     {
+std::cerr << "validation error: membership\n";
         return false;
     }
 
@@ -165,13 +176,14 @@ bool MockTxSpConciseV1::validate_tx_input_proofs(const std::shared_ptr<const Led
     this->MockTx::get_versioning_string(version_string);
 
     rct::key image_proofs_message{
-            get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_balance_proof, m_supplement)
+            get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_supplement)
         };
 
     if (!validate_mock_tx_sp_composition_proofs_v1(m_image_proofs,
         m_input_images,
         image_proofs_message))
     {
+std::cerr << "validation error: composition\n";
         return false;
     }
 

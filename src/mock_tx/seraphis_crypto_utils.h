@@ -167,6 +167,16 @@ void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &p
 */
 void sub_keys_p3(const rct::key &A, const rct::key &B, ge_p3 &result_out);
 /**
+* brief: subtract_secret_key_vectors - subtract one vector of secret keys from another
+*   sum(A) - sum(B)
+* param: keys_A - first vector (addors)
+* param: keys_B - second vector (subtractors)
+* outparam: result_out - 'sum(A) - sum(B)'
+*/
+void subtract_secret_key_vectors(const std::vector<crypto::secret_key> &keys_A,
+    const std::vector<crypto::secret_key> &keys_B,
+    crypto::secret_key &result_out);
+/**
 * brief: mask_key - commit to an EC key
 *   K' = mask G + K
 * param: mask - commitment mask/blinding factor

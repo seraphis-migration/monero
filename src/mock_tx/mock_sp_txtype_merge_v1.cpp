@@ -75,7 +75,7 @@ MockTxSpMergeV1::MockTxSpMergeV1(const std::vector<MockInputProposalSpV1> &input
     // tx components
     std::vector<MockENoteImageSpV1> input_images;
     std::vector<MockENoteSpV1> outputs;
-    std::shared_ptr<MockBalanceProofSpV1> balance_proof;
+    std::shared_ptr<MockBalanceProofSpV2> balance_proof;
     MockImageProofSpV1 tx_image_proof_merged;
     std::vector<MockMembershipProofSortableSpV1> tx_membership_proofs_sortable;
     std::vector<MockMembershipProofSpV1> tx_membership_proofs;
@@ -92,16 +92,16 @@ MockTxSpMergeV1::MockTxSpMergeV1(const std::vector<MockInputProposalSpV1> &input
         output_amounts,
         output_amount_commitment_blinding_factors,
         tx_supplement);
-    make_v1_tx_images_sp_v1(input_proposals,
+    make_v1_tx_images_sp_v3(input_proposals,
         output_amount_commitment_blinding_factors,
         input_images,
         image_address_masks,
         image_amount_masks);
-    make_v1_tx_balance_proof_sp_v1(output_amounts, //note: independent of inputs (just range proofs output commitments)
+    make_v1_tx_balance_proof_sp_v2(output_amounts, //note: independent of inputs (just range proofs output commitments)
         output_amount_commitment_blinding_factors,
         max_rangeproof_splits,
         balance_proof);
-    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, balance_proof, tx_supplement)};
+    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
     // the API here around sorting is clumsy and not well thought-out (TODO: improve if this tx variant is to be used)
     std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets_sorted{membership_ref_sets};
     std::vector<MockInputProposalSpV1> input_proposals_sorted{input_proposals};
@@ -173,7 +173,7 @@ bool MockTxSpMergeV1::validate_tx_linking_tags(const std::shared_ptr<const Ledge
 //-------------------------------------------------------------------------------------------------------------------
 bool MockTxSpMergeV1::validate_tx_amount_balance(const bool defer_batchable) const
 {
-    if (!validate_mock_tx_sp_amount_balance_v1(m_input_images, m_outputs, m_balance_proof, defer_batchable))
+    if (!validate_mock_tx_sp_amount_balance_v2(m_input_images, m_outputs, m_balance_proof, defer_batchable))
         return false;
 
     return true;
@@ -196,7 +196,7 @@ bool MockTxSpMergeV1::validate_tx_input_proofs(const std::shared_ptr<const Ledge
     this->MockTx::get_versioning_string(version_string);
 
     rct::key image_proof_message{
-            get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_balance_proof, m_supplement)
+            get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_supplement)
         };
 
     if (!validate_mock_tx_sp_composition_proof_merged_v1(m_image_proof_merged,
@@ -297,7 +297,7 @@ bool validate_mock_txs<MockTxSpMergeV1>(const std::vector<std::shared_ptr<MockTx
             return false;
 
         // gather range proofs
-        const std::shared_ptr<const MockBalanceProofSpV1> balance_proof{tx->get_balance_proof()};
+        const std::shared_ptr<const MockBalanceProofSpV2> balance_proof{tx->get_balance_proof()};
 
         if (balance_proof.get() == nullptr)
             return false;

@@ -126,23 +126,29 @@ struct MockImageProofSpV1 final
 };
 
 ////
-// MockBalanceProofSpV1 - Balance Proof V1
-// - balance proof: implicit [sum(inputs) == sum(outputs)]
+// MockBalanceProofSpV1 - Balance Proof V2
+// - balance proof: implicit with a remainder blinding factor: [sum(inputs) + remainder_blinding_factor*G == sum(outputs)]
 // - range proof: Bulletproofs+
 ///
 struct MockBalanceProofSpV1 final
 {
     /// a set of BP+ proofs
     std::vector<rct::BulletproofPlus> m_bpp_proofs;
+    /// the remainder blinding factor
+    rct::key m_remainder_blinding_factor;
 
-    /**
-    * brief: append_to_string - convert bpp proofs to a string and append to existing string (for proof transcripts)
-    *   str += {BP1}
-    * param: include_commitments - if false, do not append amount commitments to string (they may be inserted to proof
-    *   transcript by an output enote append_to_string() call)
-    * inoutparam: str_inout - proofs' contents concatenated to a string
-    */
-    void append_to_string(const bool include_commitments, std::string &str_inout) const;
+    std::size_t get_size_bytes(const bool include_commitments = false) const;
+};
+
+////
+// MockBalanceProofSpV2 - Balance Proof V1
+// - balance proof: implicit [sum(inputs) == sum(outputs)]
+// - range proof: Bulletproofs+
+///
+struct MockBalanceProofSpV2 final
+{
+    /// a set of BP+ proofs
+    std::vector<rct::BulletproofPlus> m_bpp_proofs;
 
     std::size_t get_size_bytes(const bool include_commitments = false) const;
 };

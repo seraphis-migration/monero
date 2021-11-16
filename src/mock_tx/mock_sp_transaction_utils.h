@@ -62,16 +62,14 @@ namespace mock_tx
 rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &enote_ledger_indices);
 /**
 * brief: get_tx_image_proof_message_sp_v1 - message for tx image proofs
-*   - H(crypto project name, version string, output enotes, range proofs, enote pubkeys)
+*   - H(crypto project name, version string, output enotes, enote pubkeys)
 * param: version_string -
 * param: output_enotes -
-* param: balance_proof -
 * param: tx_supplement -
 * return: message to insert in a tx image proof
 */
 rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     const std::vector<MockENoteSpV1> &output_enotes,
-    const std::shared_ptr<const MockBalanceProofSpV1> &balance_proof,
     const MockSupplementSpV1 &tx_supplement);
 /**
 * brief: sort_tx_inputs_sp_v1 - sort tx inputs
@@ -111,17 +109,26 @@ void sort_v1_tx_membership_proofs_sp_v1(const std::vector<MockENoteImageSpV1> &i
     std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_sortable_in,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out);
 /**
-* brief: prepare_input_commitment_factors_for_balance_proof_squashed_model_v1 - collect input amounts and
-*   input image amount commitment blinding factors (squashed enote model)
+* brief: prepare_input_commitment_factors_for_balance_proof_v1 - collect input amounts and input image amount
+*   commitment blinding factors
 * param: input_proposals -
 * param: image_address_masks -
 * outparam: input_amounts_out -
 * outparam: input_image_amount_commitment_blinding_factors_out -
 */
-void prepare_input_commitment_factors_for_balance_proof_squashed_model_v1(
+void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<MockInputProposalSpV1> &input_proposals,
     const std::vector<crypto::secret_key> &image_address_masks,
     std::vector<rct::xmr_amount> &input_amounts_out,
+    std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors_out);
+/**
+* brief: prepare_input_commitment_factors_for_balance_proof_v2 - collect input image amount commitment blinding
+*   factors from partial inputs
+* param: partial_inputs -
+* outparam: input_image_amount_commitment_blinding_factors_out -
+*/
+void prepare_input_commitment_factors_for_balance_proof_v2(
+    const std::vector<MockTxPartialInputSpV1> &partial_inputs,
     std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors_out);
 /**
 * brief: make_v1_tx_outputs_sp_v1 - make v1 tx outputs
@@ -196,25 +203,35 @@ void make_v1_tx_image_last_sp_v2(const MockInputProposalSpV1 &input_proposal,
 /**
 * brief: make_v1_tx_images_sp_v1 - make all v1 input images for a tx
 * param: input_proposals -
-* param: output_amount_commitment_blinding_factors -
 * outparam: input_images_out -
 * outparam: image_address_masks_out -
 * outparam: image_amount_masks_out -
 */
 void make_v1_tx_images_sp_v1(const std::vector<MockInputProposalSpV1> &input_proposals,
-    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
     std::vector<MockENoteImageSpV1> &input_images_out,
     std::vector<crypto::secret_key> &image_address_masks_out,
     std::vector<crypto::secret_key> &image_amount_masks_out);
 /**
 * brief: make_v1_tx_images_sp_v2 - make all v1 input images for a tx (squashed enote model)
 * param: input_proposals -
-* param: output_amount_commitment_blinding_factors -
 * outparam: input_images_out -
 * outparam: image_address_masks_out -
 * outparam: image_amount_masks_out -
 */
 void make_v1_tx_images_sp_v2(const std::vector<MockInputProposalSpV1> &input_proposals,
+    std::vector<MockENoteImageSpV1> &input_images_out,
+    std::vector<crypto::secret_key> &image_address_masks_out,
+    std::vector<crypto::secret_key> &image_amount_masks_out);
+/**
+* brief: make_v1_tx_images_sp_v3 - make all v1 input images for a tx
+*   - last input image's amount mask is set so input image commitments sum to equal output commitments
+* param: input_proposals -
+* param: output_amount_commitment_blinding_factors -
+* outparam: input_images_out -
+* outparam: image_address_masks_out -
+* outparam: image_amount_masks_out -
+*/
+void make_v1_tx_images_sp_v3(const std::vector<MockInputProposalSpV1> &input_proposals,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
     std::vector<MockENoteImageSpV1> &input_images_out,
     std::vector<crypto::secret_key> &image_address_masks_out,
@@ -289,16 +306,29 @@ void make_v1_tx_image_proofs_sp_v3(const std::vector<MockInputProposalSpV1> &inp
 /**
 * brief: make_v1_tx_balance_proof_sp_v1 - make v1 tx balance proof (BP+ for range proofs; balance is implicit)
 * param: output_amounts -
+* param: input_image_amount_commitment_blinding_factors -
 * param: output_amount_commitment_blinding_factors -
 * param: max_rangeproof_splits -
 * outparam: balance_proof_out -
 */
 void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &output_amounts,
+    const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
     const std::size_t max_rangeproof_splits,
     std::shared_ptr<MockBalanceProofSpV1> &balance_proof_out);
 /**
-* brief: make_v1_tx_balance_proof_sp_v2 - make v1 tx balance proof (BP+ for range proofs; balance is implicit)
+* brief: make_v1_tx_balance_proof_sp_v2 - make v2 tx balance proof (BP+ for range proofs; balance is implicit)
+* param: output_amounts -
+* param: output_amount_commitment_blinding_factors -
+* param: max_rangeproof_splits -
+* outparam: balance_proof_out -
+*/
+void make_v1_tx_balance_proof_sp_v2(const std::vector<rct::xmr_amount> &output_amounts,
+    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
+    const std::size_t max_rangeproof_splits,
+    std::shared_ptr<MockBalanceProofSpV2> &balance_proof_out);
+/**
+* brief: make_v1_tx_balance_proof_sp_v3 - make v1 tx balance proof (BP+ for range proofs; balance is implicit)
 *   - range proofs for input image amount commitments and output commitments (squashed enote model)
 * param: input_amounts -
 * param: output_amounts -
@@ -307,7 +337,7 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &output_a
 * param: max_rangeproof_splits -
 * outparam: balance_proof_out -
 */
-void make_v1_tx_balance_proof_sp_v2(const std::vector<rct::xmr_amount> &input_amounts,
+void make_v1_tx_balance_proof_sp_v3(const std::vector<rct::xmr_amount> &input_amounts,
     const std::vector<rct::xmr_amount> &output_amounts,
     const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,

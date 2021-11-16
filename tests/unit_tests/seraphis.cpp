@@ -167,6 +167,7 @@ static std::shared_ptr<mock_tx::MockTxSpConciseV1> make_sp_txtype_concise_v1(con
     std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
     std::vector<crypto::secret_key> image_address_masks;
     std::vector<crypto::secret_key> image_amount_masks;
+    std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
 
     make_v1_tx_outputs_sp_v1(destinations,
         outputs,
@@ -174,15 +175,21 @@ static std::shared_ptr<mock_tx::MockTxSpConciseV1> make_sp_txtype_concise_v1(con
         output_amount_commitment_blinding_factors,
         tx_supplement);
     make_v1_tx_images_sp_v1(input_proposals,
-        output_amount_commitment_blinding_factors,
         input_images,
         image_address_masks,
         image_amount_masks);
-    make_v1_tx_balance_proof_sp_v1(output_amounts, //note: independent of inputs (just range proofs output commitments)
+    std::vector<rct::xmr_amount> input_amounts_dummy;
+    prepare_input_commitment_factors_for_balance_proof_v1(
+        input_proposals,
+        image_amount_masks,
+        input_amounts_dummy,
+        input_image_amount_commitment_blinding_factors);
+    make_v1_tx_balance_proof_sp_v1(output_amounts,
+        input_image_amount_commitment_blinding_factors,
         output_amount_commitment_blinding_factors,
         max_rangeproof_splits,
         balance_proof);
-    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, balance_proof, tx_supplement)};
+    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
     make_v1_tx_image_proofs_sp_v1(input_proposals,
         input_images,
         image_address_masks,

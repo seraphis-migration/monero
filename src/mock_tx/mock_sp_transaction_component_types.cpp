@@ -137,31 +137,26 @@ std::size_t MockImageProofSpV1::get_size_bytes() const
     return 32 * (3 + m_composition_proof.r_i.size() + m_composition_proof.K_t1.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockBalanceProofSpV1::append_to_string(const bool include_commitments, std::string &str_inout) const
+std::size_t MockBalanceProofSpV1::get_size_bytes(const bool include_commitments /*=false*/) const
 {
-    // append all proof contents to the string
-    // - assume the input string has enouch capacity
-    for (const auto &bpp_proof : m_bpp_proofs)
+    // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
+    //TODO? don't store amount commitment set in range proofs at all
+    std::size_t size{0};
+
+    for (const auto &proof : m_bpp_proofs)
     {
         if (include_commitments)
-        {
-            for (std::size_t i{0}; i < bpp_proof.V.size(); ++i)
-                str_inout.append((const char*) bpp_proof.V[i].bytes, sizeof(rct::key));
-        }
-        str_inout.append((const char*) bpp_proof.A.bytes, sizeof(rct::key));
-        str_inout.append((const char*) bpp_proof.A1.bytes, sizeof(rct::key));
-        str_inout.append((const char*) bpp_proof.B.bytes, sizeof(rct::key));
-        str_inout.append((const char*) bpp_proof.r1.bytes, sizeof(rct::key));
-        str_inout.append((const char*) bpp_proof.s1.bytes, sizeof(rct::key));
-        str_inout.append((const char*) bpp_proof.d1.bytes, sizeof(rct::key));
-        for (std::size_t n = 0; n < bpp_proof.L.size(); ++n)
-            str_inout.append((const char*) bpp_proof.L[n].bytes, sizeof(rct::key));
-        for (std::size_t n = 0; n < bpp_proof.R.size(); ++n)
-            str_inout.append((const char*) bpp_proof.R[n].bytes, sizeof(rct::key));
+            size += 32 * proof.V.size();
+
+        size += 32 * (6 + proof.L.size() + proof.R.size());;
     }
+
+    size += 32;  // remainder blinding factor
+
+    return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t MockBalanceProofSpV1::get_size_bytes(const bool include_commitments /*=false*/) const
+std::size_t MockBalanceProofSpV2::get_size_bytes(const bool include_commitments /*=false*/) const
 {
     // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
     //TODO? don't store amount commitment set in range proofs at all
