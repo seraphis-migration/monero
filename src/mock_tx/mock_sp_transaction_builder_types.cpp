@@ -207,7 +207,7 @@ MockTxPartialSpV1::MockTxPartialSpV1(const MockTxProposalSpV1 &proposal,
         max_rangeproof_splits,
         m_balance_proof);
 
-    // gather tx input parts (sorted)
+    // gather and sort tx input parts
     m_input_images.reserve(partial_inputs.size());
     m_image_proofs.reserve(partial_inputs.size());
     m_input_enotes.reserve(partial_inputs.size());
