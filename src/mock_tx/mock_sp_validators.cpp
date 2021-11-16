@@ -78,7 +78,6 @@ static bool validate_mock_tx_sp_amount_balance_equality_check_v1_v2_v3(const std
     // sum(input masked commitments) ?= sum(output commitments) + remainder_blinding_factor*G
     if (!balance_check_equality(input_image_amount_commitments, output_commitments))
     {
-std::cerr << "validation error: equality 1 2 3\n";
         return false;
     }
 
