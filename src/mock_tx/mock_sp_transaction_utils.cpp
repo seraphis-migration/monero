@@ -341,14 +341,13 @@ void sort_v1_tx_membership_proofs_sp_v1(const std::vector<MockENoteImageSpV1> &i
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
     {
         // find the membership proof that matches with the input image at this index
-        auto ordered_membership_proof{
-                std::find_if(tx_membership_proofs_sortable_in.begin(), tx_membership_proofs_sortable_in.end(),
-                        [&](const MockMembershipProofSortableSpV1 &sortable_proof) -> bool
-                        {
-                            return input_images[input_index].m_masked_address == sortable_proof.m_masked_address;
-                        }
-                    )
-            };
+        auto ordered_membership_proof = 
+            std::find_if(tx_membership_proofs_sortable_in.begin(), tx_membership_proofs_sortable_in.end(),
+                    [&](const MockMembershipProofSortableSpV1 &sortable_proof) -> bool
+                    {
+                        return input_images[input_index].m_masked_address == sortable_proof.m_masked_address;
+                    }
+                );
 
         CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_sortable_in.end(),
             "Could not find input image to match with a sortable membership proof.");
