@@ -75,6 +75,9 @@ struct MockENoteSp
     /// C = x G + a H
     rct::key m_amount_commitment;
 
+    /// virtual destructor for non-final type
+    virtual ~MockENoteSp() = default;
+
     /**
     * brief: make_base_from_privkeys - make a Seraphis ENote when all secrets are known
     * param: enote_view_privkey -
@@ -123,6 +126,9 @@ struct MockENoteImageSp
     /// KI = (k_{b, recipient} / (k_{a, sender} + k_{a, recipient})) U
     crypto::key_image m_key_image;
 
+    /// virtual destructor for non-final type
+    virtual ~MockENoteImageSp() = default;
+
     static std::size_t get_size_bytes_base() {return 32*3;}
 };
 
@@ -140,6 +146,9 @@ struct MockInputProposalSp
     crypto::secret_key m_amount_blinding_factor;
     /// a
     rct::xmr_amount m_amount;
+
+    /// virtual destructor for non-final type
+    virtual ~MockInputProposalSp() = default;
 
     /**
     * brief: get_key_image - get this input's key image
@@ -191,6 +200,9 @@ struct MockDestinationSp
     /// K^s
     rct::key m_recipient_spendkey;
     rct::xmr_amount m_amount;
+
+    /// virtual destructor for non-final type
+    virtual ~MockDestinationSp() = default;
 
     /**
     * brief: gen_base - generate a Seraphis Destination (all random)

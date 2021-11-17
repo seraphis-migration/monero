@@ -121,6 +121,36 @@ int main(int argc, char** argv)
   timer.start();
 
 
+  /// BP+ tests, looking at DDOS risks
+  /// - does adding one large aggregate proof among many small aggregation proofs cause worse average verification
+  //    performance when batching than if the large proof were validated separately?
+  ParamsShuttleBPPAgg p_bpp_agg;
+  p_bpp_agg = {p.core_params, true, {2}, {8}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 8x 2
+  p_bpp_agg = {p.core_params, true, {32}, {8}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 8x 32
+  p_bpp_agg = {p.core_params, true, {32}, {1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 32
+  p_bpp_agg = {p.core_params, true, {2,32}, {7,1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 7x 2, 1x 32
+  p_bpp_agg = {p.core_params, true, {2,32}, {8,8}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 8x 2, 8x 32
+  p_bpp_agg = {p.core_params, true, {2}, {16}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 2
+  p_bpp_agg = {p.core_params, true, {32}, {16}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 32
+  p_bpp_agg = {p.core_params, true, {2,32}, {15,1}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 15x 2, 1x 32
+
+  p_bpp_agg = {p.core_params, true, {16}, {16}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 16
+  p_bpp_agg = {p.core_params, true, {32}, {16}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 32
+  p_bpp_agg = {p.core_params, true, {16,32}, {16,16}};
+  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 16, 16x 32
+
+
+
   /// mock tx performance tests
   MockTxPerfIncrementer incrementer;
   ParamsShuttleMockTx p_mock_tx;

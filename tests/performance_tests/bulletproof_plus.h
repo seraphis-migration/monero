@@ -33,6 +33,9 @@
 #include "ringct/rctSigs.h"
 #include "ringct/bulletproofs_plus.h"
 
+#include <utility>
+
+
 template<bool a_verify, size_t n_amounts>
 class test_bulletproof_plus
 {
@@ -61,27 +64,50 @@ private:
   rct::BulletproofPlus proof;
 };
 
-template<bool batch, size_t start, size_t repeat, size_t mul, size_t add, size_t N>
+struct ParamsShuttleBPPAgg final : public ParamsShuttle
+{
+  ParamsShuttleBPPAgg() = default;
+
+  ParamsShuttleBPPAgg(Params &core_params, bool batch, std::vector<size_t> aggregation_groups,
+    std::vector<size_t> aggregation_group_repetitions) :
+    ParamsShuttle{core_params},
+    batch{batch},
+    aggregation_groups{std::move(aggregation_groups)},
+    aggregation_group_repetitions{std::move(aggregation_group_repetitions)}
+  {}
+
+  // batch if true
+  bool batch{true};
+  // set of group sizes for aggregation, e.g. {3 proofs, 5 proofs}
+  std::vector<size_t> aggregation_groups{};
+  // number of times to make each aggregation group, e.g. {2x {3 proofs}, 4x {5 proofs}}
+  std::vector<size_t> aggregation_group_repetitions{};
+};
+
 class test_aggregated_bulletproof_plus
 {
 public:
-  static const size_t loop_count = 500 / (N * repeat);
+  static const size_t loop_count = 25;
 
-  bool init()
+  bool init(const ParamsShuttleBPPAgg &params)
   {
-    size_t o = start;
-    for (size_t n = 0; n < N; ++n)
+    m_params = params;
+
+    if (m_params.aggregation_groups.size() != m_params.aggregation_group_repetitions.size())
+      return false;
+
+    for (size_t n = 0; n < m_params.aggregation_groups.size(); ++n)
     {
-      for (size_t i = 0; i < repeat; ++i)
-        proofs.push_back(rct::bulletproof_plus_PROVE(std::vector<uint64_t>(o, 749327532984), rct::skvGen(o)));
-      o = o * mul + add;
+      for (size_t i = 0; i < m_params.aggregation_group_repetitions[n]; ++i)
+        proofs.push_back(rct::bulletproof_plus_PROVE(std::vector<uint64_t>(m_params.aggregation_groups[n], 749327532984),
+          rct::skvGen(m_params.aggregation_groups[n])));
     }
     return true;
   }
 
   bool test()
   {
-    if (batch)
+    if (m_params.batch)
     {
         return rct::bulletproof_plus_VERIFY(proofs);
     }
@@ -96,4 +122,6 @@ public:
 
 private:
   std::vector<rct::BulletproofPlus> proofs;
+
+  ParamsShuttleBPPAgg m_params;
 };

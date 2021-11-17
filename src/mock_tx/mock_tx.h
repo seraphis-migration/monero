@@ -72,7 +72,8 @@ public:
     /// default constructor
     MockTx() = default;
 
-//destructor: default
+//destructor: virtual for non-final type
+    virtual ~MockTx() = default;
 
 //member functions
     ////

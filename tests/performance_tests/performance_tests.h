@@ -43,7 +43,7 @@
 #include "common/perf_timer.h"
 #include "common/timings.h"
 
-class performance_timer
+class performance_timer final
 {
 public:
   typedef boost::chrono::high_resolution_clock clock;
@@ -69,7 +69,7 @@ private:
   clock::time_point m_start;
 };
 
-struct Params
+struct Params final
 {
   std::shared_ptr<TimingsDatabase> td;
   bool verbose;
@@ -80,6 +80,13 @@ struct Params
 struct ParamsShuttle
 {
   Params core_params;
+
+  ParamsShuttle() = default;
+
+  ParamsShuttle(Params &params) : core_params{params}
+  {}
+
+  virtual ~ParamsShuttle() = default;  // virtual for non-final type
 };
 
 template <typename T, typename ParamsT,
@@ -104,7 +111,7 @@ bool init_test(T &test, ParamsT &params_shuttle)
 }
 
 template <typename T, typename ParamsT>
-class test_runner
+class test_runner final
 {
 public:
   test_runner(const ParamsT &params_shuttle)

@@ -161,6 +161,8 @@ struct MockTxPartialInputSpV1 final //needs to be InputSetPartial for merged com
     /// normal constructor: normal input
     MockTxPartialInputSpV1(const MockInputProposalSpV1 &input_proposal, const rct::key &proposal_prefix);
 
+//destructor: default
+
 //member functions
 
 //member variables
@@ -201,6 +203,8 @@ struct MockTxPartialSpV1 final
         const std::string &version_string);
 
     /// normal constructor (TODO): assembly from multisig pieces
+
+//destructor: default
 
 //member variables
     /// tx input images  (spent e-notes)
