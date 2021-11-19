@@ -299,6 +299,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     CHECK_AND_ASSERT_THROW_MES(num_keys == y.size(), "Input key sets not the same size (K ?= y)!");
     CHECK_AND_ASSERT_THROW_MES(num_keys == z.size(), "Input key sets not the same size (K ?= z)!");
 
+    rct::key temp_K;
     for (std::size_t i{0}; i < num_keys; ++i)
     {
         CHECK_AND_ASSERT_THROW_MES(!(K[i] == rct::identity()), "Bad proof key (K[i] identity)!");
@@ -309,6 +310,13 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
         CHECK_AND_ASSERT_THROW_MES(sc_check(&y[i]) == 0, "Bad private key (y[i])!");
         CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z[i]), "Bad private key (z[i] zero)!");
         CHECK_AND_ASSERT_THROW_MES(sc_check(&z[i]) == 0, "Bad private key (z[i])!");
+
+        // verify the input key matches the input private keys
+        mock_tx::make_seraphis_spendbase(z[i], temp_K);
+        mock_tx::extend_seraphis_spendkey(y[i], temp_K);
+        mask_key(x[i], temp_K, temp_K);
+
+        CHECK_AND_ASSERT_THROW_MES(K[i] == temp_K, "Bad proof key (K[i] doesn't match privkeys)!");
     }
 
     const rct::key U_gen{get_U_gen()};
