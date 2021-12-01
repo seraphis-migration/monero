@@ -345,13 +345,13 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     crypto::secret_key alpha_a;
     rct::key alpha_a_pub;
 
-    generate_proof_alpha(rct::G, alpha_a, alpha_a_pub);
+    generate_proof_nonce(rct::G, alpha_a, alpha_a_pub);
 
     // alpha_b * U
     crypto::secret_key alpha_b;
     rct::key alpha_b_pub;
 
-    generate_proof_alpha(U_gen, alpha_b, alpha_b_pub);
+    generate_proof_nonce(U_gen, alpha_b, alpha_b_pub);
 
     // alpha_i[i] * K_i
     rct::keyV alpha_i;
@@ -361,7 +361,7 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
 
     for (std::size_t i{0}; i < num_keys; ++i)
     {
-        generate_proof_alpha(K[i], alpha_i[i], alpha_i_pub[i]);
+        generate_proof_nonce(K[i], alpha_i[i], alpha_i_pub[i]);
     }
 
 
@@ -547,12 +547,12 @@ SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const std::v
     proposal.message = message;
 
     rct::key dummy;
-    generate_proof_alpha(rct::G, proposal.signature_nonce_K_t2, dummy);
+    generate_proof_nonce(rct::G, proposal.signature_nonce_K_t2, dummy);
 
     proposal.signature_nonces_K_t1.resize(num_keys);
     for (std::size_t i{0}; i < num_keys; ++i)
     {
-        generate_proof_alpha(K[i], proposal.signature_nonces_K_t1[i], dummy);
+        generate_proof_nonce(K[i], proposal.signature_nonces_K_t1[i], dummy);
     }
 
     return proposal;
@@ -565,12 +565,12 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init()
     // alpha_{b,1,e}*U
     // store with (1/8)
     rct::key U{get_U_gen()};
-    generate_proof_alpha(U, prep.signature_nonce_1_KI_priv, prep.signature_nonce_1_KI_pub);
+    generate_proof_nonce(U, prep.signature_nonce_1_KI_priv, prep.signature_nonce_1_KI_pub);
     rct::scalarmultKey(prep.signature_nonce_1_KI_pub, prep.signature_nonce_1_KI_pub, rct::INV_EIGHT);
 
     // alpha_{b,2,e}*U
     // store with (1/8)
-    generate_proof_alpha(U, prep.signature_nonce_2_KI_priv, prep.signature_nonce_2_KI_pub);
+    generate_proof_nonce(U, prep.signature_nonce_2_KI_priv, prep.signature_nonce_2_KI_pub);
     rct::scalarmultKey(prep.signature_nonce_2_KI_pub, prep.signature_nonce_2_KI_pub, rct::INV_EIGHT);
 
     return prep;

@@ -135,13 +135,13 @@ rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows, c
 */
 rct::key small_scalar_gen(const std::size_t size_bytes);
 /**
-* brief: generate_proof_alpha - generate a random scalar and corresponding pubkey for use in a Schnorr-like signature opening
-* param: base - base EC pubkey for the alpha term
-* outparam: alpha_out - private key 'alpha'
-* outparam: alpha_pub_out - public key 'alpha * base'
+* brief: generate_proof_nonce - generate a random scalar and corresponding pubkey for use in a Schnorr-like signature opening
+* param: base - base EC pubkey for the nonce term
+* outparam: nonce_out - private key 'nonce'
+* outparam: nonce_pub_out - public key 'nonce * base'
 */
-void generate_proof_alpha(const rct::key &base, rct::key &alpha_out, rct::key &alpha_pub_out);
-void generate_proof_alpha(const rct::key &base, crypto::secret_key &alpha_out, rct::key &alpha_pub_out);
+void generate_proof_nonce(const rct::key &base, rct::key &nonce_out, rct::key &nonce_pub_out);
+void generate_proof_nonce(const rct::key &base, crypto::secret_key &nonce_out, rct::key &nonce_pub_out);
 /**
 * brief: multi_exp/multi_exp_p3 - EC multiexp operation with arbitrary element count
 *   - optimization: if a privkey == 1, skips the scalar mul operation
