@@ -38,8 +38,8 @@
 // note: uses 'concise' technique for smaller proofs, with the powers-of-aggregation coefficient approach from Triptych
 // note2: G_0 = G, G_1 = X, G_2 = U (for Seraphis paper notation)
 // note3: in practice, K_i are masked addresses from Seraphis e-note-images, and KI_i are the corresponding linking tags
-// note4: assume key images KI are in the prime subgroup (canonical bytes)
-//   - WARNING: the caller must validate KI; either...
+// note4: assume key images KI are in the prime subgroup (canonical bytes) and non-identity
+//   - WARNING: the caller must validate KI (and check non-identity); either...
 //     - 1) l*KI == identity
 //     - 2) store (1/8)*KI with proof material (e.g. in a transaction); pass 8*[(1/8)*KI] as input to composition proof
 //          validation
@@ -55,8 +55,8 @@
 //
 // Multisig references:
 // - MuSig2 (Nick): https://eprint.iacr.org/2020/1261
-// - FROST (Komlo): https://eprint.iacr.org/2020/852.pdf
-// - Multisig/threshold security (Crites): https://eprint.iacr.org/2021/1375.pdf
+// - FROST (Komlo): https://eprint.iacr.org/2020/852
+// - Multisig/threshold security (Crites): https://eprint.iacr.org/2021/1375
 // - MRL-0009 (Brandon Goodell and Sarang Noether): https://web.getmonero.org/resources/research-lab/pubs/MRL-0009.pdf
 // - Zero to Monero: 2nd Edition Chapter 9 (UkoeHB): https://web.getmonero.org/library/Zero-to-Monero-2-0-0.pdf
 // - (Technical Note) Multisig - Defeating Drijvers with Bi-Nonce Signing (UkoeHB):

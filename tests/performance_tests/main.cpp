@@ -121,32 +121,75 @@ int main(int argc, char** argv)
   timer.start();
 
 
+
+  // test hash performance for view tags
+  ParamsShuttleViewHash p_view_hash;
+  p_view_hash.core_params = p.core_params;
+  p_view_hash.domain_separator = "seraphis enote view tag";
+
+  TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_siphash);
+  TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_halfsiphash);
+  TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_cnhash);
+  TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_b2bhash);
+
+  p_view_hash.domain_separator = "tag";  // test a smaller hash message
+
+  TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_siphash);
+  TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_halfsiphash);
+  TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_cnhash);
+  TEST_PERFORMANCE0(filter, p_view_hash, test_view_scan_hash_b2bhash);
+
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+
+  // test view scan performance with view tags
+  TEST_PERFORMANCE0(filter, p, test_view_scan_cn);
+  TEST_PERFORMANCE0(filter, p, test_view_scan_cn_opt);
+
+  ParamsShuttleViewScan p_view_scan;
+  p_view_scan.core_params = p.core_params;
+  TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_sp);
+  p_view_scan.test_view_tag_check = true;
+  TEST_PERFORMANCE0(filter, p_view_scan, test_view_scan_sp);
+  TEST_PERFORMANCE0(filter, p, test_view_scan_sp_siphash);
+
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+
+
+
   /// BP+ tests, looking at DDOS risks
   /// - does adding one large aggregate proof among many small aggregation proofs cause worse average verification
   //    performance when batching than if the large proof were validated separately?
   ParamsShuttleBPPAgg p_bpp_agg;
+  std::size_t max_bpp_size{128};
+
   p_bpp_agg = {p.core_params, true, {2}, {8}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 8x 2
-  p_bpp_agg = {p.core_params, true, {32}, {8}};
+  p_bpp_agg = {p.core_params, true, {max_bpp_size}, {8}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 8x 32
-  p_bpp_agg = {p.core_params, true, {32}, {1}};
+  p_bpp_agg = {p.core_params, true, {max_bpp_size}, {1}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 32
-  p_bpp_agg = {p.core_params, true, {2,32}, {7,1}};
+  p_bpp_agg = {p.core_params, true, {2,max_bpp_size}, {7,1}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 7x 2, 1x 32
-  p_bpp_agg = {p.core_params, true, {2,32}, {8,8}};
+  p_bpp_agg = {p.core_params, true, {2,max_bpp_size}, {8,8}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 8x 2, 8x 32
   p_bpp_agg = {p.core_params, true, {2}, {16}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 2
-  p_bpp_agg = {p.core_params, true, {32}, {16}};
+  p_bpp_agg = {p.core_params, true, {max_bpp_size}, {16}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 32
-  p_bpp_agg = {p.core_params, true, {2,32}, {15,1}};
+  p_bpp_agg = {p.core_params, true, {2,max_bpp_size}, {15,1}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 15x 2, 1x 32
 
   p_bpp_agg = {p.core_params, true, {16}, {16}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 16
-  p_bpp_agg = {p.core_params, true, {32}, {16}};
+  p_bpp_agg = {p.core_params, true, {max_bpp_size}, {16}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 32
-  p_bpp_agg = {p.core_params, true, {16,32}, {16,16}};
+  p_bpp_agg = {p.core_params, true, {16,max_bpp_size}, {16,16}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 16, 16x 32
 
 
