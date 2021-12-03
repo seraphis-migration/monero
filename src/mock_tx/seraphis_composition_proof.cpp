@@ -609,6 +609,13 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
         CHECK_AND_ASSERT_THROW_MES(sc_check(&z_e[i]) == 0, "Bad private key (z[i])!");
     }
 
+    CHECK_AND_ASSERT_THROW_MES(num_signers == signer_nonces_pub_2.size(), "Signer nonces mismatch!");
+
+    CHECK_AND_ASSERT_THROW_MES(sc_check(&local_nonce_1_priv) == 0, "Bad private key (local_nonce_1_priv)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&local_nonce_1_priv), "Bad private key (local_nonce_1_priv zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(&local_nonce_2_priv) == 0, "Bad private key (local_nonce_2_priv)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&local_nonce_2_priv), "Bad private key (local_nonce_2_priv zero)!");
+
     // prepare participant nonces
     rct::keyV signer_nonces_pub_1_mul8;
     rct::keyV signer_nonces_pub_2_mul8;
