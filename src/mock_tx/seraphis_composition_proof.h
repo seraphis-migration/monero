@@ -119,9 +119,9 @@ struct SpCompositionProofMultisigProposal
     // message
     rct::key message;
 
-    // signature nonce: alpha_{e,a}
+    // signature nonce (shared component): alpha_{e,a}
     rct::key signature_nonce_K_t2;
-    // signature nonce: alpha_{e,i}
+    // signature nonce (shared components): alpha_{e,i}
     rct::keyV signature_nonces_K_t1;
 };
 
