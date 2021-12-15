@@ -42,6 +42,8 @@
 //standard headers
 #include <vector>
 
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "mock_tx"
 
 namespace mock_tx
 {

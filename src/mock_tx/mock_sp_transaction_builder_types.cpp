@@ -34,6 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "device/device.hpp"
+#include "misc_language.h"
 #include "misc_log_ex.h"
 #include "mock_sp_transaction_component_types.h"
 #include "mock_sp_transaction_utils.h"
@@ -49,6 +50,8 @@
 #include <memory>
 #include <vector>
 
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "mock_tx"
 
 namespace mock_tx
 {
@@ -101,6 +104,10 @@ void MockDestinationSpV1::get_amount_blinding_factor(const std::size_t enote_ind
 {
     // r_t: sender-receiver shared secret
     rct::key sender_receiver_secret;
+    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
+        memwipe(&sender_receiver_secret, sizeof(rct::key));
+    });
+
     make_seraphis_sender_receiver_secret(m_enote_privkey,
         m_recipient_viewkey,
         enote_index,
@@ -108,9 +115,7 @@ void MockDestinationSpV1::get_amount_blinding_factor(const std::size_t enote_ind
         sender_receiver_secret);
 
     // x_t: amount commitment mask (blinding factor)
-    make_seraphis_amount_commitment_mask(rct::rct2sk(sender_receiver_secret), amount_blinding_factor);
-
-    memwipe(&sender_receiver_secret, sizeof(rct::key));
+    make_seraphis_amount_commitment_mask(rct::rct2sk(sender_receiver_secret), rct::zero(), amount_blinding_factor);
 }
 //-------------------------------------------------------------------------------------------------------------------
 MockENoteSpV1 MockDestinationSpV1::to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const
@@ -123,6 +128,7 @@ MockENoteSpV1 MockDestinationSpV1::to_enote_v1(const std::size_t output_index, r
         m_recipient_spendkey,
         m_amount,
         output_index,
+        false,
         enote_pubkey_out);
 
     return enote;

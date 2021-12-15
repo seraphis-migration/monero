@@ -199,16 +199,22 @@ unsigned char make_seraphis_view_tag(const crypto::key_derivation &sender_receiv
 /**
 * brief: enc_dec_seraphis_amount - encode/decode an amount
 * param: sender_receiver_secret - q_t
+* param: baked_key - additional key to bake into the encoding [OPTIONAL: set to zero if unwanted]
 * return: H(q_t) XOR_64 original
 */
-rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receiver_secret, const rct::xmr_amount original);
+rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receiver_secret,
+    const rct::key &baked_key,
+    const rct::xmr_amount original);
 /**
 * brief: make_seraphis_amount_commitment_mask - x_t for an enote's amount commitment C = x_t G + a_t H
 *   x_t = H("domain-sep", q_t)
 * param: sender_receiver_secret - q_t
+* param: baked_key - additional key to bake into the mask [OPTIONAL: set to zero if unwanted]
 * outparam: mask_out - x_t
 */
-void make_seraphis_amount_commitment_mask(const crypto::secret_key &sender_receiver_secret, crypto::secret_key &mask_out);
+void make_seraphis_amount_commitment_mask(const crypto::secret_key &sender_receiver_secret,
+    const rct::key &baked_key,
+    crypto::secret_key &mask_out);
 /**
 * brief: try_get_seraphis_nominal_spend_key - test view tag; if it passes, compute and return the nominal spend key
 *    and sender-receiver secret
@@ -230,12 +236,14 @@ bool try_get_seraphis_nominal_spend_key(const crypto::key_derivation &sender_rec
 /**
 * brief: try_get_seraphis_amount - test recreating the amount commitment; if it is recreate-able, return the amount
 * param: sender_receiver_secret - q_t
+* param: baked_key - extra key baked into amount encoding and amount commitment mask [OPTIONAL: set to zero if unwanted]
 * param: amount_commitment - C = x G + a H
 * param: encoded_amount - enc(a)
 * outparam: amount_out - a' = dec(enc(a))
 * return: true if successfully recomputed the amount commitment (C' = H(q_t) G + a' H ?= C)
 */
 bool try_get_seraphis_amount(const crypto::secret_key &sender_receiver_secret,
+    const rct::key &baked_key,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out);

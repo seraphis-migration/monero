@@ -166,6 +166,7 @@ public:
             m_recipient_spend_key,
             0, // no amount
             0, // 0 index
+            false,
             m_enote_pubkey);
 
         // invalidate view tag to test the performance of short-circuiting on failed view tags
@@ -330,6 +331,7 @@ public:
             m_recipient_spend_key,
             0, // no amount
             0, // 0 index
+            false,
             m_enote_pubkey);
 
         // kludge: use siphash to make view tag
