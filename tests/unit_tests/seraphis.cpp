@@ -32,6 +32,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "device/device.hpp"
+#include "misc_language.h"
 #include "mock_tx/mock_sp_core_utils.h"
 #include "mock_tx/mock_sp_transaction_component_types.h"
 #include "mock_tx/mock_sp_transaction_utils.h"
@@ -538,8 +539,8 @@ TEST(seraphis, information_recovery_pieces)
         sender_receiver_secret = rct::rct2sk(rct::skGen());
 
     rct::xmr_amount amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-    rct::xmr_amount encoded_amount{mock_tx::enc_dec_seraphis_amount(sender_receiver_secret, amount)};
-    rct::xmr_amount decoded_amount{mock_tx::enc_dec_seraphis_amount(sender_receiver_secret, encoded_amount)};
+    rct::xmr_amount encoded_amount{mock_tx::enc_dec_seraphis_amount(sender_receiver_secret, rct::zero(), amount)};
+    rct::xmr_amount decoded_amount{mock_tx::enc_dec_seraphis_amount(sender_receiver_secret, rct::zero(), encoded_amount)};
 
     EXPECT_TRUE(encoded_amount != amount);
     EXPECT_TRUE(decoded_amount == amount);
@@ -574,13 +575,21 @@ TEST(seraphis, enote_v1_information_recovery)
         recipient_spend_key,
         amount,
         enote_index,
+        false,
         enote_pubkey);
 
     // recover information
     rct::key nominal_recipient_spendkey;
     rct::xmr_amount amount_recovered;
     rct::key sender_receiver_secret;
+    rct::key sender_receiver_secret2;
     crypto::key_derivation derivation;
+    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
+        // demo: must always memwipe these secrets after use
+        memwipe(&derivation, sizeof(crypto::key_derivation));
+        memwipe(&sender_receiver_secret, sizeof(rct::key));
+        memwipe(&sender_receiver_secret2, sizeof(rct::key));
+    });
 
     hw::get_device("default").generate_key_derivation(rct::rct2pk(enote_pubkey), recipient_view_privkey, derivation);
 
@@ -593,27 +602,20 @@ TEST(seraphis, enote_v1_information_recovery)
         );
     EXPECT_TRUE(nominal_recipient_spendkey == recipient_spend_key);
     EXPECT_TRUE(mock_tx::try_get_seraphis_amount(rct::rct2sk(sender_receiver_secret),
+            rct::zero(),
             enote.m_amount_commitment,
             enote.m_encoded_amount,
             amount_recovered)
         );
     EXPECT_TRUE(amount_recovered == amount);
 
-    // demo: must always memwipe this after use
-    memwipe(&derivation, sizeof(derivation));
-
     // check: can reproduce sender-receiver secret
-    rct::key sender_receiver_secret2;
     mock_tx::make_seraphis_sender_receiver_secret(recipient_view_privkey,
         enote_pubkey,
         enote_index,
         hw::get_device("default"),
         sender_receiver_secret2);
     EXPECT_TRUE(sender_receiver_secret2 == sender_receiver_secret);
-
-    // demo: must always memwipe this secret after use
-    memwipe(&sender_receiver_secret, sizeof(rct::key));
-    memwipe(&sender_receiver_secret2, sizeof(rct::key));
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, sp_txtype_concise_v1)

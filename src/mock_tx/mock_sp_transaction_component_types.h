@@ -66,6 +66,7 @@ struct MockENoteSpV1 final : public MockENoteSp
     * param: recipient_spend_key - K^s
     * param: amount - a
     * param: enote_index - t, index of the enote in its tx
+    * param: lock_amounts_to_DH_key - if true, then compute r_t G and bake it into the amount encoding and commitment mask
     * outparam: enote_pubkey_out - the enote's pubkey
     */
     void make(const crypto::secret_key &enote_privkey,
@@ -74,6 +75,7 @@ struct MockENoteSpV1 final : public MockENoteSp
         const rct::key &recipient_spend_key,
         const rct::xmr_amount amount,
         const std::size_t enote_index,
+        const bool lock_amounts_to_DH_key,
         rct::key &enote_pubkey_out);
     /**
     * brief: append_to_string - convert enote to a string and append to existing string

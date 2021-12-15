@@ -34,6 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "device/device.hpp"
+#include "misc_language.h"
 #include "misc_log_ex.h"
 #include "mock_sp_base_types.h"
 #include "mock_sp_core_utils.h"
@@ -47,6 +48,8 @@
 #include <memory>
 #include <vector>
 
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "mock_tx"
 
 namespace mock_tx
 {
@@ -57,21 +60,30 @@ void MockENoteSpV1::make(const crypto::secret_key &enote_privkey,
     const rct::key &recipient_spend_key,
     const rct::xmr_amount amount,
     const std::size_t enote_index,
+    const bool lock_amounts_to_DH_key,
     rct::key &enote_pubkey_out)
 {
     // note: t = enote_index
 
     // r_t: sender-receiver shared secret
     rct::key sender_receiver_secret;
+    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
+        memwipe(&sender_receiver_secret, sizeof(rct::key));
+    });
     make_seraphis_sender_receiver_secret(enote_privkey,
         recipient_view_key,
         enote_index,
         hw::get_device("default"),
         sender_receiver_secret);
 
+    // make extra key for locking ENote amounts to the recipient's DH base key (DH_base = DH_base_key * G)
+    rct::key extra_key_amounts{rct::zero()};
+    if (lock_amounts_to_DH_key)
+        rct::scalarmultBase(extra_key_amounts, rct::sk2rct(enote_privkey));
+
     // x_t: amount commitment mask (blinding factor)
     crypto::secret_key amount_mask;
-    make_seraphis_amount_commitment_mask(rct::rct2sk(sender_receiver_secret), amount_mask);
+    make_seraphis_amount_commitment_mask(rct::rct2sk(sender_receiver_secret), extra_key_amounts, amount_mask);
 
     // k_{a, sender, t}: extension to add to user's spend key
     crypto::secret_key k_a_extender;
@@ -81,7 +93,7 @@ void MockENoteSpV1::make(const crypto::secret_key &enote_privkey,
     this->make_base_with_address_extension(k_a_extender, recipient_spend_key, amount_mask, amount);
 
     // enc(a_t): encoded amount
-    m_encoded_amount = enc_dec_seraphis_amount(rct::rct2sk(sender_receiver_secret), amount);
+    m_encoded_amount = enc_dec_seraphis_amount(rct::rct2sk(sender_receiver_secret), extra_key_amounts, amount);
 
     // view_tag_t: view tag
     m_view_tag = make_seraphis_view_tag(enote_privkey,
@@ -91,8 +103,6 @@ void MockENoteSpV1::make(const crypto::secret_key &enote_privkey,
 
     // R_t: enote pubkey to send back to caller
     make_seraphis_enote_pubkey(enote_privkey, recipient_DH_base, enote_pubkey_out);
-
-    memwipe(&sender_receiver_secret, sizeof(rct::key));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockENoteSpV1::gen()

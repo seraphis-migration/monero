@@ -193,6 +193,18 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
 */
 void domain_separate_rct_hash(const std::string &domain_separator, const rct::key &rct_key, crypto::secret_key &hash_result_out);
 /**
+* brief: domain_separate_rct_hash_with_extra - hash two keys, with domain separation
+*   H("domain-sep", key, [OPTIONAL extra_key])
+* param: domain_separator - domain separator
+* param: rct_key - rct key to hash with domain separator (can be privkey or pubkey)
+* param: extra_key - additional key to include (if extra_key == rct::zero(), do not include it)
+* outparam: hash_result_out - H("domain-sep", key, [OPTIONAL extra_key])
+*/
+void domain_separate_rct_hash_with_extra(const std::string &domain_separator,
+    const rct::key &rct_key,
+    const rct::key &extra_key,
+    crypto::secret_key &hash_result_out);
+/**
 * brief: domain_separate_derivation_hash - hash a Diffie-Hellman derivation and index, with domain separation
 *   H("domain-sep", derivation, index)
 * param: domain_separator - domain separator

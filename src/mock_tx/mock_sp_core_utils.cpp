@@ -39,6 +39,7 @@ extern "C"
 }
 #include "cryptonote_config.h"
 #include "device/device.hpp"
+#include "misc_language.h"
 #include "misc_log_ex.h"
 #include "mock_tx_utils.h"
 #include "ringct/rctOps.h"
@@ -52,6 +53,8 @@ extern "C"
 #include <string>
 #include <vector>
 
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "mock_tx"
 
 namespace mock_tx
 {
@@ -170,12 +173,14 @@ void make_seraphis_sender_receiver_secret(const crypto::secret_key &privkey,
 {
     // 8 * privkey * DH_key
     crypto::key_derivation derivation;
+    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
+        memwipe(&derivation, sizeof(crypto::key_derivation));
+    });
+
     hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);
 
     // q_t = H(r_t * k^{vr} * K^{DH}, t) => H("domain sep", privkey * DH_key, output_index)
     make_seraphis_sender_receiver_secret(derivation, output_index, sender_receiver_secret_out);
-
-    memwipe(&derivation, sizeof(derivation));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_sender_receiver_secret(const crypto::key_derivation &sender_receiver_DH_derivation,
@@ -207,12 +212,14 @@ unsigned char make_seraphis_view_tag(const crypto::secret_key &privkey,
 {
     // 8 * privkey * DH_key
     crypto::key_derivation derivation;
+    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
+        memwipe(&derivation, sizeof(crypto::key_derivation));
+    });
+
     hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);
 
     // tag_t = H("domain-sep", derivation, t)
     unsigned char view_tag{make_seraphis_view_tag(derivation, output_index)};
-
-    memwipe(&derivation, sizeof(derivation));
 
     return view_tag;
 }
@@ -236,13 +243,15 @@ unsigned char make_seraphis_view_tag(const crypto::key_derivation &sender_receiv
     return static_cast<unsigned char>(view_tag_scalar.bytes[0]);
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receiver_secret, const rct::xmr_amount original)
+rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receiver_secret,
+    const rct::key &baked_key,
+    const rct::xmr_amount original)
 {
     static std::string salt{config::HASH_KEY_SERAPHIS_AMOUNT_ENC};
 
-    // ret = H("domain-sep", q_t) XOR_64 original
+    // ret = H("domain-sep", q_t, [OPTIONAL: baked_key]) XOR_64 original
     crypto::secret_key hash_result;
-    sp::domain_separate_rct_hash(salt, rct::sk2rct(sender_receiver_secret), hash_result);
+    sp::domain_separate_rct_hash_with_extra(salt, rct::sk2rct(sender_receiver_secret), baked_key, hash_result);
 
     rct::xmr_amount mask{0};
     rct::xmr_amount temp{0};
@@ -256,12 +265,14 @@ rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receive
     return original ^ mask;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_amount_commitment_mask(const crypto::secret_key &sender_receiver_secret, crypto::secret_key &mask_out)
+void make_seraphis_amount_commitment_mask(const crypto::secret_key &sender_receiver_secret,
+    const rct::key &baked_key,
+    crypto::secret_key &mask_out)
 {
     static std::string salt{config::HASH_KEY_SERAPHIS_AMOUNT_COMMITMENT_BLINDING_FACTOR};
 
-    // x_t = H("domain-sep", q_t)
-    sp::domain_separate_rct_hash(salt, rct::sk2rct(sender_receiver_secret), mask_out);
+    // x_t = H("domain-sep", q_t, [OPTIONAL: baked_key])
+    sp::domain_separate_rct_hash_with_extra(salt, rct::sk2rct(sender_receiver_secret), baked_key, mask_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_seraphis_nominal_spend_key(const crypto::key_derivation &sender_receiver_DH_derivation,
@@ -295,16 +306,17 @@ bool try_get_seraphis_nominal_spend_key(const crypto::key_derivation &sender_rec
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_seraphis_amount(const crypto::secret_key &sender_receiver_secret,
+    const rct::key &baked_key,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out)
 {
     // a' = dec(encoded_amount)
-    rct::xmr_amount nominal_amount{enc_dec_seraphis_amount(sender_receiver_secret, encoded_amount)};
+    rct::xmr_amount nominal_amount{enc_dec_seraphis_amount(sender_receiver_secret, baked_key, encoded_amount)};
 
     // C' = x' G + a' H
     crypto::secret_key nominal_amount_commitment_mask;
-    make_seraphis_amount_commitment_mask(sender_receiver_secret, nominal_amount_commitment_mask);  // x'
+    make_seraphis_amount_commitment_mask(sender_receiver_secret, baked_key, nominal_amount_commitment_mask);  // x'
     rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(nominal_amount_commitment_mask));
 
     // check that recomputed commitment matches original commitment

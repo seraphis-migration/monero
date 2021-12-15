@@ -39,6 +39,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
+#include "misc_language.h"
 #include "misc_log_ex.h"
 #include "mock_sp_core_utils.h"
 #include "mock_tx_utils.h"
@@ -52,6 +53,8 @@ extern "C"
 #include <algorithm>
 #include <vector>
 
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
 
 namespace sp
 {
@@ -204,6 +207,11 @@ static void compute_responses(const std::vector<crypto::secret_key> &x,
     /// compute responses
     rct::key r_temp;
     rct::key r_sum_temp;
+    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
+        // cleanup: clear secret prover data at the end
+        memwipe(&r_temp, sizeof(rct::key));
+        memwipe(&r_sum_temp, sizeof(rct::key));
+    });
 
     // r_a = alpha_a - c * sum_i(mu_a^i * (x_i / y_i))
     r_sum_temp = rct::zero();
@@ -235,11 +243,6 @@ static void compute_responses(const std::vector<crypto::secret_key> &x,
         r_temp = invert(rct::sk2rct(y[i]));  // 1 / y_i
         sc_mulsub(r_i_out[i].bytes, challenge.bytes, r_temp.bytes, alpha_i[i].bytes);  // alpha_i - c * (1 / y_i)
     }
-
-
-    /// cleanup: clear secret prover data
-    memwipe(&r_temp, sizeof(rct::key));
-    memwipe(&r_sum_temp, sizeof(rct::key));
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Element 'K_t1[i]' for a proof
@@ -358,6 +361,10 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
     rct::keyV alpha_i_pub;
     alpha_i.resize(num_keys);
     alpha_i_pub.resize(num_keys);
+    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
+        // cleanup: clear secret prover data at the end
+        memwipe(alpha_i.data(), alpha_i.size()*sizeof(rct::key));
+    });
 
     for (std::size_t i{0}; i < num_keys; ++i)
     {
@@ -392,10 +399,6 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
         proof.r_a,
         proof.r_b,
         proof.r_i);
-
-
-    /// cleanup: clear secret prover data
-    memwipe(alpha_i.data(), alpha_i.size()*sizeof(rct::key));
 
 
     /// done

@@ -40,6 +40,7 @@ extern "C"
 }
 #include "cryptonote_config.h"
 #include "grootle.h"
+#include "misc_language.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
 #include "mock_sp_core_utils.h"
@@ -60,6 +61,8 @@ extern "C"
 #include <string>
 #include <vector>
 
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "mock_tx"
 
 namespace mock_tx
 {
@@ -189,6 +192,23 @@ static std::vector<std::size_t> get_sort_order_for_sp_images_v1(const std::vecto
         );
 
     return original_indices;
+}
+//-------------------------------------------------------------------------------------------------------------------
+// sort order: key images ascending with byte-wise comparisons
+//-------------------------------------------------------------------------------------------------------------------
+static auto convert_skv_to_rctv(const std::vector<crypto::secret_key> &skv, rct::keyV &rctv_out)
+{
+    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
+        memwipe(rctv_out.data(), rctv_out.size()*sizeof(rct::key));
+    });
+
+    rctv_out.clear();
+    rctv_out.reserve(skv.size());
+
+    for (const auto &skey : skv)
+        rctv_out.emplace_back(rct::sk2rct(skey));
+
+    return a_wiper;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -721,19 +741,13 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &output_a
     std::vector<rct::BulletproofPlus> range_proofs;
 
     rct::keyV amount_commitment_blinding_factors;
-    amount_commitment_blinding_factors.reserve(output_amount_commitment_blinding_factors.size());
-
-    for (const auto &factor : output_amount_commitment_blinding_factors)
-        amount_commitment_blinding_factors.emplace_back(rct::sk2rct(factor));
-
+    auto vec_wiper{convert_skv_to_rctv(output_amount_commitment_blinding_factors, amount_commitment_blinding_factors)};
     make_bpp_rangeproofs(output_amounts,
         amount_commitment_blinding_factors,
         max_rangeproof_splits,
         range_proofs);
 
     balance_proof_out->m_bpp_proofs = std::move(range_proofs);
-
-    memwipe(amount_commitment_blinding_factors.data(), amount_commitment_blinding_factors.size()*sizeof(rct::key));
 
     // set the remainder blinding factor
     crypto::secret_key remainder_blinding_factor;
@@ -758,19 +772,13 @@ void make_v1_tx_balance_proof_sp_v2(const std::vector<rct::xmr_amount> &output_a
     std::vector<rct::BulletproofPlus> range_proofs;
 
     rct::keyV amount_commitment_blinding_factors;
-    amount_commitment_blinding_factors.reserve(output_amount_commitment_blinding_factors.size());
-
-    for (const auto &factor : output_amount_commitment_blinding_factors)
-        amount_commitment_blinding_factors.emplace_back(rct::sk2rct(factor));
-
+    auto vec_wiper{convert_skv_to_rctv(output_amount_commitment_blinding_factors, amount_commitment_blinding_factors)};
     make_bpp_rangeproofs(output_amounts,
         amount_commitment_blinding_factors,
         max_rangeproof_splits,
         range_proofs);
 
     balance_proof_out->m_bpp_proofs = std::move(range_proofs);
-
-    memwipe(amount_commitment_blinding_factors.data(), amount_commitment_blinding_factors.size()*sizeof(rct::key));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_balance_proof_sp_v3(const std::vector<rct::xmr_amount> &input_amounts,
@@ -802,19 +810,13 @@ void make_v1_tx_balance_proof_sp_v3(const std::vector<rct::xmr_amount> &input_am
     std::vector<rct::BulletproofPlus> range_proofs;
 
     rct::keyV amount_commitment_blinding_factors;
-    amount_commitment_blinding_factors.reserve(blinding_factors.size());
-
-    for (const auto &factor : blinding_factors)
-        amount_commitment_blinding_factors.emplace_back(rct::sk2rct(factor));
-
+    auto vec_wiper{convert_skv_to_rctv(blinding_factors, amount_commitment_blinding_factors)};
     make_bpp_rangeproofs(amounts,
         amount_commitment_blinding_factors,
         max_rangeproof_splits,
         range_proofs);
 
     balance_proof_out->m_bpp_proofs = std::move(range_proofs);
-
-    memwipe(amount_commitment_blinding_factors.data(), amount_commitment_blinding_factors.size()*sizeof(rct::key));
 
     // set the remainder blinding factor
     crypto::secret_key remainder_blinding_factor;

@@ -57,6 +57,8 @@ extern "C"
 #include <cmath>
 #include <vector>
 
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
 
 #define CHECK_AND_ASSERT_THROW_MES_L1(expr, message) {if(!(expr)) {MWARNING(message); throw std::runtime_error(message);}}
 
@@ -748,10 +750,21 @@ void domain_separate_rct_hash(const std::string &domain_separator,
     crypto::secret_key &hash_result_out)
 {
     // H("domain-sep", rct_key)
+    domain_separate_rct_hash_with_extra(domain_separator, rct_key, rct::zero(), hash_result_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void domain_separate_rct_hash_with_extra(const std::string &domain_separator,
+    const rct::key &rct_key,
+    const rct::key &extra_key,
+    crypto::secret_key &hash_result_out)
+{
+    // H("domain-sep", rct_key, [OPTIONAL extra_key])
     epee::wipeable_string hash;
-    hash.reserve(domain_separator.size() + sizeof(rct::key));
+    hash.reserve(domain_separator.size() + sizeof(rct::key) + (extra_key == rct::zero() ? 0 : sizeof(rct::key)));
     hash += domain_separator;
     hash.append((const char*) rct_key.bytes, sizeof(rct::key));
+    if (!(extra_key == rct::zero()))
+        hash.append((const char*) extra_key.bytes, sizeof(rct::key));
 
     // hash to the result
     crypto::hash_to_scalar(hash.data(), hash.size(), hash_result_out);
