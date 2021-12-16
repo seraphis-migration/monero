@@ -88,14 +88,14 @@ static rct::key compute_base_aggregation_coefficient_a(const rct::key &message,
     std::string hash;
     hash.reserve((2*(K_t1.size()) + 2)*sizeof(rct::key));
     hash = std::string((const char*) challenge.bytes, sizeof(challenge));
-    hash += std::string((const char*) message.bytes, sizeof(message));
+    hash.append((const char*) message.bytes, sizeof(message));
     for (const auto &Kt1 : K_t1)
     {
-        hash += std::string((const char*) Kt1.bytes, sizeof(Kt1));
+        hash.append((const char*) Kt1.bytes, sizeof(Kt1));
     }
     for (const auto &Ki : KI)
     {
-        hash += std::string((const char*) &Ki, sizeof(Ki));
+        hash.append((const char*) &Ki, sizeof(Ki));
     }
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
 
@@ -140,7 +140,7 @@ static rct::key compute_challenge_message(const rct::key &message, const rct::ke
     hash = std::string((const char*) message.bytes, sizeof(message));
     for (std::size_t i = 0; i < K.size(); ++i)
     {
-        hash += std::string((const char*) K[i].bytes, sizeof(K[i]));
+        hash.append((const char*) K[i].bytes, sizeof(K[i]));
     }
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
@@ -162,11 +162,11 @@ static rct::key compute_challenge(const rct::key &message,
     std::string hash;
     hash.reserve((K_t1_proofkeys.size() + 3)*sizeof(rct::key));
     hash = std::string((const char*) message.bytes, sizeof(message));
-    hash += std::string((const char*) K_t2_proofkey.bytes, sizeof(K_t2_proofkey));
-    hash += std::string((const char*) KI_proofkey.bytes, sizeof(KI_proofkey));
+    hash.append((const char*) K_t2_proofkey.bytes, sizeof(K_t2_proofkey));
+    hash.append((const char*) KI_proofkey.bytes, sizeof(KI_proofkey));
     for (std::size_t i = 0; i < K_t1_proofkeys.size(); ++i)
     {
-        hash += std::string((const char*) K_t1_proofkeys[i].bytes, sizeof(K_t1_proofkeys[i]));
+        hash.append((const char*) K_t1_proofkeys[i].bytes, sizeof(K_t1_proofkeys[i]));
     }
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
     rct::hash_to_scalar(challenge, hash.data(), hash.size());

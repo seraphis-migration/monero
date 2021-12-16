@@ -761,7 +761,7 @@ void domain_separate_rct_hash_with_extra(const std::string &domain_separator,
     // H("domain-sep", rct_key, [OPTIONAL extra_key])
     epee::wipeable_string hash;
     hash.reserve(domain_separator.size() + sizeof(rct::key) + (extra_key == rct::zero() ? 0 : sizeof(rct::key)));
-    hash += domain_separator;
+    hash = domain_separator;
     hash.append((const char*) rct_key.bytes, sizeof(rct::key));
     if (!(extra_key == rct::zero()))
         hash.append((const char*) extra_key.bytes, sizeof(rct::key));
