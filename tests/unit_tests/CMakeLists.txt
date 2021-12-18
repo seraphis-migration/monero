@@ -41,6 +41,7 @@ set(unit_tests_sources
   chacha.cpp
   checkpoints.cpp
   command_line.cpp
+  concise_grootle.cpp
   crypto.cpp
   decompose_amount_into_digits.cpp
   device.cpp
@@ -54,7 +55,6 @@ set(unit_tests_sources
   fee.cpp
   json_serialization.cpp
   get_xtype_from_string.cpp
-  grootle.cpp
   hashchain.cpp
   hmac_keccak.cpp
   http.cpp
@@ -67,7 +67,6 @@ set(unit_tests_sources
   memwipe.cpp
   mlocker.cpp
   mnemonics.cpp
-  mock_tx.cpp
   mul_div.cpp
   multiexp.cpp
   multisig.cpp
@@ -82,6 +81,7 @@ set(unit_tests_sources
   scaling_2021.cpp
   serialization.cpp
   seraphis.cpp
+  seraphis_tx.cpp
   sha256.cpp
   slow_memmem.cpp
   subaddress.cpp
@@ -102,8 +102,7 @@ set(unit_tests_sources
   is_hdd.cpp
   aligned.cpp
   rpc_version_str.cpp
-  zmq_rpc.cpp
-  triptych.cpp)
+  zmq_rpc.cpp)
 
 set(unit_tests_headers
   unit_tests_utils.h)
@@ -120,10 +119,10 @@ target_link_libraries(unit_tests
     daemon_rpc_server
     blockchain_db
     lmdb_lib
-    mock_tx
     rpc
     net
     serialization
+    seraphis
     wallet
     p2p
     version

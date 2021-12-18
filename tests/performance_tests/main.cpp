@@ -68,10 +68,8 @@
 #include "multiexp.h"
 #include "sig_mlsag.h"
 #include "sig_clsag.h"
-#include "triptych.h"
-#include "mock_tx.h"
-#include "grootle.h"
-#include "grootle_concise.h"
+#include "seraphis_tx.h"
+#include "concise_grootle.h"
 #include "view_scan.h"
 #include "pippinger_failure.h"
 
@@ -195,77 +193,17 @@ int main(int argc, char** argv)
 
 
   /// mock tx performance tests
-  MockTxPerfIncrementer incrementer;
-  ParamsShuttleMockTx p_mock_tx;
+  SpTxPerfIncrementer incrementer;
+  ParamsShuttleSpTx p_mock_tx;
   p_mock_tx.core_params = p.core_params;
 
 
   //// TEST SET 3
-  /// TEST 1: MockTxCLSAG
-
-  // TEST 1.1: MockTxCLSAG {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {4} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^4
-    if (p_mock_tx.m == 4)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(true);
-
-  // TEST 1.2: MockTxCLSAG {decomp 2-series}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 1.3: MockTxCLSAG {outputs, tx batching}
-  incrementer = {
-      {1, 25}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {1, 2, 4, 7, 12, 16}, //out counts
-      {2}, //decomp n
-      {4} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.num_rangeproof_splits > p_mock_tx.out_count/2)
-      continue;
-
-    // only decomp 2^4
-    if (p_mock_tx.m == 4)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
 
 
+  /// TEST 3: SpTxConciseV1
 
-  /// TEST 2: MockTxTriptych
-
-  // TEST 2.1: MockTxTriptych {inputs}
+  // TEST 3.1: SpTxConciseV1 {inputs}
   incrementer = {
       {1}, //batch sizes
       {0}, //rangeproof splits
@@ -278,54 +216,13 @@ int main(int argc, char** argv)
   {
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxConciseV1);
   }
   // test done, save results
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 2.2: MockTxTriptych {decomp}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {2}, //out counts
-      {2, 3}, //decomp n
-      {12, 7} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-
-
-  /// TEST 3: MockTxSpConciseV1
-
-  // TEST 3.1: MockTxSpConciseV1 {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {7} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 3.2: MockTxSpConciseV1 {decomp}
+  // TEST 3.2: SpTxConciseV1 {decomp}
   incrementer = {
       {1}, //batch sizes
       {0}, //rangeproof splits
@@ -337,13 +234,13 @@ int main(int argc, char** argv)
   while (incrementer.next(p_mock_tx))
   {
     if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxConciseV1);
   }
   // test done, save results
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 3.3: MockTxSpConciseV1 {outputs, batch size 1}
+  // TEST 3.3: SpTxConciseV1 {outputs, batch size 1}
   incrementer = {
       {1}, //batch sizes
       {0}, //rangeproof splits
@@ -359,13 +256,13 @@ int main(int argc, char** argv)
 
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxConciseV1);
   }
   // test done, save results
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 3.4: MockTxSpConciseV1 {16out, batch sizes 7,15}
+  // TEST 3.4: SpTxConciseV1 {16out, batch sizes 7,15}
   incrementer = {
       {7, 15}, //batch sizes
       {0}, //rangeproof splits
@@ -381,13 +278,13 @@ int main(int argc, char** argv)
 
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxConciseV1);
   }
   // test done, save results
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 3.5: MockTxSpConciseV1 {outputs, batch size 25}
+  // TEST 3.5: SpTxConciseV1 {outputs, batch size 25}
   incrementer = {
       {25}, //batch sizes
       {0}, //rangeproof splits
@@ -403,16 +300,16 @@ int main(int argc, char** argv)
 
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxConciseV1);
   }
   // test done, save results
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
 
-  /// TEST 4: MockTxSpMergeV1
+  /// TEST 4: SpTxMergeV1
 
-  // TEST 4.1: MockTxSpMergeV1 {inputs}
+  // TEST 4.1: SpTxMergeV1 {inputs}
   incrementer = {
       {1}, //batch sizes
       {0}, //rangeproof splits
@@ -425,7 +322,7 @@ int main(int argc, char** argv)
   {
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpMergeV1);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxMergeV1);
   }
   // test done, save results
   if (p.core_params.td.get())
@@ -433,9 +330,9 @@ int main(int argc, char** argv)
 
 
 
-  /// TEST 5: MockTxSpSquashedV1
+  /// TEST 5: SpTxSquashedV1
 
-  // TEST 5.1: MockTxSpSquashedV1 {inputs}
+  // TEST 5.1: SpTxSquashedV1 {inputs}
   incrementer = {
       {1}, //batch sizes
       {0}, //rangeproof splits
@@ -448,13 +345,13 @@ int main(int argc, char** argv)
   {
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
   }
   // test done, save results
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.2: MockTxSpSquashedV1 {decomp}
+  // TEST 5.2: SpTxSquashedV1 {decomp}
   incrementer = {
       {1}, //batch sizes
       {0}, //rangeproof splits
@@ -466,13 +363,13 @@ int main(int argc, char** argv)
   while (incrementer.next(p_mock_tx))
   {
     if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
   }
   // test done, save results
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.3: MockTxSpSquashedV1 {outputs, batch size 1}
+  // TEST 5.3: SpTxSquashedV1 {outputs, batch size 1}
   incrementer = {
       {1}, //batch sizes
       {0}, //rangeproof splits
@@ -489,13 +386,13 @@ int main(int argc, char** argv)
 
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
   }
   // test done, save results
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.4: MockTxSpSquashedV1 {16in/out, batch sizes 7, 15}
+  // TEST 5.4: SpTxSquashedV1 {16in/out, batch sizes 7, 15}
   incrementer = {
       {7, 15}, //batch sizes
       {0}, //rangeproof splits
@@ -512,13 +409,13 @@ int main(int argc, char** argv)
 
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
   }
   // test done, save results
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.5: MockTxSpSquashedV1 {outputs, batch size 25}
+  // TEST 5.5: SpTxSquashedV1 {outputs, batch size 25}
   incrementer = {
       {25}, //batch sizes
       {0}, //rangeproof splits
@@ -535,7 +432,7 @@ int main(int argc, char** argv)
 
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
   }
   // test done, save results
   if (p.core_params.td.get())
@@ -544,607 +441,6 @@ int main(int argc, char** argv)
 
 
 /*
-//// TEST SET 2
-  /// TEST 1: MockTxCLSAG
-
-  // TEST 1.1: MockTxCLSAG {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {4} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^4
-    if (p_mock_tx.m == 4)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(true);
-
-  // TEST 1.2: MockTxCLSAG {decomp 2-series}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 1.3: MockTxCLSAG {outputs, tx batching}
-  incrementer = {
-      {1, 25}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {1, 2, 4, 7, 12, 16}, //out counts
-      {2}, //decomp n
-      {4} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.num_rangeproof_splits > p_mock_tx.out_count/2)
-      continue;
-
-    // only decomp 2^4
-    if (p_mock_tx.m == 4)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-
-
-  /// TEST 2: MockTxTriptych
-
-  // TEST 2.1: MockTxTriptych {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {7} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 2.2: MockTxTriptych {decomp}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {2}, //out counts
-      {2, 3}, //decomp n
-      {12, 7} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-
-
-  /// TEST 3: MockTxSpConciseV1
-
-  // TEST 3.1: MockTxSpConciseV1 {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {7} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 3.2: MockTxSpConciseV1 {decomp}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {2}, //out counts
-      {2, 3, 4, 6, 9}, //decomp n
-      {12, 7, 6, 5, 4} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 3.3: MockTxSpConciseV1 {outputs, tx batching}
-  incrementer = {
-      {1, 25}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {1, 2, 4, 7, 12, 16}, //out counts
-      {2}, //decomp n
-      {7} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.num_rangeproof_splits > p_mock_tx.out_count/2)
-      continue;
-
-    // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-
-
-  /// TEST 4: MockTxSpMergeV1
-
-  // TEST 4.1: MockTxSpMergeV1 {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {7} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpMergeV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-
-
-  /// TEST 5: MockTxSpSquashedV1
-
-  // TEST 5.1: MockTxSpSquashedV1 {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {7} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 5.2: MockTxSpSquashedV1 {decomp}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {2}, //out counts
-      {2, 3}, //decomp n
-      {12, 7} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 5.3: MockTxSpSquashedV1 {outputs, tx batching}
-  incrementer = {
-      {1, 25}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {1, 2, 4, 7, 12, 16}, //out counts
-      {2}, //decomp n
-      {7} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
-    // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-  //// TEST SET 2 (end)
-
-
-
-
-
-
-  //// TEST SET 1
-  /// TEST 1: MockTxCLSAG
-
-  // TEST 1.1: MockTxCLSAG {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {4} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^4
-    if (p_mock_tx.m == 4)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(true);
-
-  // TEST 1.2: MockTxCLSAG {decomp 2-series}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 1.3: MockTxCLSAG {outputs, BP+ splitting, tx batching}
-  incrementer = {
-      {1, 2, 4, 7, 11, 25}, //batch sizes
-      {0, 1, 2, 3, 4}, //rangeproof splits
-      {2}, //in counts
-      {1, 2, 4, 7, 12, 16}, //out counts
-      {2}, //decomp n
-      {4} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.num_rangeproof_splits > p_mock_tx.out_count/2)
-      continue;
-
-    // only decomp 2^4
-    if (p_mock_tx.m == 4)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-
-
-  /// TEST 2: MockTxTriptych
-
-  // TEST 2.1: MockTxTriptych {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 2.2: MockTxTriptych {decomp}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {2}, //out counts
-      {2, 3, 4, 6, 9}, //decomp n
-      {12, 7, 6, 5, 4} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-
-
-  /// TEST 3: MockTxSpConciseV1
-
-  // TEST 3.1: MockTxSpConciseV1 {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 3.2: MockTxSpConciseV1 {decomp}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {2}, //out counts
-      {2, 3, 4, 6, 9}, //decomp n
-      {12, 7, 6, 5, 4} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 3.3: MockTxSpConciseV1 {outputs, BP+ splitting, tx batching}
-  incrementer = {
-      {1, 2, 4, 7, 11, 25}, //batch sizes
-      {0, 1, 2, 3, 4}, //rangeproof splits
-      {2}, //in counts
-      {1, 2, 4, 7, 12, 16}, //out counts
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.num_rangeproof_splits > p_mock_tx.out_count/2)
-      continue;
-
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-
-
-  /// TEST 4: MockTxSpMergeV1
-
-  // TEST 4.1: MockTxSpMergeV1 {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpMergeV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-
-
-  /// TEST 5: MockTxSpSquashedV1
-
-  // TEST 5.1: MockTxSpSquashedV1 {inputs}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {2}, //out counts
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 5.2: MockTxSpSquashedV1 {decomp}
-  incrementer = {
-      {1}, //batch sizes
-      {0}, //rangeproof splits
-      {2}, //in counts
-      {2}, //out counts
-      {2, 3, 4, 6, 9}, //decomp n
-      {12, 7, 6, 5, 4} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-  // TEST 5.3: MockTxSpSquashedV1 {outputs, BP+ splitting, tx batching}
-  incrementer = {
-      {1, 2, 4, 7, 11, 25}, //batch sizes
-      {0, 1, 2, 3, 4}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {1, 2, 4, 7, 12, 16}, //out counts
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-  while (incrementer.next(p_mock_tx))
-  {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
-    // only decomp 2^8
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 8)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-  //// TEST SET 1 (end)
-
-
-
-
-
-
-  // sample tests...
-  incrementer = {
-      {1, 2, 4, 7, 11, 25}, //batch sizes
-      {0, 1, 2, 3, 4}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {1, 2, 4, 7, 12, 16}, //out counts
-      {2, 3, 4, 6, 9}, //decomp n
-      {12, 7, 6, 5, 4} //decomp m limits
-    };
-
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.num_rangeproof_splits > p_mock_tx.out_count/2)
-    // if squashed model, test (out_count + in_count)/2
-      continue;
-
-    // only perf test 2-series decomposition for tx protocols that are unaffected by decomposition
-    if (p_mock_tx.n == 2)
-    {
-      // limit CLSAG to 2^8
-      if (p_mock_tx.m <= 8)
-        TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxCLSAG);
-    }
-
-    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-    {
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpMergeV1);
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-    }
-    if (p.core_params.td.get())
-      p.core_params.td->save(false);
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(true);
-
-  incrementer = {
-      {1, 2, 4, 7, 11, 25}, //batch sizes
-      {0}, //rangeproof splits
-      {1, 2, 4, 7, 12, 16}, //in counts
-      {1, 2, 4}, //out counts
-      {2}, //decomp n
-      {8} //decomp m limits
-    };
-
-  while (incrementer.next(p_mock_tx))
-  {
-    if (p_mock_tx.num_rangeproof_splits > p_mock_tx.out_count/2)
-    // if squashed model, test (out_count + in_count)/2
-      continue;
-
-    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 8)
-    {
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxTriptych);
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpMergeV1);
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
-    }
-  }
-  // test done, save results
-  if (p.core_params.td.get())
-    p.core_params.td->save(false);
-
-
-
-
-
-
-
-
-  // test for intermittent grootle verification failures
-  for (std::size_t i{0}; i < 100; ++i)
-  {
-    if (!(TEST_PERFORMANCE0(filter, p, test_ge_p3_identity_failure)))
-      std::cout << "FAILED P3 IDENT: " << i << '\n';
-    if (!(TEST_PERFORMANCE0(filter, p, test_ge_p3_identity_fix)))
-      std::cout << "FAILED P3 IDENT FIX: " << i << '\n';
-    if (!(TEST_PERFORMANCE0(filter, p, test_pippinger_failure)))
-      std::cout << "FAILED P3 PROOF: " << i << '\n';
-    if (!(TEST_PERFORMANCE0(filter, p, test_pippinger_failure_serialized)))
-      std::cout << "FAILED SERIALIZED PROOF: " << i << '\n';
-  }
-
 
   // test hash performance for view tags
   ParamsShuttleViewHash p_view_hash;
@@ -1201,31 +497,6 @@ int main(int argc, char** argv)
 
 
   // test groth/bootle proofs
-  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 4, 1, 2, true);
-  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 5, 1, 2, true);
-  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 6, 1, 2, true);
-  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 7, 1, 2, true);
-  TEST_PERFORMANCE5(filter, p, test_triptych, 2, 8, 1, 2, true);
-
-  TEST_PERFORMANCE5(filter, p, test_triptych, 3, 3, 1, 2, true);
-  TEST_PERFORMANCE5(filter, p, test_triptych, 3, 4, 1, 2, true);
-  TEST_PERFORMANCE5(filter, p, test_triptych, 3, 5, 1, 2, true);
-
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 3, 2, 1, 1, 4);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 1, 1, 4);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 1, 1, 16);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 4, 2, 2, 1, 4);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 5, 2, 2, 1, 4);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 3);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 4);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 16);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 32);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 7, 2, 2, 1, 4);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 8, 2, 2, 1, 4);
-
-  TEST_PERFORMANCE6(filter, p, test_grootle, 3, 3, 2, 2, 1, 4);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 3, 4, 2, 2, 1, 4);
-  TEST_PERFORMANCE6(filter, p, test_grootle, 3, 5, 2, 2, 1, 4);
 
   TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 3, 2, 1, 1);
   TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 6, 2, 1, 1);
@@ -1424,16 +695,6 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof_plus, true, 2, 1, 1, 0, 64); // 64 proof, each with 2 amounts
 
   // 16 inputs
-  TEST_PERFORMANCE4(filter, p, test_triptych, 2, 7, 2, 16);
-
-  TEST_PERFORMANCE4(filter, p, test_triptych, 2, 2, 2, 2);
-  TEST_PERFORMANCE4(filter, p, test_triptych, 2, 3, 2, 2);
-  TEST_PERFORMANCE4(filter, p, test_triptych, 2, 4, 2, 2);
-  TEST_PERFORMANCE4(filter, p, test_triptych, 2, 5, 2, 2);
-  TEST_PERFORMANCE4(filter, p, test_triptych, 2, 6, 2, 2);
-  TEST_PERFORMANCE4(filter, p, test_triptych, 2, 7, 2, 2);
-  TEST_PERFORMANCE4(filter, p, test_triptych, 2, 8, 2, 2);
-
   TEST_PERFORMANCE2(filter, p, test_bulletproof, true, 1); // 1 bulletproof with 1 amount
   TEST_PERFORMANCE2(filter, p, test_bulletproof, false, 1);
 

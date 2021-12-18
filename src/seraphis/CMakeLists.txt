@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2022, The Monero Project
+# Copyright (c) 2021, The Monero Project
 #
 # All rights reserved.
 #
@@ -26,51 +26,41 @@
 # STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-set(ringct_basic_sources
-  rctOps.cpp
-  rctTypes.cpp
-  rctCryptoOps.c
-  multiexp.cc
-  bulletproofs.cc
-  bulletproofs_plus.cc)
+set(seraphis_sources
+  concise_grootle.cpp
+  mock_ledger_context.cpp
+  sp_base_types.cpp
+  sp_composition_proof.cpp
+  sp_core_utils.cpp
+  sp_crypto_utils.cpp
+  sp_tx_base.cpp
+  sp_tx_base_utils.cpp
+  sp_tx_builder_types.cpp
+  sp_tx_component_types.cpp
+  sp_tx_utils.cpp
+  sp_tx_validators.cpp
+  sp_txtype_concise_v1.cpp
+  sp_txtype_merge_v1.cpp
+  sp_txtype_squashed_v1.cpp)
 
-monero_find_all_headers(ringct_basic_private_headers "${CMAKE_CURRENT_SOURCE_DIR}")
+monero_find_all_headers(seraphis_headers, "${CMAKE_CURRENT_SOURCE_DIR}")
 
-monero_private_headers(ringct_basic
-  ${crypto_private_headers})
-monero_add_library(ringct_basic
-  ${ringct_basic_sources}
-  ${ringct_basic_private_headers})
-target_link_libraries(ringct_basic
+monero_add_library(seraphis
+  ${seraphis_sources}
+  ${seraphis_headers})
+
+target_link_libraries(seraphis
   PUBLIC
-    common
     cncrypto
-  PRIVATE
-    ${OPENSSL_LIBRARIES}
-    ${EXTRA_LIBRARIES})
-
-set(ringct_sources
-  rctSigs.cpp
-)
-
-set(ringct_headers)
-
-set(ringct_private_headers
-  rctSigs.h
-)
-
-monero_private_headers(ringct
-  ${crypto_private_headers})
-monero_add_library(ringct
-  ${ringct_sources}
-  ${ringct_headers}
-  ${ringct_private_headers})
-target_link_libraries(ringct
-  PUBLIC
     common
-    cncrypto
-    cryptonote_basic
     device
+    epee
+    ringct
   PRIVATE
-    ${OPENSSL_LIBRARIES}
     ${EXTRA_LIBRARIES})
+
+target_include_directories(seraphis
+  PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+  PRIVATE
+    ${Boost_INCLUDE_DIRS})

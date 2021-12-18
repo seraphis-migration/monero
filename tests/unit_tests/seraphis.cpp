@@ -33,15 +33,15 @@ extern "C"
 }
 #include "device/device.hpp"
 #include "misc_language.h"
-#include "mock_tx/mock_sp_core_utils.h"
-#include "mock_tx/mock_sp_transaction_component_types.h"
-#include "mock_tx/mock_sp_transaction_utils.h"
-#include "mock_tx/mock_sp_txtype_concise_v1.h"
-#include "mock_tx/mock_tx_utils.h"
-#include "mock_tx/seraphis_composition_proof.h"
-#include "mock_tx/seraphis_crypto_utils.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "seraphis/sp_composition_proof.h"
+#include "seraphis/sp_core_utils.h"
+#include "seraphis/sp_crypto_utils.h"
+#include "seraphis/sp_tx_component_types.h"
+#include "seraphis/sp_tx_base_utils.h"
+#include "seraphis/sp_tx_utils.h"
+#include "seraphis/sp_txtype_concise_v1.h"
 
 #include "gtest/gtest.h"
 
@@ -110,16 +110,16 @@ static void make_fake_sp_user_keys(rct::key &recipient_DH_base_out,
     make_secret_key(recipient_spendbase_privkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-static std::shared_ptr<mock_tx::MockTxSpConciseV1> make_sp_txtype_concise_v1(const std::size_t ref_set_decomp_n,
+static std::shared_ptr<sp::SpTxConciseV1> make_sp_txtype_concise_v1(const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     const std::size_t max_rangeproof_splits,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    const mock_tx::MockTxSpConciseV1::ValidationRulesVersion validation_rules_version,
-    std::shared_ptr<mock_tx::MockLedgerContext> ledger_context_inout)
+    const sp::SpTxConciseV1::ValidationRulesVersion validation_rules_version,
+    std::shared_ptr<sp::MockLedgerContext> ledger_context_inout)
 {
     /// build a tx from base components
-    using namespace mock_tx;
+    using namespace sp;
 
     CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "Tried to make tx without any outputs.");
@@ -128,20 +128,20 @@ static std::shared_ptr<mock_tx::MockTxSpConciseV1> make_sp_txtype_concise_v1(con
 
     // make mock inputs
     // enote, ks, view key stuff, amount, amount blinding factor
-    std::vector<MockInputProposalSpV1> input_proposals{gen_mock_sp_input_proposals_v1(in_amounts)};
+    std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(in_amounts)};
 
     // make mock destinations
     // - (in practice) for 2-out tx, need special treatment when making change/dummy destination
-    std::vector<MockDestinationSpV1> destinations{gen_mock_sp_destinations_v1(out_amounts)};
+    std::vector<SpDestinationV1> destinations{gen_mock_sp_destinations_v1(out_amounts)};
 
     // membership proof ref sets
-    std::vector<MockENoteSpV1> input_enotes;
+    std::vector<SpENoteV1> input_enotes;
     input_enotes.reserve(input_proposals.size());
 
     for (const auto &input_proposal : input_proposals)
         input_enotes.emplace_back(input_proposal.m_enote);
 
-    std::vector<MockMembershipReferenceSetSpV1> membership_ref_sets{
+    std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
             gen_mock_sp_membership_ref_sets_v1(input_enotes,
                 ref_set_decomp_n,
                 ref_set_decomp_m,
@@ -151,17 +151,17 @@ static std::shared_ptr<mock_tx::MockTxSpConciseV1> make_sp_txtype_concise_v1(con
     // versioning for proofs (v1)
     std::string version_string;
     version_string.reserve(3);
-    MockTxSpConciseV1::get_versioning_string(validation_rules_version, version_string);
+    SpTxConciseV1::get_versioning_string(validation_rules_version, version_string);
 
     /// make tx
     // tx components
-    std::vector<MockENoteImageSpV1> input_images;
-    std::vector<MockENoteSpV1> outputs;
-    std::shared_ptr<MockBalanceProofSpV1> balance_proof;
-    std::vector<MockImageProofSpV1> tx_image_proofs;
-    std::vector<MockMembershipProofSortableSpV1> tx_membership_proofs_sortable;
-    std::vector<MockMembershipProofSpV1> tx_membership_proofs;
-    MockSupplementSpV1 tx_supplement;
+    std::vector<SpENoteImageV1> input_images;
+    std::vector<SpENoteV1> outputs;
+    std::shared_ptr<SpBalanceProofV1> balance_proof;
+    std::vector<SpImageProofV1> tx_image_proofs;
+    std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable;
+    std::vector<SpMembershipProofV1> tx_membership_proofs;
+    SpTxSupplementV1 tx_supplement;
 
     // info shuttles for making components
     std::vector<rct::xmr_amount> output_amounts;
@@ -202,9 +202,9 @@ static std::shared_ptr<mock_tx::MockTxSpConciseV1> make_sp_txtype_concise_v1(con
         tx_membership_proofs_sortable);
     sort_tx_inputs_sp_v1(tx_membership_proofs_sortable, tx_membership_proofs, input_images, tx_image_proofs);
 
-    return std::make_shared<MockTxSpConciseV1>(std::move(input_images), std::move(outputs),
+    return std::make_shared<SpTxConciseV1>(std::move(input_images), std::move(outputs),
         std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),
-        std::move(tx_supplement), MockTxSpConciseV1::ValidationRulesVersion::ONE);
+        std::move(tx_supplement), SpTxConciseV1::ValidationRulesVersion::ONE);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -327,7 +327,7 @@ TEST(seraphis, composition_proof)
                 std::vector<crypto::secret_key> temp_z = {z[i]};
                 make_fake_sp_masked_address(x[i], y[i], temp_z, K[i]);
                 z[i] = temp_z[0];
-                mock_tx::make_seraphis_key_image(y[i], z[i], KI[i]);
+                sp::make_seraphis_key_image(y[i], z[i], KI[i]);
             }
 
             proof = sp::sp_composition_prove(K, x, y, z, message);
@@ -359,7 +359,7 @@ TEST(seraphis, composition_proof)
             rct::subKeys(K[0], K[0], xG);   // kludge: remove x part manually
             x[0] = rct::rct2sk(rct::zero());
 
-            mock_tx::make_seraphis_key_image(y[0], z[0], KI[0]);
+            sp::make_seraphis_key_image(y[0], z[0], KI[0]);
 
             proof = sp::sp_composition_prove(K, x, y, z, message);
 
@@ -428,7 +428,7 @@ TEST(seraphis, composition_proof_multisig)
                     for (const auto &z_piece : z_pieces_temp)
                         sc_add(&z, &z, &z_piece);
 
-                    mock_tx::make_seraphis_key_image(y[i], z, KI[i]);
+                    sp::make_seraphis_key_image(y[i], z, KI[i]);
                 }
 
                 // kludge test: remove x component
@@ -523,12 +523,12 @@ TEST(seraphis, information_recovery_pieces)
     k_a_recipient = y;
     sc_add(&y, &y, &y);
     make_secret_key(z);
-    mock_tx::make_seraphis_spendbase(z, zU);
-    mock_tx::make_seraphis_spendbase(z, k_bU);
+    sp::make_seraphis_spendbase(z, zU);
+    sp::make_seraphis_spendbase(z, k_bU);
 
-    mock_tx::make_seraphis_key_image(y, z, key_image1);
-    mock_tx::make_seraphis_key_image(y, zU, key_image2);
-    mock_tx::make_seraphis_key_image_from_parts(k_a_sender, k_a_recipient, k_bU, key_image3);
+    sp::make_seraphis_key_image(y, z, key_image1);
+    sp::make_seraphis_key_image(y, zU, key_image2);
+    sp::make_seraphis_key_image_from_parts(k_a_sender, k_a_recipient, k_bU, key_image3);
 
     EXPECT_TRUE(key_image1 == key_image2);
     EXPECT_TRUE(key_image2 == key_image3);
@@ -539,8 +539,8 @@ TEST(seraphis, information_recovery_pieces)
         sender_receiver_secret = rct::rct2sk(rct::skGen());
 
     rct::xmr_amount amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-    rct::xmr_amount encoded_amount{mock_tx::enc_dec_seraphis_amount(sender_receiver_secret, rct::zero(), amount)};
-    rct::xmr_amount decoded_amount{mock_tx::enc_dec_seraphis_amount(sender_receiver_secret, rct::zero(), encoded_amount)};
+    rct::xmr_amount encoded_amount{sp::enc_dec_seraphis_amount(sender_receiver_secret, rct::zero(), amount)};
+    rct::xmr_amount decoded_amount{sp::enc_dec_seraphis_amount(sender_receiver_secret, rct::zero(), encoded_amount)};
 
     EXPECT_TRUE(encoded_amount != amount);
     EXPECT_TRUE(decoded_amount == amount);
@@ -559,7 +559,7 @@ TEST(seraphis, enote_v1_information_recovery)
 
     make_fake_sp_user_keys(recipient_DH_base, recipient_view_privkey, recipient_spendbase_privkey);  // {K^DH, k^vr, k^s}
     rct::scalarmultKey(recipient_view_key, recipient_DH_base, rct::sk2rct(recipient_view_privkey));  // K^vr
-    mock_tx::make_seraphis_spendkey(recipient_view_privkey, recipient_spendbase_privkey, recipient_spend_key);  // K^s
+    sp::make_seraphis_spendkey(recipient_view_privkey, recipient_spendbase_privkey, recipient_spend_key);  // K^s
 
     // make enote
     crypto::secret_key enote_privkey = rct::rct2sk(rct::identity());
@@ -567,7 +567,7 @@ TEST(seraphis, enote_v1_information_recovery)
         enote_privkey = rct::rct2sk(rct::skGen());
 
     rct::key enote_pubkey;
-    mock_tx::MockENoteSpV1 enote;
+    sp::SpENoteV1 enote;
 
     enote.make(enote_privkey,
         recipient_DH_base,
@@ -593,7 +593,7 @@ TEST(seraphis, enote_v1_information_recovery)
 
     hw::get_device("default").generate_key_derivation(rct::rct2pk(enote_pubkey), recipient_view_privkey, derivation);
 
-    EXPECT_TRUE(mock_tx::try_get_seraphis_nominal_spend_key(derivation,
+    EXPECT_TRUE(sp::try_get_seraphis_nominal_spend_key(derivation,
             enote_index,
             enote.m_onetime_address,
             enote.m_view_tag,
@@ -601,7 +601,7 @@ TEST(seraphis, enote_v1_information_recovery)
             nominal_recipient_spendkey)
         );
     EXPECT_TRUE(nominal_recipient_spendkey == recipient_spend_key);
-    EXPECT_TRUE(mock_tx::try_get_seraphis_amount(rct::rct2sk(sender_receiver_secret),
+    EXPECT_TRUE(sp::try_get_seraphis_amount(rct::rct2sk(sender_receiver_secret),
             rct::zero(),
             enote.m_amount_commitment,
             enote.m_encoded_amount,
@@ -610,7 +610,7 @@ TEST(seraphis, enote_v1_information_recovery)
     EXPECT_TRUE(amount_recovered == amount);
 
     // check: can reproduce sender-receiver secret
-    mock_tx::make_seraphis_sender_receiver_secret(recipient_view_privkey,
+    sp::make_seraphis_sender_receiver_secret(recipient_view_privkey,
         enote_pubkey,
         enote_index,
         hw::get_device("default"),
@@ -623,10 +623,10 @@ TEST(seraphis, sp_txtype_concise_v1)
     // demo making SpTxTypeConciseV1 with raw tx builder API
 
     // fake ledger context for this test
-    std::shared_ptr<mock_tx::MockLedgerContext> ledger_context = std::make_shared<mock_tx::MockLedgerContext>();
+    std::shared_ptr<sp::MockLedgerContext> ledger_context = std::make_shared<sp::MockLedgerContext>();
 
     // 3 tx, 11 inputs/outputs each, range proofs split x3
-    std::vector<std::shared_ptr<mock_tx::MockTxSpConciseV1>> txs;
+    std::vector<std::shared_ptr<sp::SpTxConciseV1>> txs;
     txs.reserve(3);
 
     std::vector<rct::xmr_amount> in_amounts;
@@ -642,17 +642,17 @@ TEST(seraphis, sp_txtype_concise_v1)
     {
         txs.emplace_back(
                 make_sp_txtype_concise_v1(2, 3, 3, in_amounts, out_amounts,
-                    mock_tx::MockTxSpConciseV1::ValidationRulesVersion::ONE, ledger_context)
+                    sp::SpTxConciseV1::ValidationRulesVersion::ONE, ledger_context)
             );
     }
 
-    EXPECT_TRUE(mock_tx::validate_mock_txs<mock_tx::MockTxSpConciseV1>(txs, ledger_context));
+    EXPECT_TRUE(sp::validate_mock_txs<sp::SpTxConciseV1>(txs, ledger_context));
 
     // insert key images to ledger
     for (const auto &tx : txs)
-        mock_tx::add_tx_to_ledger<mock_tx::MockTxSpConciseV1>(ledger_context, *tx);
+        sp::add_tx_to_ledger<sp::SpTxConciseV1>(ledger_context, *tx);
 
     // validation should fail due to double-spend
-    EXPECT_FALSE(mock_tx::validate_mock_txs<mock_tx::MockTxSpConciseV1>(txs, ledger_context));
+    EXPECT_FALSE(sp::validate_mock_txs<sp::SpTxConciseV1>(txs, ledger_context));
 }
 //-------------------------------------------------------------------------------------------------------------------

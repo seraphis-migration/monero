@@ -245,10 +245,6 @@ namespace config
   const unsigned char HASH_KEY_CLSAG_AGG_1[] = "CLSAG_agg_1";
   const char HASH_KEY_MESSAGE_SIGNING[] = "MoneroMessageSignature";
   const unsigned char HASH_KEY_MM_SLOT = 'm';
-  const char HASH_KEY_TRIPTYCH_H[] = "triptych H";
-  const char HASH_KEY_TRIPTYCH_U[] = "triptych U";
-  const char HASH_KEY_TRIPTYCH_TRANSCRIPT[] = "triptych transcript";
-  const char HASH_KEY_GROOTLE_TRANSCRIPT[] = "grootle transcript";
   const char HASH_KEY_CONCISE_GROOTLE_TRANSCRIPT[] = "concise grootle transcript";
   const char HASH_KEY_SP_COMPOSITION_PROOF_TRANSCRIPT[] = "seraphis composition proof transcript";
   const char HASH_KEY_GROOTLE_Hi[] = "grootle Hi";

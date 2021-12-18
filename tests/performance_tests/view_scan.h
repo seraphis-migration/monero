@@ -35,13 +35,13 @@ extern "C"
     #include "blake2_temp.h"  //copied from randomx lib
 }
 #include "device/device.hpp"
-#include "mock_tx/mock_sp_transaction_component_types.h"
-#include "mock_tx/mock_sp_core_utils.h"
-#include "mock_tx/mock_tx_utils.h"
-#include "mock_tx/seraphis_crypto_utils.h"
-#include "performance_tests.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "seraphis/sp_core_utils.h"
+#include "seraphis/sp_crypto_utils.h"
+#include "seraphis/sp_tx_component_types.h"
+#include "seraphis/sp_tx_base_utils.h"
+#include "performance_tests.h"
 
 
 /// cryptonote view key scanning
@@ -155,7 +155,7 @@ public:
         rct::key recipient_view_key;
 
         rct::scalarmultKey(recipient_view_key, recipient_DH_base, rct::sk2rct(m_recipient_view_privkey));
-        mock_tx::make_seraphis_spendkey(m_recipient_view_privkey, recipient_spendbase_privkey, m_recipient_spend_key);
+        sp::make_seraphis_spendkey(m_recipient_view_privkey, recipient_spendbase_privkey, m_recipient_spend_key);
 
         // make enote
         crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
@@ -185,7 +185,7 @@ public:
 
         rct::key nominal_recipient_spendkey;
 
-        if (!mock_tx::try_get_seraphis_nominal_spend_key(derivation,
+        if (!sp::try_get_seraphis_nominal_spend_key(derivation,
             0,
             m_enote.m_onetime_address,
             m_enote.m_view_tag,
@@ -205,7 +205,7 @@ private:
     rct::key m_recipient_spend_key;
     crypto::secret_key m_recipient_view_privkey;
 
-    mock_tx::MockENoteSpV1 m_enote;
+    sp::SpENoteV1 m_enote;
     rct::key m_enote_pubkey;
 
     bool m_test_view_tag_check;
@@ -291,16 +291,16 @@ bool try_get_seraphis_nominal_spend_key_siphash(const crypto::key_derivation &se
 
     // q_t
     // note: computing this after view tag check is an optimization
-    mock_tx::make_seraphis_sender_receiver_secret(sender_receiver_DH_derivation,
+    sp::make_seraphis_sender_receiver_secret(sender_receiver_DH_derivation,
         output_index,
         sender_receiver_secret_out);
 
     // K'^s_t = Ko_t - H(q_t) X
     crypto::secret_key k_a_extender;
-    mock_tx::make_seraphis_sender_address_extension(rct::rct2sk(sender_receiver_secret_out), k_a_extender);  // H(q_t)
+    sp::make_seraphis_sender_address_extension(rct::rct2sk(sender_receiver_secret_out), k_a_extender);  // H(q_t)
     sc_mul(&k_a_extender, sp::MINUS_ONE.bytes, &k_a_extender);  // -H(q_t)
     nominal_spend_key_out = onetime_address;  // Ko_t
-    mock_tx::extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
+    sp::extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
 
     return true;
 }
@@ -320,7 +320,7 @@ public:
         rct::key recipient_view_key;
 
         rct::scalarmultKey(recipient_view_key, recipient_DH_base, rct::sk2rct(m_recipient_view_privkey));
-        mock_tx::make_seraphis_spendkey(m_recipient_view_privkey, recipient_spendbase_privkey, m_recipient_spend_key);
+        sp::make_seraphis_spendkey(m_recipient_view_privkey, recipient_spendbase_privkey, m_recipient_spend_key);
 
         // make enote
         crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
@@ -374,7 +374,7 @@ private:
     rct::key m_recipient_spend_key;
     crypto::secret_key m_recipient_view_privkey;
 
-    mock_tx::MockENoteSpV1 m_enote;
+    sp::SpENoteV1 m_enote;
     rct::key m_enote_pubkey;
 };
 
