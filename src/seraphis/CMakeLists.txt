@@ -34,9 +34,9 @@ set(seraphis_sources
   sp_core_utils.cpp
   sp_crypto_utils.cpp
   sp_tx_base.cpp
-  sp_tx_base_utils.cpp
   sp_tx_builder_types.cpp
   sp_tx_component_types.cpp
+  sp_tx_misc_utils.cpp
   sp_tx_utils.cpp
   sp_tx_validators.cpp
   sp_txtype_concise_v1.cpp

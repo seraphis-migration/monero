@@ -44,7 +44,7 @@ extern "C"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
-#include "sp_tx_base_utils.h"
+#include "sp_tx_misc_utils.h"
 #include "wipeable_string.h"
 
 //third party headers

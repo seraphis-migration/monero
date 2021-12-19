@@ -40,7 +40,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
 #include "sp_crypto_utils.h"
-#include "sp_tx_base_utils.h"
+#include "sp_tx_misc_utils.h"
 #include "sp_tx_component_types.h"
 #include "sp_tx_utils.h"
 

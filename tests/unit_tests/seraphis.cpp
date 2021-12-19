@@ -39,7 +39,7 @@ extern "C"
 #include "seraphis/sp_core_utils.h"
 #include "seraphis/sp_crypto_utils.h"
 #include "seraphis/sp_tx_component_types.h"
-#include "seraphis/sp_tx_base_utils.h"
+#include "seraphis/sp_tx_misc_utils.h"
 #include "seraphis/sp_tx_utils.h"
 #include "seraphis/sp_txtype_concise_v1.h"
 

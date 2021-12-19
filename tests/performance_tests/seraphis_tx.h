@@ -32,10 +32,10 @@
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis/mock_ledger_context.h"
+#include "seraphis/sp_tx_misc_utils.h"
 #include "seraphis/sp_txtype_concise_v1.h"
 #include "seraphis/sp_txtype_merge_v1.h"
 #include "seraphis/sp_txtype_squashed_v1.h"
-#include "seraphis/sp_tx_base_utils.h"
 
 #include <iostream>
 #include <memory>

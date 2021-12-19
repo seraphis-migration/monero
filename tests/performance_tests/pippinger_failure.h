@@ -34,8 +34,8 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
-#include "seraphis/sp_tx_base_utils.h"
 #include "seraphis/sp_crypto_utils.h"
+#include "seraphis/sp_tx_misc_utils.h"
 #include "ringct/multiexp.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
