@@ -124,12 +124,12 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
     const rct::key &amount_commitment,
     crypto::secret_key &squash_prefix_out)
 {
-    static std::string domain_separator{config::HASH_KEY_SERAPHIS_SQUASHED_ENOTE};
+    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_SQUASHED_ENOTE};
 
     // H("domain-sep", Ko, C)
     std::string hash;
     hash.reserve(domain_separator.size() + 2*sizeof(rct::key));
-    hash += domain_separator;
+    hash = domain_separator;
     hash.append((const char*) onetime_address.bytes, sizeof(rct::key));
     hash.append((const char*) amount_commitment.bytes, sizeof(rct::key));
 
@@ -187,7 +187,7 @@ void make_seraphis_sender_receiver_secret(const crypto::key_derivation &sender_r
     const std::size_t output_index,
     rct::key &sender_receiver_secret_out)
 {
-    static std::string salt{config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET};
+    static const std::string salt{config::HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET};
 
     // q_t = H(8 * r_t * k^{vr} * K^{DH}, t) => H("domain sep", 8 * privkey * DH_key, output_index)
     sp::domain_separate_derivation_hash(salt,
@@ -199,7 +199,7 @@ void make_seraphis_sender_receiver_secret(const crypto::key_derivation &sender_r
 void make_seraphis_sender_address_extension(const crypto::secret_key &sender_receiver_secret,
     crypto::secret_key &sender_address_extension_out)
 {
-    static std::string salt{config::HASH_KEY_SERAPHIS_SENDER_ADDRESS_EXTENSION};
+    static const std::string salt{config::HASH_KEY_SERAPHIS_SENDER_ADDRESS_EXTENSION};
 
     // k_{a, sender} = H("domain-sep", q_t)
     sp::domain_separate_rct_hash(salt, rct::sk2rct(sender_receiver_secret), sender_address_extension_out);
@@ -225,7 +225,7 @@ unsigned char make_seraphis_view_tag(const crypto::secret_key &privkey,
 unsigned char make_seraphis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation,
     const std::size_t output_index)
 {
-    static std::string salt{config::HASH_KEY_SERAPHIS_VIEW_TAG};
+    static const std::string salt{config::HASH_KEY_SERAPHIS_VIEW_TAG};
 
     // tag_t = H("domain-sep", derivation, t)
     // note: the view tag is not a secret, so it doesn't need to be memory-safe (e.g. with crypto::secret_key)
@@ -245,7 +245,7 @@ rct::xmr_amount enc_dec_seraphis_amount(const crypto::secret_key &sender_receive
     const rct::key &baked_key,
     const rct::xmr_amount original)
 {
-    static std::string salt{config::HASH_KEY_SERAPHIS_AMOUNT_ENC};
+    static const std::string salt{config::HASH_KEY_SERAPHIS_AMOUNT_ENC};
 
     // ret = H("domain-sep", q_t, [OPTIONAL: baked_key]) XOR_64 original
     crypto::secret_key hash_result;
@@ -267,7 +267,7 @@ void make_seraphis_amount_commitment_mask(const crypto::secret_key &sender_recei
     const rct::key &baked_key,
     crypto::secret_key &mask_out)
 {
-    static std::string salt{config::HASH_KEY_SERAPHIS_AMOUNT_COMMITMENT_BLINDING_FACTOR};
+    static const std::string salt{config::HASH_KEY_SERAPHIS_AMOUNT_COMMITMENT_BLINDING_FACTOR};
 
     // x_t = H("domain-sep", q_t, [OPTIONAL: baked_key])
     sp::domain_separate_rct_hash_with_extra(salt, rct::sk2rct(sender_receiver_secret), baked_key, mask_out);

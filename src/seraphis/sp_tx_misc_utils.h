@@ -38,6 +38,7 @@
 //third party headers
 
 //standard headers
+#include <utility>
 #include <vector>
 
 //forward declarations
@@ -46,6 +47,46 @@
 namespace sp
 {
 
+/**
+* TODO: move this to a better file
+* 
+* brief: rearrange_vector - rearrange a vector given set of old indices
+*    - at index 'i', place element 'vec_inout[old_indices[i]]'
+*    - requires each 'i' is unique and maps into vec_inout
+* param: old_indices - vector of indices into vec_inout
+* param: vec_inout - vector to rearrange
+* return: false if a bounds check fails
+*/
+template <typename T>
+bool rearrange_vector(const std::vector<std::size_t> &old_indices, std::vector<T> &vec_inout)
+{
+    // check: vectors are aligned
+    if (old_indices.size() != vec_inout.size())
+        return false;
+
+    // check: only unique old indices allowed
+    for (auto old_indices_it{old_indices.begin()}; old_indices_it != old_indices.end(); ++old_indices_it)
+    {
+        if (std::find(old_indices.begin(), old_indices_it, *old_indices_it) != old_indices_it)
+            return false;
+    }
+
+    std::vector<T> temp_vec;
+    temp_vec.reserve(vec_inout.size());
+
+    for (std::size_t i{0}; i < old_indices.size(); ++i)
+    {
+        // check: all old indices are within vec_inout
+        if (old_indices[i] >= old_indices.size())
+            return false;
+
+        temp_vec.emplace_back(std::move(vec_inout[old_indices[i]]));
+    }
+
+    vec_inout = std::move(temp_vec);
+
+    return true;
+}
 /**
 * brief: ref_set_size_from_decomp - compute n^m from decomposition of a reference set
 * param: ref_set_decomp_n -

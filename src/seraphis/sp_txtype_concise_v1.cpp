@@ -91,7 +91,7 @@ SpTxConciseV1::SpTxConciseV1(const std::vector<SpInputProposalV1> &input_proposa
 
     // sort the membership proofs so they line up with input images
     std::vector<SpMembershipProofV1> tx_membership_proofs;
-    sort_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images, tx_membership_proofs_sortable, tx_membership_proofs);
+    align_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images, tx_membership_proofs_sortable, tx_membership_proofs);
 
     // assemble tx
     *this = SpTxConciseV1{std::move(partial_tx), std::move(tx_membership_proofs), validation_rules_version};

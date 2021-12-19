@@ -56,29 +56,6 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-// Sort order for tx inputs: key images ascending with byte-wise comparisons
-//-------------------------------------------------------------------------------------------------------------------
-static std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<SpTxPartialInputV1> &partial_inputs)
-{
-    std::vector<std::size_t> original_indices;
-    original_indices.resize(partial_inputs.size());
-
-    for (std::size_t input_index{0}; input_index < partial_inputs.size(); ++input_index)
-        original_indices[input_index] = input_index;
-
-    // sort: key images ascending with byte-wise comparisons
-    std::sort(original_indices.begin(), original_indices.end(),
-            [&partial_inputs](const std::size_t input_index_1, const std::size_t input_index_2) -> bool
-            {
-                return memcmp(&(partial_inputs[input_index_1].m_input_image.m_key_image),
-                    &(partial_inputs[input_index_2].m_input_image.m_key_image), sizeof(crypto::key_image)) < 0;
-            }
-        );
-
-    return original_indices;
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 void SpInputProposalV1::gen(const rct::xmr_amount amount)
 {
     // generate a tx input: random secrets, random memo pieces (does not support info recovery)

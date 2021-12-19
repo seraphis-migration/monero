@@ -72,6 +72,15 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     const std::vector<SpENoteV1> &output_enotes,
     const SpTxSupplementV1 &tx_supplement);
 /**
+* brief: get_tx_input_sort_order_v1 - get mapping new_index:old_index for sorting of inputs
+*    - sort order: key images ascending with byte-wise comparisons
+* param: partial_inputs/input_images/input_key_images - key image sorces
+* return: vector of indices into the input vector; at new position 'i' place old element in_vec[out_vec[i]]
+*/
+std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<SpTxPartialInputV1> &partial_inputs);
+std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<SpENoteImageV1> &input_images);
+std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<crypto::key_image> &input_key_images);
+/**
 * brief: sort_tx_inputs_sp_v1 - sort tx inputs
 *   sort order: key images ascending with byte-wise comparisons
 * param: tx_membership_proofs_sortable -
@@ -99,13 +108,13 @@ void sort_tx_inputs_sp_v2(std::vector<SpENoteImageV1> &input_images_inout,
     std::vector<SpMembershipReferenceSetV1> &membership_ref_sets_inout,
     std::vector<SpInputProposalV1> &input_proposals_inout);
 /**
-* brief: sort_v1_tx_membership_proofs_sp_v1 - rearrange membership proofs so they line up with a set of input images
+* brief: align_v1_tx_membership_proofs_sp_v1 - rearrange membership proofs so they line up with a set of input images
 *   sort order: key images ascending with byte-wise comparisons
 * param: input_images -
 * inparam: tx_membership_proofs_sortable_in -
 * outparam: tx_membership_proofs_out -
 */
-void sort_v1_tx_membership_proofs_sp_v1(const std::vector<SpENoteImageV1> &input_images,
+void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpENoteImageV1> &input_images,
     std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_sortable_in,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out);
 /**

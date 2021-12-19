@@ -275,17 +275,25 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
         input_images,
         image_address_masks,
         image_amount_masks);
-    // the API here around sorting is clumsy and not well thought-out (TODO: improve if this tx variant is to be used)
-    std::vector<SpMembershipReferenceSetV1> membership_ref_sets_sorted{membership_ref_sets};
-    std::vector<SpInputProposalV1> input_proposals_sorted{input_proposals};
-    sort_tx_inputs_sp_v2(input_images,
+    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
+    make_v1_tx_image_proofs_sp_v3(input_proposals,
+        input_images,
         image_address_masks,
-        image_amount_masks,
-        membership_ref_sets_sorted,
-        input_proposals_sorted);  //sort now so range proofs line up with input images
+        image_proofs_message,
+        tx_image_proofs);
+    // sort inputs in preparation for making a balance proof
+    const std::vector<std::size_t> input_sort_order{get_tx_input_sort_order_v1(input_images)};
+    CHECK_AND_ASSERT_THROW_MES(
+        rearrange_vector(input_sort_order, input_images)        &&
+        rearrange_vector(input_sort_order, image_address_masks) &&
+        rearrange_vector(input_sort_order, image_amount_masks)  &&
+        rearrange_vector(input_sort_order, tx_image_proofs)     &&
+        rearrange_vector(input_sort_order, membership_ref_sets) &&
+        rearrange_vector(input_sort_order, input_proposals),
+        "rearranging inputs failed");
     std::vector<rct::xmr_amount> input_amounts;
     std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
-    prepare_input_commitment_factors_for_balance_proof_v1(input_proposals_sorted,
+    prepare_input_commitment_factors_for_balance_proof_v1(input_proposals,
         image_amount_masks,
         input_amounts,
         input_image_amount_commitment_blinding_factors);
@@ -295,17 +303,11 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
         output_amount_commitment_blinding_factors,
         max_rangeproof_splits,
         balance_proof);
-    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
-    make_v1_tx_image_proofs_sp_v3(input_proposals_sorted,
-        input_images,
-        image_address_masks,
-        image_proofs_message,
-        tx_image_proofs);
-    make_v1_tx_membership_proofs_sp_v2(membership_ref_sets_sorted,
+    make_v1_tx_membership_proofs_sp_v2(membership_ref_sets,
         image_address_masks,
         image_amount_masks,
-        tx_membership_proofs_sortable);
-    sort_v1_tx_membership_proofs_sp_v1(input_images, tx_membership_proofs_sortable, tx_membership_proofs);
+        tx_membership_proofs_sortable);  //could also obtain sortable membership proofs as inputs
+    align_v1_tx_membership_proofs_sp_v1(input_images, tx_membership_proofs_sortable, tx_membership_proofs);
 
     return std::make_shared<SpTxSquashedV1>(std::move(input_images), std::move(outputs),
         std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),

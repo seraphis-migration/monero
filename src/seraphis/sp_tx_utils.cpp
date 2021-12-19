@@ -172,29 +172,7 @@ static void prepare_image_masks_all_sp_v2(const std::vector<SpInputProposalV1> &
         image_amount_masks_out.back());
 }
 //-------------------------------------------------------------------------------------------------------------------
-// sort order: key images ascending with byte-wise comparisons
-//-------------------------------------------------------------------------------------------------------------------
-static std::vector<std::size_t> get_sort_order_for_sp_images_v1(const std::vector<SpENoteImageV1> &images)
-{
-    std::vector<std::size_t> original_indices;
-    original_indices.resize(images.size());
-
-    for (std::size_t input_index{0}; input_index < images.size(); ++input_index)
-        original_indices[input_index] = input_index;
-
-    // sort: key images ascending with byte-wise comparisons
-    std::sort(original_indices.begin(), original_indices.end(),
-            [&images](const std::size_t input_index_1, const std::size_t input_index_2) -> bool
-            {
-                return memcmp(&(images[input_index_1].m_key_image),
-                    &(images[input_index_2].m_key_image), sizeof(crypto::key_image)) < 0;
-            }
-        );
-
-    return original_indices;
-}
-//-------------------------------------------------------------------------------------------------------------------
-// sort order: key images ascending with byte-wise comparisons
+// convert a crypto::secret_key vector to an rct::key vector, and obtain a memwiper for the rct::key vector
 //-------------------------------------------------------------------------------------------------------------------
 static auto convert_skv_to_rctv(const std::vector<crypto::secret_key> &skv, rct::keyV &rctv_out)
 {
@@ -262,16 +240,59 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     return hash_result;
 }
 //-------------------------------------------------------------------------------------------------------------------
+std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<SpTxPartialInputV1> &partial_inputs)
+{
+    std::vector<crypto::key_image> input_key_images;
+    input_key_images.reserve(partial_inputs.size());
+
+    for (const auto &partial_input : partial_inputs)
+        input_key_images.emplace_back(partial_input.m_input_image.m_key_image);
+
+    return get_tx_input_sort_order_v1(input_key_images);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<SpENoteImageV1> &input_images)
+{
+    std::vector<crypto::key_image> input_key_images;
+    input_key_images.reserve(input_images.size());
+
+    for (const auto &input_image : input_images)
+        input_key_images.emplace_back(input_image.m_key_image);
+
+    return get_tx_input_sort_order_v1(input_key_images);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<crypto::key_image> &input_key_images)
+{
+    std::vector<std::size_t> original_indices;
+    original_indices.resize(input_key_images.size());
+
+    for (std::size_t input_index{0}; input_index < input_key_images.size(); ++input_index)
+        original_indices[input_index] = input_index;
+
+    // sort: key images ascending with byte-wise comparisons
+    std::sort(original_indices.begin(), original_indices.end(),
+            [&input_key_images](const std::size_t input_index_1, const std::size_t input_index_2) -> bool
+            {
+                return memcmp(&(input_key_images[input_index_1]),
+                    &(input_key_images[input_index_2]), sizeof(crypto::key_image)) < 0;
+            }
+        );
+
+    return original_indices;
+}
+//-------------------------------------------------------------------------------------------------------------------
 void sort_tx_inputs_sp_v1(const std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_sortable,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out,
     std::vector<SpENoteImageV1> &input_images_inout,
     std::vector<SpImageProofV1> &tx_image_proofs_inout)
 {
+    //TODO: deleteme
     CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == tx_image_proofs_inout.size(), "Input components size mismatch");
     CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == tx_membership_proofs_sortable.size(),
         "Input components size mismatch");
 
-    std::vector<std::size_t> original_indices{get_sort_order_for_sp_images_v1(input_images_inout)};
+    std::vector<std::size_t> original_indices{get_tx_input_sort_order_v1(input_images_inout)};
     CHECK_AND_ASSERT_THROW_MES(original_indices.size() == input_images_inout.size(), "Size mismatch getting sort order.");
 
     // move all input pieces into sorted positions
@@ -303,6 +324,7 @@ void sort_tx_inputs_sp_v2(std::vector<SpENoteImageV1> &input_images_inout,
     std::vector<SpMembershipReferenceSetV1> &membership_ref_sets_inout,
     std::vector<SpInputProposalV1> &input_proposals_inout)
 {
+    //TODO: deleteme
     // for tx with merged composition proof
 
     CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == image_address_masks_inout.size(),
@@ -314,7 +336,7 @@ void sort_tx_inputs_sp_v2(std::vector<SpENoteImageV1> &input_images_inout,
     CHECK_AND_ASSERT_THROW_MES(input_images_inout.size() == input_proposals_inout.size(),
         "Input components size mismatch");
 
-    std::vector<std::size_t> original_indices{get_sort_order_for_sp_images_v1(input_images_inout)};
+    std::vector<std::size_t> original_indices{get_tx_input_sort_order_v1(input_images_inout)};
     CHECK_AND_ASSERT_THROW_MES(original_indices.size() == input_images_inout.size(), "Size mismatch getting sort order.");
 
     // move all input pieces into sorted positions
@@ -348,7 +370,7 @@ void sort_tx_inputs_sp_v2(std::vector<SpENoteImageV1> &input_images_inout,
     input_proposals_inout = std::move(input_proposals_sorted);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void sort_v1_tx_membership_proofs_sp_v1(const std::vector<SpENoteImageV1> &input_images,
+void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpENoteImageV1> &input_images,
     std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_sortable_in,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out)
 {
