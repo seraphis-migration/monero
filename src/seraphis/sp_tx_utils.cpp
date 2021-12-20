@@ -134,44 +134,6 @@ static void prepare_image_masks_all_sp_v1(const std::vector<SpInputProposalV1> &
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-// create t_k and t_c for all enote images in a tx
-//-------------------------------------------------------------------------------------------------------------------
-static void prepare_image_masks_all_sp_v2(const std::vector<SpInputProposalV1> &input_proposals,
-    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
-    std::vector<crypto::secret_key> &image_address_masks_out,
-    std::vector<crypto::secret_key> &image_amount_masks_out)
-{
-    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx input image set without any inputs.");
-    CHECK_AND_ASSERT_THROW_MES(output_amount_commitment_blinding_factors.size() > 0,
-        "Tried to make tx input image set without any output blinding factors.");
-
-    std::vector<crypto::secret_key> input_amount_blinding_factors;
-
-    image_address_masks_out.resize(input_proposals.size());
-    image_amount_masks_out.resize(input_proposals.size());
-    input_amount_blinding_factors.resize(input_proposals.size() - 1);
-
-    // make initial set of input images (all but last)
-    for (std::size_t input_index{0}; input_index < input_proposals.size() - 1; ++input_index)
-    {
-        prepare_image_masks_sp_v1(image_address_masks_out[input_index],
-            image_amount_masks_out[input_index]);
-
-        // store total blinding factor of input image masked amount commitment
-        // v_c = t_c + x
-        sc_add(&(input_amount_blinding_factors[input_index]),
-            &(image_amount_masks_out[input_index]),  // t_c
-            &(input_proposals[input_index].m_amount_blinding_factor));  // x
-    }
-
-    // make last input image
-    prepare_image_masks_last_sp_v1(input_proposals.back(),
-        output_amount_commitment_blinding_factors,
-        input_amount_blinding_factors,
-        image_address_masks_out.back(),
-        image_amount_masks_out.back());
-}
-//-------------------------------------------------------------------------------------------------------------------
 // convert a crypto::secret_key vector to an rct::key vector, and obtain a memwiper for the rct::key vector
 //-------------------------------------------------------------------------------------------------------------------
 static auto convert_skv_to_rctv(const std::vector<crypto::secret_key> &skv, rct::keyV &rctv_out)
@@ -779,29 +741,6 @@ void make_v1_tx_balance_proof_sp_v2(const std::vector<rct::xmr_amount> &input_am
         remainder_blinding_factor);
 
     balance_proof_out->m_remainder_blinding_factor = rct::sk2rct(remainder_blinding_factor);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v2_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &output_amounts,
-    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
-    const std::size_t max_rangeproof_splits,
-    std::shared_ptr<SpBalanceProofV2> &balance_proof_out)
-{
-    // for merged-type tx (no remainder blinding factor in balance proof)
-
-    if (balance_proof_out.get() == nullptr)
-        balance_proof_out = std::make_shared<SpBalanceProofV2>();
-
-    // make range proofs
-    std::vector<rct::BulletproofPlus> range_proofs;
-
-    rct::keyV amount_commitment_blinding_factors;
-    auto vec_wiper{convert_skv_to_rctv(output_amount_commitment_blinding_factors, amount_commitment_blinding_factors)};
-    make_bpp_rangeproofs(output_amounts,
-        amount_commitment_blinding_factors,
-        max_rangeproof_splits,
-        range_proofs);
-
-    balance_proof_out->m_bpp_proofs = std::move(range_proofs);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &membership_ref_set,

@@ -189,51 +189,6 @@ bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_image
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_semantics_component_counts_v2(const std::size_t num_input_images,
-    const std::size_t num_membership_proofs,
-    const std::size_t num_outputs,
-    const std::size_t num_enote_pubkeys,
-    const SpImageProofV1 &image_proof_merged,
-    const std::shared_ptr<const SpBalanceProofV2> balance_proof)
-{
-    // need at least one input
-    if (num_input_images < 1)
-        return false;
-
-    // input images and image proofs should be 1:1
-    // note: merged composition proofs have proof components that must be 1:1 with input images
-    if (num_input_images != image_proof_merged.m_composition_proof.r_i.size() ||
-        num_input_images != image_proof_merged.m_composition_proof.K_t1.size())
-        return false;
-
-    // input images and membership proofs should be 1:1
-    if (num_input_images != num_membership_proofs)
-        return false;
-
-    // need at least 1 output
-    if (num_outputs < 1)
-        return false;
-
-    // should be a balance proof
-    if (balance_proof.get() == nullptr)
-        return false;
-
-    // range proofs and outputs should be 1:1
-    std::size_t num_range_proofs{0};
-    for (const auto &proof : balance_proof->m_bpp_proofs)
-        num_range_proofs += proof.V.size();
-
-    if (num_range_proofs != num_outputs)
-        return false;
-
-    // outputs and enote pubkeys should be 1:1
-    // TODO: if (num(outputs) == 2), num(enote pubkeys) ?= 1
-    if (num_outputs != num_enote_pubkeys)
-        return false;
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_semantics_component_counts_v3(const std::size_t num_input_images,
     const std::size_t num_membership_proofs,
     const std::size_t num_image_proofs,
@@ -390,24 +345,6 @@ bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_imag
         outputs,
         balance_proof->m_bpp_proofs,
         balance_proof->m_remainder_blinding_factor,
-        defer_batchable);
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_amount_balance_v2(const std::vector<SpENoteImageV1> &input_images,
-    const std::vector<SpENoteV1> &outputs,
-    const std::shared_ptr<const SpBalanceProofV2> balance_proof,
-    const bool defer_batchable)
-{
-    // sanity check
-    if (balance_proof.get() == nullptr)
-        return false;
-
-    rct::key remainder_blinding_factor{rct::zero()};  // no remainder in this balance proof type
-
-    return validate_sp_amount_balance_v1_v2(input_images,
-        outputs,
-        balance_proof->m_bpp_proofs,
-        remainder_blinding_factor,
         defer_batchable);
 }
 //-------------------------------------------------------------------------------------------------------------------

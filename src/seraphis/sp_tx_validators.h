@@ -69,29 +69,6 @@ bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_image
     const std::size_t num_enote_pubkeys,
     const std::shared_ptr<const SpBalanceProofV1> balance_proof);
 /**
-* brief: validate_sp_semantics_component_counts_v2 - check tx component counts are valid
-*   - num(membership proofs) == num(image proofs) == num(input images)
-*   - num(outputs) >= 1
-*   - num(range proofs) == num(outputs)
-*   - num(enote pubkeys) == num(outputs)  // TODO: if (num(outputs) == 2), num(enote pubkeys) ?= 1
-* 
-*   - differences from v1:
-*     - merged v1 image proof instead of separate image proofs
-* param: num_input_images -
-* param: num_membership_proofs -
-* param: num_outputs -
-* param: num_enote_pubkeys -
-* param: merged_image_proof -
-* param: balance_proof -
-* return: true/false on validation result
-*/
-bool validate_sp_semantics_component_counts_v2(const std::size_t num_input_images,
-    const std::size_t num_membership_proofs,
-    const std::size_t num_outputs,
-    const std::size_t num_enote_pubkeys,
-    const SpImageProofV1 &image_proof_merged,
-    const std::shared_ptr<const SpBalanceProofV2> balance_proof);
-/**
 * brief: validate_sp_semantics_component_counts_v3 - check tx component counts are valid
 *   - num(membership proofs) == num(image proofs) == num(input images)
 *   - num(outputs) >= 1
@@ -167,21 +144,6 @@ bool validate_sp_linking_tags_v1(const std::vector<SpENoteImageV1> &input_images
 bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_images,
     const std::vector<SpENoteV1> &outputs,
     const std::shared_ptr<const SpBalanceProofV1> balance_proof,
-    const bool defer_batchable);
-/**
-* brief: validate_sp_amount_balance_v2 - check that amounts balance in the tx (inputs = outputs)
-*   - check BP+ range proofs on output commitments
-*     - do not check these if 'defer_batchable' is set; BP+ range proofs can be batch-verified
-*   - check sum(input image masked commitments) == sum(output commitments)
-* param: input_images -
-* param: outputs -
-* param: balance_proof -
-* param: defer_batchable -
-* return: true/false on validation result
-*/
-bool validate_sp_amount_balance_v2(const std::vector<SpENoteImageV1> &input_images,
-    const std::vector<SpENoteV1> &outputs,
-    const std::shared_ptr<const SpBalanceProofV2> balance_proof,
     const bool defer_batchable);
 /**
 * brief: validate_sp_amount_balance_v3 - check that amounts balance in the tx (inputs = outputs)

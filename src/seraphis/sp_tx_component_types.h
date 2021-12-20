@@ -143,19 +143,6 @@ struct SpBalanceProofV1 final
 };
 
 ////
-// SpBalanceProofV2 - Balance Proof V1
-// - balance proof: implicit [sum(inputs) == sum(outputs)]
-// - range proof: Bulletproofs+
-///
-struct SpBalanceProofV2 final
-{
-    /// a set of BP+ proofs
-    std::vector<rct::BulletproofPlus> m_bpp_proofs;
-
-    std::size_t get_size_bytes(const bool include_commitments = false) const;
-};
-
-////
 // SpTxSupplementV1 - supplementary info about a tx
 // - enote pubkeys: may not line up 1:1 with output enotes, so store in separate field
 // - tx memo

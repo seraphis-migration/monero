@@ -342,17 +342,6 @@ void make_v1_tx_balance_proof_sp_v2(const std::vector<rct::xmr_amount> &input_am
     const std::size_t max_rangeproof_splits,
     std::shared_ptr<SpBalanceProofV1> &balance_proof_out);
 /**
-* brief: make_v2_tx_balance_proof_sp_v1 - make v2 tx balance proof (BP+ for range proofs; balance is implicit)
-* param: output_amounts -
-* param: output_amount_commitment_blinding_factors -
-* param: max_rangeproof_splits -
-* outparam: balance_proof_out -
-*/
-void make_v2_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &output_amounts,
-    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
-    const std::size_t max_rangeproof_splits,
-    std::shared_ptr<SpBalanceProofV2> &balance_proof_out);
-/**
 * brief: make_v1_tx_membership_proof_sp_v1 - make a v1 membership proof (concise grootle)
 * param: membership_ref_set -
 * param: image_address_mask -

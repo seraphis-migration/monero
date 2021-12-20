@@ -166,23 +166,6 @@ std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=f
     return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t SpBalanceProofV2::get_size_bytes(const bool include_commitments /*=false*/) const
-{
-    // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
-    //TODO? don't store amount commitment set in range proofs at all
-    std::size_t size{0};
-
-    for (const auto &proof : m_bpp_proofs)
-    {
-        if (include_commitments)
-            size += 32 * proof.V.size();
-
-        size += 32 * (6 + proof.L.size() + proof.R.size());;
-    }
-
-    return size;
-}
-//-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSupplementV1::get_size_bytes() const
 {
     return 32 * m_output_enote_pubkeys.size();
