@@ -87,7 +87,7 @@ SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_propo
 
     // membership proofs
     std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable;
-    make_v1_tx_membership_proofs_sp_v2(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
+    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
 
     // sort the membership proofs so they line up with input images
     std::vector<SpMembershipProofV1> tx_membership_proofs;
@@ -246,7 +246,7 @@ std::shared_ptr<SpTxSquashedV1> make_mock_tx<SpTxSquashedV1>(const SpTxParamPack
         input_enotes.emplace_back(input_proposal.m_enote);
 
     std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
-            gen_mock_sp_membership_ref_sets_v2(input_enotes,
+            gen_mock_sp_membership_ref_sets_v1(input_enotes,
                 params.ref_set_decomp_n,
                 params.ref_set_decomp_m,
                 ledger_context_inout)

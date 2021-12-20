@@ -152,13 +152,13 @@ SpTxPartialInputV1::SpTxPartialInputV1(const SpInputProposalV1 &input_proposal,
     m_proposal_prefix = proposal_prefix;
 
     // prepare input image
-    make_v1_tx_image_sp_v2(input_proposal,
+    make_v1_tx_image_sp_v1(input_proposal,
         m_input_image,
         m_image_address_mask,
         m_image_amount_mask);
 
     // construct image proof
-    make_v1_tx_image_proof_sp_v2(input_proposal,
+    make_v1_tx_image_proof_sp_v1(input_proposal,
         m_input_image,
         m_image_address_mask,
         m_proposal_prefix,
@@ -186,7 +186,7 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
 
     // get input image amount commitment blinding factors
     std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
-    prepare_input_commitment_factors_for_balance_proof_v2(partial_inputs,
+    prepare_input_commitment_factors_for_balance_proof_v1(partial_inputs,
         input_image_amount_commitment_blinding_factors);
 
     // get input amounts
@@ -202,7 +202,7 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
         "Rearrange vector failed.");
 
     // make balance proof
-    make_v1_tx_balance_proof_sp_v2(input_amounts,
+    make_v1_tx_balance_proof_sp_v1(input_amounts,
         proposal.m_output_amounts,
         input_image_amount_commitment_blinding_factors,
         proposal.m_output_amount_commitment_blinding_factors,

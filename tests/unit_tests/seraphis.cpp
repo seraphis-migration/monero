@@ -142,7 +142,7 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
         input_enotes.emplace_back(input_proposal.m_enote);
 
     std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
-            gen_mock_sp_membership_ref_sets_v2(input_enotes,
+            gen_mock_sp_membership_ref_sets_v1(input_enotes,
                 ref_set_decomp_n,
                 ref_set_decomp_m,
                 ledger_context_inout)
@@ -173,12 +173,12 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
         output_amounts,
         output_amount_commitment_blinding_factors,
         tx_supplement);
-    make_v1_tx_images_sp_v2(input_proposals,
+    make_v1_tx_images_sp_v1(input_proposals,
         input_images,
         image_address_masks,
         image_amount_masks);
     rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
-    make_v1_tx_image_proofs_sp_v3(input_proposals,
+    make_v1_tx_image_proofs_sp_v1(input_proposals,
         input_images,
         image_address_masks,
         image_proofs_message,
@@ -199,13 +199,13 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
         image_amount_masks,
         input_amounts,
         input_image_amount_commitment_blinding_factors);
-    make_v1_tx_balance_proof_sp_v2(input_amounts, //note: must range proof input image commitments in squashed enote model
+    make_v1_tx_balance_proof_sp_v1(input_amounts, //note: must range proof input image commitments in squashed enote model
         output_amounts,
         input_image_amount_commitment_blinding_factors,
         output_amount_commitment_blinding_factors,
         max_rangeproof_splits,
         balance_proof);
-    make_v1_tx_membership_proofs_sp_v2(membership_ref_sets,
+    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets,
         image_address_masks,
         image_amount_masks,
         tx_membership_proofs_sortable);  //could also obtain sortable membership proofs as inputs
