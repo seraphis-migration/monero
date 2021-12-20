@@ -1116,8 +1116,8 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input
     partial_inputs_out.reserve(input_proposals.size());
 
     // make all inputs
-    for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
-        partial_inputs_out.emplace_back(input_proposals[input_index], proposal_prefix);
+    for (const auto &input_proposal : input_proposals)
+        partial_inputs_out.emplace_back(input_proposal, proposal_prefix);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,

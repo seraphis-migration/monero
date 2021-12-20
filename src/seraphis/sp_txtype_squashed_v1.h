@@ -99,6 +99,21 @@ public:
             m_tx_validation_rules_version = validation_rules_version;
         }
 
+    /// normal constructor: finalize from a partial tx
+    SpTxSquashedV1(SpTxPartialV1 partial_tx,
+        std::vector<SpMembershipProofV1> membership_proofs,
+        const ValidationRulesVersion validation_rules_version) :
+            SpTxSquashedV1{
+                std::move(partial_tx.m_input_images),
+                std::move(partial_tx.m_outputs),
+                std::move(partial_tx.m_balance_proof),
+                std::move(partial_tx.m_image_proofs),
+                std::move(membership_proofs),
+                std::move(partial_tx.m_tx_supplement),
+                validation_rules_version
+            }
+    {}
+
     /// normal constructor: monolithic tx builder (complete tx in one step)
     SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_proposals,
         const std::size_t max_rangeproof_splits,

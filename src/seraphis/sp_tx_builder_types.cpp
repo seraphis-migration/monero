@@ -152,13 +152,13 @@ SpTxPartialInputV1::SpTxPartialInputV1(const SpInputProposalV1 &input_proposal,
     m_proposal_prefix = proposal_prefix;
 
     // prepare input image
-    make_v1_tx_image_sp_v1(input_proposal,
+    make_v1_tx_image_sp_v2(input_proposal,
         m_input_image,
         m_image_address_mask,
         m_image_amount_mask);
 
     // construct image proof
-    make_v1_tx_image_proof_sp_v1(input_proposal,
+    make_v1_tx_image_proof_sp_v2(input_proposal,
         m_input_image,
         m_image_address_mask,
         m_proposal_prefix,
@@ -179,12 +179,31 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
             "Incompatible tx pieces when making partial tx.");
     }
 
-    // make balance proof
+    // prepare for sorting
+    std::vector<std::size_t> input_sort_order{get_tx_input_sort_order_v1(partial_inputs)};
+    CHECK_AND_ASSERT_THROW_MES(input_sort_order.size() == partial_inputs.size(),
+        "Vector size mismatch when making partial tx.");
+
+    // get input image amount commitment blinding factors
     std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
     prepare_input_commitment_factors_for_balance_proof_v2(partial_inputs,
         input_image_amount_commitment_blinding_factors);
 
-    make_v1_tx_balance_proof_sp_v1(proposal.m_output_amounts,
+    // get input amounts
+    std::vector<rct::xmr_amount> input_amounts;
+    input_amounts.reserve(partial_inputs.size());
+    for (const auto &partial_input : partial_inputs)
+        input_amounts.emplace_back(partial_input.m_input_amount);
+
+    // sort input pieces for balance proof
+    CHECK_AND_ASSERT_THROW_MES(
+        rearrange_vector(input_sort_order, input_image_amount_commitment_blinding_factors) &&
+        rearrange_vector(input_sort_order, input_amounts),
+        "Rearrange vector failed.");
+
+    // make balance proof
+    make_v1_tx_balance_proof_sp_v2(input_amounts,
+        proposal.m_output_amounts,
         input_image_amount_commitment_blinding_factors,
         proposal.m_output_amount_commitment_blinding_factors,
         max_rangeproof_splits,
@@ -196,10 +215,6 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
     m_input_enotes.reserve(partial_inputs.size());
     m_image_amount_masks.reserve(partial_inputs.size());
     m_image_address_masks.reserve(partial_inputs.size());
-
-    std::vector<std::size_t> input_sort_order{get_tx_input_sort_order_v1(partial_inputs)};
-    CHECK_AND_ASSERT_THROW_MES(input_sort_order.size() == partial_inputs.size(),
-        "Vector size mismatch when making partial tx.");
 
     for (std::size_t input_index{0}; input_index < partial_inputs.size(); ++input_index)
     {

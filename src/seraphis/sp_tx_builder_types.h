@@ -115,9 +115,7 @@ struct SpMembershipProofSortableV1 final
 };
 
 ////
-// SpTxProposalV1: set of destinations (and miscellaneous memos), and a balance proof
-// - in this version, balance proofs are independent of inputs (the balance proof itself is implicit, only range proofs
-//   require storage), so a tx's balance proof can be stored in the tx proposal
+// SpTxProposalV1: set of destinations (and miscellaneous memos)
 ///
 struct SpTxProposalV1 final
 {
@@ -174,7 +172,7 @@ struct SpTxPartialInputV1 final //needs to be InputSetPartial for merged composi
     crypto::secret_key m_image_address_mask;
     crypto::secret_key m_image_amount_mask;
 
-    /// proposal prefix (represents the set of destinations and memos; image proofs must sign this)
+    /// proposal prefix (represents the set of destinations and memos; signed by this partial input's image proof)
     rct::key m_proposal_prefix;
 
     /// the input enote (won't be recorded in the final tx)

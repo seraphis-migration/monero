@@ -74,65 +74,27 @@ SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_propo
     version_string.reserve(3);
     SpTxSquashedV1::get_versioning_string(validation_rules_version, version_string);
 
-    // tx components
-    std::vector<SpENoteImageV1> input_images;
-    std::vector<SpENoteV1> outputs;
-    std::shared_ptr<SpBalanceProofV1> balance_proof;
-    std::vector<SpImageProofV1> tx_image_proofs;
+    // tx proposal
+    SpTxProposalV1 tx_proposal{destinations};
+    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
+
+    // partial inputs
+    std::vector<SpTxPartialInputV1> partial_inputs;
+    make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, tx_proposal, partial_inputs);
+
+    // partial tx
+    SpTxPartialV1 partial_tx{tx_proposal, partial_inputs, max_rangeproof_splits, version_string};
+
+    // membership proofs
     std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable;
+    make_v1_tx_membership_proofs_sp_v2(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
+
+    // sort the membership proofs so they line up with input images
     std::vector<SpMembershipProofV1> tx_membership_proofs;
-    SpTxSupplementV1 tx_supplement;
+    align_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images, tx_membership_proofs_sortable, tx_membership_proofs);
 
-    // info shuttles for making components
-    std::vector<rct::xmr_amount> output_amounts;
-    std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
-    std::vector<crypto::secret_key> image_address_masks;
-    std::vector<crypto::secret_key> image_amount_masks;
-
-    make_v1_tx_outputs_sp_v1(destinations,
-        outputs,
-        output_amounts,
-        output_amount_commitment_blinding_factors,
-        tx_supplement);
-    make_v1_tx_images_sp_v2(input_proposals,
-        input_images,
-        image_address_masks,
-        image_amount_masks);
-    // the API here around sorting is clumsy and not well thought-out (TODO: improve if this tx variant is to be used)
-    std::vector<SpMembershipReferenceSetV1> membership_ref_sets_sorted{membership_ref_sets};
-    std::vector<SpInputProposalV1> input_proposals_sorted{input_proposals};
-    sort_tx_inputs_sp_v2(input_images,
-        image_address_masks,
-        image_amount_masks,
-        membership_ref_sets_sorted,
-        input_proposals_sorted);  //sort now so range proofs line up with input images
-    std::vector<rct::xmr_amount> input_amounts;
-    std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
-    prepare_input_commitment_factors_for_balance_proof_v1(input_proposals_sorted,
-        image_amount_masks,
-        input_amounts,
-        input_image_amount_commitment_blinding_factors);
-    make_v1_tx_balance_proof_sp_v2(input_amounts, //note: must range proof input image commitments in squashed enote model
-        output_amounts,
-        input_image_amount_commitment_blinding_factors,
-        output_amount_commitment_blinding_factors,
-        max_rangeproof_splits,
-        balance_proof);
-    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
-    make_v1_tx_image_proofs_sp_v3(input_proposals_sorted,
-        input_images,
-        image_address_masks,
-        image_proofs_message,
-        tx_image_proofs);
-    make_v1_tx_membership_proofs_sp_v2(membership_ref_sets_sorted,
-        image_address_masks,
-        image_amount_masks,
-        tx_membership_proofs_sortable);
-    align_v1_tx_membership_proofs_sp_v1(input_images, tx_membership_proofs_sortable, tx_membership_proofs);
-
-    *this = SpTxSquashedV1{std::move(input_images), std::move(outputs),
-        std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),
-        std::move(tx_supplement), SpTxSquashedV1::ValidationRulesVersion::ONE};
+    // assemble tx
+    *this = SpTxSquashedV1{std::move(partial_tx), std::move(tx_membership_proofs), validation_rules_version};
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTxSquashedV1::validate_tx_semantics() const
