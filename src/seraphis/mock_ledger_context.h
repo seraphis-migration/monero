@@ -75,18 +75,11 @@ public:
     void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
         std::vector<SpENoteV1> &enotes_out) const override;
     /**
-    * brief: get_reference_set_components_sp_v1 - gets components of Seraphis enotes stored in the ledger
-    * param: indices -
-    * outparam: referenced_enotes_components_out - {{enote address, enote amount commitment}}
-    */
-    void get_reference_set_components_sp_v1(const std::vector<std::size_t> &indices,
-        rct::keyM &referenced_enotes_components_out) const override;
-    /**
-    * brief: get_reference_set_components_sp_v2 - gets Seraphis squashed enotes stored in the ledger
+    * brief: get_reference_set_components_sp_v1 - gets Seraphis squashed enotes stored in the ledger
     * param: indices -
     * outparam: referenced_enotes_components_out - {{squashed enote}}
     */
-    void get_reference_set_components_sp_v2(const std::vector<std::size_t> &indices,
+    void get_reference_set_components_sp_v1(const std::vector<std::size_t> &indices,
         rct::keyM &referenced_enotes_components_out) const override;
     /**
     * brief: add_transaction_sp_squashed_v1 - add a SpTxSquashedV1 transaction to the ledger
@@ -99,24 +92,17 @@ public:
     */
     void add_linking_tag_sp_v1(const crypto::key_image &linking_tag);
     /**
-    * brief: add_enote_sp_v1 - add a Seraphis v1 enote to the ledger
-    * param: enote -
-    * return: index in the ledger of the enote just added
-    */
-    std::size_t add_enote_sp_v1(const SpENoteV1 &enote);
-    /**
     * brief: add_enote_sp_v1 - add a Seraphis v1 enote to the ledger (and store the squashed enote)
     * param: enote -
     * return: index in the ledger of the enote just added
     */
-    std::size_t add_enote_sp_v2(const SpENoteV1 &enote);
+    std::size_t add_enote_sp_v1(const SpENoteV1 &enote);
 
 private:
     /// implementations of the above, without internally locking the ledger mutex
     bool linking_tag_exists_sp_v1_impl(const crypto::key_image &linking_tag) const;
     void add_linking_tag_sp_v1_impl(const crypto::key_image &linking_tag);
     std::size_t add_enote_sp_v1_impl(const SpENoteV1 &enote);
-    std::size_t add_enote_sp_v2_impl(const SpENoteV1 &enote);
 
     /// Ledger mutex (mutable for use in const member functions)
     mutable std::mutex m_ledger_mutex;

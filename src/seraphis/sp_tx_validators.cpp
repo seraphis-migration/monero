@@ -550,7 +550,7 @@ bool validate_sp_membership_proofs_v2(const std::vector<SpMembershipProofV1> &me
         proof = {&(membership_proofs[input_index].m_concise_grootle_proof)};
 
         // get proof keys from enotes stored in the ledger
-        ledger_context->get_reference_set_components_sp_v2(membership_proofs[input_index].m_ledger_enote_indices,
+        ledger_context->get_reference_set_components_sp_v1(membership_proofs[input_index].m_ledger_enote_indices,
             membership_proof_keys);
 
         // offset (input image masked keys squashed: Q' = Ko' + C')

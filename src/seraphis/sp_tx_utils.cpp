@@ -1321,7 +1321,7 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v2(
             // insert referenced enote into mock ledger (also, record squashed enote)
             // note: in a real context, you would instead 'get' the enote's index from the ledger, and error if not found
             reference_sets[input_index].m_ledger_enote_indices[ref_index] =
-                ledger_context_inout->add_enote_sp_v2(reference_sets[input_index].m_referenced_enotes[ref_index]);
+                ledger_context_inout->add_enote_sp_v1(reference_sets[input_index].m_referenced_enotes[ref_index]);
         }
     }
 
