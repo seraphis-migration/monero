@@ -52,26 +52,6 @@ namespace sp
 * brief: validate_sp_semantics_component_counts_v1 - check tx component counts are valid
 *   - num(membership proofs) == num(image proofs) == num(input images)
 *   - num(outputs) >= 1
-*   - num(range proofs) == num(outputs)
-*   - num(enote pubkeys) == num(outputs)  // TODO: if (num(outputs) == 2), num(enote pubkeys) ?= 1
-* param: num_input_images -
-* param: num_membership_proofs -
-* param: num_image_proofs -
-* param: num_outputs -
-* param: num_enote_pubkeys -
-* param: balance_proof -
-* return: true/false on validation result
-*/
-bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_images,
-    const std::size_t num_membership_proofs,
-    const std::size_t num_image_proofs,
-    const std::size_t num_outputs,
-    const std::size_t num_enote_pubkeys,
-    const std::shared_ptr<const SpBalanceProofV1> balance_proof);
-/**
-* brief: validate_sp_semantics_component_counts_v3 - check tx component counts are valid
-*   - num(membership proofs) == num(image proofs) == num(input images)
-*   - num(outputs) >= 1
 *   - num(range proofs) == num(input images) + num(outputs)
 *   - num(enote pubkeys) == num(outputs)  // TODO: if (num(outputs) == 2), num(enote pubkeys) ?= 1
 * 
@@ -85,7 +65,7 @@ bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_image
 * param: balance_proof -
 * return: true/false on validation result
 */
-bool validate_sp_semantics_component_counts_v3(const std::size_t num_input_images,
+bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_images,
     const std::size_t num_membership_proofs,
     const std::size_t num_image_proofs,
     const std::size_t num_outputs,
@@ -132,7 +112,7 @@ bool validate_sp_linking_tags_v1(const std::vector<SpENoteImageV1> &input_images
     const std::shared_ptr<const LedgerContext> ledger_context);
 /**
 * brief: validate_sp_amount_balance_v1 - check that amounts balance in the tx (inputs = outputs)
-*   - check BP+ range proofs on output commitments
+*   - check BP+ range proofs on input image amount commitments and output commitments (e.g. for squashed enote model)
 *     - do not check these if 'defer_batchable' is set; BP+ range proofs can be batch-verified
 *   - check sum(input image masked commitments) == sum(output commitments) + remainder*G
 * param: input_images -
@@ -146,34 +126,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_imag
     const std::shared_ptr<const SpBalanceProofV1> balance_proof,
     const bool defer_batchable);
 /**
-* brief: validate_sp_amount_balance_v3 - check that amounts balance in the tx (inputs = outputs)
-*   - check BP+ range proofs on input image amount commitments and output commitments (e.g. for squashed enote model)
-*     - do not check these if 'defer_batchable' is set; BP+ range proofs can be batch-verified
-*   - check sum(input image masked commitments) == sum(output commitments) + remainder*G
-* param: input_images -
-* param: outputs -
-* param: balance_proof -
-* param: defer_batchable -
-* return: true/false on validation result
-*/
-bool validate_sp_amount_balance_v3(const std::vector<SpENoteImageV1> &input_images,
-    const std::vector<SpENoteV1> &outputs,
-    const std::shared_ptr<const SpBalanceProofV1> balance_proof,
-    const bool defer_batchable);
-/**
 * brief: validate_sp_membership_proofs_v1 - check that tx inputs exist in the ledger
-*   - try to get referenced enotes from ledger (NOT txpool)
-*   - check concise grootle proofs (membership proofs)
-* param: membership_proofs -
-* param: input_images -
-* param: ledger_context -
-* return: true/false on validation result
-*/
-bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
-    const std::vector<SpENoteImageV1> &input_images,
-    const std::shared_ptr<const LedgerContext> ledger_context);
-/**
-* brief: validate_sp_membership_proofs_v2 - check that tx inputs exist in the ledger
 *   - try to get referenced enotes from ledger in 'squashed enote' form (NOT txpool)
 *   - check concise grootle proofs (membership proofs)
 * param: membership_proofs -
@@ -181,7 +134,7 @@ bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &me
 * param: ledger_context -
 * return: true/false on validation result
 */
-bool validate_sp_membership_proofs_v2(const std::vector<SpMembershipProofV1> &membership_proofs,
+bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
     const std::vector<SpENoteImageV1> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context);
 /**
@@ -194,18 +147,6 @@ bool validate_sp_membership_proofs_v2(const std::vector<SpMembershipProofV1> &me
 * return: true/false on validation result
 */
 bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_proofs,
-    const std::vector<SpENoteImageV1> &input_images,
-    const rct::key &image_proofs_message);
-/**
-* brief: validate_sp_composition_proof_merged_v1 - check that spending tx inputs is authorized by their owners,
-*        and key images are properly constructed
-*   - check merged Seraphis composition proof
-* param: image_proofs -
-* param: input_images -
-* param: image_proofs_message -
-* return: true/false on validation result
-*/
-bool validate_sp_composition_proof_merged_v1(const SpImageProofV1 &image_proof,
     const std::vector<SpENoteImageV1> &input_images,
     const rct::key &image_proofs_message);
 

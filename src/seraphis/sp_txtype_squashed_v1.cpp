@@ -100,7 +100,7 @@ SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_propo
 bool SpTxSquashedV1::validate_tx_semantics() const
 {
     // validate component counts (num inputs/outputs/etc.)
-    if (!validate_sp_semantics_component_counts_v3(m_input_images.size(),
+    if (!validate_sp_semantics_component_counts_v1(m_input_images.size(),
         m_membership_proofs.size(),
         m_image_proofs.size(),
         m_outputs.size(),
@@ -146,7 +146,7 @@ bool SpTxSquashedV1::validate_tx_linking_tags(const std::shared_ptr<const Ledger
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTxSquashedV1::validate_tx_amount_balance(const bool defer_batchable) const
 {
-    if (!validate_sp_amount_balance_v3(m_input_images, m_outputs, m_balance_proof, defer_batchable))
+    if (!validate_sp_amount_balance_v1(m_input_images, m_outputs, m_balance_proof, defer_batchable))
     {
         return false;
     }
@@ -158,7 +158,7 @@ bool SpTxSquashedV1::validate_tx_input_proofs(const std::shared_ptr<const Ledger
     const bool defer_batchable) const
 {
     // membership proofs
-    if (!validate_sp_membership_proofs_v2(m_membership_proofs,
+    if (!validate_sp_membership_proofs_v1(m_membership_proofs,
         m_input_images,
         ledger_context))
     {

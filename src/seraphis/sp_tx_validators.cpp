@@ -58,7 +58,7 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 // helper for validating v1, v2, v3 balance proofs (balance equality check)
 //-------------------------------------------------------------------------------------------------------------------
-static bool validate_sp_amount_balance_equality_check_v1_v2_v3(const std::vector<SpENoteImageV1> &input_images,
+static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpENoteImageV1> &input_images,
     const std::vector<SpENoteV1> &outputs,
     const rct::key &remainder_blinding_factor)
 {
@@ -86,110 +86,8 @@ static bool validate_sp_amount_balance_equality_check_v1_v2_v3(const std::vector
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// helper for validating v1 and v2 balance proofs
-// - the only difference between them is the presence of a 'remainder blinding factor' in v1 proofs
-//-------------------------------------------------------------------------------------------------------------------
-static bool validate_sp_amount_balance_v1_v2(const std::vector<SpENoteImageV1> &input_images,
-    const std::vector<SpENoteV1> &outputs,
-    const std::vector<rct::BulletproofPlus> &range_proofs,
-    const rct::key &remainder_blinding_factor,
-    const bool defer_batchable)
-{
-    // sanity check
-    if (range_proofs.size() == 0)
-        return false;
-
-    // check that amount commitments balance
-    if (!validate_sp_amount_balance_equality_check_v1_v2_v3(input_images,
-            outputs,
-            remainder_blinding_factor))
-        return false;
-
-    // check that commitments in range proofs line up with output commitments
-    std::size_t range_proof_index{0};
-    std::size_t range_proof_grouping_size = range_proofs[0].V.size();
-
-    for (std::size_t output_index{0}; output_index < outputs.size(); ++output_index)
-    {
-        // assume range proofs are partitioned into groups of size 'range_proof_grouping_size' (except last one)
-        if (range_proofs[range_proof_index].V.size() == output_index - range_proof_index*range_proof_grouping_size)
-            ++range_proof_index;
-
-        // sanity checks
-        if (range_proofs.size() <= range_proof_index)
-            return false;
-        if (range_proofs[range_proof_index].V.size() <= output_index - range_proof_index*range_proof_grouping_size)
-            return false;
-
-        // double check that the two stored copies of output commitments match
-        // TODO? don't store commitments in BP+ structure
-        if (outputs[output_index].m_amount_commitment !=
-                rct::rct2pk(rct::scalarmult8(range_proofs[range_proof_index].V[output_index -
-                    range_proof_index*range_proof_grouping_size])))
-            return false;
-    }
-
-    // range proofs must be valid
-    if (!defer_batchable)
-    {
-        std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
-        range_proof_ptrs.reserve(range_proofs.size());
-
-        for (const auto &range_proof : range_proofs)
-            range_proof_ptrs.push_back(&range_proof);
-
-        if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
-            return false;
-    }
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_images,
-    const std::size_t num_membership_proofs,
-    const std::size_t num_image_proofs,
-    const std::size_t num_outputs,
-    const std::size_t num_enote_pubkeys,
-    const std::shared_ptr<const SpBalanceProofV1> balance_proof)
-{
-    // need at least one input
-    if (num_input_images < 1)
-        return false;
-
-    // input images and image proofs should be 1:1
-    if (num_input_images != num_image_proofs)
-        return false;
-
-    // input images and membership proofs should be 1:1
-    if (num_input_images != num_membership_proofs)
-        return false;
-
-    // need at least 1 output
-    if (num_outputs < 1)
-        return false;
-
-    // should be a balance proof
-    if (balance_proof.get() == nullptr)
-        return false;
-
-    // range proofs and outputs should be 1:1
-    std::size_t num_range_proofs{0};
-    for (const auto &proof : balance_proof->m_bpp_proofs)
-        num_range_proofs += proof.V.size();
-
-    if (num_range_proofs != num_outputs)
-        return false;
-
-    // outputs and enote pubkeys should be 1:1
-    // TODO: if (num(outputs) == 2), num(enote pubkeys) ?= 1
-    if (num_outputs != num_enote_pubkeys)
-        return false;
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_semantics_component_counts_v3(const std::size_t num_input_images,
     const std::size_t num_membership_proofs,
     const std::size_t num_image_proofs,
     const std::size_t num_outputs,
@@ -341,22 +239,6 @@ bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_imag
     if (balance_proof.get() == nullptr)
         return false;
 
-    return validate_sp_amount_balance_v1_v2(input_images,
-        outputs,
-        balance_proof->m_bpp_proofs,
-        balance_proof->m_remainder_blinding_factor,
-        defer_batchable);
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_amount_balance_v3(const std::vector<SpENoteImageV1> &input_images,
-    const std::vector<SpENoteV1> &outputs,
-    const std::shared_ptr<const SpBalanceProofV1> balance_proof,
-    const bool defer_batchable)
-{
-    // sanity check
-    if (balance_proof.get() == nullptr)
-        return false;
-
     const std::vector<rct::BulletproofPlus> &range_proofs = balance_proof->m_bpp_proofs;
 
     // sanity check
@@ -364,7 +246,7 @@ bool validate_sp_amount_balance_v3(const std::vector<SpENoteImageV1> &input_imag
         return false;
 
     // check that amount commitments balance
-    if (!validate_sp_amount_balance_equality_check_v1_v2_v3(input_images,
+    if (!validate_sp_amount_balance_equality_check_v1(input_images,
         outputs,
         balance_proof->m_remainder_blinding_factor))
         return false;
@@ -438,48 +320,6 @@ bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &me
     rct::keyM membership_proof_keys;
     rct::keyM offsets;
     rct::keyV message;
-
-    for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
-    {
-        proof = {&(membership_proofs[input_index].m_concise_grootle_proof)};
-
-        // get proof keys from enotes stored in the ledger
-        ledger_context->get_reference_set_components_sp_v1(membership_proofs[input_index].m_ledger_enote_indices,
-            membership_proof_keys);
-
-        // offsets (input image masked keys)
-        offsets = {{input_images[input_index].m_masked_address, input_images[input_index].m_masked_commitment}};
-
-        // proof message
-        message = {get_tx_membership_proof_message_sp_v1(membership_proofs[input_index].m_ledger_enote_indices)};
-
-        if (!sp::concise_grootle_verify(proof,
-            membership_proof_keys,
-            offsets,
-            membership_proofs[input_index].m_ref_set_decomp_n,
-            membership_proofs[input_index].m_ref_set_decomp_m,
-            message))
-        {
-            return false;
-        }
-    }
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_membership_proofs_v2(const std::vector<SpMembershipProofV1> &membership_proofs,
-    const std::vector<SpENoteImageV1> &input_images,
-    const std::shared_ptr<const LedgerContext> ledger_context)
-{
-    // sanity check
-    if (membership_proofs.size() != input_images.size())
-        return false;
-
-    // validate one proof at a time (no batching - i.e. cannot assume a shared reference set between proofs)
-    std::vector<const sp::ConciseGrootleProof*> proof;
-    rct::keyM membership_proof_keys;
-    rct::keyM offsets;
-    rct::keyV message;
     offsets.resize(1, rct::keyV(1));
 
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
@@ -532,28 +372,6 @@ bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_
         if (!sp::sp_composition_verify(image_proofs[input_index].m_composition_proof, K, KI, image_proofs_message))
             return false;
     }
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_composition_proof_merged_v1(const SpImageProofV1 &image_proof,
-    const std::vector<SpENoteImageV1> &input_images,
-    const rct::key &image_proofs_message)
-{
-    // validate the merged composition proof (one proof for all input images)
-    rct::keyV K;
-    std::vector<crypto::key_image> KI;
-    K.reserve(input_images.size());
-    KI.reserve(input_images.size());
-
-    for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
-    {
-        K.emplace_back(input_images[input_index].m_masked_address);
-        KI.emplace_back(input_images[input_index].m_key_image);
-    }
-
-    if (!sp::sp_composition_verify(image_proof.m_composition_proof, K, KI, image_proofs_message))
-            return false;
 
     return true;
 }
