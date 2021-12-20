@@ -37,8 +37,6 @@
 #include "ringct/rctTypes.h"
 #include "sp_core_utils.h"
 #include "sp_tx_component_types.h"
-#include "sp_txtype_concise_v1.h"
-#include "sp_txtype_merge_v1.h"
 #include "sp_txtype_squashed_v1.h"
 
 //third party headers
@@ -115,36 +113,6 @@ void MockLedgerContext::get_reference_set_components_sp_v2(const std::vector<std
     }
 
     referenced_enotes_components_out = std::move(referenced_enotes_components_temp);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::add_transaction_sp_concise_v1(const SpTxConciseV1 &tx_to_add)
-{
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
-
-    // add linking tags
-    for (const auto &input_image : tx_to_add.m_input_images)
-        this->add_linking_tag_sp_v1_impl(input_image.m_key_image);
-
-    // add new enotes
-    for (const auto &output_enote : tx_to_add.m_outputs)
-        this->add_enote_sp_v1_impl(output_enote);
-
-    // note: for mock ledger, don't store the whole tx
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::add_transaction_sp_merge_v1(const SpTxMergeV1 &tx_to_add)
-{
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
-
-    // add linking tags
-    for (const auto &input_image : tx_to_add.m_input_images)
-        this->add_linking_tag_sp_v1_impl(input_image.m_key_image);
-
-    // add new enotes
-    for (const auto &output_enote : tx_to_add.m_outputs)
-        this->add_enote_sp_v1_impl(output_enote);
-
-    // note: for mock ledger, don't store the whole tx
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add)

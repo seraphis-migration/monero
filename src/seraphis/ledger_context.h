@@ -44,8 +44,6 @@
 namespace sp
 {
     struct SpENoteV1;
-    class SpTxConciseV1;
-    class SpTxMergeV1;
     class SpTxSquashedV1;
 }
 
@@ -84,16 +82,6 @@ public:
     virtual void get_reference_set_components_sp_v2(const std::vector<std::size_t> &indices,
         rct::keyM &referenced_enotes_components) const = 0;
     /**
-    * brief: add_transaction_sp_concise_v1 - add a SpTxConciseV1 transaction to the ledger
-    * param: tx_to_add -
-    */
-    virtual void add_transaction_sp_concise_v1(const SpTxConciseV1 &tx_to_add) = 0;
-    /**
-    * brief: add_transaction_sp_merge_v1 - add a SpTxSquashedV1 transaction to the ledger
-    * param: tx_to_add -
-    */
-    virtual void add_transaction_sp_merge_v1(const SpTxMergeV1 &tx_to_add) = 0;
-    /**
     * brief: add_transaction_sp_squashed_v1 - add a SpTxSquashedV1 transaction to the ledger
     * param: tx_to_add -
     */
@@ -103,22 +91,6 @@ public:
 template<typename TxType>
 void add_tx_to_ledger(const std::shared_ptr<LedgerContext> &ledger_context, const TxType &tx_to_add)
 {}
-
-template<>
-inline void add_tx_to_ledger<SpTxConciseV1>(const std::shared_ptr<LedgerContext> &ledger_context,
-    const SpTxConciseV1 &tx_to_add)
-{
-    if (ledger_context.get() != nullptr)
-        ledger_context->add_transaction_sp_concise_v1(tx_to_add);
-}
-
-template<>
-inline void add_tx_to_ledger<SpTxMergeV1>(const std::shared_ptr<LedgerContext> &ledger_context,
-    const SpTxMergeV1 &tx_to_add)
-{
-    if (ledger_context.get() != nullptr)
-        ledger_context->add_transaction_sp_merge_v1(tx_to_add);
-}
 
 template<>
 inline void add_tx_to_ledger<SpTxSquashedV1>(const std::shared_ptr<LedgerContext> &ledger_context,

@@ -31,8 +31,6 @@
 #include "ringct/rctTypes.h"
 #include "seraphis/mock_ledger_context.h"
 #include "seraphis/sp_tx_base.h"
-#include "seraphis/sp_txtype_concise_v1.h"
-#include "seraphis/sp_txtype_merge_v1.h"
 #include "seraphis/sp_txtype_squashed_v1.h"
 
 #include "gtest/gtest.h"
@@ -359,36 +357,6 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_batch_splitting()
     return gen_data;
 }
 
-
-/////////////////////////////////////////////////////////////////////
-///////////////////////// Seraphis Concise //////////////////////////
-/////////////////////////////////////////////////////////////////////
-
-TEST(mock_tx, seraphis_concise)
-{
-    run_mock_tx_test<sp::SpTxConciseV1>(get_mock_tx_gen_data_misc(true));
-}
-
-TEST(mock_tx_batching, seraphis_concise)
-{
-    run_mock_tx_test_batch<sp::SpTxConciseV1>(get_mock_tx_gen_data_batching());
-    run_mock_tx_test_batch<sp::SpTxConciseV1>(get_mock_tx_gen_data_batch_splitting());
-}
-
-/////////////////////////////////////////////////////////////////////
-////////////////////////// Seraphis Merge ///////////////////////////
-/////////////////////////////////////////////////////////////////////
-
-TEST(mock_tx, seraphis_merge)
-{
-    run_mock_tx_test<sp::SpTxMergeV1>(get_mock_tx_gen_data_misc(true));
-}
-
-TEST(mock_tx_batching, seraphis_merge)
-{
-    run_mock_tx_test_batch<sp::SpTxMergeV1>(get_mock_tx_gen_data_batching());
-    run_mock_tx_test_batch<sp::SpTxMergeV1>(get_mock_tx_gen_data_batch_splitting());
-}
 
 /////////////////////////////////////////////////////////////////////
 ////////////////////////// Seraphis Squash //////////////////////////

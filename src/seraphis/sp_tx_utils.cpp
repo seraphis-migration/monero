@@ -1105,6 +1105,53 @@ void make_v1_tx_membership_proofs_sp_v2(const std::vector<SpMembershipReferenceS
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_membership_proofs_sp_v2(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    const std::vector<SpTxPartialInputV1> &partial_inputs,
+    std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_out)
+{
+    // for squashed enote model
+
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_inputs.size(), "Input components size mismatch");
+
+    tx_membership_proofs_out.resize(membership_ref_sets.size());
+
+    for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
+    {
+        CHECK_AND_ASSERT_THROW_MES(membership_ref_sets[input_index].
+                m_referenced_enotes[membership_ref_sets[input_index].m_real_spend_index_in_set].m_onetime_address ==
+            partial_inputs[input_index].m_input_enote.m_onetime_address, 
+            "Membership ref set real spend doesn't match partial input's enote.");
+
+        make_v1_tx_membership_proof_sp_v2(membership_ref_sets[input_index],
+            partial_inputs[input_index].m_image_address_mask,
+            partial_inputs[input_index].m_image_amount_mask,
+            tx_membership_proofs_out[input_index]);
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_membership_proofs_sp_v2(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    const SpTxPartialV1 &partial_tx,
+    std::vector<SpMembershipProofV1> &tx_membership_proofs_out)
+{
+    // for squashed enote model
+
+    // note: ref sets are assumed to be pre-sorted, so sortable membership proofs are not needed
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_tx.m_image_address_masks.size(),
+        "Input components size mismatch");
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_tx.m_image_amount_masks.size(),
+        "Input components size mismatch");
+
+    tx_membership_proofs_out.resize(membership_ref_sets.size());
+
+    for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
+    {
+        make_v1_tx_membership_proof_sp_v2(membership_ref_sets[input_index],
+            partial_tx.m_image_address_masks[input_index],
+            partial_tx.m_image_amount_masks[input_index],
+            tx_membership_proofs_out[input_index]);
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const rct::key &proposal_prefix,
     const SpTxProposalV1 &tx_proposal,

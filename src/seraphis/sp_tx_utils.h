@@ -411,6 +411,12 @@ void make_v1_tx_membership_proofs_sp_v2(const std::vector<SpMembershipReferenceS
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
     std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_out);
+void make_v1_tx_membership_proofs_sp_v2(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    const std::vector<SpTxPartialInputV1> &partial_inputs,
+    std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_out);
+void make_v1_tx_membership_proofs_sp_v2(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    const SpTxPartialV1 &partial_tx,
+    std::vector<SpMembershipProofV1> &tx_membership_proofs_out);
 /**
 * brief: make_v1_tx_partial_inputs_sp_v1 - make a full set of v1 partial inputs
 * param: input_proposals -

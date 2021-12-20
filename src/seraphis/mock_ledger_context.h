@@ -51,8 +51,6 @@
 namespace sp
 {
     struct SpENoteV1;
-    class SpTxConciseV1;
-    class SpTxMergeV1;
     class SpTxSquashedV1;
 }
 
@@ -90,16 +88,6 @@ public:
     */
     void get_reference_set_components_sp_v2(const std::vector<std::size_t> &indices,
         rct::keyM &referenced_enotes_components_out) const override;
-    /**
-    * brief: add_transaction_sp_concise_v1 - add a SpTxConciseV1 transaction to the ledger
-    * param: tx_to_add -
-    */
-    void add_transaction_sp_concise_v1(const SpTxConciseV1 &tx_to_add) override;
-    /**
-    * brief: add_transaction_sp_merge_v1 - add a SpTxSquashedV1 transaction to the ledger
-    * param: tx_to_add -
-    */
-    void add_transaction_sp_merge_v1(const SpTxMergeV1 &tx_to_add) override;
     /**
     * brief: add_transaction_sp_squashed_v1 - add a SpTxSquashedV1 transaction to the ledger
     * param: tx_to_add -

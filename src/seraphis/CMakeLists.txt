@@ -39,8 +39,6 @@ set(seraphis_sources
   sp_tx_misc_utils.cpp
   sp_tx_utils.cpp
   sp_tx_validators.cpp
-  sp_txtype_concise_v1.cpp
-  sp_txtype_merge_v1.cpp
   sp_txtype_squashed_v1.cpp)
 
 monero_find_all_headers(seraphis_headers, "${CMAKE_CURRENT_SOURCE_DIR}")
