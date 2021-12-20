@@ -484,10 +484,7 @@ void make_v1_tx_image_sp_v1(const SpInputProposalV1 &input_proposal,
     crypto::secret_key &image_address_mask_out,
     crypto::secret_key &image_amount_mask_out)
 {
-    prepare_image_masks_sp_v1(image_address_mask_out, image_amount_mask_out);
-
-    // enote image
-    input_proposal.to_enote_image_base(image_address_mask_out, image_amount_mask_out, input_image_out);
+    //deleteme
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_sp_v2(const SpInputProposalV1 &input_proposal,
@@ -510,14 +507,7 @@ void make_v1_tx_image_last_sp_v1(const SpInputProposalV1 &input_proposal,
     crypto::secret_key &image_address_mask_out,
     crypto::secret_key &image_amount_mask_out)
 {
-    prepare_image_masks_last_sp_v1(input_proposal,
-        output_amount_commitment_blinding_factors,
-        input_amount_blinding_factors,
-        image_address_mask_out,
-        image_amount_mask_out);
-
-    // enote image
-    input_proposal.to_enote_image_base(image_address_mask_out, image_amount_mask_out, input_image_out);
+    //deleteme
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_last_sp_v2(const SpInputProposalV1 &input_proposal,
@@ -544,23 +534,7 @@ void make_v1_tx_images_sp_v1(const std::vector<SpInputProposalV1> &input_proposa
     std::vector<crypto::secret_key> &image_address_masks_out,
     std::vector<crypto::secret_key> &image_amount_masks_out)
 {
-    prepare_image_masks_all_sp_v1(input_proposals,
-        image_address_masks_out,
-        image_amount_masks_out);
-
-    CHECK_AND_ASSERT_THROW_MES(image_address_masks_out.size() == input_proposals.size() &&
-        image_amount_masks_out.size() == input_proposals.size(),
-        "Vector size mismatch when preparing image masks.");
-
-    input_images_out.resize(input_proposals.size());
-
-    // make input images
-    for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
-    {
-        input_proposals[input_index].to_enote_image_base(image_address_masks_out[input_index],
-            image_amount_masks_out[input_index],
-            input_images_out[input_index]);
-    }
+    //deleteme
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_images_sp_v2(const std::vector<SpInputProposalV1> &input_proposals,
@@ -595,26 +569,7 @@ void make_v1_tx_images_sp_v3(const std::vector<SpInputProposalV1> &input_proposa
     std::vector<crypto::secret_key> &image_address_masks_out,
     std::vector<crypto::secret_key> &image_amount_masks_out)
 {
-    // for merged-style tx
-
-    prepare_image_masks_all_sp_v2(input_proposals,
-        output_amount_commitment_blinding_factors,
-        image_address_masks_out,
-        image_amount_masks_out);
-
-    CHECK_AND_ASSERT_THROW_MES(image_address_masks_out.size() == input_proposals.size() &&
-        image_amount_masks_out.size() == input_proposals.size(),
-        "Vector size mismatch when preparing image masks.");
-
-    input_images_out.resize(input_proposals.size());
-
-    // make input images
-    for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
-    {
-        input_proposals[input_index].to_enote_image_base(image_address_masks_out[input_index],
-            image_amount_masks_out[input_index],
-            input_images_out[input_index]);
-    }
+    //deleteme
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proof_sp_v1(const SpInputProposalV1 &input_proposal,

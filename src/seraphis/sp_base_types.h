@@ -157,16 +157,6 @@ struct SpInputProposal
     virtual void get_key_image(crypto::key_image &key_image_out) const final;
 
     /**
-    * brief: to_enote_image_base - convert this input to an enote image
-    * param: address_mask - t_k
-    * param: commitment_mask - t_c
-    * inoutparam: image_inout -
-    */
-    virtual void to_enote_image_base(const crypto::secret_key &address_mask,
-        const crypto::secret_key &commitment_mask,
-        SpENoteImage &image_inout) const final;
-
-    /**
     * brief: to_enote_image_squashed_base - convert this input to an enote image in the squashed enote model
     * param: address_mask - t_k
     * param: commitment_mask - t_c
