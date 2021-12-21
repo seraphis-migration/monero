@@ -62,7 +62,7 @@ namespace sp
 * param: num_image_proofs -
 * param: num_outputs -
 * param: num_enote_pubkeys -
-* param: balance_proof -
+* param: num_range_proofs -
 * return: true/false on validation result
 */
 bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_images,
@@ -70,7 +70,7 @@ bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_image
     const std::size_t num_image_proofs,
     const std::size_t num_outputs,
     const std::size_t num_enote_pubkeys,
-    const std::shared_ptr<const SpBalanceProofV1> balance_proof);
+    const std::size_t num_range_proofs);
 /**
 * brief: validate_sp_semantics_ref_set_size_v1 - check membership proofs have consistent reference set sizes
 *   - num(refd enotes) == ref set size

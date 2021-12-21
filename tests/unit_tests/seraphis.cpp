@@ -112,7 +112,6 @@ static void make_fake_sp_user_keys(rct::key &recipient_DH_base_out,
 //-------------------------------------------------------------------------------------------------------------------
 static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
-    const std::size_t max_rangeproof_splits,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
     const sp::SpTxSquashedV1::ValidationRulesVersion validation_rules_version,
@@ -203,7 +202,6 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
         output_amounts,
         input_image_amount_commitment_blinding_factors,
         output_amount_commitment_blinding_factors,
-        max_rangeproof_splits,
         balance_proof);
     make_v1_tx_membership_proofs_sp_v1(membership_ref_sets,
         image_address_masks,
@@ -634,7 +632,7 @@ TEST(seraphis, sp_txtype_squashed_v1)
     // fake ledger context for this test
     std::shared_ptr<sp::MockLedgerContext> ledger_context = std::make_shared<sp::MockLedgerContext>();
 
-    // 3 tx, 11 inputs/outputs each, range proofs split x3
+    // 3 tx, 11 inputs/outputs each
     std::vector<std::shared_ptr<sp::SpTxSquashedV1>> txs;
     txs.reserve(3);
 
@@ -650,7 +648,7 @@ TEST(seraphis, sp_txtype_squashed_v1)
     for (std::size_t tx_index{0}; tx_index < 3; ++tx_index)
     {
         txs.emplace_back(
-                make_sp_txtype_squashed_v1(2, 3, 3, in_amounts, out_amounts,
+                make_sp_txtype_squashed_v1(2, 3, in_amounts, out_amounts,
                     sp::SpTxSquashedV1::ValidationRulesVersion::ONE, ledger_context)
             );
     }

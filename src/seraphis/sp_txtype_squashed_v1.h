@@ -116,7 +116,6 @@ public:
 
     /// normal constructor: monolithic tx builder (complete tx in one step)
     SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_proposals,
-        const std::size_t max_rangeproof_splits,
         const std::vector<SpDestinationV1> &destinations,
         const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
         const ValidationRulesVersion validation_rules_version);

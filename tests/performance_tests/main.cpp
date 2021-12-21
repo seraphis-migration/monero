@@ -205,7 +205,6 @@ int main(int argc, char** argv)
   // TEST 5.1: SpTxSquashedV1 {inputs}
   incrementer = {
       {1}, //batch sizes
-      {0}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {2}, //out counts
       {2}, //decomp n
@@ -224,7 +223,6 @@ int main(int argc, char** argv)
   // TEST 5.2: SpTxSquashedV1 {decomp}
   incrementer = {
       {1}, //batch sizes
-      {0}, //rangeproof splits
       {2}, //in counts
       {2}, //out counts
       {2, 3}, //decomp n
@@ -242,7 +240,6 @@ int main(int argc, char** argv)
   // TEST 5.3: SpTxSquashedV1 {outputs, batch size 1}
   incrementer = {
       {1}, //batch sizes
-      {0}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {1, 2, 4, 7, 12, 16}, //out counts
       {2}, //decomp n
@@ -250,10 +247,6 @@ int main(int argc, char** argv)
     };
   while (incrementer.next(p_mock_tx))
   {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
@@ -265,7 +258,6 @@ int main(int argc, char** argv)
   // TEST 5.4: SpTxSquashedV1 {16in/out, batch sizes 7, 15}
   incrementer = {
       {7, 15}, //batch sizes
-      {0}, //rangeproof splits
       {16}, //in counts
       {16}, //out counts
       {2}, //decomp n
@@ -273,10 +265,6 @@ int main(int argc, char** argv)
     };
   while (incrementer.next(p_mock_tx))
   {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
@@ -288,7 +276,6 @@ int main(int argc, char** argv)
   // TEST 5.5: SpTxSquashedV1 {outputs, batch size 25}
   incrementer = {
       {25}, //batch sizes
-      {0}, //rangeproof splits
       {1, 2, 4, 7, 12, 16}, //in counts
       {1, 2, 4, 7, 12, 16}, //out counts
       {2}, //decomp n
@@ -296,10 +283,6 @@ int main(int argc, char** argv)
     };
   while (incrementer.next(p_mock_tx))
   {
-    // squashed model: inputs and outputs have range proofs
-    if (p_mock_tx.num_rangeproof_splits > (p_mock_tx.in_count + p_mock_tx.out_count)/2)
-      continue;
-
     // only decomp 2^7
     if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
       TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);

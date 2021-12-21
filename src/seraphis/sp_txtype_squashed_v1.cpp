@@ -59,7 +59,6 @@ namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
 SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_proposals,
-    const std::size_t max_rangeproof_splits,
     const std::vector<SpDestinationV1> &destinations,
     const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const SpTxSquashedV1::ValidationRulesVersion validation_rules_version)
@@ -83,7 +82,7 @@ SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_propo
     make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, tx_proposal, partial_inputs);
 
     // partial tx
-    SpTxPartialV1 partial_tx{tx_proposal, partial_inputs, max_rangeproof_splits, version_string};
+    SpTxPartialV1 partial_tx{tx_proposal, partial_inputs, version_string};
 
     // membership proofs
     std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable;
@@ -99,13 +98,16 @@ SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_propo
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTxSquashedV1::validate_tx_semantics() const
 {
+    if (m_balance_proof.get() == nullptr)
+        return false;
+
     // validate component counts (num inputs/outputs/etc.)
     if (!validate_sp_semantics_component_counts_v1(m_input_images.size(),
         m_membership_proofs.size(),
         m_image_proofs.size(),
         m_outputs.size(),
         m_supplement.m_output_enote_pubkeys.size(),
-        m_balance_proof))
+        m_balance_proof->m_bpp_proof.V.size()))
     {
         return false;
     }
@@ -253,7 +255,7 @@ std::shared_ptr<SpTxSquashedV1> make_mock_tx<SpTxSquashedV1>(const SpTxParamPack
         };
 
     // make tx
-    return std::make_shared<SpTxSquashedV1>(input_proposals, params.max_rangeproof_splits, destinations,
+    return std::make_shared<SpTxSquashedV1>(input_proposals, destinations,
         membership_ref_sets, SpTxSquashedV1::ValidationRulesVersion::ONE);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -279,8 +281,7 @@ bool validate_mock_txs<SpTxSquashedV1>(const std::vector<std::shared_ptr<SpTxSqu
         if (balance_proof.get() == nullptr)
             return false;
 
-        for (const auto &range_proof : balance_proof->m_bpp_proofs)
-            range_proofs.push_back(&range_proof);
+        range_proofs.push_back(&(balance_proof->m_bpp_proof));
     }
 
     // batch verify range proofs

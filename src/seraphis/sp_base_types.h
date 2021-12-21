@@ -56,12 +56,8 @@ enum TxStructureVersionSp : unsigned char
 {
     /// mining transaction (TODO)
     TxTypeSpMining = 0,
-    /// concise grootle + separate composition proofs
-    TxTypeSpConciseV1 = 1,
-    /// concise grootle + merged composition proof
-    TxTypeSpMergeV1 = 2,
-    /// concise grootle in the squashed enote model + separate composition proof
-    TxTypeSpSquashedV1 = 3
+    /// concise grootle in the squashed enote model + separate composition proofs
+    TxTypeSpSquashedV1 = 1
 };
 
 

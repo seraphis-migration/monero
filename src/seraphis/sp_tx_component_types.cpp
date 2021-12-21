@@ -153,15 +153,13 @@ std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=f
     //TODO? don't store amount commitment set in range proofs at all
     std::size_t size{0};
 
-    for (const auto &proof : m_bpp_proofs)
-    {
-        if (include_commitments)
-            size += 32 * proof.V.size();
+    // BP+ proof
+    if (include_commitments)
+        size += 32 * m_bpp_proof.V.size();
+    size += 32 * (6 + m_bpp_proof.L.size() + m_bpp_proof.R.size());;
 
-        size += 32 * (6 + proof.L.size() + proof.R.size());;
-    }
-
-    size += 32;  // remainder blinding factor
+    // remainder blinding factor
+    size += 32;
 
     return size;
 }

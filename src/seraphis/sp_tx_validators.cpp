@@ -92,7 +92,7 @@ bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_image
     const std::size_t num_image_proofs,
     const std::size_t num_outputs,
     const std::size_t num_enote_pubkeys,
-    const std::shared_ptr<const SpBalanceProofV1> balance_proof)
+    const std::size_t num_range_proofs)
 {
     // need at least one input
     if (num_input_images < 1)
@@ -110,15 +110,7 @@ bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_image
     if (num_outputs < 1)
         return false;
 
-    // should be a balance proof
-    if (balance_proof.get() == nullptr)
-        return false;
-
     // range proofs should be 1:1 with input image amount commitments and outputs
-    std::size_t num_range_proofs{0};
-    for (const auto &proof : balance_proof->m_bpp_proofs)
-        num_range_proofs += proof.V.size();
-
     if (num_range_proofs != num_input_images + num_outputs)
         return false;
 
@@ -239,10 +231,10 @@ bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_imag
     if (balance_proof.get() == nullptr)
         return false;
 
-    const std::vector<rct::BulletproofPlus> &range_proofs = balance_proof->m_bpp_proofs;
+    const rct::BulletproofPlus &range_proofs = balance_proof->m_bpp_proof;
 
     // sanity check
-    if (range_proofs.size() == 0)
+    if (range_proofs.V.size() == 0)
         return false;
 
     // check that amount commitments balance
@@ -252,42 +244,26 @@ bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_imag
         return false;
 
     // check that commitments in range proofs line up with input image and output commitments
-    std::size_t range_proof_index{0};
-    std::size_t range_proof_grouping_size = range_proofs[0].V.size();
+    if (input_images.size() + outputs.size() != range_proofs.V.size())
+        return false;
 
-    for (std::size_t commitment_index{0}; commitment_index < input_images.size() + outputs.size(); ++commitment_index)
+    for (std::size_t input_commitment_index{0}; input_commitment_index < input_images.size(); ++input_commitment_index)
     {
-        // assume range proofs are partitioned into groups of size 'range_proof_grouping_size' (except last one)
-        if (range_proofs[range_proof_index].V.size() == commitment_index - range_proof_index*range_proof_grouping_size)
-            ++range_proof_index;
-
-        // sanity checks
-        if (range_proofs.size() <= range_proof_index)
-            return false;
-        if (range_proofs[range_proof_index].V.size() <= commitment_index - range_proof_index*range_proof_grouping_size)
-            return false;
-
-        // double check that the two stored copies of output commitments match
-        // TODO? don't store commitments in BP+ structure
-        if (commitment_index < input_images.size())
+        // double check that the two stored copies of input image commitments match
+        if (input_images[input_commitment_index].m_masked_commitment !=
+            rct::rct2pk(rct::scalarmult8(range_proofs.V[input_commitment_index])))
         {
-            // input image amount commitments are range proofed first
-            if (input_images[commitment_index].m_masked_commitment !=
-                    rct::rct2pk(rct::scalarmult8(range_proofs[range_proof_index].V[commitment_index -
-                        range_proof_index*range_proof_grouping_size])))
-            {
-                return false;
-            }
+            return false;
         }
-        else
+    }
+
+    for (std::size_t output_commitment_index{0}; output_commitment_index < outputs.size(); ++output_commitment_index)
+    {
+        // double check that the two stored copies of output commitments match
+        if (outputs[output_commitment_index].m_amount_commitment !=
+            rct::rct2pk(rct::scalarmult8(range_proofs.V[input_images.size() + output_commitment_index])))
         {
-            // output commitments are range proofed last
-            if (outputs[commitment_index - input_images.size()].m_amount_commitment !=
-                    rct::rct2pk(rct::scalarmult8(range_proofs[range_proof_index].V[commitment_index -
-                        range_proof_index*range_proof_grouping_size])))
-            {
-                return false;
-            }
+            return false;
         }
     }
 
@@ -295,10 +271,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_imag
     if (!defer_batchable)
     {
         std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
-        range_proof_ptrs.reserve(range_proofs.size());
-
-        for (const auto &range_proof : range_proofs)
-            range_proof_ptrs.push_back(&range_proof);
+        range_proof_ptrs.push_back(&range_proofs);
 
         if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
             return false;

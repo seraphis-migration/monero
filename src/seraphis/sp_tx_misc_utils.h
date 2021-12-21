@@ -97,28 +97,14 @@ bool rearrange_vector(const std::vector<std::size_t> &old_indices, std::vector<T
 */
 std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const std::size_t ref_set_decomp_m);
 /**
-* brief: compute_rangeproof_grouping_size - compute max number of amounts to aggregate in one range proof at a time
-*   - given a number of amounts, split them into power-of-2 groups up to 'max num splits' times; e.g. ...
-*     n = 7, split = 1: [4, 3]
-*     n = 7, split = 2: [2, 2, 2, 1]
-*     n = 11, split = 1: [8, 3]
-*     n = 11, split = 2: [4, 4, 3]
-* param: num_amounts -
-* param: max_num_splits -
-* return: max number of amounts to aggregate in one range proof
-*/
-std::size_t compute_rangeproof_grouping_size(const std::size_t num_amounts, const std::size_t max_num_splits);
-/**
 * brief: make_bpp_rangeproofs - make BP+ range proofs
 * param: amounts -
 * param: amount_commitment_blinding_factors -
-* param: max_rangeproof_splits -
-* outparam: range_proofs_out - set of amount commitments with range proofs
+* outparam: range_proofs_out - aggregate set of amount commitments with range proofs
 */
 void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
-    const std::size_t max_rangeproof_splits,
-    std::vector<rct::BulletproofPlus> &range_proofs_out);
+    rct::BulletproofPlus &range_proofs_out);
 /**
 * brief: balance_check_equality - balance check between two commitment sets using an equality test
 *   - i.e. sum(inputs) ?= sum(outputs)

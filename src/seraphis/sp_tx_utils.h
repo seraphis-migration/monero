@@ -176,14 +176,12 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_p
 * param: output_amounts -
 * param: input_image_amount_commitment_blinding_factors -
 * param: output_amount_commitment_blinding_factors -
-* param: max_rangeproof_splits -
 * outparam: balance_proof_out -
 */
 void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_amounts,
     const std::vector<rct::xmr_amount> &output_amounts,
     const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
-    const std::size_t max_rangeproof_splits,
     std::shared_ptr<SpBalanceProofV1> &balance_proof_out);
 /**
 * brief: make_v1_tx_membership_proof_sp_v1 - make a v1 membership proof (concise grootle) (squashed enote model)

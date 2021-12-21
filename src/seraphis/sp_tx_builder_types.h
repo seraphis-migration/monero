@@ -197,7 +197,6 @@ struct SpTxPartialV1 final
     /// normal constructor: standard assembly
     SpTxPartialV1(const SpTxProposalV1 &proposal,
         const std::vector<SpTxPartialInputV1> &inputs,
-        const std::size_t max_rangeproof_splits,
         const std::string &version_string);
 
     /// normal constructor (TODO): assembly from multisig pieces

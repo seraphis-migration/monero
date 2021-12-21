@@ -53,7 +53,6 @@ struct SpTxGenData
     std::size_t ref_set_decomp_m{1};
     std::vector<rct::xmr_amount> input_amounts;
     std::vector<rct::xmr_amount> output_amounts;
-    std::size_t num_rangeproof_splits{0};
     TestType expected_result{TestType::ExpectTrue};
     bool test_double_spend{false};
 };
@@ -72,7 +71,6 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
             // mock params
             sp::SpTxParamPack tx_params;
 
-            tx_params.max_rangeproof_splits = gen.num_rangeproof_splits;
             tx_params.ref_set_decomp_n = gen.ref_set_decomp_n;
             tx_params.ref_set_decomp_m = gen.ref_set_decomp_m;
 
@@ -121,8 +119,7 @@ static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
 
             // mock params
             sp::SpTxParamPack tx_params;
-            
-            tx_params.max_rangeproof_splits = gen.num_rangeproof_splits;
+
             tx_params.ref_set_decomp_n = gen.ref_set_decomp_n;
             tx_params.ref_set_decomp_m = gen.ref_set_decomp_m;
 
@@ -130,13 +127,6 @@ static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
             txs_to_verify.push_back(
                     sp::make_mock_tx<SpTxType>(tx_params, gen.input_amounts, gen.output_amounts, ledger_context)
                 );
-
-            // sanity check that rangeproof split is actually splitting the rangeproof
-            if (gen.num_rangeproof_splits > 0 && gen.output_amounts.size() > 1)
-            {
-                EXPECT_TRUE(txs_to_verify.back()->get_balance_proof().get() != nullptr);
-                EXPECT_TRUE(txs_to_verify.back()->get_balance_proof()->m_bpp_proofs.size() > 1);
-            }
         }
         catch (...)
         {
@@ -335,28 +325,6 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_batching()
     return gen_data;
 }
 
-static std::vector<SpTxGenData> get_mock_tx_gen_data_batch_splitting()
-{
-    /// 3 tx, 11 inputs/outputs each, range proofs split x3
-    std::vector<SpTxGenData> gen_data;
-    gen_data.resize(3);
-
-    for (auto &gen : gen_data)
-    {
-        for (int i{0}; i < 11; ++i)
-        {
-            gen.input_amounts.push_back(2);
-            gen.output_amounts.push_back(2);
-        }
-
-        gen.ref_set_decomp_n = 2;
-        gen.ref_set_decomp_m = 3;
-        gen.num_rangeproof_splits = 3;
-    }
-
-    return gen_data;
-}
-
 
 /////////////////////////////////////////////////////////////////////
 ////////////////////////// Seraphis Squash //////////////////////////
@@ -370,5 +338,4 @@ TEST(mock_tx, seraphis_squashed)
 TEST(mock_tx_batching, seraphis_squashed)
 {
     run_mock_tx_test_batch<sp::SpTxSquashedV1>(get_mock_tx_gen_data_batching());
-    run_mock_tx_test_batch<sp::SpTxSquashedV1>(get_mock_tx_gen_data_batch_splitting());
 }

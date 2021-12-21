@@ -128,14 +128,14 @@ struct SpImageProofV1 final
 };
 
 ////
-// SpBalanceProofV1 - Balance Proof V2
+// SpBalanceProofV1 - Balance Proof V1
 // - balance proof: implicit with a remainder blinding factor: [sum(inputs) + remainder_blinding_factor*G == sum(outputs)]
 // - range proof: Bulletproofs+
 ///
 struct SpBalanceProofV1 final
 {
-    /// a set of BP+ proofs
-    std::vector<rct::BulletproofPlus> m_bpp_proofs;
+    /// an aggregate set of BP+ proofs
+    rct::BulletproofPlus m_bpp_proof;
     /// the remainder blinding factor
     rct::key m_remainder_blinding_factor;
 

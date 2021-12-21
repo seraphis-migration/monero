@@ -166,9 +166,8 @@ SpTxPartialInputV1::SpTxPartialInputV1(const SpInputProposalV1 &input_proposal,
 }
 //-------------------------------------------------------------------------------------------------------------------
 SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
-        const std::vector<SpTxPartialInputV1> &partial_inputs,
-        const std::size_t max_rangeproof_splits,
-        const std::string &version_string)
+    const std::vector<SpTxPartialInputV1> &partial_inputs,
+    const std::string &version_string)
 {
     // inputs and proposal must be for the same tx
     rct::key proposal_prefix{proposal.get_proposal_prefix(version_string)};
@@ -206,7 +205,6 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
         proposal.m_output_amounts,
         input_image_amount_commitment_blinding_factors,
         proposal.m_output_amount_commitment_blinding_factors,
-        max_rangeproof_splits,
         m_balance_proof);
 
     // gather and sort tx input parts

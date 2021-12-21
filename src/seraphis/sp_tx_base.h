@@ -57,7 +57,6 @@ namespace sp
 ///
 struct SpTxParamPack
 {
-    std::size_t max_rangeproof_splits;
     std::size_t ref_set_decomp_n;
     std::size_t ref_set_decomp_m;
 };
