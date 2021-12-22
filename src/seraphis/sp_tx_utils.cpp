@@ -92,6 +92,8 @@ static void prepare_image_masks_all_sp_v1(const std::vector<SpInputProposalV1> &
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx input image set without any inputs.");
 
+    image_address_masks_out.clear();
+    image_amount_masks_out.clear();
     image_address_masks_out.resize(input_proposals.size());
     image_amount_masks_out.resize(input_proposals.size());
 
@@ -250,6 +252,8 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == image_address_masks.size(),
         "Mismatch between input proposals and image address masks.");
 
+    input_amounts_out.clear();
+    input_image_amount_commitment_blinding_factors_out.clear();
     input_amounts_out.resize(input_proposals.size());
     input_image_amount_commitment_blinding_factors_out.resize(input_proposals.size());
 
@@ -268,6 +272,7 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<SpTxPartialInputV1> &partial_inputs,
     std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors_out)
 {
+    input_image_amount_commitment_blinding_factors_out.clear();
     input_image_amount_commitment_blinding_factors_out.resize(partial_inputs.size());
 
     for (std::size_t input_index{0}; input_index < partial_inputs.size(); ++input_index)
@@ -291,6 +296,7 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpDestinationV1> &destinations,
     outputs_out.reserve(destinations.size());
     output_amounts_out.clear();
     output_amounts_out.reserve(destinations.size());
+    output_amount_commitment_blinding_factors_out.clear();
     output_amount_commitment_blinding_factors_out.resize(destinations.size());
 
     for (std::size_t dest_index{0}; dest_index < destinations.size(); ++dest_index)
@@ -350,6 +356,7 @@ void make_v1_tx_images_sp_v1(const std::vector<SpInputProposalV1> &input_proposa
         image_amount_masks_out.size() == input_proposals.size(),
         "Vector size mismatch when preparing image masks.");
 
+    input_images_out.clear();
     input_images_out.resize(input_proposals.size());
 
     // make input images
@@ -367,27 +374,19 @@ void make_v1_tx_image_proof_sp_v1(const SpInputProposalV1 &input_proposal,
     const rct::key &message,
     SpImageProofV1 &tx_image_proof_out)
 {
-    // prepare for proof (squashed enote model)
-    rct::keyV proof_K;
-    std::vector<crypto::secret_key> x, y, z;
-
-    // K
-    proof_K.emplace_back(input_image.m_masked_address);
-
-    // x, y, z
+    // prepare for proof (squashed enote model): y, z
+    crypto::secret_key y, z;
     crypto::secret_key squash_prefix;
     make_seraphis_squash_prefix(input_proposal.m_enote.m_onetime_address,
         input_proposal.m_enote.m_amount_commitment,
         squash_prefix);
 
-    x.emplace_back(image_address_mask);  // t_k
-    y.resize(1);
-    sc_mul(&(y[0]), &squash_prefix, &(input_proposal.m_enote_view_privkey));  // H(Ko,C) (k_{a, recipient} + k_{a, sender})
-    z.resize(1);
-    sc_mul(&(z[0]), &squash_prefix, &(input_proposal.m_spendbase_privkey));  // H(Ko,C) k_{b, recipient}
+    sc_mul(&y, &squash_prefix, &(input_proposal.m_enote_view_privkey));  // H(Ko,C) (k_{a, recipient} + k_{a, sender})
+    sc_mul(&z, &squash_prefix, &(input_proposal.m_spendbase_privkey));  // H(Ko,C) k_{b, recipient}
 
     // make seraphis composition proof
-    tx_image_proof_out.m_composition_proof = sp_composition_prove(proof_K, x, y, z, message);
+    tx_image_proof_out.m_composition_proof =
+        sp_composition_prove(message, input_image.m_masked_address, image_address_mask, y, z);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
@@ -402,6 +401,7 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_p
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == input_images.size(), "Input components size mismatch");
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == image_address_masks.size(), "Input components size mismatch");
 
+    tx_image_proofs_out.clear();
     tx_image_proofs_out.resize(input_proposals.size());
 
     for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
@@ -559,6 +559,7 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_address_masks.size(), "Input components size mismatch");
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_amount_masks.size(), "Input components size mismatch");
 
+    tx_membership_proofs_out.clear();
     tx_membership_proofs_out.resize(membership_ref_sets.size());
 
     for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
@@ -578,6 +579,7 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
 
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_inputs.size(), "Input components size mismatch");
 
+    tx_membership_proofs_out.clear();
     tx_membership_proofs_out.resize(membership_ref_sets.size());
 
     for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
@@ -606,6 +608,7 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_tx.m_image_amount_masks.size(),
         "Input components size mismatch");
 
+    tx_membership_proofs_out.clear();
     tx_membership_proofs_out.resize(membership_ref_sets.size());
 
     for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)

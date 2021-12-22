@@ -144,7 +144,7 @@ std::size_t SpMembershipProofV1::get_size_bytes() const
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpImageProofV1::get_size_bytes() const
 {
-    return 32 * (3 + m_composition_proof.r_i.size() + m_composition_proof.K_t1.size());
+    return 32 * 5;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=false*/) const

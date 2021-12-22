@@ -67,107 +67,54 @@ static void transcript_init(rct::key &transcript)
     rct::hash_to_scalar(transcript, salt.data(), salt.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Aggregation coefficient 'mu_a' for concise structure
-// - K_t2 = K_t1 - X - KI
-//   - X is a generator
-//   - embedding {K_t1}, {KI} in the coefficient implicitly embeds K_t2
-//
-// mu_a = H(H("domain-sep"), message, {K_t1}, {KI})
-//-------------------------------------------------------------------------------------------------------------------
-static rct::key compute_base_aggregation_coefficient_a(const rct::key &message,
-    const rct::keyV &K_t1,
-    const std::vector<crypto::key_image> &KI)
-{
-    CHECK_AND_ASSERT_THROW_MES(K_t1.size() == KI.size(), "Transcript challenge inputs have incorrect size!");
-
-    // initialize transcript message
-    rct::key challenge;
-    transcript_init(challenge);
-
-    // collect challenge string
-    std::string hash;
-    hash.reserve((2*(K_t1.size()) + 2)*sizeof(rct::key));
-    hash = std::string((const char*) challenge.bytes, sizeof(challenge));
-    hash.append((const char*) message.bytes, sizeof(message));
-    for (const auto &Kt1 : K_t1)
-    {
-        hash.append((const char*) Kt1.bytes, sizeof(Kt1));
-    }
-    for (const auto &Ki : KI)
-    {
-        hash.append((const char*) &Ki, sizeof(Ki));
-    }
-    CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
-
-    // challenge
-    rct::hash_to_scalar(challenge, hash.data(), hash.size());
-
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
-
-    return challenge;
-}
-//-------------------------------------------------------------------------------------------------------------------
-// Aggregation coefficient 'mu_b' for concise structure
-// - {KI} is embedded in mu_a, so it is sufficient to separate mu_a and mu_b with a single hash
-//
-// mu_b = H(mu_a)
-//-------------------------------------------------------------------------------------------------------------------
-static rct::key compute_base_aggregation_coefficient_b(const rct::key &mu_a)
-{
-    rct::key challenge;
-    std::string hash;
-    hash.reserve(1*sizeof(rct::key));
-    hash = std::string((const char*) mu_a.bytes, sizeof(mu_a));
-    CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
-    rct::hash_to_scalar(challenge, hash.data(), hash.size());
-
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
-
-    return challenge;
-}
-//-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge message
-// challenge_message = H(message, {K})
 //
-// note: in practice, this extends the aggregation coefficients (i.e. message = mu_b)
-// challenge_message = H(H(H(H("domain-sep"), m, {K_t1}, {KI}), {K}))
+// challenge_message = H(H("domain-sep"), X, U, m, K, KI, K_t1)
 //-------------------------------------------------------------------------------------------------------------------
-static rct::key compute_challenge_message(const rct::key &message, const rct::keyV &K)
+static rct::key compute_challenge_message(const rct::key &message,
+    const rct::key &K,
+    const crypto::key_image &KI,
+    const rct::key &K_t1)
 {
-    rct::key challenge;
+    // initialize transcript message
+    rct::key challenge_message;
+    transcript_init(challenge_message);
+
+    // collect challenge_message string
     std::string hash;
-    hash.reserve((K.size() + 1)*sizeof(rct::key));
-    hash = std::string((const char*) message.bytes, sizeof(message));
-    for (std::size_t i = 0; i < K.size(); ++i)
-    {
-        hash.append((const char*) K[i].bytes, sizeof(K[i]));
-    }
+    hash.reserve(7 * sizeof(rct::key));
+    hash = std::string((const char*) challenge_message.bytes, sizeof(challenge_message));
+    hash.append((const char*) (get_X_gen()).bytes, sizeof(message));
+    hash.append((const char*) (get_U_gen()).bytes, sizeof(message));
+    hash.append((const char*) message.bytes, sizeof(message));
+    hash.append((const char*) K.bytes, sizeof(K));
+    hash.append((const char*) &KI, sizeof(KI));
+    hash.append((const char*) K_t1.bytes, sizeof(K_t1));
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
-    rct::hash_to_scalar(challenge, hash.data(), hash.size());
 
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
+    // challenge_message
+    rct::hash_to_scalar(challenge_message, hash.data(), hash.size());
 
-    return challenge;
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge_message.bytes), "Transcript challenge_message must be nonzero!");
+
+    return challenge_message;
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge
-// c = H(challenge_message, [K_t2 proof key], [KI proof key], {[K_t1 proof key]})
+// c = H(challenge_message, [K_t1 proof key], [K_t2 proof key], [KI proof key])
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge(const rct::key &message,
+    const rct::key &K_t1_proofkey,
     const rct::key &K_t2_proofkey,
-    const rct::key &KI_proofkey,
-    const rct::keyV &K_t1_proofkeys)
+    const rct::key &KI_proofkey)
 {
     rct::key challenge;
     std::string hash;
-    hash.reserve((K_t1_proofkeys.size() + 3)*sizeof(rct::key));
+    hash.reserve(4 * sizeof(rct::key));
     hash = std::string((const char*) message.bytes, sizeof(message));
+    hash.append((const char*) K_t1_proofkey.bytes, sizeof(K_t1_proofkey));
     hash.append((const char*) K_t2_proofkey.bytes, sizeof(K_t2_proofkey));
     hash.append((const char*) KI_proofkey.bytes, sizeof(KI_proofkey));
-    for (std::size_t i = 0; i < K_t1_proofkeys.size(); ++i)
-    {
-        hash.append((const char*) K_t1_proofkeys[i].bytes, sizeof(K_t1_proofkeys[i]));
-    }
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
 
@@ -177,86 +124,48 @@ static rct::key compute_challenge(const rct::key &message,
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Proof responses
-// r_a = alpha_a - c * sum_i(mu_a^i * (x_i / y_i))
-// r_b = alpha_b - c * sum_i(mu_b^i * (z_i / y_i))
-// r_i = alpha_i - c * (1 / y_i)
+// r_t1 = alpha_t1 - c * (1 / y)
+// r_t2 = alpha_t2 - c * (x / y)
+// r_ki = alpha_ki - c * (z / y)
 //-------------------------------------------------------------------------------------------------------------------
-static void compute_responses(const std::vector<crypto::secret_key> &x,
-    const std::vector<crypto::secret_key> &y,
-    const std::vector<crypto::secret_key> &z,
-    const rct::keyV &mu_a_pows,
-    const rct::keyV &mu_b_pows,
-    const rct::key &alpha_a,
-    const rct::key &alpha_b,
-    const rct::keyV &alpha_i,
-    const rct::key &challenge,
-    rct::key &r_a_out,
-    rct::key &r_b_out,
-    rct::keyV &r_i_out)
+static void compute_responses(const rct::key &challenge,
+    const rct::key &alpha_t1,
+    const rct::key &alpha_t2,
+    const rct::key &alpha_ki,
+    const crypto::secret_key &x,
+    const crypto::secret_key &y,
+    const crypto::secret_key &z,
+    rct::key &r_t1_out,
+    rct::key &r_t2_out,
+    rct::key &r_ki_out)
 {
-    /// input checks
-    const std::size_t num_keys{x.size()};
+    // r_t1 = alpha_t1 - c * (1 / y)
+    r_t1_out = invert(rct::sk2rct(y));  // 1 / y
+    sc_mulsub(r_t1_out.bytes, challenge.bytes, r_t1_out.bytes, alpha_t1.bytes);  // alpha_t1 - c * (1 / y)
 
-    CHECK_AND_ASSERT_THROW_MES(num_keys == y.size(), "Not enough keys!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == z.size(), "Not enough keys!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == mu_a_pows.size(), "Not enough keys!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == mu_b_pows.size(), "Not enough keys!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == alpha_i.size(), "Not enough keys!");
+    // r_t2 = alpha_t2 - c * (x / y)
+    r_t2_out = invert(rct::sk2rct(y));  // 1 / y
+    sc_mul(r_t2_out.bytes, r_t2_out.bytes, &x);  // x / y
+    sc_mulsub(r_t2_out.bytes, challenge.bytes, r_t2_out.bytes, alpha_t2.bytes);  // alpha_t2 - c * (x / y)
 
-
-    /// compute responses
-    rct::key r_temp;
-    rct::key r_sum_temp;
-    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
-        // cleanup: clear secret prover data at the end
-        memwipe(&r_temp, sizeof(rct::key));
-        memwipe(&r_sum_temp, sizeof(rct::key));
-    });
-
-    // r_a = alpha_a - c * sum_i(mu_a^i * (x_i / y_i))
-    r_sum_temp = rct::zero();
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        r_temp = invert(rct::sk2rct(y[i]));  // 1 / y_i
-        sc_mul(r_temp.bytes, r_temp.bytes, &x[i]);  // x_i / y_i
-        sc_mul(r_temp.bytes, r_temp.bytes, mu_a_pows[i].bytes);  // mu_a^i * x_i / y_i
-        sc_add(r_sum_temp.bytes, r_sum_temp.bytes, r_temp.bytes);  // sum_i(...)
-    }
-    sc_mulsub(r_a_out.bytes, challenge.bytes, r_sum_temp.bytes, alpha_a.bytes);  // alpha_a - c * sum_i(...)
-
-    // r_b = alpha_b - c * sum_i(mu_b^i * (z_i / y_i))
-    r_sum_temp = rct::zero();
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        r_temp = invert(rct::sk2rct(y[i]));  // 1 / y_i
-        sc_mul(r_temp.bytes, r_temp.bytes, &z[i]);  // z_i / y_i
-        sc_mul(r_temp.bytes, r_temp.bytes, mu_b_pows[i].bytes);  // mu_b^i * z_i / y_i
-        sc_add(r_sum_temp.bytes, r_sum_temp.bytes, r_temp.bytes);  // sum_i(...)
-    }
-    sc_mulsub(r_b_out.bytes, challenge.bytes, r_sum_temp.bytes, alpha_b.bytes);  // alpha_b - c * sum_i(...)
-
-    // r_i = alpha_i - c * (1 / y_i)
-    r_i_out.resize(num_keys);
-
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        r_temp = invert(rct::sk2rct(y[i]));  // 1 / y_i
-        sc_mulsub(r_i_out[i].bytes, challenge.bytes, r_temp.bytes, alpha_i[i].bytes);  // alpha_i - c * (1 / y_i)
-    }
+    // r_ki = alpha_ki - c * (z / y)
+    r_ki_out = invert(rct::sk2rct(y));  // 1 / y
+    sc_mul(r_ki_out.bytes, r_ki_out.bytes, &z);  // z / y
+    sc_mulsub(r_ki_out.bytes, challenge.bytes, r_ki_out.bytes, alpha_ki.bytes);  // alpha_ki - c * (z / y)
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Element 'K_t1[i]' for a proof
+// Element 'K_t1' for a proof
 //   - multiplied by (1/8) for storage (and use in byte-aware contexts)
-// K_t1_i = (1/y_i) * K_i
-// return: (1/8)*K_t1_i
+// K_t1 = (1/y) * K
+// return: (1/8)*K_t1
 //-------------------------------------------------------------------------------------------------------------------
-static void compute_K_t1_for_proof(const crypto::secret_key &y_i,
-    const rct::key &K_i,
+static void compute_K_t1_for_proof(const crypto::secret_key &y,
+    const rct::key &K,
     rct::key &K_t1_out)
 {
-    K_t1_out = invert(rct::sk2rct(y_i));  // borrow the variable
+    K_t1_out = invert(rct::sk2rct(y));  // borrow the variable
     sc_mul(K_t1_out.bytes, K_t1_out.bytes, rct::INV_EIGHT.bytes);
-    rct::scalarmultKey(K_t1_out, K_i, K_t1_out);
+    rct::scalarmultKey(K_t1_out, K, K_t1_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 // MuSig2--style bi-nonce signing merge factor
@@ -270,7 +179,8 @@ static rct::key multisig_binonce_merge_factor(const rct::key &message,
 
     // build hash
     std::string hash;
-    hash.reserve(sizeof(config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR) + 1 + nonces_1.size() + nonces_2.size());
+    hash.reserve(sizeof(config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR) +
+        (1 + nonces_1.size() + nonces_2.size()) * sizeof(rct::key));
     hash = config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR;
     hash.append((const char*) message.bytes, sizeof(message));
     for (const auto &nonce_1 : nonces_1)
@@ -288,117 +198,80 @@ static rct::key multisig_binonce_merge_factor(const rct::key &message,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-SpCompositionProof sp_composition_prove(const rct::keyV &K,
-    const std::vector<crypto::secret_key> &x,
-    const std::vector<crypto::secret_key> &y,
-    const std::vector<crypto::secret_key> &z,
-    const rct::key &message)
+SpCompositionProof sp_composition_prove(const rct::key &message,
+    const rct::key &K,
+    const crypto::secret_key &x,
+    const crypto::secret_key &y,
+    const crypto::secret_key &z)
 {
     /// input checks and initialization
-    const std::size_t num_keys{K.size()};
+    CHECK_AND_ASSERT_THROW_MES(!(K == rct::identity()), "Bad proof key (K identity)!");
 
-    CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Not enough keys to make a proof!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == x.size(), "Input key sets not the same size (K ?= x)!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == y.size(), "Input key sets not the same size (K ?= y)!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == z.size(), "Input key sets not the same size (K ?= z)!");
+    // x == 0 is allowed
+    CHECK_AND_ASSERT_THROW_MES(sc_check(&x) == 0, "Bad private key (x)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "Bad private key (y zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(&y) == 0, "Bad private key (y)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z), "Bad private key (z zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(&z) == 0, "Bad private key (z)!");
 
+    // verify the input key matches the input private keys
     rct::key temp_K;
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        CHECK_AND_ASSERT_THROW_MES(!(K[i] == rct::identity()), "Bad proof key (K[i] identity)!");
+    sp::make_seraphis_spendbase(z, temp_K);
+    sp::extend_seraphis_spendkey(y, temp_K);
+    mask_key(x, temp_K, temp_K);
 
-        // x == 0 is allowed
-        CHECK_AND_ASSERT_THROW_MES(sc_check(&x[i]) == 0, "Bad private key (x[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y[i]), "Bad private key (y[i] zero)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(&y[i]) == 0, "Bad private key (y[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z[i]), "Bad private key (z[i] zero)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(&z[i]) == 0, "Bad private key (z[i])!");
-
-        // verify the input key matches the input private keys
-        sp::make_seraphis_spendbase(z[i], temp_K);
-        sp::extend_seraphis_spendkey(y[i], temp_K);
-        mask_key(x[i], temp_K, temp_K);
-
-        CHECK_AND_ASSERT_THROW_MES(K[i] == temp_K, "Bad proof key (K[i] doesn't match privkeys)!");
-    }
+    CHECK_AND_ASSERT_THROW_MES(K == temp_K, "Bad proof key (K doesn't match privkeys)!");
 
     const rct::key U_gen{get_U_gen()};
 
     SpCompositionProof proof;
 
-    // make K_t1 and KI
-    std::vector<crypto::key_image> KI;
-    proof.K_t1.resize(num_keys);
-    KI.resize(num_keys);
 
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        // K_t1_i = (1/8) * (1/y_i) * K_i
-        compute_K_t1_for_proof(y[i], K[i], proof.K_t1[i]);
+    /// make K_t1 and KI
 
-        // KI = (z_i / y_i) * U
-        // note: plain KI is used in all byte-aware contexts
-        sp::make_seraphis_key_image(y[i], z[i], KI[i]);
-    }
+    // K_t1 = (1/8) * (1/y) * K
+    compute_K_t1_for_proof(y, K, proof.K_t1);
+
+    // KI = (z / y) * U
+    // note: plain KI is used in all byte-aware contexts
+    crypto::key_image KI;
+    sp::make_seraphis_key_image(y, z, KI);
 
 
     /// signature openers
 
-    // alpha_a * G
-    crypto::secret_key alpha_a;
-    rct::key alpha_a_pub;
+    // alpha_t1 * K
+    crypto::secret_key alpha_t1;
+    rct::key alpha_t1_pub;
+    generate_proof_nonce(K, alpha_t1, alpha_t1_pub);
 
-    generate_proof_nonce(rct::G, alpha_a, alpha_a_pub);
+    // alpha_t2 * G
+    crypto::secret_key alpha_t2;
+    rct::key alpha_t2_pub;
+    generate_proof_nonce(rct::G, alpha_t2, alpha_t2_pub);
 
-    // alpha_b * U
-    crypto::secret_key alpha_b;
-    rct::key alpha_b_pub;
-
-    generate_proof_nonce(U_gen, alpha_b, alpha_b_pub);
-
-    // alpha_i[i] * K_i
-    rct::keyV alpha_i;
-    rct::keyV alpha_i_pub;
-    alpha_i.resize(num_keys);
-    alpha_i_pub.resize(num_keys);
-    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
-        // cleanup: clear secret prover data at the end
-        memwipe(alpha_i.data(), alpha_i.size()*sizeof(rct::key));
-    });
-
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        generate_proof_nonce(K[i], alpha_i[i], alpha_i_pub[i]);
-    }
-
-
-    /// challenge message and aggregation coefficients
-    rct::key mu_a = compute_base_aggregation_coefficient_a(message, proof.K_t1, KI);
-    rct::keyV mu_a_pows = powers_of_scalar(mu_a, num_keys);
-
-    rct::key mu_b = compute_base_aggregation_coefficient_b(mu_a);
-    rct::keyV mu_b_pows = powers_of_scalar(mu_b, num_keys);
-
-    rct::key m = compute_challenge_message(mu_b, K);
+    // alpha_ki * U
+    crypto::secret_key alpha_ki;
+    rct::key alpha_ki_pub;
+    generate_proof_nonce(U_gen, alpha_ki, alpha_ki_pub);
 
 
     /// compute proof challenge
-    proof.c = compute_challenge(m, alpha_a_pub, alpha_b_pub, alpha_i_pub);
+    rct::key m = compute_challenge_message(message, K, KI, proof.K_t1);
+    proof.c = compute_challenge(m, alpha_t1_pub, alpha_t2_pub, alpha_ki_pub);
 
 
     /// responses
-    compute_responses(x,
+    compute_responses(proof.c,
+        rct::sk2rct(alpha_t1),
+        rct::sk2rct(alpha_t2),
+        rct::sk2rct(alpha_ki),
+        x,
         y,
         z,
-        mu_a_pows,
-        mu_b_pows,
-        rct::sk2rct(alpha_a),
-        rct::sk2rct(alpha_b),
-        alpha_i,
-        proof.c,
-        proof.r_a,
-        proof.r_b,
-        proof.r_i);
+        proof.r_t1,
+        proof.r_t2,
+        proof.r_ki);
 
 
     /// done
@@ -406,157 +279,82 @@ SpCompositionProof sp_composition_prove(const rct::keyV &K,
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool sp_composition_verify(const SpCompositionProof &proof,
-    const rct::keyV &K,
-    const std::vector<crypto::key_image> &KI,
-    const rct::key &message)
+    const rct::key &message,
+    const rct::key &K,
+    const crypto::key_image &KI)
 {
     /// input checks and initialization
-    const std::size_t num_keys{K.size()};
+    CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_t1.bytes) == 0, "Bad response (r_t1)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_t2.bytes) == 0, "Bad response (r_t2)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_ki.bytes) == 0, "Bad response (r_ki)!");
 
-    CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Proof has no keys!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == KI.size(), "Input key sets not the same size (KI)!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == proof.K_t1.size(), "Input key sets not the same size (K_t1)!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == proof.r_i.size(), "Insufficient proof responses!");
-
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(proof.r_a.bytes), "Bad response (r_a zero)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_a.bytes) == 0, "Bad resonse (r_a)!");
-
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(proof.r_i[i].bytes), "Bad response (r[i] zero)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.r_i[i].bytes) == 0, "Bad resonse (r[i])!");
-
-        CHECK_AND_ASSERT_THROW_MES(!(rct::ki2rct(KI[i]) == rct::identity()), "Invalid key image!");
-    }
+    CHECK_AND_ASSERT_THROW_MES(!(rct::ki2rct(KI) == rct::identity()), "Invalid key image!");
 
 
-    /// challenge message and aggregation coefficients
-    rct::key mu_a = compute_base_aggregation_coefficient_a(message, proof.K_t1, KI);
-    rct::keyV mu_a_pows = powers_of_scalar(mu_a, num_keys);
-
-    rct::key mu_b = compute_base_aggregation_coefficient_b(mu_a);
-    rct::keyV mu_b_pows = powers_of_scalar(mu_b, num_keys);
-
-    rct::key m = compute_challenge_message(mu_b, K);
+    /// challenge message
+    rct::key m = compute_challenge_message(message, K, KI, proof.K_t1);
 
 
     /// challenge pieces
 
-    // K_t2 part: [r_a * G + c * sum_i(mu_a^i * K_t2[i])]
-    // KI part:   [r_b * U + c * sum_i(mu_b^i * KI[i]  )]
-    // K_t1[i] parts: [r[i] * K[i] + c * K_t1[i]]
-    rct::keyV K_t2_coeff;
-    rct::keyV KI_privkeys;
-    rct::keyV K_t1_privkeys;
-    std::vector<ge_p3> K_t2_p3;
-    std::vector<ge_p3> KI_part_p3;
-    std::vector<ge_p3> K_t1_p3;
-    rct::keyV challenge_parts_i;
-    ge_p3 temp_p3;
-    ge_cached temp_cache;
-    ge_cached X_cache;
-    ge_p1p1 temp_p1p1;
-    K_t2_coeff.reserve(num_keys + 1);
-    KI_privkeys.reserve(num_keys + 1);
-    K_t1_privkeys.resize(2);
-    K_t2_p3.resize(num_keys);   // note: no '+ 1' because G is implied
-    KI_part_p3.resize(num_keys + 1);
-    K_t1_p3.resize(2);
-    challenge_parts_i.resize(num_keys);
+    rct::key part_t1, part_t2, part_ki;
+    ge_p3 K_p3, K_t1_p3, K_t2_p3, KI_p3;
 
-    temp_p3 = get_X_p3_gen();
-    ge_p3_to_cached(&X_cache, &temp_p3); // cache X for use below
-    K_t1_privkeys[1] = proof.c; // prep outside loop
+    // get K
+    CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&K_p3, K.bytes) == 0,
+        "ge_frombytes_vartime failed!");
 
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        // c * mu_a^i
-        K_t2_coeff.push_back(mu_a_pows[i]);
-        sc_mul(K_t2_coeff.back().bytes, K_t2_coeff.back().bytes, proof.c.bytes);
+    // get K_t1
+    rct::scalarmult8(K_t1_p3, proof.K_t1);
+    CHECK_AND_ASSERT_THROW_MES(!(ge_p3_is_point_at_infinity_vartime(&K_t1_p3)), "Invalid proof element K_t1!");
 
-        // c * mu_b^i
-        KI_privkeys.push_back(mu_b_pows[i]);
-        sc_mul(KI_privkeys.back().bytes, KI_privkeys.back().bytes, proof.c.bytes);
+    // get KI
+    CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&KI_p3, rct::ki2rct(KI).bytes) == 0,
+        "ge_frombytes_vartime failed!");
 
-        // get K_t1, multiply by cofactor as part of deserialization, and check it is non-identity
-        rct::scalarmult8(K_t1_p3[1], proof.K_t1[i]);
-        CHECK_AND_ASSERT_THROW_MES(!(ge_p3_is_point_at_infinity_vartime(&K_t1_p3[1])), "Invalid proof element K_t1!");
+    // K_t2 = K_t1 - X - KI
+    multi_exp_vartime_p3({rct::identity(), MINUS_ONE, MINUS_ONE},
+        {K_t1_p3, get_X_p3_gen(), KI_p3},
+        K_t2_p3);
 
-        // get KI
-        CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&KI_part_p3[i], rct::ki2rct(KI[i]).bytes) == 0,
-            "ge_frombytes_vartime failed!");
+    // K_t1 part: [r_t1 * K + c * K_t1]
+    multi_exp_vartime({proof.r_t1, proof.c},
+        {K_p3, K_t1_p3},
+        part_t1);
 
-        // get K
-        CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&K_t1_p3[0], K[i].bytes) == 0,
-            "ge_frombytes_vartime failed!");
+    // K_t2 part: [r_t2 * G + c * K_t2]
+    multi_exp_vartime({proof.c, proof.r_t2},
+        {K_t2_p3/*, G is implicit*/},
+        part_t2);
 
-        // temp: K_t1 - KI
-        ge_p3_to_cached(&temp_cache, &KI_part_p3[i]);
-        ge_sub(&temp_p1p1, &K_t1_p3[1], &temp_cache);
-        ge_p1p1_to_p3(&temp_p3, &temp_p1p1);
-
-        // K_t2 = (K_t1 - KI) - X
-        ge_sub(&temp_p1p1, &temp_p3, &X_cache);
-        ge_p1p1_to_p3(&K_t2_p3[i], &temp_p1p1);
-
-        // privkey for K_t1 part
-        K_t1_privkeys[0] = proof.r_i[i];
-
-        // compute 'K_t1[i]' piece
-        multi_exp_vartime(K_t1_privkeys, K_t1_p3, challenge_parts_i[i]);
-    }
-
-    // K_t2: r_a * G + ...
-    K_t2_coeff.push_back(proof.r_a);
-    //G implied, not stored in 'K_t2_p3'
-
-    // KI: r_b * U + ...
-    KI_privkeys.push_back(proof.r_b);
-    KI_part_p3[num_keys] = get_U_p3_gen();
-
-    // compute 'a' piece
-    rct::key challenge_part_a;
-    multi_exp_vartime(K_t2_coeff, K_t2_p3, challenge_part_a);
-
-    // compute 'b' piece
-    rct::key challenge_part_b;
-    multi_exp_vartime(KI_privkeys, KI_part_p3, challenge_part_b);
+    // KI part:   [r_ki * U + c * KI  ]
+    multi_exp_vartime({proof.r_ki, proof.c},
+        {get_U_p3_gen(), KI_p3},
+        part_ki);
 
 
     /// compute nominal challenge
-    rct::key challenge_nom{compute_challenge(m, challenge_part_a, challenge_part_b, challenge_parts_i)};
+    rct::key challenge_nom{compute_challenge(m, part_t1, part_t2, part_ki)};
 
 
     /// validate proof
     return challenge_nom == proof.c;
 }
 //-------------------------------------------------------------------------------------------------------------------
-SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const std::vector<crypto::key_image> &KI,
-    const rct::keyV &K,
-    const rct::key &message)
+SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::key &message,
+    const rct::key &K,
+    const crypto::key_image &KI)
 {
-    /// input checks and initialization
-    const std::size_t num_keys{K.size()};
-
-    CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Proof has no keys!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == KI.size(), "Input key sets not the same size (KI)!");
-
+    /// assemble proposal
     SpCompositionProofMultisigProposal proposal;
 
-
-    /// assemble proposal
-    proposal.KI = KI;
-    proposal.K = K;
     proposal.message = message;
+    proposal.K = K;
+    proposal.KI = KI;
 
     rct::key dummy;
+    generate_proof_nonce(K, proposal.signature_nonce_K_t1, dummy);
     generate_proof_nonce(rct::G, proposal.signature_nonce_K_t2, dummy);
-
-    proposal.signature_nonces_K_t1.resize(num_keys);
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        generate_proof_nonce(K[i], proposal.signature_nonces_K_t1[i], dummy);
-    }
 
     return proposal;
 }
@@ -565,13 +363,13 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init()
 {
     SpCompositionProofMultisigPrep prep;
 
-    // alpha_{b,1,e}*U
+    // alpha_{ki,1,e}*U
     // store with (1/8)
     rct::key U{get_U_gen()};
     generate_proof_nonce(U, prep.signature_nonce_1_KI_priv, prep.signature_nonce_1_KI_pub);
     rct::scalarmultKey(prep.signature_nonce_1_KI_pub, prep.signature_nonce_1_KI_pub, rct::INV_EIGHT);
 
-    // alpha_{b,2,e}*U
+    // alpha_{ki,2,e}*U
     // store with (1/8)
     generate_proof_nonce(U, prep.signature_nonce_2_KI_priv, prep.signature_nonce_2_KI_pub);
     rct::scalarmultKey(prep.signature_nonce_2_KI_pub, prep.signature_nonce_2_KI_pub, rct::INV_EIGHT);
@@ -580,37 +378,26 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init()
 }
 //-------------------------------------------------------------------------------------------------------------------
 SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCompositionProofMultisigProposal &proposal,
-    const std::vector<crypto::secret_key> &x,
-    const std::vector<crypto::secret_key> &y,
-    const std::vector<crypto::secret_key> &z_e,
+    const crypto::secret_key &x,
+    const crypto::secret_key &y,
+    const crypto::secret_key &z_e,
     const rct::keyV &signer_nonces_pub_1,
     const rct::keyV &signer_nonces_pub_2,
     const crypto::secret_key &local_nonce_1_priv,
     const crypto::secret_key &local_nonce_2_priv)
 {
     /// input checks and initialization
-    const std::size_t num_keys{proposal.K.size()};
     const std::size_t num_signers{signer_nonces_pub_1.size()};
 
-    CHECK_AND_ASSERT_THROW_MES(num_keys > 0, "Not enough keys to make a proof!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == proposal.KI.size(), "Input key sets not the same size (K ?= KI)!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == proposal.signature_nonces_K_t1.size(), "Input key sets not the same size (K ?= KI)!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == x.size(), "Input key sets not the same size (K ?= x)!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == y.size(), "Input key sets not the same size (K ?= y)!");
-    CHECK_AND_ASSERT_THROW_MES(num_keys == z_e.size(), "Input key sets not the same size (K ?= z)!");
+    CHECK_AND_ASSERT_THROW_MES(!(proposal.K == rct::identity()), "Bad proof key (K identity)!");
+    CHECK_AND_ASSERT_THROW_MES(!(rct::ki2rct(proposal.KI) == rct::identity()), "Bad proof key (KI identity)!");
 
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        CHECK_AND_ASSERT_THROW_MES(!(proposal.K[i] == rct::identity()), "Bad proof key (K[i] identity)!");
-        CHECK_AND_ASSERT_THROW_MES(!(rct::ki2rct(proposal.KI[i]) == rct::identity()), "Bad proof key (KI[i] identity)!");
-
-        // x == 0 is allowed
-        CHECK_AND_ASSERT_THROW_MES(sc_check(&x[i]) == 0, "Bad private key (x[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y[i]), "Bad private key (y[i] zero)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(&y[i]) == 0, "Bad private key (y[i])!");
-        CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z_e[i]), "Bad private key (z[i] zero)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(&z_e[i]) == 0, "Bad private key (z[i])!");
-    }
+    // x == 0 is allowed
+    CHECK_AND_ASSERT_THROW_MES(sc_check(&x) == 0, "Bad private key (x)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "Bad private key (y zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(&y) == 0, "Bad private key (y)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z_e), "Bad private key (z zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(&z_e) == 0, "Bad private key (z)!");
 
     CHECK_AND_ASSERT_THROW_MES(num_signers == signer_nonces_pub_2.size(), "Signer nonces mismatch!");
 
@@ -650,22 +437,13 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
             }
         );
 
-    rct::keyV signer_nonces_pub_1_mul8_temp{std::move(signer_nonces_pub_1_mul8)};
-    rct::keyV signer_nonces_pub_2_mul8_temp{std::move(signer_nonces_pub_2_mul8)};
-    signer_nonces_pub_1_mul8.clear();
-    signer_nonces_pub_2_mul8.clear();
-    signer_nonces_pub_1_mul8.reserve(num_signers);
-    signer_nonces_pub_2_mul8.reserve(num_signers);
-
-    for (std::size_t e{0}; e < num_signers; ++e)
-    {
-        signer_nonces_pub_1_mul8.emplace_back(signer_nonces_pub_1_mul8_temp[signer_nonces_pub_original_indices[e]]);
-        signer_nonces_pub_2_mul8.emplace_back(signer_nonces_pub_2_mul8_temp[signer_nonces_pub_original_indices[e]]);
-    }
-
-    const rct::key U_gen{get_U_gen()};
+    CHECK_AND_ASSERT_THROW_MES(
+        rearrange_vector(signer_nonces_pub_original_indices, signer_nonces_pub_1_mul8) &&
+        rearrange_vector(signer_nonces_pub_original_indices, signer_nonces_pub_2_mul8),
+        "rearranging vectors failed");
 
     // check that the local signer's signature opening is in the input set of opening nonces
+    const rct::key U_gen{get_U_gen()};
     bool found_local_nonce{false};
     rct::key local_nonce_1_pub;
     rct::key local_nonce_2_pub;
@@ -687,83 +465,64 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     /// prepare partial signature
     SpCompositionProofMultisigPartial partial_sig;
 
-    // make K_t1
-    partial_sig.K_t1.resize(num_keys);
-
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        // K_t1_i = (1/8) * (1/y_i) * K_i
-        compute_K_t1_for_proof(y[i], proposal.K[i], partial_sig.K_t1[i]);
-    }
-
     // set partial sig pieces
-    partial_sig.KI = proposal.KI;
-    partial_sig.K = proposal.K;
     partial_sig.message = proposal.message;
+    partial_sig.K = proposal.K;
+    partial_sig.KI = proposal.KI;
+
+    // make K_t1 = (1/8) * (1/y) * K
+    compute_K_t1_for_proof(y, proposal.K, partial_sig.K_t1);
 
 
-    /// challenge message and aggregation coefficients
-    rct::key mu_a{compute_base_aggregation_coefficient_a(partial_sig.message, partial_sig.K_t1, partial_sig.KI)};
-    rct::keyV mu_a_pows{powers_of_scalar(mu_a, num_keys)};
-
-    rct::key mu_b{compute_base_aggregation_coefficient_b(mu_a)};
-    rct::keyV mu_b_pows{powers_of_scalar(mu_b, num_keys)};
-
-    rct::key m{compute_challenge_message(mu_b, partial_sig.K)};
+    /// challenge message and binonce merge factor
+    rct::key m{compute_challenge_message(partial_sig.message, partial_sig.K, partial_sig.KI, partial_sig.K_t1)};
 
     rct::key binonce_merge_factor{multisig_binonce_merge_factor(m, signer_nonces_pub_1_mul8, signer_nonces_pub_2_mul8)};
 
 
     /// signature openers
 
-    // alpha_a * G
-    rct::key alpha_a_pub;
-    rct::scalarmultKey(alpha_a_pub, rct::G, proposal.signature_nonce_K_t2);
+    // alpha_t1 * K
+    rct::key alpha_t1_pub;
+    rct::scalarmultKey(alpha_t1_pub, partial_sig.K, rct::sk2rct(proposal.signature_nonce_K_t1));
 
-    // alpha_b * U
+    // alpha_t2 * G
+    rct::key alpha_t2_pub;
+    rct::scalarmultKey(alpha_t2_pub, rct::G, rct::sk2rct(proposal.signature_nonce_K_t2));
+
+    // alpha_ki * U
     // - MuSig2-style merged nonces from all multisig participants
 
-    // alpha_b_1 = sum(alpha_b_1_e * U)
-    rct::key alpha_b_pub{rct::addKeys(signer_nonces_pub_1_mul8)};
+    // alpha_ki_1 = sum(alpha_ki_1_e * U)
+    rct::key alpha_ki_pub{rct::addKeys(signer_nonces_pub_1_mul8)};
 
-    // alpha_b_2 * U = rho * sum(alpha_b_2_e * U)
-    // rho = H(m, {alpha_b_1_e * U}, {alpha_b_2_e * U})
-    rct::key alpha_b_2_pub{rct::addKeys(signer_nonces_pub_2_mul8)};
-    rct::scalarmultKey(alpha_b_2_pub, alpha_b_2_pub, binonce_merge_factor);
+    // alpha_ki_2 * U = rho * sum(alpha_ki_2_e * U)
+    // rho = H(m, {alpha_ki_1_e * U}, {alpha_ki_2_e * U})
+    rct::key alpha_ki_2_pub{rct::addKeys(signer_nonces_pub_2_mul8)};
+    rct::scalarmultKey(alpha_ki_2_pub, alpha_ki_2_pub, binonce_merge_factor);
 
-    // alpha_b * U = alpha_b_1 + alpha_b_2
-    rct::addKeys(alpha_b_pub, alpha_b_pub, alpha_b_2_pub);
-
-    // alpha_i[i] * K_i
-    rct::keyV alpha_i_pub;
-    alpha_i_pub.resize(num_keys);
-
-    for (std::size_t i{0}; i < num_keys; ++i)
-    {
-        rct::scalarmultKey(alpha_i_pub[i], partial_sig.K[i], proposal.signature_nonces_K_t1[i]);
-    }
+    // alpha_ki * U = alpha_ki_1 + alpha_ki_2
+    rct::addKeys(alpha_ki_pub, alpha_ki_pub, alpha_ki_2_pub);
 
 
     /// compute proof challenge
-    partial_sig.c = compute_challenge(m, alpha_a_pub, alpha_b_pub, alpha_i_pub);
+    partial_sig.c = compute_challenge(m, alpha_t1_pub, alpha_t2_pub, alpha_ki_pub);
 
 
     /// responses
     crypto::secret_key merged_nonce_KI_priv;  // alpha_1_local + rho * alpha_2_local
     sc_muladd(&merged_nonce_KI_priv, &local_nonce_2_priv, binonce_merge_factor.bytes, &local_nonce_1_priv);
 
-    compute_responses(x,
+    compute_responses(partial_sig.c,
+            rct::sk2rct(proposal.signature_nonce_K_t1),
+            rct::sk2rct(proposal.signature_nonce_K_t2),
+            rct::sk2rct(merged_nonce_KI_priv),  // for partial signature
+            x,
             y,
             z_e,  // for partial signature
-            mu_a_pows,
-            mu_b_pows,
-            proposal.signature_nonce_K_t2,
-            rct::sk2rct(merged_nonce_KI_priv),  // for partial signature
-            proposal.signature_nonces_K_t1,
-            partial_sig.c,
-            partial_sig.r_a,
-            partial_sig.r_b_partial,  // partial response
-            partial_sig.r_i
+            partial_sig.r_t1,
+            partial_sig.r_t2,
+            partial_sig.r_ki_partial  // partial response
         );
 
 
@@ -776,27 +535,17 @@ SpCompositionProof sp_composition_prove_multisig_final(const std::vector<SpCompo
     /// input checks and initialization
     CHECK_AND_ASSERT_THROW_MES(partial_sigs.size() > 0, "No partial signatures to make proof out of!");
 
-    const std::size_t num_keys{partial_sigs[0].K.size()};
-
     // common parts between partial signatures should match
     for (std::size_t sig_index{0}; sig_index < partial_sigs.size(); ++sig_index)
     {
-        CHECK_AND_ASSERT_THROW_MES(num_keys == partial_sigs[sig_index].K.size(), "Input key sets not the same size!");
-        CHECK_AND_ASSERT_THROW_MES(num_keys == partial_sigs[sig_index].KI.size(), "Input key sets not the same size!");
-        CHECK_AND_ASSERT_THROW_MES(num_keys == partial_sigs[sig_index].K_t1.size(), "Input key sets not the same size!");
-        CHECK_AND_ASSERT_THROW_MES(num_keys == partial_sigs[sig_index].r_i.size(), "Input key sets not the same size!");
-
         CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].c == partial_sigs[sig_index].c, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_a == partial_sigs[sig_index].r_a, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].message == partial_sigs[sig_index].message, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t1 == partial_sigs[sig_index].r_t1, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t2 == partial_sigs[sig_index].r_t2, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K_t1 == partial_sigs[sig_index].K_t1, "Input key sets don't match!");
 
-        for (std::size_t i{0}; i < num_keys; ++i)
-        {
-            CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K[i] == partial_sigs[sig_index].K[i], "Input key sets don't match!");
-            CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].KI[i] == partial_sigs[sig_index].KI[i], "Input key sets don't match!");
-            CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K_t1[i] == partial_sigs[sig_index].K_t1[i], "Input key sets don't match!");
-            CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_i[i] == partial_sigs[sig_index].r_i[i], "Input key sets don't match!");
-        }
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K == partial_sigs[sig_index].K, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].KI == partial_sigs[sig_index].KI, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].message == partial_sigs[sig_index].message, "Input key sets don't match!");
     }
 
 
@@ -804,24 +553,24 @@ SpCompositionProof sp_composition_prove_multisig_final(const std::vector<SpCompo
     SpCompositionProof proof;
 
     proof.c = partial_sigs[0].c;
-    proof.r_a = partial_sigs[0].r_a;
+    proof.r_t1 = partial_sigs[0].r_t1;
+    proof.r_t2 = partial_sigs[0].r_t2;
 
-    proof.r_b = rct::zero();
+    proof.r_ki = rct::zero();
     for (std::size_t sig_index{0}; sig_index < partial_sigs.size(); ++sig_index)
     {
         // sum of responses from each multisig participant
-        sc_add(proof.r_b.bytes, proof.r_b.bytes, partial_sigs[sig_index].r_b_partial.bytes);
+        sc_add(proof.r_ki.bytes, proof.r_ki.bytes, partial_sigs[sig_index].r_ki_partial.bytes);
     }
 
-    proof.r_i = partial_sigs[0].r_i;
     proof.K_t1 = partial_sigs[0].K_t1;
 
 
     /// verify that proof assembly succeeded
     CHECK_AND_ASSERT_THROW_MES(sp_composition_verify(proof,
+            partial_sigs[0].message,
             partial_sigs[0].K,
-            partial_sigs[0].KI,
-            partial_sigs[0].message),
+            partial_sigs[0].KI),
         "Multisig composition proof failed to verify on assembly!");
 
 

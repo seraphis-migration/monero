@@ -311,106 +311,71 @@ TEST(seraphis, multi_exp)
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, composition_proof)
 {
-    rct::keyV K;
-    std::vector<crypto::key_image> KI;
-    std::vector<crypto::secret_key> x, y, z;
+    rct::key K;
+    crypto::key_image KI;
+    crypto::secret_key x, y, z;
     rct::key message{rct::zero()};
     sp::SpCompositionProof proof;
 
-    // degenerate case works (1 key)
-    // normal cases work (>1 key)
-    for (std::size_t num_keys{1}; num_keys < 5; ++num_keys)
+    try
     {
-        K.resize(num_keys);
-        KI.resize(num_keys);
-        x.resize(num_keys);
-        y.resize(num_keys);
-        z.resize(num_keys);
+        std::vector<crypto::secret_key> temp_z = {z};
+        make_fake_sp_masked_address(x, y, temp_z, K);
+        z = temp_z[0];
+        sp::make_seraphis_key_image(y, z, KI);
 
-        try
-        {
-            for (std::size_t i{0}; i < num_keys; ++i)
-            {
-                std::vector<crypto::secret_key> temp_z = {z[i]};
-                make_fake_sp_masked_address(x[i], y[i], temp_z, K[i]);
-                z[i] = temp_z[0];
-                sp::make_seraphis_key_image(y[i], z[i], KI[i]);
-            }
+        proof = sp::sp_composition_prove(message, K, x, y, z);
 
-            proof = sp::sp_composition_prove(K, x, y, z, message);
-
-            EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
-        }
-        catch (...)
-        {
-            EXPECT_TRUE(false);
-        }
+        EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
+    }
+    catch (...)
+    {
+        EXPECT_TRUE(false);
     }
 
     // works even if x = 0
+    try
     {
-        K.resize(1);
-        KI.resize(1);
-        x.resize(1);
-        y.resize(1);
-        z.resize(1);
+        std::vector<crypto::secret_key> temp_z = {z};
+        make_fake_sp_masked_address(x, y, temp_z, K);
+        z = temp_z[0];
 
-        try
-        {
-            std::vector<crypto::secret_key> temp_z = {z[0]};
-            make_fake_sp_masked_address(x[0], y[0], temp_z, K[0]);
-            z[0] = temp_z[0];
+        rct::key xG;
+        rct::scalarmultBase(xG, rct::sk2rct(x));
+        rct::subKeys(K, K, xG);   // kludge: remove x part manually
+        x = rct::rct2sk(rct::zero());
 
-            rct::key xG;
-            rct::scalarmultBase(xG, rct::sk2rct(x[0]));
-            rct::subKeys(K[0], K[0], xG);   // kludge: remove x part manually
-            x[0] = rct::rct2sk(rct::zero());
+        sp::make_seraphis_key_image(y, z, KI);
 
-            sp::make_seraphis_key_image(y[0], z[0], KI[0]);
+        proof = sp::sp_composition_prove(message, K, x, y, z);
 
-            proof = sp::sp_composition_prove(K, x, y, z, message);
-
-            EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
-        }
-        catch (...)
-        {
-            EXPECT_TRUE(false);
-        }
+        EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
+    }
+    catch (...)
+    {
+        EXPECT_TRUE(false);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, composition_proof_multisig)
 {
-    rct::keyV K, signer_nonces_1_pubs, signer_nonces_2_pubs;
-    std::vector<crypto::key_image> KI;
-    std::vector<crypto::secret_key> x, y, z_pieces_temp;
-    std::vector<std::vector<crypto::secret_key>> z_pieces;
+    rct::key K;
+    rct::keyV signer_nonces_1_pubs, signer_nonces_2_pubs;
+    crypto::key_image KI;
+    crypto::secret_key x, y;
+    std::vector<crypto::secret_key> z_pieces;
     rct::key message{rct::zero()};
     std::vector<sp::SpCompositionProofMultisigPrep> signer_preps;
     std::vector<sp::SpCompositionProofMultisigPartial> partial_sigs;
     sp::SpCompositionProof proof;
 
     // works even if x = 0 (kludge test)
-    // degenerate case works (1 key)
-    // normal cases work (>1 key)
     // range of co-signers works (1-3 signers)
     for (const bool test_x_0 : {true, false})
     {
-    for (std::size_t num_keys{1}; num_keys < 4; ++num_keys)
-    {
-        K.resize(num_keys);
-        KI.resize(num_keys);
-        x.resize(num_keys);
-        y.resize(num_keys);
-
         for (std::size_t num_signers{1}; num_signers < 4; ++num_signers)
         {
-            z_pieces_temp.resize(num_signers);
             z_pieces.resize(num_signers);
-            for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
-            {
-                z_pieces[signer_index].resize(num_keys);
-            }
             signer_preps.resize(num_signers);
             signer_nonces_1_pubs.resize(num_signers);
             signer_nonces_2_pubs.resize(num_signers);
@@ -418,37 +383,27 @@ TEST(seraphis, composition_proof_multisig)
 
             try
             {
-                // prepare keys to sign with
-                for (std::size_t i{0}; i < num_keys; ++i)
-                {
-                    // each signer gets their own z value for each key to sign with
-                    make_fake_sp_masked_address(x[i], y[i], z_pieces_temp, K[i]);
+                // note: each signer gets their own z value
+                make_fake_sp_masked_address(x, y, z_pieces, K);
 
-                    for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
-                    {
-                        // have to map between different indexing views
-                        z_pieces[signer_index][i] = z_pieces_temp[signer_index];
-                    }
+                // add z pieces together from all signers to build the key image
+                crypto::secret_key z{rct::rct2sk(rct::zero())};
+                for (const auto &z_piece : z_pieces)
+                    sc_add(&z, &z, &z_piece);
 
-                    // add z pieces together from all signers to build the key image
-                    crypto::secret_key z{rct::rct2sk(rct::zero())};
-                    for (const auto &z_piece : z_pieces_temp)
-                        sc_add(&z, &z, &z_piece);
-
-                    sp::make_seraphis_key_image(y[i], z, KI[i]);
-                }
+                sp::make_seraphis_key_image(y, z, KI);
 
                 // kludge test: remove x component
                 if (test_x_0)
                 {
                     rct::key xG;
-                    rct::scalarmultBase(xG, rct::sk2rct(x[0]));
-                    rct::subKeys(K[0], K[0], xG);
-                    x[0] = rct::rct2sk(rct::zero());
+                    rct::scalarmultBase(xG, rct::sk2rct(x));
+                    rct::subKeys(K, K, xG);
+                    x = rct::rct2sk(rct::zero());
                 }
 
                 // tx proposer: make proposal
-                sp::SpCompositionProofMultisigProposal proposal{sp::sp_composition_multisig_proposal(KI, K, message)};
+                sp::SpCompositionProofMultisigProposal proposal{sp::sp_composition_multisig_proposal(message, K, KI)};
 
                 // all participants: signature openers
                 for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
@@ -477,7 +432,7 @@ TEST(seraphis, composition_proof_multisig)
                 proof = sp::sp_composition_prove_multisig_final(partial_sigs);
 
                 // verify tx
-                EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
+                EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
 
 
                 /// test: rearranging nonces between signers makes a valid proof
@@ -507,14 +462,13 @@ TEST(seraphis, composition_proof_multisig)
                 proof = sp::sp_composition_prove_multisig_final(partial_sigs);
 
                 // verify tx again
-                EXPECT_TRUE(sp::sp_composition_verify(proof, K, KI, message));
+                EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
             }
             catch (...)
             {
                 EXPECT_TRUE(false);
             }
         }
-    }
     }
 }
 //-------------------------------------------------------------------------------------------------------------------

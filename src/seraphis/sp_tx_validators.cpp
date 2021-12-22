@@ -333,16 +333,13 @@ bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_
     if (image_proofs.size() != input_images.size())
         return false;
 
-    // validate each composition proof; these proofs are unmerged (one per input)
-    rct::keyV K;
-    std::vector<crypto::key_image> KI;
-
+    // validate each composition proof
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
     {
-        K = {input_images[input_index].m_masked_address};
-        KI = {input_images[input_index].m_key_image};
-
-        if (!sp::sp_composition_verify(image_proofs[input_index].m_composition_proof, K, KI, image_proofs_message))
+        if (!sp::sp_composition_verify(image_proofs[input_index].m_composition_proof,
+                image_proofs_message,
+                input_images[input_index].m_masked_address,
+                input_images[input_index].m_key_image))
             return false;
     }
 

@@ -29,29 +29,27 @@
 // NOT FOR PRODUCTION
 
 ////
-// Schnorr-like composition proof for a set of keys of the form K_i = x_i*G + y_i*X + z_i*U
-// - demonstrates knowledge of all x_i, y_i, z_i
-//   - x_i >= 0
-//   - y_i, z_i > 0
-// - shows that key images KI_i = (z_i/y_i)*U
+// Schnorr-like composition proof for a se key of the form K = x*G + y*X + z*U
+// - demonstrates knowledge of x, y, z
+//   - x >= 0
+//   - y, z > 0
+// - shows that key image KI = (z/y)*U
 //
-// note: uses 'concise' technique for smaller proofs, with the powers-of-aggregation coefficient approach from Triptych
-// note2: G_0 = G, G_1 = X, G_2 = U (for Seraphis paper notation)
-// note3: in practice, K_i are masked addresses from Seraphis e-note-images, and KI_i are the corresponding linking tags
-// note4: assume key images KI are in the prime subgroup (canonical bytes) and non-identity
+// note: G_0 = G, G_1 = X, G_2 = U (for Seraphis paper notation)
+// note: in practice, K is a masked address from a Seraphis e-note-image, and KI is the corresponding linking tag
+// note: assume key image KI is in the prime subgroup (canonical bytes) and non-identity
 //   - WARNING: the caller must validate KI (and check non-identity); either...
 //     - 1) l*KI == identity
 //     - 2) store (1/8)*KI with proof material (e.g. in a transaction); pass 8*[(1/8)*KI] as input to composition proof
 //          validation
 //
-// multisig notation: alpha_{b,n,e}
-// - b: indicates which part of the proof this is for
+// multisig notation: alpha_{a,n,e}
+// - a: indicates which part of the proof this is for
 // - n: for MuSig2-style bi-nonce signing, alpha_{b,1,e} is nonce 'D', alpha_{b,2,e} is nonce 'E' (in their notation)
 // - e: multisig signer index
 //
 // References:
 // - Seraphis (UkoeHB): https://github.com/UkoeHB/Seraphis (temporary reference)
-// - Triptych (Sarang Noether): https://eprint.iacr.org/2020/018
 //
 // Multisig references:
 // - MuSig2 (Nick): https://eprint.iacr.org/2020/1261
@@ -92,14 +90,12 @@ struct SpCompositionProof
 {
     // challenge
     rct::key c;
-    // condensed responses
-    rct::key r_a, r_b;
-    // un-condensible responses
-    rct::keyV r_i;
-    // intermediate proof keys (stored as (1/8)*KI)
-    rct::keyV K_t1;
-    // key images KI: not stored with proof
-    // main proof keys K: not stored with proof
+    // responses
+    rct::key r_t1, r_t2, r_ki;
+    // intermediate proof key (stored as (1/8)*KI)
+    rct::key K_t1;
+    // key image KI: not stored with proof
+    // main proof key K: not stored with proof
     // message m: not stored with proof
 };
 
@@ -112,23 +108,23 @@ struct SpCompositionProof
 ///
 struct SpCompositionProofMultisigProposal
 {
-    // key images KI
-    std::vector<crypto::key_image> KI;
-    // main proof keys K
-    rct::keyV K;
     // message
     rct::key message;
+    // main proof key K
+    rct::key K;
+    // key image KI
+    crypto::key_image KI;
 
-    // signature nonce (shared component): alpha_{e,a}
-    rct::key signature_nonce_K_t2;
-    // signature nonce (shared components): alpha_{e,i}
-    rct::keyV signature_nonces_K_t1;
+    // signature nonce (shared component): alpha_t1
+    crypto::secret_key signature_nonce_K_t1;
+    // signature nonce (shared component): alpha_t2
+    crypto::secret_key signature_nonce_K_t2;
 };
 
 ////
 // Multisig prep struct
 // - store multisig participant's MuSig2-style signature opening nonces for KI component
-//   - multisig assumes only proof component KI is subject to multisig signing (keys z_i split between signers)
+//   - multisig assumes only proof component KI is subject to multisig signing (key z is split between signers)
 //
 // WARNING: must only use a 'prep' to make ONE 'partial signature',
 //          after that the opening nonce privkeys should be deleted immediately
@@ -136,40 +132,39 @@ struct SpCompositionProofMultisigProposal
 ///
 struct SpCompositionProofMultisigPrep
 {
-    // signature nonce privkey: alpha_{b,1,e}
+    // signature nonce privkey: alpha_{ki,1,e}
     crypto::secret_key signature_nonce_1_KI_priv;
-    // signature nonce pubkey: alpha_{b,1,e}*U
+    // signature nonce pubkey: alpha_{ki,1,e}*U
     rct::key signature_nonce_1_KI_pub;
-    // signature nonce privkey: alpha_{b,2,e}
+    // signature nonce privkey: alpha_{ki,2,e}
     crypto::secret_key signature_nonce_2_KI_priv;
-    // signature nonce pubkey: alpha_{b,2,e}*U
+    // signature nonce pubkey: alpha_{ki,2,e}*U
     rct::key signature_nonce_2_KI_pub;
 };
 
 ////
 // Multisig partially signed composition proof (from one multisig participant)
-// - multisig assumes only proof component KI is subject to multisig signing (keys z_i split between signers)
-// - store signature opening for KI component (response r_b)
+// - multisig assumes only proof component KI is subject to multisig signing (key z is split between signers)
+// - store signature opening for KI component (response r_ki)
 ///
 struct SpCompositionProofMultisigPartial
 {
-    // challenge
-    rct::key c;
-    // condensed response r_a
-    rct::key r_a;
-    // un-condensible responses
-    rct::keyV r_i;
-    // intermediate proof keys
-    rct::keyV K_t1;
-    // key images KI
-    std::vector<crypto::key_image> KI;
-    // main proof keys K
-    rct::keyV K;
     // message
     rct::key message;
+    // main proof key K
+    rct::key K;
+    // key image KI
+    crypto::key_image KI;
 
-    // partial response for r_b (from one multisig participant)
-    rct::key r_b_partial;
+    // challenge
+    rct::key c;
+    // responses r_t1, r_t2
+    rct::key r_t1, r_t2;
+    // intermediate proof key K_t1
+    rct::key K_t1;
+
+    // partial response for r_ki (from one multisig participant)
+    rct::key r_ki_partial;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -178,30 +173,30 @@ struct SpCompositionProofMultisigPartial
 
 /**
 * brief: sp_composition_prove - create a Seraphis composition proof
-* param: K - main proof keys
-* param: x - secret keys (x_i)
-* param: y - secret keys (y_i)
-* param: z - secret keys (z_i)
 * param: message - message to insert in Fiat-Shamir transform hash
+* param: K - main proof key
+* param: x - secret key
+* param: y - secret key
+* param: z - secret key
 * return: Seraphis composition proof
 */
-SpCompositionProof sp_composition_prove(const rct::keyV &K,
-    const std::vector<crypto::secret_key> &x,
-    const std::vector<crypto::secret_key> &y,
-    const std::vector<crypto::secret_key> &z,
-    const rct::key &message);
+SpCompositionProof sp_composition_prove(const rct::key &message,
+    const rct::key &K,
+    const crypto::secret_key &x,
+    const crypto::secret_key &y,
+    const crypto::secret_key &z);
 /**
 * brief: sp_composition_verify - verify a Seraphis composition proof
 * param: proof - proof to verify
-* param: K - main proof keys
-* param: KI - proof key images
 * param: message - message to insert in Fiat-Shamir transform hash
+* param: K - main proof key
+* param: KI - proof key image
 * return: true/false on verification result
 */
 bool sp_composition_verify(const SpCompositionProof &proof,
-    const rct::keyV &K,
-    const std::vector<crypto::key_image> &KI,
-    const rct::key &message);
+    const rct::key &message,
+    const rct::key &K,
+    const crypto::key_image &KI);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////// Multisig ///////////////////////////////////////////////////
@@ -209,14 +204,14 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 
 /**
 * brief: sp_composition_multisig_proposal - propose to make a multisig Seraphis composition proof
-* param: KI - key images KI
-* param: K - main proof keys K
 * param: message - message to insert in the proof's Fiat-Shamir transform hash
+* param: K - main proof key
+* param: KI - key image
 * return: Seraphis composition proof multisig proposal
 */
-SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const std::vector<crypto::key_image> &KI,
-    const rct::keyV &K,
-    const rct::key &message);
+SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::key &message,
+    const rct::key &K,
+    const crypto::key_image &KI);
 /**
 * brief: sp_composition_multisig_init - prepare for making a multisig Seraphis composition proof
 * return: multisig participant's prep work for a Seraphis composition proof
@@ -226,23 +221,23 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init();
 * brief: sp_composition_multisig_partial_sig - make local multisig signer's partial signature for a Seraphis composition
 *        proof
 *   - caller must validate 'proposal'
-*       - are key images well-made?
-*       - are main keys legitimate?
-*       - is message correct?
+*       - is the key image well-made?
+*       - is the main key legitimate?
+*       - is the message correct?
 * param: proposal - proof proposal to construct proof partial signature from
-* param: x - secret keys (x_i)
-* param: y - secret keys (y_i)
-* param: z_e - secret keys of multisig signer (z_{e,i})
-* param: signer_nonces_pub_1 - signature nonce pubkeys alpha_{b,1,e}*U from all signers (including local signer)
-* param: signer_nonces_pub_2 - signature nonce pubkeys alpha_{b,2,e}*U from all signers (including local signer)
-* param: local_nonce_1_priv - alpha_{b,1,e} for local signer
-* param: local_nonce_2_priv - alpha_{b,2,e} for local signer
+* param: x - secret key
+* param: y - secret key
+* param: z_e - secret key of multisig signer e
+* param: signer_nonces_pub_1 - signature nonce pubkeys alpha_{ki,1,e}*U from all signers (including local signer)
+* param: signer_nonces_pub_2 - signature nonce pubkeys alpha_{ki,2,e}*U from all signers (including local signer)
+* param: local_nonce_1_priv - alpha_{ki,1,e} for local signer
+* param: local_nonce_2_priv - alpha_{ki,2,e} for local signer
 * return: partially signed Seraphis composition proof
 */
 SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCompositionProofMultisigProposal &proposal,
-    const std::vector<crypto::secret_key> &x,
-    const std::vector<crypto::secret_key> &y,
-    const std::vector<crypto::secret_key> &z_e,
+    const crypto::secret_key &x,
+    const crypto::secret_key &y,
+    const crypto::secret_key &z_e,
     const rct::keyV &signer_nonces_pub_1,
     const rct::keyV &signer_nonces_pub_2,
     const crypto::secret_key &local_nonce_1_priv,
