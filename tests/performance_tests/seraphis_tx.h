@@ -217,7 +217,7 @@ private:
 };
 
 template <typename SpTxType>
-class test_mock_tx
+class test_seraphis_tx
 {
 public:
     static const size_t loop_count = 1;

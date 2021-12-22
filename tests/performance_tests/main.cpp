@@ -71,7 +71,6 @@
 #include "seraphis_tx.h"
 #include "concise_grootle.h"
 #include "view_scan.h"
-#include "pippinger_failure.h"
 
 namespace po = boost::program_options;
 
@@ -194,8 +193,8 @@ int main(int argc, char** argv)
 
   /// mock tx performance tests
   SpTxPerfIncrementer incrementer;
-  ParamsShuttleSpTx p_mock_tx;
-  p_mock_tx.core_params = p.core_params;
+  ParamsShuttleSpTx p_seraphis_tx;
+  p_seraphis_tx.core_params = p.core_params;
 
 
   //// TEST SET 3
@@ -210,11 +209,11 @@ int main(int argc, char** argv)
       {2}, //decomp n
       {7} //decomp m limits
     };
-  while (incrementer.next(p_mock_tx))
+  while (incrementer.next(p_seraphis_tx))
   {
     // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m == 7)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
   }
   // test done, save results
   if (p.core_params.td.get())
@@ -228,10 +227,10 @@ int main(int argc, char** argv)
       {2, 3}, //decomp n
       {12, 7} //decomp m limits
     };
-  while (incrementer.next(p_mock_tx))
+  while (incrementer.next(p_seraphis_tx))
   {
-    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m >= 2)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
   }
   // test done, save results
   if (p.core_params.td.get())
@@ -245,11 +244,11 @@ int main(int argc, char** argv)
       {2}, //decomp n
       {7} //decomp m limits
     };
-  while (incrementer.next(p_mock_tx))
+  while (incrementer.next(p_seraphis_tx))
   {
     // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m == 7)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
   }
   // test done, save results
   if (p.core_params.td.get())
@@ -263,11 +262,11 @@ int main(int argc, char** argv)
       {2}, //decomp n
       {7} //decomp m limits
     };
-  while (incrementer.next(p_mock_tx))
+  while (incrementer.next(p_seraphis_tx))
   {
     // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m == 7)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
   }
   // test done, save results
   if (p.core_params.td.get())
@@ -281,11 +280,11 @@ int main(int argc, char** argv)
       {2}, //decomp n
       {7} //decomp m limits
     };
-  while (incrementer.next(p_mock_tx))
+  while (incrementer.next(p_seraphis_tx))
   {
     // only decomp 2^7
-    if (p_mock_tx.n >= 2 && p_mock_tx.m == 7)
-      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, sp::SpTxSquashedV1);
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m == 7)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
   }
   // test done, save results
   if (p.core_params.td.get())
