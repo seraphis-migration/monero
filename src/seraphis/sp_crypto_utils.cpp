@@ -54,6 +54,7 @@ extern "C"
 //standard headers
 #include <array>
 #include <cmath>
+#include <string>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -72,8 +73,8 @@ static ge_p3 G_p3;
 static ge_p3 H_p3;
 static ge_p3 U_p3;
 static ge_p3 X_p3;
-static rct::key U;
-static rct::key X;
+static rct::key U;  //x126582dfc357b10ecb0ce0f12c26359f53c64d4900b7696c2c4b3f7dcab7f730
+static rct::key X;  //x4017a126181c34b0774d590523a08346be4f42348eddd50eb7a441b571b2b613
 
 // Useful scalar and group constants
 static const rct::key ZERO = rct::zero();
