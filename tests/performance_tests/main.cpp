@@ -71,6 +71,7 @@
 #include "seraphis_tx.h"
 #include "concise_grootle.h"
 #include "view_scan.h"
+#include "blowfish.h"
 
 namespace po = boost::program_options;
 
@@ -118,6 +119,10 @@ int main(int argc, char** argv)
   timer.start();
 
 
+
+  // test blowfish performance for single blocks
+  TEST_PERFORMANCE0(filter, p, test_blowfish_address_id);
+  TEST_PERFORMANCE0(filter, p, test_blowfish_context_init);
 
   // test hash performance for view tags
   ParamsShuttleViewHash p_view_hash;
