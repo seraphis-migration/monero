@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2022, The Monero Project
+// Copyright (c) 2021, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -26,37 +26,41 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
-// Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
+// Parts of this file are originally copyright (c) 1997 Paul Kocher
 
-#pragma once
-
-#if defined(__cplusplus)
-#include "crypto/crypto.h"
-
-extern "C" {
-#endif
+#include "crypto/blowfish.h"
 
 #include <stdbool.h>
 #include <stdint.h>
 
-void setup_random(void);
-int siphash_test(void);
 bool check_blowfish_block(uint8_t *key,
     unsigned int key_length,
     uint32_t L_enc,
     uint32_t R_enc,
     uint32_t L_expected,
-    uint32_t R_expected);
-bool blowfish_test(void);
+    uint32_t R_expected)
+{
+  uint32_t L_temp = L_expected, R_temp = R_expected;
 
-#if defined(__cplusplus)
+  // initialize the blowfish context
+  BLOWFISH_CTX ctx;
+  Blowfish_Init (&ctx, key, key_length);
+
+  // encrypt the test values
+  Blowfish_Encrypt(&ctx, &L_temp, &R_temp);
+  if (!(L_temp == L_enc && R_temp == R_enc))
+      return false;
+
+  // decrypt the test encryption values
+  Blowfish_Decrypt(&ctx, &L_temp, &R_temp);
+  if (!(L_temp == L_expected && R_temp == R_expected))
+      return false;
+
+  return true;
 }
 
-bool check_scalar(const crypto::ec_scalar &scalar);
-void random_scalar(crypto::ec_scalar &res);
-void hash_to_scalar(const void *data, std::size_t length, crypto::ec_scalar &res);
-void hash_to_point(const crypto::hash &h, crypto::ec_point &res);
-void hash_to_ec(const crypto::public_key &key, crypto::ec_point &res);
-bool check_ge_p3_identity_failure(const crypto::public_key &point);
-bool check_ge_p3_identity_success(const crypto::public_key &point);
-#endif
+bool blowfish_test(void)
+{
+    const char test_key[] = "TESTKEY";
+    return check_blowfish_block((uint8_t *)test_key, 7, 0xDF333FD2L, 0x30A71BB4L, 1, 2);
+}

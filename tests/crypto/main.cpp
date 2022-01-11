@@ -274,17 +274,23 @@ int main(int argc, char *argv[]) {
         goto error;
       }
     } else {
-      throw ios_base::failure("Unknown function: " + cmd);
+      goto error;
     }
     continue;
 error:
     cerr << "Wrong result on test " << test << endl;
     error = true;
+    break;
   }
   //if (siphash_test() != 0)
   {
     //cerr << "Wrong result on test 'siphash_test'" << endl;
     //error = true;
+  }
+  if (blowfish_test() != true)
+  {
+    cerr << "Wrong result on test 'blowfish_test'" << endl;
+    error = true;
   }
   return error ? 1 : 0;
   CATCH_ENTRY_L0("main", 0);

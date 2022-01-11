@@ -29,6 +29,7 @@
 set(crypto_sources
   aesb.c
   blake256.c
+  blowfish.c
   chacha.c
   crypto-ops-data.c
   crypto-ops.c
