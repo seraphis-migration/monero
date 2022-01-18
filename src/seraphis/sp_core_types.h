@@ -64,15 +64,12 @@ enum TxStructureVersionSp : unsigned char
 ////
 // SpENote - Seraphis ENote base
 ///
-struct SpENote
+struct SpENote final
 {
     /// Ko = (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
     rct::key m_onetime_address;
     /// C = x G + a H
     rct::key m_amount_commitment;
-
-    /// virtual destructor for non-final type
-    virtual ~SpENote() = default;
 
     /**
     * brief: make_base_from_privkeys - make a Seraphis ENote when all secrets are known
@@ -81,10 +78,10 @@ struct SpENote
     * param: amount_blinding_factor -
     * param: amount -
     */
-    virtual void make_base_from_privkeys(const crypto::secret_key &enote_view_privkey,
+    void make_base_from_privkeys(const crypto::secret_key &enote_view_privkey,
         const crypto::secret_key &spendbase_privkey,
         const crypto::secret_key &amount_blinding_factor,
-        const rct::xmr_amount amount) final;
+        const rct::xmr_amount amount);
     /**
     * brief: make_base_with_address_extension - make a Seraphis ENote by extending an existing address
     * param: extension_privkey -
@@ -92,28 +89,28 @@ struct SpENote
     * param: amount_blinding_factor -
     * param: amount -
     */
-    virtual void make_base_with_address_extension(const crypto::secret_key &extension_privkey,
+    void make_base_with_address_extension(const crypto::secret_key &extension_privkey,
         const rct::key &initial_address,
         const crypto::secret_key &amount_blinding_factor,
-        const rct::xmr_amount amount) final;
+        const rct::xmr_amount amount);
     /**
     * brief: gen_base - generate a Seraphis ENote (all random)
     */
-    virtual void gen_base() final;
+    void gen_base();
 
     /**
     * brief: append_to_string - convert enote to a string and append to existing string (for proof transcripts)
     * inoutparam: str_inout - enote contents concatenated to a string
     */
-    virtual void append_to_string(std::string &str_inout) const = 0;
+    void append_to_string(std::string &str_inout) const = 0;
 
-    static std::size_t get_size_bytes_base() {return 32*2;}
+    static std::size_t get_size_bytes() { return 32*2; }
 };
 
 ////
 // SpENoteImage - Seraphis ENote Image base
 ///
-struct SpENoteImage
+struct SpENoteImage final
 {
     /// Ko' = t_k G + (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
     rct::key m_masked_address;
@@ -122,17 +119,14 @@ struct SpENoteImage
     /// KI = (k_{b, recipient} / (k_{a, sender} + k_{a, recipient})) U
     crypto::key_image m_key_image;
 
-    /// virtual destructor for non-final type
-    virtual ~SpENoteImage() = default;
-
-    static std::size_t get_size_bytes_base() {return 32*3;}
+    static std::size_t get_size_bytes() { return 32*3; }
 };
 
 ////
 // SpInputProposal - Seraphis Input Proposal base
-// - a tx input is an enote, so this is parameterized by the enote type
+// - for spending an enote
 ///
-struct SpInputProposal
+struct SpInputProposal final
 {
     /// k_{a, sender} + k_{a, recipient}
     crypto::secret_key m_enote_view_privkey;
@@ -143,58 +137,55 @@ struct SpInputProposal
     /// a
     rct::xmr_amount m_amount;
 
-    /// virtual destructor for non-final type
-    virtual ~SpInputProposal() = default;
+    /// t_k
+    crypto::secret_key m_address_mask;
+    /// t_c
+    crypto::secret_key m_commitment_mask;
 
     /**
     * brief: get_key_image - get this input's key image
     * outparam: key_image_out - KI
     */
-    virtual void get_key_image(crypto::key_image &key_image_out) const final;
+    void get_key_image(crypto::key_image &key_image_out) const;
 
     /**
-    * brief: to_enote_image_squashed_base - convert this input to an enote image in the squashed enote model
-    * param: address_mask - t_k
-    * param: commitment_mask - t_c
-    * inoutparam: image_inout -
+    * brief: get_enote_base - get the enote this input proposal represents
+    * outparam: enote_out -
     */
-    virtual void to_enote_image_squashed_base(const crypto::secret_key &address_mask,
-        const crypto::secret_key &commitment_mask,
-        SpENoteImage &image_inout) const final;
+    void get_enote_base(SpEnote &enote_out) const;
 
     /**
-    * brief: gen_base - generate a Seraphis Input (all random)
+    * brief: get_enote_image_squashed_base - get this input's enote image in the squashed enote model
+    * inoutparam: image_out -
+    */
+    void get_enote_image_squashed_base(SpENoteImage &image_out) const;
+
+    /**
+    * brief: gen - generate random enote keys
     * param: amount -
     */
-    virtual void gen_base(const rct::xmr_amount amount) final;
-
-protected:
-    /// inheritor needs to store the enote this input is trying to spend, then pass it back up to the base class here
-    virtual const SpENote& get_enote_base() const = 0;
+    void gen(const rct::xmr_amount amount);
 };
 
 ////
 // SpDestination - Seraphis Destination base
 // - for creating an e-note to send an amount to someone
 ///
-struct SpDestination
+struct SpDestination final
 {
-    /// K^{DH}
+    /// K^{DH}_addr
     rct::key m_recipient_DHkey;
-    /// K^{vr}
-    rct::key m_recipient_viewkey;
-    /// K^s
-    rct::key m_recipient_spendkey;
+    /// K^v_addr
+    rct::key m_recipient_addr_viewkey;
+    /// K^s_addr
+    rct::key m_recipient_addr_spendkey;
     rct::xmr_amount m_amount;
 
-    /// virtual destructor for non-final type
-    virtual ~SpDestination() = default;
-
     /**
-    * brief: gen_base - generate a Seraphis Destination (all random)
+    * brief: gen - generate a random destination address
     * param: amount -
     */
-    virtual void gen_base(const rct::xmr_amount amount) final;
+    void gen(const rct::xmr_amount amount);
 };
 
 } //namespace sp

@@ -37,7 +37,7 @@
 #include "mock_ledger_context.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctTypes.h"
-#include "sp_base_types.h"
+#include "sp_core_types.h"
 #include "sp_tx_builder_types.h"
 #include "sp_tx_component_types.h"
 #include "sp_tx_misc_utils.h"
@@ -272,7 +272,7 @@ bool validate_mock_txs<SpTxSquashedV1>(const std::vector<std::shared_ptr<SpTxSqu
             return false;
 
         // validate unbatchable parts of tx
-        if (!tx->validate(ledger_context, true))
+        if (!validate_sp_tx(*tx, ledger_context, true))
             return false;
 
         // gather range proofs

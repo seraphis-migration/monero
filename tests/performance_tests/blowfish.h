@@ -110,6 +110,7 @@ public:
     {
         // blowfish key
         m_secret_key = rct::skGen();
+
         return true;
     }
 

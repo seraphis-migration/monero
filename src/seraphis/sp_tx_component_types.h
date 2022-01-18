@@ -34,9 +34,9 @@
 //local headers
 #include "crypto/crypto.h"
 #include "concise_grootle.h"
-#include "sp_base_types.h"
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
+#include "sp_core_types.h"
 
 //third party headers
 
@@ -51,12 +51,17 @@ namespace sp
 ////
 // SpENoteV1 - v1 enote
 ///
-struct SpENoteV1 final : public SpENote
+struct SpENoteV1 final
 {
+    /// enote core (one-time address, amount commitment)
+    SpENote m_enote_core;
+
     /// enc(a)
     rct::xmr_amount m_encoded_amount;
     /// tag_t
     unsigned char m_view_tag;
+    /// addr_tag_t
+    std::uint64_t m_addr_tag;
 
     /**
     * brief: make - make a v1 enote
@@ -82,20 +87,23 @@ struct SpENoteV1 final : public SpENote
     *   str += Ko | C | enc(a) | view_tag
     * inoutparam: str_inout - enote contents concatenated to a string
     */
-    void append_to_string(std::string &str_inout) const override;
+    void append_to_string(std::string &str_inout) const;
 
     /// generate a dummy v1 enote (all random; completely unspendable)
     void gen();
 
-    static std::size_t get_size_bytes() { return get_size_bytes_base() + 8 + 1; }
+    static std::size_t get_size_bytes() { return m_enote_core.get_size_bytes() + 8 + 1 + 8; }
 };
 
 ////
 // SpENoteImageV1 - ENote Image V1
 ///
-struct SpENoteImageV1 final : public SpENoteImage
+struct SpENoteImageV1 final
 {
-    static std::size_t get_size_bytes() { return get_size_bytes_base(); }
+    /// enote image core (masked address, masked amount commitment, key image)
+    SpENoteImage m_enote_image_core;
+
+    static std::size_t get_size_bytes() { return m_enote_image_core.get_size_bytes(); }
 };
 
 ////

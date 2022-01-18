@@ -44,18 +44,18 @@
 namespace sp
 {
 //-----------------------------------------------------------------
-bool SpTx::validate(const std::shared_ptr<const LedgerContext> ledger_context, const bool defer_batchable) const
+bool validate(const SpTx &tx, const std::shared_ptr<const LedgerContext> ledger_context, const bool defer_batchable)
 {
-    if (!validate_tx_semantics())
+    if (!tx.validate_tx_semantics())
         return false;
 
-    if (!validate_tx_linking_tags(ledger_context))
+    if (!tx.validate_tx_linking_tags(ledger_context))
         return false;
 
-    if (!validate_tx_amount_balance(defer_batchable))
+    if (!tx.validate_tx_amount_balance(defer_batchable))
         return false;
 
-    if (!validate_tx_input_proofs(ledger_context, defer_batchable))
+    if (!tx.validate_tx_input_proofs(ledger_context, defer_batchable))
         return false;
 
     return true;

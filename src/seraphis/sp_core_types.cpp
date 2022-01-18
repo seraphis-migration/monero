@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "sp_base_types.h"
+#include "sp_core_types.h"
 
 //local headers
 #include "crypto/crypto.h"
@@ -89,22 +89,27 @@ void SpInputProposal::get_key_image(crypto::key_image &key_image_out) const
     make_seraphis_key_image(m_enote_view_privkey, m_spendbase_privkey, key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpInputProposal::to_enote_image_squashed_base(const crypto::secret_key &address_mask,
-    const crypto::secret_key &commitment_mask,
-    SpENoteImage &image_inout) const
+void SpInputProposal::get_enote_base(SpEnote &enote_out) const
 {
-    // Ko' = t_k G + H(Ko,C) Ko
-    squash_seraphis_address(get_enote_base().m_onetime_address,
-        get_enote_base().m_amount_commitment,
-        image_inout.m_masked_address);
-    sp::mask_key(address_mask, image_inout.m_masked_address, image_inout.m_masked_address);
-    // C' = t_c G + C
-    sp::mask_key(commitment_mask, get_enote_base().m_amount_commitment, image_inout.m_masked_commitment);
-    // KI = k_a X + k_a U
-    this->get_key_image(image_inout.m_key_image);
+    enote_out.make_base_from_privkeys(m_enote_view_privkey, m_spendbase_privkey, m_amount_blinding_factor, m_amount);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpInputProposal::gen_base(const rct::xmr_amount amount)
+void SpInputProposal::get_enote_image_squashed_base(SpENoteImage &image_out) const
+{
+    SpEnote enote_temp;
+    this->get_enote_base(enote_temp);
+    // Ko' = t_k G + H(Ko,C) Ko
+    squash_seraphis_address(enote_temp.m_onetime_address,
+        enote_temp.m_amount_commitment,
+        image_out.m_masked_address);  //H(Ko,C) Ko
+    sp::mask_key(m_address_mask, image_out.m_masked_address, image_out.m_masked_address);  //t_k G + H(Ko,C) Ko
+    // C' = t_c G + C
+    sp::mask_key(m_commitment_mask, enote_temp.m_amount_commitment, image_out.m_masked_commitment);
+    // KI = k_a X + k_b U
+    this->get_key_image(image_out.m_key_image);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpInputProposal::gen(const rct::xmr_amount amount)
 {
     m_enote_view_privkey = rct::rct2sk(rct::skGen());
     m_spendbase_privkey = rct::rct2sk(rct::skGen());
@@ -112,13 +117,12 @@ void SpInputProposal::gen_base(const rct::xmr_amount amount)
     m_amount = amount;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpDestination::gen_base(const rct::xmr_amount amount)
+void SpDestination::gen(const rct::xmr_amount amount)
 {
     // all random except amount
     m_recipient_DHkey = rct::pkGen();
     m_recipient_viewkey = rct::pkGen();
     m_recipient_spendkey = rct::pkGen();
-
     m_amount = amount;
 }
 //-------------------------------------------------------------------------------------------------------------------

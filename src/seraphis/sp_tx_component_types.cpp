@@ -38,7 +38,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "sp_base_types.h"
+#include "sp_core_types.h"
 #include "sp_core_utils.h"
 
 //third party headers

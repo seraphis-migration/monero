@@ -75,13 +75,6 @@ public:
     virtual ~SpTx() = default;
 
 //member functions
-    ////
-    // validate the transaction
-    // - if 'defer_batchable' is set, then batchable validation steps shouldn't be executed
-    ///
-    virtual bool validate(const std::shared_ptr<const LedgerContext> ledger_context,
-        const bool defer_batchable = false) const;
-
     /// get size of tx
     virtual std::size_t get_size_bytes() const = 0;
 
@@ -122,6 +115,15 @@ protected:
     /// a tx format's validation rules version
     unsigned char m_tx_validation_rules_version;
 };
+
+/**
+* brief: validate_sp_tx - validate a seraphis transaction
+* param: tx -
+* param: ledger_context -
+* param: defer_batchable - if set, then batchable validation steps shouldn't be executed
+* return: true/false on validation result
+*/
+bool validate_sp_tx(const SpTx &tx, const std::shared_ptr<const LedgerContext> ledger_context, const bool defer_batchable);
 
 /**
 * brief: make_mock_tx - make a mock transaction
