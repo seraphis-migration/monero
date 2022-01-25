@@ -44,7 +44,7 @@ bool check_blowfish_block(uint8_t *key,
 
   // initialize the blowfish context
   BLOWFISH_CTX ctx;
-  Blowfish_Init (&ctx, key, key_length);
+  Blowfish_Init(&ctx, key, key_length);
 
   // encrypt the test values
   Blowfish_Encrypt(&ctx, &L_temp, &R_temp);

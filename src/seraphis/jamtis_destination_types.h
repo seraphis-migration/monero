@@ -39,6 +39,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "jamtis_core_types.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
 
@@ -51,6 +52,8 @@ extern "C"
 
 
 namespace sp
+{
+namespace jamtis
 {
 
 /// self-send destination type, used to define enote-construction procedure for self-sends
@@ -78,17 +81,18 @@ struct JamtisDestinationV1 final
     /// b
     rct::xmr_amount m_amount;
 
-    /// enote privkey
+    /// enote privkey: r
     crypto::secret_key m_enote_privkey;
 
     /**
     * brief: get_output_proposal_v1 - convert this destination to a concrete output proposal
-    * outparam: enote_out -
+    * outparam: output_proposal_out -
+    * outparam: enote_pubkey_out -
     */
     void get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out, rct::key &enote_pubkey_out) const;
 
     /**
-    * brief: gen - generate a random destination address
+    * brief: gen - generate a random destination
     * param: amount -
     */
     void gen(const rct::xmr_amount amount);
@@ -114,23 +118,25 @@ struct JamtisDestinationSelfSendV1 final
     /// b
     rct::xmr_amount m_amount;
 
-    /// enote privkey
+    /// enote privkey: r
     crypto::secret_key m_enote_privkey;
 
-    /// view-balance key
+    /// view-balance privkey: k_vb
     crypto::secret_key m_viewbalance_privkey;
 
     /**
     * brief: get_output_proposal_v1 - convert this destination to a concrete output proposal
-    * outparam: enote_out -
+    * outparam: output_proposal_out -
+    * outparam: enote_pubkey_out -
     */
     void get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out, rct::key &enote_pubkey_out) const;
 
     /**
-    * brief: gen - generate a random destination address
+    * brief: gen - generate a random destination
     * param: amount -
     */
     void gen(const rct::xmr_amount amount);
 };
 
+} //namespace jamtis
 } //namespace sp

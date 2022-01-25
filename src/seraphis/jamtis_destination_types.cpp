@@ -33,6 +33,7 @@
 
 //local headers
 #include "common/varint.h"
+#include "crypto/crypto.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
@@ -59,11 +60,23 @@ extern "C"
 
 namespace sp
 {
+namespace jamtis
+{
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisDestinationV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out,
     rct::key &enote_pubkey_out) const
 {
 
+}
+//-------------------------------------------------------------------------------------------------------------------
+void JamtisDestinationV1::gen(const rct::xmr_amount amount)
+{
+    m_addr_K1 = rct::pkGen();
+    m_addr_K2 = rct::pkGen();
+    m_addr_K3 = rct::pkGen();
+    m_address_tag = crypto::rand_idx(static_cast<address_tag_t>(-1));
+    m_amount = amount;
+    m_enote_privkey = rct::rct2sk(rct::skGen());
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisDestinationSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out,
@@ -72,4 +85,17 @@ void JamtisDestinationSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 &out
 
 }
 //-------------------------------------------------------------------------------------------------------------------
+void JamtisDestinationSelfSendV1::gen(const rct::xmr_amount amount)
+{
+    m_addr_K1 = rct::pkGen();
+    m_addr_K2 = rct::pkGen();
+    m_addr_K3 = rct::pkGen();
+    m_address_index =
+        address_index_from_canonical(address_index_to_canonical(crypto::rand_idx(static_cast<address_index_t>(-1))));
+    m_amount = amount;
+    m_enote_privkey = rct::rct2sk(rct::skGen());
+    m_viewbalance_privkey = rct::rct2sk(rct::skGen());
+}
+//-------------------------------------------------------------------------------------------------------------------
+} //namespace jamtis
 } //namespace sp

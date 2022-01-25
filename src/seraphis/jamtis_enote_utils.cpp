@@ -59,6 +59,8 @@ extern "C"
 
 namespace sp
 {
+namespace jamtis
+{
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_enote_pubkey(const crypto::secret_key &enote_privkey,
     const rct::key &DH_base,
@@ -229,4 +231,5 @@ bool try_get_jamtis_amount(const crypto::secret_key &sender_receiver_secret,
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+} //namespace jamtis
 } //namespace sp

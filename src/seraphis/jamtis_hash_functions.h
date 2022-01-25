@@ -28,24 +28,18 @@
 
 // NOT FOR PRODUCTION
 
-// Core implementation details for making Jamtis privkeys
-// - Jamtis is a specification for Seraphis-compatible addresses
+// Hash functions for Jamtis addresses
 
 
 #pragma once
 
 //local headers
-extern "C"
-{
-#include "crypto/crypto-ops.h"
-}
-#include "device/device.hpp"
 #include "ringct/rctTypes.h"
 
 //third party headers
 
 //standard headers
-#include <vector>
+#include <string>
 
 //forward declarations
 
@@ -55,19 +49,38 @@ namespace sp
 namespace jamtis
 {
 
-/// t_view (TODO: core_types file?)
-using view_tag_t = unsigned char;
-
-/**
-* brief: make_jamtis_enote_pubkey - enote pubkey R_t
-*   R_t = r_t K^{DH}_recipient
-* param: enote_privkey - r_t
-* param: DH_base - K^{DH}_recipient
-* outparam: enote_pubkey_out - R_t
-*/
-void make_jamtis_enote_pubkey(const crypto::secret_key &enote_privkey,
-    const rct::key &DH_base,
-    rct::key &enote_pubkey_out);
+/// H_1(x): 1-byte output
+void jamtis_hash1(const std::string &domain_separator,
+    const unsigned char &input,
+    const std::size_t input_length,
+    unsigned char *hash_out);
+/// H_8(x): 8-byte output
+void jamtis_hash8(const std::string &domain_separator,
+    const unsigned char &input,
+    const std::size_t input_length,
+    unsigned char *hash_out);
+/// H_16(x): 16-byte output
+void jamtis_hash16(const std::string &domain_separator,
+    const unsigned char &input,
+    const std::size_t input_length,
+    unsigned char *hash_out);
+/// H_n(x): Ed25519 group scalar output
+void jamtis_hash_scalar(const std::string &domain_separator,
+    const unsigned char &input,
+    const std::size_t input_length,
+    unsigned char *hash_out);
+/// H_n(Pad_136(k), x): Ed25519 group scalar output
+void jamtis_key_derive(const std::string &domain_separator,
+    const rct::key &derivation_key,
+    const unsigned char &input,
+    const std::size_t input_length,
+    unsigned char *hash_out);
+/// H_32(Pad_136(k), x): 32-byte output
+void jamtis_secret_derive(const std::string &domain_separator,
+    const rct::key &derivation_key,
+    const unsigned char &input,
+    const std::size_t input_length,
+    unsigned char *hash_out);
 
 } //namespace jamtis
 } //namespace sp

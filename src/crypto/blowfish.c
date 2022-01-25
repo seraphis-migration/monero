@@ -329,7 +329,7 @@ static const uint32_t ORIG_S[4][256] = {
 };
 
 
-static uint32_t F(BLOWFISH_CTX *ctx, uint32_t x) {
+static uint32_t F(const BLOWFISH_CTX *ctx, uint32_t x) {
    uint16_t a, b, c, d;
    uint32_t  y;
 
@@ -348,7 +348,7 @@ static uint32_t F(BLOWFISH_CTX *ctx, uint32_t x) {
 }
 
 
-void Blowfish_Encrypt(BLOWFISH_CTX *ctx, uint32_t *xl, uint32_t *xr){
+void Blowfish_Encrypt(const BLOWFISH_CTX *ctx, uint32_t *xl, uint32_t *xr){
   uint32_t  Xl;
   uint32_t  Xr;
   uint32_t  temp;
@@ -378,7 +378,7 @@ void Blowfish_Encrypt(BLOWFISH_CTX *ctx, uint32_t *xl, uint32_t *xr){
 }
 
 
-void Blowfish_Decrypt(BLOWFISH_CTX *ctx, uint32_t *xl, uint32_t *xr){
+void Blowfish_Decrypt(const BLOWFISH_CTX *ctx, uint32_t *xl, uint32_t *xr){
   uint32_t  Xl;
   uint32_t  Xr;
   uint32_t  temp;

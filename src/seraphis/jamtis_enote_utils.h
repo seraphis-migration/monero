@@ -52,6 +52,8 @@ extern "C"
 
 namespace sp
 {
+namespace jamtis
+{
 /**
 * brief: make_jamtis_enote_pubkey - enote pubkey R_t
 *   R_t = r_t K^{DH}_recipient
@@ -169,4 +171,5 @@ bool try_get_jamtis_amount(const crypto::secret_key &sender_receiver_secret,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out);
 
+} //namespace jamtis
 } //namespace sp
