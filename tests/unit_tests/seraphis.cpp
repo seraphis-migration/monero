@@ -134,7 +134,7 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     std::vector<SpDestinationV1> destinations{gen_mock_sp_destinations_v1(out_amounts)};
 
     // make mock membership proof ref sets
-    std::vector<SpENoteV1> input_enotes;
+    std::vector<SpEnoteV1> input_enotes;
     input_enotes.reserve(input_proposals.size());
 
     for (const auto &input_proposal : input_proposals)
@@ -153,8 +153,8 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     SpTxSquashedV1::get_versioning_string(validation_rules_version, version_string);
 
     // tx components
-    std::vector<SpENoteImageV1> input_images;
-    std::vector<SpENoteV1> outputs;
+    std::vector<SpEnoteImageV1> input_images;
+    std::vector<SpEnoteV1> outputs;
     std::shared_ptr<SpBalanceProofV1> balance_proof;
     std::vector<SpImageProofV1> tx_image_proofs;
     std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable;
@@ -528,7 +528,7 @@ TEST(seraphis, enote_v1_information_recovery)
         enote_privkey = rct::rct2sk(rct::skGen());
 
     rct::key enote_pubkey;
-    sp::SpENoteV1 enote;
+    sp::SpEnoteV1 enote;
 
     enote.make(enote_privkey,
         recipient_DH_base,

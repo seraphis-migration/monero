@@ -196,10 +196,10 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
     std::size_t size{0};
 
     // input images
-    size += m_input_images.size() * SpENoteImageV1::get_size_bytes();
+    size += m_input_images.size() * SpEnoteImageV1::get_size_bytes();
 
     // outputs
-    size += m_outputs.size() * SpENoteV1::get_size_bytes();
+    size += m_outputs.size() * SpEnoteV1::get_size_bytes();
 
     // balance proof
     if (m_balance_proof.get() != nullptr)
@@ -241,7 +241,7 @@ std::shared_ptr<SpTxSquashedV1> make_mock_tx<SpTxSquashedV1>(const SpTxParamPack
     std::vector<SpDestinationV1> destinations{gen_mock_sp_destinations_v1(out_amounts)};
 
     // make mock membership proof ref sets
-    std::vector<SpENoteV1> input_enotes;
+    std::vector<SpEnoteV1> input_enotes;
     input_enotes.reserve(input_proposals.size());
 
     for (const auto &input_proposal : input_proposals)

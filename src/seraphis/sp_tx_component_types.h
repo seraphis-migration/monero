@@ -49,12 +49,12 @@ namespace sp
 {
 
 ////
-// SpENoteV1 - v1 enote
+// SpEnoteV1 - v1 enote
 ///
-struct SpENoteV1 final
+struct SpEnoteV1 final
 {
     /// enote core (one-time address, amount commitment)
-    SpENote m_enote_core;
+    SpEnote m_enote_core;
 
     /// enc(a)
     rct::xmr_amount m_encoded_amount;
@@ -96,12 +96,12 @@ struct SpENoteV1 final
 };
 
 ////
-// SpENoteImageV1 - ENote Image V1
+// SpEnoteImageV1 - ENote Image V1
 ///
-struct SpENoteImageV1 final
+struct SpEnoteImageV1 final
 {
     /// enote image core (masked address, masked amount commitment, key image)
-    SpENoteImage m_enote_image_core;
+    SpEnoteImage m_enote_image_core;
 
     static std::size_t get_size_bytes() { return m_enote_image_core.get_size_bytes(); }
 };
@@ -162,7 +162,6 @@ struct SpTxSupplementV1 final
     rct::keyV m_output_enote_pubkeys;
     //TODO - tx memo: none in mockup
     //TODO - fee: none in mockup
-    //TODO - encoded payment ID: none in mockup
 
     std::size_t get_size_bytes() const;
 };

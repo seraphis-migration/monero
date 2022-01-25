@@ -54,7 +54,7 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void SpENoteV1::make(const crypto::secret_key &enote_privkey,
+void SpEnoteV1::make(const crypto::secret_key &enote_privkey,
     const rct::key &recipient_DH_base,
     const rct::key &recipient_view_key,
     const rct::key &recipient_spend_key,
@@ -105,7 +105,7 @@ void SpENoteV1::make(const crypto::secret_key &enote_privkey,
     make_seraphis_enote_pubkey(enote_privkey, recipient_DH_base, enote_pubkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpENoteV1::gen()
+void SpEnoteV1::gen()
 {
     // generate a dummy enote: random pieces, completely unspendable
 
@@ -117,7 +117,7 @@ void SpENoteV1::gen()
     m_view_tag = crypto::rand_idx(static_cast<unsigned char>(-1));
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpENoteV1::append_to_string(std::string &str_inout) const
+void SpEnoteV1::append_to_string(std::string &str_inout) const
 {
     // append all enote contents to the string
     // - assume the input string has enouch capacity

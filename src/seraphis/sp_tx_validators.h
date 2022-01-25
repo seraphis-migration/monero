@@ -85,7 +85,7 @@ bool validate_sp_semantics_ref_set_size_v1(const std::vector<SpMembershipProofV1
 * param: input_images -
 * return: true/false on validation result
 */
-bool validate_sp_semantics_input_images_v1(const std::vector<SpENoteImageV1> &input_images);
+bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &input_images);
 /**
 * brief: validate_sp_semantics_sorting_v1 - check tx components are properly sorted
 *   - membership proof referenced enote indices are sorted (ascending)
@@ -95,7 +95,7 @@ bool validate_sp_semantics_input_images_v1(const std::vector<SpENoteImageV1> &in
 * return: true/false on validation result
 */
 bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
-    const std::vector<SpENoteImageV1> &input_images);
+    const std::vector<SpEnoteImageV1> &input_images);
 /**
 * brief: validate_sp_linking_tags_v1 - check tx does not double spend
 *   - no key image duplicates in ledger
@@ -108,7 +108,7 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
 * param: ledger_context -
 * return: true/false on validation result
 */
-bool validate_sp_linking_tags_v1(const std::vector<SpENoteImageV1> &input_images,
+bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context);
 /**
 * brief: validate_sp_amount_balance_v1 - check that amounts balance in the tx (inputs = outputs)
@@ -121,8 +121,8 @@ bool validate_sp_linking_tags_v1(const std::vector<SpENoteImageV1> &input_images
 * param: defer_batchable -
 * return: true/false on validation result
 */
-bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_images,
-    const std::vector<SpENoteV1> &outputs,
+bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_images,
+    const std::vector<SpEnoteV1> &outputs,
     const std::shared_ptr<const SpBalanceProofV1> balance_proof,
     const bool defer_batchable);
 /**
@@ -135,7 +135,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_imag
 * return: true/false on validation result
 */
 bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
-    const std::vector<SpENoteImageV1> &input_images,
+    const std::vector<SpEnoteImageV1> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context);
 /**
 * brief: validate_sp_composition_proofs_v1 - check that spending tx inputs is authorized by their owners,
@@ -147,7 +147,7 @@ bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &me
 * return: true/false on validation result
 */
 bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_proofs,
-    const std::vector<SpENoteImageV1> &input_images,
+    const std::vector<SpEnoteImageV1> &input_images,
     const rct::key &image_proofs_message);
 
 } //namespace sp

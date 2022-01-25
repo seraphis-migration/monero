@@ -64,7 +64,6 @@ extern "C"
 
 namespace sp
 {
-
 /// File-scope data
 
 // generators

@@ -62,9 +62,9 @@ enum TxStructureVersionSp : unsigned char
 
 
 ////
-// SpENote - Seraphis ENote base
+// SpEnote
 ///
-struct SpENote final
+struct SpEnote final
 {
     /// Ko = (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
     rct::key m_onetime_address;
@@ -72,16 +72,15 @@ struct SpENote final
     rct::key m_amount_commitment;
 
     /**
-    * brief: make_base_from_privkeys - make a Seraphis ENote when all secrets are known
-    * param: enote_view_privkey -
-    * param: spendbase_privkey -
+    * brief: make_base_with_onetime_address - make a Seraphis ENote from a pre-made onetime address
+    * param: onetime_address -
     * param: amount_blinding_factor -
     * param: amount -
     */
-    void make_base_from_privkeys(const crypto::secret_key &enote_view_privkey,
-        const crypto::secret_key &spendbase_privkey,
+    void make_base_with_onetime_address(const rct::key &onetime_address,
         const crypto::secret_key &amount_blinding_factor,
         const rct::xmr_amount amount);
+
     /**
     * brief: make_base_with_address_extension - make a Seraphis ENote by extending an existing address
     * param: extension_privkey -
@@ -93,6 +92,19 @@ struct SpENote final
         const rct::key &initial_address,
         const crypto::secret_key &amount_blinding_factor,
         const rct::xmr_amount amount);
+
+    /**
+    * brief: make_base_with_privkeys - make a Seraphis ENote when all secrets are known
+    * param: enote_view_privkey -
+    * param: spendbase_privkey -
+    * param: amount_blinding_factor -
+    * param: amount -
+    */
+    void make_base_with_privkeys(const crypto::secret_key &enote_view_privkey,
+        const crypto::secret_key &spendbase_privkey,
+        const crypto::secret_key &amount_blinding_factor,
+        const rct::xmr_amount amount);
+
     /**
     * brief: gen_base - generate a Seraphis ENote (all random)
     */
@@ -102,15 +114,15 @@ struct SpENote final
     * brief: append_to_string - convert enote to a string and append to existing string (for proof transcripts)
     * inoutparam: str_inout - enote contents concatenated to a string
     */
-    void append_to_string(std::string &str_inout) const = 0;
+    void append_to_string(std::string &str_inout) const;
 
     static std::size_t get_size_bytes() { return 32*2; }
 };
 
 ////
-// SpENoteImage - Seraphis ENote Image base
+// SpEnoteImage
 ///
-struct SpENoteImage final
+struct SpEnoteImage final
 {
     /// Ko' = t_k G + (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
     rct::key m_masked_address;
@@ -123,7 +135,7 @@ struct SpENoteImage final
 };
 
 ////
-// SpInputProposal - Seraphis Input Proposal base
+// SpInputProposal
 // - for spending an enote
 ///
 struct SpInputProposal final
@@ -158,7 +170,7 @@ struct SpInputProposal final
     * brief: get_enote_image_squashed_base - get this input's enote image in the squashed enote model
     * inoutparam: image_out -
     */
-    void get_enote_image_squashed_base(SpENoteImage &image_out) const;
+    void get_enote_image_squashed_base(SpEnoteImage &image_out) const;
 
     /**
     * brief: gen - generate random enote keys
@@ -168,21 +180,26 @@ struct SpInputProposal final
 };
 
 ////
-// SpDestination - Seraphis Destination base
+// SpOutputProposal
 // - for creating an e-note to send an amount to someone
 ///
-struct SpDestination final
+struct SpOutputProposal final
 {
-    /// K^{DH}_addr
-    rct::key m_recipient_DHkey;
-    /// K^v_addr
-    rct::key m_recipient_addr_viewkey;
-    /// K^s_addr
-    rct::key m_recipient_addr_spendkey;
+    /// K^o
+    rct::key m_onetime_address;
+    /// y
+    crypto::secret_key m_amount_blinding_factor;
+    /// b
     rct::xmr_amount m_amount;
 
     /**
-    * brief: gen - generate a random destination address
+    * brief: get_enote_base - get the enote this input proposal represents
+    * outparam: enote_out -
+    */
+    void get_enote_base(SpEnote &enote_out) const;
+
+    /**
+    * brief: gen - generate a random proposal
     * param: amount -
     */
     void gen(const rct::xmr_amount amount);

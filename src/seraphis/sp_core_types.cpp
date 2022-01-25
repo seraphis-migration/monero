@@ -50,7 +50,31 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void SpENote::make_base_from_privkeys(const crypto::secret_key &enote_view_privkey,
+void SpEnote::make_base_with_onetime_address(const rct::key &onetime_address,
+    const crypto::secret_key &amount_blinding_factor,
+    const rct::xmr_amount amount)
+{
+    // Ko
+    m_onetime_address = onetime_address;
+
+    // C = x G + a H
+    m_amount_commitment = rct::commit(amount, rct::sk2rct(amount_blinding_factor));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnote::make_base_with_address_extension(const crypto::secret_key &extension_privkey,
+        const rct::key &initial_address,
+        const crypto::secret_key &amount_blinding_factor,
+        const rct::xmr_amount amount)
+{
+    // Ko = k_address_extension X + K
+    m_onetime_address = initial_address;
+    extend_seraphis_spendkey(extension_privkey, m_onetime_address);
+
+    // finish making enote base
+    this->make_base_with_onetime_address(m_onetime_address, amount_blinding_factor, amount);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnote::make_base_with_privkeys(const crypto::secret_key &enote_view_privkey,
         const crypto::secret_key &spendbase_privkey,
         const crypto::secret_key &amount_blinding_factor,
         const rct::xmr_amount amount)
@@ -63,24 +87,19 @@ void SpENote::make_base_from_privkeys(const crypto::secret_key &enote_view_privk
     this->make_base_with_address_extension(enote_view_privkey, spendbase, amount_blinding_factor, amount);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpENote::make_base_with_address_extension(const crypto::secret_key &extension_privkey,
-        const rct::key &initial_address,
-        const crypto::secret_key &amount_blinding_factor,
-        const rct::xmr_amount amount)
-{
-    // Ko = k_m_address_extension X + K
-    m_onetime_address = initial_address;
-    extend_seraphis_spendkey(extension_privkey, m_onetime_address);
-
-    // C = x G + a H
-    m_amount_commitment = rct::commit(amount, rct::sk2rct(amount_blinding_factor));
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpENote::gen_base()
+void SpEnote::gen_base()
 {
     // all random
     m_onetime_address = rct::pkGen();
     m_amount_commitment = rct::pkGen();
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnote::append_to_string(std::string &str_inout) const
+{
+    // append all enote contents to the string
+    // - assume the input string has enough capacity (or the caller doesn't care about allocations)
+    str_inout.append((const char*) m_onetime_address.bytes, sizeof(rct::key));
+    str_inout.append((const char*) m_amount_commitment.bytes, sizeof(rct::key));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpInputProposal::get_key_image(crypto::key_image &key_image_out) const
@@ -91,20 +110,24 @@ void SpInputProposal::get_key_image(crypto::key_image &key_image_out) const
 //-------------------------------------------------------------------------------------------------------------------
 void SpInputProposal::get_enote_base(SpEnote &enote_out) const
 {
-    enote_out.make_base_from_privkeys(m_enote_view_privkey, m_spendbase_privkey, m_amount_blinding_factor, m_amount);
+    enote_out.make_base_with_privkeys(m_enote_view_privkey, m_spendbase_privkey, m_amount_blinding_factor, m_amount);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpInputProposal::get_enote_image_squashed_base(SpENoteImage &image_out) const
+void SpInputProposal::get_enote_image_squashed_base(SpEnoteImage &image_out) const
 {
+    // {Ko, C}
     SpEnote enote_temp;
     this->get_enote_base(enote_temp);
+
     // Ko' = t_k G + H(Ko,C) Ko
     squash_seraphis_address(enote_temp.m_onetime_address,
         enote_temp.m_amount_commitment,
         image_out.m_masked_address);  //H(Ko,C) Ko
     sp::mask_key(m_address_mask, image_out.m_masked_address, image_out.m_masked_address);  //t_k G + H(Ko,C) Ko
+
     // C' = t_c G + C
     sp::mask_key(m_commitment_mask, enote_temp.m_amount_commitment, image_out.m_masked_commitment);
+
     // KI = k_a X + k_b U
     this->get_key_image(image_out.m_key_image);
 }
@@ -117,12 +140,16 @@ void SpInputProposal::gen(const rct::xmr_amount amount)
     m_amount = amount;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpDestination::gen(const rct::xmr_amount amount)
+void SpOutputProposal::get_enote_base(SpEnote &enote_out) const
+{
+    enote_out.make_base_with_onetime_address(m_onetime_address, m_amount_blinding_factor, m_amount);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpOutputProposal::gen(const rct::xmr_amount amount)
 {
     // all random except amount
-    m_recipient_DHkey = rct::pkGen();
-    m_recipient_viewkey = rct::pkGen();
-    m_recipient_spendkey = rct::pkGen();
+    m_onetime_address = rct::pkGen();
+    m_amount_blinding_factor = rct::rct2sk(rct::skGen());
     m_amount = amount;
 }
 //-------------------------------------------------------------------------------------------------------------------

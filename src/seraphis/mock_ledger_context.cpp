@@ -59,11 +59,11 @@ bool MockLedgerContext::linking_tag_exists_sp_v1(const crypto::key_image &linkin
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
-    std::vector<SpENoteV1> &enotes_out) const
+    std::vector<SpEnoteV1> &enotes_out) const
 {
     std::lock_guard<std::mutex> lock{m_ledger_mutex};
 
-    std::vector<SpENoteV1> enotes_temp;
+    std::vector<SpEnoteV1> enotes_temp;
     enotes_temp.reserve(indices.size());
 
     for (const std::size_t index : indices)
@@ -118,7 +118,7 @@ void MockLedgerContext::add_linking_tag_sp_v1(const crypto::key_image &linking_t
     add_linking_tag_sp_v1_impl(linking_tag);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t MockLedgerContext::add_enote_sp_v1(const SpENoteV1 &enote)
+std::size_t MockLedgerContext::add_enote_sp_v1(const SpEnoteV1 &enote)
 {
     std::lock_guard<std::mutex> lock{m_ledger_mutex};
 
@@ -139,7 +139,7 @@ void MockLedgerContext::add_linking_tag_sp_v1_impl(const crypto::key_image &link
     m_sp_linking_tags.insert(linking_tag);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t MockLedgerContext::add_enote_sp_v1_impl(const SpENoteV1 &enote)
+std::size_t MockLedgerContext::add_enote_sp_v1_impl(const SpEnoteV1 &enote)
 {
     // add the enote
     m_sp_enotes[m_sp_enotes.size()] = enote;

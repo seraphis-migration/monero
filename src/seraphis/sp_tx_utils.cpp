@@ -148,14 +148,14 @@ rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &e
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
-    const std::vector<SpENoteV1> &output_enotes,
+    const std::vector<SpEnoteV1> &output_enotes,
     const SpTxSupplementV1 &tx_supplement)
 {
     rct::key hash_result;
     std::string hash;
     hash.reserve(sizeof(CRYPTONOTE_NAME) +
         version_string.size() +
-        output_enotes.size()*SpENoteV1::get_size_bytes() +
+        output_enotes.size()*SpEnoteV1::get_size_bytes() +
         tx_supplement.m_output_enote_pubkeys.size());
     hash = CRYPTONOTE_NAME;
     hash += version_string;
@@ -184,7 +184,7 @@ std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<SpTxPartia
     return get_tx_input_sort_order_v1(input_key_images);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<SpENoteImageV1> &input_images)
+std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<SpEnoteImageV1> &input_images)
 {
     std::vector<crypto::key_image> input_key_images;
     input_key_images.reserve(input_images.size());
@@ -215,7 +215,7 @@ std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<crypto::ke
     return original_indices;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpENoteImageV1> &input_images,
+void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &input_images,
     std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_sortable_in,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out)
 {
@@ -285,7 +285,7 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_outputs_sp_v1(const std::vector<SpDestinationV1> &destinations,
-    std::vector<SpENoteV1> &outputs_out,
+    std::vector<SpEnoteV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
     SpTxSupplementV1 &tx_supplement_inout)
@@ -329,7 +329,7 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpDestinationV1> &destinations,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_sp_v1(const SpInputProposalV1 &input_proposal,
-    SpENoteImageV1 &input_image_out,
+    SpEnoteImageV1 &input_image_out,
     crypto::secret_key &image_address_mask_out,
     crypto::secret_key &image_amount_mask_out)
 {
@@ -342,7 +342,7 @@ void make_v1_tx_image_sp_v1(const SpInputProposalV1 &input_proposal,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_images_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
-    std::vector<SpENoteImageV1> &input_images_out,
+    std::vector<SpEnoteImageV1> &input_images_out,
     std::vector<crypto::secret_key> &image_address_masks_out,
     std::vector<crypto::secret_key> &image_amount_masks_out)
 {
@@ -369,7 +369,7 @@ void make_v1_tx_images_sp_v1(const std::vector<SpInputProposalV1> &input_proposa
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proof_sp_v1(const SpInputProposalV1 &input_proposal,
-    const SpENoteImageV1 &input_image,
+    const SpEnoteImageV1 &input_image,
     const crypto::secret_key &image_address_mask,
     const rct::key &message,
     SpImageProofV1 &tx_image_proof_out)
@@ -390,7 +390,7 @@ void make_v1_tx_image_proof_sp_v1(const SpInputProposalV1 &input_proposal,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
-    const std::vector<SpENoteImageV1> &input_images,
+    const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<crypto::secret_key> &image_address_masks,
     const rct::key &message,
     std::vector<SpImageProofV1> &tx_image_proofs_out)
@@ -680,7 +680,7 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
 {
     // for squashed enote model
 
-    std::vector<SpENoteV1> input_enotes;
+    std::vector<SpEnoteV1> input_enotes;
     input_enotes.reserve(input_proposals.size());
 
     for (const auto &input_proposal : input_proposals)
@@ -692,7 +692,7 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
-    const std::vector<SpENoteV1> &input_enotes,
+    const std::vector<SpEnoteV1> &input_enotes,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     std::shared_ptr<MockLedgerContext> ledger_context_inout)

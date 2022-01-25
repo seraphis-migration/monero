@@ -95,9 +95,9 @@ void SpDestinationV1::get_amount_blinding_factor(const std::size_t enote_index,
     make_seraphis_amount_commitment_mask(rct::rct2sk(sender_receiver_secret), rct::zero(), amount_blinding_factor);
 }
 //-------------------------------------------------------------------------------------------------------------------
-SpENoteV1 SpDestinationV1::to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const
+SpEnoteV1 SpDestinationV1::to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const
 {
-    SpENoteV1 enote;
+    SpEnoteV1 enote;
 
     enote.make(m_enote_privkey,
         m_recipient_DHkey,

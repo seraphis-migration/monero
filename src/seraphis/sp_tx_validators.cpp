@@ -58,8 +58,8 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 // helper for validating v1, v2, v3 balance proofs (balance equality check)
 //-------------------------------------------------------------------------------------------------------------------
-static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpENoteImageV1> &input_images,
-    const std::vector<SpENoteV1> &outputs,
+static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpEnoteImageV1> &input_images,
+    const std::vector<SpEnoteV1> &outputs,
     const rct::key &remainder_blinding_factor)
 {
     rct::keyV input_image_amount_commitments;
@@ -150,7 +150,7 @@ bool validate_sp_semantics_ref_set_size_v1(const std::vector<SpMembershipProofV1
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_semantics_input_images_v1(const std::vector<SpENoteImageV1> &input_images)
+bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &input_images)
 {
     for (const auto &image : input_images)
     {
@@ -171,7 +171,7 @@ bool validate_sp_semantics_input_images_v1(const std::vector<SpENoteImageV1> &in
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
-    const std::vector<SpENoteImageV1> &input_images)
+    const std::vector<SpEnoteImageV1> &input_images)
 {
     // membership proof referenced enote indices should be sorted (ascending)
     // note: duplicate references are allowed
@@ -198,7 +198,7 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_linking_tags_v1(const std::vector<SpENoteImageV1> &input_images,
+bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context)
 {
     // sanity check
@@ -222,8 +222,8 @@ bool validate_sp_linking_tags_v1(const std::vector<SpENoteImageV1> &input_images
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_images,
-    const std::vector<SpENoteV1> &outputs,
+bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_images,
+    const std::vector<SpEnoteV1> &outputs,
     const std::shared_ptr<const SpBalanceProofV1> balance_proof,
     const bool defer_batchable)
 {
@@ -281,7 +281,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpENoteImageV1> &input_imag
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
-    const std::vector<SpENoteImageV1> &input_images,
+    const std::vector<SpEnoteImageV1> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context)
 {
     // sanity check
@@ -326,7 +326,7 @@ bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &me
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_proofs,
-    const std::vector<SpENoteImageV1> &input_images,
+    const std::vector<SpEnoteImageV1> &input_images,
     const rct::key &image_proofs_message)
 {
     // sanity check

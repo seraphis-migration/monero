@@ -50,7 +50,7 @@
 //forward declarations
 namespace sp
 {
-    struct SpENoteV1;
+    struct SpEnoteV1;
     class SpTxSquashedV1;
 }
 
@@ -73,7 +73,7 @@ public:
     * outparam: enotes_out - 
     */
     void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
-        std::vector<SpENoteV1> &enotes_out) const override;
+        std::vector<SpEnoteV1> &enotes_out) const override;
     /**
     * brief: get_reference_set_components_sp_v1 - gets Seraphis squashed enotes stored in the ledger
     * param: indices -
@@ -96,13 +96,13 @@ public:
     * param: enote -
     * return: index in the ledger of the enote just added
     */
-    std::size_t add_enote_sp_v1(const SpENoteV1 &enote);
+    std::size_t add_enote_sp_v1(const SpEnoteV1 &enote);
 
 private:
     /// implementations of the above, without internally locking the ledger mutex
     bool linking_tag_exists_sp_v1_impl(const crypto::key_image &linking_tag) const;
     void add_linking_tag_sp_v1_impl(const crypto::key_image &linking_tag);
-    std::size_t add_enote_sp_v1_impl(const SpENoteV1 &enote);
+    std::size_t add_enote_sp_v1_impl(const SpEnoteV1 &enote);
 
     /// Ledger mutex (mutable for use in const member functions)
     mutable std::mutex m_ledger_mutex;
@@ -110,7 +110,7 @@ private:
     /// Seraphis linking tags
     std::unordered_set<crypto::key_image> m_sp_linking_tags;
     /// Seraphis v1 ENotes
-    std::unordered_map<std::size_t, SpENoteV1> m_sp_enotes;
+    std::unordered_map<std::size_t, SpEnoteV1> m_sp_enotes;
     /// Seraphis squashed enotes
     std::unordered_map<std::size_t, rct::key> m_sp_squashed_enotes;
 };

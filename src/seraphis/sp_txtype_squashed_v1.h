@@ -76,8 +76,8 @@ public:
     SpTxSquashedV1() = default;
 
     /// normal constructor: new tx from pieces
-    SpTxSquashedV1(std::vector<SpENoteImageV1> input_images,
-        std::vector<SpENoteV1> outputs,
+    SpTxSquashedV1(std::vector<SpEnoteImageV1> input_images,
+        std::vector<SpEnoteV1> outputs,
         std::shared_ptr<SpBalanceProofV1> balance_proof,
         std::vector<SpImageProofV1> image_proofs,
         std::vector<SpMembershipProofV1> membership_proofs,
@@ -164,9 +164,9 @@ private:
 
 //member variables
     /// tx input images  (spent e-notes)
-    std::vector<SpENoteImageV1> m_input_images;
+    std::vector<SpEnoteImageV1> m_input_images;
     /// tx outputs (new e-notes)
-    std::vector<SpENoteV1> m_outputs;
+    std::vector<SpEnoteV1> m_outputs;
     /// balance proof (balance proof and range proofs)
     std::shared_ptr<SpBalanceProofV1> m_balance_proof;
     /// composition proofs: ownership/key-image-legitimacy for each input

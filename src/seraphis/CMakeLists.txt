@@ -28,6 +28,7 @@
 
 set(seraphis_sources
   concise_grootle.cpp
+  jamtis_core_utils.cpp
   mock_ledger_context.cpp
   sp_base_types.cpp
   sp_composition_proof.cpp

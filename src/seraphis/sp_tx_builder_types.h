@@ -53,7 +53,7 @@ namespace sp
 struct SpInputProposalV1 final : public SpInputProposal
 {
     /// the enote to spend (e.g. found in the ledger, or in a tx that has not been added to the ledger)
-    SpENoteV1 m_enote;
+    SpEnoteV1 m_enote;
     /// the enote's pubkey (these are not stored in enotes directly)
     rct::key m_enote_pubkey;
 
@@ -61,7 +61,7 @@ struct SpInputProposalV1 final : public SpInputProposal
     void gen(const rct::xmr_amount amount);
 
 protected:
-    virtual const SpENote& get_enote_base() const { return m_enote; }
+    virtual const SpEnote& get_enote_base() const { return m_enote; }
 };
 
 ////
@@ -76,7 +76,7 @@ struct SpDestinationV1 final : public SpDestination
     void get_amount_blinding_factor(const std::size_t output_index, crypto::secret_key &amount_blinding_factor) const;
 
     /// convert this destination into a v1 enote
-    SpENoteV1 to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const;
+    SpEnoteV1 to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const;
 
     /**
     * brief: gen - generate a V1 Destination (random)
@@ -96,7 +96,7 @@ struct SpMembershipReferenceSetV1 final
     /// locations in the ledger of the referenced enotes; only enotes in the ledger can have a membership proof
     std::vector<std::size_t> m_ledger_enote_indices;
     /// the referenced enotes
-    std::vector<SpENoteV1> m_referenced_enotes;
+    std::vector<SpEnoteV1> m_referenced_enotes;
     /// the index in the referenced enotes vector of the enote who will be proven a member of the ref set (via its image)
     std::size_t m_real_spend_index_in_set;
 };
@@ -134,7 +134,7 @@ struct SpTxProposalV1 final
     /// proposed destinations
     std::vector<SpDestinationV1> m_destinations;
     /// proposed outputs (created from the destinations)
-    std::vector<SpENoteV1> m_outputs;
+    std::vector<SpEnoteV1> m_outputs;
     /// proposed tx supplement
     SpTxSupplementV1 m_tx_supplement;
     /// output amounts and blinding factors (for future balance proofs)
@@ -165,7 +165,7 @@ struct SpTxPartialInputV1 final //needs to be InputSetPartial for merged composi
 
 //member variables
     /// input's image
-    SpENoteImageV1 m_input_image;
+    SpEnoteImageV1 m_input_image;
     /// input image's proof (demonstrates ownership of the underlying enote, and that the key image is correct)
     SpImageProofV1 m_image_proof;
     /// image masks
@@ -176,7 +176,7 @@ struct SpTxPartialInputV1 final //needs to be InputSetPartial for merged composi
     rct::key m_proposal_prefix;
 
     /// the input enote (won't be recorded in the final tx)
-    SpENoteV1 m_input_enote;
+    SpEnoteV1 m_input_enote;
     /// input amount
     rct::xmr_amount m_input_amount;
     /// input amount commitment's blinding factor; only used for making the balance proof's remainder blinding factor
@@ -205,9 +205,9 @@ struct SpTxPartialV1 final
 
 //member variables
     /// tx input images  (spent e-notes)
-    std::vector<SpENoteImageV1> m_input_images;
+    std::vector<SpEnoteImageV1> m_input_images;
     /// tx outputs (new e-notes)
-    std::vector<SpENoteV1> m_outputs;
+    std::vector<SpEnoteV1> m_outputs;
     /// balance proof (balance proof and range proofs)
     std::shared_ptr<SpBalanceProofV1> m_balance_proof;
     /// composition proofs: ownership/unspentness for each input
@@ -216,7 +216,7 @@ struct SpTxPartialV1 final
     SpTxSupplementV1 m_tx_supplement;
 
     /// sorted input enotes
-    std::vector<SpENoteV1> m_input_enotes;
+    std::vector<SpEnoteV1> m_input_enotes;
     /// sorted image masks for creating input membership proofs
     std::vector<crypto::secret_key> m_image_address_masks;
     std::vector<crypto::secret_key> m_image_amount_masks;
