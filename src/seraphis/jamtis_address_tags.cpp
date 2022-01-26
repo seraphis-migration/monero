@@ -37,6 +37,7 @@ extern "C"
 #include "crypto/blowfish.h"
 }
 #include "int-util.h"
+#include "jamtis_hash_functions.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
 
@@ -102,7 +103,7 @@ address_tag_t address_index_to_tag(const address_index_t j,
 {
     address_index_t j_canonical{address_index_to_canonical(j)};
 
-    // t_addr = j_canonical | MAC
+    // t_addr = j_canonical || MAC
     address_tag_t t_addr{};
     memcpy(t_addr, j_canonical, ADDRESS_INDEX_BYTES);
     memcpy(t_addr + ADDRESS_INDEX_BYTES, &mac, ADDRESS_TAG_MAC_BYTES);

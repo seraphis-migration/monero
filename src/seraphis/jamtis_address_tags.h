@@ -38,7 +38,6 @@
 extern "C"
 {
 #include "crypto/blowfish.h"
-#include "crypto/crypto-ops.h"
 }
 #include "ringct/rctTypes.h"
 
@@ -57,13 +56,13 @@ namespace jamtis
 /// index (system-endian; only 56 bits are used): j
 using address_index_t = std::uint64_t;
 constexpr std::size_t ADDRESS_INDEX_BYTES{7};
-constexpr address_index_t ADDRESS_INDEX_MAX{(1uLL << 8*ADDRESS_INDEX_BYTES) - 1};  //2^56 - 1
+constexpr address_index_t ADDRESS_INDEX_MAX{(address_index_t{1} << 8*ADDRESS_INDEX_BYTES) - 1};  //2^56 - 1
 
 /// MAC for address tags (system-endian): t_addr_MAC
 constexpr std::size_t ADDRESS_TAG_MAC_BYTES{1};  //if > 1, then endianness must be preserved
 using address_tag_MAC_t = unsigned char;
 
-/// index ciphered with view-balance key: t_addr = enc(little_endian(j) | little_endian(t_addr_MAC))
+/// index ciphered with view-balance key: t_addr = enc(little_endian(j) || little_endian(t_addr_MAC))
 using address_tag_t = unsigned char[ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES];
 
 /// address tag XORd with a user-defined secret: t_addr_enc = t_addr XOR t_addr_enc_secret
