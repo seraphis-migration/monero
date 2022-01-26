@@ -39,6 +39,8 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "jamtis_address_tags.h"
+#include "jamtis_address_utils.h"
 #include "jamtis_core_types.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
@@ -57,10 +59,10 @@ namespace jamtis
 {
 
 /// self-send destination type, used to define enote-construction procedure for self-sends
-enum class JamtisSelfSendType
+enum class JamtisSelfSendType : public unsigned char
 {
-    CHANGE,
-    SELF_SPEND
+    CHANGE = 0,
+    SELF_SPEND = 1
 };
 
 ////
@@ -83,6 +85,8 @@ struct JamtisDestinationV1 final
 
     /// enote privkey: r
     crypto::secret_key m_enote_privkey;
+
+    ///TODO: misc memo
 
     /**
     * brief: get_output_proposal_v1 - convert this destination to a concrete output proposal
@@ -124,6 +128,8 @@ struct JamtisDestinationSelfSendV1 final
     /// view-balance privkey: k_vb
     crypto::secret_key m_viewbalance_privkey;
 
+    ///TODO: misc memo suggestion (fields to add to memo)
+
     /**
     * brief: get_output_proposal_v1 - convert this destination to a concrete output proposal
     * outparam: output_proposal_out -
@@ -135,7 +141,7 @@ struct JamtisDestinationSelfSendV1 final
     * brief: gen - generate a random destination
     * param: amount -
     */
-    void gen(const rct::xmr_amount amount);
+    void gen(const rct::xmr_amount amount, const JamtisSelfSendType type);
 };
 
 } //namespace jamtis

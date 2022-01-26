@@ -33,7 +33,7 @@
 
 //local headers
 #include "ringct/rctTypes.h"
-#include "sp_tx_component_types.h"
+#include "tx_component_types.h"
 
 //third party headers
 

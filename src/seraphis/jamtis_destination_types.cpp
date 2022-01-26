@@ -40,13 +40,15 @@ extern "C"
 }
 #include "cryptonote_config.h"
 #include "device/device.hpp"
+#include "jamtis_address_tags.h"
+#include "jamtis_address_utils.h"
 #include "misc_language.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_utils.h"
 #include "sp_crypto_utils.h"
-#include "sp_tx_misc_utils.h"
+#include "tx_misc_utils.h"
 #include "wipeable_string.h"
 
 //third party headers
@@ -66,7 +68,15 @@ namespace jamtis
 void JamtisDestinationV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out,
     rct::key &enote_pubkey_out) const
 {
-
+    // derived key: Kd = 8*r*K2 (generate_key_derivation())
+    // enote ephemeral pubkey: Ke = r K3
+    // view tag: view_tag = H1(Kd)
+    // sender-receiver shared secret: q = Hn(Kd)
+    // encrypt address tag: addr_tag_enc = addr_tag(blowfish(j, mac)) ^ H8(q)
+    // onetime address: Ko = q X + K1
+    // enote base pubkey: r G
+    // amount blinding factor: y = Hn(q, r G)
+    // encrypted amount: enc_amount = a ^ H8(q, r G)
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisDestinationV1::gen(const rct::xmr_amount amount)
@@ -82,16 +92,24 @@ void JamtisDestinationV1::gen(const rct::xmr_amount amount)
 void JamtisDestinationSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out,
     rct::key &enote_pubkey_out) const
 {
-
+    // derived key: Kd = 8*r*K3 (generate_key_derivation())
+    // enote ephemeral pubkey: Ke = r K3
+    // view tag: view_tag = H1(Kd)
+    // sender-receiver shared secret: q = Hn(k_vb, Ke)  //note: Ke not Kd, so q can be computed immediately by recipient
+    // encrypt address tag: addr_tag_enc = addr_tag(j, mac) ^ H8(q)
+    // onetime address: Ko = q X + K1
+    // enote base pubkey: r G
+    // amount blinding factor: y = Hn(q)
+    // encrypted amount: enc_amount = a ^ H8(q)
 }
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisDestinationSelfSendV1::gen(const rct::xmr_amount amount)
+void JamtisDestinationSelfSendV1::gen(const rct::xmr_amount amount, const JamtisSelfSendType type)
 {
     m_addr_K1 = rct::pkGen();
     m_addr_K2 = rct::pkGen();
     m_addr_K3 = rct::pkGen();
-    m_address_index =
-        address_index_from_canonical(address_index_to_canonical(crypto::rand_idx(static_cast<address_index_t>(-1))));
+    m_address_index = crypto::rand_idx(ADDRESS_INDEX_MAX);
+    m_type = type;
     m_amount = amount;
     m_enote_privkey = rct::rct2sk(rct::skGen());
     m_viewbalance_privkey = rct::rct2sk(rct::skGen());

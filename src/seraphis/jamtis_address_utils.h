@@ -55,6 +55,11 @@ namespace sp
 namespace jamtis
 {
 
+/// index (system-endian; only 56 bits are used): j
+using address_index_t = std::uint64_t;
+constexpr std::size_t ADDRESS_INDEX_BYTES{7};
+constexpr address_index_t ADDRESS_INDEX_MAX{(address_index_t{1} << 8*ADDRESS_INDEX_BYTES) - 1};  //2^56 - 1
+
 /// t_view (TODO: core_types file?)
 using view_tag_t = unsigned char;
 

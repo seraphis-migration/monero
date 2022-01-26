@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "sp_tx_base.h"
+#include "tx_base.h"
 
 //local headers
 #include "ledger_context.h"

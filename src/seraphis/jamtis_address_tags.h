@@ -39,6 +39,7 @@ extern "C"
 {
 #include "crypto/blowfish.h"
 }
+#include "jamtis_address_utils.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -53,19 +54,14 @@ namespace sp
 namespace jamtis
 {
 
-/// index (system-endian; only 56 bits are used): j
-using address_index_t = std::uint64_t;
-constexpr std::size_t ADDRESS_INDEX_BYTES{7};
-constexpr address_index_t ADDRESS_INDEX_MAX{(address_index_t{1} << 8*ADDRESS_INDEX_BYTES) - 1};  //2^56 - 1
-
-/// MAC for address tags (system-endian): t_addr_MAC
+/// MAC for address tags (system-endian): addr_tag_MAC
 constexpr std::size_t ADDRESS_TAG_MAC_BYTES{1};  //if > 1, then endianness must be preserved
 using address_tag_MAC_t = unsigned char;
 
-/// index ciphered with view-balance key: t_addr = enc(little_endian(j) || little_endian(t_addr_MAC))
+/// index ciphered with view-balance key: addr_tag = enc(little_endian(j) || little_endian(addr_tag_MAC))
 using address_tag_t = unsigned char[ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES];
 
-/// address tag XORd with a user-defined secret: t_addr_enc = t_addr XOR t_addr_enc_secret
+/// address tag XORd with a user-defined secret: addr_tag_enc = addr_tag XOR addr_tag_enc_secret
 using encrypted_address_tag_t = address_tag_t;
 
 /// sizes are consistent
@@ -80,32 +76,32 @@ static_assert(
 /// convert {j, mac} to/from an address tag byte-representation
 address_tag_t address_index_to_tag(const address_index_t j,
     const address_tag_MAC_t mac);
-address_index_t tag_to_address_index(const address_tag_t t_addr,
+address_index_t tag_to_address_index(const address_tag_t addr_tag,
     address_tag_MAC_t &mac_out);
 
-/// {j, t_addr_MAC} -> t_addr
+/// {j, addr_tag_MAC} -> addr_tag
 address_tag_t make_address_tag(const BLOWFISH_CTX &blowfish_context,
     const address_index_t j,
     const address_tag_MAC_t mac);
-address_tag_t make_address_tag(const rct::key &cipher_key,
+address_tag_t make_address_tag_with_key(const rct::key &cipher_key,
     const address_index_t j,
     const address_tag_MAC_t mac);
 
-/// t_addr -> {j, t_addr_MAC}
+/// addr_tag -> {j, addr_tag_MAC}
 address_tag_MAC_t try_get_address_index(const BLOWFISH_CTX &blowfish_context,
-    const address_tag_t t_addr,
+    const address_tag_t addr_tag,
     address_index_t &j_out);
-address_tag_MAC_t try_get_address_index(const rct::key &cipher_key,
-    const address_tag_t t_addr,
+address_tag_MAC_t try_get_address_index_with_key(const rct::key &cipher_key,
+    const address_tag_t addr_tag,
     address_index_t &j_out);
 
-/// t_addr_enc = t_addr XOR t_addr_enc_secret
+/// addr_tag_enc = addr_tag XOR addr_tag_enc_secret
 encrypted_address_tag_t make_encrypted_address_tag(const rct::key &encryption_key,
-    const address_tag_t t_addr);
+    const address_tag_t addr_tag);
 
-/// t_addr = t_addr_enc XOR t_addr_enc_secret
+/// addr_tag = addr_tag_enc XOR addr_tag_enc_secret
 address_tag_t get_decrypted_address_tag(const rct::key &encryption_key,
-    const encrypted_address_tag_t t_addr_tag_enc);
+    const encrypted_address_tag_t addr_tag_tag_enc);
 
 } //namespace jamtis
 } //namespace sp

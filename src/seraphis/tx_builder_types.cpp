@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "sp_tx_builder_types.h"
+#include "tx_builder_types.h"
 
 //local headers
 #include "crypto/crypto.h"
@@ -39,9 +39,9 @@
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_utils.h"
-#include "sp_tx_component_types.h"
-#include "sp_tx_misc_utils.h"
-#include "sp_tx_utils.h"
+#include "tx_misc_utils.h"
+#include "tx_utils.h"
+#include "tx_component_types.h"
 
 //third party headers
 

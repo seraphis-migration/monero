@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "sp_tx_utils.h"
+#include "tx_utils.h"
 
 //local headers
 #include "common/varint.h"
@@ -49,9 +49,9 @@ extern "C"
 #include "sp_composition_proof.h"
 #include "sp_core_utils.h"
 #include "sp_crypto_utils.h"
-#include "sp_tx_builder_types.h"
-#include "sp_tx_component_types.h"
-#include "sp_tx_misc_utils.h"
+#include "tx_builder_types.h"
+#include "tx_component_types.h"
+#include "tx_misc_utils.h"
 
 //third party headers
 

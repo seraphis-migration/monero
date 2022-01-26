@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "sp_tx_misc_utils.h"
+#include "tx_misc_utils.h"
 
 //local headers
 #include "misc_log_ex.h"

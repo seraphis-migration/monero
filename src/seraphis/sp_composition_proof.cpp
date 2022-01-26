@@ -45,7 +45,7 @@ extern "C"
 #include "ringct/rctTypes.h"
 #include "sp_core_utils.h"
 #include "sp_crypto_utils.h"
-#include "sp_tx_misc_utils.h"
+#include "tx_misc_utils.h"
 
 //third party headers
 
@@ -216,8 +216,8 @@ SpCompositionProof sp_composition_prove(const rct::key &message,
 
     // verify the input key matches the input private keys
     rct::key temp_K;
-    sp::make_seraphis_spendbase(z, temp_K);
-    sp::extend_seraphis_spendkey(y, temp_K);
+    make_seraphis_spendbase(z, temp_K);
+    extend_seraphis_spendkey(y, temp_K);
     mask_key(x, temp_K, temp_K);
 
     CHECK_AND_ASSERT_THROW_MES(K == temp_K, "Bad proof key (K doesn't match privkeys)!");
@@ -235,7 +235,7 @@ SpCompositionProof sp_composition_prove(const rct::key &message,
     // KI = (z / y) * U
     // note: plain KI is used in all byte-aware contexts
     crypto::key_image KI;
-    sp::make_seraphis_key_image(y, z, KI);
+    make_seraphis_key_image(y, z, KI);
 
 
     /// signature openers

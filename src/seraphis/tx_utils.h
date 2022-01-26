@@ -36,8 +36,8 @@
 #include "mock_ledger_context.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
-#include "sp_tx_builder_types.h"
-#include "sp_tx_component_types.h"
+#include "tx_builder_types.h"
+#include "tx_component_types.h"
 
 //third party headers
 

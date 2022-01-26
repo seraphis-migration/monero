@@ -257,6 +257,7 @@ namespace config
   const char HASH_KEY_SERAPHIS_AMOUNT_ENC[] = "seraphis enote amount encoding";
   const char HASH_KEY_SERAPHIS_SQUASHED_ENOTE[] = "seraphis squashed enote";
   const char HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR[] = "multisig binonce merge factor";
+  const char HASH_KEY_JAMTIS_ADDRESS_TAG[] = "jamtis address tag";
 
   // Multisig
   const uint32_t MULTISIG_MAX_SIGNERS{16};

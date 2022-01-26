@@ -33,9 +33,9 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "sp_core_types.h"
-#include "sp_tx_component_types.h"
 #include "ringct/rctTypes.h"
+#include "sp_core_types.h"
+#include "tx_component_types.h"
 
 //third party headers
 
@@ -48,35 +48,38 @@ namespace sp
 {
 
 ////
-// SpInputProposalV1 - Input V1
+// SpInputProposalV1
 ///
-struct SpInputProposalV1 final : public SpInputProposal
+struct SpInputProposalV1 final
 {
-    /// the enote to spend (e.g. found in the ledger, or in a tx that has not been added to the ledger)
-    SpEnoteV1 m_enote;
-    /// the enote's pubkey (these are not stored in enotes directly)
-    rct::key m_enote_pubkey;
+    /// core of the proposal
+    SpInputProposal m_proposal_core;
 
     /// generate a v1 input (all random; does not support info recovery)
-    void gen(const rct::xmr_amount amount);
-
-protected:
-    virtual const SpEnote& get_enote_base() const { return m_enote; }
+    void gen(const rct::xmr_amount amount) { m_proposal_core.gen(amount); }
 };
 
 ////
-// SpDestinationV1 - Destination V1
+// SpOutputProposalV1
 ///
-struct SpDestinationV1 final : public SpDestination
+struct SpOutputProposalV1 final
 {
-    /// r_t
-    crypto::secret_key m_enote_privkey;
+    /// core of the proposal
+    SpOutputProposal m_proposal_core;
 
-    /// get the amount blinding factor
-    void get_amount_blinding_factor(const std::size_t output_index, crypto::secret_key &amount_blinding_factor) const;
+    /// Ke: enote ephemeral pubkey
+    rct::key m_enote_pubkey;
+    /// enc(a)
+    rct::xmr_amount m_encoded_amount;
+    /// view_tag
+    jamtis::view_tag_t m_view_tag;
+    /// addr_tag
+    jamtis::address_tag_t m_addr_tag;
+
+    ///TODO: misc memo suggestion (fields to add to memo)
 
     /// convert this destination into a v1 enote
-    SpEnoteV1 to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const;
+    SpEnoteV1 to_enote_v1() const;
 
     /**
     * brief: gen - generate a V1 Destination (random)
@@ -94,6 +97,7 @@ struct SpMembershipReferenceSetV1 final
     std::size_t m_ref_set_decomp_n;
     std::size_t m_ref_set_decomp_m;
     /// locations in the ledger of the referenced enotes; only enotes in the ledger can have a membership proof
+    ///TODO: deterministic references instead of indices
     std::vector<std::size_t> m_ledger_enote_indices;
     /// the referenced enotes
     std::vector<SpEnoteV1> m_referenced_enotes;
@@ -124,15 +128,13 @@ struct SpTxProposalV1 final
     SpTxProposalV1() = default;
 
     /// normal constructor: make a tx proposal from destinations (a.k.a. outlays)
-    SpTxProposalV1(std::vector<SpDestinationV1> destinations);
+    SpTxProposalV1(std::vector<SpOutputProposalV1> destinations);
 
 //member functions
     /// message to be signed by input spend proofs
     rct::key get_proposal_prefix(const std::string &version_string) const;
 
 //member variables
-    /// proposed destinations
-    std::vector<SpDestinationV1> m_destinations;
     /// proposed outputs (created from the destinations)
     std::vector<SpEnoteV1> m_outputs;
     /// proposed tx supplement
@@ -140,7 +142,6 @@ struct SpTxProposalV1 final
     /// output amounts and blinding factors (for future balance proofs)
     std::vector<rct::xmr_amount> m_output_amounts;
     std::vector<crypto::secret_key> m_output_amount_commitment_blinding_factors;
-    //TODO: miscellaneous memo(s)
 };
 
 ////
@@ -209,7 +210,7 @@ struct SpTxPartialV1 final
     /// tx outputs (new e-notes)
     std::vector<SpEnoteV1> m_outputs;
     /// balance proof (balance proof and range proofs)
-    std::shared_ptr<SpBalanceProofV1> m_balance_proof;
+    std::shared_ptr<const SpBalanceProofV1> m_balance_proof;
     /// composition proofs: ownership/unspentness for each input
     std::vector<SpImageProofV1> m_image_proofs;
     /// supplemental data for tx

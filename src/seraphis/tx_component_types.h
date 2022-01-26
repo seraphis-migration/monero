@@ -58,33 +58,14 @@ struct SpEnoteV1 final
 
     /// enc(a)
     rct::xmr_amount m_encoded_amount;
-    /// tag_t
-    unsigned char m_view_tag;
-    /// addr_tag_t
-    std::uint64_t m_addr_tag;
+    /// view_tag
+    jamtis::view_tag_t m_view_tag;
+    /// addr_tag
+    jamtis::address_tag_t m_addr_tag;
 
     /**
-    * brief: make - make a v1 enote
-    * param: enote_privkey - r_t
-    * param: recipient_DH_base - K^{DH}   [change in 2-out: other recipient's K^{DH}]
-    * param: recipient_view_key - K^{vr}  [change in 2-out: k^{vr}_local * K^{DH}_other_recipient]
-    * param: recipient_spend_key - K^s
-    * param: amount - a
-    * param: enote_index - t, index of the enote in its tx
-    * param: lock_amounts_to_DH_key - if true, then compute r_t G and bake it into the amount encoding and commitment mask
-    * outparam: enote_pubkey_out - the enote's pubkey
-    */
-    void make(const crypto::secret_key &enote_privkey,
-        const rct::key &recipient_DH_base,
-        const rct::key &recipient_view_key,
-        const rct::key &recipient_spend_key,
-        const rct::xmr_amount amount,
-        const std::size_t enote_index,
-        const bool lock_amounts_to_DH_key,
-        rct::key &enote_pubkey_out);
-    /**
     * brief: append_to_string - convert enote to a string and append to existing string
-    *   str += Ko | C | enc(a) | view_tag
+    *   str += Ko || C || enc(a) || view_tag || addr_tag
     * inoutparam: str_inout - enote contents concatenated to a string
     */
     void append_to_string(std::string &str_inout) const;
@@ -92,7 +73,10 @@ struct SpEnoteV1 final
     /// generate a dummy v1 enote (all random; completely unspendable)
     void gen();
 
-    static std::size_t get_size_bytes() { return m_enote_core.get_size_bytes() + 8 + 1 + 8; }
+    static std::size_t get_size_bytes()
+    {
+        return SpEnote::get_size_bytes() + sizeof(rct::xmr_amount) + sizeof(view_tag_t) + sizeof(address_tag_t);
+    }
 };
 
 ////
@@ -103,7 +87,7 @@ struct SpEnoteImageV1 final
     /// enote image core (masked address, masked amount commitment, key image)
     SpEnoteImage m_enote_image_core;
 
-    static std::size_t get_size_bytes() { return m_enote_image_core.get_size_bytes(); }
+    static std::size_t get_size_bytes() { return SpEnoteImage::get_size_bytes(); }
 };
 
 ////
@@ -158,7 +142,7 @@ struct SpBalanceProofV1 final
 ///
 struct SpTxSupplementV1 final
 {
-    /// R_t: enote pubkeys for outputs
+    /// Ke: enote ephemeral pubkeys for outputs
     rct::keyV m_output_enote_pubkeys;
     //TODO - tx memo: none in mockup
     //TODO - fee: none in mockup

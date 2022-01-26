@@ -38,11 +38,11 @@
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
-#include "sp_tx_builder_types.h"
-#include "sp_tx_component_types.h"
-#include "sp_tx_misc_utils.h"
-#include "sp_tx_utils.h"
-#include "sp_tx_validators.h"
+#include "tx_builder_types.h"
+#include "tx_component_types.h"
+#include "tx_misc_utils.h"
+#include "tx_utils.h"
+#include "tx_validators.h"
 
 //third party headers
 

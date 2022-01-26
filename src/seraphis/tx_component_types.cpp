@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "sp_tx_component_types.h"
+#include "tx_component_types.h"
 
 //local headers
 #include "crypto/crypto.h"

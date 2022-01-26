@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "sp_tx_validators.h"
+#include "tx_validators.h"
 
 //local headers
 #include "concise_grootle.h"
@@ -40,9 +40,9 @@
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
 #include "sp_crypto_utils.h"
-#include "sp_tx_misc_utils.h"
-#include "sp_tx_component_types.h"
-#include "sp_tx_utils.h"
+#include "tx_misc_utils.h"
+#include "tx_component_types.h"
+#include "tx_utils.h"
 
 //third party headers
 

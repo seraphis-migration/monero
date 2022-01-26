@@ -36,7 +36,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_utils.h"
-#include "sp_tx_component_types.h"
+#include "tx_component_types.h"
 #include "sp_txtype_squashed_v1.h"
 
 //third party headers

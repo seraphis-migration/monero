@@ -158,6 +158,9 @@ void generate_proof_nonce(const rct::key &base, crypto::secret_key &nonce_out, r
 * brief: multi_exp/multi_exp_p3 - EC multiexp operation with arbitrary element count
 *   - optimization: if a privkey == 1, skips the scalar mul operation
 *   - optimization2: if privkeys.size() > pubkeys.size(), the trailing privkeys will all be 'p * G'
+* 
+* TODO: these are ugly, fixme
+* 
 * param: privkeys - a, b, ..., m, ..., n
 * param: pubkeys - A, B, ..., M
 * outparam: result_out - aA + bB + ... + mM + ... + n*G

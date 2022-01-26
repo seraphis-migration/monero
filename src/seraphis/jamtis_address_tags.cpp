@@ -32,11 +32,13 @@
 #include "jamtis_address_tags.h"
 
 //local headers
+#include "cryptonote_config.h"
 extern "C"
 {
 #include "crypto/blowfish.h"
 }
 #include "int-util.h"
+#include "jamtis_address_utils.h"
 #include "jamtis_hash_functions.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
@@ -80,19 +82,19 @@ static address_index_t address_index_from_canonical(address_index_t j_canonical)
     return SWAP64LE(j);
 }
 //-------------------------------------------------------------------------------------------------------------------
-// t_addr_enc = H_8('domain-sep', encryption_key)
+// addr_tag_enc = H_8('domain-sep', encryption_key)
 //-------------------------------------------------------------------------------------------------------------------
 static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct::key &encryption_key)
 {
     static_assert(sizeof(encrypted_address_tag_secret_t) == 8, "");
 
-    static std::size_t domain_separator{config::HASH_KEY_JAMTIS_ADDRESS_TAG};
+    static std::string domain_separator{config::HASH_KEY_JAMTIS_ADDRESS_TAG};
 
-    // t_addr_enc = H_8('domain-sep', encryption_key)
-    encrypted_address_tag_secret_t t_addr_enc{};
-    jamtis_hash8(domain_separator, encryption_key.bytes, sizeof(rct::key), t_addr_enc);
+    // addr_tag_enc = H_8('domain-sep', encryption_key)
+    encrypted_address_tag_secret_t addr_tag_enc{};
+    jamtis_hash8(domain_separator, encryption_key.bytes, sizeof(rct::key), addr_tag_enc);
 
-    return t_addr_enc;
+    return addr_tag_enc;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -101,21 +103,21 @@ address_tag_t address_index_to_tag(const address_index_t j,
 {
     address_index_t j_canonical{address_index_to_canonical(j)};
 
-    // t_addr = j_canonical || MAC
-    address_tag_t t_addr{};
-    memcpy(t_addr, j_canonical, ADDRESS_INDEX_BYTES);
-    memcpy(t_addr + ADDRESS_INDEX_BYTES, &mac, ADDRESS_TAG_MAC_BYTES);
+    // addr_tag = j_canonical || MAC
+    address_tag_t addr_tag{};
+    memcpy(addr_tag, j_canonical, ADDRESS_INDEX_BYTES);  //canonical j is little-endian
+    memcpy(addr_tag + ADDRESS_INDEX_BYTES, &mac, ADDRESS_TAG_MAC_BYTES);
 
-    return t_addr;
+    return addr_tag;
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_index_t tag_to_address_index(const address_tag_t t_addr,
+address_index_t tag_to_address_index(const address_tag_t addr_tag,
     address_tag_MAC_t &mac_out)
 {
-    // t_addr -> {j_canonical, MAC}
+    // addr_tag -> {j_canonical, MAC}
     address_index_t j_canonical{};
-    memcpy(j_canonical, t_addr, ADDRESS_INDEX_BYTES);
-    memcpy(&mac_out, t_addr + ADDRESS_INDEX_BYTES, ADDRESS_TAG_MAC_BYTES);
+    memcpy(j_canonical, addr_tag, ADDRESS_INDEX_BYTES);
+    memcpy(&mac_out, addr_tag + ADDRESS_INDEX_BYTES, ADDRESS_TAG_MAC_BYTES);
 
     // j = system_endian(j_canonical)
     return address_index_from_canonical(j_canonical);
@@ -126,22 +128,22 @@ address_tag_t make_address_tag(const BLOWFISH_CTX &blowfish_context,
     const address_tag_MAC_t mac)
 {
     // concatenate index and MAC
-    address_tag_t t_addr{address_index_to_tag(j, mac)};
+    address_tag_t addr_tag{address_index_to_tag(j, mac)};
 
     // paste the concatenated packet into a Blowfish-compatible format
-    Blowfish_LR t_addr_formatted{};
-    memcpy(&t_addr_formatted, t_addr, sizeof(address_tag_t));
+    Blowfish_LR addr_tag_formatted{};
+    memcpy(&addr_tag_formatted, addr_tag, sizeof(address_tag_t));
 
     // encrypt the packet
-    Blowfish_Encrypt(&blowfish_context, &(t_addr_formatted.L), &(t_addr_formatted.R));
+    Blowfish_Encrypt(&blowfish_context, &(addr_tag_formatted.L), &(addr_tag_formatted.R));
 
     // paste back into the address tag
-    memcpy(t_addr, &t_addr_formatted, sizeof(address_tag_t));
+    memcpy(addr_tag, &addr_tag_formatted, sizeof(address_tag_t));
 
-    return t_addr;
+    return addr_tag;
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_t make_address_tag(const rct::key &cipher_key,
+address_tag_t make_address_tag_with_key(const rct::key &cipher_key,
     const address_index_t j,
     const address_tag_MAC_t mac)
 {
@@ -154,29 +156,29 @@ address_tag_t make_address_tag(const rct::key &cipher_key,
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_tag_MAC_t try_get_address_index(const BLOWFISH_CTX &blowfish_context,
-    const address_tag_t t_addr,
+    const address_tag_t addr_tag,
     address_index_t &j_out)
 {
     // paste the tag into a Blowfish-compatible format
-    Blowfish_LR t_addr_formatted{};
-    memcpy(&t_addr_formatted, t_addr, sizeof(address_tag_t));
+    Blowfish_LR addr_tag_formatted{};
+    memcpy(&addr_tag_formatted, addr_tag, sizeof(address_tag_t));
 
     // decrypt the tag
-    Blowfish_Decrypt(&blowfish_context, &(t_addr_formatted.L), &(t_addr_formatted.R));
+    Blowfish_Decrypt(&blowfish_context, &(addr_tag_formatted.L), &(addr_tag_formatted.R));
 
     // paste back into the address tag
-    address_tag_t t_addr_decrypted{};
-    memcpy(t_addr_decrypted, &t_addr_formatted, sizeof(address_tag_t));
+    address_tag_t addr_tag_decrypted{};
+    memcpy(addr_tag_decrypted, &addr_tag_formatted, sizeof(address_tag_t));
 
     // convert to {j, MAC}
     address_tag_MAC_t mac{};
-    j_out = tag_to_address_index(t_addr_decrypted, mac);
+    j_out = tag_to_address_index(addr_tag_decrypted, mac);
 
     return mac;
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_MAC_t try_get_address_index(const rct::key &cipher_key,
-    const address_tag_t t_addr,
+address_tag_MAC_t try_get_address_index_with_key(const rct::key &cipher_key,
+    const address_tag_t addr_tag,
     address_index_t &j_out)
 {
     // prepare to decrypt the tag
@@ -184,21 +186,21 @@ address_tag_MAC_t try_get_address_index(const rct::key &cipher_key,
     Blowfish_Init(&blowfish_context, cipher_key.bytes, sizeof(rct::key));
 
     // decrypt it
-    return try_get_address_index(blowfish_context, t_addr, j_out);
+    return try_get_address_index(blowfish_context, addr_tag, j_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 encrypted_address_tag_t make_encrypted_address_tag(const rct::key &encryption_key,
-    const address_tag_t t_addr)
+    const address_tag_t addr_tag)
 {
-    // t_addr_tag_enc = t_addr XOR_8 encryption_secret
-    return t_addr ^ get_encrypted_address_tag_secret(encryption_key);
+    // addr_tag_tag_enc = addr_tag XOR_8 encryption_secret
+    return addr_tag ^ get_encrypted_address_tag_secret(encryption_key);
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_tag_t get_decrypted_address_tag(const rct::key &encryption_key,
-    const encrypted_address_tag_t t_addr_tag_enc)
+    const encrypted_address_tag_t addr_tag_tag_enc)
 {
-    // t_addr = t_addr_tag_enc XOR_8 encryption_secret
-    return t_addr_tag_enc ^ get_encrypted_address_tag_secret(encryption_key);
+    // addr_tag = addr_tag_tag_enc XOR_8 encryption_secret
+    return addr_tag_tag_enc ^ get_encrypted_address_tag_secret(encryption_key);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

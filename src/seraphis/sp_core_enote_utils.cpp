@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "sp_core_utils.h"
+#include "sp_core_enote_utils.h"
 
 //local headers
 extern "C"
