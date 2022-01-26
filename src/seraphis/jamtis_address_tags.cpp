@@ -45,8 +45,6 @@ extern "C"
 
 //standard headers
 
-#undef MONERO_DEFAULT_LOG_CATEGORY
-#define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
 
 namespace sp
 {
