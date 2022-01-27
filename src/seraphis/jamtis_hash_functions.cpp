@@ -73,7 +73,7 @@ static void jamtis_pad_key136(const rct::key &key, epee::wipeable_string &padded
     padded_key_out.clear();
     padded_key_out.reserve(KECCAK_256_BITRATE_BYTES);
 
-    padded_key_out.append((const char *)&key, sizeof(rct::key));
+    padded_key_out.append(reinterpret_cast<char *>(&key), sizeof(rct::key));
     padded_key_out += padding;
 }
 //-------------------------------------------------------------------------------------------------------------------

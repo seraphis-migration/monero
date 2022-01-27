@@ -58,87 +58,79 @@ namespace sp
 namespace jamtis
 {
 
-/// self-send destination type, used to define enote-construction procedure for self-sends
-enum class JamtisSelfSendType : public unsigned char
+/// normal proposal type, used to define enote-construction procedure for normal proposals
+enum class JamtisPlainType : public address_tag_MAC_t
+{
+    PLAIN = 0
+};
+
+/// self-send proposal type, used to define enote-construction procedure for self-sends
+enum class JamtisSelfSendType : public address_tag_MAC_t
 {
     CHANGE = 0,
     SELF_SPEND = 1
 };
 
 ////
-// JamtisDestinationV1
+// JamtisPaymentProposalV1
 // - for creating an output proposal to send an amount to someone
+// - JamtisPlainType::PLAIN (implicit)
 ///
-struct JamtisDestinationV1 final
+struct JamtisPaymentProposalV1 final
 {
-    /// K_1 = k^j_x X + K_s  (address spend key)
-    rct::key m_addr_K1;
-    /// K_2 = k^j_a K_fr     (address view key)
-    rct::key m_addr_K2;
-    /// K_3 = k^j_a G        (DH base key)
-    rct::key m_addr_K3;
-    /// t_addr
-    address_tag_t m_address_tag;
+    /// user address
+    JamtisDestinationV1 m_destination;
 
     /// b
     rct::xmr_amount m_amount;
 
-    /// enote privkey: r
-    crypto::secret_key m_enote_privkey;
-
+    /// enote ephemeral privkey: r
+    crypto::secret_key m_enote_ephemeral_privkey;
     ///TODO: misc memo
 
     /**
-    * brief: get_output_proposal_v1 - convert this destination to a concrete output proposal
+    * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
     * outparam: output_proposal_out -
     * outparam: enote_pubkey_out -
     */
     void get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out, rct::key &enote_pubkey_out) const;
 
     /**
-    * brief: gen - generate a random destination
+    * brief: gen - generate a random proposal
     * param: amount -
     */
     void gen(const rct::xmr_amount amount);
 };
 
 ////
-// JamtisDestinationSelfSendV1
+// JamtisPaymentProposalSelfSendV1
 // - for creating an output proposal to send an amount to the tx author
 ///
-struct JamtisDestinationSelfSendV1 final
+struct JamtisPaymentProposalSelfSendV1 final
 {
-    /// K_1 = k^j_x X + K_s  (address spend key)
-    rct::key m_addr_K1;
-    /// K_2 = k^j_a K_fr     (address view key)
-    rct::key m_addr_K2;
-    /// K_3 = k^j_a G        (DH base key)
-    rct::key m_addr_K3;
-    /// j
-    address_index_t m_address_index;
-    /// type
-    JamtisSelfSendType m_type;
+    /// user address
+    JamtisDestinationV1 m_destination;
 
     /// b
     rct::xmr_amount m_amount;
 
-    /// enote privkey: r
-    crypto::secret_key m_enote_privkey;
-
+    /// type
+    JamtisSelfSendType m_type;
+    /// enote ephemeral privkey: r
+    crypto::secret_key m_enote_ephemeral_privkey;
     /// view-balance privkey: k_vb
     crypto::secret_key m_viewbalance_privkey;
-
     ///TODO: misc memo suggestion (fields to add to memo)
 
     /**
-    * brief: get_output_proposal_v1 - convert this destination to a concrete output proposal
+    * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
     * outparam: output_proposal_out -
     * outparam: enote_pubkey_out -
     */
     void get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out, rct::key &enote_pubkey_out) const;
 
     /**
-    * brief: gen - generate a random destination
+    * brief: gen - generate a random proposal
     * param: amount -
     */
     void gen(const rct::xmr_amount amount, const JamtisSelfSendType type);

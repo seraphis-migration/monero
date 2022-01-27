@@ -68,7 +68,7 @@ struct SpOutputProposalV1 final
     SpOutputProposal m_proposal_core;
 
     /// Ke: enote ephemeral pubkey
-    rct::key m_enote_pubkey;
+    rct::key m_enote_ephemeral_pubkey;
     /// enc(a)
     rct::xmr_amount m_encoded_amount;
     /// view_tag

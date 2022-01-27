@@ -143,7 +143,7 @@ struct SpBalanceProofV1 final
 struct SpTxSupplementV1 final
 {
     /// Ke: enote ephemeral pubkeys for outputs
-    rct::keyV m_output_enote_pubkeys;
+    rct::keyV m_output_enote_ephemeral_pubkeys;
     //TODO - tx memo: none in mockup
     //TODO - fee: none in mockup
 

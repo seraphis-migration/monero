@@ -29,26 +29,22 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "jamtis_enote_utils.h"
+#include "jamtis_payment_proposal.h"
 
 //local headers
-#include "common/varint.h"
 #include "crypto/crypto.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
-#include "device/device.hpp"
 #include "jamtis_address_tags.h"
 #include "jamtis_address_utils.h"
 #include "misc_language.h"
 #include "misc_log_ex.h"
-#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_utils.h"
 #include "sp_crypto_utils.h"
-#include "tx_misc_utils.h"
 #include "wipeable_string.h"
 
 //third party headers
@@ -65,52 +61,46 @@ namespace sp
 namespace jamtis
 {
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisDestinationV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out,
+void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out,
     rct::key &enote_pubkey_out) const
 {
-    // derived key: Kd = 8*r*K2 (generate_key_derivation())
-    // enote ephemeral pubkey: Ke = r K3
-    // view tag: view_tag = H1(Kd)
-    // sender-receiver shared secret: q = Hn(Kd)
+    // derived key: K_d = 8*r*K_2 (generate_key_derivation())
+    // enote ephemeral pubkey: K_e = r K_3
+    // view tag: view_tag = H1(K_d)
+    // sender-receiver shared secret: q = H_32(K_d)
     // encrypt address tag: addr_tag_enc = addr_tag(blowfish(j, mac)) ^ H8(q)
-    // onetime address: Ko = q X + K1
+    // onetime address: Ko = H_n(q) X + K_1
     // enote base pubkey: r G
-    // amount blinding factor: y = Hn(q, r G)
+    // amount blinding factor: y = H_n(q, r G)
     // encrypted amount: enc_amount = a ^ H8(q, r G)
 }
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisDestinationV1::gen(const rct::xmr_amount amount)
+void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount)
 {
-    m_addr_K1 = rct::pkGen();
-    m_addr_K2 = rct::pkGen();
-    m_addr_K3 = rct::pkGen();
-    m_address_tag = crypto::rand_idx(static_cast<address_tag_t>(-1));
+    m_destination.gen();
     m_amount = amount;
     m_enote_privkey = rct::rct2sk(rct::skGen());
 }
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisDestinationSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out,
+void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out,
     rct::key &enote_pubkey_out) const
 {
-    // derived key: Kd = 8*r*K3 (generate_key_derivation())
-    // enote ephemeral pubkey: Ke = r K3
-    // view tag: view_tag = H1(Kd)
-    // sender-receiver shared secret: q = Hn(k_vb, Ke)  //note: Ke not Kd, so q can be computed immediately by recipient
-    // encrypt address tag: addr_tag_enc = addr_tag(j, mac) ^ H8(q)
-    // onetime address: Ko = q X + K1
+    // derived key: K_d = 8*r*K_2 (generate_key_derivation())
+    // enote ephemeral pubkey: K_e = r K_3
+    // view tag: view_tag = H1(K_d)
+    // sender-receiver shared secret: q = H_32(k_vb, K_e)  //note: K_e not K_d, so q can be computed immediately by recipient
+    // encrypt address tag: addr_tag_enc = addr_tag(j, mac) ^ H_8(q)
+    // onetime address: Ko = H_n(q) X + K_1
     // enote base pubkey: r G
     // amount blinding factor: y = Hn(q)
     // encrypted amount: enc_amount = a ^ H8(q)
 }
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisDestinationSelfSendV1::gen(const rct::xmr_amount amount, const JamtisSelfSendType type)
+void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount, const JamtisSelfSendType type)
 {
-    m_addr_K1 = rct::pkGen();
-    m_addr_K2 = rct::pkGen();
-    m_addr_K3 = rct::pkGen();
-    m_address_index = crypto::rand_idx(ADDRESS_INDEX_MAX);
-    m_type = type;
+    m_destination.gen();
     m_amount = amount;
+    m_type = type;
     m_enote_privkey = rct::rct2sk(rct::skGen());
     m_viewbalance_privkey = rct::rct2sk(rct::skGen());
 }

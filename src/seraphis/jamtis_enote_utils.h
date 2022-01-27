@@ -54,44 +54,65 @@ namespace sp
 {
 namespace jamtis
 {
-/**
-* brief: make_jamtis_enote_pubkey - enote pubkey R_t
-*   R_t = r_t K^{DH}_recipient
-* param: enote_privkey - r_t
-* param: DH_base - K^{DH}_recipient
-* outparam: enote_pubkey_out - R_t
+
+/*
+enote recovery:
+1. view tag checking
+2. address tag checking
+3. nominal spend key checking
+4. amount commitment checking
+5. spent status checking
+6. loop back to 2 for all unowned enotes created in txs with spent enotes (self-send style checks)
+
+
 */
-void make_jamtis_enote_pubkey(const crypto::secret_key &enote_privkey,
-    const rct::key &DH_base,
-    rct::key &enote_pubkey_out);
+
 /**
-* brief: make_jamtis_sender_receiver_secret - sender-receiver secret q_t for an output at index 't' in the tx that created it
-*    q_t = H(8 * r_t * k^{vr} * K^{DH}, t) => H("domain sep", 8 * privkey * DH_key, output_index)
-* param: privkey - [sender: r_t] [recipient: k^{vr}]
-* param: DH_key - [sender: K^{vr}] [sender-change-2out: k^{vr}*K^{DH}_other] [recipient: R_t]
-* param: output_index - t (index of the enote within its tx)
-* param: hwdev - abstract reference to a hardware-specific implemention of crypto ops
-* outparam: sender_receiver_secret_out - q_t
+* brief: make_jamtis_enote_ephemeral_pubkey - enote ephemeral pubkey K_e
+*   K_e = r K_3
+* param: enote_privkey - r
+* param: DH_base - K_3
+* outparam: enote_ephemeral_pubkey_out - K_e
+*/
+void make_jamtis_enote_ephemeral_pubkey(const crypto::secret_key &enote_privkey,
+    const rct::key &DH_base,
+    rct::key &enote_ephemeral_pubkey_out);
+/**
+* brief: make_jamtis_sender_receiver_secret - sender-receiver secret q for a normal enote
+*    q = H_32(DH_derivation)
+* param: sender_receiver_DH_derivation - 8 * privkey * DH_key
+* outparam: sender_receiver_secret_out - q
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 */
-void make_jamtis_sender_receiver_secret(const crypto::secret_key &privkey,
+void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
+    rct::key &sender_receiver_secret_out);
+/**
+* brief: make_jamtis_sender_receiver_secret_plain - sender-receiver secret q for a normal enote
+*    q = H_32(8 * r * k_fr * G) => H_32(8 * privkey * DH_key)
+* param: privkey - [sender: r] [recipient: k_fr]
+* param: DH_key - [sender: K_3] [sender-change-2out: k_fr * K_3_other] [recipient: K_e]
+* param: hwdev - abstract reference to a hardware-specific implemention of crypto ops
+* outparam: sender_receiver_secret_out - q
+*   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
+*/
+void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
     const rct::key &DH_key,
-    const std::size_t output_index,
     hw::device &hwdev,
     rct::key &sender_receiver_secret_out);
 /**
-* brief: make_jamtis_sender_receiver_secret - overload in case the derivation was already computed by caller
-* param: sender_receiver_DH_derivation - 8 * privkey * DH_key
-* param: output_index - t (index of the enote within its tx)
-* outparam: sender_receiver_secret_out - q_t
+* brief: make_jamtis_sender_receiver_secret - sender-receiver secret q for a self-send enote
+*    q = H_32(k_vb, K_e)
+* param: k_view_balance - k_vb
+* param: enote_ephemeral_pubkey - K_e
+* outparam: sender_receiver_secret_out - q
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 */
-void make_jamtis_sender_receiver_secret(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const std::size_t output_index,
+void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_view_balance,
+    const rct::key &enote_ephemeral_pubkey,
     rct::key &sender_receiver_secret_out);
 /**
 * brief: make_jamtis_sender_address_extension - extension for transforming a recipient spendkey into an enote one-time address
-*    k_{a, sender} = H("domain-sep", q_t)
+*    k_{a, sender} = H_n(q)
 * param: sender_receiver_secret - q_t
 * outparam: sender_address_extension_out - k_{a, sender}
 */
