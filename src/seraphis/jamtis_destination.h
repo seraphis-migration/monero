@@ -63,8 +63,8 @@ struct JamtisDestinationV1 final
     rct::key m_addr_K2;
     /// K_3 = k^j_a G        (DH base key)
     rct::key m_addr_K3;
-    /// t_addr
-    address_tag_t m_address_tag;
+    /// addr_tag
+    address_tag_t m_addr_tag;
 
     /**
     * brief: gen - generate a random destination

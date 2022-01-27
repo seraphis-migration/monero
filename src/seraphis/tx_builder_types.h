@@ -73,8 +73,8 @@ struct SpOutputProposalV1 final
     rct::xmr_amount m_encoded_amount;
     /// view_tag
     jamtis::view_tag_t m_view_tag;
-    /// addr_tag
-    jamtis::address_tag_t m_addr_tag;
+    /// addr_tag_enc
+    jamtis::encrypted_address_tag_t m_addr_tag_enc;
 
     ///TODO: misc memo suggestion (fields to add to memo)
 

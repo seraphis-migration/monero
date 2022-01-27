@@ -35,15 +35,9 @@
 #pragma once
 
 //local headers
-extern "C"
-{
-#include "crypto/crypto-ops.h"
-}
 #include "jamtis_address_tags.h"
-#include "jamtis_address_utils.h"
-#include "jamtis_core_types.h"
+#include "jamtis_destination.h"
 #include "ringct/rctTypes.h"
-#include "tx_builder_types.h"
 
 //third party headers
 
@@ -91,9 +85,8 @@ struct JamtisPaymentProposalV1 final
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
     * outparam: output_proposal_out -
-    * outparam: enote_pubkey_out -
     */
-    void get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out, rct::key &enote_pubkey_out) const;
+    void get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const;
 
     /**
     * brief: gen - generate a random proposal
@@ -125,9 +118,8 @@ struct JamtisPaymentProposalSelfSendV1 final
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
     * outparam: output_proposal_out -
-    * outparam: enote_pubkey_out -
     */
-    void get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out, rct::key &enote_pubkey_out) const;
+    void get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const;
 
     /**
     * brief: gen - generate a random proposal
