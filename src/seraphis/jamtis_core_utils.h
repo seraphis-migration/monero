@@ -66,7 +66,7 @@ using view_tag_t = unsigned char;
 /**
 * brief: make_jamtis_findreceived_key - find-received key, for finding enotes received by the wallet
 *   - use to compute view tags and nominal spend keys
-*   k_fr = H_n(k_vb)
+*   k_fr = H_n(Pad136(k_vb))
 * param: k_view_balance - k_vb
 * outparam: ciphertag_secret_out - s_ct
 */
@@ -74,7 +74,7 @@ void make_jamtis_findreceived_key(const crypto::secret_key &k_view_balance,
     crypto::secret_key &findreceived_key_out);
 /**
 * brief: make_jamtis_generateaddress_secret - generate-address secret, for generating addresses
-*   s_ga = H_32(k_vb)
+*   s_ga = H_32(Pad136(k_vb))
 * param: k_view_balance - k_vb
 * outparam: generateaddress_secret_out - s_ga
 */
@@ -82,7 +82,7 @@ void make_jamtis_generateaddress_secret(const crypto::secret_key &k_view_balance
     crypto::secret_key &generateaddress_secret_out);
 /**
 * brief: make_jamtis_ciphertag_secret - cipher-tag secret, for ciphering address indices to/from address tags
-*   s_ct = H_32(k_ga)
+*   s_ct = H_32(Pad136(k_ga))
 * param: k_generate_address - k_ga
 * outparam: ciphertag_secret_out - s_ct
 */
@@ -90,7 +90,7 @@ void make_jamtis_ciphertag_secret(const crypto::secret_key &k_generate_address,
     crypto::secret_key &ciphertag_secret_out);
 /**
 * brief: make_jamtis_identifywallet_key - identify-wallet key, for certifying that an address belongs to a certain wallet
-*   k_id = H_n(k_ga)
+*   k_id = H_n(Pad136(k_ga))
 * param: k_generate_address - k_ga
 * outparam: identifywallet_key_out - k_id
 */

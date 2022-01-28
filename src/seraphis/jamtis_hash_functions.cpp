@@ -33,12 +33,6 @@
 
 //local headers
 #include "crypto/hash.h"
-extern "C"
-{
-#include "crypto/crypto-ops.h"
-}
-#include "misc_language.h"
-#include "ringct/rctTypes.h"
 #include "wipeable_string.h"
 
 //third party headers
@@ -54,11 +48,11 @@ namespace jamtis
 
 struct jamtis_hash_result
 {
-    unsigned char bytes[32];
+    crypto::hash hash;
 
     ~jamtis_hash_result()
     {
-        memwipe(bytes, sizeof(bytes));
+        memwipe(hash, sizeof(crypto::hash));
     }
 };
 
@@ -66,14 +60,15 @@ constexpr std::size_t KECCAK_256_BITRATE_BYTES{136};
 
 //-------------------------------------------------------------------------------------------------------------------
 // Pad136(k) = k || 104*(0x00)
+// - assumes sizeof(k) == 32
 //-------------------------------------------------------------------------------------------------------------------
-static void jamtis_pad_key136(const rct::key &key, epee::wipeable_string &padded_key_out)
+static void jamtis_pad_key136(const unsigned char *key, epee::wipeable_string &padded_key_out)
 {
-    static const std::string padding{KECCAK_256_BITRATE_BYTES - sizeof(rct::key), '0'};
+    static const std::string padding{KECCAK_256_BITRATE_BYTES - 32, '0'};
     padded_key_out.clear();
     padded_key_out.reserve(KECCAK_256_BITRATE_BYTES);
 
-    padded_key_out.append(reinterpret_cast<char *>(&key), sizeof(rct::key));
+    padded_key_out.append(reinterpret_cast<const char *>(key), 32);
     padded_key_out += padding;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -87,7 +82,7 @@ static void jamtis_hash_fill_data(const std::string &domain_separator,
     data_inout.reserve(data_out.size() + domain_separator.size() + input_length);
 
     if (input && input_length > 0)
-        data_inout.append(input, input_length);
+        data_inout.append(reinterpret_cast<const char *>(input), input_length);
     data_inout.append(domain_separator);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -97,7 +92,7 @@ static void jamtis_hash_base(const epee::wipeable_string &data, unsigned char *h
 {
     jamtis_hash_result hash_result{};
 
-    cn_fast_hash(data.data(), data.size(), reinterpret_cast<char *>(hash_result.bytes));
+    cn_fast_hash(data.data(), data.size(), hash_result.hash);
     memcpy(hash_out, hash_result.bytes, out_length);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -118,7 +113,7 @@ static void jamtis_hash_simple(const std::string &domain_separator,
 // H_32(Pad136(k) || [input] || 'domain-sep')
 //-------------------------------------------------------------------------------------------------------------------
 static void jamtis_hash_padded(const std::string &domain_separator,
-    const rct::key &derivation_key,
+    const unsigned char *derivation_key,  //32 bytes
     const unsigned char *input,
     const std::size_t input_length,
     unsigned char *hash_out,
@@ -160,6 +155,15 @@ void jamtis_hash16(const std::string &domain_separator,
     jamtis_hash_simple(domain_separator, input, input_length, hash_out, 16);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void jamtis_hash32(const std::string &domain_separator,
+    const unsigned char *input,
+    const std::size_t input_length,
+    unsigned char *hash_out)
+{
+    // H_32(x): 32-byte output
+    jamtis_hash_simple(domain_separator, input, input_length, hash_out, 32);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void jamtis_hash_scalar(const std::string &domain_separator,
     const unsigned char *input,
     const std::size_t input_length,
@@ -171,7 +175,7 @@ void jamtis_hash_scalar(const std::string &domain_separator,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void jamtis_derive_key(const std::string &domain_separator,
-    const rct::key &derivation_key,
+    const unsigned char *derivation_key,  //32 bytes
     const unsigned char *input,
     const std::size_t input_length,
     unsigned char *hash_out)
@@ -182,7 +186,7 @@ void jamtis_derive_key(const std::string &domain_separator,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void jamtis_derive_secret(const std::string &domain_separator,
-    const rct::key &derivation_key,
+    const unsigned char *derivation_key,  //32 bytes
     const unsigned char *input,
     const std::size_t input_length,
     unsigned char *hash_out)

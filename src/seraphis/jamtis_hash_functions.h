@@ -64,6 +64,11 @@ void jamtis_hash16(const std::string &domain_separator,
     const unsigned char *input,
     const std::size_t input_length,
     unsigned char *hash_out);
+/// H_32(x): 32-byte output
+void jamtis_hash32(const std::string &domain_separator,
+    const unsigned char *input,
+    const std::size_t input_length,
+    unsigned char *hash_out);
 /// H_n(x): Ed25519 group scalar output (32 bytes)
 void jamtis_hash_scalar(const std::string &domain_separator,
     const unsigned char *input,
@@ -71,13 +76,13 @@ void jamtis_hash_scalar(const std::string &domain_separator,
     unsigned char *hash_out);
 /// H_n(Pad_136(k), x): Ed25519 group scalar output (32 bytes)
 void jamtis_derive_key(const std::string &domain_separator,
-    const rct::key &derivation_key,
+    const unsigned char *derivation_key,  //32 bytes
     const unsigned char *input,
     const std::size_t input_length,
     unsigned char *hash_out);
 /// H_32(Pad_136(k), x): 32-byte output
 void jamtis_derive_secret(const std::string &domain_separator,
-    const rct::key &derivation_key,
+    const unsigned char *derivation_key,  //32 bytes
     const unsigned char *input,
     const std::size_t input_length,
     unsigned char *hash_out);

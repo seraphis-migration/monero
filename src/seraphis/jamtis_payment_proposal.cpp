@@ -34,7 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "jamtis_address_tags.h"
-#include "jamtis_address_utils.h"
+#include "jamtis_core_utils.h"
 #include "jamtis_enote_utils.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
@@ -120,10 +120,10 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     // view tag: view_tag = H1(K_d)
     output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d);
 
-    // sender-receiver shared secret: q = H_32(K_e, k_vb)  //note: K_e not K_d, so recipient can get q immediately
+    // sender-receiver shared secret: q = H_32(Pad136(k_vb), K_e)  //note: K_e not K_d, so recipient can get q immediately
     crypto::secret_key q;
-    make_jamtis_sender_receiver_secret_selfsend(output_proposal_out.m_enote_ephemeral_pubkey,
-            m_viewbalance_privkey,
+    make_jamtis_sender_receiver_secret_selfsend(m_viewbalance_privkey,
+            output_proposal_out.m_enote_ephemeral_pubkey,
             q
         );
 
@@ -137,7 +137,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     address_index_t j;
     CHECK_AND_ASSERT_THROW_MES(
         try_get_address_index_with_key(ciphertag_secret, m_destination.m_addr_tag, j) == address_tag_MAC_t{0},
-        "Failed to create a self-send-type output proposal: could not decipher the address tag.");
+        "Failed to create a self-send-type output proposal: could not decipher the destination's address tag.");
 
     // 2. make a raw address tag (not ciphered) from {j || selfspend_type} (with the type as mac)
     address_tag_t raw_addr_tag{address_index_to_tag(j, m_type)};

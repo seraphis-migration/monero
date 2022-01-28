@@ -246,22 +246,23 @@ namespace config
   const char HASH_KEY_MESSAGE_SIGNING[] = "MoneroMessageSignature";
   const unsigned char HASH_KEY_MM_SLOT = 'm';
   const char HASH_KEY_CONCISE_GROOTLE_TRANSCRIPT[] = "concise grootle transcript";
-  const char HASH_KEY_SP_COMPOSITION_PROOF_TRANSCRIPT[] = "seraphis composition proof transcript";
   const char HASH_KEY_GROOTLE_Hi[] = "grootle Hi";
   const char HASH_KEY_SERAPHIS_U[] = "seraphis U";
   const char HASH_KEY_SERAPHIS_X[] = "seraphis X";
-  const char HASH_KEY_SERAPHIS_SENDER_RECEIVER_SECRET[] = "seraphis sender-receiver secret";
-  const char HASH_KEY_SERAPHIS_SENDER_ADDRESS_EXTENSION[] = "seraphis sender address extension";
-  const char HASH_KEY_SERAPHIS_AMOUNT_COMMITMENT_BLINDING_FACTOR[] = "seraphis enote amount commitment blinding factor";
-  const char HASH_KEY_SERAPHIS_VIEW_TAG[] = "seraphis enote view tag";
-  const char HASH_KEY_SERAPHIS_AMOUNT_ENC[] = "seraphis enote amount encoding";
+  const char HASH_KEY_SP_COMPOSITION_PROOF_TRANSCRIPT[] = "seraphis composition proof transcript";
   const char HASH_KEY_SERAPHIS_SQUASHED_ENOTE[] = "seraphis squashed enote";
   const char HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR[] = "multisig binonce merge factor";
-  const char HASH_KEY_JAMTIS_ADDRESS_TAG[] = "jamtis address tag";
   const char HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET[] = "jamtis generate-address secret";
   const char HASH_KEY_JAMTIS_CIPHERTAG_SECRET[] = "jamtis cipher-tag secret";
   const char HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY[] = "jamtis identify-wallet key";
   const char HASH_KEY_JAMTIS_FINDRECEIVED_KEY[] = "jamtis find-received key";
+  const char HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG[] = "jamtis encrypted address tag";
+  const char HASH_KEY_JAMTIS_VIEW_TAG[] = "jamtis enote view tag";
+  const char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN[] = "jamtis sender-receiver secret plain";
+  const char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF[] = "jamtis sender-receiver secret self-send";
+  const char HASH_KEY_JAMTIS_SENDER_ADDRESS_EXTENSION[] = "jamtis sender address extension";
+  const char HASH_KEY_JAMTIS_AMOUNT_COMMITMENT_BLINDING_FACTOR[] = "jamtis enote amount commitment blinding factor";
+  const char HASH_KEY_JAMTIS_AMOUNT_ENC[] = "jamtis enote amount encoding";
 
   // Multisig
   const uint32_t MULTISIG_MAX_SIGNERS{16};
