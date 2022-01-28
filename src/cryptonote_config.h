@@ -258,6 +258,10 @@ namespace config
   const char HASH_KEY_SERAPHIS_SQUASHED_ENOTE[] = "seraphis squashed enote";
   const char HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR[] = "multisig binonce merge factor";
   const char HASH_KEY_JAMTIS_ADDRESS_TAG[] = "jamtis address tag";
+  const char HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET[] = "jamtis generate-address secret";
+  const char HASH_KEY_JAMTIS_CIPHERTAG_SECRET[] = "jamtis cipher-tag secret";
+  const char HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY[] = "jamtis identify-wallet key";
+  const char HASH_KEY_JAMTIS_FINDRECEIVED_KEY[] = "jamtis find-received key";
 
   // Multisig
   const uint32_t MULTISIG_MAX_SIGNERS{16};

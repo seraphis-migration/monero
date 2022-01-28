@@ -56,28 +56,29 @@ namespace jamtis
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const
 {
+    // enote ephemeral pubkey: K_e = r K_3
+    make_jamtis_enote_ephemeral_pubkey(m_enote_ephemeral_privkey,
+            m_destination.m_addr_K3,
+            output_proposal_out.m_enote_ephemeral_pubkey
+        );
+
     // derived key: K_d = 8*r*K_2 (generate_key_derivation())
     crypto::key_derivation K_d;
     crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
 
-    // enote ephemeral pubkey: K_e = r K_3
-    output_proposal_out.m_enote_ephemeral_pubkey{
-            rct::scalarmultKey(m_destination.m_addr_K3, rct::sk2rct(m_enote_ephemeral_privkey))
-        };
-
     // view tag: view_tag = H1(K_d)
-    output_proposal_out.m_view_tag{make_jamtis_view_tag(K_d)};
+    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d);
 
     // sender-receiver shared secret: q = H_32(K_d)
-    crypto::secret_key q;
-    make_jamtis_sender_receiver_secret_simple(K_d, q);
+    rct::key q;
+    make_jamtis_sender_receiver_secret_plain(K_d, q);
 
     // encrypt address tag: addr_tag_enc = addr_tag(blowfish(j, mac)) ^ H8(q)
-    output_proposal_out.m_addr_tag_enc{make_encrypted_address_tag(q, m_destination.m_addr_tag)};
+    output_proposal_out.m_addr_tag_enc = make_encrypted_address_tag(q, m_destination.m_addr_tag);
 
     // onetime address: Ko = H_n(q) X + K_1
-    make_jamtis_onetime_address(m_destination.m_addr_K1,
-            q,
+    make_jamtis_onetime_address(q,
+            m_destination.m_addr_K1,
             output_proposal_out.m_proposal_core.m_onetime_address
         );
 
@@ -85,7 +86,7 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
     rct::key ephemeral_base_pubkey{rct::scalarmultBase(m_enote_ephemeral_privkey)};
 
     // amount blinding factor: y = H_n(q, r G)
-    make_jamtis_amount_blinding_factor_simple(q,
+    make_jamtis_amount_blinding_factor_plain(q,
             ephemeral_base_pubkey,
             output_proposal_out.m_proposal_core.m_amount_blinding_factor
         );
@@ -94,9 +95,7 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
     output_proposal_out.m_proposal_core.m_amount = m_amount;
 
     // encrypted amount: enc_amount = a ^ H8(q, r G)
-    output_proposal_out.m_encoded_amount{
-            make_jamtis_encoded_amount_simple(m_amount, q, ephemeral_base_pubkey)
-        };
+    output_proposal_out.m_encoded_amount = make_jamtis_encoded_amount_plain(m_amount, q, ephemeral_base_pubkey);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount)
@@ -108,17 +107,18 @@ void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount)
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const
 {
+    // enote ephemeral pubkey: K_e = r K_3
+    make_jamtis_enote_ephemeral_pubkey(m_enote_ephemeral_privkey,
+            m_destination.m_addr_K3,
+            output_proposal_out.m_enote_ephemeral_pubkey
+        );
+
     // derived key: K_d = 8*r*K_2 (generate_key_derivation())
     crypto::key_derivation K_d;
     crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
 
-    // enote ephemeral pubkey: K_e = r K_3
-    output_proposal_out.m_enote_ephemeral_pubkey{
-            rct::scalarmultKey(m_destination.m_addr_K3, rct::sk2rct(m_enote_ephemeral_privkey))
-        };
-
     // view tag: view_tag = H1(K_d)
-    output_proposal_out.m_view_tag{make_jamtis_view_tag(K_d)};
+    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d);
 
     // sender-receiver shared secret: q = H_32(K_e, k_vb)  //note: K_e not K_d, so recipient can get q immediately
     crypto::secret_key q;
@@ -130,8 +130,10 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     // encrypt address index and mac: addr_tag_enc = addr_tag(j, mac) ^ H_8(q)
 
     // 1. extract the address index from the destination address's address tag
+    crypto::secret_key generateaddress_secret;
     crypto::secret_key ciphertag_secret;
-    make_jamtis_ciphertag_secret(m_viewbalance_privkey, ciphertag_secret);
+    make_jamtis_generateaddress_secret(m_viewbalance_privkey, generateaddress_secret);
+    make_jamtis_ciphertag_secret(generateaddress_secret, ciphertag_secret);
     address_index_t j;
     CHECK_AND_ASSERT_THROW_MES(
         try_get_address_index_with_key(ciphertag_secret, m_destination.m_addr_tag, j) == address_tag_MAC_t{0},
@@ -141,12 +143,12 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     address_tag_t raw_addr_tag{address_index_to_tag(j, m_type)};
 
     // 3. encrypt the raw address tag
-    output_proposal_out.m_addr_tag_enc{make_encrypted_address_tag(q, raw_addr_tag)};
+    output_proposal_out.m_addr_tag_enc = make_encrypted_address_tag(q, raw_addr_tag);
 
 
     // onetime address: Ko = H_n(q) X + K_1
-    make_jamtis_onetime_address(m_destination.m_addr_K1,
-            q,
+    make_jamtis_onetime_address(q,
+            m_destination.m_addr_K1,
             output_proposal_out.m_proposal_core.m_onetime_address
         );
 
@@ -162,9 +164,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     output_proposal_out.m_proposal_core.m_amount = m_amount;
 
     // encrypted amount: enc_amount = a ^ H8(q)
-    output_proposal_out.m_encoded_amount{
-            make_jamtis_encoded_amount_selfsend(m_amount, q)
-        };
+    output_proposal_out.m_encoded_amount = make_jamtis_encoded_amount_selfsend(m_amount, q);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount, const JamtisSelfSendType type)

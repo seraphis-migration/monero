@@ -86,7 +86,8 @@ static void jamtis_hash_fill_data(const std::string &domain_separator,
 {
     data_inout.reserve(data_out.size() + domain_separator.size() + input_length);
 
-    data_inout.append(input, input_length);
+    if (input && input_length > 0)
+        data_inout.append(input, input_length);
     data_inout.append(domain_separator);
 }
 //-------------------------------------------------------------------------------------------------------------------
