@@ -28,13 +28,12 @@
 
 // NOT FOR PRODUCTION
 
-// Hash functions for Jamtis addresses
+// Hash functions for Jamtis addresses and making enotes with Jamtis addresses
 
 
 #pragma once
 
 //local headers
-#include "ringct/rctTypes.h"
 
 //third party headers
 

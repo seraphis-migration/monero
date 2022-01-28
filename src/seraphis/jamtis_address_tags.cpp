@@ -40,6 +40,7 @@ extern "C"
 #include "int-util.h"
 #include "jamtis_address_utils.h"
 #include "jamtis_hash_functions.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
 

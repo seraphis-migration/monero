@@ -31,17 +31,13 @@
 // Core implementation details for making Jamtis privkeys
 // - Jamtis is a specification for Seraphis-compatible addresses
 
-//TODO: reorganize this file
-
 #pragma once
 
 //local headers
-#include "crypto/crypto.h"
 
 //third party headers
 
 //standard headers
-#include <vector>
 
 //forward declarations
 
@@ -51,39 +47,59 @@ namespace sp
 namespace jamtis
 {
 
-/**
-* brief: make_jamtis_findreceived_key - find-received key, for finding enotes received by the wallet
-*   - use to compute view tags and nominal spend keys
-*   k_fr = H_n(Pad136(k_vb))
-* param: k_view_balance - k_vb
-* outparam: k_find_received_out - k_fr
-*/
-void make_jamtis_findreceived_key(const crypto::secret_key &k_view_balance,
-    crypto::secret_key &k_find_received_out);
-/**
-* brief: make_jamtis_generateaddress_secret - generate-address secret, for generating addresses
-*   s_ga = H_32(Pad136(k_vb))
-* param: k_view_balance - k_vb
-* outparam: s_generate_address_out - s_ga
-*/
-void make_jamtis_generateaddress_secret(const crypto::secret_key &k_view_balance,
-    crypto::secret_key &s_generate_address_out);
-/**
-* brief: make_jamtis_ciphertag_secret - cipher-tag secret, for ciphering address indices to/from address tags
-*   s_ct = H_32(Pad136(k_ga))
-* param: s_generate_address - s_ga
-* outparam: s_cipher_tag_out - s_ct
-*/
-void make_jamtis_ciphertag_secret(const crypto::secret_key &s_generate_address,
-    crypto::secret_key &s_cipher_tag_out);
-/**
-* brief: make_jamtis_identifywallet_key - identify-wallet key, for certifying that an address belongs to a certain wallet
-*   k_id = H_n(Pad136(k_ga))
-* param: s_generate_address - s_ga
-* outparam: k_identify_wallet_out - k_id
-*/
-void make_jamtis_identifywallet_key(const crypto::secret_key &s_generate_address,
-    crypto::secret_key &k_identify_wallet_out);
+/// index (system-endian; only 56 bits are used): j
+using address_index_t = std::uint64_t;
+constexpr std::size_t ADDRESS_INDEX_BYTES{7};
+constexpr address_index_t ADDRESS_INDEX_MAX{(address_index_t{1} << 8*ADDRESS_INDEX_BYTES) - 1};  //2^56 - 1
+
+/// MAC for address tags (system-endian): addr_tag_MAC
+constexpr std::size_t ADDRESS_TAG_MAC_BYTES{1};  //if > 1, then endianness must be preserved
+using address_tag_MAC_t = unsigned char;
+
+/// index ciphered with view-balance key: addr_tag = enc(little_endian(j) || little_endian(addr_tag_MAC))
+struct address_tag_t
+{
+    unsigned char bytes[ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES];
+
+    // customize operator^ for encrypting tags
+    address_tag_t operator^(const address_tag_t &other_tag) const
+    {
+        address_tag_t temp;
+
+        for (std::size_t i{0}; i < sizeof(address_tag_t); ++i)
+            temp.bytes[i] = *this.bytes[i] ^ other_tag.bytes[i];
+
+        return temp;
+    }
+};
+
+/// address tag XORd with a user-defined secret: addr_tag_enc = addr_tag XOR addr_tag_enc_secret
+using encrypted_address_tag_t = address_tag_t;
+
+/// sizes are consistent
+static_assert(
+    sizeof(address_index_t)   >= ADDRESS_INDEX_BYTES                          &&
+    sizeof(address_tag_MAC_t) >= ADDRESS_TAG_MAC_BYTES                        &&
+    sizeof(address_tag_t)     == ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES  &&
+    sizeof(address_tag_t)     == sizeof(encrypted_address_tag_t),
+    ""
+);
+
+/// normal proposal type, used to define enote-construction procedure for normal proposals
+enum class JamtisPlainType : public address_tag_MAC_t
+{
+    PLAIN = 0
+};
+
+/// self-send proposal type, used to define enote-construction procedure for self-sends
+enum class JamtisSelfSendType : public address_tag_MAC_t
+{
+    CHANGE = 0,
+    SELF_SPEND = 1
+};
+
+/// view_tag (TODO: use view tags implemented in PR 8061)
+using view_tag_t = unsigned char;
 
 } //namespace jamtis
 } //namespace sp

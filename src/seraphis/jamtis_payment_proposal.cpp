@@ -34,8 +34,10 @@
 //local headers
 #include "crypto/crypto.h"
 #include "jamtis_address_tags.h"
+#include "jamtis_address_utils.h"
 #include "jamtis_core_utils.h"
 #include "jamtis_enote_utils.h"
+#include "jamtis_support_types.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -174,6 +176,56 @@ void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount, const Ja
     m_type = type;
     m_enote_privkey = rct::rct2sk(rct::skGen());
     m_viewbalance_privkey = rct::rct2sk(rct::skGen());
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool is_self_send_proposal(const SpOutputProposalV1 &proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance)
+{
+    // find-received key
+    crypto::secret_key findreceived_key;
+    make_jamtis_findreceived_key(k_view_balance, findreceived_key);
+
+    // check if the view tag can be reproduced
+    crypto::key_derivation K_d;
+    crypto::generate_key_derivation(rct::rct2pk(proposal.m_enote_ephemeral_pubkey), findreceived_key, K_d);
+    
+    if (make_jamtis_view_tag(K_d) != proposal.m_view_tag)
+        return false;
+
+    // sender-receiver shared secret
+    crypto::secret_key q;
+    make_jamtis_sender_receiver_secret_selfsend(k_view_balance,
+            proposal.m_enote_ephemeral_pubkey,
+            q
+        );
+
+    // get the nominal raw address tag
+    address_tag_t nominal_raw_address_tag{get_decrypted_address_tag(q, proposal.m_addr_tag_enc)};
+
+    // check if the mac is a self-send type
+    address_tag_MAC_t nominal_mac;
+    address_index_t nominal_address_index{tag_to_address_index(nominal_raw_address_tag, nominal_mac)};
+
+    if (nominal_mac != JamtisSelfSendType::CHANGE ||
+        nominal_mac != JamtisSelfSendType::SELF_SPEND)
+    {
+        return false;
+    }
+
+    // get the nominal spend key of the enote
+    rct::key nominal_spendkey;
+    get_jamtis_nominal_spend_key(q, proposal.m_proposal_core.m_onetime_address, nominal_spendkey);
+
+    // generate-address secret
+    crypto::secret_key generateaddress_secret;
+    make_jamtis_generateaddress_secret(k_view_balance, generateaddress_secret);
+
+    // check if the nominal spend key is owned by this wallet
+    return test_nominal_spend_key(wallet_spend_pubkey,
+        generateaddress_secret,
+        nominal_address_index,
+        nominal_spendkey);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

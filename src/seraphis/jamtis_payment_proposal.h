@@ -37,6 +37,7 @@
 //local headers
 #include "jamtis_address_tags.h"
 #include "jamtis_destination.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -51,19 +52,6 @@ namespace sp
 {
 namespace jamtis
 {
-
-/// normal proposal type, used to define enote-construction procedure for normal proposals
-enum class JamtisPlainType : public address_tag_MAC_t
-{
-    PLAIN = 0
-};
-
-/// self-send proposal type, used to define enote-construction procedure for self-sends
-enum class JamtisSelfSendType : public address_tag_MAC_t
-{
-    CHANGE = 0,
-    SELF_SPEND = 1
-};
 
 ////
 // JamtisPaymentProposalV1
@@ -127,6 +115,16 @@ struct JamtisPaymentProposalSelfSendV1 final
     */
     void gen(const rct::xmr_amount amount, const JamtisSelfSendType type);
 };
+
+/**
+* brief: is_self_send_proposal - test if an output proposal is a self-send-type
+* param: proposal -
+* param: k_view_balance 
+* return: true if it's a self-send proposal (either change or self-spend)
+*/
+bool is_self_send_proposal(const SpOutputProposalV1 &proposal,
+    const rct::key &wallet_spend_key,
+    const crypto::secret_key &k_view_balance);
 
 } //namespace jamtis
 } //namespace sp

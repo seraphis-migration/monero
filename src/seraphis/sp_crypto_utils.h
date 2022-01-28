@@ -56,7 +56,7 @@ struct MultiexpData;
 
 namespace crypto
 {
-// type conversions for easier calls to sc_add(), sc_sub()
+// type conversions for easier calls to sc_add(), sc_sub(), hash functions
 static inline unsigned char *operator &(crypto::ec_scalar &scalar)
 {
     return &reinterpret_cast<unsigned char &>(scalar);
@@ -64,6 +64,14 @@ static inline unsigned char *operator &(crypto::ec_scalar &scalar)
 static inline const unsigned char *operator &(const crypto::ec_scalar &scalar)
 {
     return &reinterpret_cast<const unsigned char &>(scalar);
+}
+static inline unsigned char *operator &(crypto::ec_point &point)
+{
+    return &reinterpret_cast<unsigned char &>(point);
+}
+static inline const unsigned char *operator &(const crypto::ec_point &point)
+{
+    return &reinterpret_cast<const unsigned char &>(point);
 }
 } //namespace crypto
 

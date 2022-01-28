@@ -35,7 +35,9 @@
 #pragma once
 
 //local headers
+#include "crypto/crypto.h"
 #include "jamtis_address_tags.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -71,6 +73,11 @@ struct JamtisDestinationV1 final
     */
     void gen();
 };
+
+//TODO: description
+bool is_destination_of_wallet(const JamtisDestinationV1 &destination,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &s_generate_address);
 
 } //namespace jamtis
 } //namespace sp

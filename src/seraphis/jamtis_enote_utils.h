@@ -40,7 +40,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "device/device.hpp"
-#include "jamtis_core_utils.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -178,15 +178,6 @@ rct::xmr_amount make_jamtis_encoded_amount_plain(const rct::xmr_amount amount,
     const rct::key &baked_key);
 /**
 * brief: make_jamtis_encoded_amount_plain - encode an amount
-*   a_enc = a XOR H_8(q)
-* param: amount - a
-* param: sender_receiver_secret - q
-* return: a_enc
-*/
-rct::xmr_amount make_jamtis_encoded_amount_selfsend(const rct::xmr_amount amount,
-    const rct::key &sender_receiver_secret);
-/**
-* brief: make_jamtis_encoded_amount_plain - encode an amount
 *   a = a_enc XOR H_8(q, r G)
 * param: encoded_amount - a_enc
 * param: sender_receiver_secret - q
@@ -198,6 +189,15 @@ rct::xmr_amount decode_jamtis_amount_plain(const rct::xmr_amount encoded_amount,
     const rct::key &baked_key);
 /**
 * brief: make_jamtis_encoded_amount_plain - encode an amount
+*   a_enc = a XOR H_8(q)
+* param: amount - a
+* param: sender_receiver_secret - q
+* return: a_enc
+*/
+rct::xmr_amount make_jamtis_encoded_amount_selfsend(const rct::xmr_amount amount,
+    const rct::key &sender_receiver_secret);
+/**
+* brief: make_jamtis_encoded_amount_plain - encode an amount
 *   a = a_enc XOR H_8(q)
 * param: encoded_amount - a_enc
 * param: sender_receiver_secret - q
@@ -205,6 +205,16 @@ rct::xmr_amount decode_jamtis_amount_plain(const rct::xmr_amount encoded_amount,
 */
 rct::xmr_amount decode_jamtis_amount_selfsend(const rct::xmr_amount encoded_amount,
     const rct::key &sender_receiver_secret);
+/**
+* brief: get_jamtis_nominal_spend_key - get a nominal spend key from a onetime address
+*   K'_1 = Ko - H_n(q) X
+* param: sender_receiver_secret - q
+* param: onetime_address - K0
+* outparam: nominal_spend_key_out - K'_1
+*/
+void get_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
+    const rct::key &onetime_address
+    rct::key &nominal_spend_key_out);
 /**
 * brief: try_get_jamtis_nominal_spend_key - test view tag; if it passes, compute and return the nominal spend key
 *    and sender-receiver secret

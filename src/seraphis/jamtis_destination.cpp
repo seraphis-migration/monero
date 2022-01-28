@@ -29,11 +29,13 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "jamtis_payment_proposal.h"
+#include "jamtis_destination.h"
 
 //local headers
 #include "crypto/crypto.h"
 #include "jamtis_address_utils.h"
+#include "jamtis_core_utils.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctOps.h"
 
 //third party headers
@@ -54,6 +56,30 @@ void JamtisDestinationV1::gen()
     m_addr_K2 = rct::pkGen();
     m_addr_K3 = rct::pkGen();
     m_address_index = crypto::rand_idx(ADDRESS_INDEX_MAX);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool is_destination_of_wallet(const JamtisDestinationV1 &destination,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_generate_address)
+{
+    // ciphertag secret
+    crypto::secret_key ciphertag_secret;
+    make_jamtis_ciphertag_secret(k_generate_address, ciphertag_secret);
+
+    // get the nominal address index from the destination's address tag
+    address_index_t nominal_address_index;
+
+    if (try_get_address_index_with_key(ciphertag_secret, destination.m_addr_tag, nominal_address_index) !=
+        address_tag_MAC_t{0})
+    {
+        return false;
+    }
+
+    // check if the destination's key K_1 is owned by this wallet
+    return test_nominal_spend_key(wallet_spend_pubkey,
+        k_generate_address,
+        nominal_address_index,
+        destination.m_addr_K1);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

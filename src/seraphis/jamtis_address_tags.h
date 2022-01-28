@@ -40,6 +40,7 @@ extern "C"
 #include "crypto/blowfish.h"
 }
 #include "jamtis_address_utils.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -53,28 +54,6 @@ namespace sp
 {
 namespace jamtis
 {
-
-/// MAC for address tags (system-endian): addr_tag_MAC
-constexpr std::size_t ADDRESS_TAG_MAC_BYTES{1};  //if > 1, then endianness must be preserved
-using address_tag_MAC_t = unsigned char;
-
-/// index ciphered with view-balance key: addr_tag = enc(little_endian(j) || little_endian(addr_tag_MAC))
-struct address_tag_t
-{
-    unsigned char bytes[ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES];
-};
-
-/// address tag XORd with a user-defined secret: addr_tag_enc = addr_tag XOR addr_tag_enc_secret
-using encrypted_address_tag_t = address_tag_t;
-
-/// sizes are consistent
-static_assert(
-    sizeof(address_index_t)   >= ADDRESS_INDEX_BYTES                          &&
-    sizeof(address_tag_MAC_t) >= ADDRESS_TAG_MAC_BYTES                        &&
-    sizeof(address_tag_t)     == ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES  &&
-    sizeof(address_tag_t)     == sizeof(encrypted_address_tag_t),
-    ""
-);
 
 /// convert {j, mac} to/from an address tag byte-representation
 address_tag_t address_index_to_tag(const address_index_t j,
