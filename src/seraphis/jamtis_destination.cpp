@@ -67,13 +67,13 @@ bool is_destination_of_wallet(const JamtisDestinationV1 &destination,
     make_jamtis_ciphertag_secret(k_generate_address, ciphertag_secret);
 
     // get the nominal address index from the destination's address tag
-    address_index_t nominal_address_index;
+    address_tag_MAC_t address_index_mac;
+    address_index_t nominal_address_index{
+            decipher_address_index(ciphertag_secret, destination.m_addr_tag, address_index_mac)
+        };
 
-    if (try_get_address_index_with_key(ciphertag_secret, destination.m_addr_tag, nominal_address_index) !=
-        address_tag_MAC_t{0})
-    {
+    if (address_index_mac != address_tag_MAC_t{0})
         return false;
-    }
 
     // check if the destination's key K_1 is owned by this wallet
     return test_nominal_spend_key(wallet_spend_pubkey,

@@ -28,8 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Address tags for Jamtis addresses
-// note: secret keys are 'rct::key' instead of 'crypto::secret_key' for performance during view-scanning
+// Address tag handling for Jamtis addresses
 
 
 #pragma once
@@ -58,32 +57,32 @@ namespace jamtis
 /// convert {j, mac} to/from an address tag byte-representation
 address_tag_t address_index_to_tag(const address_index_t j,
     const address_tag_MAC_t mac);
-address_index_t tag_to_address_index(const address_tag_t addr_tag,
+address_index_t address_tag_to_index(const address_tag_t addr_tag,
     address_tag_MAC_t &mac_out);
 
 /// {j, addr_tag_MAC} -> addr_tag
-address_tag_t make_address_tag(const BLOWFISH_CTX &blowfish_context,
+address_tag_t cipher_address_index_with_context(const BLOWFISH_CTX &blowfish_context,
     const address_index_t j,
     const address_tag_MAC_t mac);
-address_tag_t make_address_tag_with_key(const rct::key &cipher_key,
+address_tag_t cipher_address_index(const rct::key &cipher_key,
     const address_index_t j,
     const address_tag_MAC_t mac);
 
 /// addr_tag -> {j, addr_tag_MAC}
-address_tag_MAC_t try_get_address_index(const BLOWFISH_CTX &blowfish_context,
+address_index_t decipher_address_index_with_context(const BLOWFISH_CTX &blowfish_context,
     const address_tag_t addr_tag,
-    address_index_t &j_out);
-address_tag_MAC_t try_get_address_index_with_key(const rct::key &cipher_key,
+    address_tag_MAC_t &mac_out);
+address_index_t decipher_address_index(const rct::key &cipher_key,
     const address_tag_t addr_tag,
-    address_index_t &j_out);
+    address_tag_MAC_t &mac_out);
 
 /// addr_tag_enc = addr_tag XOR addr_tag_enc_secret
-encrypted_address_tag_t make_encrypted_address_tag(const rct::key &encryption_key,
+encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key,
     const address_tag_t addr_tag);
 
 /// addr_tag = addr_tag_enc XOR addr_tag_enc_secret
-address_tag_t get_decrypted_address_tag(const rct::key &encryption_key,
-    const encrypted_address_tag_t addr_tag_tag_enc);
+address_tag_t decrypt_address_tag(const rct::key &encryption_key,
+    const encrypted_address_tag_t addr_tag_enc);
 
 } //namespace jamtis
 } //namespace sp

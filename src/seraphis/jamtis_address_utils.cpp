@@ -117,7 +117,7 @@ void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
     crypto::secret_key ciphertag_secret;
     make_jamtis_ciphertag_secret(generateaddress_secret, ciphertag_secret);
 
-    destination_out.m_addr_tag = make_address_tag_with_key(rct::sk2rct(ciphertag_secret), j, 0);
+    destination_out.m_addr_tag = cipher_address_index_with_key(rct::sk2rct(ciphertag_secret), j, 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool test_nominal_spend_key(const rct::key &wallet_spend_pubkey,

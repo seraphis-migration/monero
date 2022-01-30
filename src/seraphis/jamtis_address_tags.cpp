@@ -38,7 +38,6 @@ extern "C"
 #include "crypto/blowfish.h"
 }
 #include "int-util.h"
-#include "jamtis_address_utils.h"
 #include "jamtis_hash_functions.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
@@ -53,7 +52,7 @@ namespace sp
 {
 namespace jamtis
 {
-/// secret for encryption address tags
+/// secret for encrypting address tags
 using encrypted_address_tag_secret_t = encrypted_address_tag_t;
 static_assert(sizeof(encrypted_address_tag_secret_t) == sizeof(address_tag_t), "");
 
@@ -80,10 +79,10 @@ static address_index_t address_index_from_canonical(address_index_t j_canonical)
 {
     static_assert(sizeof(address_index_t) == 8);
     // on big-endian systems, this makes the result big-endian (since it always starts as little-endian)
-    return SWAP64LE(j);
+    return SWAP64LE(j_canonical);
 }
 //-------------------------------------------------------------------------------------------------------------------
-// addr_tag_enc = H_8('domain-sep', encryption_key)
+// addr_tag_enc = H_8(encryption_key)
 //-------------------------------------------------------------------------------------------------------------------
 static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct::key &encryption_key)
 {
@@ -91,7 +90,7 @@ static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct
 
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG};
 
-    // addr_tag_enc = H_8('domain-sep', encryption_key)
+    // addr_tag_enc = H_8(encryption_key)
     encrypted_address_tag_secret_t addr_tag_enc;
     jamtis_hash8(domain_separator, encryption_key.bytes, sizeof(rct::key), addr_tag_enc.bytes);
 
@@ -112,7 +111,7 @@ address_tag_t address_index_to_tag(const address_index_t j,
     return addr_tag;
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_index_t tag_to_address_index(const address_tag_t addr_tag,
+address_index_t address_tag_to_index(const address_tag_t addr_tag,
     address_tag_MAC_t &mac_out)
 {
     // addr_tag -> {j_canonical, MAC}
@@ -124,7 +123,7 @@ address_index_t tag_to_address_index(const address_tag_t addr_tag,
     return address_index_from_canonical(j_canonical);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_t make_address_tag(const BLOWFISH_CTX &blowfish_context,
+address_tag_t cipher_address_index_with_context(const BLOWFISH_CTX &blowfish_context,
     const address_index_t j,
     const address_tag_MAC_t mac)
 {
@@ -144,7 +143,7 @@ address_tag_t make_address_tag(const BLOWFISH_CTX &blowfish_context,
     return addr_tag;
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_t make_address_tag_with_key(const rct::key &cipher_key,
+address_tag_t cipher_address_index(const rct::key &cipher_key,
     const address_index_t j,
     const address_tag_MAC_t mac)
 {
@@ -153,12 +152,12 @@ address_tag_t make_address_tag_with_key(const rct::key &cipher_key,
     Blowfish_Init(&blowfish_context, cipher_key.bytes, sizeof(rct::key));
 
     // encrypt it
-    return make_address_tag(blowfish_context, j, mac);
+    return cipher_address_index_with_context(blowfish_context, j, mac);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_MAC_t try_get_address_index(const BLOWFISH_CTX &blowfish_context,
+address_index_t decipher_address_index_with_context(const BLOWFISH_CTX &blowfish_context,
     const address_tag_t addr_tag,
-    address_index_t &j_out)
+    address_tag_MAC_t &mac_out)
 {
     // paste the tag into a Blowfish-compatible format
     Blowfish_LR addr_tag_formatted;
@@ -167,41 +166,38 @@ address_tag_MAC_t try_get_address_index(const BLOWFISH_CTX &blowfish_context,
     // decrypt the tag
     Blowfish_Decrypt(&blowfish_context, &(addr_tag_formatted.L), &(addr_tag_formatted.R));
 
-    // paste back into the address tag
+    // paste back into an address tag
     address_tag_t addr_tag_decrypted;
     memcpy(addr_tag_decrypted.bytes, &addr_tag_formatted, sizeof(address_tag_t));
 
     // convert to {j, MAC}
-    address_tag_MAC_t mac;
-    j_out = tag_to_address_index(addr_tag_decrypted, mac);
-
-    return mac;
+    return address_tag_to_index(addr_tag_decrypted, mac_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_MAC_t try_get_address_index_with_key(const rct::key &cipher_key,
+address_index_t decipher_address_index(const rct::key &cipher_key,
     const address_tag_t addr_tag,
-    address_index_t &j_out)
+    address_tag_MAC_t &mac_out)
 {
     // prepare to decrypt the tag
     BLOWFISH_CTX blowfish_context;  //TODO: must be wrapped in a wiper
     Blowfish_Init(&blowfish_context, cipher_key.bytes, sizeof(rct::key));
 
     // decrypt it
-    return try_get_address_index(blowfish_context, addr_tag, j_out);
+    return decipher_address_index_with_context(blowfish_context, addr_tag, mac_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-encrypted_address_tag_t make_encrypted_address_tag(const rct::key &encryption_key,
+encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key,
     const address_tag_t addr_tag)
 {
-    // addr_tag_tag_enc = addr_tag XOR_8 encryption_secret
+    // addr_tag_enc = addr_tag XOR_8 encryption_secret
     return addr_tag ^ get_encrypted_address_tag_secret(encryption_key);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_t get_decrypted_address_tag(const rct::key &encryption_key,
-    const encrypted_address_tag_t addr_tag_tag_enc)
+address_tag_t decrypt_address_tag(const rct::key &encryption_key,
+    const encrypted_address_tag_t addr_tag_enc)
 {
-    // addr_tag = addr_tag_tag_enc XOR_8 encryption_secret
-    return addr_tag_tag_enc ^ get_encrypted_address_tag_secret(encryption_key);
+    // addr_tag = addr_tag_enc XOR_8 encryption_secret
+    return addr_tag_enc ^ get_encrypted_address_tag_secret(encryption_key);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

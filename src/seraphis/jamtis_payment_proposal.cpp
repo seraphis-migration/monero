@@ -68,21 +68,21 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
     crypto::key_derivation K_d;
     crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
 
-    // view tag: view_tag = H1(K_d)
-    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d);
-
     // sender-receiver shared secret: q = H_32(K_d)
     rct::key q;
     make_jamtis_sender_receiver_secret_plain(K_d, q);
 
     // encrypt address tag: addr_tag_enc = addr_tag(blowfish(j, mac)) ^ H8(q)
-    output_proposal_out.m_addr_tag_enc = make_encrypted_address_tag(q, m_destination.m_addr_tag);
+    output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, m_destination.m_addr_tag);
 
     // onetime address: Ko = H_n(q) X + K_1
     make_jamtis_onetime_address(q,
             m_destination.m_addr_K1,
             output_proposal_out.m_proposal_core.m_onetime_address
         );
+
+    // view tag: view_tag = H1(K_d, Ko)
+    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_proposal_core.m_onetime_address);
 
     // enote ephemeral base pubkey: r G
     rct::key ephemeral_base_pubkey{rct::scalarmultBase(m_enote_ephemeral_privkey)};
@@ -119,9 +119,6 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     crypto::key_derivation K_d;
     crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
 
-    // view tag: view_tag = H1(K_d)
-    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d);
-
     // sender-receiver shared secret: q = H_32(Pad136(k_vb), K_e)  //note: K_e not K_d, so recipient can get q immediately
     crypto::secret_key q;
     make_jamtis_sender_receiver_secret_selfsend(m_viewbalance_privkey,
@@ -136,16 +133,16 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     crypto::secret_key ciphertag_secret;
     make_jamtis_generateaddress_secret(m_viewbalance_privkey, generateaddress_secret);
     make_jamtis_ciphertag_secret(generateaddress_secret, ciphertag_secret);
-    address_index_t j;
-    CHECK_AND_ASSERT_THROW_MES(
-        try_get_address_index_with_key(ciphertag_secret, m_destination.m_addr_tag, j) == address_tag_MAC_t{0},
+    address_tag_MAC_t j_mac;
+    address_index_t j{decipher_address_index(ciphertag_secret, m_destination.m_addr_tag, j_mac)};
+    CHECK_AND_ASSERT_THROW_MES(j_mac == address_tag_MAC_t{0},
         "Failed to create a self-send-type output proposal: could not decipher the destination's address tag.");
 
     // 2. make a raw address tag (not ciphered) from {j || selfspend_type} (with the type as mac)
     address_tag_t raw_addr_tag{address_index_to_tag(j, m_type)};
 
     // 3. encrypt the raw address tag
-    output_proposal_out.m_addr_tag_enc = make_encrypted_address_tag(q, raw_addr_tag);
+    output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, raw_addr_tag);
 
 
     // onetime address: Ko = H_n(q) X + K_1
@@ -153,6 +150,9 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
             m_destination.m_addr_K1,
             output_proposal_out.m_proposal_core.m_onetime_address
         );
+
+    // view tag: view_tag = H1(K_d, Ko)
+    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_proposal_core.m_onetime_address);
 
     // enote base pubkey: r G
     // NOT USED HERE (the adjusted 'q' computation makes 'r G' unnecessary)
@@ -190,7 +190,7 @@ bool is_self_send_proposal(const SpOutputProposalV1 &proposal,
     crypto::key_derivation K_d;
     crypto::generate_key_derivation(rct::rct2pk(proposal.m_enote_ephemeral_pubkey), findreceived_key, K_d);
     
-    if (make_jamtis_view_tag(K_d) != proposal.m_view_tag)
+    if (make_jamtis_view_tag(K_d, proposal.m_proposal_core.m_onetime_address) != proposal.m_view_tag)
         return false;
 
     // sender-receiver shared secret
@@ -201,11 +201,11 @@ bool is_self_send_proposal(const SpOutputProposalV1 &proposal,
         );
 
     // get the nominal raw address tag
-    address_tag_t nominal_raw_address_tag{get_decrypted_address_tag(q, proposal.m_addr_tag_enc)};
+    address_tag_t nominal_raw_address_tag{decrypt_address_tag(q, proposal.m_addr_tag_enc)};
 
     // check if the mac is a self-send type
     address_tag_MAC_t nominal_mac;
-    address_index_t nominal_address_index{tag_to_address_index(nominal_raw_address_tag, nominal_mac)};
+    address_index_t nominal_address_index{address_tag_to_index(nominal_raw_address_tag, nominal_mac)};
 
     if (nominal_mac != JamtisSelfSendType::CHANGE ||
         nominal_mac != JamtisSelfSendType::SELF_SPEND)
@@ -222,6 +222,7 @@ bool is_self_send_proposal(const SpOutputProposalV1 &proposal,
     make_jamtis_generateaddress_secret(k_view_balance, generateaddress_secret);
 
     // check if the nominal spend key is owned by this wallet
+    //TODO: use dependency injection on this function? in case spend key construction is implementation-defined
     return test_nominal_spend_key(wallet_spend_pubkey,
         generateaddress_secret,
         nominal_address_index,

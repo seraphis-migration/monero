@@ -80,23 +80,24 @@ static auto make_derivation_with_wiper(const crypto::secret_key &privkey,
     return a_wiper;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// secret || baked_key
+// key1 || key2
+// - assumes both keys are 32 bytes
 //-------------------------------------------------------------------------------------------------------------------
-static void prepare_secret_and_baked_key(const rct::key &secret,
-    const rct::key &baked_key,
+static void get_doublekey_hash_data(const unsigned char *key1,
+    const unsigned char *key2,
     epee::wipeable_string &data_out)
 {
     data_out.clear();
-    data_out.reserve(2 * sizeof(rct::key));
+    data_out.reserve(2 * 32);
 
-    data_out.append(reinterpret_cast<const char *>(secret.bytes), sizeof(rct::key));
-    data_out.append(reinterpret_cast<const char *>(baked_key.bytes), sizeof(rct::key));
+    data_out.append(reinterpret_cast<const char *>(key1), 32);
+    data_out.append(reinterpret_cast<const char *>(key2), 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
 // a = a_enc XOR H_8(q, r G)
 // a_enc = a XOR H_8(q, r G)
 //-------------------------------------------------------------------------------------------------------------------
-static rct::xmr_amount enc_dec_jamtis_amount_plain(const crypto::secret_key &sender_receiver_secret,
+static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::key &sender_receiver_secret,
     const rct::key &baked_key,
     const rct::xmr_amount original)
 {
@@ -106,7 +107,7 @@ static rct::xmr_amount enc_dec_jamtis_amount_plain(const crypto::secret_key &sen
 
     // ret = H_8(q, r G) XOR_64 original
     epee::wipeable_string data;
-    prepare_secret_and_baked_key(sender_receiver_secret, baked_key, data);
+    get_doublekey_hash_data(sender_receiver_secret.bytes, baked_key.bytes, data);
 
     crypto::secret_key hash_result;
     jamtis_hash8(domain_separator, data.data(), data.size(), &hash_result);
@@ -146,30 +147,35 @@ void make_jamtis_enote_ephemeral_pubkey(const crypto::secret_key &enote_privkey,
     rct::scalarmultKey(enote_ephemeral_pubkey_out, DH_base, rct::sk2rct(enote_privkey));
 }
 //-------------------------------------------------------------------------------------------------------------------
-view_tag_t make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation)
+view_tag_t make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const rct::key &onetime_address)
 {
     static_assert(sizeof(view_tag_t) == 1, "");
 
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_VIEW_TAG};
 
-    // view_tag = H_1(K_d)
+    // view_tag = H_1(K_d, Ko)
     // TODO: consider using a simpler/cheaper hash function for view tags
+    epee::wipeable_string data;
+    get_doublekey_hash_data(&sender_receiver_DH_derivation, onetime_address.bytes, data);
+
     view_tag_t view_tag;
-    jamtis_hash1(domain_separator, &sender_receiver_DH_derivation, sizeof(crypto::key_derivation), &view_tag);
+    jamtis_hash1(domain_separator, data.data(), data.size(), &view_tag);
 
     return view_tag;
 }
 //-------------------------------------------------------------------------------------------------------------------
 view_tag_t make_jamtis_view_tag(const crypto::secret_key &privkey,
     const rct::key &DH_key,
-    hw::device &hwdev)
+    hw::device &hwdev,
+    const rct::key &onetime_address)
 {
-    // 8 * privkey * DH_key
+    // K_d = 8 * privkey * DH_key
     crypto::key_derivation derivation;
     auto a_wiper = make_derivation_with_wiper(privkey, DH_key, hwdev, derivation);
 
-    // view_tag = H_1(derivation)
-    return make_jamtis_view_tag(derivation);
+    // view_tag = H_1(K_d, Ko)
+    return make_jamtis_view_tag(derivation, onetime_address);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
@@ -240,7 +246,7 @@ void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_se
 
     // x = H_n(q, r G)
     epee::wipeable_string data;
-    prepare_secret_and_baked_key(sender_receiver_secret, baked_key, data);  //q || r G
+    get_doublekey_hash_data(sender_receiver_secret.bytes, baked_key.bytes, data);  //q || r G
 
     jamtis_hash_scalar(domain_separator, data.data(), data.size(), &mask_out);
 }

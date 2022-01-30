@@ -80,22 +80,26 @@ void make_jamtis_enote_ephemeral_pubkey(const crypto::secret_key &enote_privkey,
     rct::key &enote_ephemeral_pubkey_out);
 /**
 * brief: make_jamtis_view_tag - view tag for optimized identification of owned enotes
-*    view_tag = H_1(K_d)
+*    view_tag = H_1(K_d, Ko)
 * param: sender_receiver_DH_derivation - K_d
+* param: onetime_address - Ko
 * return: view_tag
 */
-view_tag_t make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation);
+view_tag_t make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const rct::key &onetime_address);
 /**
 * brief: make_jamtis_view_tag - view tag for optimized identification of owned enotes
-*    view_tag = H_1(8 * privkey * DH_key)
+*    view_tag = H_1(8 * privkey * DH_key, Ko)
 * param: privkey - [sender: r] [recipient: k_fr]
 * param: DH_key - [sender: K_2] [sender-change-2out: k_fr * K_2_other] [recipient: K_e]
 * param: hwdev - abstract reference to a hardware-specific implemention of crypto ops
+* param: onetime_address - Ko
 * return: view_tag
 */
 view_tag_t make_jamtis_view_tag(const crypto::secret_key &privkey,
     const rct::key &DH_key,
-    hw::device &hwdev);
+    hw::device &hwdev,
+    const rct::key &onetime_address);
 /**
 * brief: make_jamtis_sender_receiver_secret - sender-receiver secret q for a normal enote
 *    q = H_32(DH_derivation)
