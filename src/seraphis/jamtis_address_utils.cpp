@@ -50,27 +50,11 @@ namespace sp
 namespace jamtis
 {
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_address_key(const crypto::secret_key s_generate_address,
+void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
     const address_index_t j,
-    crypto::secret_key &address_key_out)
+    crypto::secret_key &extension_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_JAMTIS_ADDRESS_KEY};
-
-    // k^j_a = H_n(Pad136(s_ga), j)
-    address_tag_t raw_address_index{address_index_to_tag(j, 0)};
-
-    jamtis_derive_key(domain_separator,
-        &s_generate_address,
-        raw_address_index.bytes,
-        ADDRESS_INDEX_BYTES,
-        &address_key_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_address_extension_key(const crypto::secret_key s_generate_address,
-    const address_index_t j,
-    crypto::secret_key &address_extension_key_out)
-{
-    static const std::string domain_separator{config::HASH_KEY_JAMTIS_ADDRESS_EXTENSION_KEY};
+    static const std::string domain_separator{config::HASH_KEY_JAMTIS_SPENDKEY_EXTENSION};
 
     // k^j_x = H_n(Pad136(s_ga), j)
     address_tag_t raw_address_index{address_index_to_tag(j, 0)};
@@ -79,7 +63,23 @@ void make_jamtis_address_extension_key(const crypto::secret_key s_generate_addre
         &s_generate_address,
         raw_address_index.bytes,
         ADDRESS_INDEX_BYTES,
-        &address_extension_key_out);
+        &extension_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
+    const address_index_t j,
+    crypto::secret_key &address_privkey_out)
+{
+    static const std::string domain_separator{config::HASH_KEY_JAMTIS_ADDRESS_PRIVKEY};
+
+    // k^j_a = H_n(Pad136(s_ga), j)
+    address_tag_t raw_address_index{address_index_to_tag(j, 0)};
+
+    jamtis_derive_key(domain_separator,
+        &s_generate_address,
+        raw_address_index.bytes,
+        ADDRESS_INDEX_BYTES,
+        &address_privkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_address_spend_key(const rct::key &wallet_spend_pubkey,
@@ -89,10 +89,10 @@ void make_jamtis_address_spend_key(const rct::key &wallet_spend_pubkey,
 {
     // K_1 = k^j_x X + K_s
     crypto::secret_key address_extension_key;
-    make_jamtis_address_extension_key(s_generate_address, j, address_extension_key);
+    make_jamtis_spendkey_extension(s_generate_address, j, address_extension_key);  //k^j_x
 
-    address_spendkey_out = wallet_spend_pubkey;
-    extend_seraphis_spendkey(address_extension_key, address_spendkey_out);
+    address_spendkey_out = wallet_spend_pubkey;  //K_s
+    extend_seraphis_spendkey(address_extension_key, address_spendkey_out);  //k^j_x X + K_s
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
@@ -105,13 +105,13 @@ void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
     make_jamtis_address_spend_key(wallet_spend_pubkey, s_generate_address, j, destination_out.m_addr_K1);
 
     // K_2 = k^j_a K_fr
-    crypto::secret_key address_key;
-    make_jamtis_address_key(s_generate_address, j, address_key);
+    crypto::secret_key address_privkey;
+    make_jamtis_address_privkey(s_generate_address, j, address_privkey);  //k^j_a
 
-    rct::scalarmultKey(destination_out.m_addr_K2, findreceived_pubkey, rct::sk2rct(address_key));
+    rct::scalarmultKey(destination_out.m_addr_K2, findreceived_pubkey, rct::sk2rct(address_privkey));
 
     // K_3 = k^j_a G
-    rct::scalarmultBase(destination_out.m_addr_K3, rct::sk2rct(address_key));
+    rct::scalarmultBase(destination_out.m_addr_K3, rct::sk2rct(address_privkey));
 
     // addr_tag = blowfish[s_ct](j, mac)
     crypto::secret_key ciphertag_secret;
@@ -120,7 +120,7 @@ void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
     destination_out.m_addr_tag = cipher_address_index_with_key(rct::sk2rct(ciphertag_secret), j, 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool test_nominal_spend_key(const rct::key &wallet_spend_pubkey,
+bool test_jamtis_nominal_spend_key(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
     const address_index_t j,
     const rct::key &nominal_spend_key)

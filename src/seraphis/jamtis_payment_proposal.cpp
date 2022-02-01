@@ -65,11 +65,11 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
         );
 
     // derived key: K_d = 8*r*K_2 (generate_key_derivation())
-    crypto::key_derivation K_d;
+    crypto::key_derivation K_d;  //TODO: add wiper?
     crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
 
     // sender-receiver shared secret: q = H_32(K_d)
-    rct::key q;
+    rct::key q;  //TODO: add wiper?
     make_jamtis_sender_receiver_secret_plain(K_d, q);
 
     // encrypt address tag: addr_tag_enc = addr_tag(blowfish(j, mac)) ^ H8(q)
@@ -84,20 +84,21 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
     // view tag: view_tag = H1(K_d, Ko)
     output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_proposal_core.m_onetime_address);
 
-    // enote ephemeral base pubkey: r G
-    rct::key ephemeral_base_pubkey{rct::scalarmultBase(m_enote_ephemeral_privkey)};
+    // enote amount baked key: 8 r G
+    crypto::key_derivation amount_baked_key;  //TODO: add wiper?
+    make_jamtis_amount_baked_key_plain_sender(m_enote_ephemeral_privkey, amount_baked_key);
 
-    // amount blinding factor: y = H_n(q, r G)
+    // amount blinding factor: y = H_n(q, 8 r G)
     make_jamtis_amount_blinding_factor_plain(q,
-            ephemeral_base_pubkey,
+            amount_baked_key,
             output_proposal_out.m_proposal_core.m_amount_blinding_factor
         );
 
     // amount: a
     output_proposal_out.m_proposal_core.m_amount = m_amount;
 
-    // encrypted amount: enc_amount = a ^ H8(q, r G)
-    output_proposal_out.m_encoded_amount = make_jamtis_encoded_amount_plain(m_amount, q, ephemeral_base_pubkey);
+    // encrypted amount: enc_amount = a ^ H8(q, 8 r G)
+    output_proposal_out.m_encoded_amount = encode_jamtis_amount_plain(m_amount, q, amount_baked_key);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount)
@@ -154,9 +155,6 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     // view tag: view_tag = H1(K_d, Ko)
     output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_proposal_core.m_onetime_address);
 
-    // enote base pubkey: r G
-    // NOT USED HERE (the adjusted 'q' computation makes 'r G' unnecessary)
-
     // amount blinding factor: y = Hn(q)
     make_jamtis_amount_blinding_factor_selfsend(q,
             output_proposal_out.m_proposal_core.m_amount_blinding_factor
@@ -166,7 +164,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     output_proposal_out.m_proposal_core.m_amount = m_amount;
 
     // encrypted amount: enc_amount = a ^ H8(q)
-    output_proposal_out.m_encoded_amount = make_jamtis_encoded_amount_selfsend(m_amount, q);
+    output_proposal_out.m_encoded_amount = encode_jamtis_amount_selfsend(m_amount, q);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount, const JamtisSelfSendType type)

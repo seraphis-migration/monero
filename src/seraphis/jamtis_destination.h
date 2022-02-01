@@ -68,13 +68,29 @@ struct JamtisDestinationV1 final
     /// addr_tag
     address_tag_t m_addr_tag;
 
+    /// comparison operator
+    bool operator==(const JamtisDestinationV1 &other) const
+    {
+        return (m_addr_K1 == other.m_addr_K1) &&
+            (m_addr_K2 == other.m_addr_K2) &&
+            (m_addr_K3 == other.m_addr_K3) &&
+            (m_addr_tag_enc == other.m_addr_tag_enc);
+    }
+
     /**
     * brief: gen - generate a random destination
     */
     void gen();
 };
 
-//TODO: description
+/**
+* brief: is_destination_of_wallet - check if a destination can be recreated
+*    - note: partial-recreation of a destination will return FALSE
+* param: destination - destination address to recreate
+* param: wallet_spend_pubkey - K_s
+* param: s_generate_address - s_ga
+* return: true if the destination can be recreated
+*/
 bool is_destination_of_wallet(const JamtisDestinationV1 &destination,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address);

@@ -60,11 +60,11 @@ void JamtisDestinationV1::gen()
 //-------------------------------------------------------------------------------------------------------------------
 bool is_destination_of_wallet(const JamtisDestinationV1 &destination,
     const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_generate_address)
+    const crypto::secret_key &s_generate_address)
 {
     // ciphertag secret
     crypto::secret_key ciphertag_secret;
-    make_jamtis_ciphertag_secret(k_generate_address, ciphertag_secret);
+    make_jamtis_ciphertag_secret(s_generate_address, ciphertag_secret);
 
     // get the nominal address index from the destination's address tag
     address_tag_MAC_t address_index_mac;
@@ -75,11 +75,18 @@ bool is_destination_of_wallet(const JamtisDestinationV1 &destination,
     if (address_index_mac != address_tag_MAC_t{0})
         return false;
 
-    // check if the destination's key K_1 is owned by this wallet
-    return test_nominal_spend_key(wallet_spend_pubkey,
-        k_generate_address,
+    // recreate the destination
+    JamtisDestinationV1 test_destination;
+
+    make_jamtis_destination_v1(wallet_spend_pubkey,
+        findreceived_pubkey,
+        s_generate_address,
         nominal_address_index,
-        destination.m_addr_K1);
+        test_destination);
+
+    // check the destinations are the same
+    // note: partial equality will return false
+    return test_destination == destination;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

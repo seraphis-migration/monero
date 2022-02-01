@@ -256,13 +256,13 @@ namespace config
   const char HASH_KEY_JAMTIS_CIPHERTAG_SECRET[] = "jamtis cipher-tag secret";
   const char HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY[] = "jamtis identify-wallet key";
   const char HASH_KEY_JAMTIS_FINDRECEIVED_KEY[] = "jamtis find-received key";
-  const char HASH_KEY_JAMTIS_ADDRESS_KEY[] = "jamtis address key";
-  const char HASH_KEY_JAMTIS_ADDRESS_EXTENSION_KEY[] = "jamtis address extension key";
+  const char HASH_KEY_JAMTIS_ADDRESS_PRIVKEY[] = "jamtis address privkey";
+  const char HASH_KEY_JAMTIS_SPENDKEY_EXTENSION[] = "jamtis spendkey extension";
   const char HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG[] = "jamtis encrypted address tag";
   const char HASH_KEY_JAMTIS_VIEW_TAG[] = "jamtis enote view tag";
   const char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN[] = "jamtis sender-receiver secret plain";
   const char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF[] = "jamtis sender-receiver secret self-send";
-  const char HASH_KEY_JAMTIS_SENDER_ADDRESS_EXTENSION[] = "jamtis sender address extension";
+  const char HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION[] = "jamtis sender onetime address extension";
   const char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN[] = "jamtis enote amount commitment blinding factor plain";
   const char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF[] = "jamtis enote amount commitment blinding factor self";
   const char HASH_KEY_JAMTIS_AMOUNT_ENC[] = "jamtis enote amount encoding";

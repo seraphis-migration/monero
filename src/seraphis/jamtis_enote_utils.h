@@ -134,15 +134,17 @@ void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_vie
     const rct::key &enote_ephemeral_pubkey,
     rct::key &sender_receiver_secret_out);
 /**
-* brief: make_jamtis_sender_address_extension - extension for transforming a recipient spendkey into an enote one-time address
+* brief: make_jamtis_onetime_address_extension - extension for transforming a recipient spendkey into an
+*        enote one-time address
 *    k_{a, sender} = H_n(q)
 * param: sender_receiver_secret - q
-* outparam: sender_address_extension_out - k_{a, sender}
+* outparam: sender_extension_out - k_{a, sender}
 */
-void make_jamtis_sender_address_extension(const rct::key &sender_receiver_secret,
-    crypto::secret_key &sender_address_extension_out);
+void make_jamtis_onetime_address_extension(const rct::key &sender_receiver_secret,
+    crypto::secret_key &sender_extension_out);
 /**
-* brief: make_jamtis_sender_address_extension - extension for transforming a recipient spendkey into an enote one-time address
+* brief: make_jamtis_onetime_address_extension - extension for transforming a recipient spendkey into an
+*        enote one-time address
 *    Ko = H_n(q) X + K_1
 * param: sender_receiver_secret - q
 * param: recipient_spend_key - K_1
@@ -151,6 +153,13 @@ void make_jamtis_sender_address_extension(const rct::key &sender_receiver_secret
 void make_jamtis_onetime_address(const rct::key &sender_receiver_secret,
     const rct::key &recipient_spend_key,
     rct::key &onetime_address_out);
+//todo
+void make_jamtis_amount_baked_key_plain_sender(const crypto::secret_key &enote_privkey,
+    crypto::key_derivation &baked_key_out);
+//todo
+void make_jamtis_amount_baked_key_plain_recipient(const rct::key &enote_ephemeral_pubkey,
+    const crypto::secret_key &address_privkey,
+    crypto::key_derivation &baked_key_out);
 /**
 * brief: make_jamtis_amount_blinding_factor_selfsend - x for an enote's amount commitment C = x G + a H
 *   x = H_n(q, r G)
@@ -159,7 +168,7 @@ void make_jamtis_onetime_address(const rct::key &sender_receiver_secret,
 * outparam: mask_out - x
 */
 void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_secret,
-    const rct::key &baked_key,
+    const crypto::key_derivation &baked_key,
     crypto::secret_key &mask_out);
 /**
 * brief: make_jamtis_amount_blinding_factor_selfsend - x for a self-spend enote's amount commitment C = x G + a H
@@ -170,18 +179,18 @@ void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_se
 void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver_secret,
     crypto::secret_key &mask_out);
 /**
-* brief: make_jamtis_encoded_amount_plain - encode an amount
+* brief: encode_jamtis_amount_plain - encode an amount
 *   a_enc = a XOR H_8(q, r G)
 * param: amount - a
 * param: sender_receiver_secret - q
 * param: baked_key - r G
 * return: a_enc
 */
-rct::xmr_amount make_jamtis_encoded_amount_plain(const rct::xmr_amount amount,
+rct::xmr_amount encode_jamtis_amount_plain(const rct::xmr_amount amount,
     const rct::key &sender_receiver_secret,
-    const rct::key &baked_key);
+    const crypto::key_derivation &baked_key);
 /**
-* brief: make_jamtis_encoded_amount_plain - encode an amount
+* brief: encode_jamtis_amount_plain - encode an amount
 *   a = a_enc XOR H_8(q, r G)
 * param: encoded_amount - a_enc
 * param: sender_receiver_secret - q
@@ -190,18 +199,18 @@ rct::xmr_amount make_jamtis_encoded_amount_plain(const rct::xmr_amount amount,
 */
 rct::xmr_amount decode_jamtis_amount_plain(const rct::xmr_amount encoded_amount,
     const rct::key &sender_receiver_secret,
-    const rct::key &baked_key);
+    const crypto::key_derivation &baked_key);
 /**
-* brief: make_jamtis_encoded_amount_plain - encode an amount
+* brief: encode_jamtis_amount_plain - encode an amount
 *   a_enc = a XOR H_8(q)
 * param: amount - a
 * param: sender_receiver_secret - q
 * return: a_enc
 */
-rct::xmr_amount make_jamtis_encoded_amount_selfsend(const rct::xmr_amount amount,
+rct::xmr_amount encode_jamtis_amount_selfsend(const rct::xmr_amount amount,
     const rct::key &sender_receiver_secret);
 /**
-* brief: make_jamtis_encoded_amount_plain - encode an amount
+* brief: encode_jamtis_amount_plain - encode an amount
 *   a = a_enc XOR H_8(q)
 * param: encoded_amount - a_enc
 * param: sender_receiver_secret - q
@@ -231,10 +240,17 @@ void get_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
 * outparam: nominal_spend_key_out - K'^s_t = Ko_t - H(q_t) X
 * return: true if successfully recomputed the view tag
 */
-bool try_get_jamtis_nominal_spend_key(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const std::size_t output_index,
+bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
     const rct::key &onetime_address,
     const view_tag_t view_tag,
+    rct::key &sender_receiver_secret_out,
+    rct::key &nominal_spend_key_out);
+//todo
+bool try_get_jamtis_nominal_spend_key_selfsend(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const rct::key &onetime_address,
+    const view_tag_t view_tag,
+    const crypto::secret_key &k_view_balance,
+    const rct::key &enote_ephemeral_pubkey,
     rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out);
 /**
@@ -246,8 +262,13 @@ bool try_get_jamtis_nominal_spend_key(const crypto::key_derivation &sender_recei
 * outparam: amount_out - a' = dec(enc(a))
 * return: true if successfully recomputed the amount commitment (C' = H(q_t) G + a' H ?= C)
 */
-bool try_get_jamtis_amount(const crypto::secret_key &sender_receiver_secret,
-    const rct::key &baked_key,
+bool try_get_jamtis_amount_plain(const crypto::secret_key &sender_receiver_secret,
+    const crypto::key_derivation &baked_key,
+    const rct::key &amount_commitment,
+    const rct::xmr_amount encoded_amount,
+    rct::xmr_amount &amount_out);
+//todo
+bool try_get_jamtis_amount_selfsend(const crypto::secret_key &sender_receiver_secret,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out);

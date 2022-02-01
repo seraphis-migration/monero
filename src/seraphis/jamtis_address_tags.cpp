@@ -82,7 +82,7 @@ static address_index_t address_index_from_canonical(address_index_t j_canonical)
     return SWAP64LE(j_canonical);
 }
 //-------------------------------------------------------------------------------------------------------------------
-// addr_tag_enc = H_8(encryption_key)
+// encryption_secret = H_8(encryption_key)
 //-------------------------------------------------------------------------------------------------------------------
 static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct::key &encryption_key)
 {
@@ -90,11 +90,11 @@ static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct
 
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG};
 
-    // addr_tag_enc = H_8(encryption_key)
-    encrypted_address_tag_secret_t addr_tag_enc;
-    jamtis_hash8(domain_separator, encryption_key.bytes, sizeof(rct::key), addr_tag_enc.bytes);
+    // encryption_secret = H_8(encryption_key)
+    encrypted_address_tag_secret_t encryption_secret;
+    jamtis_hash8(domain_separator, encryption_key.bytes, sizeof(rct::key), encryption_secret.bytes);
 
-    return addr_tag_enc;
+    return encryption_secret;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

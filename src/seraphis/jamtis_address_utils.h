@@ -54,25 +54,25 @@ namespace jamtis
 {
 
 /**
-* brief: make_jamtis_address_key -
-*   - k^j_a = H_n(Pad136(s_ga), j)
-* param: s_generate_address - s_ga
-* param: j - address index
-* outparam: address_key_out - k^j_a
-*/
-void make_jamtis_address_key(const crypto::secret_key s_generate_address,
-    const address_index_t j,
-    crypto::secret_key &address_key_out);
-/**
-* brief: make_jamtis_address_extension_key -
+* brief: make_jamtis_spendkey_extension -
 *   - k^j_x = H_n(Pad136(s_ga), j)
 * param: s_generate_address - s_ga
 * param: j - address index
-* outparam: address_extension_key_out - k^j_x
+* outparam: extension_out - k^j_x
 */
-void make_jamtis_address_extension_key(const crypto::secret_key s_generate_address,
+void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
     const address_index_t j,
-    crypto::secret_key &address_extension_key_out);
+    crypto::secret_key &extension_out);
+/**
+* brief: make_jamtis_address_privkey -
+*   - k^j_a = H_n(Pad136(s_ga), j)
+* param: s_generate_address - s_ga
+* param: j - address index
+* outparam: address_privkey_out - k^j_a
+*/
+void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
+    const address_index_t j,
+    crypto::secret_key &address_privkey_out);
 /**
 * brief: make_jamtis_address_spend_key -
 *   - K_1 = k^j_x X + K_s
@@ -99,14 +99,14 @@ void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
     const address_index_t j,
     JamtisDestinationV1 &destination_out);
 /**
-* brief: test_nominal_spend_key - see if a spend key is owned by this wallet
+* brief: test_jamtis_nominal_spend_key - see if a spend key is owned by this wallet
 * param: wallet_spend_pubkey - K_s = k_vb X + k_m U
 * param: s_generate_address - s_ga
 * param: j - address_index
 * param: nominal_spend_key - spend key to test
-* return: true if the nominal spend key matches a spend key owned by this wallet
+* return: true if the nominal spend key matches this wallet's spend key at address index 'j'
 */
-bool test_nominal_spend_key(const rct::key &wallet_spend_pubkey,
+bool test_jamtis_nominal_spend_key(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
     const address_index_t j,
     const rct::key &nominal_spend_key);
