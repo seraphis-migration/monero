@@ -171,7 +171,7 @@ view_tag_t make_jamtis_view_tag(const crypto::secret_key &privkey,
     const rct::key &onetime_address)
 {
     // K_d = 8 * privkey * DH_key
-    //TODO: consider converting to curve25519 and using x25519 variable-scalar-mult to get the derivation instead
+    //TODO: consider using curve25519/x25519 variable-scalar-mult to get the derivation instead (faster?)
     crypto::key_derivation derivation;
     auto a_wiper = make_derivation_with_wiper(privkey, DH_key, hwdev, derivation);
 
@@ -201,7 +201,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
     auto a_wiper = make_derivation_with_wiper(privkey, DH_key, hwdev, derivation);
 
     // q = H_32(DH_derivation)
-    make_jamtis_sender_receiver_secret_plain(derivation, &sender_receiver_secret_out);
+    make_jamtis_sender_receiver_secret_plain(derivation, sender_receiver_secret_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_view_balance,
@@ -246,8 +246,8 @@ void make_jamtis_amount_baked_key_plain_sender(const crypto::secret_key &enote_p
     crypto::generate_key_derivation(rct::rct2pk(rct::G), enote_privkey, baked_key_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_amount_baked_key_plain_recipient(const rct::key &enote_ephemeral_pubkey,
-    const crypto::secret_key &address_privkey,
+void make_jamtis_amount_baked_key_plain_recipient(const crypto::secret_key &address_privkey,
+    const rct::key &enote_ephemeral_pubkey,
     crypto::key_derivation &baked_key_out)
 {
     // 8 * (1/k^j_a) * K_e = 8 r G
@@ -282,7 +282,7 @@ rct::xmr_amount encode_jamtis_amount_plain(const rct::xmr_amount amount,
     const rct::key &sender_receiver_secret,
     const crypto::key_derivation &baked_key)
 {
-    // a_enc = little_endian(a) XOR H_8(q, r G)
+    // a_enc = little_endian(a) XOR H_8(q, 8 r G)
     return enc_dec_jamtis_amount_plain(SWAP64LE(amount), sender_receiver_secret, baked_key);
 }
 //-------------------------------------------------------------------------------------------------------------------

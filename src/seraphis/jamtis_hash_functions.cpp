@@ -79,7 +79,7 @@ static void jamtis_hash_fill_data(const std::string &domain_separator,
     const std::size_t input_length,
     epee::wipeable_string &data_inout)
 {
-    data_inout.reserve(data_out.size() + domain_separator.size() + input_length);
+    data_inout.reserve(data_inout.size() + domain_separator.size() + input_length);
 
     if (input && input_length > 0)
         data_inout.append(reinterpret_cast<const char *>(input), input_length);

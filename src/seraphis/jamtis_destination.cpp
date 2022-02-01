@@ -33,10 +33,11 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "jamtis_address_tags.h"
 #include "jamtis_address_utils.h"
-#include "jamtis_core_utils.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctOps.h"
+#include "ringct/rctTypes.h"
 
 //third party headers
 
@@ -56,6 +57,31 @@ void JamtisDestinationV1::gen()
     m_addr_K2 = rct::pkGen();
     m_addr_K3 = rct::pkGen();
     m_address_index = crypto::rand_idx(ADDRESS_INDEX_MAX);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
+    const rct::key &findreceived_pubkey,
+    const crypto::secret_key &s_generate_address,
+    const address_index_t j,
+    JamtisDestinationV1 &destination_out)
+{
+    // K_1 = k^j_x X + K_s
+    make_jamtis_address_spend_key(wallet_spend_pubkey, s_generate_address, j, destination_out.m_addr_K1);
+
+    // K_2 = k^j_a K_fr
+    crypto::secret_key address_privkey;
+    make_jamtis_address_privkey(s_generate_address, j, address_privkey);  //k^j_a
+
+    rct::scalarmultKey(destination_out.m_addr_K2, findreceived_pubkey, rct::sk2rct(address_privkey));
+
+    // K_3 = k^j_a G
+    rct::scalarmultBase(destination_out.m_addr_K3, rct::sk2rct(address_privkey));
+
+    // addr_tag = blowfish[s_ct](j, mac)
+    crypto::secret_key ciphertag_secret;
+    make_jamtis_ciphertag_secret(s_generate_address, ciphertag_secret);
+
+    destination_out.m_addr_tag = cipher_address_index_with_key(rct::sk2rct(ciphertag_secret), j, 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool is_destination_of_wallet(const JamtisDestinationV1 &destination,

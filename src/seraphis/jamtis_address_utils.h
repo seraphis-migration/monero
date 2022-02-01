@@ -36,7 +36,6 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "jamtis_destination.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 
@@ -85,19 +84,6 @@ void make_jamtis_address_spend_key(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
     const address_index_t j,
     rct::key &address_spendkey_out);
-/**
-* brief: make_jamtis_destination_v1 - make a JamtisDestinationV1 (full destination address)
-* param: wallet_spend_pubkey - K_s = k_vb X + k_m U
-* param: findreceived_pubkey - K_fr = k_fr G
-* param: s_generate_address - s_ga
-* param: j - address_index
-* outparam: destination_out - the full address, with address tag
-*/
-void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
-    const rct::key &findreceived_pubkey,
-    const crypto::secret_key &s_generate_address,
-    const address_index_t j,
-    JamtisDestinationV1 &destination_out);
 /**
 * brief: test_jamtis_nominal_spend_key - see if a spend key is owned by this wallet
 * param: wallet_spend_pubkey - K_s = k_vb X + k_m U

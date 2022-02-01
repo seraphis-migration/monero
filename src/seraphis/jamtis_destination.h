@@ -28,8 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Core types for making enotes with Jamtis addresses
-// - Jamtis is a specification for Seraphis-compatible addresses
+// A Jamtis 'destination', i.e. an address that can receive funds
 
 
 #pragma once
@@ -43,7 +42,6 @@
 //third party headers
 
 //standard headers
-#include <vector>
 
 //forward declarations
 
@@ -55,7 +53,7 @@ namespace jamtis
 
 ////
 // JamtisDestinationV1
-// - a user address to make a payment proposal with
+// - a user address, aka a 'destination for funds'
 ///
 struct JamtisDestinationV1 final
 {
@@ -83,6 +81,19 @@ struct JamtisDestinationV1 final
     void gen();
 };
 
+/**
+* brief: make_jamtis_destination_v1 - make a JamtisDestinationV1 (full destination address)
+* param: wallet_spend_pubkey - K_s = k_vb X + k_m U
+* param: findreceived_pubkey - K_fr = k_fr G
+* param: s_generate_address - s_ga
+* param: j - address_index
+* outparam: destination_out - the full address, with address tag
+*/
+void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
+    const rct::key &findreceived_pubkey,
+    const crypto::secret_key &s_generate_address,
+    const address_index_t j,
+    JamtisDestinationV1 &destination_out);
 /**
 * brief: is_destination_of_wallet - check if a destination can be recreated
 *    - note: partial-recreation of a destination will return FALSE
