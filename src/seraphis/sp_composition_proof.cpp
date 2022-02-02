@@ -83,13 +83,13 @@ static rct::key compute_challenge_message(const rct::key &message,
     // collect challenge_message string
     std::string hash;
     hash.reserve(7 * sizeof(rct::key));
-    hash = std::string((const char*) challenge_message.bytes, sizeof(challenge_message));
-    hash.append((const char*) (get_X_gen()).bytes, sizeof(message));
-    hash.append((const char*) (get_U_gen()).bytes, sizeof(message));
-    hash.append((const char*) message.bytes, sizeof(message));
-    hash.append((const char*) K.bytes, sizeof(K));
-    hash.append((const char*) &KI, sizeof(KI));
-    hash.append((const char*) K_t1.bytes, sizeof(K_t1));
+    hash = std::string(reinterpret_cast<const char*>(challenge_message.bytes), sizeof(challenge_message));
+    hash.append(reinterpret_cast<const char*>((get_X_gen()).bytes), sizeof(message));
+    hash.append(reinterpret_cast<const char*>((get_U_gen()).bytes), sizeof(message));
+    hash.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
+    hash.append(reinterpret_cast<const char*>(K.bytes), sizeof(K));
+    hash.append(reinterpret_cast<const char*>(&KI), sizeof(KI));
+    hash.append(reinterpret_cast<const char*>(K_t1.bytes), sizeof(K_t1));
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
 
     // challenge_message
@@ -111,10 +111,10 @@ static rct::key compute_challenge(const rct::key &message,
     rct::key challenge;
     std::string hash;
     hash.reserve(4 * sizeof(rct::key));
-    hash = std::string((const char*) message.bytes, sizeof(message));
-    hash.append((const char*) K_t1_proofkey.bytes, sizeof(K_t1_proofkey));
-    hash.append((const char*) K_t2_proofkey.bytes, sizeof(K_t2_proofkey));
-    hash.append((const char*) KI_proofkey.bytes, sizeof(KI_proofkey));
+    hash = std::string(reinterpret_cast<const char*>(message.bytes), sizeof(message));
+    hash.append(reinterpret_cast<const char*>(K_t1_proofkey.bytes), sizeof(K_t1_proofkey));
+    hash.append(reinterpret_cast<const char*>(K_t2_proofkey.bytes), sizeof(K_t2_proofkey));
+    hash.append(reinterpret_cast<const char*>(KI_proofkey.bytes), sizeof(KI_proofkey));
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
 
@@ -182,14 +182,14 @@ static rct::key multisig_binonce_merge_factor(const rct::key &message,
     hash.reserve(sizeof(config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR) +
         (1 + nonces_1.size() + nonces_2.size()) * sizeof(rct::key));
     hash = config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR;
-    hash.append((const char*) message.bytes, sizeof(message));
+    hash.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
     for (const auto &nonce_1 : nonces_1)
     {
-        hash.append((const char*) nonce_1.bytes, sizeof(rct::key));
+        hash.append(reinterpret_cast<const char*>(nonce_1.bytes), sizeof(rct::key));
     }
     for (const auto &nonce_2 : nonces_2)
     {
-        hash.append((const char*) nonce_2.bytes, sizeof(rct::key));
+        hash.append(reinterpret_cast<const char*>(nonce_2.bytes), sizeof(rct::key));
     }
 
     rct::hash_to_scalar(merge_factor, hash.data(), hash.size());

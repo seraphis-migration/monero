@@ -64,7 +64,7 @@ constexpr std::size_t KECCAK_256_BITRATE_BYTES{136};
 //-------------------------------------------------------------------------------------------------------------------
 static void jamtis_pad_key136(const unsigned char *key, epee::wipeable_string &padded_key_out)
 {
-    static const std::string padding{KECCAK_256_BITRATE_BYTES - 32, '0'};
+    static const std::string padding{KECCAK_256_BITRATE_BYTES - 32, char{0}};
     padded_key_out.clear();
     padded_key_out.reserve(KECCAK_256_BITRATE_BYTES);
 

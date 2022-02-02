@@ -125,8 +125,8 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
     std::string hash;
     hash.reserve(domain_separator.size() + 2*sizeof(rct::key));
     hash = domain_separator;
-    hash.append((const char*) onetime_address.bytes, sizeof(rct::key));
-    hash.append((const char*) amount_commitment.bytes, sizeof(rct::key));
+    hash.append(reinterpret_cast<const char*>(onetime_address.bytes), sizeof(rct::key));
+    hash.append(reinterpret_cast<const char*>(amount_commitment.bytes), sizeof(rct::key));
 
     // hash to the result
     crypto::hash_to_scalar(hash.data(), hash.size(), squash_prefix_out);

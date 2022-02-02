@@ -130,21 +130,21 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     // collect challenge string
     std::string hash;
     hash.reserve(((M.size() + 1)*C_offsets.size() + 6)*sizeof(rct::key));
-    hash = std::string((const char*) challenge.bytes, sizeof(challenge));
-    hash += std::string((const char*) message.bytes, sizeof(message));
+    hash = std::string(reinterpret_cast<const char*>(challenge.bytes), sizeof(challenge));
+    hash += std::string(reinterpret_cast<const char*>(message.bytes), sizeof(message));
     for (const auto &tuple : M)
     {
         for (const auto &key : tuple)
-            hash += std::string((const char*) key.bytes, sizeof(key));
+            hash += std::string(reinterpret_cast<const char*>(key.bytes), sizeof(key));
     }
     for (const auto &offset : C_offsets)
     {
-        hash += std::string((const char*) offset.bytes, sizeof(offset));
+        hash += std::string(reinterpret_cast<const char*>(offset.bytes), sizeof(offset));
     }
-    hash += std::string((const char*) A.bytes, sizeof(A));
-    hash += std::string((const char*) B.bytes, sizeof(B));
-    hash += std::string((const char*) C.bytes, sizeof(C));
-    hash += std::string((const char*) D.bytes, sizeof(D));
+    hash += std::string(reinterpret_cast<const char*>(A.bytes), sizeof(A));
+    hash += std::string(reinterpret_cast<const char*>(B.bytes), sizeof(B));
+    hash += std::string(reinterpret_cast<const char*>(C.bytes), sizeof(C));
+    hash += std::string(reinterpret_cast<const char*>(D.bytes), sizeof(D));
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
 
     // challenge
@@ -166,10 +166,10 @@ static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
     rct::key challenge;
     std::string hash;
     hash.reserve((X.size() + 1)*sizeof(rct::key));
-    hash = std::string((const char*) message.bytes, sizeof(message));
+    hash = std::string(reinterpret_cast<const char*>(message.bytes), sizeof(message));
     for (std::size_t j = 0; j < X.size(); ++j)
     {
-        hash += std::string((const char*) X[j].bytes, sizeof(X[j]));
+        hash += std::string(reinterpret_cast<const char*>(X[j].bytes), sizeof(X[j]));
     }
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
