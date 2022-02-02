@@ -29,17 +29,12 @@
 // NOT FOR PRODUCTION
 
 // Core implementation details for making and finding enotes with Jamtis address privkeys
-// - Jamtis is a specification for Seraphis-compatible addresses
 
 
 #pragma once
 
 //local headers
 #include "crypto/crypto.h"
-extern "C"
-{
-#include "crypto/crypto-ops.h"
-}
 #include "device/device.hpp"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"

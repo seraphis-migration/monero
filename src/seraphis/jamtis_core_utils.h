@@ -28,11 +28,12 @@
 
 // NOT FOR PRODUCTION
 
+////
 // Core implementation details for making Jamtis privkeys
 // - Jamtis is a specification for Seraphis-compatible addresses
+//
 // reference: https://gist.github.com/tevador/50160d160d24cfc6c52ae02eb3d17024
-
-//TODO: reorganize this file
+///
 
 #pragma once
 

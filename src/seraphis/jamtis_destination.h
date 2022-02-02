@@ -35,7 +35,6 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "jamtis_address_tags.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 
@@ -82,7 +81,7 @@ struct JamtisDestinationV1 final
 };
 
 /**
-* brief: make_jamtis_destination_v1 - make a JamtisDestinationV1 (full destination address)
+* brief: make_jamtis_destination_v1 - make a destination address
 * param: wallet_spend_pubkey - K_s = k_vb X + k_m U
 * param: findreceived_pubkey - K_fr = k_fr G
 * param: s_generate_address - s_ga

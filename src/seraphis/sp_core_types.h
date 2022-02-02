@@ -185,7 +185,7 @@ struct SpInputProposal final
 ///
 struct SpOutputProposal final
 {
-    /// K^o
+    /// Ko
     rct::key m_onetime_address;
     /// y
     crypto::secret_key m_amount_blinding_factor;

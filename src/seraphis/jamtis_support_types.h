@@ -85,20 +85,22 @@ static_assert(
     ""
 );
 
-/// normal proposal type, used to define enote-construction procedure for normal proposals
-enum class JamtisPlainType : public address_tag_MAC_t
+/// jamtis enote types
+enum class JamtisEnoteType : public unsigned int
 {
-    PLAIN = 0
+    PLAIN = 0,
+    CHANGE = 1,
+    SELF_SPEND = 2
 };
 
-/// self-send proposal type, used to define enote-construction procedure for self-sends
-enum class JamtisSelfSendType : public address_tag_MAC_t
+/// jamtis self-send MACs, used to define enote-construction procedure for self-sends
+enum class JamtisSelfSendMAC : public address_tag_MAC_t
 {
     CHANGE = 0,
     SELF_SPEND = 1
 };
 
-/// view_tag (TODO: use view tags implemented in PR 8061)
+/// jamtis view tags
 using view_tag_t = unsigned char;
 
 } //namespace jamtis

@@ -326,18 +326,15 @@ bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender
     rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out)
 {
-    // view tag
-    view_tag_t nominal_view_tag{make_jamtis_view_tag(sender_receiver_DH_derivation, onetime_address)};
-
-    // check that recomputed tag matches original tag; short-circuit on failure
-    if (nominal_view_tag != view_tag)
+    // recompute view tag and check that it matches; short-circuit on failure
+    if (make_jamtis_view_tag(sender_receiver_DH_derivation, onetime_address) != view_tag)
         return false;
 
     // q (normal derivation path)
     make_jamtis_sender_receiver_secret_plain(sender_receiver_DH_derivation,
         sender_receiver_secret_out);
 
-    // K'_1 = Ko - Hn(q) X
+    // K'_1 = Ko - H_n(q) X
     get_jamtis_nominal_spend_key(sender_receiver_secret_out, onetime_address, nominal_spend_key_out);
 
     return true;
@@ -351,11 +348,8 @@ bool try_get_jamtis_nominal_spend_key_selfsend(const crypto::key_derivation &sen
     rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out)
 {
-    // view tag
-    view_tag_t nominal_view_tag{make_jamtis_view_tag(sender_receiver_DH_derivation, onetime_address)};
-
-    // check that recomputed tag matches original tag; short-circuit on failure
-    if (nominal_view_tag != view_tag)
+    // recompute view tag and check that it matches; short-circuit on failure
+    if (make_jamtis_view_tag(sender_receiver_DH_derivation, onetime_address) != view_tag)
         return false;
 
     // q (self-send derivation path)
@@ -363,7 +357,7 @@ bool try_get_jamtis_nominal_spend_key_selfsend(const crypto::key_derivation &sen
         enote_ephemeral_pubkey,
         sender_receiver_secret_out);
 
-    // K'_1 = Ko - Hn(q) X
+    // K'_1 = Ko - H_n(q) X
     get_jamtis_nominal_spend_key(sender_receiver_secret_out, onetime_address, nominal_spend_key_out);
 
     return true;
@@ -375,13 +369,13 @@ bool try_get_jamtis_amount_plain(const crypto::secret_key &sender_receiver_secre
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out)
 {
-    // a' = dec(encoded_amount)
+    // a' = dec(enc_a)
     rct::xmr_amount nominal_amount{decode_jamtis_amount_plain(encoded_amount, sender_receiver_secret, baked_key)};
 
     // C' = x' G + a' H
-    crypto::secret_key nominal_amount_commitment_mask;
-    make_jamtis_amount_blinding_factor_plain(sender_receiver_secret, baked_key, nominal_amount_commitment_mask);  // x'
-    rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(nominal_amount_commitment_mask));
+    crypto::secret_key nominal_amount_blinding_factor;
+    make_jamtis_amount_blinding_factor_plain(sender_receiver_secret, baked_key, nominal_amount_blinding_factor);  // x'
+    rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(nominal_amount_blinding_factor));
 
     // check that recomputed commitment matches original commitment
     if (!(nominal_amount_commitment == amount_commitment))
@@ -397,13 +391,13 @@ bool try_get_jamtis_amount_selfsend(const crypto::secret_key &sender_receiver_se
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out)
 {
-    // a' = dec(encoded_amount)
+    // a' = dec(enc_a)
     rct::xmr_amount nominal_amount{decode_jamtis_amount_selfsend(encoded_amount, sender_receiver_secret)};
 
     // C' = x' G + a' H
-    crypto::secret_key nominal_amount_commitment_mask;
-    make_jamtis_amount_blinding_factor_selfsend(sender_receiver_secret, nominal_amount_commitment_mask);  // x'
-    rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(nominal_amount_commitment_mask));
+    crypto::secret_key nominal_amount_blinding_factor;
+    make_jamtis_amount_blinding_factor_selfsend(sender_receiver_secret, nominal_amount_blinding_factor);  // x'
+    rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(nominal_amount_blinding_factor));
 
     // check that recomputed commitment matches original commitment
     if (!(nominal_amount_commitment == amount_commitment))

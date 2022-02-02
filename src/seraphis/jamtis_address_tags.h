@@ -38,7 +38,6 @@ extern "C"
 {
 #include "crypto/blowfish.h"
 }
-#include "jamtis_address_utils.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 

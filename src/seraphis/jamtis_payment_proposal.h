@@ -28,14 +28,13 @@
 
 // NOT FOR PRODUCTION
 
-// Core types for making enotes with Jamtis addresses
-// - Jamtis is a specification for Seraphis-compatible addresses
+// A 'payment proposal' is a proposal to make an enote sending funds to a Jamtis address
 
 
 #pragma once
 
 //local headers
-#include "jamtis_address_tags.h"
+#include "crypto/crypto.h"
 #include "jamtis_destination.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
@@ -43,7 +42,6 @@
 //third party headers
 
 //standard headers
-#include <vector>
 
 //forward declarations
 
@@ -56,7 +54,6 @@ namespace jamtis
 ////
 // JamtisPaymentProposalV1
 // - for creating an output proposal to send an amount to someone
-// - JamtisPlainType::PLAIN (implicit)
 ///
 struct JamtisPaymentProposalV1 final
 {
@@ -68,7 +65,7 @@ struct JamtisPaymentProposalV1 final
 
     /// enote ephemeral privkey: r
     crypto::secret_key m_enote_ephemeral_privkey;
-    ///TODO: misc memo
+    ///TODO: misc memo suggestion (fields to add to memo)
 
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
@@ -95,8 +92,8 @@ struct JamtisPaymentProposalSelfSendV1 final
     /// b
     rct::xmr_amount m_amount;
 
-    /// type
-    JamtisSelfSendType m_type;
+    /// self-send type
+    JamtisSelfSendMAC m_type;
     /// enote ephemeral privkey: r
     crypto::secret_key m_enote_ephemeral_privkey;
     /// view-balance privkey: k_vb
@@ -113,16 +110,17 @@ struct JamtisPaymentProposalSelfSendV1 final
     * brief: gen - generate a random proposal
     * param: amount -
     */
-    void gen(const rct::xmr_amount amount, const JamtisSelfSendType type);
+    void gen(const rct::xmr_amount amount, const JamtisSelfSendMAC type);
 };
 
 /**
-* brief: is_self_send_proposal - test if an output proposal is a self-send-type
+* brief: is_self_send_output_proposal - test if an output proposal is a self-send-type
 * param: proposal -
-* param: k_view_balance 
+* param: wallet_spend_key -
+* param: k_view_balance -
 * return: true if it's a self-send proposal (either change or self-spend)
 */
-bool is_self_send_proposal(const SpOutputProposalV1 &proposal,
+bool is_self_send_output_proposal(const SpOutputProposalV1 &proposal,
     const rct::key &wallet_spend_key,
     const crypto::secret_key &k_view_balance);
 
