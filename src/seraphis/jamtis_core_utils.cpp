@@ -54,7 +54,7 @@ void make_jamtis_findreceived_key(const crypto::secret_key &k_view_balance,
 {
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_FINDRECEIVED_KEY};
 
-    // k_fr = H_n(Pad136(k_vb))
+    // k_fr = H_n[k_vb]()
     jamtis_derive_key(domain_separator, &k_view_balance, nullptr, 0, &k_find_received_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ void make_jamtis_generateaddress_secret(const crypto::secret_key &k_view_balance
 {
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET};
 
-    // s_ga = H_32(Pad136(k_vb))
+    // s_ga = H_32[k_vb]()
     jamtis_derive_secret(domain_separator, &k_view_balance, nullptr, 0, &s_generate_address_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -72,7 +72,7 @@ void make_jamtis_ciphertag_secret(const crypto::secret_key &s_generate_address,
 {
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_CIPHERTAG_SECRET};
 
-    // s_ct = H_32(Pad136(s_ga))
+    // s_ct = H_32[s_ga]()
     jamtis_derive_secret(domain_separator, &s_generate_address, nullptr, 0, &s_cipher_tag_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -81,7 +81,7 @@ void make_jamtis_identifywallet_key(const crypto::secret_key &s_generate_address
 {
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY};
 
-    // k_id = H_n(Pad136(s_ga))
+    // k_id = H_n[s_ga]()
     jamtis_derive_key(domain_separator, &s_generate_address, nullptr, 0, &k_identify_wallet_out);
 }
 //-------------------------------------------------------------------------------------------------------------------

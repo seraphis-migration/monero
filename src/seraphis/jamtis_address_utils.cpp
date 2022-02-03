@@ -56,7 +56,7 @@ void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
 {
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_SPENDKEY_EXTENSION};
 
-    // k^j_x = H_n(Pad136(s_ga), j)
+    // k^j_x = H_n[s_ga](j)
     address_tag_t raw_address_index{address_index_to_tag(j, 0)};
 
     jamtis_derive_key(domain_separator,
@@ -72,7 +72,7 @@ void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
 {
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_ADDRESS_PRIVKEY};
 
-    // k^j_a = H_n(Pad136(s_ga), j)
+    // k^j_a = H_n[s_ga](j)
     address_tag_t raw_address_index{address_index_to_tag(j, 0)};
 
     jamtis_derive_key(domain_separator,

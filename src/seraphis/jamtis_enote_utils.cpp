@@ -210,7 +210,7 @@ void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_vie
 {
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF};
 
-    // q = H_32(Pad136(k_vb), K_e)
+    // q = H_32[k_vb](K_e)
     jamtis_derive_secret(domain_separator,
         &k_view_balance,
         enote_ephemeral_pubkey.bytes,

@@ -114,7 +114,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
             output_proposal_out.m_enote_ephemeral_pubkey
         );
 
-    // sender-receiver shared secret: q = H_32(Pad136(k_vb), K_e)  //note: K_e not K_d
+    // sender-receiver shared secret: q = H_32[k_vb](K_e)  //note: K_e not K_d
     crypto::secret_key q;
     make_jamtis_sender_receiver_secret_selfsend(m_viewbalance_privkey,
             output_proposal_out.m_enote_ephemeral_pubkey,

@@ -56,26 +56,6 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void SpInputProposalV1::gen(const rct::xmr_amount amount)
-{
-    // generate a tx input: random secrets, random memo pieces (does not support info recovery)
-
-    // input secrets
-    this->gen_base(amount);
-
-    // enote pubkey (these are stored separate from enotes)
-    m_enote_pubkey = rct::pkGen();
-
-    // enote
-    rct::key recipient_spendbase;
-    make_seraphis_spendbase(m_spendbase_privkey, recipient_spendbase);
-
-    m_enote.make_base_with_address_extension(m_enote_view_privkey, recipient_spendbase, m_amount_blinding_factor, m_amount);
-
-    m_enote.m_view_tag = crypto::rand_idx(static_cast<unsigned char>(-1));
-    m_enote.m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-}
-//-------------------------------------------------------------------------------------------------------------------
 void SpDestinationV1::get_amount_blinding_factor(const std::size_t enote_index,
     crypto::secret_key &amount_blinding_factor) const
 {

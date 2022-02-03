@@ -107,7 +107,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
     rct::key &sender_receiver_secret_out);
 /**
 * brief: make_jamtis_sender_receiver_secret_selfsend - sender-receiver secret q for a self-send enote
-*    q = H_32(Pad136(k_vb), K_e)
+*    q = H_32[k_vb](K_e)
 * param: k_view_balance - k_vb
 * param: enote_ephemeral_pubkey - K_e
 * outparam: sender_receiver_secret_out - q

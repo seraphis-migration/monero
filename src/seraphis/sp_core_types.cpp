@@ -138,6 +138,8 @@ void SpInputProposal::gen(const rct::xmr_amount amount)
     m_spendbase_privkey = rct::rct2sk(rct::skGen());
     m_amount_blinding_factor = rct::rct2sk(rct::skGen());
     m_amount = amount;
+    m_address_mask = rct::rct2sk(rct::skGen());;
+    m_commitment_mask = rct::rct2sk(rct::skGen());;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpOutputProposal::get_enote_base(SpEnote &enote_out) const

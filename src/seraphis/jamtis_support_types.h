@@ -57,7 +57,7 @@ constexpr std::size_t ADDRESS_TAG_MAC_BYTES{1};  //if > 1, then endianness must 
 using address_tag_MAC_t = unsigned char;
 
 /// index ciphered with view-balance key: addr_tag = enc(little_endian(j) || little_endian(addr_tag_MAC))
-struct address_tag_t
+struct address_tag_t final
 {
     unsigned char bytes[ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES];
 

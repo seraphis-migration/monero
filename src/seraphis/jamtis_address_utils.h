@@ -54,7 +54,7 @@ namespace jamtis
 
 /**
 * brief: make_jamtis_spendkey_extension -
-*   - k^j_x = H_n(Pad136(s_ga), j)
+*   - k^j_x = H_n[s_ga](j)
 * param: s_generate_address - s_ga
 * param: j - address index
 * outparam: extension_out - k^j_x
@@ -64,7 +64,7 @@ void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
     crypto::secret_key &extension_out);
 /**
 * brief: make_jamtis_address_privkey -
-*   - k^j_a = H_n(Pad136(s_ga), j)
+*   - k^j_a = H_n[s_ga](j)
 * param: s_generate_address - s_ga
 * param: j - address index
 * outparam: address_privkey_out - k^j_a
