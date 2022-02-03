@@ -71,6 +71,12 @@ struct SpEnote final
     /// C = x G + a H
     rct::key m_amount_commitment;
 
+    /// less-than operator for sorting
+    bool operator<(const SpEnote &other_enote) const
+    {
+        return memcmp(&m_onetime_address, &other_enote.m_onetime_address, sizeof(rct::key)) < 0;
+    }
+
     /**
     * brief: make_base_with_onetime_address - make a Seraphis ENote from a pre-made onetime address
     * param: onetime_address -
@@ -108,7 +114,7 @@ struct SpEnote final
     /**
     * brief: gen_base - generate a Seraphis ENote (all random)
     */
-    void gen_base();
+    void gen();
 
     /**
     * brief: append_to_string - convert enote to a string and append to existing string (for proof transcripts)
@@ -130,6 +136,12 @@ struct SpEnoteImage final
     rct::key m_masked_commitment;
     /// KI = (k_{b, recipient} / (k_{a, sender} + k_{a, recipient})) U
     crypto::key_image m_key_image;
+
+    /// less-than operator for sorting
+    bool operator<(const SpEnoteImage &other_image) const
+    {
+        return memcmp(&m_key_image, &other_image.m_key_image, sizeof(crypto::key_image)) < 0;
+    }
 
     static std::size_t get_size_bytes() { return 32*3; }
 };
@@ -168,7 +180,7 @@ struct SpInputProposal final
 
     /**
     * brief: get_enote_image_squashed_base - get this input's enote image in the squashed enote model
-    * inoutparam: image_out -
+    * outparam: image_out -
     */
     void get_enote_image_squashed_base(SpEnoteImage &image_out) const;
 
@@ -191,6 +203,12 @@ struct SpOutputProposal final
     crypto::secret_key m_amount_blinding_factor;
     /// b
     rct::xmr_amount m_amount;
+
+    /// less-than operator for sorting
+    bool operator<(const SpOutputProposal &other_proposal) const
+    {
+        return memcmp(&m_onetime_address, &other_proposal.m_onetime_address, sizeof(rct::key)) < 0;
+    }
 
     /**
     * brief: get_enote_base - get the enote this input proposal represents

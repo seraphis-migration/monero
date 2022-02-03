@@ -38,6 +38,7 @@
 #include "jamtis_destination.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
+#include "tx_builder_types.h"
 
 //third party headers
 

@@ -60,7 +60,7 @@ void make_seraphis_key_image(const crypto::secret_key &y, const rct::key &zU, cr
     CHECK_AND_ASSERT_THROW_MES(!(zU == rct::identity()), "zU must not be identity element for making a key image!");
 
     // KI = (z/y)*U
-    rct::key temp = sp::invert(rct::sk2rct(y)); // 1/y
+    rct::key temp{sp::invert(rct::sk2rct(y))}; // 1/y
     rct::scalarmultKey(temp, zU, temp); // (z/y)*U
 
     key_image_out = rct::rct2ki(temp);
@@ -72,7 +72,7 @@ void make_seraphis_key_image(const crypto::secret_key &y, const crypto::secret_k
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "y must be nonzero for making a key image!");
 
     // KI = (z/y)*U
-    rct::key temp = sp::invert(rct::sk2rct(y)); // 1/y
+    rct::key temp{sp::invert(rct::sk2rct(y))}; // 1/y
     sc_mul(temp.bytes, &z, temp.bytes); // z*(1/y)
     rct::scalarmultKey(temp, sp::get_U_gen(), temp); // (z/y)*U
 

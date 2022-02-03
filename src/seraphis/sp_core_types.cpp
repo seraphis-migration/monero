@@ -87,7 +87,7 @@ void SpEnote::make_base_with_privkeys(const crypto::secret_key &enote_view_privk
     this->make_base_with_address_extension(enote_view_privkey, spendbase, amount_blinding_factor, amount);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnote::gen_base()
+void SpEnote::gen()
 {
     // all random
     m_onetime_address = rct::pkGen();

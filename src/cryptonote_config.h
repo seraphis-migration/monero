@@ -226,6 +226,10 @@ namespace config
   std::string const GENESIS_TX = "013c01ff0001ffffffffffff03029b2e4c0281c0b02e7c53291a94d1d0cbff8883f8024f5142ee494ffbbd08807121017767aafcde9be00dcfd098715ebcf7f410daebc582fda69d24a28e9d0bc890d1";
   uint32_t const GENESIS_NONCE = 10000;
 
+  // misc config
+  const uint16_t SP_MAX_INPUTS_V1 = 128 - BULLETPROOF_MAX_OUTPUTS;
+  const uint16_t SP_MAX_OUTPUTS_V1 = BULLETPROOF_MAX_OUTPUTS;
+
   // Hash domain separators
   const char HASH_KEY_BULLETPROOF_EXPONENT[] = "bulletproof";
   const char HASH_KEY_BULLETPROOF_PLUS_EXPONENT[] = "bulletproof_plus";
@@ -245,27 +249,27 @@ namespace config
   const unsigned char HASH_KEY_CLSAG_AGG_1[] = "CLSAG_agg_1";
   const char HASH_KEY_MESSAGE_SIGNING[] = "MoneroMessageSignature";
   const unsigned char HASH_KEY_MM_SLOT = 'm';
-  const char HASH_KEY_CONCISE_GROOTLE_TRANSCRIPT[] = "concise grootle transcript";
-  const char HASH_KEY_GROOTLE_Hi[] = "grootle Hi";
-  const char HASH_KEY_SERAPHIS_U[] = "seraphis U";
-  const char HASH_KEY_SERAPHIS_X[] = "seraphis X";
-  const char HASH_KEY_SP_COMPOSITION_PROOF_TRANSCRIPT[] = "seraphis composition proof transcript";
-  const char HASH_KEY_SERAPHIS_SQUASHED_ENOTE[] = "seraphis squashed enote";
-  const char HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR[] = "multisig binonce merge factor";
-  const char HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET[] = "jamtis generate-address secret";
-  const char HASH_KEY_JAMTIS_CIPHERTAG_SECRET[] = "jamtis cipher-tag secret";
-  const char HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY[] = "jamtis identify-wallet key";
-  const char HASH_KEY_JAMTIS_FINDRECEIVED_KEY[] = "jamtis find-received key";
-  const char HASH_KEY_JAMTIS_ADDRESS_PRIVKEY[] = "jamtis address privkey";
-  const char HASH_KEY_JAMTIS_SPENDKEY_EXTENSION[] = "jamtis spendkey extension";
-  const char HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG[] = "jamtis encrypted address tag";
-  const char HASH_KEY_JAMTIS_VIEW_TAG[] = "jamtis enote view tag";
-  const char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN[] = "jamtis sender-receiver secret plain";
-  const char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF[] = "jamtis sender-receiver secret self-send";
-  const char HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION[] = "jamtis sender onetime address extension";
-  const char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN[] = "jamtis enote amount commitment blinding factor plain";
-  const char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF[] = "jamtis enote amount commitment blinding factor self";
-  const char HASH_KEY_JAMTIS_AMOUNT_ENC[] = "jamtis enote amount encoding";
+  const char HASH_KEY_CONCISE_GROOTLE_TRANSCRIPT[] = "concise_grootle_transcript";
+  const char HASH_KEY_GROOTLE_Hi[] = "grootle_Hi";
+  const char HASH_KEY_SERAPHIS_U[] = "seraphis_U";
+  const char HASH_KEY_SERAPHIS_X[] = "seraphis_X";
+  const char HASH_KEY_SP_COMPOSITION_PROOF_TRANSCRIPT[] = "seraphis_composition_proof_transcript";
+  const char HASH_KEY_SERAPHIS_SQUASHED_ENOTE[] = "seraphis_squashed_enote";
+  const char HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR[] = "multisig_binonce_merge_factor";
+  const char HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET[] = "jamtis_generate_address_secret";
+  const char HASH_KEY_JAMTIS_CIPHERTAG_SECRET[] = "jamtis_cipher_tag_secret";
+  const char HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY[] = "jamtis_identify_wallet_key";
+  const char HASH_KEY_JAMTIS_FINDRECEIVED_KEY[] = "jamtis_find_received_key";
+  const char HASH_KEY_JAMTIS_ADDRESS_PRIVKEY[] = "jamtis_address_privkey";
+  const char HASH_KEY_JAMTIS_SPENDKEY_EXTENSION[] = "jamtis_spendkey_extension";
+  const char HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG[] = "jamtis_encrypted_address_tag";
+  const char HASH_KEY_JAMTIS_VIEW_TAG[] = "jamtis_enote_view_tag";
+  const char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN[] = "jamtis_sender_receiver_secret_plain";
+  const char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF[] = "jamtis_sender_receiver_secret_self_send";
+  const char HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION[] = "jamtis_sender_onetime_address_extension";
+  const char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN[] = "jamtis_enote_amount_commitment_blinding_factor_plain";
+  const char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF[] = "jamtis_enote_amount_commitment_blinding_factor_self";
+  const char HASH_KEY_JAMTIS_AMOUNT_ENC[] = "jamtis_enote_amount_encoding";
 
   // Multisig
   const uint32_t MULTISIG_MAX_SIGNERS{16};

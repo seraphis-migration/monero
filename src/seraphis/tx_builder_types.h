@@ -78,8 +78,14 @@ struct SpOutputProposalV1 final
 
     ///TODO: misc memo suggestion (fields to add to memo)
 
+    /// less-than operator for sorting
+    bool operator<(const SpOutputProposalV1 &other_proposal) const
+    {
+        return m_proposal_core < other_proposal.m_proposal_core;
+    }
+
     /// convert this destination into a v1 enote
-    SpEnoteV1 to_enote_v1() const;
+    void get_enote_v1(SpEnoteV1 &enote_out) const;
 
     /**
     * brief: gen - generate a V1 Destination (random)
@@ -127,8 +133,8 @@ struct SpTxProposalV1 final
     /// default constructor
     SpTxProposalV1() = default;
 
-    /// normal constructor: make a tx proposal from destinations (a.k.a. outlays)
-    SpTxProposalV1(std::vector<SpOutputProposalV1> destinations);
+    /// normal constructor: make a deterministic tx proposal from output proposals
+    SpTxProposalV1(std::vector<SpOutputProposalV1> output_proposals);
 
 //member functions
     /// message to be signed by input spend proofs
@@ -151,7 +157,7 @@ struct SpTxProposalV1 final
 // - spend proof for input (and proof the input's key image is properly constructed)
 // - proposal prefix (spend proof msg) [for consistency checks when handling this object]
 ///
-struct SpTxPartialInputV1 final //needs to be InputSetPartial for merged composition proofs
+struct SpTxPartialInputV1 final
 {
 //constructors
     /// default constructor
@@ -162,6 +168,12 @@ struct SpTxPartialInputV1 final //needs to be InputSetPartial for merged composi
 
 //destructor: default
 
+    /// less-than operator for sorting
+    bool operator<(const SpTxPartialInputV1 &other_input) const
+    {
+        return m_input_image < other_input.m_input_image;
+    }
+
 //member functions
 
 //member variables
@@ -171,16 +183,16 @@ struct SpTxPartialInputV1 final //needs to be InputSetPartial for merged composi
     SpImageProofV1 m_image_proof;
     /// image masks
     crypto::secret_key m_image_address_mask;
-    crypto::secret_key m_image_amount_mask;
+    crypto::secret_key m_image_commitment_mask;
 
     /// proposal prefix (represents the set of destinations and memos; signed by this partial input's image proof)
     rct::key m_proposal_prefix;
 
-    /// the input enote (won't be recorded in the final tx)
-    SpEnoteV1 m_input_enote;
+    /// the input enote's core; used for making a membership proof
+    SpEnote m_input_enote_core;
     /// input amount
     rct::xmr_amount m_input_amount;
-    /// input amount commitment's blinding factor; only used for making the balance proof's remainder blinding factor
+    /// input amount commitment's blinding factor; used for making the balance proof
     crypto::secret_key m_input_amount_blinding_factor;
 };
 
@@ -197,7 +209,7 @@ struct SpTxPartialV1 final
 
     /// normal constructor: standard assembly
     SpTxPartialV1(const SpTxProposalV1 &proposal,
-        const std::vector<SpTxPartialInputV1> &inputs,
+        std::vector<SpTxPartialInputV1> inputs,
         const std::string &version_string);
 
     /// normal constructor (TODO): assembly from multisig pieces
@@ -220,7 +232,7 @@ struct SpTxPartialV1 final
     std::vector<SpEnoteV1> m_input_enotes;
     /// sorted image masks for creating input membership proofs
     std::vector<crypto::secret_key> m_image_address_masks;
-    std::vector<crypto::secret_key> m_image_amount_masks;
+    std::vector<crypto::secret_key> m_image_commitment_masks;
 };
 
 } //namespace sp

@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "tx_utils.h"
+#include "tx_builder_inputs.h"
 
 //local headers
 #include "common/varint.h"
@@ -47,7 +47,7 @@ extern "C"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
-#include "sp_core_utils.h"
+#include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
@@ -56,7 +56,6 @@ extern "C"
 //third party headers
 
 //standard headers
-#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -66,61 +65,6 @@ extern "C"
 
 namespace sp
 {
-//-------------------------------------------------------------------------------------------------------------------
-// create t_k and t_c for an enote image
-//-------------------------------------------------------------------------------------------------------------------
-static void prepare_image_masks_sp_v1(crypto::secret_key &image_address_mask_out,
-    crypto::secret_key &image_amount_mask_out)
-{
-    image_address_mask_out = rct::rct2sk(rct::zero());
-    image_amount_mask_out = rct::rct2sk(rct::zero());
-
-    // t_k
-    while (image_address_mask_out == rct::rct2sk(rct::zero()))
-        image_address_mask_out = rct::rct2sk(rct::skGen());
-
-    // t_c
-    while (image_amount_mask_out == rct::rct2sk(rct::zero()))
-        image_amount_mask_out = rct::rct2sk(rct::skGen());
-}
-//-------------------------------------------------------------------------------------------------------------------
-// create t_k and t_c for all enote images in a tx
-//-------------------------------------------------------------------------------------------------------------------
-static void prepare_image_masks_all_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
-    std::vector<crypto::secret_key> &image_address_masks_out,
-    std::vector<crypto::secret_key> &image_amount_masks_out)
-{
-    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx input image set without any inputs.");
-
-    image_address_masks_out.clear();
-    image_amount_masks_out.clear();
-    image_address_masks_out.resize(input_proposals.size());
-    image_amount_masks_out.resize(input_proposals.size());
-
-    // make all input images
-    for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
-    {
-        prepare_image_masks_sp_v1(image_address_masks_out[input_index],
-            image_amount_masks_out[input_index]);
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
-// convert a crypto::secret_key vector to an rct::key vector, and obtain a memwiper for the rct::key vector
-//-------------------------------------------------------------------------------------------------------------------
-static auto convert_skv_to_rctv(const std::vector<crypto::secret_key> &skv, rct::keyV &rctv_out)
-{
-    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
-        memwipe(rctv_out.data(), rctv_out.size()*sizeof(rct::key));
-    });
-
-    rctv_out.clear();
-    rctv_out.reserve(skv.size());
-
-    for (const auto &skey : skv)
-        rctv_out.emplace_back(rct::sk2rct(skey));
-
-    return a_wiper;
-}
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &enote_ledger_indices)
@@ -145,102 +89,6 @@ rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &e
     rct::hash_to_scalar(hash_result, hash.data(), hash.size());
 
     return hash_result;
-}
-//-------------------------------------------------------------------------------------------------------------------
-rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
-    const std::vector<SpEnoteV1> &output_enotes,
-    const SpTxSupplementV1 &tx_supplement)
-{
-    rct::key hash_result;
-    std::string hash;
-    hash.reserve(sizeof(CRYPTONOTE_NAME) +
-        version_string.size() +
-        output_enotes.size()*SpEnoteV1::get_size_bytes() +
-        tx_supplement.m_output_enote_pubkeys.size());
-    hash = CRYPTONOTE_NAME;
-    hash += version_string;
-    for (const auto &output_enote : output_enotes)
-    {
-        output_enote.append_to_string(hash);
-    }
-    for (const auto &enote_pubkey : tx_supplement.m_output_enote_pubkeys)
-    {
-        hash.append((const char*) enote_pubkey.bytes, sizeof(enote_pubkey));
-    }
-
-    rct::hash_to_scalar(hash_result, hash.data(), hash.size());
-
-    return hash_result;
-}
-//-------------------------------------------------------------------------------------------------------------------
-std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<SpTxPartialInputV1> &partial_inputs)
-{
-    std::vector<crypto::key_image> input_key_images;
-    input_key_images.reserve(partial_inputs.size());
-
-    for (const auto &partial_input : partial_inputs)
-        input_key_images.emplace_back(partial_input.m_input_image.m_key_image);
-
-    return get_tx_input_sort_order_v1(input_key_images);
-}
-//-------------------------------------------------------------------------------------------------------------------
-std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<SpEnoteImageV1> &input_images)
-{
-    std::vector<crypto::key_image> input_key_images;
-    input_key_images.reserve(input_images.size());
-
-    for (const auto &input_image : input_images)
-        input_key_images.emplace_back(input_image.m_key_image);
-
-    return get_tx_input_sort_order_v1(input_key_images);
-}
-//-------------------------------------------------------------------------------------------------------------------
-std::vector<std::size_t> get_tx_input_sort_order_v1(const std::vector<crypto::key_image> &input_key_images)
-{
-    std::vector<std::size_t> original_indices;
-    original_indices.resize(input_key_images.size());
-
-    for (std::size_t input_index{0}; input_index < input_key_images.size(); ++input_index)
-        original_indices[input_index] = input_index;
-
-    // sort: key images ascending with byte-wise comparisons
-    std::sort(original_indices.begin(), original_indices.end(),
-            [&input_key_images](const std::size_t input_index_1, const std::size_t input_index_2) -> bool
-            {
-                return memcmp(&(input_key_images[input_index_1]),
-                    &(input_key_images[input_index_2]), sizeof(crypto::key_image)) < 0;
-            }
-        );
-
-    return original_indices;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &input_images,
-    std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_sortable_in,
-    std::vector<SpMembershipProofV1> &tx_membership_proofs_out)
-{
-    CHECK_AND_ASSERT_THROW_MES(tx_membership_proofs_sortable_in.size() == input_images.size(),
-        "Mismatch between sortable membership proof count and partial tx input image count.");
-
-    tx_membership_proofs_out.clear();
-    tx_membership_proofs_out.reserve(tx_membership_proofs_sortable_in.size());
-
-    for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
-    {
-        // find the membership proof that matches with the input image at this index
-        auto ordered_membership_proof = 
-            std::find_if(tx_membership_proofs_sortable_in.begin(), tx_membership_proofs_sortable_in.end(),
-                    [&](const SpMembershipProofSortableV1 &sortable_proof) -> bool
-                    {
-                        return input_images[input_index].m_masked_address == sortable_proof.m_masked_address;
-                    }
-                );
-
-        CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_sortable_in.end(),
-            "Could not find input image to match with a sortable membership proof.");
-
-        tx_membership_proofs_out.emplace_back(std::move(ordered_membership_proof->m_membership_proof));
-    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 void prepare_input_commitment_factors_for_balance_proof_v1(
@@ -279,97 +127,13 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     {
         // input image amount commitment blinding factor: t_c + x
         sc_add(&(input_image_amount_commitment_blinding_factors_out[input_index]),
-            &(partial_inputs[input_index].m_image_amount_mask),  // t_c
+            &(partial_inputs[input_index].m_image_commitment_mask),  // t_c
             &(partial_inputs[input_index].m_input_amount_blinding_factor));  // x
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_outputs_sp_v1(const std::vector<SpDestinationV1> &destinations,
-    std::vector<SpEnoteV1> &outputs_out,
-    std::vector<rct::xmr_amount> &output_amounts_out,
-    std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
-    SpTxSupplementV1 &tx_supplement_inout)
-{
-    rct::keyV temp_enote_pubkeys;
-    temp_enote_pubkeys.resize(destinations.size());
-    outputs_out.clear();
-    outputs_out.reserve(destinations.size());
-    output_amounts_out.clear();
-    output_amounts_out.reserve(destinations.size());
-    output_amount_commitment_blinding_factors_out.clear();
-    output_amount_commitment_blinding_factors_out.resize(destinations.size());
-
-    for (std::size_t dest_index{0}; dest_index < destinations.size(); ++dest_index)
-    {
-        // build output set
-        outputs_out.emplace_back(destinations[dest_index].to_enote_v1(dest_index, temp_enote_pubkeys[dest_index]));
-
-        // prepare for range proofs
-        output_amounts_out.emplace_back(destinations[dest_index].m_amount);
-        destinations[dest_index].get_amount_blinding_factor(dest_index,
-            output_amount_commitment_blinding_factors_out[dest_index]);
-    }
-
-    // copy non-duplicate enote pubkeys to tx supplement
-    tx_supplement_inout.m_output_enote_pubkeys.clear();
-    tx_supplement_inout.m_output_enote_pubkeys.reserve(destinations.size());
-
-    for (const auto &enote_pubkey : temp_enote_pubkeys)
-    {
-        if (std::find(tx_supplement_inout.m_output_enote_pubkeys.begin(), tx_supplement_inout.m_output_enote_pubkeys.end(),
-            enote_pubkey) == tx_supplement_inout.m_output_enote_pubkeys.end())
-        {
-            tx_supplement_inout.m_output_enote_pubkeys.emplace_back(enote_pubkey);
-        }
-    }
-
-    // should be either 1 enote pubkey for entire destination set, or 1:1 per destination
-    CHECK_AND_ASSERT_THROW_MES(tx_supplement_inout.m_output_enote_pubkeys.size() == 1 ||
-        tx_supplement_inout.m_output_enote_pubkeys.size() == destinations.size(), "Invalid number of enote pubkeys in destination set.");
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_image_sp_v1(const SpInputProposalV1 &input_proposal,
-    SpEnoteImageV1 &input_image_out,
-    crypto::secret_key &image_address_mask_out,
-    crypto::secret_key &image_amount_mask_out)
-{
-    // for squashed enote model
-
-    prepare_image_masks_sp_v1(image_address_mask_out, image_amount_mask_out);
-
-    // enote image
-    input_proposal.to_enote_image_squashed_base(image_address_mask_out, image_amount_mask_out, input_image_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_images_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
-    std::vector<SpEnoteImageV1> &input_images_out,
-    std::vector<crypto::secret_key> &image_address_masks_out,
-    std::vector<crypto::secret_key> &image_amount_masks_out)
-{
-    // for squashed enote model
-
-    prepare_image_masks_all_sp_v1(input_proposals,
-        image_address_masks_out,
-        image_amount_masks_out);
-
-    CHECK_AND_ASSERT_THROW_MES(image_address_masks_out.size() == input_proposals.size() &&
-        image_amount_masks_out.size() == input_proposals.size(),
-        "Vector size mismatch when preparing image masks.");
-
-    input_images_out.clear();
-    input_images_out.resize(input_proposals.size());
-
-    // make input images
-    for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
-    {
-        input_proposals[input_index].to_enote_image_squashed_base(image_address_masks_out[input_index],
-            image_amount_masks_out[input_index],
-            input_images_out[input_index]);
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proof_sp_v1(const SpInputProposalV1 &input_proposal,
-    const SpEnoteImageV1 &input_image,
+    const rct::key &masked_address,
     const crypto::secret_key &image_address_mask,
     const rct::key &message,
     SpImageProofV1 &tx_image_proof_out)
@@ -377,16 +141,16 @@ void make_v1_tx_image_proof_sp_v1(const SpInputProposalV1 &input_proposal,
     // prepare for proof (squashed enote model): y, z
     crypto::secret_key y, z;
     crypto::secret_key squash_prefix;
-    make_seraphis_squash_prefix(input_proposal.m_enote.m_onetime_address,
-        input_proposal.m_enote.m_amount_commitment,
-        squash_prefix);
+    make_seraphis_squash_prefix(input_proposal.m_input_enote_core.m_onetime_address,
+        input_proposal.m_input_enote_core.m_amount_commitment,
+        squash_prefix);  // H(Ko,C)
 
     sc_mul(&y, &squash_prefix, &(input_proposal.m_enote_view_privkey));  // H(Ko,C) (k_{a, recipient} + k_{a, sender})
     sc_mul(&z, &squash_prefix, &(input_proposal.m_spendbase_privkey));  // H(Ko,C) k_{b, recipient}
 
     // make seraphis composition proof
     tx_image_proof_out.m_composition_proof =
-        sp_composition_prove(message, input_image.m_masked_address, image_address_mask, y, z);
+        sp_composition_prove(message, masked_address, image_address_mask, y, z);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
@@ -407,55 +171,11 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_p
     for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
     {
         make_v1_tx_image_proof_sp_v1(input_proposals[input_index],
-            input_images[input_index],
+            input_images[input_index].m_enote_image_core.m_masked_address,
             image_address_masks[input_index],
             message,
             tx_image_proofs_out[input_index]);
     }
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_amounts,
-    const std::vector<rct::xmr_amount> &output_amounts,
-    const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
-    const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
-    std::shared_ptr<SpBalanceProofV1> &balance_proof_out)
-{
-    // for squashed enote model
-
-    if (balance_proof_out.get() == nullptr)
-        balance_proof_out = std::make_shared<SpBalanceProofV1>();
-
-    // combine inputs and outputs
-    std::vector<rct::xmr_amount> amounts;
-    std::vector<crypto::secret_key> blinding_factors;
-    amounts.reserve(input_amounts.size() + output_amounts.size());
-    blinding_factors.reserve(input_amounts.size() + output_amounts.size());
-
-    amounts = input_amounts;
-    amounts.insert(amounts.end(),output_amounts.begin(), output_amounts.end());
-    blinding_factors = input_image_amount_commitment_blinding_factors;
-    blinding_factors.insert(blinding_factors.end(),
-        output_amount_commitment_blinding_factors.begin(),
-        output_amount_commitment_blinding_factors.end());
-
-    // make range proofs
-    rct::BulletproofPlus range_proofs;
-
-    rct::keyV amount_commitment_blinding_factors;
-    auto vec_wiper{convert_skv_to_rctv(blinding_factors, amount_commitment_blinding_factors)};
-    make_bpp_rangeproofs(amounts,
-        amount_commitment_blinding_factors,
-        range_proofs);
-
-    balance_proof_out->m_bpp_proof = std::move(range_proofs);
-
-    // set the remainder blinding factor
-    crypto::secret_key remainder_blinding_factor;
-    subtract_secret_key_vectors(input_image_amount_commitment_blinding_factors,
-        output_amount_commitment_blinding_factors,
-        remainder_blinding_factor);
-
-    balance_proof_out->m_remainder_blinding_factor = rct::sk2rct(remainder_blinding_factor);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
@@ -591,7 +311,7 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
 
         make_v1_tx_membership_proof_sp_v1(membership_ref_sets[input_index],
             partial_inputs[input_index].m_image_address_mask,
-            partial_inputs[input_index].m_image_amount_mask,
+            partial_inputs[input_index].m_image_commitment_mask,
             tx_membership_proofs_out[input_index]);
     }
 }
@@ -605,7 +325,7 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
     // note: ref sets are assumed to be pre-sorted, so sortable membership proofs are not needed
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_tx.m_image_address_masks.size(),
         "Input components size mismatch");
-    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_tx.m_image_amount_masks.size(),
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_tx.m_image_commitment_masks.size(),
         "Input components size mismatch");
 
     tx_membership_proofs_out.clear();
@@ -615,7 +335,7 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
     {
         make_v1_tx_membership_proof_sp_v1(membership_ref_sets[input_index],
             partial_tx.m_image_address_masks[input_index],
-            partial_tx.m_image_amount_masks[input_index],
+            partial_tx.m_image_commitment_masks[input_index],
             tx_membership_proofs_out[input_index]);
     }
 }
@@ -633,29 +353,6 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input
     // make all inputs
     for (const auto &input_proposal : input_proposals)
         partial_inputs_out.emplace_back(input_proposal, proposal_prefix);
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
-    const std::vector<SpDestinationV1> &destinations,
-    const rct::xmr_amount transaction_fee)
-{
-    std::vector<rct::xmr_amount> in_amounts;
-    std::vector<rct::xmr_amount> out_amounts;
-    in_amounts.reserve(input_proposals.size());
-    out_amounts.reserve(destinations.size() + 1);
-
-    for (const auto &input_proposal : input_proposals)
-    {
-        in_amounts.emplace_back(input_proposal.m_amount);
-    }
-    for (const auto &destination : destinations)
-    {
-        out_amounts.emplace_back(destination.m_amount);
-    }
-
-    out_amounts.emplace_back(transaction_fee);
-
-    return balance_check_in_out_amnts(in_amounts, out_amounts);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts)
@@ -734,24 +431,6 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     }
 
     return reference_sets;
-}
-//-------------------------------------------------------------------------------------------------------------------
-std::vector<SpDestinationV1> gen_mock_sp_destinations_v1(const std::vector<rct::xmr_amount> &out_amounts)
-{
-    // randomize destination order
-    std::vector<rct::xmr_amount> randomized_out_amounts{out_amounts};
-    std::shuffle(randomized_out_amounts.begin(), randomized_out_amounts.end(), crypto::random_device{});
-
-    // generate random destinations
-    std::vector<SpDestinationV1> destinations;
-    destinations.resize(randomized_out_amounts.size());
-
-    for (std::size_t dest_index{0}; dest_index < randomized_out_amounts.size(); ++dest_index)
-    {
-        destinations[dest_index].gen(randomized_out_amounts[dest_index]);
-    }
-
-    return destinations;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

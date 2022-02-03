@@ -536,7 +536,7 @@ SpCompositionProof sp_composition_prove_multisig_final(const std::vector<SpCompo
     CHECK_AND_ASSERT_THROW_MES(partial_sigs.size() > 0, "No partial signatures to make proof out of!");
 
     // common parts between partial signatures should match
-    for (std::size_t sig_index{0}; sig_index < partial_sigs.size(); ++sig_index)
+    for (std::size_t sig_index{1}; sig_index < partial_sigs.size(); ++sig_index)
     {
         CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].c == partial_sigs[sig_index].c, "Input key sets don't match!");
         CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t1 == partial_sigs[sig_index].r_t1, "Input key sets don't match!");

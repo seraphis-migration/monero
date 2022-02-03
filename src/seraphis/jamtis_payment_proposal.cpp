@@ -41,6 +41,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "tx_builder_types.h"
 
 //third party headers
 

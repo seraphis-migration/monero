@@ -187,7 +187,9 @@ static FORCE_INLINE uint64_t rotr64(const uint64_t w, const unsigned c) {
 
 /// END: blake2-impl.h
 
-#define clear_internal_memory memwipe
+void clear_internal_memory(void *mem, const size_t length) {
+    memwipe(mem, length);
+}
 
 /// BEGIN: blake2b.c
 

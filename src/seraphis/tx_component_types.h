@@ -60,8 +60,14 @@ struct SpEnoteV1 final
     rct::xmr_amount m_encoded_amount;
     /// view_tag
     jamtis::view_tag_t m_view_tag;
-    /// addr_tag
-    jamtis::address_tag_t m_addr_tag;
+    /// addr_tag_enc
+    jamtis::encrypted_address_tag_t m_addr_tag_enc;
+
+    /// less-than operator for sorting
+    bool operator<(const SpEnoteV1 &other_enote) const
+    {
+        return m_enote_core < other_enote.m_enote_core;
+    }
 
     /**
     * brief: append_to_string - convert enote to a string and append to existing string
@@ -86,6 +92,12 @@ struct SpEnoteImageV1 final
 {
     /// enote image core (masked address, masked amount commitment, key image)
     SpEnoteImage m_enote_image_core;
+
+    /// less-than operator for sorting
+    bool operator<(const SpEnoteImageV1 &other_image) const
+    {
+        return m_enote_image_core < other_image.m_enote_image_core;
+    }
 
     static std::size_t get_size_bytes() { return SpEnoteImage::get_size_bytes(); }
 };

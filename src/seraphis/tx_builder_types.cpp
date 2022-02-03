@@ -33,14 +33,12 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "device/device.hpp"
-#include "misc_language.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "sp_core_utils.h"
-#include "tx_misc_utils.h"
-#include "tx_utils.h"
+#include "tx_builders_inputs.h"
+#include "tx_builders_mixed.h"
+#include "tx_builders_outputs.h"
 #include "tx_component_types.h"
 
 //third party headers
@@ -56,63 +54,49 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void SpDestinationV1::get_amount_blinding_factor(const std::size_t enote_index,
-    crypto::secret_key &amount_blinding_factor) const
+void SpOutputProposalV1::get_enote_v1(SpEnoteV1 &enote_out) const
 {
-    // r_t: sender-receiver shared secret
-    rct::key sender_receiver_secret;
-    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
-        memwipe(&sender_receiver_secret, sizeof(rct::key));
-    });
+    // enote core
+    enote_out.m_enote_core.m_onetime_address = m_proposal_core.m_onetime_address;
+    enote_out.m_enote_core.m_amount_commitment =
+        rct::commit(m_proposal_core.m_amount, m_proposal_core.m_amount_blinding_factor);
 
-    make_seraphis_sender_receiver_secret(m_enote_privkey,
-        m_recipient_viewkey,
-        enote_index,
-        hw::get_device("default"),
-        sender_receiver_secret);
-
-    // x_t: amount commitment mask (blinding factor)
-    make_seraphis_amount_commitment_mask(rct::rct2sk(sender_receiver_secret), rct::zero(), amount_blinding_factor);
+    // enote misc. details
+    enote_out.m_encoded_amount = m_encoded_amount;
+    enote_out.m_view_tag = m_view_tag;
+    enote_out.m_addr_tag_enc = m_addr_tag_enc;
 }
 //-------------------------------------------------------------------------------------------------------------------
-SpEnoteV1 SpDestinationV1::to_enote_v1(const std::size_t output_index, rct::key &enote_pubkey_out) const
-{
-    SpEnoteV1 enote;
-
-    enote.make(m_enote_privkey,
-        m_recipient_DHkey,
-        m_recipient_viewkey,
-        m_recipient_spendkey,
-        m_amount,
-        output_index,
-        false,
-        enote_pubkey_out);
-
-    return enote;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpDestinationV1::gen(const rct::xmr_amount amount)
+void SpOutputProposalV1::gen(const rct::xmr_amount amount)
 {
     // gen base of destination
-    this->gen_base(amount);
+    m_proposal_core.gen(amount);
 
-    m_enote_privkey = rct::rct2sk(rct::skGen());
+    m_enote_ephemeral_pubkey = rct::pkGen();
+    m_encoded_amount = crypto::rand_idx(rct::xmr_amount{-1});
+    m_view_tag = crypto::rand_idx(view_tag_t{-1});
+    crypto::rand(sizeof(m_addr_tag_enc), m_addr_tag_enc.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
-SpTxProposalV1::SpTxProposalV1(std::vector<SpDestinationV1> destinations)
+SpTxProposalV1::SpTxProposalV1(std::vector<SpOutputProposalV1> output_proposals)
 {
-    // destinations should be randomly ordered
-    std::shuffle(destinations.begin(), destinations.end(), crypto::random_device{});
-    m_destinations = std::move(destinations);
+    // outputs should be sorted by onetime address
+    std::sort(output_proposals.begin(), output_proposals.end());
+
+    // sanity-check semantics
+    check_v1_output_proposals_semantics_sp_v1(output_proposals);
 
     // make outputs
     // make tx supplement
     // prepare for range proofs
-    make_v1_tx_outputs_sp_v1(m_destinations,
+    make_v1_tx_outputs_sp_v1(output_proposals,
         m_outputs,
+        m_tx_supplement,
         m_output_amounts,
-        m_output_amount_commitment_blinding_factors,
-        m_tx_supplement);
+        m_output_amount_commitment_blinding_factors);
+
+    // sanity-check semantics
+    check_v1_tx_supplement_semantics_sp_v1(m_tx_supplement, m_outputs.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key SpTxProposalV1::get_proposal_prefix(const std::string &version_string) const
@@ -125,31 +109,32 @@ rct::key SpTxProposalV1::get_proposal_prefix(const std::string &version_string) 
 SpTxPartialInputV1::SpTxPartialInputV1(const SpInputProposalV1 &input_proposal,
     const rct::key &proposal_prefix)
 {
-    // record proposal info
-    m_input_enote = input_proposal.m_enote;
-    m_input_amount = input_proposal.m_amount;
-    m_input_amount_blinding_factor = input_proposal.m_amount_blinding_factor;
-    m_proposal_prefix = proposal_prefix;
-
     // prepare input image
-    make_v1_tx_image_sp_v1(input_proposal,
-        m_input_image,
-        m_image_address_mask,
-        m_image_amount_mask);
+    input_proposal.m_proposal_core.get_enote_image_squashed_base(m_input_image.m_enote_image_core);
+
+    // copy misc. proposal info
+    m_image_address_mask           = input_proposal.m_proposal_core.m_address_mask;
+    m_image_commitment_mask        = input_proposal.m_proposal_core.m_commitment_mask;
+    m_proposal_prefix              = proposal_prefix;
+    m_input_amount                 = input_proposal.m_proposal_core.m_amount;
+    m_input_amount_blinding_factor = input_proposal.m_proposal_core.m_amount_blinding_factor;
+    input_proposal.m_proposal_core.get_enote_base(m_input_enote_core);
 
     // construct image proof
     make_v1_tx_image_proof_sp_v1(input_proposal,
-        m_input_image,
+        m_input_image.m_enote_image_core.m_masked_address,
         m_image_address_mask,
         m_proposal_prefix,
         m_image_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------
 SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
-    const std::vector<SpTxPartialInputV1> &partial_inputs,
+    std::vector<SpTxPartialInputV1> partial_inputs,
     const std::string &version_string)
 {
-    // inputs and proposal must be for the same tx
+    /// prepare
+
+    // inputs and proposal must be compatible
     rct::key proposal_prefix{proposal.get_proposal_prefix(version_string)};
 
     for (const auto &partial_input : partial_inputs)
@@ -158,10 +143,11 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
             "Incompatible tx pieces when making partial tx.");
     }
 
-    // prepare for sorting
-    std::vector<std::size_t> input_sort_order{get_tx_input_sort_order_v1(partial_inputs)};
-    CHECK_AND_ASSERT_THROW_MES(input_sort_order.size() == partial_inputs.size(),
-        "Vector size mismatch when making partial tx.");
+    // sort the inputs by key image
+    std::sort(partial_inputs.begin(), partial_inputs.end());
+
+
+    /// balance proof
 
     // get input image amount commitment blinding factors
     std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
@@ -174,12 +160,6 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
     for (const auto &partial_input : partial_inputs)
         input_amounts.emplace_back(partial_input.m_input_amount);
 
-    // sort input pieces for balance proof
-    CHECK_AND_ASSERT_THROW_MES(
-        rearrange_vector(input_sort_order, input_image_amount_commitment_blinding_factors) &&
-        rearrange_vector(input_sort_order, input_amounts),
-        "Rearrange vector failed.");
-
     // make balance proof
     make_v1_tx_balance_proof_sp_v1(input_amounts,
         proposal.m_output_amounts,
@@ -187,26 +167,26 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
         proposal.m_output_amount_commitment_blinding_factors,
         m_balance_proof);
 
-    // gather and sort tx input parts
+
+    /// copy misc tx pieces
+
+    // gather tx input parts
     m_input_images.reserve(partial_inputs.size());
     m_image_proofs.reserve(partial_inputs.size());
     m_input_enotes.reserve(partial_inputs.size());
-    m_image_amount_masks.reserve(partial_inputs.size());
     m_image_address_masks.reserve(partial_inputs.size());
+    m_image_commitment_masks.reserve(partial_inputs.size());
 
-    for (std::size_t input_index{0}; input_index < partial_inputs.size(); ++input_index)
+    for (auto &partial_input : partial_inputs)
     {
-        CHECK_AND_ASSERT_THROW_MES(input_sort_order[input_index] < partial_inputs.size(),
-            "Invalid old index for input pieces.");
-
-        m_input_images.emplace_back(partial_inputs[input_sort_order[input_index]].m_input_image);
-        m_image_proofs.emplace_back(partial_inputs[input_sort_order[input_index]].m_image_proof);
-        m_input_enotes.emplace_back(partial_inputs[input_sort_order[input_index]].m_input_enote);
-        m_image_address_masks.emplace_back(partial_inputs[input_sort_order[input_index]].m_image_address_mask);
-        m_image_amount_masks.emplace_back(partial_inputs[input_sort_order[input_index]].m_image_amount_mask);
+        m_input_images.emplace_back(partial_input.m_input_image);
+        m_image_proofs.emplace_back(std::move(partial_input.m_image_proof));
+        m_input_enotes.emplace_back(partial_input.m_input_enote);
+        m_image_address_masks.emplace_back(partial_input.m_image_address_mask);
+        m_image_commitment_masks.emplace_back(partial_input.m_image_commitment_mask);
     }
 
-    // gather the remaining tx parts
+    // gather tx output parts
     m_outputs = proposal.m_outputs;
     m_tx_supplement = proposal.m_tx_supplement;
 }
