@@ -55,6 +55,12 @@ struct SpInputProposalV1 final
     /// core of the proposal
     SpInputProposal m_proposal_core;
 
+     /// less-than operator for sorting
+    bool operator<(const SpInputProposalV1 &other_proposal) const
+    {
+        return m_proposal_core < other_proposal.m_proposal_core;
+    }
+
     /// generate a v1 input (all random; does not support info recovery)
     void gen(const rct::xmr_amount amount) { m_proposal_core.gen(amount); }
 };
@@ -228,9 +234,9 @@ struct SpTxPartialV1 final
     /// supplemental data for tx
     SpTxSupplementV1 m_tx_supplement;
 
-    /// sorted input enotes
+    /// input enotes
     std::vector<SpEnoteV1> m_input_enotes;
-    /// sorted image masks for creating input membership proofs
+    /// image masks for creating input membership proofs
     std::vector<crypto::secret_key> m_image_address_masks;
     std::vector<crypto::secret_key> m_image_commitment_masks;
 };

@@ -121,9 +121,8 @@ SpTxPartialInputV1::SpTxPartialInputV1(const SpInputProposalV1 &input_proposal,
     input_proposal.m_proposal_core.get_enote_base(m_input_enote_core);
 
     // construct image proof
-    make_v1_tx_image_proof_sp_v1(input_proposal,
+    make_v1_tx_image_proof_sp_v1(input_proposal.m_proposal_core,
         m_input_image.m_enote_image_core.m_masked_address,
-        m_image_address_mask,
         m_proposal_prefix,
         m_image_proof);
 }
@@ -149,16 +148,16 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
 
     /// balance proof
 
-    // get input image amount commitment blinding factors
+    // get input image amount commitment blinding factors and amounts
     std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
-    prepare_input_commitment_factors_for_balance_proof_v1(partial_inputs,
-        input_image_amount_commitment_blinding_factors);
-
-    // get input amounts
     std::vector<rct::xmr_amount> input_amounts;
-    input_amounts.reserve(partial_inputs.size());
-    for (const auto &partial_input : partial_inputs)
-        input_amounts.emplace_back(partial_input.m_input_amount);
+    prepare_input_commitment_factors_for_balance_proof_v1(partial_inputs,
+        input_image_amount_commitment_blinding_factors,
+        input_amounts);
+
+    // check balance (TODO: add fee)
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(input_amounts, proposal.m_output_amounts),
+        "Amounts don't balance when making partial tx.");
 
     // make balance proof
     make_v1_tx_balance_proof_sp_v1(input_amounts,

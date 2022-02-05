@@ -166,6 +166,9 @@ struct SpInputProposal final
     /// t_c
     crypto::secret_key m_commitment_mask;
 
+    /// less-than operator for sorting
+    bool operator<(const SpInputProposal &other_proposal) const;
+
     /**
     * brief: get_key_image - get this input's key image
     * outparam: key_image_out - KI

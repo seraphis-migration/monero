@@ -66,6 +66,33 @@ extern "C"
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
+void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &input_images,
+    std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_sortable_in,
+    std::vector<SpMembershipProofV1> &tx_membership_proofs_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(tx_membership_proofs_sortable_in.size() == input_images.size(),
+        "Mismatch between sortable membership proof count and partial tx input image count.");
+
+    tx_membership_proofs_out.clear();
+    tx_membership_proofs_out.reserve(tx_membership_proofs_sortable_in.size());
+
+    for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
+    {
+        // find the membership proof that matches with the input image at this index
+        auto ordered_membership_proof = 
+            std::find_if(tx_membership_proofs_sortable_in.begin(), tx_membership_proofs_sortable_in.end(),
+                    [&](const SpMembershipProofSortableV1 &sortable_proof) -> bool
+                    {
+                        return input_images[input_index].m_masked_address == sortable_proof.m_masked_address;
+                    }
+                );
+
+        CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_sortable_in.end(),
+            "Could not find input image to match with a sortable membership proof.");
+
+        tx_membership_proofs_out.emplace_back(std::move(ordered_membership_proof->m_membership_proof));
+    }
+}
 //-------------------------------------------------------------------------------------------------------------------
 rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &enote_ledger_indices)
 {
@@ -94,55 +121,65 @@ rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &e
 void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<SpInputProposalV1> &input_proposals,
     const std::vector<crypto::secret_key> &image_address_masks,
-    std::vector<rct::xmr_amount> &input_amounts_out,
-    std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors_out)
+    std::vector<crypto::secret_key> &blinding_factors_out,
+    std::vector<rct::xmr_amount> &input_amounts_out)
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == image_address_masks.size(),
         "Mismatch between input proposals and image address masks.");
 
+    blinding_factors_out.clear();
     input_amounts_out.clear();
-    input_image_amount_commitment_blinding_factors_out.clear();
-    input_amounts_out.resize(input_proposals.size());
-    input_image_amount_commitment_blinding_factors_out.resize(input_proposals.size());
+    blinding_factors_out.resize(partial_inputs.size());
+    input_amounts_out.reserve(partial_inputs.size());
 
     for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
     {
-        input_amounts_out[input_index] = input_proposals[input_index].m_amount;
-
         // input image amount commitment blinding factor: t_c + x
-        sc_add(&(input_image_amount_commitment_blinding_factors_out[input_index]),
+        sc_add(&(blinding_factors_out[input_index]),
             &(image_address_masks[input_index]),  // t_c
             &(input_proposals[input_index].m_amount_blinding_factor));  // x
+
+        // input amount: a
+        input_amounts_out.emplace_back(input_proposals[input_index].m_amount);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
 void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<SpTxPartialInputV1> &partial_inputs,
-    std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors_out)
+    std::vector<crypto::secret_key> &blinding_factors_out,
+    std::vector<rct::xmr_amount> &input_amounts_out)
 {
-    input_image_amount_commitment_blinding_factors_out.clear();
-    input_image_amount_commitment_blinding_factors_out.resize(partial_inputs.size());
+    blinding_factors_out.clear();
+    input_amounts_out.clear();
+    blinding_factors_out.resize(partial_inputs.size());
+    input_amounts_out.reserve(partial_inputs.size());
 
     for (std::size_t input_index{0}; input_index < partial_inputs.size(); ++input_index)
     {
         // input image amount commitment blinding factor: t_c + x
-        sc_add(&(input_image_amount_commitment_blinding_factors_out[input_index]),
+        sc_add(&(blinding_factors_out[input_index]),
             &(partial_inputs[input_index].m_image_commitment_mask),  // t_c
             &(partial_inputs[input_index].m_input_amount_blinding_factor));  // x
+
+        // input amount: a
+        input_amounts_out.emplace_back(partial_inputs[input_index].m_input_amount);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_image_proof_sp_v1(const SpInputProposalV1 &input_proposal,
+void make_v1_tx_image_proof_sp_v1(const SpInputProposal &input_proposal,
     const rct::key &masked_address,
-    const crypto::secret_key &image_address_mask,
     const rct::key &message,
     SpImageProofV1 &tx_image_proof_out)
 {
+    // the input enote
+    SpEnote input_enote_base;
+    input_proposal.get_enote_base(input_enote_base);
+
     // prepare for proof (squashed enote model): y, z
     crypto::secret_key y, z;
     crypto::secret_key squash_prefix;
-    make_seraphis_squash_prefix(input_proposal.m_input_enote_core.m_onetime_address,
-        input_proposal.m_input_enote_core.m_amount_commitment,
+    make_seraphis_squash_prefix(input_enote_base.m_onetime_address,
+        input_enote_base.m_amount_commitment,
         squash_prefix);  // H(Ko,C)
 
     sc_mul(&y, &squash_prefix, &(input_proposal.m_enote_view_privkey));  // H(Ko,C) (k_{a, recipient} + k_{a, sender})
@@ -150,17 +187,14 @@ void make_v1_tx_image_proof_sp_v1(const SpInputProposalV1 &input_proposal,
 
     // make seraphis composition proof
     tx_image_proof_out.m_composition_proof =
-        sp_composition_prove(message, masked_address, image_address_mask, y, z);
+        sp_composition_prove(message, masked_address, input_proposal.m_address_mask, y, z);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const std::vector<SpEnoteImageV1> &input_images,
-    const std::vector<crypto::secret_key> &image_address_masks,
     const rct::key &message,
     std::vector<SpImageProofV1> &tx_image_proofs_out)
 {
-    // for squashed enote model
-
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make image proofs for 0 inputs.");
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == input_images.size(), "Input components size mismatch");
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == image_address_masks.size(), "Input components size mismatch");
@@ -170,9 +204,8 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_p
 
     for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
     {
-        make_v1_tx_image_proof_sp_v1(input_proposals[input_index],
+        make_v1_tx_image_proof_sp_v1(input_proposals[input_index].m_proposal_core,
             input_images[input_index].m_enote_image_core.m_masked_address,
-            image_address_masks[input_index],
             message,
             tx_image_proofs_out[input_index]);
     }
@@ -181,34 +214,8 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_p
 void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
-    SpMembershipProofSortableV1 &tx_membership_proof_out)
-{
-    // for squashed enote model
-
-    // make the membership proof
-    make_v1_tx_membership_proof_sp_v1(membership_ref_set,
-        image_address_mask,
-        image_amount_mask,
-        tx_membership_proof_out.m_membership_proof);
-
-    // save the masked address for later matching the membership proof with its input image
-    squash_seraphis_address(
-        membership_ref_set.m_referenced_enotes[membership_ref_set.m_real_spend_index_in_set].m_onetime_address,
-        membership_ref_set.m_referenced_enotes[membership_ref_set.m_real_spend_index_in_set].m_amount_commitment,
-        tx_membership_proof_out.m_masked_address);
-
-    mask_key(image_address_mask,
-        tx_membership_proof_out.m_masked_address,
-        tx_membership_proof_out.m_masked_address);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
-    const crypto::secret_key &image_address_mask,
-    const crypto::secret_key &image_amount_mask,
     SpMembershipProofV1 &tx_membership_proof_out)
 {
-    // for squashed enote model
-
     /// initial checks
     std::size_t ref_set_size{
             ref_set_size_from_decomp(membership_ref_set.m_ref_set_decomp_n, membership_ref_set.m_ref_set_decomp_m)
@@ -218,12 +225,6 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
         "Ref set size doesn't match number of referenced enotes");
     CHECK_AND_ASSERT_THROW_MES(membership_ref_set.m_ledger_enote_indices.size() == ref_set_size,
         "Ref set size doesn't match number of referenced enotes' ledger indices");
-
-
-    /// miscellaneous components
-    tx_membership_proof_out.m_ledger_enote_indices = membership_ref_set.m_ledger_enote_indices;
-    tx_membership_proof_out.m_ref_set_decomp_n = membership_ref_set.m_ref_set_decomp_n;
-    tx_membership_proof_out.m_ref_set_decomp_m = membership_ref_set.m_ref_set_decomp_m;
 
 
     /// prepare to make proof
@@ -246,13 +247,15 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
     image_offsets.resize(1);
 
     // Q'
-    crypto::secret_key q_prime;
-    sc_add(&q_prime, &image_address_mask, &image_amount_mask);  // t_k + t_c
-    mask_key(q_prime, referenced_enotes[membership_ref_set.m_real_spend_index_in_set][0], image_offsets[0]);  // Q'
+    crypto::secret_key squashed_enote_mask;
+    sc_add(&squashed_enote_mask, &image_address_mask, &image_amount_mask);  // t_k + t_c
+    mask_key(squashed_enote_mask,
+        referenced_enotes[membership_ref_set.m_real_spend_index_in_set][0],
+        image_offsets[0]);  // Q'
 
     // secret key of (Q[l] - Q')
     std::vector<crypto::secret_key> image_masks;
-    image_masks.emplace_back(q_prime);  // t_k + t_c
+    image_masks.emplace_back(squashed_enote_mask);  // t_k + t_c
     sc_mul(&(image_masks[0]), &(image_masks[0]), MINUS_ONE.bytes);  // -(t_k + t_c)
 
     // proof message
@@ -267,6 +270,34 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
         membership_ref_set.m_ref_set_decomp_n,
         membership_ref_set.m_ref_set_decomp_m,
         message);
+
+
+    /// copy miscellaneous components
+    tx_membership_proof_out.m_ledger_enote_indices = membership_ref_set.m_ledger_enote_indices;
+    tx_membership_proof_out.m_ref_set_decomp_n = membership_ref_set.m_ref_set_decomp_n;
+    tx_membership_proof_out.m_ref_set_decomp_m = membership_ref_set.m_ref_set_decomp_m;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
+    const crypto::secret_key &image_address_mask,
+    const crypto::secret_key &image_amount_mask,
+    SpMembershipProofSortableV1 &tx_membership_proof_out)
+{
+    // save the masked address to later match the membership proof with its input image
+    squash_seraphis_address(
+        membership_ref_set.m_referenced_enotes[membership_ref_set.m_real_spend_index_in_set].m_onetime_address,
+        membership_ref_set.m_referenced_enotes[membership_ref_set.m_real_spend_index_in_set].m_amount_commitment,
+        tx_membership_proof_out.m_masked_address);
+
+    mask_key(image_address_mask,
+        tx_membership_proof_out.m_masked_address,
+        tx_membership_proof_out.m_masked_address);
+
+    // make the membership proof
+    make_v1_tx_membership_proof_sp_v1(membership_ref_set,
+        image_address_mask,
+        image_amount_mask,
+        tx_membership_proof_out.m_membership_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
@@ -274,8 +305,6 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
     const std::vector<crypto::secret_key> &image_amount_masks,
     std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_out)
 {
-    // for squashed enote model
-
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_address_masks.size(), "Input components size mismatch");
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_amount_masks.size(), "Input components size mismatch");
 
@@ -295,8 +324,6 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
     const std::vector<SpTxPartialInputV1> &partial_inputs,
     std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_out)
 {
-    // for squashed enote model
-
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_inputs.size(), "Input components size mismatch");
 
     tx_membership_proofs_out.clear();
@@ -320,8 +347,6 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
     const SpTxPartialV1 &partial_tx,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out)
 {
-    // for squashed enote model
-
     // note: ref sets are assumed to be pre-sorted, so sortable membership proofs are not needed
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_tx.m_image_address_masks.size(),
         "Input components size mismatch");
@@ -342,7 +367,6 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const rct::key &proposal_prefix,
-    const SpTxProposalV1 &tx_proposal,
     std::vector<SpTxPartialInputV1> &partial_inputs_out)
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Can't make partial tx inputs without any input proposals");
@@ -351,7 +375,7 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input
     partial_inputs_out.reserve(input_proposals.size());
 
     // make all inputs
-    for (const auto &input_proposal : input_proposals)
+    for (const SpInputProposalV1 &input_proposal : input_proposals)
         partial_inputs_out.emplace_back(input_proposal, proposal_prefix);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -370,32 +394,11 @@ std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
-    const std::vector<SpInputProposalV1> &input_proposals,
-    const std::size_t ref_set_decomp_n,
-    const std::size_t ref_set_decomp_m,
-    std::shared_ptr<MockLedgerContext> ledger_context_inout)
-{
-    // for squashed enote model
-
-    std::vector<SpEnoteV1> input_enotes;
-    input_enotes.reserve(input_proposals.size());
-
-    for (const auto &input_proposal : input_proposals)
-    {
-        input_enotes.emplace_back(input_proposal.m_enote);
-    }
-
-    return gen_mock_sp_membership_ref_sets_v1(input_enotes, ref_set_decomp_n, ref_set_decomp_m, ledger_context_inout);
-}
-//-------------------------------------------------------------------------------------------------------------------
-std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     const std::vector<SpEnoteV1> &input_enotes,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     std::shared_ptr<MockLedgerContext> ledger_context_inout)
 {
-    // for squashed enote model
-
     std::vector<SpMembershipReferenceSetV1> reference_sets;
     reference_sets.resize(input_enotes.size());
 
@@ -431,6 +434,23 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     }
 
     return reference_sets;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
+    const std::vector<SpInputProposalV1> &input_proposals,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    std::shared_ptr<MockLedgerContext> ledger_context_inout)
+{
+    std::vector<SpEnoteV1> input_enotes;
+    input_enotes.reserve(input_proposals.size());
+
+    for (const SpInputProposalV1 &input_proposal : input_proposals)
+    {
+        input_enotes.emplace_back(input_proposal.m_enote);
+    }
+
+    return gen_mock_sp_membership_ref_sets_v1(input_enotes, ref_set_decomp_n, ref_set_decomp_m, ledger_context_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

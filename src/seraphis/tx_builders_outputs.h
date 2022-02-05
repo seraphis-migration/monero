@@ -50,13 +50,6 @@
 namespace sp
 {
 
-//todo
-void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_t &total_input_amount,
-    const rct::xmr_amount fee,
-    const JamtisDestinationV1 &change_destination,
-    const rct::key &wallet_spend_pubkey,
-    const rct::key &k_view_balance/*, TODO: extra memo values*/,
-    std::vector<SpOutputProposalV1> &output_proposals_inout);
 /**
 * brief: get_tx_membership_proof_message_sp_v1 - message for membership proofs
 *   - H(crypto project name, enote ledger references)
@@ -87,6 +80,13 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_prop
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
     SpTxSupplementV1 &tx_supplement_inout);
+//todo
+void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_t &total_input_amount,
+    const rct::xmr_amount transaction_fee,
+    const JamtisDestinationV1 &change_destination,
+    const rct::key &wallet_spend_pubkey,
+    const rct::key &k_view_balance/*, TODO: extra memo values*/,
+    std::vector<SpOutputProposalV1> &output_proposals_inout);
 /**
 * brief: gen_mock_sp_destinations_v1 - create random mock destinations
 * param: out_amounts -
