@@ -33,6 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "jamtis_destination.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
@@ -50,7 +51,12 @@ namespace sp
 {
 
 //todo
-void finalize_v1_output_proposal_set_sp_v1();
+void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_t &total_input_amount,
+    const rct::xmr_amount fee,
+    const JamtisDestinationV1 &change_destination,
+    const rct::key &wallet_spend_pubkey,
+    const rct::key &k_view_balance/*, TODO: extra memo values*/,
+    std::vector<SpOutputProposalV1> &output_proposals_inout);
 /**
 * brief: get_tx_membership_proof_message_sp_v1 - message for membership proofs
 *   - H(crypto project name, enote ledger references)

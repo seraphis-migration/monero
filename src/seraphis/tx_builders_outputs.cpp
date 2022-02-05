@@ -34,12 +34,16 @@
 //local headers
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
+#include "jamtis_destination.h"
+#include "jamtis_payment_proposal.h"
+#include "jamtis_support_types.h"
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 
 //third party headers
+#include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
 #include <algorithm>
@@ -52,9 +56,203 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void finalize_v1_output_proposal_set_sp_v1()
+// check that all enote ephemeral pubkeys in an output proposal set are unique
+//-------------------------------------------------------------------------------------------------------------------
+static bool check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(const std::vector<SpOutputProposalV1> &output_proposals)
 {
-    //TODO
+    for (auto output_it{output_proposals.begin()}; output_it != output_proposals.end(); ++output_it)
+    {
+        if (std::find_if(output_proposals.begin(), output_it,
+                    [](const SpOutputProposalV1 &proposal_1, const SpOutputProposalV1 &proposal_2) -> bool
+                    {
+                        return proposal_1.m_enote_ephemeral_pubkey == proposal_2.m_enote_ephemeral_pubkey;
+                    }
+                ) != output_it)
+            return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_t &total_input_amount,
+    const rct::xmr_amount fee,
+    const JamtisDestinationV1 &change_destination,
+    const rct::key &wallet_spend_pubkey,
+    const rct::key &k_view_balance/*, TODO: extra memo values*/,
+    std::vector<SpOutputProposalV1> &output_proposals_inout)
+{
+    // get change amount
+    boost::multiprecision::uint128_t output_sum{fee};
+
+    for (const SpOutputProposalV1 &proposal : output_proposals_inout)
+        output_sum += proposal.m_proposal_core.m_amount;
+
+    CHECK_AND_ASSERT_THROW_MES(output_sum <= total_input_amount, "Finalize output proposals: input amount is too small.");
+    CHECK_AND_ASSERT_THROW_MES(total_input_amount - output_sum <= rct::xmr_amount{-1},
+        "Finalize output proposals: change amount exceeds maximum value allowed.");
+
+    rct::xmr_amount change_amount{total_input_amount - output_sum};
+
+    // finalize the output proposal set: add zero or more of the following
+    // - dummy output
+    // - normal change output
+    // - special change output (2-out txs only)
+    if (output_proposals_inout.size() == 0)
+    {
+        // txs should have at least 1 non-change output
+
+        CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: 0 outputs specified. If you want to send money to
+            yourself, use a self-spend enote type instead of forcing it via a change enote type.");
+    }
+    else if (output_proposals_inout.size() == 1)
+    {
+        if (change_amount == 0)
+        {
+            // txs need at least 2 outputs
+
+            // add a dummy special output
+            // - 0 amount
+            // - make sure the final proposal set will have 1 unique enote ephemeral pubkey
+            JamtisPaymentProposalSelfSendV1 special_dummy;
+            special_dummy.gen(0, JamtisSelfSendMAC::CHANGE);
+            special_dummy.m_destination.m_addr_K3 = output_proposals_inout[0].m_enote_ephemeral_pubkey;
+            special_dummy.m_enote_ephemeral_privkey = rct::rct2sk(rct::identity());  //r = 1 (not needed)
+
+            output_proposals_inout.push_back();
+            special_dummy.get_output_proposal_v1(output_proposals_inout.back());
+        }
+        else if /*change_amount > 0 &&*/
+            (is_self_send_output_proposal(wallet_spend_pubkey, k_view_balance, output_proposals_inout[0]))
+        {
+            // 2-out txs may not have 2 self-send type enotes from the same wallet, so we can't have a special change here
+
+            // add a dummy normal output
+            // - 0 amount
+            output_proposals_inout.push_back();
+            output_proposals_inout.back().gen(0);
+
+            // add a normal change output
+            // - 'change' amount
+            JamtisPaymentProposalSelfSendV1 normal_change;
+            normal_change.m_destination = change_destination;
+            normal_change.m_amount = change_amount;
+            normal_change.m_type = JamtisSelfSendMAC::CHANGE;
+            normal_change.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+            normal_change.m_viewbalance_privkey = k_view_balance;
+
+            output_proposals_inout.push_back();
+            normal_change.get_output_proposal_v1(output_proposals_inout.back());
+        }
+        else //(change_amount > 0 && not self-send)
+        {
+            // if there is 1 normal output and non-zero change, then make a special change enote that shares
+            //   the normal output's enote ephemeral pubkey
+
+            // add a special change output
+            // - 'change' amount
+            // - make sure the final proposal set will have 1 unique enote ephemeral pubkey
+            crypto::secret_key findreceived_key;
+            make_jamtis_findreceived_key(k_view_balance, findreceived_key);
+            rct::key special_change_addr_K2{
+                    rct::scalarmultKey(output_proposals_inout[0].m_enote_ephemeral_pubkey, rct::sk2rct(findreceived_key))
+                };  //k_fr * K_e_other
+
+            JamtisPaymentProposalSelfSendV1 special_change;
+            special_change.m_destination = change_destination;
+            special_change.m_destination.m_addr_K2 = special_change_addr_K2;  //k_fr * K_e_other
+            special_change.m_destination.m_addr_K3 = output_proposals_inout[0].m_enote_ephemeral_pubkey;  //K_e_other
+            special_change.m_amount = change_amount;
+            special_change.m_type = JamtisSelfSendMAC::CHANGE;
+            special_change.m_enote_ephemeral_privkey = rct::rct2sk(rct::identity());  //r = 1 (not needed)
+            special_change.m_viewbalance_privkey = k_view_balance;
+
+            output_proposals_inout.push_back();
+            special_change.get_output_proposal_v1(output_proposals_inout.back());
+        }
+    }
+    else if (output_proposals_inout.size() == 2 &&
+        !(output_proposals_inout[0].m_enote_ephemeral_pubkey == output_proposals_inout[1].m_enote_ephemeral_pubkey))
+    {
+        if (change_amount == 0)
+        {
+            // 2-out txs need 1 shared enote ephemeral pubkey; add a dummy output here since the outputs have different
+            //   enote ephemeral pubkeys
+
+            // add a dummy normal output
+            // - 0 amount
+            output_proposals_inout.push_back();
+            output_proposals_inout.back().gen(0);
+        }
+        else //(change_amount > 0)
+        {
+            // 2 separate outputs + 1 change output = a simple 3-out tx
+
+            // add a normal change output
+            // - 'change' amount
+            JamtisPaymentProposalSelfSendV1 normal_change;
+            normal_change.m_destination = change_destination;
+            normal_change.m_amount = change_amount;
+            normal_change.m_type = JamtisSelfSendMAC::CHANGE;
+            normal_change.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+            normal_change.m_viewbalance_privkey = k_view_balance;
+
+            output_proposals_inout.push_back();
+            normal_change.get_output_proposal_v1(output_proposals_inout.back());
+        }
+    }
+    else if (output_proposals_inout.size() == 2 &&
+        output_proposals_inout[0].m_enote_ephemeral_pubkey == output_proposals_inout[1].m_enote_ephemeral_pubkey)
+    {
+        if (change_amount == 0)
+        {
+            if (is_self_send_output_proposal(wallet_spend_pubkey, k_view_balance, output_proposals_inout[0]) &&
+                is_self_send_output_proposal(wallet_spend_pubkey, k_view_balance, output_proposals_inout[1]))
+            {
+                CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: there are 2 self-send outputs that share
+                    an enote ephemeral pubkey, but this can reduce user privacy. If you want to send money to yourself, make
+                    independent self-spend types, or avoid calling this function (not recommended).");
+            }
+            else //(at most 1 output proposal is a self-send)
+            {
+                // do nothing: the proposal set is already 'final'
+            }
+        }
+        else //(change_amount > 0)
+        {
+            CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: there are 2 outputs that share
+                an enote ephemeral pubkey, but a non-zero change amount. In >2-out txs, all enote ephemeral pubkeys should
+                be unique, so adding a change output isn't feasible here. You need to make independent output proposals, or
+                avoid calling this function (not recommended).");
+        }
+    }
+    else //(output_proposals_inout.size() > 2)
+    {
+        CHECK_AND_ASSERT_THROW_MES(check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(output_proposals_inout),
+            "Finalize output proposals: there are >2 outputs but their enote ephemeral pubkeys aren't all
+            unique.");
+
+        if (change_amount == 0)
+        {
+            // do nothing: the proposal set is already 'final'
+        }
+        else //(change_amount > 0)
+        {
+            // >2 separate outputs + 1 change output = a simple tx with 3+ outputs
+
+            // add a normal change output
+            // - 'change' amount
+            JamtisPaymentProposalSelfSendV1 normal_change;
+            normal_change.m_destination = change_destination;
+            normal_change.m_amount = change_amount;
+            normal_change.m_type = JamtisSelfSendMAC::CHANGE;
+            normal_change.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+            normal_change.m_viewbalance_privkey = k_view_balance;
+
+            output_proposals_inout.push_back();
+            normal_change.get_output_proposal_v1(output_proposals_inout.back());
+        }
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposalV1> &output_proposals)
@@ -78,12 +276,7 @@ void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposa
     {
         for (auto output_it{output_proposals.begin()}; output_it != output_proposals.end(); ++output_it)
         {
-            CHECK_AND_ASSERT_THROW_MES(std::find_if(output_proposals.begin(), output_it,
-                        [](const SpOutputProposalV1 &proposal_1, const SpOutputProposalV1 &proposal_2) -> bool
-                        {
-                            return proposal_1.m_enote_ephemeral_pubkey == proposal_2.m_enote_ephemeral_pubkey;
-                        }
-                    ) == output_it,
+            CHECK_AND_ASSERT_THROW_MES(check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(output_proposals),
                 "Semantics check output proposals v1: there are >2 outputs but their enote ephemeral pubkeys aren't all
                 unique.");
         }

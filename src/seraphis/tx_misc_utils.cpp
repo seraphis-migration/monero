@@ -60,7 +60,7 @@ std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const s
     {
         for (std::size_t mul{1}; mul < ref_set_decomp_m; ++mul)
         {
-            if (ref_set_size*ref_set_decomp_n < ref_set_size)
+            if (ref_set_size*ref_set_decomp_n < ref_set_size)  //overflow
                 return -1;
             else
                 ref_set_size *= ref_set_decomp_n;
