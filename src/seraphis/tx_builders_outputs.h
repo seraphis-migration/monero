@@ -39,6 +39,7 @@
 #include "tx_component_types.h"
 
 //third party headers
+#include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
 #include <string>
@@ -83,9 +84,9 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_prop
 //todo
 void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_t &total_input_amount,
     const rct::xmr_amount transaction_fee,
-    const JamtisDestinationV1 &change_destination,
+    const jamtis::JamtisDestinationV1 &change_destination,
     const rct::key &wallet_spend_pubkey,
-    const rct::key &k_view_balance/*, TODO: extra memo values*/,
+    const crypto::secret_key &k_view_balance/*, TODO: extra memo values*/,
     std::vector<SpOutputProposalV1> &output_proposals_inout);
 /**
 * brief: gen_mock_sp_destinations_v1 - create random mock destinations

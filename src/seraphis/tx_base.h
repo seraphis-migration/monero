@@ -107,7 +107,6 @@ public:
 
     //get_tx_byte_blob()
 
-private:
     virtual bool validate_tx_semantics() const = 0;
     virtual bool validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const = 0;
     // e.g. sum(inputs) == sum(outputs), range proofs
@@ -115,8 +114,9 @@ private:
     // e.g. membership, ownership, unspentness proofs
     virtual bool validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
         const bool defer_batchable) const = 0;
+
 //member variables
-public:
+protected:
     /// era of the tx (e.g. CryptoNote/RingCT/Seraphis)
     unsigned char m_tx_era_version;
     /// format version of the tx within its era

@@ -33,19 +33,12 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "device/device.hpp"
-#include "misc_language.h"
-#include "misc_log_ex.h"
-#include "ringct/rctOps.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
-#include "sp_core_types.h"
-#include "sp_core_utils.h"
 
 //third party headers
 
 //standard headers
-#include <algorithm>
-#include <memory>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -54,55 +47,18 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnoteV1::make(const crypto::secret_key &enote_privkey,
-    const rct::key &recipient_DH_base,
-    const rct::key &recipient_view_key,
-    const rct::key &recipient_spend_key,
-    const rct::xmr_amount amount,
-    const std::size_t enote_index,
-    const bool lock_amounts_to_DH_key,
-    rct::key &enote_pubkey_out)
+void SpEnoteV1::append_to_string(std::string &str_inout) const
 {
-    // note: t = enote_index
+    // append all enote contents to the string
+    str_inout.reserve(str_inout.size() + get_size_bytes());
 
-    // r_t: sender-receiver shared secret
-    rct::key sender_receiver_secret;
-    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
-        memwipe(&sender_receiver_secret, sizeof(rct::key));
-    });
-    make_seraphis_sender_receiver_secret(enote_privkey,
-        recipient_view_key,
-        enote_index,
-        hw::get_device("default"),
-        sender_receiver_secret);
-
-    // make extra key for locking ENote amounts to the recipient's DH base key (DH_base = DH_base_key * G)
-    rct::key extra_key_amounts{rct::zero()};
-    if (lock_amounts_to_DH_key)
-        rct::scalarmultBase(extra_key_amounts, rct::sk2rct(enote_privkey));
-
-    // x_t: amount commitment mask (blinding factor)
-    crypto::secret_key amount_mask;
-    make_seraphis_amount_commitment_mask(rct::rct2sk(sender_receiver_secret), extra_key_amounts, amount_mask);
-
-    // k_{a, sender, t}: extension to add to user's spend key
-    crypto::secret_key k_a_extender;
-    make_seraphis_sender_address_extension(rct::rct2sk(sender_receiver_secret), k_a_extender);
-
-    // make the base of the enote (Ko_t, C_t)
-    this->make_base_with_address_extension(k_a_extender, recipient_spend_key, amount_mask, amount);
-
-    // enc(a_t): encoded amount
-    m_encoded_amount = enc_dec_seraphis_amount(rct::rct2sk(sender_receiver_secret), extra_key_amounts, amount);
-
-    // view_tag_t: view tag
-    m_view_tag = make_seraphis_view_tag(enote_privkey,
-        recipient_view_key,
-        enote_index,
-        hw::get_device("default"));
-
-    // R_t: enote pubkey to send back to caller
-    make_seraphis_enote_pubkey(enote_privkey, recipient_DH_base, enote_pubkey_out);
+    m_enote_core.append_to_string(str_inout);
+    for (int i{0}; i < 8; ++i)
+    {
+        str_inout += static_cast<char>(m_encoded_amount >> i*8);
+    }
+    str_inout += static_cast<char>(m_view_tag);
+    str_inout.append(reinterpret_cast<const char*>(m_addr_tag_enc.bytes), sizeof(jamtis::encrypted_address_tag_t));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpEnoteV1::gen()
@@ -110,24 +66,12 @@ void SpEnoteV1::gen()
     // generate a dummy enote: random pieces, completely unspendable
 
     // gen base of enote
-    this->gen_base();
+    m_enote_core.gen();
 
     // memo
-    m_encoded_amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-    m_view_tag = crypto::rand_idx(static_cast<unsigned char>(-1));
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpEnoteV1::append_to_string(std::string &str_inout) const
-{
-    // append all enote contents to the string
-    // - assume the input string has enouch capacity
-    str_inout.append((const char*) m_onetime_address.bytes, sizeof(rct::key));
-    str_inout.append((const char*) m_amount_commitment.bytes, sizeof(rct::key));
-    for (int i{7}; i >= 0; --i)
-    {
-        str_inout += static_cast<char>(m_encoded_amount >> i*8);
-    }
-    str_inout += static_cast<char>(m_view_tag);
+    m_encoded_amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));
+    m_view_tag = crypto::rand_idx(static_cast<jamtis::view_tag_t>(-1));
+    crypto::rand(sizeof(jamtis::encrypted_address_tag_t), m_addr_tag_enc.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpMembershipProofV1::get_size_bytes() const
@@ -142,15 +86,8 @@ std::size_t SpMembershipProofV1::get_size_bytes() const
     return 32 * num_elements;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t SpImageProofV1::get_size_bytes() const
-{
-    return 32 * 5;
-}
-//-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=false*/) const
 {
-    // note: ignore the amount commitment set stored in the range proofs, they are double counted by the output set
-    //TODO? don't store amount commitment set in range proofs at all
     std::size_t size{0};
 
     // BP+ proof
@@ -166,7 +103,7 @@ std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=f
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSupplementV1::get_size_bytes() const
 {
-    return 32 * m_output_enote_pubkeys.size();
+    return 32 * m_output_enote_ephemeral_pubkeys.size();
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

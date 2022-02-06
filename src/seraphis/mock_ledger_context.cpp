@@ -101,7 +101,7 @@ void MockLedgerContext::add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_
 
     // add linking tags
     for (const auto &input_image : tx_to_add.m_input_images)
-        this->add_linking_tag_sp_v1_impl(input_image.m_key_image);
+        this->add_linking_tag_sp_v1_impl(input_image.m_enote_image_core.m_key_image);
 
     // add new enotes
     for (const auto &output_enote : tx_to_add.m_outputs)
@@ -144,8 +144,8 @@ std::size_t MockLedgerContext::add_enote_sp_v1_impl(const SpEnoteV1 &enote)
     m_sp_enotes[m_sp_enotes.size()] = enote;
 
     // add the squashed enote
-    seraphis_squashed_enote_Q(enote.m_onetime_address,
-        enote.m_amount_commitment,
+    seraphis_squashed_enote_Q(enote.m_enote_core.m_onetime_address,
+        enote.m_enote_core.m_amount_commitment,
         m_sp_squashed_enotes[m_sp_enotes.size() - 1]);
 
     return m_sp_enotes.size() - 1;

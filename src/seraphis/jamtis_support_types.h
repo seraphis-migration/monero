@@ -63,13 +63,13 @@ struct address_tag_t final
 {
     unsigned char bytes[ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES];
 
-    // comparison operator
+    /// comparison operator
     bool operator==(const address_tag_t &other_tag) const
     {
         return memcmp(bytes, other_tag.bytes, sizeof(address_tag_t)) == 0;
     }
 
-    // customize operator^ for encrypting tags
+    /// customize operator^ for encrypting tags
     address_tag_t operator^(const address_tag_t &other_tag) const
     {
         address_tag_t temp;

@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "tx_builder_inputs.h"
+#include "tx_builders_inputs.h"
 
 //local headers
 #include "common/varint.h"
@@ -82,7 +82,8 @@ void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &inpu
             std::find_if(tx_membership_proofs_sortable.begin(), tx_membership_proofs_sortable.end(),
                     [&](const SpMembershipProofSortableV1 &sortable_proof) -> bool
                     {
-                        return input_images[input_index].m_masked_address == sortable_proof.m_masked_address;
+                        return input_images[input_index].m_enote_image_core.m_masked_address ==
+                            sortable_proof.m_masked_address;
                     }
                 );
 
@@ -128,18 +129,18 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
 
     blinding_factors_out.clear();
     input_amounts_out.clear();
-    blinding_factors_out.resize(partial_inputs.size());
-    input_amounts_out.reserve(partial_inputs.size());
+    blinding_factors_out.resize(input_proposals.size());
+    input_amounts_out.reserve(input_proposals.size());
 
     for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
     {
         // input image amount commitment blinding factor: t_c + x
         sc_add(&(blinding_factors_out[input_index]),
             &(image_address_masks[input_index]),  // t_c
-            &(input_proposals[input_index].m_amount_blinding_factor));  // x
+            &(input_proposals[input_index].m_proposal_core.m_amount_blinding_factor));  // x
 
         // input amount: a
-        input_amounts_out.emplace_back(input_proposals[input_index].m_amount);
+        input_amounts_out.emplace_back(input_proposals[input_index].m_proposal_core.m_amount);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -196,7 +197,6 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_p
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make image proofs for 0 inputs.");
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == input_images.size(), "Input components size mismatch");
-    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == image_address_masks.size(), "Input components size mismatch");
 
     tx_image_proofs_out.clear();
     tx_image_proofs_out.resize(input_proposals.size());
@@ -332,7 +332,7 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
     {
         CHECK_AND_ASSERT_THROW_MES(membership_ref_sets[input_index].
                 m_referenced_enotes[membership_ref_sets[input_index].m_real_spend_index_in_set].m_onetime_address ==
-            partial_inputs[input_index].m_input_enote.m_onetime_address, 
+            partial_inputs[input_index].m_input_enote_core.m_onetime_address, 
             "Membership ref set real spend doesn't match partial input's enote.");
 
         make_v1_tx_membership_proof_sp_v1(membership_ref_sets[input_index],

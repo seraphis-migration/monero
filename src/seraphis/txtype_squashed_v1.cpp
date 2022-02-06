@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "sp_txtype_squashed_v1.h"
+#include "txtype_squashed_v1.h"
 
 //local headers
 #include "cryptonote_config.h"
@@ -40,10 +40,11 @@
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
 #include "tx_builder_types.h"
+#include "tx_builders_inputs.h"
 #include "tx_builders_mixed.h"
+#include "tx_builders_outputs.h"
 #include "tx_component_types.h"
 #include "tx_misc_utils.h"
-#include "tx_utils.h"
 #include "tx_validators.h"
 
 //third party headers
@@ -124,7 +125,7 @@ SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_propo
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(output_proposals.size() > 0, "Tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, output_proposals),
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, output_proposals, 0),
         "Tried to make tx with unbalanced amounts.");  //TODO: include fee in balance check
 
     // versioning for proofs
@@ -138,7 +139,7 @@ SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_propo
 
     // partial inputs
     std::vector<SpTxPartialInputV1> partial_inputs;
-    make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, tx_proposal, partial_inputs);
+    make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, partial_inputs);
 
     // membership proofs (input proposals assumed to line up with membership ref sets)
     std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable;
@@ -169,7 +170,7 @@ bool SpTxSquashedV1::validate_tx_semantics() const
         m_membership_proofs.size(),
         m_image_proofs.size(),
         m_outputs.size(),
-        m_supplement.m_output_enote_pubkeys.size(),
+        m_supplement.m_output_enote_ephemeral_pubkeys.size(),
         m_balance_proof->m_bpp_proof.V.size()))
     {
         return false;
@@ -332,7 +333,7 @@ bool validate_mock_txs<SpTxSquashedV1>(const std::vector<std::shared_ptr<SpTxSqu
     std::vector<const rct::BulletproofPlus*> range_proofs;
     range_proofs.reserve(txs_to_validate.size());
 
-    for (const auto &tx : txs_to_validate)
+    for (const std::shared_ptr<SpTxSquashedV1> &tx : txs_to_validate)
     {
         if (tx.get() == nullptr)
             return false;

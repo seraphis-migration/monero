@@ -33,6 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "cryptonote_config.h"
 #include "misc_language.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
@@ -82,14 +83,14 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     hash.reserve(sizeof(CRYPTONOTE_NAME) +
         version_string.size() +
         output_enotes.size()*SpEnoteV1::get_size_bytes() +
-        tx_supplement.m_output_enote_pubkeys.size());
+        tx_supplement.m_output_enote_ephemeral_pubkeys.size());
     hash = CRYPTONOTE_NAME;
     hash += version_string;
     for (const auto &output_enote : output_enotes)
     {
         output_enote.append_to_string(hash);
     }
-    for (const auto &enote_pubkey : tx_supplement.m_output_enote_pubkeys)
+    for (const auto &enote_pubkey : tx_supplement.m_output_enote_ephemeral_pubkeys)
     {
         hash.append((const char*) enote_pubkey.bytes, sizeof(enote_pubkey));
     }
@@ -103,12 +104,11 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_am
     const std::vector<rct::xmr_amount> &output_amounts,
     const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
-    std::shared_ptr<SpBalanceProofV1> &balance_proof_out)
+    std::shared_ptr<const SpBalanceProofV1> &balance_proof_out)
 {
     // for squashed enote model
 
-    if (balance_proof_out.get() == nullptr)
-        balance_proof_out = std::make_shared<SpBalanceProofV1>();
+    std::shared_ptr<SpBalanceProofV1> balance_proof_temp = std::make_shared<SpBalanceProofV1>();
 
     // combine inputs and outputs
     std::vector<rct::xmr_amount> amounts;
@@ -132,7 +132,7 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_am
         amount_commitment_blinding_factors,
         range_proofs);
 
-    balance_proof_out->m_bpp_proof = std::move(range_proofs);
+    balance_proof_temp->m_bpp_proof = std::move(range_proofs);
 
     // set the remainder blinding factor
     crypto::secret_key remainder_blinding_factor;
@@ -140,7 +140,10 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_am
         output_amount_commitment_blinding_factors,
         remainder_blinding_factor);
 
-    balance_proof_out->m_remainder_blinding_factor = rct::sk2rct(remainder_blinding_factor);
+    balance_proof_temp->m_remainder_blinding_factor = rct::sk2rct(remainder_blinding_factor);
+
+    // set the return value
+    balance_proof_out = std::move(balance_proof_temp);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,

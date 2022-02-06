@@ -74,7 +74,7 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_am
     const std::vector<rct::xmr_amount> &output_amounts,
     const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
-    std::shared_ptr<SpBalanceProofV1> &balance_proof_out);
+    std::shared_ptr<const SpBalanceProofV1> &balance_proof_out);
 /**
 * brief: balance_check_in_out_amnts_sp_v1 - wrapper on balance_check_in_out_amnts()
 * param: input_proposals -

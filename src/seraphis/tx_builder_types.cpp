@@ -40,6 +40,7 @@
 #include "tx_builders_mixed.h"
 #include "tx_builders_outputs.h"
 #include "tx_component_types.h"
+#include "tx_misc_utils.h"
 
 //third party headers
 
@@ -59,7 +60,7 @@ void SpOutputProposalV1::get_enote_v1(SpEnoteV1 &enote_out) const
     // enote core
     enote_out.m_enote_core.m_onetime_address = m_proposal_core.m_onetime_address;
     enote_out.m_enote_core.m_amount_commitment =
-        rct::commit(m_proposal_core.m_amount, m_proposal_core.m_amount_blinding_factor);
+        rct::commit(m_proposal_core.m_amount, rct::sk2rct(m_proposal_core.m_amount_blinding_factor));
 
     // enote misc. details
     enote_out.m_encoded_amount = m_encoded_amount;
@@ -73,8 +74,8 @@ void SpOutputProposalV1::gen(const rct::xmr_amount amount)
     m_proposal_core.gen(amount);
 
     m_enote_ephemeral_pubkey = rct::pkGen();
-    m_encoded_amount = crypto::rand_idx(rct::xmr_amount{-1});
-    m_view_tag = crypto::rand_idx(view_tag_t{-1});
+    m_encoded_amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));
+    m_view_tag = crypto::rand_idx(static_cast<jamtis::view_tag_t>(-1));
     crypto::rand(sizeof(m_addr_tag_enc), m_addr_tag_enc.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -91,9 +92,9 @@ SpTxProposalV1::SpTxProposalV1(std::vector<SpOutputProposalV1> output_proposals)
     // prepare for range proofs
     make_v1_tx_outputs_sp_v1(output_proposals,
         m_outputs,
-        m_tx_supplement,
         m_output_amounts,
-        m_output_amount_commitment_blinding_factors);
+        m_output_amount_commitment_blinding_factors,
+        m_tx_supplement);
 
     // sanity-check semantics
     check_v1_tx_supplement_semantics_sp_v1(m_tx_supplement, m_outputs.size());
@@ -180,7 +181,7 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
     {
         m_input_images.emplace_back(partial_input.m_input_image);
         m_image_proofs.emplace_back(std::move(partial_input.m_image_proof));
-        m_input_enotes.emplace_back(partial_input.m_input_enote);
+        m_input_enotes.emplace_back(partial_input.m_input_enote_core);
         m_image_address_masks.emplace_back(partial_input.m_image_address_mask);
         m_image_commitment_masks.emplace_back(partial_input.m_image_commitment_mask);
     }

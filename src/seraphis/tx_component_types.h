@@ -34,6 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "concise_grootle.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
 #include "sp_core_types.h"
@@ -81,7 +82,10 @@ struct SpEnoteV1 final
 
     static std::size_t get_size_bytes()
     {
-        return SpEnote::get_size_bytes() + sizeof(rct::xmr_amount) + sizeof(view_tag_t) + sizeof(address_tag_t);
+        return SpEnote::get_size_bytes() +
+            sizeof(rct::xmr_amount) +
+            sizeof(jamtis::view_tag_t) +
+            sizeof(jamtis::encrypted_address_tag_t);
     }
 };
 
@@ -128,7 +132,7 @@ struct SpImageProofV1 final
     /// a seraphis composition proof
     sp::SpCompositionProof m_composition_proof;
 
-    std::size_t get_size_bytes() const;
+    static std::size_t get_size_bytes() { return 32*5; }
 };
 
 ////

@@ -79,12 +79,12 @@ public:
     /// normal constructor: new tx from pieces
     SpTxSquashedV1(std::vector<SpEnoteImageV1> input_images,
         std::vector<SpEnoteV1> outputs,
-        std::shared_ptr<SpBalanceProofV1> balance_proof,
+        std::shared_ptr<const SpBalanceProofV1> balance_proof,
         std::vector<SpImageProofV1> image_proofs,
         std::vector<SpMembershipProofV1> membership_proofs,
         SpTxSupplementV1 tx_supplement,
         const SemanticRulesVersion semantic_rules_version) :
-            SpTx{TxEraSp, TxStructureVersionSp::TxTypeSpSquashedV1, semantic_rules_version}  //base class
+            SpTx{TxEraSp, TxStructureVersionSp::TxTypeSpSquashedV1, semantic_rules_version},  //base class
             m_input_images{std::move(input_images)},
             m_outputs{std::move(outputs)},
             m_balance_proof{std::move(balance_proof)},
@@ -124,14 +124,6 @@ public:
 //destructor: default
 
 //member functions
-    /// validate tx
-    bool validate(const std::shared_ptr<const LedgerContext> ledger_context,
-        const bool defer_batchable = false) const override
-    {
-        // punt to the parent class
-        return this->SpTx::validate(ledger_context, defer_batchable);
-    }
-
     /// get size of tx
     std::size_t get_size_bytes() const override;
 
@@ -167,7 +159,7 @@ private:
     /// tx outputs (new e-notes)
     std::vector<SpEnoteV1> m_outputs;
     /// balance proof (balance proof and range proofs)
-    std::shared_ptr<SpBalanceProofV1> m_balance_proof;
+    std::shared_ptr<const SpBalanceProofV1> m_balance_proof;
     /// composition proofs: ownership/key-image-legitimacy for each input
     std::vector<SpImageProofV1> m_image_proofs;
     /// concise Grootle proofs on squashed enotes: membership for each input

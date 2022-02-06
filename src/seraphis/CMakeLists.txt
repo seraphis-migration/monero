@@ -28,19 +28,27 @@
 
 set(seraphis_sources
   concise_grootle.cpp
+  jamtis_address_tags.cpp
+  jamtis_address_utils.cpp
   jamtis_core_utils.cpp
+  jamtis_destination.cpp
+  jamtis_enote_utils.cpp
+  jamtis_hash_functions.cpp
+  jamtis_payment_proposal.cpp
   mock_ledger_context.cpp
-  sp_base_types.cpp
   sp_composition_proof.cpp
-  sp_core_utils.cpp
+  sp_core_enote_utils.cpp
+  sp_core_types.cpp
   sp_crypto_utils.cpp
-  sp_tx_base.cpp
-  sp_tx_builder_types.cpp
-  sp_tx_component_types.cpp
-  sp_tx_misc_utils.cpp
-  sp_tx_utils.cpp
-  sp_tx_validators.cpp
-  sp_txtype_squashed_v1.cpp)
+  tx_base.cpp
+  tx_builder_types.cpp
+  tx_builders_inputs.cpp
+  tx_builders_mixed.cpp
+  tx_builders_outputs.cpp
+  tx_component_types.cpp
+  tx_misc_utils.cpp
+  tx_validators.cpp
+  txtype_squashed_v1.cpp)
 
 monero_find_all_headers(seraphis_headers, "${CMAKE_CURRENT_SOURCE_DIR}")
 

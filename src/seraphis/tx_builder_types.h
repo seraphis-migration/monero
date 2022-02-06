@@ -235,7 +235,7 @@ struct SpTxPartialV1 final
     SpTxSupplementV1 m_tx_supplement;
 
     /// input enotes
-    std::vector<SpEnoteV1> m_input_enotes;
+    std::vector<SpEnote> m_input_enotes;
     /// image masks for creating input membership proofs
     std::vector<crypto::secret_key> m_image_address_masks;
     std::vector<crypto::secret_key> m_image_commitment_masks;

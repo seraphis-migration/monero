@@ -36,7 +36,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "sp_core_utils.h"
+#include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 
 //third party headers
@@ -96,10 +96,11 @@ void SpEnote::gen()
 //-------------------------------------------------------------------------------------------------------------------
 void SpEnote::append_to_string(std::string &str_inout) const
 {
-    // append all enote contents to the string
-    // - assume the input string has enough capacity (or the caller doesn't care about allocations)
-    str_inout.append((const char*) m_onetime_address.bytes, sizeof(rct::key));
-    str_inout.append((const char*) m_amount_commitment.bytes, sizeof(rct::key));
+    // append enote contents to the string
+    str_inout.reserve(str_inout.size() + get_size_bytes());
+
+    str_inout.append(reinterpret_cast<const char *>(m_onetime_address.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(m_amount_commitment.bytes), sizeof(rct::key));
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpInputProposal::operator<(const SpInputProposal &other_proposal) const
