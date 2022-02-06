@@ -420,10 +420,10 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
     for (std::size_t e{0}; e < num_signers; ++e)
     {
-        signer_nonces_pub_mul8.emplace_back(
-                rct::scalarmult8(signer_nonces_pub_1[e]),
-                rct::scalarmult8(signer_nonces_pub_2[e])
-            );
+        signer_nonces_pub_mul8.emplace_back();
+        signer_nonces_pub_mul8.back().nonce_1 = rct::scalarmult8(signer_nonces_pub_1[e]);
+        signer_nonces_pub_mul8.back().nonce_2 = rct::scalarmult8(signer_nonces_pub_2[e]);
+
         CHECK_AND_ASSERT_THROW_MES(!(signer_nonces_pub_mul8.back().nonce_1 == rct::identity()),
             "Bad signer nonce (alpha_1 identity)!");
         CHECK_AND_ASSERT_THROW_MES(!(signer_nonces_pub_mul8.back().nonce_2 == rct::identity()),

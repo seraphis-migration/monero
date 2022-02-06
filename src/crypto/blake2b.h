@@ -34,9 +34,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /// NOTE: implementation lifted out of randomx package
 
-#ifndef PORTABLE_BLAKE2_H
-#define PORTABLE_BLAKE2_H
+#pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 #include <limits.h>
 
@@ -104,6 +104,4 @@ extern "C" {
 
 #if defined(__cplusplus)
 }
-#endif
-
 #endif

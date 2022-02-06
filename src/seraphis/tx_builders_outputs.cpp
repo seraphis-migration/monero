@@ -65,9 +65,9 @@ static bool check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(const std::
     for (auto output_it{output_proposals.begin()}; output_it != output_proposals.end(); ++output_it)
     {
         if (std::find_if(output_proposals.begin(), output_it,
-                    [](const SpOutputProposalV1 &proposal_1, const SpOutputProposalV1 &proposal_2) -> bool
+                    [&output_it](const SpOutputProposalV1 &previous_proposal) -> bool
                     {
-                        return proposal_1.m_enote_ephemeral_pubkey == proposal_2.m_enote_ephemeral_pubkey;
+                        return previous_proposal.m_enote_ephemeral_pubkey == output_it->m_enote_ephemeral_pubkey;
                     }
                 ) != output_it)
             return false;
@@ -108,10 +108,10 @@ void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposa
     for (auto output_it{output_proposals.begin()}; output_it != output_proposals.end(); ++output_it)
     {
         CHECK_AND_ASSERT_THROW_MES(std::find_if(output_proposals.begin(), output_it,
-                    [](const SpOutputProposalV1 &proposal_1, const SpOutputProposalV1 &proposal_2) -> bool
+                    [&output_it](const SpOutputProposalV1 &previous_proposal) -> bool
                     {
-                        return proposal_1.m_proposal_core.m_onetime_address ==
-                            proposal_2.m_proposal_core.m_onetime_address;
+                        return previous_proposal.m_proposal_core.m_onetime_address ==
+                            output_it->m_proposal_core.m_onetime_address;
                     }
                 ) == output_it,
             "Semantics check output proposals v1: output onetime addresses are not all unique.");
