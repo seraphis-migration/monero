@@ -43,7 +43,6 @@ extern "C"
 #include "misc_language.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
-#include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
@@ -67,27 +66,27 @@ namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
 void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &input_images,
-    std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_sortable_in,
+    std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(tx_membership_proofs_sortable_in.size() == input_images.size(),
+    CHECK_AND_ASSERT_THROW_MES(tx_membership_proofs_sortable.size() == input_images.size(),
         "Mismatch between sortable membership proof count and partial tx input image count.");
 
     tx_membership_proofs_out.clear();
-    tx_membership_proofs_out.reserve(tx_membership_proofs_sortable_in.size());
+    tx_membership_proofs_out.reserve(tx_membership_proofs_sortable.size());
 
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
     {
         // find the membership proof that matches with the input image at this index
         auto ordered_membership_proof = 
-            std::find_if(tx_membership_proofs_sortable_in.begin(), tx_membership_proofs_sortable_in.end(),
+            std::find_if(tx_membership_proofs_sortable.begin(), tx_membership_proofs_sortable.end(),
                     [&](const SpMembershipProofSortableV1 &sortable_proof) -> bool
                     {
                         return input_images[input_index].m_masked_address == sortable_proof.m_masked_address;
                     }
                 );
 
-        CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_sortable_in.end(),
+        CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_sortable.end(),
             "Could not find input image to match with a sortable membership proof.");
 
         tx_membership_proofs_out.emplace_back(std::move(ordered_membership_proof->m_membership_proof));

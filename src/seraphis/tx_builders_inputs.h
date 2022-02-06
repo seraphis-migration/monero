@@ -35,6 +35,7 @@
 #include "crypto/crypto.h"
 #include "mock_ledger_context.h"
 #include "ringct/rctTypes.h"
+#include "sp_core_types.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 

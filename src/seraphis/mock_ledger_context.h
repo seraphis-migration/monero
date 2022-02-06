@@ -75,12 +75,12 @@ public:
     void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
         std::vector<SpEnoteV1> &enotes_out) const override;
     /**
-    * brief: get_reference_set_components_sp_v1 - gets Seraphis squashed enotes stored in the ledger
+    * brief: get_reference_set_proof_elements_sp_v1 - gets Seraphis squashed enotes stored in the ledger
     * param: indices -
-    * outparam: referenced_enotes_components_out - {{squashed enote}}
+    * outparam: proof_elements_out - {{squashed enote}}
     */
-    void get_reference_set_components_sp_v1(const std::vector<std::size_t> &indices,
-        rct::keyM &referenced_enotes_components_out) const override;
+    void get_reference_set_proof_elements_sp_v1(const std::vector<std::size_t> &indices,
+        rct::keyM &proof_elements_out) const override;
     /**
     * brief: add_transaction_sp_squashed_v1 - add a SpTxSquashedV1 transaction to the ledger
     * param: tx_to_add -
@@ -109,7 +109,7 @@ private:
 
     /// Seraphis linking tags
     std::unordered_set<crypto::key_image> m_sp_linking_tags;
-    /// Seraphis v1 ENotes
+    /// Seraphis v1 enotes
     std::unordered_map<std::size_t, SpEnoteV1> m_sp_enotes;
     /// Seraphis squashed enotes
     std::unordered_map<std::size_t, rct::key> m_sp_squashed_enotes;

@@ -35,9 +35,9 @@
 #include "crypto/crypto.h"
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
-#include "sp_core_utils.h"
+#include "sp_core_enote_utils.h"
 #include "tx_component_types.h"
-#include "sp_txtype_squashed_v1.h"
+#include "txtype_squashed_v1.h"
 
 //third party headers
 
@@ -75,25 +75,24 @@ void MockLedgerContext::get_reference_set_sp_v1(const std::vector<std::size_t> &
     enotes_out = std::move(enotes_temp);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::get_reference_set_components_sp_v1(const std::vector<std::size_t> &indices,
-        rct::keyM &referenced_enotes_components_out) const
+void MockLedgerContext::get_reference_set_proof_elements_sp_v1(const std::vector<std::size_t> &indices,
+    rct::keyM &proof_elements_out) const
 {
     std::lock_guard<std::mutex> lock{m_ledger_mutex};
 
     // gets squashed enotes
-    rct::keyM referenced_enotes_components_temp;
-    referenced_enotes_components_temp.reserve(indices.size());
+    rct::keyM referenced_enotes_squashed;
+    referenced_enotes_squashed.reserve(indices.size());
 
     for (const std::size_t index : indices)
     {
-        CHECK_AND_ASSERT_THROW_MES(m_sp_squashed_enotes.find(index) != m_sp_squashed_enotes.end(),
-            "Tried to get squashed enote that doesn't exist.");
-        referenced_enotes_components_temp.emplace_back(
+        CHECK_AND_ASSERT_THROW_MES(index < m_sp_squashed_enotes.size(), "Tried to get squashed enote that doesn't exist.");
+        referenced_enotes_squashed.emplace_back(
                 rct::keyV{m_sp_squashed_enotes.at(index)}
             );
     }
 
-    referenced_enotes_components_out = std::move(referenced_enotes_components_temp);
+    proof_elements_out = std::move(referenced_enotes_squashed);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add)

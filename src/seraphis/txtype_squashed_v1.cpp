@@ -59,41 +59,43 @@ namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
 SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_proposals,
-    const std::vector<SpDestinationV1> &destinations,
+    std::vector<SpOutputProposalV1> output_proposals,
     const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-    const SpTxSquashedV1::ValidationRulesVersion validation_rules_version)
+    const SemanticRulesVersion semantic_rules_version)
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
-    CHECK_AND_ASSERT_THROW_MES(destinations.size() > 0, "Tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, destinations),
+    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() > 0, "Tried to make tx without any outputs.");
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, output_proposals),
         "Tried to make tx with unbalanced amounts.");  //TODO: include fee in balance check
 
     // versioning for proofs
     std::string version_string;
     version_string.reserve(3);
-    SpTxSquashedV1::get_versioning_string(validation_rules_version, version_string);
+    SpTxSquashedV1::get_versioning_string(semantic_rules_version, version_string);
 
     // tx proposal
-    SpTxProposalV1 tx_proposal{destinations};
+    SpTxProposalV1 tx_proposal{std::move(output_proposals)};
     rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
 
     // partial inputs
     std::vector<SpTxPartialInputV1> partial_inputs;
     make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, tx_proposal, partial_inputs);
 
-    // partial tx
-    SpTxPartialV1 partial_tx{tx_proposal, partial_inputs, version_string};
-
-    // membership proofs
+    // membership proofs (input proposals assumed to line up with membership ref sets)
     std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable;
     make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
 
-    // sort the membership proofs so they line up with input images
+    // partial tx
+    SpTxPartialV1 partial_tx{tx_proposal, std::move(partial_inputs), version_string};
+
+    // line up the the membership proofs with the partial tx's input images (which are sorted)
     std::vector<SpMembershipProofV1> tx_membership_proofs;
-    align_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images, tx_membership_proofs_sortable, tx_membership_proofs);
+    align_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images,
+        std::move(tx_membership_proofs_sortable),
+        tx_membership_proofs);
 
     // assemble tx
-    *this = SpTxSquashedV1{std::move(partial_tx), std::move(tx_membership_proofs), validation_rules_version};
+    *this = SpTxSquashedV1{std::move(partial_tx), std::move(tx_membership_proofs), semantic_rules_version};
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTxSquashedV1::validate_tx_semantics() const
@@ -102,7 +104,9 @@ bool SpTxSquashedV1::validate_tx_semantics() const
         return false;
 
     // validate component counts (num inputs/outputs/etc.)
-    if (!validate_sp_semantics_component_counts_v1(m_input_images.size(),
+    if (!validate_sp_semantics_component_counts_v1(
+        semantic_config_component_counts_v1<SpTxSquashedV1>(m_tx_semantic_rules_version),
+        m_input_images.size(),
         m_membership_proofs.size(),
         m_image_proofs.size(),
         m_outputs.size(),
@@ -113,19 +117,27 @@ bool SpTxSquashedV1::validate_tx_semantics() const
     }
 
     // validate input proof reference set sizes
-    if (!validate_sp_semantics_ref_set_size_v1(m_membership_proofs))
+    if (!validate_sp_semantics_ref_set_size_v1(
+        semantic_config_ref_set_size_v1<SpTxSquashedV1>(m_tx_semantic_rules_version),
+        m_membership_proofs))
     {
         return false;
     }
 
     // validate linking tag semantics
-    if (!validate_sp_semantics_input_images_v1(m_input_images))
+    if (!validate_sp_semantics_input_images_v1(
+        semantic_config_input_images_v1<SpTxSquashedV1>(m_tx_semantic_rules_version),
+        m_input_images))
     {
         return false;
     }
 
-    // validate membershio proof ref sets and input images are sorted
-    if (!validate_sp_semantics_sorting_v1(m_membership_proofs, m_input_images))
+    // validate input images, membershio proof ref sets, and outputs are sorted
+    if (!validate_sp_semantics_sorting_v1(
+        semantic_config_sorting_v1<SpTxSquashedV1>(m_tx_semantic_rules_version),
+        m_membership_proofs,
+        m_input_images,
+        m_outputs))
     {
         return false;
     }
@@ -222,6 +234,49 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
+SemanticConfigComponentCountsV1 semantic_config_component_counts_v1<SpTxSquashedV1>(
+    const unsigned char tx_semantic_rules_version)
+{
+    SemanticConfigComponentCountsV1 config{};
+
+    if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
+    {
+
+    }
+    else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
+    {
+
+    }
+    else  //unknown semantic rules version
+    {
+        CHECK_AND_ASSERT_THROW_MES(false, "Tried to get semantic config for component counts with unknown rules version.");
+    }
+
+    return config;
+}
+//-------------------------------------------------------------------------------------------------------------------
+template <>
+SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1<SpTxSquashedV1>(const unsigned char tx_semantic_rules_version)
+{
+    SemanticConfigRefSetSizeV1 config{};
+
+    if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
+    {
+
+    }
+    else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
+    {
+
+    }
+    else  //unknown semantic rules version
+    {
+        CHECK_AND_ASSERT_THROW_MES(false, "Tried to get semantic config for ref set sizes with unknown rules version.");
+    }
+
+    return config;
+}
+//-------------------------------------------------------------------------------------------------------------------
+template <>
 std::shared_ptr<SpTxSquashedV1> make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
@@ -256,7 +311,7 @@ std::shared_ptr<SpTxSquashedV1> make_mock_tx<SpTxSquashedV1>(const SpTxParamPack
 
     // make tx
     return std::make_shared<SpTxSquashedV1>(input_proposals, destinations,
-        membership_ref_sets, SpTxSquashedV1::ValidationRulesVersion::ONE);
+        membership_ref_sets, SpTxSquashedV1::SemanticRulesVersion::MOCK);
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>

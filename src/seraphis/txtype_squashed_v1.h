@@ -56,7 +56,7 @@ namespace sp
 
 ////
 // Seraphis tx: based on concise grootle membership proofs on squashed enotes,
-//              with a merged composition proof for input images
+//              with separate composition proofs for input images
 ///
 class SpTxSquashedV1 final : public SpTx
 {
@@ -64,9 +64,10 @@ class SpTxSquashedV1 final : public SpTx
 
 public:
 //member types
-    enum ValidationRulesVersion : unsigned char
+    enum SemanticRulesVersion : unsigned char
     {
-        MIN = 1,
+        MIN = 0,
+        MOCK = 0,
         ONE = 1,
         MAX = 1
     };
@@ -82,7 +83,8 @@ public:
         std::vector<SpImageProofV1> image_proofs,
         std::vector<SpMembershipProofV1> membership_proofs,
         SpTxSupplementV1 tx_supplement,
-        const ValidationRulesVersion validation_rules_version) :
+        const SemanticRulesVersion semantic_rules_version) :
+            SpTx{TxEraSp, TxStructureVersionSp::TxTypeSpSquashedV1, semantic_rules_version}  //base class
             m_input_images{std::move(input_images)},
             m_outputs{std::move(outputs)},
             m_balance_proof{std::move(balance_proof)},
@@ -91,18 +93,14 @@ public:
             m_supplement{std::move(tx_supplement)}
         {
             CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble SpTxSquashedV1.");
-            CHECK_AND_ASSERT_THROW_MES(validation_rules_version >= ValidationRulesVersion::MIN &&
-                validation_rules_version <= ValidationRulesVersion::MAX, "Invalid validation rules version.");
-
-            m_tx_era_version = TxEraSp;
-            m_tx_format_version = TxStructureVersionSp::TxTypeSpSquashedV1;
-            m_tx_validation_rules_version = validation_rules_version;
+            CHECK_AND_ASSERT_THROW_MES(semantic_rules_version >= SemanticRulesVersion::MIN &&
+                semantic_rules_version <= SemanticRulesVersion::MAX, "Invalid validation rules version.");
         }
 
     /// normal constructor: finalize from a partial tx
     SpTxSquashedV1(SpTxPartialV1 partial_tx,
         std::vector<SpMembershipProofV1> membership_proofs,
-        const ValidationRulesVersion validation_rules_version) :
+        const SemanticRulesVersion semantic_rules_version) :
             SpTxSquashedV1{
                 std::move(partial_tx.m_input_images),
                 std::move(partial_tx.m_outputs),
@@ -110,15 +108,15 @@ public:
                 std::move(partial_tx.m_image_proofs),
                 std::move(membership_proofs),
                 std::move(partial_tx.m_tx_supplement),
-                validation_rules_version
+                semantic_rules_version
             }
     {}
 
     /// normal constructor: monolithic tx builder (complete tx in one step)
     SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_proposals,
-        const std::vector<SpDestinationV1> &destinations,
+        std::vector<SpOutputProposalV1> output_proposals,
         const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-        const ValidationRulesVersion validation_rules_version);
+        const SemanticRulesVersion semantic_rules_version);
 
     /// normal constructor: from existing tx byte blob
     //mock tx doesn't do this
@@ -140,13 +138,14 @@ public:
     /// get a short description of the tx type
     std::string get_descriptor() const override { return "Sp-Squashed"; }
 
-    /// get the tx version string: era | format | validation rules
-    static void get_versioning_string(const unsigned char tx_validation_rules_version,
+    /// get the tx version string: era | format | semantic rules
+    static void get_versioning_string(const unsigned char tx_semantic_rules_version,
         std::string &version_string)
     {
-        version_string += static_cast<char>(TxEraSp);
-        version_string += static_cast<char>(TxStructureVersionSp::TxTypeSpSquashedV1);
-        version_string += static_cast<char>(tx_validation_rules_version);
+        SpTx::get_versioning_string(TxEraSp,
+            TxStructureVersionSp::TxTypeSpSquashedV1,
+            tx_semantic_rules_version,
+            version_string);
     }
 
     /// get balance proof
@@ -176,6 +175,13 @@ private:
     /// supplemental data for tx
     SpTxSupplementV1 m_supplement;
 };
+
+template <>
+SemanticConfigComponentCountsV1 semantic_config_component_counts_v1<SpTxSquashedV1>(
+    const unsigned char tx_semantic_rules_version);
+
+template <>
+SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1<SpTxSquashedV1>(const unsigned char tx_semantic_rules_version);
 
 /**
 * brief: make_mock_tx - make a SpTxSquashedV1 transaction (function specialization)

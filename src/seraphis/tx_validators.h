@@ -150,4 +150,26 @@ bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_
     const std::vector<SpEnoteImageV1> &input_images,
     const rct::key &image_proofs_message);
 
+
+struct DefaultSemanticConfig {};
+
+template <typename SpTxType>
+SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(const unsigned char tx_semantic_rules_version);
+
+template <typename SpTxType>
+SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1(const unsigned char tx_semantic_rules_version);
+
+template <typename SpTxType>
+DefaultSemanticConfig semantic_config_input_images_v1(const unsigned char tx_semantic_rules_version)
+{
+    return DefaultSemanticConfig{};
+}
+
+template <typename SpTxType>
+DefaultSemanticConfig semantic_config_sorting_v1(const unsigned char tx_semantic_rules_version)
+{
+    return DefaultSemanticConfig{};
+}
+
+
 } //namespace sp

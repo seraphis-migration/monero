@@ -247,7 +247,7 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
             // - make sure the final proposal set will have 1 unique enote ephemeral pubkey
             crypto::secret_key findreceived_key;
             make_jamtis_findreceived_key(k_view_balance, findreceived_key);
-            rct::key special_change_addr_K2{
+            const rct::key special_change_addr_K2{
                     rct::scalarmultKey(output_proposals_inout[0].m_enote_ephemeral_pubkey, rct::sk2rct(findreceived_key))
                 };  //k_fr * K_e_other
 

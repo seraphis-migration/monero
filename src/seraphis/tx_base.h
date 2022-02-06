@@ -71,6 +71,15 @@ public:
     /// default constructor
     SpTx() = default;
 
+    /// normal constructor
+    SpTx(const unsigned char tx_era_version,
+            const unsigned char tx_format_version,
+            const unsigned char tx_semantic_rules_version) :
+        m_tx_era_version{tx_era_version},
+        m_tx_format_version{tx_format_version},
+        m_tx_semantic_rules_version{tx_semantic_rules_version}
+    {}
+
 //destructor: virtual for non-final type
     virtual ~SpTx() = default;
 
@@ -81,19 +90,19 @@ public:
     /// get a short description of the tx type
     virtual std::string get_descriptor() const = 0;
 
-    /// get the tx version string: era | format | validation rules
+    /// get the tx version string: era | format | semantic rules
     static void get_versioning_string(const unsigned char tx_era_version,
         const unsigned char tx_format_version,
-        const unsigned char tx_validation_rules_version,
+        const unsigned char tx_semantic_rules_version,
         std::string &version_string)
     {
         version_string += static_cast<char>(tx_era_version);
         version_string += static_cast<char>(tx_format_version);
-        version_string += static_cast<char>(tx_validation_rules_version);
+        version_string += static_cast<char>(tx_semantic_rules_version);
     }
     virtual void get_versioning_string(std::string &version_string) const final
     {
-        get_versioning_string(m_tx_era_version, m_tx_format_version, m_tx_validation_rules_version, version_string);
+        get_versioning_string(m_tx_era_version, m_tx_format_version, m_tx_semantic_rules_version, version_string);
     }
 
     //get_tx_byte_blob()
@@ -107,13 +116,13 @@ private:
     virtual bool validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
         const bool defer_batchable) const = 0;
 //member variables
-protected:
+public:
     /// era of the tx (e.g. CryptoNote/RingCT/Seraphis)
-    unsigned char m_tx_era_version;
+    const unsigned char m_tx_era_version;
     /// format version of the tx within its era
-    unsigned char m_tx_format_version;
+    const unsigned char m_tx_format_version;
     /// a tx format's validation rules version
-    unsigned char m_tx_validation_rules_version;
+    const unsigned char m_tx_semantic_rules_version;
 };
 
 /**
@@ -133,8 +142,8 @@ bool validate_sp_tx(const SpTx &tx, const std::shared_ptr<const LedgerContext> l
 * param: out_amounts -
 * return: the mock tx created
 */
-template <typename SpTxType>
-std::shared_ptr<SpTxType> make_mock_tx(const SpTxParamPack &params,
+template <typename SpTxType, typename SpTxParamsT = SpTxParamPack>
+std::shared_ptr<SpTxType> make_mock_tx(const SpTxParamsT &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
     std::shared_ptr<MockLedgerContext> ledger_context = nullptr);

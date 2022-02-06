@@ -49,7 +49,7 @@ namespace sp
 //// Versioning
 
 /// Transaction protocol era: following CryptoNote (1) and RingCT (2)
-const unsigned char TxEraSp = 3;
+constexpr unsigned char TxEraSp{3};
 
 /// Transaction structure types
 enum TxStructureVersionSp : unsigned char
