@@ -33,6 +33,10 @@
 
 //local headers
 #include "crypto/blake2b.h"
+extern "C"
+{
+#include "crypto/crypto-ops.h"
+}
 #include "wipeable_string.h"
 
 //third party headers
@@ -57,7 +61,7 @@ static void jamtis_hash_data(const std::string &domain_separator,
     data_out.clear();
     data_out.reserve(data_out.size() + domain_separator.size() + input_length);
 
-    data_out.append(domain_separator);
+    data_out += domain_separator;
     if (input && input_length > 0)
         data_out.append(reinterpret_cast<const char *>(input), input_length);
 }

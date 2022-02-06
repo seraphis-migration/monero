@@ -35,6 +35,7 @@
 #include "crypto/crypto.h"
 #include "jamtis_address_tags.h"
 #include "jamtis_address_utils.h"
+#include "jamtis_core_utils.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -56,7 +57,7 @@ void JamtisDestinationV1::gen()
     m_addr_K1 = rct::pkGen();
     m_addr_K2 = rct::pkGen();
     m_addr_K3 = rct::pkGen();
-    m_address_index = crypto::rand_idx(ADDRESS_INDEX_MAX);
+    crypto::rand(sizeof(address_tag_t), m_addr_tag.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
@@ -81,11 +82,12 @@ void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
     crypto::secret_key ciphertag_secret;
     make_jamtis_ciphertag_secret(s_generate_address, ciphertag_secret);
 
-    destination_out.m_addr_tag = cipher_address_index_with_key(rct::sk2rct(ciphertag_secret), j, 0);
+    destination_out.m_addr_tag = cipher_address_index(rct::sk2rct(ciphertag_secret), j, 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool is_destination_of_wallet(const JamtisDestinationV1 &destination,
     const rct::key &wallet_spend_pubkey,
+    const rct::key &findreceived_pubkey,
     const crypto::secret_key &s_generate_address)
 {
     // ciphertag secret
@@ -95,7 +97,7 @@ bool is_destination_of_wallet(const JamtisDestinationV1 &destination,
     // get the nominal address index from the destination's address tag
     address_tag_MAC_t address_index_mac;
     address_index_t nominal_address_index{
-            decipher_address_index(ciphertag_secret, destination.m_addr_tag, address_index_mac)
+            decipher_address_index(rct::sk2rct(ciphertag_secret), destination.m_addr_tag, address_index_mac)
         };
 
     if (address_index_mac != address_tag_MAC_t{0})

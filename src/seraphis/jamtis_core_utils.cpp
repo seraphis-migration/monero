@@ -33,6 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "cryptonote_config.h"
 #include "jamtis_hash_functions.h"
 #include "sp_crypto_utils.h"
 

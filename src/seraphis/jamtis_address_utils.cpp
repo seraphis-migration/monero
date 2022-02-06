@@ -33,10 +33,14 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "cryptonote_config.h"
+#include "jamtis_address_tags.h"
 #include "jamtis_core_utils.h"
+#include "jamtis_hash_functions.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctOps.h"
 #include "sp_core_enote_utils.h"
+#include "sp_crypto_utils.h"
 
 //third party headers
 

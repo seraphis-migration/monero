@@ -19,6 +19,8 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 See blowfish.c for more information about this file.
 */
 
+#pragma once
+
 #include <inttypes.h>
 
 typedef struct {
@@ -26,6 +28,6 @@ typedef struct {
   uint32_t S[4][256];
 } BLOWFISH_CTX;
 
-void Blowfish_Init(BLOWFISH_CTX *ctx, uint8_t *key, int32_t keyLen);
+void Blowfish_Init(BLOWFISH_CTX *ctx, const uint8_t *key, const int32_t keyLen);
 void Blowfish_Encrypt(const BLOWFISH_CTX *ctx, uint32_t *xl, uint32_t *xr);
 void Blowfish_Decrypt(const BLOWFISH_CTX *ctx, uint32_t *xl, uint32_t *xr);

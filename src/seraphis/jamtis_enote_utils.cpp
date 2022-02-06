@@ -45,6 +45,7 @@ extern "C"
 #include "misc_language.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "wipeable_string.h"
 
@@ -97,9 +98,9 @@ static void get_doublekey_hash_data(const unsigned char *key1,
 // a = a_enc XOR H_8(q, 8 r G)
 // a_enc = a XOR H_8(q, 8 r G)
 //-------------------------------------------------------------------------------------------------------------------
-static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::key &sender_receiver_secret,
-    const crypto::key_derivation &baked_key,
-    const rct::xmr_amount original)
+static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::xmr_amount original,
+    const rct::key &sender_receiver_secret,
+    const crypto::key_derivation &baked_key)
 {
     static_assert(sizeof(rct::xmr_amount) == 8, "");
 
@@ -110,7 +111,7 @@ static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::key &sender_receiv
     get_doublekey_hash_data(sender_receiver_secret.bytes, &baked_key, data);
 
     crypto::secret_key hash_result;
-    jamtis_hash8(domain_separator, data.data(), data.size(), &hash_result);
+    jamtis_hash8(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), &hash_result);
 
     rct::xmr_amount mask;
     memcpy(&mask, &hash_result, 8);
@@ -121,8 +122,8 @@ static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::key &sender_receiv
 // a = a_enc XOR H_8(q)
 // a_enc = a XOR H_8(q)
 //-------------------------------------------------------------------------------------------------------------------
-static rct::xmr_amount enc_dec_jamtis_amount_selfsend(const crypto::secret_key &sender_receiver_secret,
-    const rct::xmr_amount original)
+static rct::xmr_amount enc_dec_jamtis_amount_selfsend(const rct::xmr_amount original,
+    const rct::key &sender_receiver_secret)
 {
     static_assert(sizeof(rct::xmr_amount) == 8, "");
 
@@ -130,7 +131,7 @@ static rct::xmr_amount enc_dec_jamtis_amount_selfsend(const crypto::secret_key &
 
     // ret = H_8(q) XOR_64 original
     crypto::secret_key hash_result;
-    jamtis_hash8(domain_separator, &sender_receiver_secret, sizeof(crypto::secret_key), &hash_result);
+    jamtis_hash8(domain_separator, sender_receiver_secret.bytes, sizeof(crypto::secret_key), &hash_result);
 
     rct::xmr_amount mask;
     memcpy(&mask, &hash_result, 8);
@@ -160,7 +161,7 @@ view_tag_t make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH
     get_doublekey_hash_data(&sender_receiver_DH_derivation, onetime_address.bytes, data);
 
     view_tag_t view_tag;
-    jamtis_hash1(domain_separator, data.data(), data.size(), &view_tag);
+    jamtis_hash1(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), &view_tag);
 
     return view_tag;
 }
@@ -266,7 +267,7 @@ void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_se
     epee::wipeable_string data;
     get_doublekey_hash_data(sender_receiver_secret.bytes, &baked_key, data);  //q || 8 r G
 
-    jamtis_hash_scalar(domain_separator, data.data(), data.size(), &mask_out);
+    jamtis_hash_scalar(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), &mask_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver_secret,
@@ -309,7 +310,7 @@ rct::xmr_amount decode_jamtis_amount_selfsend(const rct::xmr_amount encoded_amou
 }
 //-------------------------------------------------------------------------------------------------------------------
 void get_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
-    const rct::key &onetime_address
+    const rct::key &onetime_address,
     rct::key &nominal_spend_key_out)
 {
     // K'_1 = Ko - H_n(q) X
@@ -363,7 +364,7 @@ bool try_get_jamtis_nominal_spend_key_selfsend(const crypto::key_derivation &sen
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_jamtis_amount_plain(const crypto::secret_key &sender_receiver_secret,
+bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
     const crypto::key_derivation &baked_key,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
@@ -386,7 +387,7 @@ bool try_get_jamtis_amount_plain(const crypto::secret_key &sender_receiver_secre
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_jamtis_amount_selfsend(const crypto::secret_key &sender_receiver_secret,
+bool try_get_jamtis_amount_selfsend(const rct::key &sender_receiver_secret,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out)

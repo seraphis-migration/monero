@@ -221,7 +221,7 @@ rct::xmr_amount decode_jamtis_amount_selfsend(const rct::xmr_amount encoded_amou
 * outparam: nominal_spend_key_out - K'_1
 */
 void get_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
-    const rct::key &onetime_address
+    const rct::key &onetime_address,
     rct::key &nominal_spend_key_out);
 /**
 * brief: try_get_jamtis_nominal_spend_key_plain - test view tag; if it passes, compute and return the nominal spend key
@@ -267,7 +267,7 @@ bool try_get_jamtis_nominal_spend_key_selfsend(const crypto::key_derivation &sen
 * outparam: amount_out - a' = dec(enc_a)
 * return: true if successfully recomputed the amount commitment (C' = x' G + a' H ?= C)
 */
-bool try_get_jamtis_amount_plain(const crypto::secret_key &sender_receiver_secret,
+bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
     const crypto::key_derivation &baked_key,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
@@ -281,7 +281,7 @@ bool try_get_jamtis_amount_plain(const crypto::secret_key &sender_receiver_secre
 * outparam: amount_out - a' = dec(enc_a)
 * return: true if successfully recomputed the amount commitment (C' = x' G + a' H ?= C)
 */
-bool try_get_jamtis_amount_selfsend(const crypto::secret_key &sender_receiver_secret,
+bool try_get_jamtis_amount_selfsend(const rct::key &sender_receiver_secret,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out);

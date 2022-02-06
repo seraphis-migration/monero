@@ -40,7 +40,9 @@
 //standard headers
 
 //forward declarations
-
+#include <cstdint>
+#include <cstddef>
+#include <cstring>
 
 namespace sp
 {
@@ -61,13 +63,19 @@ struct address_tag_t final
 {
     unsigned char bytes[ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES];
 
+    // comparison operator
+    bool operator==(const address_tag_t &other_tag) const
+    {
+        return memcmp(bytes, other_tag.bytes, sizeof(address_tag_t)) == 0;
+    }
+
     // customize operator^ for encrypting tags
     address_tag_t operator^(const address_tag_t &other_tag) const
     {
         address_tag_t temp;
 
         for (std::size_t i{0}; i < sizeof(address_tag_t); ++i)
-            temp.bytes[i] = *this.bytes[i] ^ other_tag.bytes[i];
+            temp.bytes[i] = bytes[i] ^ other_tag.bytes[i];
 
         return temp;
     }
@@ -86,7 +94,7 @@ static_assert(
 );
 
 /// jamtis enote types
-enum class JamtisEnoteType : public unsigned int
+enum class JamtisEnoteType : unsigned int
 {
     PLAIN = 0,
     CHANGE = 1,
@@ -94,11 +102,20 @@ enum class JamtisEnoteType : public unsigned int
 };
 
 /// jamtis self-send MACs, used to define enote-construction procedure for self-sends
-enum class JamtisSelfSendMAC : public address_tag_MAC_t
+enum class JamtisSelfSendMAC : address_tag_MAC_t
 {
     CHANGE = 0,
     SELF_SPEND = 1
 };
+
+/// overload equality operators for convenience
+inline bool operator==(const JamtisSelfSendMAC a, const address_tag_MAC_t b)
+{
+    return static_cast<address_tag_MAC_t>(a) == b;
+}
+inline bool operator==(const address_tag_MAC_t a, const JamtisSelfSendMAC b) { return b == a; }
+inline bool operator!=(const JamtisSelfSendMAC a, const address_tag_MAC_t b) { return !(a == b); }
+inline bool operator!=(const address_tag_MAC_t a, const JamtisSelfSendMAC b) { return !(a == b); }
 
 /// jamtis view tags
 using view_tag_t = unsigned char;

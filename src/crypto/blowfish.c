@@ -410,7 +410,7 @@ void Blowfish_Decrypt(const BLOWFISH_CTX *ctx, uint32_t *xl, uint32_t *xr){
 }
 
 
-void Blowfish_Init(BLOWFISH_CTX *ctx, uint8_t *key, int32_t keyLen) {
+void Blowfish_Init(BLOWFISH_CTX *ctx, const uint8_t *key, const int32_t keyLen) {
   int32_t i, j, k;
   uint32_t data, datal, datar;
 

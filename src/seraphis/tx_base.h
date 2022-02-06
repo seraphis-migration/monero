@@ -118,11 +118,11 @@ private:
 //member variables
 public:
     /// era of the tx (e.g. CryptoNote/RingCT/Seraphis)
-    const unsigned char m_tx_era_version;
+    unsigned char m_tx_era_version;
     /// format version of the tx within its era
-    const unsigned char m_tx_format_version;
+    unsigned char m_tx_format_version;
     /// a tx format's validation rules version
-    const unsigned char m_tx_semantic_rules_version;
+    unsigned char m_tx_semantic_rules_version;
 };
 
 /**

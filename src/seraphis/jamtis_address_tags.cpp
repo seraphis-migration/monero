@@ -69,7 +69,7 @@ static_assert(sizeof(Blowfish_LR) == sizeof(address_tag_t), "");
 //-------------------------------------------------------------------------------------------------------------------
 static address_index_t address_index_to_canonical(address_index_t j)
 {
-    static_assert(sizeof(address_index_t) == 8);
+    static_assert(sizeof(address_index_t) == 8, "");
     return SWAP64LE(j);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -77,7 +77,7 @@ static address_index_t address_index_to_canonical(address_index_t j)
 //-------------------------------------------------------------------------------------------------------------------
 static address_index_t address_index_from_canonical(address_index_t j_canonical)
 {
-    static_assert(sizeof(address_index_t) == 8);
+    static_assert(sizeof(address_index_t) == 8, "");
     // on big-endian systems, this makes the result big-endian (since it always starts as little-endian)
     return SWAP64LE(j_canonical);
 }
