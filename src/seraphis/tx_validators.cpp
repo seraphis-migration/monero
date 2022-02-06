@@ -87,15 +87,17 @@ static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpEno
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_images,
+bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCountsV1 &config,
+    const std::size_t num_input_images,
     const std::size_t num_membership_proofs,
     const std::size_t num_image_proofs,
     const std::size_t num_outputs,
     const std::size_t num_enote_pubkeys,
     const std::size_t num_range_proofs)
 {
-    // need at least one input
-    if (num_input_images < 1)
+    // input count
+    if (num_input_images < config.m_min_inputs ||
+        num_input_images > config.m_max_inputs)
         return false;
 
     // input images and image proofs should be 1:1
@@ -106,8 +108,9 @@ bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_image
     if (num_input_images != num_membership_proofs)
         return false;
 
-    // need at least 1 output
-    if (num_outputs < 1)
+    // output count
+    if (num_outputs < config.m_min_outputs ||
+        num_outputs > config.m_max_outputs)
         return false;
 
     // range proofs should be 1:1 with input image amount commitments and outputs
@@ -115,23 +118,38 @@ bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_image
         return false;
 
     // outputs and enote pubkeys should be 1:1
-    // TODO: if (num(outputs) == 2), num(enote pubkeys) ?= 1
-    if (num_outputs != num_enote_pubkeys)
+    // - except for 2-out txs, which should have only one enote pubkey
+    if (num_outputs == 2)
+    {
+        if (num_enote_pubkeys != 1)
+            return false;
+    }
+    else if (num_outputs != num_enote_pubkeys)
         return false;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_semantics_ref_set_size_v1(const std::vector<SpMembershipProofV1> &membership_proofs)
+bool validate_sp_semantics_ref_set_size_v1(const SemanticConfigRefSetSizeV1 &config,
+    const std::vector<SpMembershipProofV1> &membership_proofs)
 {
     // sanity check
     if (membership_proofs.size() == 0)
         return false;
 
-    // TODO: validate ref set decomp equals a versioned config setting
+    // check ref set decomp
     std::size_t ref_set_decomp_n{membership_proofs[0].m_ref_set_decomp_n};
     std::size_t ref_set_decomp_m{membership_proofs[0].m_ref_set_decomp_m};
 
+    if (ref_set_decomp_n < m_decom_n_min ||
+        ref_set_decomp_n > m_decom_n_max)
+        return false;
+
+    if (ref_set_decomp_m < m_decom_m_min ||
+        ref_set_decomp_m > m_decom_m_max)
+        return false;
+
+    // check membership proofs
     for (const auto &proof : membership_proofs)
     {
         // proof ref set decomposition (n^m) should match number of referenced enotes

@@ -229,6 +229,8 @@ namespace config
   // misc config
   const uint16_t SP_MAX_INPUTS_V1 = 128 - BULLETPROOF_MAX_OUTPUTS;
   const uint16_t SP_MAX_OUTPUTS_V1 = BULLETPROOF_MAX_OUTPUTS;
+  const uint16_t SP_GROOTLE_N_V1 = 2;
+  const uint16_t SP_GROOTLE_M_V1 = 7;  //v1: 2^7 = 128
 
   // Hash domain separators
   const char HASH_KEY_BULLETPROOF_EXPONENT[] = "bulletproof";

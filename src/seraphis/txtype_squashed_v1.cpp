@@ -32,6 +32,7 @@
 #include "sp_txtype_squashed_v1.h"
 
 //local headers
+#include "cryptonote_config.h"
 #include "ledger_context.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
@@ -57,6 +58,63 @@
 
 namespace sp
 {
+//-------------------------------------------------------------------------------------------------------------------
+// semantic validation config: component counts
+//-------------------------------------------------------------------------------------------------------------------
+static SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(const unsigned char tx_semantic_rules_version)
+{
+    SemanticConfigComponentCountsV1 config{};
+
+    if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
+    {
+        config.m_min_inputs = 1;
+        config.m_max_inputs = 100000;
+        config.m_min_outputs = 2;
+        config.m_max_outputs = 100000;
+    }
+    else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
+    {
+        config.m_min_inputs = 1;
+        config.m_max_inputs = config::SP_MAX_INPUTS_V1;
+        config.m_min_outputs = 2;
+        config.m_max_outputs = config::SP_MAX_OUTPUTS_V1;
+    }
+    else  //unknown semantic rules version
+    {
+        CHECK_AND_ASSERT_THROW_MES(false, "Tried to get semantic config for component counts with unknown rules version.");
+    }
+
+    return config;
+}
+//-------------------------------------------------------------------------------------------------------------------
+// semantic validation config: reference set size
+//-------------------------------------------------------------------------------------------------------------------
+static SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1(const unsigned char tx_semantic_rules_version)
+{
+    SemanticConfigRefSetSizeV1 config{};
+
+    if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
+    {
+        config.m_decom_n_min = 0;
+        config.m_decom_n_max = 100000;
+        config.m_decom_m_min = 0;
+        config.m_decom_m_max = 100000;
+    }
+    else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
+    {
+        config.m_decom_n_min = config::SP_GROOTLE_N_V1;
+        config.m_decom_n_max = config::SP_GROOTLE_N_V1;
+        config.m_decom_m_min = config::SP_GROOTLE_M_V1;
+        config.m_decom_m_max = config::SP_GROOTLE_M_V1;
+    }
+    else  //unknown semantic rules version
+    {
+        CHECK_AND_ASSERT_THROW_MES(false, "Tried to get semantic config for ref set sizes with unknown rules version.");
+    }
+
+    return config;
+}
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_proposals,
     std::vector<SpOutputProposalV1> output_proposals,
@@ -105,7 +163,7 @@ bool SpTxSquashedV1::validate_tx_semantics() const
 
     // validate component counts (num inputs/outputs/etc.)
     if (!validate_sp_semantics_component_counts_v1(
-        semantic_config_component_counts_v1<SpTxSquashedV1>(m_tx_semantic_rules_version),
+        semantic_config_component_counts_v1(m_tx_semantic_rules_version),
         m_input_images.size(),
         m_membership_proofs.size(),
         m_image_proofs.size(),
@@ -118,7 +176,7 @@ bool SpTxSquashedV1::validate_tx_semantics() const
 
     // validate input proof reference set sizes
     if (!validate_sp_semantics_ref_set_size_v1(
-        semantic_config_ref_set_size_v1<SpTxSquashedV1>(m_tx_semantic_rules_version),
+        semantic_config_ref_set_size_v1(m_tx_semantic_rules_version),
         m_membership_proofs))
     {
         return false;
@@ -126,7 +184,6 @@ bool SpTxSquashedV1::validate_tx_semantics() const
 
     // validate linking tag semantics
     if (!validate_sp_semantics_input_images_v1(
-        semantic_config_input_images_v1<SpTxSquashedV1>(m_tx_semantic_rules_version),
         m_input_images))
     {
         return false;
@@ -134,7 +191,6 @@ bool SpTxSquashedV1::validate_tx_semantics() const
 
     // validate input images, membershio proof ref sets, and outputs are sorted
     if (!validate_sp_semantics_sorting_v1(
-        semantic_config_sorting_v1<SpTxSquashedV1>(m_tx_semantic_rules_version),
         m_membership_proofs,
         m_input_images,
         m_outputs))
@@ -231,49 +287,6 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
     size += m_supplement.get_size_bytes();
 
     return size;
-}
-//-------------------------------------------------------------------------------------------------------------------
-template <>
-SemanticConfigComponentCountsV1 semantic_config_component_counts_v1<SpTxSquashedV1>(
-    const unsigned char tx_semantic_rules_version)
-{
-    SemanticConfigComponentCountsV1 config{};
-
-    if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
-    {
-
-    }
-    else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
-    {
-
-    }
-    else  //unknown semantic rules version
-    {
-        CHECK_AND_ASSERT_THROW_MES(false, "Tried to get semantic config for component counts with unknown rules version.");
-    }
-
-    return config;
-}
-//-------------------------------------------------------------------------------------------------------------------
-template <>
-SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1<SpTxSquashedV1>(const unsigned char tx_semantic_rules_version)
-{
-    SemanticConfigRefSetSizeV1 config{};
-
-    if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
-    {
-
-    }
-    else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
-    {
-
-    }
-    else  //unknown semantic rules version
-    {
-        CHECK_AND_ASSERT_THROW_MES(false, "Tried to get semantic config for ref set sizes with unknown rules version.");
-    }
-
-    return config;
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>

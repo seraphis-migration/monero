@@ -48,6 +48,22 @@ namespace sp { class LedgerContext; }
 namespace sp
 {
 
+struct SemanticConfigComponentCountsV1 final
+{
+    std::size_t m_min_inputs;
+    std::size_t m_max_inputs;
+    std::size_t m_min_outputs;
+    std::size_t m_max_outputs;
+};
+
+struct SemanticConfigRefSetSizeV1 final
+{
+    std::size_t m_decom_n_min;
+    std::size_t m_decom_n_max;
+    std::size_t m_decom_m_min;
+    std::size_t m_decom_m_max;
+};
+
 /**
 * brief: validate_sp_semantics_component_counts_v1 - check tx component counts are valid
 *   - num(membership proofs) == num(image proofs) == num(input images)
@@ -57,6 +73,7 @@ namespace sp
 * 
 *   - differences from v1:
 *     - input image amount commitments also have range proofs
+* param: config -
 * param: num_input_images -
 * param: num_membership_proofs -
 * param: num_image_proofs -
@@ -65,7 +82,8 @@ namespace sp
 * param: num_range_proofs -
 * return: true/false on validation result
 */
-bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_images,
+bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCountsV1 &config,
+    const std::size_t num_input_images,
     const std::size_t num_membership_proofs,
     const std::size_t num_image_proofs,
     const std::size_t num_outputs,
@@ -74,10 +92,12 @@ bool validate_sp_semantics_component_counts_v1(const std::size_t num_input_image
 /**
 * brief: validate_sp_semantics_ref_set_size_v1 - check membership proofs have consistent reference set sizes
 *   - num(refd enotes) == ref set size
+* param: config
 * param: membership_proofs -
 * return: true/false on validation result
 */
-bool validate_sp_semantics_ref_set_size_v1(const std::vector<SpMembershipProofV1> &membership_proofs);
+bool validate_sp_semantics_ref_set_size_v1(const SemanticConfigRefSetSizeV1 &config,
+    const std::vector<SpMembershipProofV1> &membership_proofs);
 /**
 * brief: validate_sp_semantics_input_images_v1 - check key images are well-formed
 *   - key images are in the prime-order EC subgroup: l*KI == identity
@@ -149,27 +169,5 @@ bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &me
 bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_proofs,
     const std::vector<SpEnoteImageV1> &input_images,
     const rct::key &image_proofs_message);
-
-
-struct DefaultSemanticConfig {};
-
-template <typename SpTxType>
-SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(const unsigned char tx_semantic_rules_version);
-
-template <typename SpTxType>
-SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1(const unsigned char tx_semantic_rules_version);
-
-template <typename SpTxType>
-DefaultSemanticConfig semantic_config_input_images_v1(const unsigned char tx_semantic_rules_version)
-{
-    return DefaultSemanticConfig{};
-}
-
-template <typename SpTxType>
-DefaultSemanticConfig semantic_config_sorting_v1(const unsigned char tx_semantic_rules_version)
-{
-    return DefaultSemanticConfig{};
-}
-
 
 } //namespace sp

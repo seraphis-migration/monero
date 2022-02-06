@@ -176,13 +176,6 @@ private:
     SpTxSupplementV1 m_supplement;
 };
 
-template <>
-SemanticConfigComponentCountsV1 semantic_config_component_counts_v1<SpTxSquashedV1>(
-    const unsigned char tx_semantic_rules_version);
-
-template <>
-SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1<SpTxSquashedV1>(const unsigned char tx_semantic_rules_version);
-
 /**
 * brief: make_mock_tx - make a SpTxSquashedV1 transaction (function specialization)
 * param: params -
