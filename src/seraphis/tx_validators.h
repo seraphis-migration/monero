@@ -48,6 +48,7 @@ namespace sp { class LedgerContext; }
 namespace sp
 {
 
+/// semantic validation config: component counts
 struct SemanticConfigComponentCountsV1 final
 {
     std::size_t m_min_inputs;
@@ -56,6 +57,7 @@ struct SemanticConfigComponentCountsV1 final
     std::size_t m_max_outputs;
 };
 
+/// semantic validation config: reference set size
 struct SemanticConfigRefSetSizeV1 final
 {
     std::size_t m_decom_n_min;
@@ -110,12 +112,15 @@ bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &in
 * brief: validate_sp_semantics_sorting_v1 - check tx components are properly sorted
 *   - membership proof referenced enote indices are sorted (ascending)
 *   - input images sorted by key image with byte-wise comparisons (ascending)
+*   - output enotes sorted by onetime addresses with byte-wise comparisons (ascending)
 * param: membership_proofs -
 * param: input_images -
+* param: outputs -
 * return: true/false on validation result
 */
 bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
-    const std::vector<SpEnoteImageV1> &input_images);
+    const std::vector<SpEnoteImageV1> &input_images,
+    const std::vector<SpEnoteV1> &outputs);
 /**
 * brief: validate_sp_linking_tags_v1 - check tx does not double spend
 *   - no key image duplicates in ledger

@@ -40,6 +40,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
 #include "tx_builder_types.h"
+#include "tx_builders_mixed.h"
 #include "tx_component_types.h"
 #include "tx_misc_utils.h"
 #include "tx_utils.h"
@@ -198,7 +199,7 @@ bool SpTxSquashedV1::validate_tx_semantics() const
         return false;
     }
 
-    // validate memo semantics: none for mockup
+    //TODO: validate memo semantics
 
     return true;
 }
@@ -256,7 +257,7 @@ bool SpTxSquashedV1::validate_tx_input_proofs(const std::shared_ptr<const Ledger
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSquashedV1::get_size_bytes() const
 {
-    // doesn't include (compared to a real tx):
+    // doesn't include:
     // - ring member references (e.g. indices or explicit copies)
     // - tx fees
     // - memos
@@ -304,26 +305,23 @@ std::shared_ptr<SpTxSquashedV1> make_mock_tx<SpTxSquashedV1>(const SpTxParamPack
     // enote, ks, view key stuff, amount, amount blinding factor
     std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(in_amounts)};
 
-    // make mock destinations
-    // - (in practice) for 2-out tx, need special treatment when making change/dummy destination
-    std::vector<SpDestinationV1> destinations{gen_mock_sp_destinations_v1(out_amounts)};
+    // make mock outputs
+    std::vector<SpOutputProposalV1> output_proposals{gen_mock_sp_output_proposals_v1(out_amounts)};
+
+    // for 2-out tx, the enote ephemeral pubkey is shared by both outputs
+    if (output_proposals.size() == 2)
+        output_proposals[1].m_enote_ephemeral_pubkey = output_proposals[0].m_enote_ephemeral_pubkey;
 
     // make mock membership proof ref sets
-    std::vector<SpEnoteV1> input_enotes;
-    input_enotes.reserve(input_proposals.size());
-
-    for (const auto &input_proposal : input_proposals)
-        input_enotes.emplace_back(input_proposal.m_enote);
-
     std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
-            gen_mock_sp_membership_ref_sets_v1(input_enotes,
+            gen_mock_sp_membership_ref_sets_v1(input_proposals,
                 params.ref_set_decomp_n,
                 params.ref_set_decomp_m,
                 ledger_context_inout)
         };
 
     // make tx
-    return std::make_shared<SpTxSquashedV1>(input_proposals, destinations,
+    return std::make_shared<SpTxSquashedV1>(input_proposals, output_proposals,
         membership_ref_sets, SpTxSquashedV1::SemanticRulesVersion::MOCK);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -332,7 +330,7 @@ bool validate_mock_txs<SpTxSquashedV1>(const std::vector<std::shared_ptr<SpTxSqu
     const std::shared_ptr<const LedgerContext> ledger_context)
 {
     std::vector<const rct::BulletproofPlus*> range_proofs;
-    range_proofs.reserve(txs_to_validate.size()*10);
+    range_proofs.reserve(txs_to_validate.size());
 
     for (const auto &tx : txs_to_validate)
     {

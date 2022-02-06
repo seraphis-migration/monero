@@ -40,13 +40,14 @@
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
 #include "sp_crypto_utils.h"
-#include "tx_misc_utils.h"
+#include "tx_builders_inputs.h"
 #include "tx_component_types.h"
-#include "tx_utils.h"
+#include "tx_misc_utils.h"
 
 //third party headers
 
 //standard headers
+#include <algorithm>
 #include <memory>
 #include <vector>
 
@@ -56,7 +57,7 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-// helper for validating v1, v2, v3 balance proofs (balance equality check)
+// helper for validating v1 balance proofs (balance equality check)
 //-------------------------------------------------------------------------------------------------------------------
 static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
@@ -78,12 +79,7 @@ static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpEno
         output_commitments.emplace_back(rct::scalarmultBase(remainder_blinding_factor));
 
     // sum(input masked commitments) ?= sum(output commitments) + remainder_blinding_factor*G
-    if (!balance_check_equality(input_image_amount_commitments, output_commitments))
-    {
-        return false;
-    }
-
-    return true;
+    return balance_check_equality(input_image_amount_commitments, output_commitments);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -189,29 +185,24 @@ bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &in
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
-    const std::vector<SpEnoteImageV1> &input_images)
+    const std::vector<SpEnoteImageV1> &input_images,
+    const std::vector<SpEnoteV1> &outputs)
 {
     // membership proof referenced enote indices should be sorted (ascending)
     // note: duplicate references are allowed
     for (const auto &proof : membership_proofs)
     {
-        for (std::size_t reference_index{1}; reference_index < proof.m_ledger_enote_indices.size(); ++ reference_index)
-        {
-            if (proof.m_ledger_enote_indices[reference_index - 1] > proof.m_ledger_enote_indices[reference_index])
-                return false;
-        }
+        if (!std::is_sorted(proof.m_ledger_enote_indices.begin(), proof.m_ledger_enote_indices.end()))
+            return false;
     }
 
     // input images should be sorted by key image with byte-wise comparisons (ascending)
-    for (std::size_t input_index{1}; input_index < input_images.size(); ++input_index)
-    {
-        if (memcmp(&(input_images[input_index - 1].m_key_image),
-                    &(input_images[input_index].m_key_image),
-                    sizeof(crypto::key_image)) > 0)
-        {
-            return false;
-        }
-    }
+    if (!std::is_sorted(input_images.begin(), input_images.end()))
+        return false;
+
+    // output enotes should be sorted by onetime address with byte-wise comparisons (ascending)
+    if (!std::is_sorted(outputs.begin(), outputs.end()))
+        return false;
 
     return true;
 }
@@ -226,6 +217,7 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
     {
         // check no duplicates in tx
+        // note: assumes key images are sorted
         if (input_index > 0)
         {
             if (input_images[input_index - 1].m_key_image == input_images[input_index].m_key_image)
@@ -289,7 +281,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     if (!defer_batchable)
     {
         std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
-        range_proof_ptrs.push_back(&range_proofs);
+        range_proof_ptrs.push_back(&range_proofs);  //not batched: there is only one range proofs aggregate
 
         if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
             return false;
@@ -318,7 +310,7 @@ bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &me
         proof = {&(membership_proofs[input_index].m_concise_grootle_proof)};
 
         // get proof keys from enotes stored in the ledger
-        ledger_context->get_reference_set_components_sp_v1(membership_proofs[input_index].m_ledger_enote_indices,
+        ledger_context->get_reference_set_proof_elements_sp_v1(membership_proofs[input_index].m_ledger_enote_indices,
             membership_proof_keys);
 
         // offset (input image masked keys squashed: Q' = Ko' + C')

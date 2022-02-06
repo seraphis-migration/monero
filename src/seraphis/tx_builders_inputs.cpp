@@ -393,7 +393,7 @@ std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
-    const std::vector<SpEnoteV1> &input_enotes,
+    const std::vector<SpEnote> &input_enotes,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     std::shared_ptr<MockLedgerContext> ledger_context_inout)
@@ -427,8 +427,11 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
 
             // insert referenced enote into mock ledger (also, record squashed enote)
             // note: in a real context, you would instead 'get' the enote's index from the ledger, and error if not found
+            SpEnoteV1 temp_enote;
+            temp_enote.m_enote_core = reference_sets[input_index].m_referenced_enotes[ref_index];
+
             reference_sets[input_index].m_ledger_enote_indices[ref_index] =
-                ledger_context_inout->add_enote_sp_v1(reference_sets[input_index].m_referenced_enotes[ref_index]);
+                ledger_context_inout->add_enote_sp_v1(temp_enote);
         }
     }
 
@@ -441,13 +444,11 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     const std::size_t ref_set_decomp_m,
     std::shared_ptr<MockLedgerContext> ledger_context_inout)
 {
-    std::vector<SpEnoteV1> input_enotes;
-    input_enotes.reserve(input_proposals.size());
+    std::vector<SpEnote> input_enotes;
+    input_enotes.resize(input_proposals.size());
 
-    for (const SpInputProposalV1 &input_proposal : input_proposals)
-    {
-        input_enotes.emplace_back(input_proposal.m_enote);
-    }
+    for (std::size_t input_index{0}; input_index< input_proposals.size(); ++input_index)
+        input_proposals[input_index].m_proposal_core.get_enote_base(input_enotes[input_index]);
 
     return gen_mock_sp_membership_ref_sets_v1(input_enotes, ref_set_decomp_n, ref_set_decomp_m, ledger_context_inout);
 }

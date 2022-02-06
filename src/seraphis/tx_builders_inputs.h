@@ -55,11 +55,11 @@ namespace sp
 * brief: align_v1_tx_membership_proofs_sp_v1 - rearrange membership proofs so they line up with a set of input images
 *   sort order: key images ascending with byte-wise comparisons
 * param: input_images -
-* inparam: tx_membership_proofs_sortable_in -
+* inparam: tx_membership_proofs_sortable -
 * outparam: tx_membership_proofs_out -
 */
 void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &input_images,
-    std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_sortable_in,
+    std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out);
 /**
 * brief: get_tx_membership_proof_message_sp_v1 - message for membership proofs
@@ -167,7 +167,7 @@ std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<
 * return: set of membership proof reference sets
 */
 std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
-    const std::vector<SpEnoteV1> &input_enotes,
+    const std::vector<SpEnote> &input_enotes,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     std::shared_ptr<MockLedgerContext> ledger_context_inout);

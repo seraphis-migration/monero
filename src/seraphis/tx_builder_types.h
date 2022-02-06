@@ -112,7 +112,7 @@ struct SpMembershipReferenceSetV1 final
     ///TODO: deterministic references instead of indices
     std::vector<std::size_t> m_ledger_enote_indices;
     /// the referenced enotes
-    std::vector<SpEnoteV1> m_referenced_enotes;
+    std::vector<SpEnote> m_referenced_enotes;
     /// the index in the referenced enotes vector of the enote who will be proven a member of the ref set (via its image)
     std::size_t m_real_spend_index_in_set;
 };
