@@ -285,6 +285,12 @@ bool try_get_jamtis_amount_selfsend(const rct::key &sender_receiver_secret,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out);
+//todo
+void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &address_privkey,
+    const crypto::secret_key &address_extension,
+    crypto::key_image &key_image_out);
 
 } //namespace jamtis
 } //namespace sp

@@ -44,7 +44,7 @@
 namespace sp
 {
 //-----------------------------------------------------------------
-bool validate(const SpTx &tx, const std::shared_ptr<const LedgerContext> ledger_context, const bool defer_batchable)
+bool validate_sp_tx(const SpTx &tx, const std::shared_ptr<const LedgerContext> ledger_context, const bool defer_batchable)
 {
     if (!tx.validate_tx_semantics())
         return false;

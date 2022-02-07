@@ -74,18 +74,18 @@ rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &e
 *   commitment blinding factors
 * param: input_proposals -
 * param: image_address_masks -
-* outparam: blinding_factors_out -
 * outparam: input_amounts_out -
+* outparam: blinding_factors_out -
 */
 void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<SpInputProposalV1> &input_proposals,
     const std::vector<crypto::secret_key> &image_address_masks,
-    std::vector<crypto::secret_key> &blinding_factors_out,
-    std::vector<rct::xmr_amount> &input_amounts_out);
+    std::vector<rct::xmr_amount> &input_amounts_out,
+    std::vector<crypto::secret_key> &blinding_factors_out);
 void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<SpTxPartialInputV1> &partial_inputs,
-    std::vector<crypto::secret_key> &blinding_factors_out,
-    std::vector<rct::xmr_amount> &input_amounts_out);
+    std::vector<rct::xmr_amount> &input_amounts_out,
+    std::vector<crypto::secret_key> &blinding_factors_out);
 /**
 * brief: make_v1_tx_image_proof_sp_v1 - make a v1 tx input image proof (seraphis composition proof) (squashed enote model)
 * param: input_proposal -

@@ -111,7 +111,7 @@ SpTxPartialInputV1::SpTxPartialInputV1(const SpInputProposalV1 &input_proposal,
     const rct::key &proposal_prefix)
 {
     // prepare input image
-    input_proposal.m_proposal_core.get_enote_image_squashed_base(m_input_image.m_enote_image_core);
+    input_proposal.get_enote_image_v1(m_input_image);
 
     // copy misc. proposal info
     m_image_address_mask           = input_proposal.m_proposal_core.m_address_mask;
@@ -149,12 +149,12 @@ SpTxPartialV1::SpTxPartialV1(const SpTxProposalV1 &proposal,
 
     /// balance proof
 
-    // get input image amount commitment blinding factors and amounts
-    std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
+    // get input amounts and image amount commitment blinding factors
     std::vector<rct::xmr_amount> input_amounts;
+    std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
     prepare_input_commitment_factors_for_balance_proof_v1(partial_inputs,
-        input_image_amount_commitment_blinding_factors,
-        input_amounts);
+        input_amounts,
+        input_image_amount_commitment_blinding_factors);
 
     // check balance (TODO: add fee)
     CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(input_amounts, proposal.m_output_amounts),

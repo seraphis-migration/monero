@@ -30,8 +30,8 @@
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis/mock_ledger_context.h"
-#include "seraphis/sp_tx_base.h"
-#include "seraphis/sp_txtype_squashed_v1.h"
+#include "seraphis/tx_base.h"
+#include "seraphis/txtype_squashed_v1.h"
 
 #include "gtest/gtest.h"
 
@@ -81,7 +81,7 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
             EXPECT_TRUE(tx.get() != nullptr);
 
             // validate tx
-            EXPECT_TRUE(tx->validate(ledger_context));
+            EXPECT_TRUE(sp::validate_sp_tx(*tx, ledger_context, false));
 
             if (gen.test_double_spend)
             {
@@ -90,7 +90,7 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
 
                 // re-validate tx
                 // - should fail now that key images were added to the ledger
-                EXPECT_FALSE(tx->validate(ledger_context));
+                EXPECT_FALSE(sp::validate_sp_tx(*tx, ledger_context, false));
             }
         }
         catch (...)

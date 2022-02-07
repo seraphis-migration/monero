@@ -61,6 +61,15 @@ struct SpInputProposalV1 final
         return m_proposal_core < other_proposal.m_proposal_core;
     }
 
+    /**
+    * brief: get_enote_image_v1 - get this input's enote image in the squashed enote model
+    * outparam: image_out -
+    */
+    void get_enote_image_v1(SpEnoteImageV1 &image_out) const
+    {
+        return m_proposal_core.get_enote_image_squashed_base(image_out.m_enote_image_core);
+    }
+
     /// generate a v1 input (all random; does not support info recovery)
     void gen(const rct::xmr_amount amount) { m_proposal_core.gen(amount); }
 };

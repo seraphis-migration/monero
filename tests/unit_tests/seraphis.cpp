@@ -35,35 +35,47 @@ extern "C"
 #include "misc_language.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "seraphis/jamtis_address_tags.h"
+#include "seraphis/jamtis_address_utils.h"
+#include "seraphis/jamtis_core_utils.h"
+#include "seraphis/jamtis_destination.h"
+#include "seraphis/jamtis_enote_utils.h"
+#include "seraphis/jamtis_payment_proposal.h"
+#include "seraphis/jamtis_support_types.h"
+#include "seraphis/ledger_context.h"
+#include "seraphis/mock_ledger_context.h"
 #include "seraphis/sp_composition_proof.h"
-#include "seraphis/sp_core_utils.h"
+#include "seraphis/sp_core_enote_utils.h"
+#include "seraphis/sp_core_types.h"
 #include "seraphis/sp_crypto_utils.h"
-#include "seraphis/sp_tx_component_types.h"
-#include "seraphis/sp_tx_misc_utils.h"
-#include "seraphis/sp_tx_utils.h"
-#include "seraphis/sp_txtype_squashed_v1.h"
+#include "seraphis/tx_base.h"
+#include "seraphis/tx_builder_types.h"
+#include "seraphis/tx_builders_inputs.h"
+#include "seraphis/tx_builders_mixed.h"
+#include "seraphis/tx_builders_outputs.h"
+#include "seraphis/tx_component_types.h"
+#include "seraphis/tx_misc_utils.h"
+#include "seraphis/txtype_squashed_v1.h"
 
 #include "gtest/gtest.h"
 
+#include <memory>
 #include <vector>
 
 
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void make_secret_key(crypto::secret_key &skey_out)
 {
-    skey_out = rct::rct2sk(rct::zero());
-
-    while (skey_out == rct::rct2sk(rct::zero()))
-        skey_out = rct::rct2sk(rct::skGen());
+    skey_out = rct::rct2sk(rct::skGen());
 }
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void make_pubkey(rct::key &pkey_out)
 {
-    pkey_out = rct::identity();
-
-    while (pkey_out == rct::identity())
-        pkey_out = rct::pkGen();
+    pkey_out = rct::pkGen();
 }
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void make_fake_sp_masked_address(crypto::secret_key &mask,
     crypto::secret_key &view_stuff,
@@ -101,20 +113,22 @@ static void make_fake_sp_masked_address(crypto::secret_key &mask,
     sp::multi_exp(privkeys, pubkeys, masked_address);
 }
 //-------------------------------------------------------------------------------------------------------------------
-static void make_fake_sp_user_keys(rct::key &recipient_DH_base_out,
-    crypto::secret_key &recipient_view_privkey_out,
-    crypto::secret_key &recipient_spendbase_privkey_out)
+//-------------------------------------------------------------------------------------------------------------------
+static void make_fake_sp_masked_address(crypto::secret_key &mask,
+    crypto::secret_key &view_stuff,
+    crypto::secret_key &spendkey,
+    rct::key &masked_address)
 {
-    make_pubkey(recipient_DH_base_out);
-    make_secret_key(recipient_view_privkey_out);
-    make_secret_key(recipient_spendbase_privkey_out);
+    std::vector<crypto::secret_key> spendkeys = {spendkey};
+    make_fake_sp_masked_address(mask, view_stuff, spendkeys, masked_address);
 }
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    const sp::SpTxSquashedV1::ValidationRulesVersion validation_rules_version,
+    const sp::SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     std::shared_ptr<sp::MockLedgerContext> ledger_context_inout)
 {
     /// build a tx from base components
@@ -129,16 +143,22 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     // enote, ks, view key stuff, amount, amount blinding factor
     std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(in_amounts)};
 
-    // make mock destinations
-    // - (in practice) for 2-out tx, need special treatment when making change/dummy destination
-    std::vector<SpDestinationV1> destinations{gen_mock_sp_destinations_v1(out_amounts)};
+    // make mock output proposals
+    std::vector<SpOutputProposalV1> output_proposals{gen_mock_sp_output_proposals_v1(out_amounts)};
+
+    // for 2-out txs, can only have one unique enote ephemeral pubkey
+    if (output_proposals.size() == 2)
+        output_proposals[1].m_enote_ephemeral_pubkey = output_proposals[0].m_enote_ephemeral_pubkey;
 
     // make mock membership proof ref sets
-    std::vector<SpEnoteV1> input_enotes;
+    std::vector<SpEnote> input_enotes;
     input_enotes.reserve(input_proposals.size());
 
     for (const auto &input_proposal : input_proposals)
-        input_enotes.emplace_back(input_proposal.m_enote);
+    {
+        input_enotes.emplace_back();
+        input_proposal.m_proposal_core.get_enote_base(input_enotes.back());
+    }
 
     std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
             gen_mock_sp_membership_ref_sets_v1(input_enotes,
@@ -150,14 +170,14 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     // versioning for proofs
     std::string version_string;
     version_string.reserve(3);
-    SpTxSquashedV1::get_versioning_string(validation_rules_version, version_string);
+    SpTxSquashedV1::get_versioning_string(semantic_rules_version, version_string);
 
     // tx components
     std::vector<SpEnoteImageV1> input_images;
     std::vector<SpEnoteV1> outputs;
-    std::shared_ptr<SpBalanceProofV1> balance_proof;
+    std::shared_ptr<const SpBalanceProofV1> balance_proof;
     std::vector<SpImageProofV1> tx_image_proofs;
-    std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable;
+    std::vector<SpMembershipProofAlignableV1> tx_membership_proofs_alignable;
     std::vector<SpMembershipProofV1> tx_membership_proofs;
     SpTxSupplementV1 tx_supplement;
 
@@ -166,34 +186,34 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
     std::vector<crypto::secret_key> image_address_masks;
     std::vector<crypto::secret_key> image_amount_masks;
+    std::vector<rct::xmr_amount> input_amounts;
+    std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
 
-    make_v1_tx_outputs_sp_v1(destinations,
+    input_images.resize(input_proposals.size());
+    image_address_masks.resize(input_proposals.size());
+    image_amount_masks.resize(input_proposals.size());
+
+    // pre-sort inputs and outputs
+    std::sort(input_proposals.begin(), input_proposals.end());  //note: this is very inefficient for large input counts
+    std::sort(output_proposals.begin(), output_proposals.end());
+
+    // make everything
+    make_v1_tx_outputs_sp_v1(output_proposals,
         outputs,
         output_amounts,
         output_amount_commitment_blinding_factors,
         tx_supplement);
-    make_v1_tx_images_sp_v1(input_proposals,
-        input_images,
-        image_address_masks,
-        image_amount_masks);
+    for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
+    {
+        input_proposals[input_index].get_enote_image_v1(input_images[input_index]);
+        image_address_masks[input_index] = input_proposals[input_index].m_proposal_core.m_address_mask;
+        image_amount_masks[input_index] = input_proposals[input_index].m_proposal_core.m_commitment_mask;
+    }
     rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
     make_v1_tx_image_proofs_sp_v1(input_proposals,
         input_images,
-        image_address_masks,
         image_proofs_message,
         tx_image_proofs);
-    // sort inputs in preparation for making a balance proof
-    const std::vector<std::size_t> input_sort_order{get_tx_input_sort_order_v1(input_images)};
-    CHECK_AND_ASSERT_THROW_MES(
-        rearrange_vector(input_sort_order, input_images)        &&
-        rearrange_vector(input_sort_order, image_address_masks) &&
-        rearrange_vector(input_sort_order, image_amount_masks)  &&
-        rearrange_vector(input_sort_order, tx_image_proofs)     &&
-        rearrange_vector(input_sort_order, membership_ref_sets) &&
-        rearrange_vector(input_sort_order, input_proposals),
-        "rearranging inputs failed");
-    std::vector<rct::xmr_amount> input_amounts;
-    std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
     prepare_input_commitment_factors_for_balance_proof_v1(input_proposals,
         image_amount_masks,
         input_amounts,
@@ -206,12 +226,12 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     make_v1_tx_membership_proofs_sp_v1(membership_ref_sets,
         image_address_masks,
         image_amount_masks,
-        tx_membership_proofs_sortable);  //could also obtain sortable membership proofs as inputs
-    align_v1_tx_membership_proofs_sp_v1(input_images, tx_membership_proofs_sortable, tx_membership_proofs);
+        tx_membership_proofs_alignable);  //alignable membership proofs could theoretically be inputs as well
+    align_v1_tx_membership_proofs_sp_v1(input_images, std::move(tx_membership_proofs_alignable), tx_membership_proofs);
 
     return std::make_shared<SpTxSquashedV1>(std::move(input_images), std::move(outputs),
         std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),
-        std::move(tx_supplement), SpTxSquashedV1::ValidationRulesVersion::ONE);
+        std::move(tx_supplement), semantic_rules_version);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -319,13 +339,10 @@ TEST(seraphis, composition_proof)
 
     try
     {
-        std::vector<crypto::secret_key> temp_z = {z};
-        make_fake_sp_masked_address(x, y, temp_z, K);
-        z = temp_z[0];
-        sp::make_seraphis_key_image(y, z, KI);
-
+        make_fake_sp_masked_address(x, y, z, K);
         proof = sp::sp_composition_prove(message, K, x, y, z);
 
+        sp::make_seraphis_key_image(y, z, KI);
         EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
     }
     catch (...)
@@ -333,22 +350,19 @@ TEST(seraphis, composition_proof)
         EXPECT_TRUE(false);
     }
 
-    // works even if x = 0
+    // check: works even if x = 0
     try
     {
-        std::vector<crypto::secret_key> temp_z = {z};
-        make_fake_sp_masked_address(x, y, temp_z, K);
-        z = temp_z[0];
+        make_fake_sp_masked_address(x, y, z, K);
 
         rct::key xG;
         rct::scalarmultBase(xG, rct::sk2rct(x));
         rct::subKeys(K, K, xG);   // kludge: remove x part manually
         x = rct::rct2sk(rct::zero());
 
-        sp::make_seraphis_key_image(y, z, KI);
-
         proof = sp::sp_composition_prove(message, K, x, y, z);
 
+        sp::make_seraphis_key_image(y, z, KI);
         EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
     }
     catch (...)
@@ -369,8 +383,8 @@ TEST(seraphis, composition_proof_multisig)
     std::vector<sp::SpCompositionProofMultisigPartial> partial_sigs;
     sp::SpCompositionProof proof;
 
-    // works even if x = 0 (kludge test)
-    // range of co-signers works (1-3 signers)
+    // check: works even if x = 0 (kludge test)
+    // check: range of co-signers works (1-3 signers)
     for (const bool test_x_0 : {true, false})
     {
         for (std::size_t num_signers{1}; num_signers < 4; ++num_signers)
@@ -428,10 +442,10 @@ TEST(seraphis, composition_proof_multisig)
                         );
                 }
 
-                // assemble tx
+                // assemble proof
                 proof = sp::sp_composition_prove_multisig_final(partial_sigs);
 
-                // verify tx
+                // verify proof
                 EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
 
 
@@ -458,10 +472,10 @@ TEST(seraphis, composition_proof_multisig)
                         );
                 }
 
-                // assemble tx again
+                // assemble proof again
                 proof = sp::sp_composition_prove_multisig_final(partial_sigs);
 
-                // verify tx again
+                // verify proof again
                 EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
             }
             catch (...)
@@ -472,12 +486,12 @@ TEST(seraphis, composition_proof_multisig)
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-TEST(seraphis, information_recovery_pieces)
+TEST(seraphis, information_recovery_keyimage)
 {
     // different methods for making key images all have same results
     crypto::secret_key y, z, k_a_sender, k_a_recipient;
     rct::key zU, k_bU;
-    crypto::key_image key_image1, key_image2, key_image3;
+    crypto::key_image key_image1, key_image2, key_image3, key_image_jamtis;
 
     make_secret_key(y);
     k_a_sender = y;
@@ -487,96 +501,274 @@ TEST(seraphis, information_recovery_pieces)
     sp::make_seraphis_spendbase(z, zU);
     sp::make_seraphis_spendbase(z, k_bU);
 
-    sp::make_seraphis_key_image(y, z, key_image1);
+    sp::make_seraphis_key_image(y, z, key_image1);  // y X + y X + z U -> (z/2y) U
     sp::make_seraphis_key_image(y, zU, key_image2);
     sp::make_seraphis_key_image_from_parts(k_a_sender, k_a_recipient, k_bU, key_image3);
 
+    rct::key wallet_spend_pubkey{k_bU};
+    crypto::secret_key k_view_balance, address_privkey;
+    sc_add(&k_view_balance, &y, &y);  // k_vb = 2*(2*y)
+    sc_mul(&address_privkey, sp::MINUS_ONE.bytes, &k_a_sender);  // k^j_a = -y
+    sp::extend_seraphis_spendkey(k_view_balance, wallet_spend_pubkey);  // 4*y X + z U
+    sp::jamtis::make_seraphis_key_image_jamtis_style(wallet_spend_pubkey,
+        k_view_balance,
+        address_privkey,
+        k_a_sender,
+        key_image_jamtis);  // -y X + -y X + (4*y X + z U) -> (z/2y) U
+
     EXPECT_TRUE(key_image1 == key_image2);
-    EXPECT_TRUE(key_image2 == key_image3);
+    EXPECT_TRUE(key_image1 == key_image3);
+    EXPECT_TRUE(key_image1 == key_image_jamtis);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis, information_recovery_amountencoding)
+{
+    using namespace sp;
+    using namespace jamtis;
 
-    // encoding/decoding amounts succeeds
-    crypto::secret_key sender_receiver_secret = rct::rct2sk(rct::identity());
-    while (sender_receiver_secret == rct::rct2sk(rct::identity()))
-        sender_receiver_secret = rct::rct2sk(rct::skGen());
-
+    // encoding/decoding amounts
+    crypto::secret_key sender_receiver_secret;
+    make_secret_key(sender_receiver_secret);
     rct::xmr_amount amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-    rct::xmr_amount encoded_amount{sp::enc_dec_seraphis_amount(sender_receiver_secret, rct::zero(), amount)};
-    rct::xmr_amount decoded_amount{sp::enc_dec_seraphis_amount(sender_receiver_secret, rct::zero(), encoded_amount)};
 
-    EXPECT_TRUE(encoded_amount != amount);
+    crypto::key_derivation fake_baked_key;
+    memcpy(&fake_baked_key, rct::zero().bytes, sizeof(rct::key));
+
+    rct::xmr_amount encoded_amount{encode_jamtis_amount_plain(amount, rct::sk2rct(sender_receiver_secret), fake_baked_key)};
+    rct::xmr_amount decoded_amount{decode_jamtis_amount_plain(encoded_amount, rct::sk2rct(sender_receiver_secret), fake_baked_key)};
+    EXPECT_TRUE(encoded_amount != amount);  //might fail (collision in ~ 2^32 attempts)
+    EXPECT_TRUE(decoded_amount == amount);
+
+    encoded_amount = encode_jamtis_amount_selfsend(amount, rct::sk2rct(sender_receiver_secret));
+    decoded_amount = decode_jamtis_amount_selfsend(encoded_amount, rct::sk2rct(sender_receiver_secret));
+    EXPECT_TRUE(encoded_amount != amount);  //might fail (collision in ~ 2^32 attempts)
     EXPECT_TRUE(decoded_amount == amount);
 }
 //-------------------------------------------------------------------------------------------------------------------
-TEST(seraphis, enote_v1_information_recovery)
+TEST(seraphis, information_recovery_addressindex)
 {
-    // prepare to make enote
-    rct::key recipient_DH_base;
-    crypto::secret_key recipient_view_privkey;
-    rct::key recipient_view_key;
-    crypto::secret_key recipient_spendbase_privkey;
-    rct::key recipient_spend_key;
-    rct::xmr_amount amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
-    std::size_t enote_index = static_cast<std::size_t>(rct::randXmrAmount(rct::xmr_amount{16}));
+    using namespace sp;
+    using namespace jamtis;
 
-    make_fake_sp_user_keys(recipient_DH_base, recipient_view_privkey, recipient_spendbase_privkey);  // {K^DH, k^vr, k^s}
-    rct::scalarmultKey(recipient_view_key, recipient_DH_base, rct::sk2rct(recipient_view_privkey));  // K^vr
-    sp::make_seraphis_spendkey(recipient_view_privkey, recipient_spendbase_privkey, recipient_spend_key);  // K^s
+    // make an address index
+    address_index_t j{crypto::rand_idx(ADDRESS_INDEX_MAX)};
 
-    // make enote
-    crypto::secret_key enote_privkey = rct::rct2sk(rct::identity());
-    while (enote_privkey == rct::rct2sk(rct::identity()))
-        enote_privkey = rct::rct2sk(rct::skGen());
+    // convert the index to/from raw tag form
+    address_tag_t raw_tag{address_index_to_tag(j, 0)};
+    address_tag_MAC_t raw_mac;
+    EXPECT_TRUE(address_tag_to_index(raw_tag, raw_mac) == j);
+    EXPECT_TRUE(raw_mac == 0);
 
-    rct::key enote_pubkey;
-    sp::SpEnoteV1 enote;
+    // cipher and decipher the index
+    crypto::secret_key cipher_key;
+    make_secret_key(cipher_key);
+    address_tag_t ciphered_tag{cipher_address_index(rct::sk2rct(cipher_key), j, 0)};
+    address_tag_MAC_t decipher_mac;
+    EXPECT_TRUE(decipher_address_index(rct::sk2rct(cipher_key), ciphered_tag, decipher_mac) == j);
+    EXPECT_TRUE(decipher_mac == 0);
 
-    enote.make(enote_privkey,
-        recipient_DH_base,
-        recipient_view_key,
-        recipient_spend_key,
-        amount,
-        enote_index,
-        false,
-        enote_pubkey);
+    // encrypt and decrypt an address tag
+    crypto::secret_key encryption_key;
+    make_secret_key(encryption_key);
+    encrypted_address_tag_t encrypted_ciphered_tag{encrypt_address_tag(rct::sk2rct(encryption_key), ciphered_tag)};
+    EXPECT_TRUE(decrypt_address_tag(rct::sk2rct(encryption_key), encrypted_ciphered_tag) == ciphered_tag);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis, information_recovery_enote_v1_plain)
+{
+    using namespace sp;
+    using namespace jamtis;
 
-    // recover information
-    rct::key nominal_recipient_spendkey;
-    rct::xmr_amount amount_recovered;
+    /// setup
+
+    // user wallet keys
+    crypto::secret_key k_master, k_view_balance, k_find_received, s_generate_address, s_cipher_tag;
+    rct::key wallet_spend_pubkey, findreceived_pubkey;
+    make_secret_key(k_master);
+    make_secret_key(k_view_balance);
+    make_jamtis_findreceived_key(k_view_balance, k_find_received);
+    make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
+    make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
+    make_seraphis_spendkey(k_view_balance, k_master, wallet_spend_pubkey);
+    rct::scalarmultBase(findreceived_pubkey, rct::sk2rct(k_find_received));
+
+    // user address
+    address_index_t j{crypto::rand_idx(ADDRESS_INDEX_MAX)};
+    JamtisDestinationV1 user_address;
+
+    make_jamtis_destination_v1(wallet_spend_pubkey,
+        findreceived_pubkey,
+        s_generate_address,
+        j,
+        user_address);
+
+    // make a plain enote paying to address
+    rct::xmr_amount amount{crypto::rand_idx(static_cast<rct::xmr_amount>(-1))};
+    crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
+
+    JamtisPaymentProposalV1 payment_proposal{user_address, amount, enote_privkey};
+    SpOutputProposalV1 output_proposal;
+    payment_proposal.get_output_proposal_v1(output_proposal);
+    SpEnoteV1 plain_enote;
+    rct::key enote_ephemeral_pubkey{output_proposal.m_enote_ephemeral_pubkey};
+    output_proposal.get_enote_v1(plain_enote);
+
+
+    /// try to reproduce spend key (and recover address index)
+
+    // 1. sender-receiver secret, nominal spend key
     rct::key sender_receiver_secret;
-    rct::key sender_receiver_secret2;
     crypto::key_derivation derivation;
-    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
-        // demo: must always memwipe these secrets after use
-        memwipe(&derivation, sizeof(crypto::key_derivation));
-        memwipe(&sender_receiver_secret, sizeof(rct::key));
-        memwipe(&sender_receiver_secret2, sizeof(rct::key));
-    });
 
-    hw::get_device("default").generate_key_derivation(rct::rct2pk(enote_pubkey), recipient_view_privkey, derivation);
+    hw::get_device("default").generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey),
+        k_find_received,
+        derivation);
 
-    EXPECT_TRUE(sp::try_get_seraphis_nominal_spend_key(derivation,
-            enote_index,
-            enote.m_onetime_address,
-            enote.m_view_tag,
-            sender_receiver_secret,
-            nominal_recipient_spendkey)
+    rct::key nominal_recipient_spendkey;
+
+    EXPECT_TRUE(try_get_jamtis_nominal_spend_key_plain(derivation,
+        plain_enote.m_enote_core.m_onetime_address,
+        plain_enote.m_view_tag,
+        sender_receiver_secret,
+        nominal_recipient_spendkey));
+
+    // 2. decrypt encrypted address tag
+    address_tag_t decrypted_addr_tag{decrypt_address_tag(sender_receiver_secret, plain_enote.m_addr_tag_enc)};
+
+    // 3. decipher address tag
+    address_tag_MAC_t enote_tag_mac;
+    EXPECT_TRUE(decipher_address_index(rct::sk2rct(s_cipher_tag), decrypted_addr_tag, enote_tag_mac) == j);
+    EXPECT_TRUE(enote_tag_mac == 0);
+
+    // 4. check nominal spend key
+    EXPECT_TRUE(test_jamtis_nominal_spend_key(wallet_spend_pubkey, s_generate_address, j, nominal_recipient_spendkey));
+
+
+    /// try to recover amount
+
+    // 1. make baked key
+    crypto::secret_key address_privkey;
+    make_jamtis_address_privkey(s_generate_address, j, address_privkey);
+
+    crypto::key_derivation amount_baked_key;
+    make_jamtis_amount_baked_key_plain_recipient(address_privkey, enote_ephemeral_pubkey, amount_baked_key);
+
+    // 2. try to recover the amount
+    rct::xmr_amount recovered_amount;
+    EXPECT_TRUE(
+            try_get_jamtis_amount_plain(sender_receiver_secret,
+                amount_baked_key,
+                plain_enote.m_enote_core.m_amount_commitment,
+                plain_enote.m_encoded_amount,
+                recovered_amount)
         );
-    EXPECT_TRUE(nominal_recipient_spendkey == recipient_spend_key);
-    EXPECT_TRUE(sp::try_get_seraphis_amount(rct::rct2sk(sender_receiver_secret),
-            rct::zero(),
-            enote.m_amount_commitment,
-            enote.m_encoded_amount,
-            amount_recovered)
-        );
-    EXPECT_TRUE(amount_recovered == amount);
+    EXPECT_TRUE(recovered_amount == amount);
+
 
     // check: can reproduce sender-receiver secret
-    sp::make_seraphis_sender_receiver_secret(recipient_view_privkey,
-        enote_pubkey,
-        enote_index,
+    rct::key sender_receiver_secret_reproduced;
+    make_jamtis_sender_receiver_secret_plain(k_find_received,
+        enote_ephemeral_pubkey,
         hw::get_device("default"),
-        sender_receiver_secret2);
-    EXPECT_TRUE(sender_receiver_secret2 == sender_receiver_secret);
+        sender_receiver_secret_reproduced);
+    EXPECT_TRUE(sender_receiver_secret_reproduced == sender_receiver_secret);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis, information_recovery_enote_v1_selfsend)
+{
+    using namespace sp;
+    using namespace jamtis;
+
+    /// setup
+
+    // user wallet keys
+    crypto::secret_key k_master, k_view_balance, k_find_received, s_generate_address, s_cipher_tag;
+    rct::key wallet_spend_pubkey, findreceived_pubkey;
+    make_secret_key(k_master);
+    make_secret_key(k_view_balance);
+    make_jamtis_findreceived_key(k_view_balance, k_find_received);
+    make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
+    make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
+    make_seraphis_spendkey(k_view_balance, k_master, wallet_spend_pubkey);
+    rct::scalarmultBase(findreceived_pubkey, rct::sk2rct(k_find_received));
+
+    // user address
+    address_index_t j{crypto::rand_idx(ADDRESS_INDEX_MAX)};
+    JamtisDestinationV1 user_address;
+
+    make_jamtis_destination_v1(wallet_spend_pubkey,
+        findreceived_pubkey,
+        s_generate_address,
+        j,
+        user_address);
+
+    // make a self-spend enote paying to address
+    rct::xmr_amount amount{crypto::rand_idx(static_cast<rct::xmr_amount>(-1))};
+    crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
+
+    JamtisPaymentProposalSelfSendV1 payment_proposal{user_address,
+        amount,
+        JamtisSelfSendMAC::SELF_SPEND,
+        enote_privkey,
+        k_view_balance};
+    SpOutputProposalV1 output_proposal;
+    payment_proposal.get_output_proposal_v1(output_proposal);
+    SpEnoteV1 self_spend_enote;
+    rct::key enote_ephemeral_pubkey{output_proposal.m_enote_ephemeral_pubkey};
+    output_proposal.get_enote_v1(self_spend_enote);
+
+
+    /// try to reproduce spend key (and recover address index)
+
+    // 1. sender-receiver secret, nominal spend key
+    rct::key sender_receiver_secret;
+    crypto::key_derivation derivation;
+
+    hw::get_device("default").generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey),
+        k_find_received,
+        derivation);
+
+    rct::key nominal_recipient_spendkey;
+
+    EXPECT_TRUE(try_get_jamtis_nominal_spend_key_selfsend(derivation,
+        self_spend_enote.m_enote_core.m_onetime_address,
+        self_spend_enote.m_view_tag,
+        k_view_balance,
+        enote_ephemeral_pubkey,
+        sender_receiver_secret,
+        nominal_recipient_spendkey));
+
+    // 2. decrypt encrypted address tag
+    address_tag_t decrypted_addr_tag{decrypt_address_tag(sender_receiver_secret, self_spend_enote.m_addr_tag_enc)};
+
+    // 3. convert raw address tag to address index
+    address_tag_MAC_t enote_tag_mac;
+    EXPECT_TRUE(address_tag_to_index(decrypted_addr_tag, enote_tag_mac) == j);
+    EXPECT_TRUE(enote_tag_mac == JamtisSelfSendMAC::SELF_SPEND);
+
+    // 4. check nominal spend key
+    EXPECT_TRUE(test_jamtis_nominal_spend_key(wallet_spend_pubkey, s_generate_address, j, nominal_recipient_spendkey));
+
+
+    /// try to recover amount
+
+    // 1. try to recover the amount
+    rct::xmr_amount recovered_amount;
+    EXPECT_TRUE(
+            try_get_jamtis_amount_selfsend(sender_receiver_secret,
+                self_spend_enote.m_enote_core.m_amount_commitment,
+                self_spend_enote.m_encoded_amount,
+                recovered_amount)
+        );
+    EXPECT_TRUE(recovered_amount == amount);
+
+
+    // check: can reproduce sender-receiver secret
+    rct::key sender_receiver_secret_reproduced;
+    make_jamtis_sender_receiver_secret_selfsend(k_view_balance,
+        enote_ephemeral_pubkey,
+        sender_receiver_secret_reproduced);
+    EXPECT_TRUE(sender_receiver_secret_reproduced == sender_receiver_secret);
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, sp_txtype_squashed_v1)
@@ -603,7 +795,7 @@ TEST(seraphis, sp_txtype_squashed_v1)
     {
         txs.emplace_back(
                 make_sp_txtype_squashed_v1(2, 3, in_amounts, out_amounts,
-                    sp::SpTxSquashedV1::ValidationRulesVersion::ONE, ledger_context)
+                    sp::SpTxSquashedV1::SemanticRulesVersion::MOCK, ledger_context)
             );
     }
 

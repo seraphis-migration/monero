@@ -92,7 +92,7 @@ struct SpCompositionProof
     rct::key c;
     // responses
     rct::key r_t1, r_t2, r_ki;
-    // intermediate proof key (stored as (1/8)*KI)
+    // intermediate proof key (stored as (1/8)*K_t1)
     rct::key K_t1;
     // key image KI: not stored with proof
     // main proof key K: not stored with proof
