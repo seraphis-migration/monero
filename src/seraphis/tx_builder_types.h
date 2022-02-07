@@ -118,11 +118,11 @@ struct SpMembershipReferenceSetV1 final
 };
 
 ////
-// SpMembershipProofSortableV1 - Sortable Membership Proof V1
-// - not technically 'sortable', the masked address can be used to match this membership proof with its input image
+// SpMembershipProofAlignableV1 - Alignable Membership Proof V1
+// - the masked address can be used to match this membership proof with its input image
 //   - note: matching can fail if a masked address is reused in a tx, but that is almost definitely an implementation error!
 ///
-struct SpMembershipProofSortableV1 final
+struct SpMembershipProofAlignableV1 final
 {
     /// masked address used in the membership proof (for matching with actual input image)
     rct::key m_masked_address;

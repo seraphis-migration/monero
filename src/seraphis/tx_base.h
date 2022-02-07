@@ -53,7 +53,7 @@ namespace sp
 {
 
 ////
-// SpTxParamPack - parameter pack for base tx
+// SpTxParamPack - parameter pack for base tx (for unit tests/mockups/etc.)
 ///
 struct SpTxParamPack
 {

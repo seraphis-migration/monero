@@ -141,8 +141,8 @@ SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_propo
     std::vector<SpTxPartialInputV1> partial_inputs;
     make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, partial_inputs);
 
-    // membership proofs (input proposals assumed to line up with membership ref sets)
-    std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable;
+    // membership proofs (input proposals are assumed to line up with membership ref sets)
+    std::vector<SpMembershipProofAlignableV1> tx_membership_proofs_sortable;
     make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
 
     // partial tx
@@ -335,7 +335,7 @@ bool validate_mock_txs<SpTxSquashedV1>(const std::vector<std::shared_ptr<SpTxSqu
 
     for (const std::shared_ptr<SpTxSquashedV1> &tx : txs_to_validate)
     {
-        if (tx.get() == nullptr)
+        if (!tx || tx.use_count() == 0)
             return false;
 
         // validate unbatchable parts of tx

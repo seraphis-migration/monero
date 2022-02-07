@@ -59,7 +59,7 @@ namespace sp
 * outparam: tx_membership_proofs_out -
 */
 void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &input_images,
-    std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable,
+    std::vector<SpMembershipProofAlignableV1> tx_membership_proofs_sortable,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out);
 /**
 * brief: get_tx_membership_proof_message_sp_v1 - message for membership proofs
@@ -123,7 +123,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
 void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
-    SpMembershipProofSortableV1 &tx_membership_proof_out);
+    SpMembershipProofAlignableV1 &tx_membership_proof_out);
 /**
 * brief: make_v1_tx_membership_proofs_sp_v1 - make v1 membership proofs (concise grootle: 1 per input)
 *   (squashed enote model)
@@ -135,10 +135,10 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
-    std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_out);
+    std::vector<SpMembershipProofAlignableV1> &tx_membership_proofs_out);
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const std::vector<SpTxPartialInputV1> &partial_inputs,
-    std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_out);
+    std::vector<SpMembershipProofAlignableV1> &tx_membership_proofs_out);
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const SpTxPartialV1 &partial_tx,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out);

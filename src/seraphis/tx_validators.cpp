@@ -211,7 +211,7 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
     const std::shared_ptr<const LedgerContext> ledger_context)
 {
     // sanity check
-    if (ledger_context.get() == nullptr)
+    if (!ledger_context || ledger_context.use_count() == 0)
         return false;
 
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
@@ -239,7 +239,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     const bool defer_batchable)
 {
     // sanity check
-    if (balance_proof.get() == nullptr)
+    if (!balance_proof || balance_proof.use_count() == 0)
         return false;
 
     const rct::BulletproofPlus &range_proofs = balance_proof->m_bpp_proof;

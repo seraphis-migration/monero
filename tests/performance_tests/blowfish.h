@@ -30,7 +30,7 @@
 
 extern "C"
 {
-    #include "crypto/blowfish.h"
+#include "crypto/blowfish.h"
 }
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"

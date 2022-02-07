@@ -66,28 +66,28 @@ namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
 void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &input_images,
-    std::vector<SpMembershipProofSortableV1> tx_membership_proofs_sortable,
+    std::vector<SpMembershipProofAlignableV1> tx_membership_proofs_alignable,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(tx_membership_proofs_sortable.size() == input_images.size(),
+    CHECK_AND_ASSERT_THROW_MES(tx_membership_proofs_alignable.size() == input_images.size(),
         "Mismatch between sortable membership proof count and partial tx input image count.");
 
     tx_membership_proofs_out.clear();
-    tx_membership_proofs_out.reserve(tx_membership_proofs_sortable.size());
+    tx_membership_proofs_out.reserve(tx_membership_proofs_alignable.size());
 
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
     {
         // find the membership proof that matches with the input image at this index
         auto ordered_membership_proof = 
-            std::find_if(tx_membership_proofs_sortable.begin(), tx_membership_proofs_sortable.end(),
-                    [&](const SpMembershipProofSortableV1 &sortable_proof) -> bool
+            std::find_if(tx_membership_proofs_alignable.begin(), tx_membership_proofs_alignable.end(),
+                    [&](const SpMembershipProofAlignableV1 &sortable_proof) -> bool
                     {
                         return input_images[input_index].m_enote_image_core.m_masked_address ==
                             sortable_proof.m_masked_address;
                     }
                 );
 
-        CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_sortable.end(),
+        CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_alignable.end(),
             "Could not find input image to match with a sortable membership proof.");
 
         tx_membership_proofs_out.emplace_back(std::move(ordered_membership_proof->m_membership_proof));
@@ -280,7 +280,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
 void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
-    SpMembershipProofSortableV1 &tx_membership_proof_out)
+    SpMembershipProofAlignableV1 &tx_membership_proof_out)
 {
     // save the masked address to later match the membership proof with its input image
     squash_seraphis_address(
@@ -302,7 +302,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
-    std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_out)
+    std::vector<SpMembershipProofAlignableV1> &tx_membership_proofs_out)
 {
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_address_masks.size(), "Input components size mismatch");
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_amount_masks.size(), "Input components size mismatch");
@@ -321,7 +321,7 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const std::vector<SpTxPartialInputV1> &partial_inputs,
-    std::vector<SpMembershipProofSortableV1> &tx_membership_proofs_out)
+    std::vector<SpMembershipProofAlignableV1> &tx_membership_proofs_out)
 {
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_inputs.size(), "Input components size mismatch");
 

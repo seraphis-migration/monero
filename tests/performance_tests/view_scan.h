@@ -31,16 +31,18 @@
 #include "crypto/crypto.h"
 extern "C"
 {
-    #include "crypto/siphash.h"
-    #include "blake2_temp.h"  //copied from randomx lib
+#include "crypto/siphash.h"
+#include "crypto/blake2b.h"
 }
 #include "device/device.hpp"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "seraphis/sp_core_utils.h"
-#include "seraphis/sp_crypto_utils.h"
-#include "seraphis/sp_tx_component_types.h"
-#include "seraphis/sp_tx_misc_utils.h"
+#include "seraphis/jamtis_destination.h"
+#include "seraphis/jamtis_enote_utils.h"
+#include "seraphis/jamtis_payment_proposal.h"
+#include "seraphis/sp_core_enote_utils.h"
+#include "seraphis/tx_builder_types.h"
+#include "seraphis/tx_component_types.h"
 #include "performance_tests.h"
 
 
@@ -148,26 +150,30 @@ public:
     {
         m_test_view_tag_check = params.test_view_tag_check;
 
+        // user wallet keys (incomplete set)
+        rct::key wallet_spend_pubkey{rct::pkGen()};
+        crypto::secret_key s_generate_address{rct::rct2sk(rct::skGen())};
+        m_recipient_findreceived_key = rct::rct2sk(rct::skGen());
+        rct::key findreceived_pubkey{rct::scalarmultBase(rct::sk2rct(m_recipient_findreceived_key))};
+
         // user address
-        rct::key recipient_DH_base{rct::pkGen()};
-        m_recipient_view_privkey = rct::rct2sk(rct::skGen());
-        crypto::secret_key recipient_spendbase_privkey{rct::rct2sk(rct::skGen())};
-        rct::key recipient_view_key;
+        sp::jamtis::JamtisDestinationV1 user_address;
 
-        rct::scalarmultKey(recipient_view_key, recipient_DH_base, rct::sk2rct(m_recipient_view_privkey));
-        sp::make_seraphis_spendkey(m_recipient_view_privkey, recipient_spendbase_privkey, m_recipient_spend_key);
+        sp::jamtis::make_jamtis_destination_v1(wallet_spend_pubkey,
+            findreceived_pubkey,
+            s_generate_address,
+            0, //address 0
+            user_address);
 
-        // make enote
+        m_recipient_spend_key = user_address.m_addr_K1;
+
+        // make enote paying to address
         crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
-
-        m_enote.make(enote_privkey,
-            recipient_DH_base,
-            recipient_view_key,
-            m_recipient_spend_key,
-            0, // no amount
-            0, // 0 index
-            false,
-            m_enote_pubkey);
+        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, 0, enote_privkey};
+        sp::SpOutputProposalV1 output_proposal;
+        payment_proposal.get_output_proposal_v1(output_proposal);
+        m_enote_pubkey = output_proposal.m_enote_ephemeral_pubkey;
+        output_proposal.get_enote_v1(m_enote);
 
         // invalidate view tag to test the performance of short-circuiting on failed view tags
         if (m_test_view_tag_check)
@@ -181,18 +187,19 @@ public:
         rct::key sender_receiver_secret_dummy;
         crypto::key_derivation derivation;
 
-        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_pubkey), m_recipient_view_privkey, derivation);
+        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_pubkey),
+            m_recipient_findreceived_key,
+            derivation);
 
         rct::key nominal_recipient_spendkey;
 
-        if (!sp::try_get_seraphis_nominal_spend_key(derivation,
-            0,
-            m_enote.m_onetime_address,
+        if (!sp::jamtis::try_get_jamtis_nominal_spend_key_plain(derivation,
+            m_enote.m_enote_core.m_onetime_address,
             m_enote.m_view_tag,
             sender_receiver_secret_dummy,  //outparam not used
             nominal_recipient_spendkey))
         {
-            return m_test_view_tag_check;  // only valid if trying to trigger view tag check
+            return m_test_view_tag_check;  // this branch is only valid if trying to trigger view tag check
         }
 
         memwipe(&sender_receiver_secret_dummy, sizeof(rct::key));
@@ -203,9 +210,9 @@ public:
 
 private:
     rct::key m_recipient_spend_key;
-    crypto::secret_key m_recipient_view_privkey;
+    crypto::secret_key m_recipient_findreceived_key;
 
-    sp::SpENoteV1 m_enote;
+    sp::SpEnoteV1 m_enote;
     rct::key m_enote_pubkey;
 
     bool m_test_view_tag_check;
@@ -215,20 +222,12 @@ private:
 
 void domain_separate_derivation_hash_siphash(const std::string &domain_separator,
     const crypto::key_derivation &derivation,
-    const std::size_t index,
     rct::key &hash_result_out)
 {
-    // derivation_hash = H("domain-sep", derivation, index)
+    // derivation_hash = H("domain-sep", derivation)
     std::string hash;
-    hash.reserve(domain_separator.size() + ((sizeof(std::size_t) * 8 + 6) / 7));
     // "domain-sep"
     hash = domain_separator;
-    // index
-    char converted_index[(sizeof(size_t) * 8 + 6) / 7];
-    char* end = converted_index;
-    tools::write_varint(end, index);
-    assert(end <= converted_index + sizeof(converted_index));
-    hash.append(converted_index, end - converted_index);
 
     // siphash key
     char siphash_key[16];
@@ -241,18 +240,15 @@ void domain_separate_derivation_hash_siphash(const std::string &domain_separator
     memwipe(siphash_key, 16);
 }
 
-unsigned char make_seraphis_view_tag_siphash(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const std::size_t output_index)
+unsigned char make_seraphis_view_tag_siphash(const crypto::key_derivation &sender_receiver_DH_derivation)
 {
-    static std::string salt{config::HASH_KEY_SERAPHIS_VIEW_TAG};
+    static std::string salt{config::HASH_KEY_JAMTIS_VIEW_TAG};
 
-    // tag_t = H("domain-sep", derivation, t)
-    // TODO: consider using a simpler/cheaper hash function for view tags
+    // tag_t = H("domain-sep", derivation)
     rct::key view_tag_scalar;
 
     domain_separate_derivation_hash_siphash(salt,
         sender_receiver_DH_derivation,
-        output_index,
         view_tag_scalar);
 
     return static_cast<unsigned char>(view_tag_scalar.bytes[0]);
@@ -260,7 +256,6 @@ unsigned char make_seraphis_view_tag_siphash(const crypto::key_derivation &sende
 
 unsigned char make_seraphis_view_tag_siphash(const crypto::secret_key &privkey,
     const rct::key &DH_key,
-    const std::size_t output_index,
     hw::device &hwdev)
 {
     // privkey * DH_key
@@ -268,22 +263,21 @@ unsigned char make_seraphis_view_tag_siphash(const crypto::secret_key &privkey,
     hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);
 
     // tag_t = H("domain-sep", derivation, t)
-    unsigned char view_tag{make_seraphis_view_tag_siphash(derivation, output_index)};
+    unsigned char view_tag{make_seraphis_view_tag_siphash(derivation)};
 
     memwipe(&derivation, sizeof(derivation));
 
     return view_tag;
 }
 
-bool try_get_seraphis_nominal_spend_key_siphash(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const std::size_t output_index,
+bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_derivation &sender_receiver_DH_derivation,
     const rct::key &onetime_address,
     const unsigned char view_tag,
     rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out)
 {
     // tag'_t = H(q_t)
-    unsigned char nominal_view_tag{make_seraphis_view_tag_siphash(sender_receiver_DH_derivation, output_index)};
+    unsigned char nominal_view_tag{make_seraphis_view_tag_siphash(sender_receiver_DH_derivation)};
 
     // check that recomputed tag matches original tag; short-circuit on failure
     if (nominal_view_tag != view_tag)
@@ -291,13 +285,12 @@ bool try_get_seraphis_nominal_spend_key_siphash(const crypto::key_derivation &se
 
     // q_t
     // note: computing this after view tag check is an optimization
-    sp::make_seraphis_sender_receiver_secret(sender_receiver_DH_derivation,
-        output_index,
+    sp::jamtis::make_jamtis_sender_receiver_secret_plain(sender_receiver_DH_derivation,
         sender_receiver_secret_out);
 
     // K'^s_t = Ko_t - H(q_t) X
     crypto::secret_key k_a_extender;
-    sp::make_seraphis_sender_address_extension(rct::rct2sk(sender_receiver_secret_out), k_a_extender);  // H(q_t)
+    sp::jamtis::make_jamtis_onetime_address_extension(sender_receiver_secret_out, k_a_extender);  // H(q_t)
     sc_mul(&k_a_extender, sp::MINUS_ONE.bytes, &k_a_extender);  // -H(q_t)
     nominal_spend_key_out = onetime_address;  // Ko_t
     sp::extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
@@ -313,31 +306,34 @@ public:
 
     bool init()
     {
+        // user wallet keys (incomplete set)
+        rct::key wallet_spend_pubkey{rct::pkGen()};
+        crypto::secret_key s_generate_address{rct::rct2sk(rct::skGen())};
+        m_recipient_findreceived_key = rct::rct2sk(rct::skGen());
+        rct::key findreceived_pubkey{rct::scalarmultBase(rct::sk2rct(m_recipient_findreceived_key))};
+
         // user address
-        rct::key recipient_DH_base{rct::pkGen()};
-        m_recipient_view_privkey = rct::rct2sk(rct::skGen());
-        crypto::secret_key recipient_spendbase_privkey{rct::rct2sk(rct::skGen())};
-        rct::key recipient_view_key;
+        sp::jamtis::JamtisDestinationV1 user_address;
 
-        rct::scalarmultKey(recipient_view_key, recipient_DH_base, rct::sk2rct(m_recipient_view_privkey));
-        sp::make_seraphis_spendkey(m_recipient_view_privkey, recipient_spendbase_privkey, m_recipient_spend_key);
+        sp::jamtis::make_jamtis_destination_v1(wallet_spend_pubkey,
+            findreceived_pubkey,
+            s_generate_address,
+            0, //address 0
+            user_address);
 
-        // make enote
+        m_recipient_spend_key = user_address.m_addr_K1;
+
+        // make enote paying to address
         crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
-
-        m_enote.make(enote_privkey,
-            recipient_DH_base,
-            recipient_view_key,
-            m_recipient_spend_key,
-            0, // no amount
-            0, // 0 index
-            false,
-            m_enote_pubkey);
+        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, 0, enote_privkey};
+        sp::SpOutputProposalV1 output_proposal;
+        payment_proposal.get_output_proposal_v1(output_proposal);
+        m_enote_pubkey = output_proposal.m_enote_ephemeral_pubkey;
+        output_proposal.get_enote_v1(m_enote);
 
         // kludge: use siphash to make view tag
         m_enote.m_view_tag = make_seraphis_view_tag_siphash(enote_privkey,
-            recipient_view_key,
-            0,
+            user_address.m_addr_K3,
             hw::get_device("default"));
         // want view tag test to fail
         ++m_enote.m_view_tag;
@@ -350,13 +346,12 @@ public:
         rct::key sender_receiver_secret_dummy;
         crypto::key_derivation derivation;
 
-        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_pubkey), m_recipient_view_privkey, derivation);
+        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_pubkey), m_recipient_findreceived_key, derivation);
 
         rct::key nominal_recipient_spendkey;
 
-        if (!try_get_seraphis_nominal_spend_key_siphash(derivation,
-            0,
-            m_enote.m_onetime_address,
+        if (!try_get_jamtis_nominal_spend_key_plain_siphash(derivation,
+            m_enote.m_enote_core.m_onetime_address,
             m_enote.m_view_tag,
             sender_receiver_secret_dummy,  //outparam not used
             nominal_recipient_spendkey))
@@ -372,9 +367,9 @@ public:
 
 private:
     rct::key m_recipient_spend_key;
-    crypto::secret_key m_recipient_view_privkey;
+    crypto::secret_key m_recipient_findreceived_key;
 
-    sp::SpENoteV1 m_enote;
+    sp::SpEnoteV1 m_enote;
     rct::key m_enote_pubkey;
 };
 
