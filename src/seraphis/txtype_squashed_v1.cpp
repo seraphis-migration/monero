@@ -71,7 +71,7 @@ static SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(const
     {
         config.m_min_inputs = 1;
         config.m_max_inputs = 100000;
-        config.m_min_outputs = 2;
+        config.m_min_outputs = 1;
         config.m_max_outputs = 100000;
     }
     else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)

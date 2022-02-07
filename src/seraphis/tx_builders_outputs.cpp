@@ -79,11 +79,8 @@ static bool check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(const std::
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposalV1> &output_proposals)
 {
-    // num proposals must be in range [2, MAX_OUTS]
-    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() >= 2,
+    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() >= 1,
         "Semantics check output proposals v1: insufficient outputs.");
-    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() <= config::SP_MAX_OUTPUTS_V1,
-        "Semantics check output proposals v1: too many outputs.");
 
     // if 2 proposals, must be a shared enote ephemeral pubkey
     if (output_proposals.size() == 2)
@@ -136,10 +133,6 @@ void check_v1_tx_supplement_semantics_sp_v1(const SpTxSupplementV1 &tx_supplemen
         CHECK_AND_ASSERT_THROW_MES(tx_supplement.m_output_enote_ephemeral_pubkeys.size() == num_outputs,
             "Semantics check tx supplement v1: there must be one enote pubkey for each output when there are 3+ outputs.");
     }
-    else //num_outputs == 1
-    {
-        CHECK_AND_ASSERT_THROW_MES(false, "Semantics check tx supplement v1: one output is not allowed.");
-    }
 
     // if 3+ enote pubkeys, all should be unique
     if (tx_supplement.m_output_enote_ephemeral_pubkeys.size() >= 3)
@@ -166,7 +159,7 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_prop
     output_amounts_out.clear();
     output_amounts_out.reserve(output_proposals.size());
     output_amount_commitment_blinding_factors_out.clear();
-    output_amount_commitment_blinding_factors_out.resize(output_proposals.size());
+    output_amount_commitment_blinding_factors_out.reserve(output_proposals.size());
     tx_supplement_inout.m_output_enote_ephemeral_pubkeys.clear();
     tx_supplement_inout.m_output_enote_ephemeral_pubkeys.reserve(output_proposals.size());
 

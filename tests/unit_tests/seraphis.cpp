@@ -71,12 +71,6 @@ static void make_secret_key(crypto::secret_key &skey_out)
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void make_pubkey(rct::key &pkey_out)
-{
-    pkey_out = rct::pkGen();
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 static void make_fake_sp_masked_address(crypto::secret_key &mask,
     crypto::secret_key &view_stuff,
     std::vector<crypto::secret_key> &spendkeys,
@@ -121,6 +115,7 @@ static void make_fake_sp_masked_address(crypto::secret_key &mask,
 {
     std::vector<crypto::secret_key> spendkeys = {spendkey};
     make_fake_sp_masked_address(mask, view_stuff, spendkeys, masked_address);
+    spendkey = spendkeys[0];
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -149,6 +144,10 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     // for 2-out txs, can only have one unique enote ephemeral pubkey
     if (output_proposals.size() == 2)
         output_proposals[1].m_enote_ephemeral_pubkey = output_proposals[0].m_enote_ephemeral_pubkey;
+
+    // pre-sort inputs and outputs (doing this here makes everything else easier)
+    std::sort(input_proposals.begin(), input_proposals.end());  //note: this is very inefficient for large input counts
+    std::sort(output_proposals.begin(), output_proposals.end());
 
     // make mock membership proof ref sets
     std::vector<SpEnote> input_enotes;
@@ -192,10 +191,6 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     input_images.resize(input_proposals.size());
     image_address_masks.resize(input_proposals.size());
     image_amount_masks.resize(input_proposals.size());
-
-    // pre-sort inputs and outputs
-    std::sort(input_proposals.begin(), input_proposals.end());  //note: this is very inefficient for large input counts
-    std::sort(output_proposals.begin(), output_proposals.end());
 
     // make everything
     make_v1_tx_outputs_sp_v1(output_proposals,
@@ -513,7 +508,7 @@ TEST(seraphis, information_recovery_keyimage)
     sp::jamtis::make_seraphis_key_image_jamtis_style(wallet_spend_pubkey,
         k_view_balance,
         address_privkey,
-        k_a_sender,
+        address_privkey,
         key_image_jamtis);  // -y X + -y X + (4*y X + z U) -> (z/2y) U
 
     EXPECT_TRUE(key_image1 == key_image2);

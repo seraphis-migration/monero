@@ -60,9 +60,12 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 static auto convert_skv_to_rctv(const std::vector<crypto::secret_key> &skv, rct::keyV &rctv_out)
 {
-    auto a_wiper = epee::misc_utils::create_scope_leave_handler([&]{
-        memwipe(rctv_out.data(), rctv_out.size()*sizeof(rct::key));
-    });
+    auto a_wiper = epee::misc_utils::create_scope_leave_handler(
+            [&rctv_out]()
+            {
+                memwipe(rctv_out.data(), rctv_out.size()*sizeof(rct::key));
+            }
+        );
 
     rctv_out.clear();
     rctv_out.reserve(skv.size());
