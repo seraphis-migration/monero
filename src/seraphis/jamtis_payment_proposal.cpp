@@ -209,7 +209,7 @@ bool is_self_send_output_proposal(const SpOutputProposalV1 &proposal,
     address_tag_MAC_t nominal_mac;
     address_index_t nominal_address_index{address_tag_to_index(nominal_raw_address_tag, nominal_mac)};
 
-    if (nominal_mac != JamtisSelfSendMAC::CHANGE ||
+    if (nominal_mac != JamtisSelfSendMAC::CHANGE &&
         nominal_mac != JamtisSelfSendMAC::SELF_SPEND)
     {
         return false;

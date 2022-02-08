@@ -57,6 +57,7 @@ extern "C"
 #include "seraphis/tx_misc_utils.h"
 #include "seraphis/txtype_squashed_v1.h"
 
+#include "boost/multiprecision/cpp_int.hpp"
 #include "gtest/gtest.h"
 
 #include <memory>
@@ -728,10 +729,10 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
         k_view_balance};
     SpOutputProposalV1 output_proposal;
     payment_proposal.get_output_proposal_v1(output_proposal);
+    EXPECT_TRUE(is_self_send_output_proposal(output_proposal, wallet_spend_pubkey, k_view_balance));
     SpEnoteV1 self_spend_enote;
     output_proposal.get_enote_v1(self_spend_enote);
     rct::key enote_ephemeral_pubkey{output_proposal.m_enote_ephemeral_pubkey};
-
 
     /// try to reproduce spend key (and recover address index)
 
@@ -786,7 +787,228 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     EXPECT_TRUE(sender_receiver_secret_reproduced == sender_receiver_secret);
 }
 //-------------------------------------------------------------------------------------------------------------------
-TEST(seraphis, sp_txtype_squashed_v1)
+TEST(seraphis, finalize_v1_output_proposal_set_sp_v1)
+{
+    /// setup
+    using namespace sp;
+    using namespace jamtis;
+
+    // user wallet keys
+    crypto::secret_key k_m, k_vb, k_fr, s_ga;
+    rct::key K_1_base, K_fr;
+    make_secret_key(k_m);
+    make_secret_key(k_vb);
+    make_jamtis_findreceived_key(k_vb, k_fr);
+    make_jamtis_generateaddress_secret(k_vb, s_ga);
+    make_seraphis_spendkey(k_vb, k_m, K_1_base);
+    rct::scalarmultBase(K_fr, rct::sk2rct(k_fr));
+
+    // user addresses
+    address_index_t j_selfspend{crypto::rand_idx(MAX_ADDRESS_INDEX)};
+    address_index_t j_change{crypto::rand_idx(MAX_ADDRESS_INDEX)};
+    JamtisDestinationV1 selfspend_dest;
+    JamtisDestinationV1 change_dest;
+    make_jamtis_destination_v1(K_1_base, K_fr, s_ga, j_selfspend, selfspend_dest);
+    make_jamtis_destination_v1(K_1_base, K_fr, s_ga, j_change, change_dest);
+
+    // prepare self-spend outputs
+    JamtisPaymentProposalSelfSendV1 self_spend_payment_proposal;
+    self_spend_payment_proposal.m_destination = selfspend_dest;
+    self_spend_payment_proposal.m_amount = 1;
+    self_spend_payment_proposal.m_type = JamtisSelfSendMAC::SELF_SPEND;
+    make_secret_key(self_spend_payment_proposal.m_enote_ephemeral_privkey);
+    self_spend_payment_proposal.m_viewbalance_privkey = k_vb;
+    SpOutputProposalV1 self_spend_proposal_amnt_1;
+    self_spend_payment_proposal.get_output_proposal_v1(self_spend_proposal_amnt_1);
+
+    JamtisPaymentProposalSelfSendV1 self_spend_payment_proposal2{self_spend_payment_proposal};
+    make_secret_key(self_spend_payment_proposal2.m_enote_ephemeral_privkey);
+    SpOutputProposalV1 self_spend_proposal2_amnt_1;
+    self_spend_payment_proposal2.get_output_proposal_v1(self_spend_proposal2_amnt_1);
+
+    /// test cases
+    boost::multiprecision::uint128_t in_amount{0};
+    rct::xmr_amount fee_amnt_1{1};
+    std::vector<SpOutputProposalV1> out_proposals{};
+
+    // 0 outputs, 0 change: error
+    in_amount = 1;
+    out_proposals.clear();
+    EXPECT_ANY_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+
+    // 0 outputs, >0 change: error
+    in_amount = 2;
+    out_proposals.clear();  //change = 1
+    EXPECT_ANY_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+
+    // 1 normal output, 0 change: 2 outputs (1 dummy)
+    in_amount = 2;
+    out_proposals.resize(1);
+    out_proposals[0].gen(1);
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 2);
+    EXPECT_FALSE(is_self_send_output_proposal(out_proposals[1], K_1_base, k_vb));
+
+    // 1 normal output, >0 change: 2 outputs (1 change)
+    in_amount = 3;
+    out_proposals.resize(1);
+    out_proposals[0].gen(1);  //change = 1
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 2);
+    EXPECT_TRUE(is_self_send_output_proposal(out_proposals[1], K_1_base, k_vb));
+
+    // 2 normal outputs, 0 change: 3 outputs (1 dummy)
+    in_amount = 3;
+    out_proposals.resize(2);
+    out_proposals[0].gen(1);
+    out_proposals[1].gen(1);
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 3);
+    EXPECT_FALSE(is_self_send_output_proposal(out_proposals[2], K_1_base, k_vb));
+
+    // 2 normal outputs (shared ephemeral pubkey), 0 change: 2 outputs
+    in_amount = 3;
+    out_proposals.resize(2);
+    out_proposals[0].gen(1);
+    out_proposals[1].gen(1);
+    out_proposals[1].m_enote_ephemeral_pubkey = out_proposals[0].m_enote_ephemeral_pubkey;
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 2);
+
+    // 2 normal outputs (shared ephemeral pubkey), >0 change: error
+    in_amount = 4;
+    out_proposals.resize(2);
+    out_proposals[0].gen(1);
+    out_proposals[1].gen(1);  //change = 1
+    out_proposals[1].m_enote_ephemeral_pubkey = out_proposals[0].m_enote_ephemeral_pubkey;
+    EXPECT_ANY_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+
+    // 3 normal outputs, 0 change: 3 outputs
+    in_amount = 4;
+    out_proposals.resize(3);
+    out_proposals[0].gen(1);
+    out_proposals[1].gen(1);
+    out_proposals[2].gen(1);
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 3);
+
+    // 3 normal outputs, >0 change: 4 outputs (1 change)
+    in_amount = 5;
+    out_proposals.resize(3);
+    out_proposals[0].gen(1);
+    out_proposals[1].gen(1);
+    out_proposals[2].gen(1);  //change = 1
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 4);
+    EXPECT_TRUE(is_self_send_output_proposal(out_proposals[3], K_1_base, k_vb));
+
+    // 1 self-send output, 0 change: 2 outputs (1 dummy)
+    in_amount = 2;
+    out_proposals.resize(1);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 2);
+    EXPECT_TRUE(is_self_send_output_proposal(out_proposals[0], K_1_base, k_vb));   //self-spend
+    EXPECT_FALSE(is_self_send_output_proposal(out_proposals[1], K_1_base, k_vb));  //dummy
+
+    // 1 self-send output, >0 change: 3 outputs (1 dummy, 1 change)
+    in_amount = 3;
+    out_proposals.resize(1);
+    out_proposals[0] = self_spend_proposal_amnt_1;  //change = 1
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 3);
+    EXPECT_TRUE(is_self_send_output_proposal(out_proposals[0], K_1_base, k_vb));   //self-spend
+    EXPECT_FALSE(is_self_send_output_proposal(out_proposals[1], K_1_base, k_vb));  //dummy
+    EXPECT_TRUE(is_self_send_output_proposal(out_proposals[2], K_1_base, k_vb));   //change
+
+    // 1 self-send output & 1 normal output (shared ephemeral pubkey), 0 change: 2 outputs
+    in_amount = 3;
+    out_proposals.resize(2);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    out_proposals[1].gen(1);
+    out_proposals[1].m_enote_ephemeral_pubkey = out_proposals[0].m_enote_ephemeral_pubkey;
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 2);
+
+    // 1 self-send output & 1 normal output (shared ephemeral pubkey), >0 change: error
+    in_amount = 4;
+    out_proposals.resize(2);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    out_proposals[1].gen(1);  //change = 1
+    out_proposals[1].m_enote_ephemeral_pubkey = out_proposals[0].m_enote_ephemeral_pubkey;
+    EXPECT_ANY_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+
+    // 1 self-send output, 1 normal output, 0 change: 3 outputs (1 dummy)
+    in_amount = 3;
+    out_proposals.resize(2);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    out_proposals[1].gen(1);
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 3);
+    EXPECT_FALSE(is_self_send_output_proposal(out_proposals[2], K_1_base, k_vb));
+
+    // 1 self-send output, 1 normal output, >0 change: 3 outputs (1 change)
+    in_amount = 4;
+    out_proposals.resize(2);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    out_proposals[1].gen(1);  //change = 1
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 3);
+    EXPECT_TRUE(is_self_send_output_proposal(out_proposals[2], K_1_base, k_vb));
+
+    // 1 self-send output, 2 normal outputs, 0 change: 3 outputs
+    in_amount = 4;
+    out_proposals.resize(3);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    out_proposals[1].gen(1);
+    out_proposals[2].gen(1);
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 3);
+
+    // 1 self-send output, 2 normal outputs, >0 change: 4 outputs (1 change)
+    in_amount = 5;
+    out_proposals.resize(3);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    out_proposals[1].gen(1);
+    out_proposals[2].gen(1);  //change = 1
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 4);
+    EXPECT_TRUE(is_self_send_output_proposal(out_proposals[3], K_1_base, k_vb));
+
+    // 2 self-send outputs (shared ephemeral pubkey), 0 change: error
+    in_amount = 3;
+    out_proposals.resize(2);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    out_proposals[1] = self_spend_proposal_amnt_1;
+    EXPECT_ANY_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+
+    // 2 self-send outputs (shared ephemeral pubkey), >0 change: error
+    in_amount = 4;
+    out_proposals.resize(2);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    out_proposals[1] = self_spend_proposal_amnt_1;  //change = 1
+    EXPECT_ANY_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+
+    // 2 self-send outputs, 0 change: 3 outputs (1 dummy)
+    in_amount = 3;
+    out_proposals.resize(2);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    out_proposals[1] = self_spend_proposal2_amnt_1;
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 3);
+    EXPECT_FALSE(is_self_send_output_proposal(out_proposals[2], K_1_base, k_vb));
+
+    // 2 self-send outputs, >0 change: 3 outputs (1 change)
+    in_amount = 4;
+    out_proposals.resize(2);
+    out_proposals[0] = self_spend_proposal_amnt_1;
+    out_proposals[1] = self_spend_proposal2_amnt_1;  //change = 1
+    EXPECT_NO_THROW(finalize_v1_output_proposal_set_sp_v1(in_amount, fee_amnt_1, change_dest, K_1_base, k_vb, out_proposals));
+    EXPECT_TRUE(out_proposals.size() == 3);
+    EXPECT_TRUE(is_self_send_output_proposal(out_proposals[2], K_1_base, k_vb));
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis, txtype_squashed_v1)
 {
     // demo making SpTxTypeSquasedV1 with raw tx builder API
 

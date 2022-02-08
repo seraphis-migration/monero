@@ -97,7 +97,7 @@ void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposa
         for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
         {
             CHECK_AND_ASSERT_THROW_MES(check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(output_proposals),
-                "Semantics check output proposals v1: there are >2 outputs but their enote ephemeral pubkeys aren't all"
+                "Semantics check output proposals v1: there are >2 outputs but their enote ephemeral pubkeys aren't all "
                 "unique.");
         }
     }
@@ -189,7 +189,7 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
     for (const SpOutputProposalV1 &proposal : output_proposals_inout)
         output_sum += proposal.m_core.m_amount;
 
-    CHECK_AND_ASSERT_THROW_MES(output_sum <= total_input_amount, "Finalize output proposals: input amount is too small.");
+    CHECK_AND_ASSERT_THROW_MES(total_input_amount >= output_sum, "Finalize output proposals: input amount is too small.");
     CHECK_AND_ASSERT_THROW_MES(total_input_amount - output_sum <= static_cast<rct::xmr_amount>(-1),
         "Finalize output proposals: change amount exceeds maximum value allowed.");
 
@@ -204,7 +204,7 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
     {
         // txs should have at least 1 non-change output
 
-        CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: 0 outputs specified. If you want to send money to"
+        CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: 0 outputs specified. If you want to send money to "
             "yourself, use a self-spend enote type instead of forcing it via a change enote type.");
     }
     else if (output_proposals_inout.size() == 1)
@@ -216,13 +216,9 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
             // add a special dummy output
             // - 0 amount
             // - make sure the final proposal set will have 1 unique enote ephemeral pubkey
-            jamtis::JamtisPaymentProposalSelfSendV1 special_dummy;
-            special_dummy.gen(0, jamtis::JamtisSelfSendMAC::CHANGE);
-            special_dummy.m_destination.m_addr_K3 = output_proposals_inout[0].m_enote_ephemeral_pubkey;
-            special_dummy.m_enote_ephemeral_privkey = rct::rct2sk(rct::identity());  //r = 1 (not needed)
-
             output_proposals_inout.emplace_back();
-            special_dummy.get_output_proposal_v1(output_proposals_inout.back());
+            output_proposals_inout.back().gen(0);
+            output_proposals_inout.back().m_enote_ephemeral_pubkey = output_proposals_inout[0].m_enote_ephemeral_pubkey;
         }
         else if /*change_amount > 0 &&*/
             (!jamtis::is_self_send_output_proposal(output_proposals_inout[0], wallet_spend_pubkey, k_view_balance))
@@ -311,9 +307,9 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
             if (jamtis::is_self_send_output_proposal(output_proposals_inout[0], wallet_spend_pubkey, k_view_balance) &&
                 jamtis::is_self_send_output_proposal(output_proposals_inout[1], wallet_spend_pubkey, k_view_balance))
             {
-                CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: there are 2 self-send outputs that share"
-                    "an enote ephemeral pubkey, but this can reduce user privacy. If you want to send money to yourself, make"
-                    "independent self-spend types, or avoid calling this function (not recommended).");
+                CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: there are 2 self-send outputs that share "
+                    "an enote ephemeral pubkey, but this can reduce user privacy. If you want to send money to yourself, "
+                    "make independent self-spend types, or avoid calling this function (not recommended).");
             }
             else //(at most 1 output proposal is a self-send)
             {
@@ -322,17 +318,16 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
         }
         else //(change_amount > 0)
         {
-            CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: there are 2 outputs that share"
-                "an enote ephemeral pubkey, but a non-zero change amount. In >2-out txs, all enote ephemeral pubkeys should"
-                "be unique, so adding a change output isn't feasible here. You need to make independent output proposals, or"
+            CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: there are 2 outputs that share "
+                "an enote ephemeral pubkey, but a non-zero change amount. In >2-out txs, all enote ephemeral pubkeys should "
+                "be unique, so adding a change output isn't feasible here. You need to make independent output proposals, or "
                 "avoid calling this function (not recommended).");
         }
     }
     else //(output_proposals_inout.size() > 2)
     {
         CHECK_AND_ASSERT_THROW_MES(check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(output_proposals_inout),
-            "Finalize output proposals: there are >2 outputs but their enote ephemeral pubkeys aren't all"
-            "unique.");
+            "Finalize output proposals: there are >2 outputs but their enote ephemeral pubkeys aren't all unique.");
 
         if (change_amount == 0)
         {
