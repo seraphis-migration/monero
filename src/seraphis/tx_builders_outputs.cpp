@@ -107,8 +107,8 @@ void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposa
         CHECK_AND_ASSERT_THROW_MES(std::find_if(output_proposals.begin(), output_it,
                     [&output_it](const SpOutputProposalV1 &previous_proposal) -> bool
                     {
-                        return previous_proposal.m_proposal_core.m_onetime_address ==
-                            output_it->m_proposal_core.m_onetime_address;
+                        return previous_proposal.m_core.m_onetime_address ==
+                            output_it->m_core.m_onetime_address;
                     }
                 ) == output_it,
             "Semantics check output proposals v1: output onetime addresses are not all unique.");
@@ -171,8 +171,8 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_prop
         proposal.get_enote_v1(outputs_out[output_index]);
 
         // prepare for range proofs
-        output_amounts_out.emplace_back(proposal.m_proposal_core.m_amount);
-        output_amount_commitment_blinding_factors_out.emplace_back(proposal.m_proposal_core.m_amount_blinding_factor);
+        output_amounts_out.emplace_back(proposal.m_core.m_amount);
+        output_amount_commitment_blinding_factors_out.emplace_back(proposal.m_core.m_amount_blinding_factor);
 
         // copy non-duplicate enote pubkeys to tx supplement
         if (std::find(tx_supplement_inout.m_output_enote_ephemeral_pubkeys.begin(), tx_supplement_inout.m_output_enote_ephemeral_pubkeys.end(),
@@ -194,7 +194,7 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
     boost::multiprecision::uint128_t output_sum{transaction_fee};
 
     for (const SpOutputProposalV1 &proposal : output_proposals_inout)
-        output_sum += proposal.m_proposal_core.m_amount;
+        output_sum += proposal.m_core.m_amount;
 
     CHECK_AND_ASSERT_THROW_MES(output_sum <= total_input_amount, "Finalize output proposals: input amount is too small.");
     CHECK_AND_ASSERT_THROW_MES(total_input_amount - output_sum <= static_cast<rct::xmr_amount>(-1),

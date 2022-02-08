@@ -160,11 +160,11 @@ bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &inpu
 
     for (const auto &input_proposal : input_proposals)
     {
-        in_amounts.emplace_back(input_proposal.m_proposal_core.m_amount);
+        in_amounts.emplace_back(input_proposal.m_core.m_amount);
     }
     for (const auto &output_proposal : output_proposals)
     {
-        out_amounts.emplace_back(output_proposal.m_proposal_core.m_amount);
+        out_amounts.emplace_back(output_proposal.m_core.m_amount);
     }
 
     out_amounts.emplace_back(transaction_fee);

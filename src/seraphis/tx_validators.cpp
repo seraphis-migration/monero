@@ -70,10 +70,10 @@ static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpEno
         (remainder_blinding_factor == rct::zero() ? 0 : 1));
 
     for (const auto &input_image : input_images)
-        input_image_amount_commitments.emplace_back(input_image.m_enote_image_core.m_masked_commitment);
+        input_image_amount_commitments.emplace_back(input_image.m_core.m_masked_commitment);
 
     for (const auto &output : outputs)
-        output_commitments.emplace_back(output.m_enote_core.m_amount_commitment);
+        output_commitments.emplace_back(output.m_core.m_amount_commitment);
 
     if (!(remainder_blinding_factor == rct::zero()))
         output_commitments.emplace_back(rct::scalarmultBase(remainder_blinding_factor));
@@ -169,15 +169,15 @@ bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &in
     for (const auto &image : input_images)
     {
         // input linking tags must be in the prime subgroup: l*KI = identity
-        if (!sp::key_domain_is_prime_subgroup(rct::ki2rct(image.m_enote_image_core.m_key_image)))
+        if (!sp::key_domain_is_prime_subgroup(rct::ki2rct(image.m_core.m_key_image)))
             return false;
 
         // image parts must not be identity
-        if (rct::ki2rct(image.m_enote_image_core.m_key_image) == rct::identity())
+        if (rct::ki2rct(image.m_core.m_key_image) == rct::identity())
             return false;
-        if (image.m_enote_image_core.m_masked_address == rct::identity())
+        if (image.m_core.m_masked_address == rct::identity())
             return false;
-        if (image.m_enote_image_core.m_masked_commitment == rct::identity())
+        if (image.m_core.m_masked_commitment == rct::identity())
             return false;
     }
 
@@ -220,13 +220,13 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
         // note: assumes key images are sorted
         if (input_index > 0)
         {
-            if (input_images[input_index - 1].m_enote_image_core.m_key_image ==
-                input_images[input_index].m_enote_image_core.m_key_image)
+            if (input_images[input_index - 1].m_core.m_key_image ==
+                input_images[input_index].m_core.m_key_image)
                 return false;
         }
 
         // check no duplicates in ledger context
-        if (ledger_context->linking_tag_exists_sp_v1(input_images[input_index].m_enote_image_core.m_key_image))
+        if (ledger_context->linking_tag_exists_sp_v1(input_images[input_index].m_core.m_key_image))
             return false;
     }
 
@@ -261,7 +261,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     for (std::size_t input_commitment_index{0}; input_commitment_index < input_images.size(); ++input_commitment_index)
     {
         // double check that the two stored copies of input image commitments match
-        if (input_images[input_commitment_index].m_enote_image_core.m_masked_commitment !=
+        if (input_images[input_commitment_index].m_core.m_masked_commitment !=
             rct::rct2pk(rct::scalarmult8(range_proofs.V[input_commitment_index])))
         {
             return false;
@@ -271,7 +271,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     for (std::size_t output_commitment_index{0}; output_commitment_index < outputs.size(); ++output_commitment_index)
     {
         // double check that the two stored copies of output commitments match
-        if (outputs[output_commitment_index].m_enote_core.m_amount_commitment !=
+        if (outputs[output_commitment_index].m_core.m_amount_commitment !=
             rct::rct2pk(rct::scalarmult8(range_proofs.V[input_images.size() + output_commitment_index])))
         {
             return false;
@@ -316,8 +316,8 @@ bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &me
 
         // offset (input image masked keys squashed: Q' = Ko' + C')
         rct::addKeys(offsets[0][0],
-            input_images[input_index].m_enote_image_core.m_masked_address,
-            input_images[input_index].m_enote_image_core.m_masked_commitment);
+            input_images[input_index].m_core.m_masked_address,
+            input_images[input_index].m_core.m_masked_commitment);
 
         // proof message
         message = {get_tx_membership_proof_message_sp_v1(membership_proofs[input_index].m_ledger_enote_indices)};
@@ -349,8 +349,8 @@ bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_
     {
         if (!sp::sp_composition_verify(image_proofs[input_index].m_composition_proof,
                 image_proofs_message,
-                input_images[input_index].m_enote_image_core.m_masked_address,
-                input_images[input_index].m_enote_image_core.m_key_image))
+                input_images[input_index].m_core.m_masked_address,
+                input_images[input_index].m_core.m_key_image))
             return false;
     }
 

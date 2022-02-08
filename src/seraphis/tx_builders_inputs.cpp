@@ -82,7 +82,7 @@ void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &inpu
             std::find_if(tx_membership_proofs_alignable.begin(), tx_membership_proofs_alignable.end(),
                     [&](const SpMembershipProofAlignableV1 &alignable_proof) -> bool
                     {
-                        return input_image.m_enote_image_core.m_masked_address ==
+                        return input_image.m_core.m_masked_address ==
                             alignable_proof.m_masked_address;
                     }
                 );
@@ -137,10 +137,10 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
         // input image amount commitment blinding factor: t_c + x
         sc_add(&(blinding_factors_out[input_index]),
             &(image_address_masks[input_index]),  // t_c
-            &(input_proposals[input_index].m_proposal_core.m_amount_blinding_factor));  // x
+            &(input_proposals[input_index].m_core.m_amount_blinding_factor));  // x
 
         // input amount: a
-        input_amounts_out.emplace_back(input_proposals[input_index].m_proposal_core.m_amount);
+        input_amounts_out.emplace_back(input_proposals[input_index].m_core.m_amount);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -203,8 +203,8 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_p
 
     for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
     {
-        make_v1_tx_image_proof_sp_v1(input_proposals[input_index].m_proposal_core,
-            input_images[input_index].m_enote_image_core.m_masked_address,
+        make_v1_tx_image_proof_sp_v1(input_proposals[input_index].m_core,
+            input_images[input_index].m_core.m_masked_address,
             message,
             tx_image_proofs_out[input_index]);
     }
@@ -428,7 +428,7 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
             // insert referenced enote into mock ledger (also, record squashed enote)
             // note: in a real context, you would instead 'get' the enote's index from the ledger, and error if not found
             SpEnoteV1 temp_enote;
-            temp_enote.m_enote_core = reference_sets[input_index].m_referenced_enotes[ref_index];
+            temp_enote.m_core = reference_sets[input_index].m_referenced_enotes[ref_index];
 
             reference_sets[input_index].m_ledger_enote_indices[ref_index] =
                 ledger_context_inout->add_enote_sp_v1(temp_enote);
@@ -448,7 +448,7 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     input_enotes.resize(input_proposals.size());
 
     for (std::size_t input_index{0}; input_index< input_proposals.size(); ++input_index)
-        input_proposals[input_index].m_proposal_core.get_enote_base(input_enotes[input_index]);
+        input_proposals[input_index].m_core.get_enote_base(input_enotes[input_index]);
 
     return gen_mock_sp_membership_ref_sets_v1(input_enotes, ref_set_decomp_n, ref_set_decomp_m, ledger_context_inout);
 }

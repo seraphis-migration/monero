@@ -55,7 +55,7 @@ namespace sp
 struct SpEnoteV1 final
 {
     /// enote core (one-time address, amount commitment)
-    SpEnote m_enote_core;
+    SpEnote m_core;
 
     /// enc(a)
     rct::xmr_amount m_encoded_amount;
@@ -67,7 +67,7 @@ struct SpEnoteV1 final
     /// less-than operator for sorting
     bool operator<(const SpEnoteV1 &other_enote) const
     {
-        return m_enote_core < other_enote.m_enote_core;
+        return m_core < other_enote.m_core;
     }
 
     /**
@@ -95,12 +95,12 @@ struct SpEnoteV1 final
 struct SpEnoteImageV1 final
 {
     /// enote image core (masked address, masked amount commitment, key image)
-    SpEnoteImage m_enote_image_core;
+    SpEnoteImage m_core;
 
     /// less-than operator for sorting
     bool operator<(const SpEnoteImageV1 &other_image) const
     {
-        return m_enote_image_core < other_image.m_enote_image_core;
+        return m_core < other_image.m_core;
     }
 
     static std::size_t get_size_bytes() { return SpEnoteImage::get_size_bytes(); }

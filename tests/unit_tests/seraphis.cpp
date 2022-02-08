@@ -156,7 +156,7 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     for (const auto &input_proposal : input_proposals)
     {
         input_enotes.emplace_back();
-        input_proposal.m_proposal_core.get_enote_base(input_enotes.back());
+        input_proposal.m_core.get_enote_base(input_enotes.back());
     }
 
     std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
@@ -201,8 +201,8 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
     {
         input_proposals[input_index].get_enote_image_v1(input_images[input_index]);
-        image_address_masks[input_index] = input_proposals[input_index].m_proposal_core.m_address_mask;
-        image_amount_masks[input_index] = input_proposals[input_index].m_proposal_core.m_commitment_mask;
+        image_address_masks[input_index] = input_proposals[input_index].m_core.m_address_mask;
+        image_amount_masks[input_index] = input_proposals[input_index].m_core.m_commitment_mask;
     }
     rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
     make_v1_tx_image_proofs_sp_v1(input_proposals,
@@ -581,11 +581,11 @@ TEST(seraphis, information_recovery_addressindex)
 
     // test address indices
     EXPECT_TRUE(test_info_recovery_addressindex(0));
-    EXPECT_TRUE(test_info_recovery_addressindex(ADDRESS_INDEX_MAX));
-    EXPECT_FALSE(test_info_recovery_addressindex(ADDRESS_INDEX_MAX + 1));
+    EXPECT_TRUE(test_info_recovery_addressindex(MAX_ADDRESS_INDEX));
+    EXPECT_FALSE(test_info_recovery_addressindex(MAX_ADDRESS_INDEX + 1));
 
     for (std::size_t i{0}; i < 10; ++i)
-        EXPECT_TRUE(test_info_recovery_addressindex(crypto::rand_idx(ADDRESS_INDEX_MAX)));
+        EXPECT_TRUE(test_info_recovery_addressindex(crypto::rand_idx(MAX_ADDRESS_INDEX)));
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, information_recovery_enote_v1_plain)
@@ -607,7 +607,7 @@ TEST(seraphis, information_recovery_enote_v1_plain)
     rct::scalarmultBase(findreceived_pubkey, rct::sk2rct(k_find_received));
 
     // user address
-    address_index_t j{crypto::rand_idx(ADDRESS_INDEX_MAX)};
+    address_index_t j{crypto::rand_idx(MAX_ADDRESS_INDEX)};
     JamtisDestinationV1 user_address;
 
     make_jamtis_destination_v1(wallet_spend_pubkey,
@@ -641,7 +641,7 @@ TEST(seraphis, information_recovery_enote_v1_plain)
     rct::key nominal_recipient_spendkey;
 
     EXPECT_TRUE(try_get_jamtis_nominal_spend_key_plain(derivation,
-        plain_enote.m_enote_core.m_onetime_address,
+        plain_enote.m_core.m_onetime_address,
         plain_enote.m_view_tag,
         sender_receiver_secret,
         nominal_recipient_spendkey));
@@ -673,7 +673,7 @@ TEST(seraphis, information_recovery_enote_v1_plain)
     EXPECT_TRUE(
             try_get_jamtis_amount_plain(sender_receiver_secret,
                 amount_baked_key,
-                plain_enote.m_enote_core.m_amount_commitment,
+                plain_enote.m_core.m_amount_commitment,
                 plain_enote.m_encoded_amount,
                 recovered_amount)
         );
@@ -708,7 +708,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     rct::scalarmultBase(findreceived_pubkey, rct::sk2rct(k_find_received));
 
     // user address
-    address_index_t j{crypto::rand_idx(ADDRESS_INDEX_MAX)};
+    address_index_t j{crypto::rand_idx(MAX_ADDRESS_INDEX)};
     JamtisDestinationV1 user_address;
 
     make_jamtis_destination_v1(wallet_spend_pubkey,
@@ -746,7 +746,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     rct::key nominal_recipient_spendkey;
 
     EXPECT_TRUE(try_get_jamtis_nominal_spend_key_selfsend(derivation,
-        self_spend_enote.m_enote_core.m_onetime_address,
+        self_spend_enote.m_core.m_onetime_address,
         self_spend_enote.m_view_tag,
         k_view_balance,
         enote_ephemeral_pubkey,
@@ -771,7 +771,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     rct::xmr_amount recovered_amount;
     EXPECT_TRUE(
             try_get_jamtis_amount_selfsend(sender_receiver_secret,
-                self_spend_enote.m_enote_core.m_amount_commitment,
+                self_spend_enote.m_core.m_amount_commitment,
                 self_spend_enote.m_encoded_amount,
                 recovered_amount)
         );

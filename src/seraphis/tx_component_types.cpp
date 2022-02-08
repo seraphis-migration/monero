@@ -52,7 +52,7 @@ void SpEnoteV1::append_to_string(std::string &str_inout) const
     // append all enote contents to the string
     str_inout.reserve(str_inout.size() + get_size_bytes());
 
-    m_enote_core.append_to_string(str_inout);
+    m_core.append_to_string(str_inout);
     for (int i{0}; i < 8; ++i)
     {
         str_inout += static_cast<char>(m_encoded_amount >> i*8);
@@ -66,7 +66,7 @@ void SpEnoteV1::gen()
     // generate a dummy enote: random pieces, completely unspendable
 
     // gen base of enote
-    m_enote_core.gen();
+    m_core.gen();
 
     // memo
     m_encoded_amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));

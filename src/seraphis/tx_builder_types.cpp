@@ -58,9 +58,9 @@ namespace sp
 void SpOutputProposalV1::get_enote_v1(SpEnoteV1 &enote_out) const
 {
     // enote core
-    enote_out.m_enote_core.m_onetime_address = m_proposal_core.m_onetime_address;
-    enote_out.m_enote_core.m_amount_commitment =
-        rct::commit(m_proposal_core.m_amount, rct::sk2rct(m_proposal_core.m_amount_blinding_factor));
+    enote_out.m_core.m_onetime_address = m_core.m_onetime_address;
+    enote_out.m_core.m_amount_commitment =
+        rct::commit(m_core.m_amount, rct::sk2rct(m_core.m_amount_blinding_factor));
 
     // enote misc. details
     enote_out.m_encoded_amount = m_encoded_amount;
@@ -71,7 +71,7 @@ void SpOutputProposalV1::get_enote_v1(SpEnoteV1 &enote_out) const
 void SpOutputProposalV1::gen(const rct::xmr_amount amount)
 {
     // gen base of destination
-    m_proposal_core.gen(amount);
+    m_core.gen(amount);
 
     m_enote_ephemeral_pubkey = rct::pkGen();
     m_encoded_amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));
@@ -114,16 +114,16 @@ SpTxPartialInputV1::SpTxPartialInputV1(const SpInputProposalV1 &input_proposal,
     input_proposal.get_enote_image_v1(m_input_image);
 
     // copy misc. proposal info
-    m_image_address_mask           = input_proposal.m_proposal_core.m_address_mask;
-    m_image_commitment_mask        = input_proposal.m_proposal_core.m_commitment_mask;
+    m_image_address_mask           = input_proposal.m_core.m_address_mask;
+    m_image_commitment_mask        = input_proposal.m_core.m_commitment_mask;
     m_proposal_prefix              = proposal_prefix;
-    m_input_amount                 = input_proposal.m_proposal_core.m_amount;
-    m_input_amount_blinding_factor = input_proposal.m_proposal_core.m_amount_blinding_factor;
-    input_proposal.m_proposal_core.get_enote_base(m_input_enote_core);
+    m_input_amount                 = input_proposal.m_core.m_amount;
+    m_input_amount_blinding_factor = input_proposal.m_core.m_amount_blinding_factor;
+    input_proposal.m_core.get_enote_base(m_input_enote_core);
 
     // construct image proof
-    make_v1_tx_image_proof_sp_v1(input_proposal.m_proposal_core,
-        m_input_image.m_enote_image_core.m_masked_address,
+    make_v1_tx_image_proof_sp_v1(input_proposal.m_core,
+        m_input_image.m_core.m_masked_address,
         m_proposal_prefix,
         m_image_proof);
 }

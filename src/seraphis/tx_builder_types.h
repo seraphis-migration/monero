@@ -53,12 +53,12 @@ namespace sp
 struct SpInputProposalV1 final
 {
     /// core of the proposal
-    SpInputProposal m_proposal_core;
+    SpInputProposal m_core;
 
      /// less-than operator for sorting
     bool operator<(const SpInputProposalV1 &other_proposal) const
     {
-        return m_proposal_core < other_proposal.m_proposal_core;
+        return m_core < other_proposal.m_core;
     }
 
     /**
@@ -67,11 +67,11 @@ struct SpInputProposalV1 final
     */
     void get_enote_image_v1(SpEnoteImageV1 &image_out) const
     {
-        return m_proposal_core.get_enote_image_squashed_base(image_out.m_enote_image_core);
+        return m_core.get_enote_image_squashed_base(image_out.m_core);
     }
 
     /// generate a v1 input (all random; does not support info recovery)
-    void gen(const rct::xmr_amount amount) { m_proposal_core.gen(amount); }
+    void gen(const rct::xmr_amount amount) { m_core.gen(amount); }
 };
 
 ////
@@ -80,7 +80,7 @@ struct SpInputProposalV1 final
 struct SpOutputProposalV1 final
 {
     /// core of the proposal
-    SpOutputProposal m_proposal_core;
+    SpOutputProposal m_core;
 
     /// K_e: enote ephemeral pubkey
     rct::key m_enote_ephemeral_pubkey;
@@ -96,7 +96,7 @@ struct SpOutputProposalV1 final
     /// less-than operator for sorting
     bool operator<(const SpOutputProposalV1 &other_proposal) const
     {
-        return m_proposal_core < other_proposal.m_proposal_core;
+        return m_core < other_proposal.m_core;
     }
 
     /// convert this destination into a v1 enote

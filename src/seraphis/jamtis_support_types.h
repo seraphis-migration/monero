@@ -52,7 +52,7 @@ namespace jamtis
 /// index (system-endian; only 56 bits are used): j
 using address_index_t = std::uint64_t;
 constexpr std::size_t ADDRESS_INDEX_BYTES{7};
-constexpr address_index_t ADDRESS_INDEX_MAX{(address_index_t{1} << 8*ADDRESS_INDEX_BYTES) - 1};  //2^56 - 1
+constexpr address_index_t MAX_ADDRESS_INDEX{(address_index_t{1} << 8*ADDRESS_INDEX_BYTES) - 1};  //2^56 - 1
 
 /// MAC for address tags (system-endian): addr_tag_MAC
 constexpr std::size_t ADDRESS_TAG_MAC_BYTES{1};  //if > 1, then endianness must be preserved
@@ -70,7 +70,7 @@ struct address_tag_t final
     }
     bool operator!=(const address_tag_t &other_tag) const { return !(*this == other_tag); }
 
-    /// customize operator^ for encrypting tags
+    /// operator^ for encrypting tags
     address_tag_t operator^(const address_tag_t &other_tag) const
     {
         address_tag_t temp;

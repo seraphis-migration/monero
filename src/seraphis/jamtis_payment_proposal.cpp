@@ -77,11 +77,11 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
     // onetime address: Ko = H_n(q) X + K_1
     make_jamtis_onetime_address(q,
             m_destination.m_addr_K1,
-            output_proposal_out.m_proposal_core.m_onetime_address
+            output_proposal_out.m_core.m_onetime_address
         );
 
     // view tag: view_tag = H_1(K_d, Ko)
-    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_proposal_core.m_onetime_address);
+    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address);
 
     // enote amount baked key: 8 r G
     crypto::key_derivation amount_baked_key;  //TODO: add wiper?
@@ -90,11 +90,11 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
     // amount blinding factor: y = H_n(q, 8 r G)
     make_jamtis_amount_blinding_factor_plain(q,
             amount_baked_key,
-            output_proposal_out.m_proposal_core.m_amount_blinding_factor
+            output_proposal_out.m_core.m_amount_blinding_factor
         );
 
     // amount: a
-    output_proposal_out.m_proposal_core.m_amount = m_amount;
+    output_proposal_out.m_core.m_amount = m_amount;
 
     // encrypted amount: enc_amount = a ^ H_8(q, 8 r G)
     output_proposal_out.m_encoded_amount = encode_jamtis_amount_plain(m_amount, q, amount_baked_key);
@@ -148,19 +148,19 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     // onetime address: Ko = H_n(q) X + K_1
     make_jamtis_onetime_address(q,
             m_destination.m_addr_K1,
-            output_proposal_out.m_proposal_core.m_onetime_address
+            output_proposal_out.m_core.m_onetime_address
         );
 
     // view tag: view_tag = H_1(K_d, Ko)
-    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_proposal_core.m_onetime_address);
+    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address);
 
     // amount blinding factor: y = H_n(q)  //note: no baked key
     make_jamtis_amount_blinding_factor_selfsend(q,
-            output_proposal_out.m_proposal_core.m_amount_blinding_factor
+            output_proposal_out.m_core.m_amount_blinding_factor
         );
 
     // amount: a
-    output_proposal_out.m_proposal_core.m_amount = m_amount;
+    output_proposal_out.m_core.m_amount = m_amount;
 
     // encrypted amount: enc_amount = a ^ H_8(q)  //note: no baked key
     output_proposal_out.m_encoded_amount = encode_jamtis_amount_selfsend(m_amount, q);
@@ -191,7 +191,7 @@ bool is_self_send_output_proposal(const SpOutputProposalV1 &proposal,
     rct::key nominal_spendkey;
 
     if(!try_get_jamtis_nominal_spend_key_selfsend(K_d,
-            proposal.m_proposal_core.m_onetime_address,
+            proposal.m_core.m_onetime_address,
             proposal.m_view_tag,
             k_view_balance,
             proposal.m_enote_ephemeral_pubkey,
