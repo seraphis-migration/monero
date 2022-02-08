@@ -130,7 +130,7 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_am
     rct::BulletproofPlus range_proofs;
 
     rct::keyV amount_commitment_blinding_factors;
-    auto vec_wiper{convert_skv_to_rctv(blinding_factors, amount_commitment_blinding_factors)};
+    auto vec_wiper = convert_skv_to_rctv(blinding_factors, amount_commitment_blinding_factors);
     make_bpp_rangeproofs(amounts,
         amount_commitment_blinding_factors,
         range_proofs);

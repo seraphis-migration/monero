@@ -605,8 +605,8 @@ TEST(seraphis, information_recovery_enote_v1_plain)
     SpOutputProposalV1 output_proposal;
     payment_proposal.get_output_proposal_v1(output_proposal);
     SpEnoteV1 plain_enote;
-    rct::key enote_ephemeral_pubkey{output_proposal.m_enote_ephemeral_pubkey};
     output_proposal.get_enote_v1(plain_enote);
+    rct::key enote_ephemeral_pubkey{output_proposal.m_enote_ephemeral_pubkey};
 
 
     /// try to reproduce spend key (and recover address index)
@@ -709,8 +709,8 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     SpOutputProposalV1 output_proposal;
     payment_proposal.get_output_proposal_v1(output_proposal);
     SpEnoteV1 self_spend_enote;
-    rct::key enote_ephemeral_pubkey{output_proposal.m_enote_ephemeral_pubkey};
     output_proposal.get_enote_v1(self_spend_enote);
+    rct::key enote_ephemeral_pubkey{output_proposal.m_enote_ephemeral_pubkey};
 
 
     /// try to reproduce spend key (and recover address index)

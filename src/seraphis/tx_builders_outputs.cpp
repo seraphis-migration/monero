@@ -62,7 +62,7 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 static bool check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(const std::vector<SpOutputProposalV1> &output_proposals)
 {
-    for (auto output_it{output_proposals.begin()}; output_it != output_proposals.end(); ++output_it)
+    for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
     {
         if (std::find_if(output_proposals.begin(), output_it,
                     [&output_it](const SpOutputProposalV1 &previous_proposal) -> bool
@@ -93,7 +93,7 @@ void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposa
     // if >2 proposals, all enote ephemeral pubkeys should be unique
     if (output_proposals.size() > 2)
     {
-        for (auto output_it{output_proposals.begin()}; output_it != output_proposals.end(); ++output_it)
+        for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
         {
             CHECK_AND_ASSERT_THROW_MES(check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(output_proposals),
                 "Semantics check output proposals v1: there are >2 outputs but their enote ephemeral pubkeys aren't all"
@@ -102,7 +102,7 @@ void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposa
     }
 
     // all onetime addresses should be unique
-    for (auto output_it{output_proposals.begin()}; output_it != output_proposals.end(); ++output_it)
+    for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
     {
         CHECK_AND_ASSERT_THROW_MES(std::find_if(output_proposals.begin(), output_it,
                     [&output_it](const SpOutputProposalV1 &previous_proposal) -> bool
@@ -137,7 +137,7 @@ void check_v1_tx_supplement_semantics_sp_v1(const SpTxSupplementV1 &tx_supplemen
     // if 3+ enote pubkeys, all should be unique
     if (tx_supplement.m_output_enote_ephemeral_pubkeys.size() >= 3)
     {
-        for (auto enote_pubkey_it{tx_supplement.m_output_enote_ephemeral_pubkeys.begin()};
+        for (auto enote_pubkey_it = tx_supplement.m_output_enote_ephemeral_pubkeys.begin();
             enote_pubkey_it != tx_supplement.m_output_enote_ephemeral_pubkeys.end();
             ++enote_pubkey_it)
         {
