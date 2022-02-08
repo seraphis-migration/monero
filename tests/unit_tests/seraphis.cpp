@@ -230,6 +230,40 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static bool test_info_recovery_addressindex(const sp::jamtis::address_index_t j)
+{
+    using namespace sp;
+    using namespace jamtis;
+
+    // convert the index to/from raw tag form
+    address_tag_t raw_tag{address_index_to_tag(j, 0)};
+    address_tag_MAC_t raw_mac;
+    if (address_tag_to_index(raw_tag, raw_mac) != j)
+        return false;
+    if (raw_mac != 0)
+        return false;
+
+    // cipher and decipher the index
+    crypto::secret_key cipher_key;
+    make_secret_key(cipher_key);
+    address_tag_t ciphered_tag{cipher_address_index(rct::sk2rct(cipher_key), j, 0)};
+    address_tag_MAC_t decipher_mac;
+    if (decipher_address_index(rct::sk2rct(cipher_key), ciphered_tag, decipher_mac) != j)
+        return false;
+    if (decipher_mac != 0)
+        return false;
+
+    // encrypt and decrypt an address tag
+    crypto::secret_key encryption_key;
+    make_secret_key(encryption_key);
+    encrypted_address_tag_t encrypted_ciphered_tag{encrypt_address_tag(rct::sk2rct(encryption_key), ciphered_tag)};
+    if (decrypt_address_tag(rct::sk2rct(encryption_key), encrypted_ciphered_tag) != ciphered_tag)
+        return false;
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, multi_exp)
 {
     rct::key test_key;
@@ -545,28 +579,13 @@ TEST(seraphis, information_recovery_addressindex)
     using namespace sp;
     using namespace jamtis;
 
-    // make an address index
-    address_index_t j{crypto::rand_idx(ADDRESS_INDEX_MAX)};
+    // test address indices
+    EXPECT_TRUE(test_info_recovery_addressindex(0));
+    EXPECT_TRUE(test_info_recovery_addressindex(ADDRESS_INDEX_MAX));
+    EXPECT_FALSE(test_info_recovery_addressindex(ADDRESS_INDEX_MAX + 1));
 
-    // convert the index to/from raw tag form
-    address_tag_t raw_tag{address_index_to_tag(j, 0)};
-    address_tag_MAC_t raw_mac;
-    EXPECT_TRUE(address_tag_to_index(raw_tag, raw_mac) == j);
-    EXPECT_TRUE(raw_mac == 0);
-
-    // cipher and decipher the index
-    crypto::secret_key cipher_key;
-    make_secret_key(cipher_key);
-    address_tag_t ciphered_tag{cipher_address_index(rct::sk2rct(cipher_key), j, 0)};
-    address_tag_MAC_t decipher_mac;
-    EXPECT_TRUE(decipher_address_index(rct::sk2rct(cipher_key), ciphered_tag, decipher_mac) == j);
-    EXPECT_TRUE(decipher_mac == 0);
-
-    // encrypt and decrypt an address tag
-    crypto::secret_key encryption_key;
-    make_secret_key(encryption_key);
-    encrypted_address_tag_t encrypted_ciphered_tag{encrypt_address_tag(rct::sk2rct(encryption_key), ciphered_tag)};
-    EXPECT_TRUE(decrypt_address_tag(rct::sk2rct(encryption_key), encrypted_ciphered_tag) == ciphered_tag);
+    for (std::size_t i{0}; i < 10; ++i)
+        EXPECT_TRUE(test_info_recovery_addressindex(crypto::rand_idx(ADDRESS_INDEX_MAX)));
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, information_recovery_enote_v1_plain)
@@ -629,6 +648,7 @@ TEST(seraphis, information_recovery_enote_v1_plain)
 
     // 2. decrypt encrypted address tag
     address_tag_t decrypted_addr_tag{decrypt_address_tag(sender_receiver_secret, plain_enote.m_addr_tag_enc)};
+    EXPECT_TRUE(decrypted_addr_tag == user_address.m_addr_tag);
 
     // 3. decipher address tag
     address_tag_MAC_t enote_tag_mac;

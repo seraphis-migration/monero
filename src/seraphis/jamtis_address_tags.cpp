@@ -115,7 +115,7 @@ address_index_t address_tag_to_index(const address_tag_t addr_tag,
     address_tag_MAC_t &mac_out)
 {
     // addr_tag -> {j_canonical, MAC}
-    address_index_t j_canonical;
+    address_index_t j_canonical{0};
     memcpy(&j_canonical, addr_tag.bytes, ADDRESS_INDEX_BYTES);
     memcpy(&mac_out, addr_tag.bytes + ADDRESS_INDEX_BYTES, ADDRESS_TAG_MAC_BYTES);
 
