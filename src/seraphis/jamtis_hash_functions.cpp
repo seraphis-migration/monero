@@ -59,7 +59,7 @@ static void jamtis_hash_data(const std::string &domain_separator,
     epee::wipeable_string &data_out)
 {
     data_out.clear();
-    data_out.reserve(data_out.size() + domain_separator.size() + input_length);
+    data_out.reserve(domain_separator.size() + input_length);
 
     data_out += domain_separator;
     if (input && input_length > 0)

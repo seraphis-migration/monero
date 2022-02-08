@@ -135,49 +135,49 @@ static void init_sp_gens()
     init_done = true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-ge_p3 get_grootle_Hi_p3_gen(const std::size_t i)
+const ge_p3& get_grootle_Hi_p3_gen(const std::size_t i)
 {
     init_sp_gens();
 
     return grootle_Hi_p3[i];
 }
 //-------------------------------------------------------------------------------------------------------------------
-ge_p3 get_G_p3_gen()
+const ge_p3& get_G_p3_gen()
 {
     init_sp_gens();
 
     return G_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-ge_p3 get_H_p3_gen()
+const ge_p3& get_H_p3_gen()
 {
     init_sp_gens();
 
     return H_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-ge_p3 get_U_p3_gen()
+const ge_p3& get_U_p3_gen()
 {
     init_sp_gens();
 
     return U_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-ge_p3 get_X_p3_gen()
+const ge_p3& get_X_p3_gen()
 {
     init_sp_gens();
 
     return X_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::key get_U_gen()
+const rct::key& get_U_gen()
 {
     init_sp_gens();
 
     return U;
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::key get_X_gen()
+const rct::key& get_X_gen()
 {
     init_sp_gens();
 
@@ -742,55 +742,6 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
 {
     // K' = mask G + K
     rct::addKeys1(masked_key_out, rct::sk2rct(mask), key);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void domain_separate_rct_hash(const std::string &domain_separator,
-    const rct::key &rct_key,
-    crypto::secret_key &hash_result_out)
-{
-    // H("domain-sep", rct_key)
-    domain_separate_rct_hash_with_extra(domain_separator, rct_key, rct::zero(), hash_result_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void domain_separate_rct_hash_with_extra(const std::string &domain_separator,
-    const rct::key &rct_key,
-    const rct::key &extra_key,
-    crypto::secret_key &hash_result_out)
-{
-    // H("domain-sep", rct_key, [OPTIONAL extra_key])
-    epee::wipeable_string hash;
-    hash.reserve(domain_separator.size() + sizeof(rct::key) + (extra_key == rct::zero() ? 0 : sizeof(rct::key)));
-    hash = domain_separator;
-    hash.append((const char*) rct_key.bytes, sizeof(rct::key));
-    if (!(extra_key == rct::zero()))
-        hash.append((const char*) extra_key.bytes, sizeof(rct::key));
-
-    // hash to the result
-    crypto::hash_to_scalar(hash.data(), hash.size(), hash_result_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void domain_separate_derivation_hash(const std::string &domain_separator,
-    const crypto::key_derivation &derivation,
-    const std::size_t index,
-    rct::key &hash_result_out)
-{
-    // derivation_hash = H("domain-sep", derivation, index)
-    epee::wipeable_string hash;
-    hash.reserve(domain_separator.size() + sizeof(rct::key) +
-        ((sizeof(std::size_t) * 8 + 6) / 7));
-    // "domain-sep"
-    hash = domain_separator;
-    // derivation (e.g. a DH shared key)
-    hash.append((const char*) &derivation, sizeof(rct::key));
-    // index
-    char converted_index[(sizeof(size_t) * 8 + 6) / 7];
-    char* end = converted_index;
-    tools::write_varint(end, index);
-    assert(end <= converted_index + sizeof(converted_index));
-    hash.append(converted_index, end - converted_index);
-
-    // hash to the result
-    rct::hash_to_scalar(hash_result_out, hash.data(), hash.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool key_domain_is_prime_subgroup(const rct::key &check_key)

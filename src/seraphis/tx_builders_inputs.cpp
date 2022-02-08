@@ -78,14 +78,12 @@ void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &inpu
     for (const SpEnoteImageV1 &input_image : input_images)
     {
         // find the membership proof that matches with the input image at this index
-        auto ordered_membership_proof = 
-            std::find_if(tx_membership_proofs_alignable.begin(), tx_membership_proofs_alignable.end(),
-                    [&](const SpMembershipProofAlignableV1 &alignable_proof) -> bool
-                    {
-                        return input_image.m_core.m_masked_address ==
-                            alignable_proof.m_masked_address;
-                    }
-                );
+        auto ordered_membership_proof =
+            std::find(
+                tx_membership_proofs_alignable.begin(),
+                tx_membership_proofs_alignable.end(),
+                input_image.m_core.m_masked_address
+            );
 
         CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_alignable.end(),
             "Could not find input image to match with a sortable membership proof.");

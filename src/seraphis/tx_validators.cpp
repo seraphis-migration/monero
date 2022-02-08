@@ -196,12 +196,16 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
             return false;
     }
 
-    // input images should be sorted by key image with byte-wise comparisons (ascending)
+    // input images should be sorted by key image with byte-wise comparisons (ascending), and unique
     if (!std::is_sorted(input_images.begin(), input_images.end()))
         return false;
+    if (std::adjacent_find(input_images.begin(), input_images.end(), equals_from_less{}) != input_images.end())
+        return false;
 
-    // output enotes should be sorted by onetime address with byte-wise comparisons (ascending)
+    // output enotes should be sorted by onetime address with byte-wise comparisons (ascending), and unique
     if (!std::is_sorted(outputs.begin(), outputs.end()))
+        return false;
+    if (std::adjacent_find(outputs.begin(), outputs.end(), equals_from_less{}) != outputs.end())
         return false;
 
     return true;
@@ -214,18 +218,9 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
     if (!ledger_context || ledger_context.use_count() == 0)
         return false;
 
+    // check no duplicates in ledger context
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
     {
-        // check no duplicates in tx
-        // note: assumes key images are sorted
-        if (input_index > 0)
-        {
-            if (input_images[input_index - 1].m_core.m_key_image ==
-                input_images[input_index].m_core.m_key_image)
-                return false;
-        }
-
-        // check no duplicates in ledger context
         if (ledger_context->linking_tag_exists_sp_v1(input_images[input_index].m_core.m_key_image))
             return false;
     }
@@ -282,7 +277,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     if (!defer_batchable)
     {
         std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
-        range_proof_ptrs.push_back(&range_proofs);  //not batched: there is only one range proofs aggregate
+        range_proof_ptrs.push_back(&range_proofs);  //not batched: there is only one range proofs aggregate per tx
 
         if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
             return false;

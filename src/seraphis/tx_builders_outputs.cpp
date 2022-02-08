@@ -43,6 +43,7 @@
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
+#include "tx_misc_utils.h"
 
 //third party headers
 #include "boost/multiprecision/cpp_int.hpp"
@@ -101,22 +102,14 @@ void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposa
         }
     }
 
-    // all onetime addresses should be unique
-    for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
-    {
-        CHECK_AND_ASSERT_THROW_MES(std::find_if(output_proposals.begin(), output_it,
-                    [&output_it](const SpOutputProposalV1 &previous_proposal) -> bool
-                    {
-                        return previous_proposal.m_core.m_onetime_address ==
-                            output_it->m_core.m_onetime_address;
-                    }
-                ) == output_it,
-            "Semantics check output proposals v1: output onetime addresses are not all unique.");
-    }
-
     // proposals should be sorted
     CHECK_AND_ASSERT_THROW_MES(std::is_sorted(output_proposals.begin(), output_proposals.end()),
         "Semantics check output proposals v1: outputs aren't sorted.");
+
+    // proposals should be unique (can use adjacent_find when sorted)
+    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(output_proposals.begin(), output_proposals.end(), equals_from_less{})
+            == output_proposals.end(),
+        "Semantics check output proposals v1: output onetime addresses are not all unique.");
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_tx_supplement_semantics_sp_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs)

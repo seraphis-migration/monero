@@ -63,11 +63,12 @@ struct multisig_binonce_factors
     rct::key nonce_1;
     rct::key nonce_2;
 
-    /// overload operator< for sorting
-    bool operator<(const multisig_binonce_factors &other_factors) const
+    /// overload operator< for sorting: compare nonce_1 then nonce_2
+    bool operator<(const multisig_binonce_factors &other) const
     {
-        return memcmp(&nonce_1, &other_factors.nonce_1, sizeof(rct::key)) < 0;
+        return memcmp(this, &other, sizeof(multisig_binonce_factors)) < 0;
     }
+    bool operator==(const multisig_binonce_factors &other) const { return equals_from_less{}(*this, other); }
 };
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -230,7 +231,7 @@ SpCompositionProof sp_composition_prove(const rct::key &message,
 
     CHECK_AND_ASSERT_THROW_MES(K == temp_K, "Bad proof key (K doesn't match privkeys)!");
 
-    const rct::key U_gen{get_U_gen()};
+    const rct::key &U_gen{get_U_gen()};
 
     SpCompositionProof proof;
 
@@ -373,7 +374,7 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init()
 
     // alpha_{ki,1,e}*U
     // store with (1/8)
-    rct::key U{get_U_gen()};
+    const rct::key &U{get_U_gen()};
     generate_proof_nonce(U, prep.signature_nonce_1_KI_priv, prep.signature_nonce_1_KI_pub);
     rct::scalarmultKey(prep.signature_nonce_1_KI_pub, prep.signature_nonce_1_KI_pub, rct::INV_EIGHT);
 
@@ -435,22 +436,14 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
     // check that the local signer's signature opening is in the input set of opening nonces
     const rct::key U_gen{get_U_gen()};
-    bool found_local_nonce{false};
-    rct::key local_nonce_1_pub;
-    rct::key local_nonce_2_pub;
-    rct::scalarmultKey(local_nonce_1_pub, U_gen, rct::sk2rct(local_nonce_1_priv));
-    rct::scalarmultKey(local_nonce_2_pub, U_gen, rct::sk2rct(local_nonce_2_priv));
+    multisig_binonce_factors local_nonce_pubs;
+    rct::scalarmultKey(local_nonce_pubs.nonce_1, U_gen, rct::sk2rct(local_nonce_1_priv));
+    rct::scalarmultKey(local_nonce_pubs.nonce_2, U_gen, rct::sk2rct(local_nonce_2_priv));
 
-    for (std::size_t e{0}; e < num_signers; ++e)
-    {
-        if (local_nonce_1_pub == signer_nonces_pub_mul8[e].nonce_1 &&
-            local_nonce_2_pub == signer_nonces_pub_mul8[e].nonce_2)
-        {
-            found_local_nonce = true;
-            break;
-        }
-    }
-    CHECK_AND_ASSERT_THROW_MES(found_local_nonce, "Local signer's opening nonces not in input set!");
+    CHECK_AND_ASSERT_THROW_MES(std::find(signer_nonces_pub_mul8.begin(),
+            signer_nonces_pub_mul8.end(),
+            local_nonce_pubs) != signer_nonces_pub_mul8.end(),
+        "Local signer's opening nonces not in input set!");
 
 
     /// prepare partial signature
@@ -534,16 +527,16 @@ SpCompositionProof sp_composition_prove_multisig_final(const std::vector<SpCompo
     CHECK_AND_ASSERT_THROW_MES(partial_sigs.size() > 0, "No partial signatures to make proof out of!");
 
     // common parts between partial signatures should match
-    for (std::size_t sig_index{1}; sig_index < partial_sigs.size(); ++sig_index)
+    for (const SpCompositionProofMultisigPartial &partial_sig : partial_sigs)
     {
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].c == partial_sigs[sig_index].c, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t1 == partial_sigs[sig_index].r_t1, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t2 == partial_sigs[sig_index].r_t2, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K_t1 == partial_sigs[sig_index].K_t1, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].c == partial_sig.c, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t1 == partial_sig.r_t1, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t2 == partial_sig.r_t2, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K_t1 == partial_sig.K_t1, "Input key sets don't match!");
 
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K == partial_sigs[sig_index].K, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].KI == partial_sigs[sig_index].KI, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].message == partial_sigs[sig_index].message, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K == partial_sig.K, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].KI == partial_sig.KI, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].message == partial_sig.message, "Input key sets don't match!");
     }
 
 
@@ -555,10 +548,10 @@ SpCompositionProof sp_composition_prove_multisig_final(const std::vector<SpCompo
     proof.r_t2 = partial_sigs[0].r_t2;
 
     proof.r_ki = rct::zero();
-    for (std::size_t sig_index{0}; sig_index < partial_sigs.size(); ++sig_index)
+    for (const SpCompositionProofMultisigPartial &partial_sig : partial_sigs)
     {
         // sum of responses from each multisig participant
-        sc_add(proof.r_ki.bytes, proof.r_ki.bytes, partial_sigs[sig_index].r_ki_partial.bytes);
+        sc_add(proof.r_ki.bytes, proof.r_ki.bytes, partial_sig.r_ki_partial.bytes);
     }
 
     proof.K_t1 = partial_sigs[0].K_t1;

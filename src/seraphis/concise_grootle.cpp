@@ -120,7 +120,7 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     const rct::key &C,
     const rct::key &D)
 {
-    for (const auto &tuple : M)
+    for (const rct::keyV &tuple : M)
         CHECK_AND_ASSERT_THROW_MES(tuple.size() == C_offsets.size(), "Transcript challenge inputs have incorrect size!");
 
     // initialize transcript message
@@ -132,12 +132,12 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     hash.reserve(((M.size() + 1)*C_offsets.size() + 6)*sizeof(rct::key));
     hash = std::string(reinterpret_cast<const char*>(challenge.bytes), sizeof(challenge));
     hash += std::string(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    for (const auto &tuple : M)
+    for (const rct::keyV &tuple : M)
     {
-        for (const auto &key : tuple)
+        for (const rct::key &key : tuple)
             hash += std::string(reinterpret_cast<const char*>(key.bytes), sizeof(key));
     }
-    for (const auto &offset : C_offsets)
+    for (const rct::key &offset : C_offsets)
     {
         hash += std::string(reinterpret_cast<const char*>(offset.bytes), sizeof(offset));
     }
@@ -167,9 +167,9 @@ static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
     std::string hash;
     hash.reserve((X.size() + 1)*sizeof(rct::key));
     hash = std::string(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    for (std::size_t j = 0; j < X.size(); ++j)
+    for (const rct::key &x : X)
     {
-        hash += std::string(reinterpret_cast<const char*>(X[j].bytes), sizeof(X[j]));
+        hash += std::string(reinterpret_cast<const char*>(x.bytes), sizeof(x));
     }
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
@@ -202,7 +202,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
 
     CHECK_AND_ASSERT_THROW_MES(privkeys.size() == num_keys, "Private key vector is wrong size!");
 
-    for (const auto &tuple : M)
+    for (const rct::keyV &tuple : M)
         CHECK_AND_ASSERT_THROW_MES(tuple.size() == num_keys, "Commitment tuple is wrong size!");
 
     // commitment to zero signing keys
@@ -482,10 +482,10 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
     // commitment offsets must line up with input set
     const std::size_t num_keys = proof_offsets[0].size();
 
-    for (const auto &C_offsets : proof_offsets)
+    for (const rct::keyV &C_offsets : proof_offsets)
         CHECK_AND_ASSERT_THROW_MES(C_offsets.size() == num_keys, "Incorrect number of commitment offsets!");
 
-    for (const auto &tuple : M)
+    for (const rct::keyV &tuple : M)
         CHECK_AND_ASSERT_THROW_MES(tuple.size() == num_keys, "Incorrect number of input keys!");
 
 

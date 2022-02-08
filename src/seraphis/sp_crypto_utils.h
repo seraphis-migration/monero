@@ -85,13 +85,13 @@ static const rct::key MINUS_ONE = { {0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0
 /**
 * brief: get generators
 */
-ge_p3 get_grootle_Hi_p3_gen(const std::size_t i);  // get i'th Hi generator
-ge_p3 get_G_p3_gen();
-ge_p3 get_H_p3_gen();
-ge_p3 get_U_p3_gen();
-ge_p3 get_X_p3_gen();
-rct::key get_U_gen();
-rct::key get_X_gen();
+const ge_p3& get_grootle_Hi_p3_gen(const std::size_t i);  // get i'th Hi generator
+const ge_p3& get_G_p3_gen();
+const ge_p3& get_H_p3_gen();
+const ge_p3& get_U_p3_gen();
+const ge_p3& get_X_p3_gen();
+const rct::key& get_U_gen();
+const rct::key& get_X_gen();
 /**
 * brief: invert - invert a nonzero scalar
 * param: x - scalar to invert
@@ -207,38 +207,6 @@ void subtract_secret_key_vectors(const std::vector<crypto::secret_key> &keys_A,
 * outparam: masked_key_out - K', the masked key
 */
 void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &masked_key_out);
-/**
-* brief: domain_separate_rct_hash - hash a key, with domain separation
-*   H("domain-sep", key)
-* param: domain_separator - domain separator
-* param: rct_key - rct key to hash with domain separator (can be privkey or pubkey)
-* outparam: hash_result_out - H("domain-sep", key)
-*/
-void domain_separate_rct_hash(const std::string &domain_separator, const rct::key &rct_key, crypto::secret_key &hash_result_out);
-/**
-* brief: domain_separate_rct_hash_with_extra - hash two keys, with domain separation
-*   H("domain-sep", key, [OPTIONAL extra_key])
-* param: domain_separator - domain separator
-* param: rct_key - rct key to hash with domain separator (can be privkey or pubkey)
-* param: extra_key - additional key to include (if extra_key == rct::zero(), do not include it)
-* outparam: hash_result_out - H("domain-sep", key, [OPTIONAL extra_key])
-*/
-void domain_separate_rct_hash_with_extra(const std::string &domain_separator,
-    const rct::key &rct_key,
-    const rct::key &extra_key,
-    crypto::secret_key &hash_result_out);
-/**
-* brief: domain_separate_derivation_hash - hash a Diffie-Hellman derivation and index, with domain separation
-*   H("domain-sep", derivation, index)
-* param: domain_separator - domain separator
-* param: derivation - Diffie-Hellman derived key to hash
-* param: index - index to append to hash digest as varint
-* outparam: hash_result_out - H("domain-sep", derivation, index)
-*/
-void domain_separate_derivation_hash(const std::string &domain_separator,
-    const crypto::key_derivation &derivation,
-    const std::size_t index,
-    rct::key &hash_result_out);
 /**
 * brief: key_domain_is_prime_subgroup - check that input key is in prime order EC subgroup
 *   l*K ?= identity

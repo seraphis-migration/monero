@@ -137,6 +137,10 @@ struct SpMembershipProofAlignableV1 final
     rct::key m_masked_address;
     /// the membership proof
     SpMembershipProofV1 m_membership_proof;
+
+    /// overloaded operator for aligning
+    bool operator==(const SpMembershipProofAlignableV1 &other) const { return m_masked_address == other.m_masked_address; }
+    bool operator==(const rct::key &other_masked_address) const { return m_masked_address == other_masked_address; }
 };
 
 ////

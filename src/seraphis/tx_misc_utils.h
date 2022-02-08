@@ -47,6 +47,17 @@
 namespace sp
 {
 
+/// use operator< to get operator==
+///TODO: really want the spaceship operator instead (C++20)...
+struct equals_from_less final
+{
+    template <typename T>
+    bool operator()(const T &a, const T &b)
+    {
+        return !(a < b) && !(b < a);
+    }
+};
+
 /**
 * brief: ref_set_size_from_decomp - compute n^m from decomposition of a reference set
 * param: ref_set_decomp_n -
