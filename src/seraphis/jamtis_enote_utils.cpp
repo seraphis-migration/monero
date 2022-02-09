@@ -38,6 +38,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
+#include "seraphis_config_temp.h"
 #include "device/device.hpp"
 #include "int-util.h"
 #include "jamtis_hash_functions.h"

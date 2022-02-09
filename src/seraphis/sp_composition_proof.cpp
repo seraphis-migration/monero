@@ -39,6 +39,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
+#include "seraphis_config_temp.h"
 #include "misc_language.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"

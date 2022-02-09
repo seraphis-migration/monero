@@ -33,6 +33,7 @@
 
 //local headers
 #include "cryptonote_config.h"
+#include "seraphis_config_temp.h"
 extern "C"
 {
 #include "crypto/blowfish.h"

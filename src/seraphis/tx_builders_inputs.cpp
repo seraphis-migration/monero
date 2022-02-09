@@ -40,6 +40,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
+#include "seraphis_config_temp.h"
 #include "misc_language.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
@@ -227,8 +228,8 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
     /// prepare to make proof
 
     // public keys referenced by proof
-    rct::keyM referenced_enotes;
-    referenced_enotes.resize(ref_set_size, rct::keyV(1));
+    rct::keyM reference_keys;
+    reference_keys.resize(ref_set_size, rct::keyV(1));
 
     for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
     {
@@ -236,7 +237,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
         // computing this for every enote for every proof is expensive; TODO: copy Q_i from the node record
         seraphis_squashed_enote_Q(membership_ref_set.m_referenced_enotes[ref_index].m_onetime_address,
             membership_ref_set.m_referenced_enotes[ref_index].m_amount_commitment,
-            referenced_enotes[ref_index][0]);
+            reference_keys[ref_index][0]);
     }
 
     // proof offsets
@@ -247,7 +248,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
     crypto::secret_key squashed_enote_mask;
     sc_add(&squashed_enote_mask, &image_address_mask, &image_amount_mask);  // t_k + t_c
     mask_key(squashed_enote_mask,
-        referenced_enotes[membership_ref_set.m_real_spend_index_in_set][0],
+        reference_keys[membership_ref_set.m_real_spend_index_in_set][0],
         image_offsets[0]);  // Q'
 
     // secret key of (Q[l] - Q')
@@ -260,7 +261,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
 
 
     /// make concise grootle proof
-    tx_membership_proof_out.m_concise_grootle_proof = concise_grootle_prove(referenced_enotes,
+    tx_membership_proof_out.m_concise_grootle_proof = concise_grootle_prove(reference_keys,
         membership_ref_set.m_real_spend_index_in_set,
         image_offsets,
         image_masks,

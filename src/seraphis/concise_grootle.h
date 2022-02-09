@@ -35,6 +35,9 @@
 // - prove DL knowledge with respect to G of the commitment to zero tuple {S_pi - O} for an index \pi
 //   in the set that is unknown to verifiers
 // - uses 'aggregation coefficients', a size reduction technique used in CLSAG/Triptych/Lelantus-Spark-CP-proofs
+// - allows proof batching (around (2*n*m)/(n^m + 2*n*m) amortization speedup possible)
+//   - limitations: assumes each proof uses a different reference set (proofs with the same ref set could be MUCH
+//     faster), can only batch proofs with the same decomposition (n^m) and number of parallel commitments (tuple size)
 //
 // note: to prove DL of a point in S with respect to G directly, set its offset equal to the identity element I
 //
@@ -43,6 +46,7 @@
 // - Short Accountable Ring Signatures Based on DDH (Bootle): https://eprint.iacr.org/2015/643
 // - Triptych (Sarang Noether): https://eprint.iacr.org/2020/018
 // - Lelantus-Spark (Aram Jivanyan, Aaron Feickert [Sarang Noether]): https://eprint.iacr.org/2021/1173
+// - MatRiCT (Esgin et. al): https://eprint.iacr.org/2019/1287.pdf (section 1.3, for A/B optimization)
 ///
 
 
@@ -63,7 +67,7 @@ namespace sp
 {
 
 /// Maximum matrix entries
-constexpr std::size_t GROOTLE_MAX_MN{128};
+constexpr std::size_t GROOTLE_MAX_MN{128};  //2^64, 3^42, etc.
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -75,10 +79,10 @@ constexpr std::size_t GROOTLE_MAX_MN{128};
 ///
 struct ConciseGrootleProof
 {
-    rct::key A, B, C, D;
+    rct::key A, B;
     rct::keyM f;
     rct::keyV X;
-    rct::key zA, zC, z;
+    rct::key zA, z;
 };
 
 

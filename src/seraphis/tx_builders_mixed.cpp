@@ -34,6 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
+#include "seraphis_config_temp.h"
 #include "misc_language.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"

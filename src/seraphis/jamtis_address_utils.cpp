@@ -34,6 +34,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
+#include "seraphis_config_temp.h"
 #include "jamtis_address_tags.h"
 #include "jamtis_core_utils.h"
 #include "jamtis_hash_functions.h"

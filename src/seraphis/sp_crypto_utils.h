@@ -47,11 +47,6 @@ extern "C"
 #include <vector>
 
 //forward declarations
-namespace rct
-{
-struct pippenger_cached_data;
-struct MultiexpData;
-}
 
 
 namespace crypto
@@ -85,7 +80,6 @@ static const rct::key MINUS_ONE = { {0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0
 /**
 * brief: get generators
 */
-const ge_p3& get_grootle_Hi_p3_gen(const std::size_t i);  // get i'th Hi generator
 const ge_p3& get_G_p3_gen();
 const ge_p3& get_H_p3_gen();
 const ge_p3& get_U_p3_gen();
@@ -99,11 +93,6 @@ const rct::key& get_X_gen();
 */
 rct::key invert(const rct::key &x);
 /**
-* brief: get_grootle_Hi_pippinger_cache_init - get initial cache for pippinger multiexp in Grootle proofs
-* return: initialized pippinger cache
-*/
-std::shared_ptr<rct::pippenger_cached_data> get_grootle_Hi_pippinger_cache_init();
-/**
 * brief: invert - decompose an integer with a fixed base and size
 *   val -> [_, _, ... ,_]
 *   - num slots = 'size'
@@ -115,15 +104,6 @@ std::shared_ptr<rct::pippenger_cached_data> get_grootle_Hi_pippinger_cache_init(
 * outparam: r_out - decomposed val (little endian)
 */
 void decompose(const std::size_t val, const std::size_t base, const std::size_t size, std::vector<std::size_t> &r_out);
-/**
-* brief: com_matrix - commit to a scalar matrix
-*   vector commitment for values a_{1,1}, ..., a_{1,n} ..., a_{m,n} and blinding factor x
-*   C = x G + a_{1,1} H_{1,1} + a_{1,2} H_{1,2} + ... + a_{m,n} H_{m,n}
-* param: M_priv - matrix of private keys to commit to
-* param: x - commitment blinding factor
-* outparam: data_out - multiexp data for computing the matrix commitment in one step
-*/
-void com_matrix(const rct::keyM &M_priv, const rct::key &x, std::vector<rct::MultiexpData> &data_out);
 /**
 * brief: delta - Kronecker delta
 * param: x - first integer
