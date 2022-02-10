@@ -70,18 +70,15 @@ void make_seraphis_key_image(const crypto::secret_key &y, const rct::key &zU, cr
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_key_image(const crypto::secret_key &y, const crypto::secret_key &z, crypto::key_image &key_image_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z), "z must be nonzero for making a key image!");
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "y must be nonzero for making a key image!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z), "z must be nonzero for making a key image!");
 
     // KI = (z/y)*U
-    rct::key temp{sp::invert(rct::sk2rct(y))}; // 1/y
-    sc_mul(temp.bytes, &z, temp.bytes); // z*(1/y)
-    rct::scalarmultKey(temp, sp::get_U_gen(), temp); // (z/y)*U
-
-    key_image_out = rct::rct2ki(temp);
+    rct::key zU{rct::scalarmultKey(sp::get_U_gen(), rct::sk2rct(z))}; // z U
+    make_seraphis_key_image(y, zU, key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_key_image_from_parts(const crypto::secret_key &k_a_sender,
+void make_seraphis_key_image(const crypto::secret_key &k_a_sender,
     const crypto::secret_key &k_a_recipient,
     const rct::key &k_bU,
     crypto::key_image &key_image_out)

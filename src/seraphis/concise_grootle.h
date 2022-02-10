@@ -46,7 +46,7 @@
 // - Short Accountable Ring Signatures Based on DDH (Bootle): https://eprint.iacr.org/2015/643
 // - Triptych (Sarang Noether): https://eprint.iacr.org/2020/018
 // - Lelantus-Spark (Aram Jivanyan, Aaron Feickert [Sarang Noether]): https://eprint.iacr.org/2021/1173
-// - MatRiCT (Esgin et. al): https://eprint.iacr.org/2019/1287.pdf (section 1.3, for A/B optimization)
+// - MatRiCT (Esgin et. al): https://eprint.iacr.org/2019/1287.pdf (section 1.3 for A/B optimization)
 ///
 
 
@@ -75,7 +75,7 @@ constexpr std::size_t GROOTLE_MAX_MN{128};  //2^64, 3^42, etc.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////
-// concise Grootle proof (using the aggregation coefficients described in Triptych)
+// concise Grootle proof (using the aggregation coefficients described in Triptych, A/B optimization from MatRiCT)
 ///
 struct ConciseGrootleProof
 {

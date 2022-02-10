@@ -133,7 +133,7 @@ void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
 
     // k_a_sender = H_n(q)
     // KI = (1/(k_a_sender + k_a_recipient))*k_b*U
-    make_seraphis_key_image_from_parts(address_extension, k_a_recipient, master_pubkey, key_image_out);
+    make_seraphis_key_image(address_extension, k_a_recipient, master_pubkey, key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

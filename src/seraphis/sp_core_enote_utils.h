@@ -75,7 +75,7 @@ void make_seraphis_key_image(const crypto::secret_key &y, const crypto::secret_k
 * param: k_bU - recipient's spendbase pubkey (k_{b, recipient} * U)
 * outparam: key_image_out - KI
 */
-void make_seraphis_key_image_from_parts(const crypto::secret_key &k_a_sender,
+void make_seraphis_key_image(const crypto::secret_key &k_a_sender,
     const crypto::secret_key &k_a_recipient,
     const rct::key &k_bU,
     crypto::key_image &key_image_out);
