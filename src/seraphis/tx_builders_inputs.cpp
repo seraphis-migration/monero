@@ -56,6 +56,7 @@ extern "C"
 //third party headers
 
 //standard headers
+#include <algorithm>
 #include <memory>
 #include <string>
 #include <vector>
@@ -395,7 +396,7 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     const std::vector<SpEnote> &input_enotes,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
-    std::shared_ptr<MockLedgerContext> ledger_context_inout)
+    MockLedgerContext &ledger_context_inout)
 {
     std::vector<SpMembershipReferenceSetV1> reference_sets;
     reference_sets.resize(input_enotes.size());
@@ -429,8 +430,7 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
             SpEnoteV1 temp_enote;
             temp_enote.m_core = reference_sets[input_index].m_referenced_enotes[ref_index];
 
-            reference_sets[input_index].m_ledger_enote_indices[ref_index] =
-                ledger_context_inout->add_enote_sp_v1(temp_enote);
+            reference_sets[input_index].m_ledger_enote_indices[ref_index] = ledger_context_inout.add_enote_sp_v1(temp_enote);
         }
     }
 
@@ -441,7 +441,7 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     const std::vector<SpInputProposalV1> &input_proposals,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
-    std::shared_ptr<MockLedgerContext> ledger_context_inout)
+    MockLedgerContext &ledger_context_inout)
 {
     std::vector<SpEnote> input_enotes;
     input_enotes.resize(input_proposals.size());

@@ -224,9 +224,8 @@ public:
 
     bool init(const ParamsShuttleSpTx &params)
     {
-        static_assert(std::is_base_of<sp::SpTx, SpTxType>::value, "Invalid tx type.");
-
         m_txs.reserve(params.batch_size);
+        m_tx_ptrs.reserve(params.batch_size);
 
         // fresh mock ledger context
         m_ledger_contex = std::make_shared<sp::MockLedgerContext>();
@@ -264,9 +263,9 @@ public:
                 tx_params.ref_set_decomp_m = params.m;
 
                 // make tx
-                m_txs.emplace_back(
-                        sp::make_mock_tx<SpTxType>(tx_params, input_amounts, output_amounts, m_ledger_contex)
-                    );
+                m_txs.emplace_back();
+                sp::make_mock_tx<SpTxType>(tx_params, input_amounts, output_amounts, *m_ledger_contex, m_txs.back());
+                m_tx_ptrs.push_back(&(m_txs.back()));
             }
             catch (...)
             {
@@ -276,8 +275,8 @@ public:
 
         // report tx info
         std::string report;
-        report += m_txs.back()->get_descriptor() + " || ";
-        report += std::string{"Size (bytes): "} + std::to_string(m_txs.back()->get_size_bytes()) + " || ";
+        report += sp::get_descriptor<SpTxType>() + " || ";
+        report += std::string{"Size (bytes): "} + std::to_string(m_txs.back().get_size_bytes()) + " || ";
         report += std::string{"batch size: "} + std::to_string(params.batch_size) + " || ";
         report += std::string{"inputs: "} + std::to_string(params.in_count) + " || ";
         report += std::string{"outputs: "} + std::to_string(params.out_count) + " || ";
@@ -294,8 +293,8 @@ public:
 
             std::string report_csv;
             std::string separator{','};
-            report_csv += m_txs.back()->get_descriptor() + separator;
-            report_csv += std::to_string(m_txs.back()->get_size_bytes()) + separator;
+            report_csv += sp::get_descriptor<SpTxType>() + separator;
+            report_csv += std::to_string(m_txs.back().get_size_bytes()) + separator;
             report_csv += std::to_string(params.batch_size) + separator;
             report_csv += std::to_string(params.in_count) + separator;
             report_csv += std::to_string(params.out_count) + separator;
@@ -313,7 +312,7 @@ public:
     {
         try
         {
-            return sp::validate_mock_txs<SpTxType>(m_txs, m_ledger_contex);
+            return sp::validate_txs(m_tx_ptrs, *m_ledger_contex);
         }
         catch (...)
         {
@@ -322,6 +321,7 @@ public:
     }
 
 private:
-    std::vector<std::shared_ptr<SpTxType>> m_txs;
+    std::vector<SpTxType> m_txs;
+    std::vector<const SpTxType*> m_tx_ptrs;
     std::shared_ptr<sp::MockLedgerContext> m_ledger_contex;
 };

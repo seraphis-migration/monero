@@ -42,7 +42,6 @@
 //third party headers
 
 //standard headers
-#include <memory>
 #include <vector>
 
 //forward declarations
@@ -170,11 +169,11 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     const std::vector<SpEnote> &input_enotes,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
-    std::shared_ptr<MockLedgerContext> ledger_context_inout);
+    MockLedgerContext &ledger_context_inout);
 std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     const std::vector<SpInputProposalV1> &input_proposals,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
-    std::shared_ptr<MockLedgerContext> ledger_context_inout);
+    MockLedgerContext &ledger_context_inout);
 
 } //namespace sp

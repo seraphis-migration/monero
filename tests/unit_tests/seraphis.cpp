@@ -326,12 +326,13 @@ static void check_is_owned_selfsend(const sp::SpOutputProposalV1 &test_proposal,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
+static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
     const sp::SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
-    std::shared_ptr<sp::MockLedgerContext> ledger_context_inout)
+    sp::MockLedgerContext &ledger_context_inout,
+    sp::SpTxSquashedV1 &tx_out)
 {
     /// build a tx from base components
     using namespace sp;
@@ -376,7 +377,7 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     // versioning for proofs
     std::string version_string;
     version_string.reserve(3);
-    SpTxSquashedV1::get_versioning_string(semantic_rules_version, version_string);
+    get_versioning_string(semantic_rules_version, version_string);
 
     // tx components
     std::vector<SpEnoteImageV1> input_images;
@@ -431,9 +432,9 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
         tx_membership_proofs_alignable);  //alignable membership proofs could theoretically be inputs as well
     align_v1_tx_membership_proofs_sp_v1(input_images, std::move(tx_membership_proofs_alignable), tx_membership_proofs);
 
-    return std::make_shared<SpTxSquashedV1>(std::move(input_images), std::move(outputs),
+    make_seraphis_tx_squashed_v1(std::move(input_images), std::move(outputs),
         std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),
-        std::move(tx_supplement), semantic_rules_version);
+        std::move(tx_supplement), semantic_rules_version, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -1135,38 +1136,42 @@ TEST(seraphis, finalize_v1_output_proposal_set_sp_v1)
 TEST(seraphis, txtype_squashed_v1)
 {
     // demo making SpTxTypeSquasedV1 with raw tx builder API
+    std::size_t num_txs{3};
+    std::size_t num_ins_outs{11};
 
     // fake ledger context for this test
-    std::shared_ptr<sp::MockLedgerContext> ledger_context = std::make_shared<sp::MockLedgerContext>();
+    sp::MockLedgerContext ledger_context{};
 
-    // 3 tx, 11 inputs/outputs each
-    std::vector<std::shared_ptr<sp::SpTxSquashedV1>> txs;
-    txs.reserve(3);
+    // make txs
+    std::vector<sp::SpTxSquashedV1> txs;
+    std::vector<const sp::SpTxSquashedV1*> tx_ptrs;
+    txs.reserve(num_txs);
+    tx_ptrs.reserve(num_txs);
 
     std::vector<rct::xmr_amount> in_amounts;
     std::vector<rct::xmr_amount> out_amounts;
 
-    for (int i{0}; i < 11; ++i)
+    for (int i{0}; i < num_ins_outs; ++i)
     {
         in_amounts.push_back(2);
         out_amounts.push_back(2);
     }
 
-    for (std::size_t tx_index{0}; tx_index < 3; ++tx_index)
+    for (std::size_t tx_index{0}; tx_index < num_txs; ++tx_index)
     {
-        txs.emplace_back(
-                make_sp_txtype_squashed_v1(2, 3, in_amounts, out_amounts,
-                    sp::SpTxSquashedV1::SemanticRulesVersion::MOCK, ledger_context)
-            );
+        txs.emplace_back();
+        make_sp_txtype_squashed_v1(2, 3, in_amounts, out_amounts,
+            sp::SpTxSquashedV1::SemanticRulesVersion::MOCK, ledger_context, txs.back());
+        tx_ptrs.push_back(&(txs.back()));
     }
 
-    EXPECT_TRUE(sp::validate_mock_txs<sp::SpTxSquashedV1>(txs, ledger_context));
+    EXPECT_TRUE(sp::validate_txs<sp::SpTxSquashedV1>(tx_ptrs, ledger_context));
 
     // insert key images to ledger
-    for (const auto &tx : txs)
-        EXPECT_TRUE(sp::try_add_tx_to_ledger<sp::SpTxSquashedV1>(ledger_context, *tx));
+    for (const sp::SpTxSquashedV1 &tx : txs)
+        EXPECT_TRUE(sp::try_add_tx_to_ledger<sp::SpTxSquashedV1>(ledger_context, tx));
 
     // validation should fail due to double-spend
-    EXPECT_FALSE(sp::validate_mock_txs<sp::SpTxSquashedV1>(txs, ledger_context));
+    EXPECT_FALSE(sp::validate_txs<sp::SpTxSquashedV1>(tx_ptrs, ledger_context));
 }
 //-------------------------------------------------------------------------------------------------------------------

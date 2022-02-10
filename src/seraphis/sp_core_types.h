@@ -46,20 +46,6 @@
 namespace sp
 {
 
-//// Versioning
-
-/// Transaction protocol era: following CryptoNote (1) and RingCT (2)
-constexpr unsigned char TxEraSp{3};
-
-/// Transaction structure types
-enum TxStructureVersionSp : unsigned char
-{
-    /// mining transaction (TODO)
-    TxTypeSpMining = 0,
-    /// concise grootle in the squashed enote model + separate composition proofs
-    TxTypeSpSquashedV1 = 1
-};
-
 
 ////
 // SpEnote

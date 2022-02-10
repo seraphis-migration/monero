@@ -40,7 +40,6 @@ set(seraphis_sources
   sp_core_enote_utils.cpp
   sp_core_types.cpp
   sp_crypto_utils.cpp
-  tx_base.cpp
   tx_builder_types.cpp
   tx_builders_inputs.cpp
   tx_builders_mixed.cpp

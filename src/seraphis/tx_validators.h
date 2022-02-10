@@ -133,8 +133,7 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
 * param: ledger_context -
 * return: true/false on validation result
 */
-bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images,
-    const std::shared_ptr<const LedgerContext> ledger_context);
+bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images, const LedgerContext &ledger_context);
 /**
 * brief: validate_sp_amount_balance_v1 - check that amounts balance in the tx (inputs = outputs)
 *   - check BP+ range proofs on input image amount commitments and output commitments (e.g. for squashed enote model)
@@ -161,7 +160,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 */
 bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
-    const std::shared_ptr<const LedgerContext> ledger_context);
+    const LedgerContext &ledger_context);
 /**
 * brief: validate_sp_composition_proofs_v1 - check that spending tx inputs is authorized by their owners,
 *        and key images are properly constructed

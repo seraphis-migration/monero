@@ -211,17 +211,12 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images,
-    const std::shared_ptr<const LedgerContext> ledger_context)
+bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images, const LedgerContext &ledger_context)
 {
-    // sanity check
-    if (!ledger_context || ledger_context.use_count() == 0)
-        return false;
-
     // check no duplicates in ledger context
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
     {
-        if (ledger_context->linking_tag_exists_sp_v1(input_images[input_index].m_core.m_key_image))
+        if (ledger_context.linking_tag_exists_sp_v1(input_images[input_index].m_core.m_key_image))
             return false;
     }
 
@@ -288,7 +283,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
-    const std::shared_ptr<const LedgerContext> ledger_context)
+    const LedgerContext &ledger_context)
 {
     std::size_t num_proofs{membership_proofs.size()};
 
@@ -317,7 +312,7 @@ bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV
         proofs.push_back(&(membership_proofs[proof_index]->m_concise_grootle_proof));
 
         // get proof keys from enotes stored in the ledger
-        ledger_context->get_reference_set_proof_elements_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices,
+        ledger_context.get_reference_set_proof_elements_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices,
             membership_proof_keys[proof_index]);
 
         // offset (input image masked keys squashed: Q' = Ko' + C')

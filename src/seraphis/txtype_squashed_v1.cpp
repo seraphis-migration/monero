@@ -64,7 +64,8 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 // semantic validation config: component counts
 //-------------------------------------------------------------------------------------------------------------------
-static SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(const unsigned char tx_semantic_rules_version)
+static SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(
+    const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version)
 {
     SemanticConfigComponentCountsV1 config{};
 
@@ -93,7 +94,8 @@ static SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(const
 //-------------------------------------------------------------------------------------------------------------------
 // semantic validation config: reference set size
 //-------------------------------------------------------------------------------------------------------------------
-static SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1(const unsigned char tx_semantic_rules_version)
+static SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1(
+    const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version)
 {
     SemanticConfigRefSetSizeV1 config{};
 
@@ -119,156 +121,6 @@ static SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1(const unsigned
     return config;
 }
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-SpTxSquashedV1::SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_proposals,
-    std::vector<SpOutputProposalV1> output_proposals,
-    const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-    const SemanticRulesVersion semantic_rules_version)
-{
-    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
-    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() > 0, "Tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, output_proposals, 0),
-        "Tried to make tx with unbalanced amounts.");  //TODO: include fee in balance check
-
-    // versioning for proofs
-    std::string version_string;
-    version_string.reserve(3);
-    SpTxSquashedV1::get_versioning_string(semantic_rules_version, version_string);
-
-    // tx proposal
-    SpTxProposalV1 tx_proposal{std::move(output_proposals)};
-    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
-
-    // partial inputs
-    std::vector<SpTxPartialInputV1> partial_inputs;
-    make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, partial_inputs);
-
-    // membership proofs (input proposals are assumed to line up with membership ref sets)
-    std::vector<SpMembershipProofAlignableV1> tx_membership_proofs_sortable;
-    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
-
-    // partial tx
-    SpTxPartialV1 partial_tx{tx_proposal, std::move(partial_inputs), version_string};
-
-    // line up the the membership proofs with the partial tx's input images (which are sorted)
-    std::vector<SpMembershipProofV1> tx_membership_proofs;
-    align_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images,
-        std::move(tx_membership_proofs_sortable),
-        tx_membership_proofs);
-
-    // assemble tx
-    *this = SpTxSquashedV1{std::move(partial_tx), std::move(tx_membership_proofs), semantic_rules_version};
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool SpTxSquashedV1::validate_tx_semantics() const
-{
-    if (m_balance_proof.get() == nullptr)
-        return false;
-
-    // validate component counts (num inputs/outputs/etc.)
-    if (!validate_sp_semantics_component_counts_v1(
-        semantic_config_component_counts_v1(m_tx_semantic_rules_version),
-        m_input_images.size(),
-        m_membership_proofs.size(),
-        m_image_proofs.size(),
-        m_outputs.size(),
-        m_supplement.m_output_enote_ephemeral_pubkeys.size(),
-        m_balance_proof->m_bpp_proof.V.size()))
-    {
-        return false;
-    }
-
-    // validate input proof reference set sizes
-    if (!validate_sp_semantics_ref_set_size_v1(
-        semantic_config_ref_set_size_v1(m_tx_semantic_rules_version),
-        m_membership_proofs))
-    {
-        return false;
-    }
-
-    // validate linking tag semantics
-    if (!validate_sp_semantics_input_images_v1(
-        m_input_images))
-    {
-        return false;
-    }
-
-    // validate input images, membershio proof ref sets, and outputs are sorted
-    if (!validate_sp_semantics_sorting_v1(
-        m_membership_proofs,
-        m_input_images,
-        m_outputs))
-    {
-        return false;
-    }
-
-    //TODO: validate memo semantics
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool SpTxSquashedV1::validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const
-{
-    // unspentness proof (key images not in ledger)
-    if (!validate_sp_linking_tags_v1(m_input_images, ledger_context))
-    {
-        return false;
-    }
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool SpTxSquashedV1::validate_tx_amount_balance(const bool defer_batchable) const
-{
-    if (!validate_sp_amount_balance_v1(m_input_images, m_outputs, m_balance_proof, defer_batchable))
-    {
-        return false;
-    }
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool SpTxSquashedV1::validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
-    const bool defer_batchable) const
-{
-    // membership proofs (can be deferred for batching)
-    if (!defer_batchable)
-    {
-        std::vector<const SpMembershipProofV1*> membership_proof_ptrs;
-        std::vector<const SpEnoteImage*> input_image_ptrs;
-        membership_proof_ptrs.reserve(m_membership_proofs.size());
-        input_image_ptrs.reserve(m_input_images.size());
-
-        for (const auto &membership_proof : m_membership_proofs)
-            membership_proof_ptrs.push_back(&membership_proof);
-
-        for (const auto &input_image : m_input_images)
-            input_image_ptrs.push_back(&(input_image.m_core));
-
-        if (!validate_sp_membership_proofs_v1(membership_proof_ptrs,
-            input_image_ptrs,
-            ledger_context))
-        {
-            return false;
-        }
-    }
-
-    // ownership proof (and proof that key images are well-formed)
-    std::string version_string;
-    version_string.reserve(3);
-    this->SpTx::get_versioning_string(version_string);
-
-    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_supplement)};
-
-    if (!validate_sp_composition_proofs_v1(m_image_proofs,
-        m_input_images,
-        image_proofs_message))
-    {
-        return false;
-    }
-
-    return true;
-}
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSquashedV1::get_size_bytes() const
 {
@@ -305,11 +157,247 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
     return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
+    std::vector<SpEnoteV1> outputs,
+    std::shared_ptr<const SpBalanceProofV1> balance_proof,
+    std::vector<SpImageProofV1> image_proofs,
+    std::vector<SpMembershipProofV1> membership_proofs,
+    SpTxSupplementV1 tx_supplement,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    SpTxSquashedV1 &tx_out)
+{
+    tx_out.m_input_images = std::move(input_images);
+    tx_out.m_outputs = std::move(outputs);
+    tx_out.m_balance_proof = std::move(balance_proof);
+    tx_out.m_image_proofs = std::move(image_proofs);
+    tx_out.m_membership_proofs = std::move(membership_proofs);
+    tx_out.m_supplement = std::move(tx_supplement);
+    tx_out.m_tx_semantic_rules_version = semantic_rules_version;
+
+    CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(tx_out), "Failed to assemble a SpTxSquashedV1.");
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
+    std::vector<SpMembershipProofV1> membership_proofs,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    SpTxSquashedV1 &tx_out)
+{
+    // finish tx from pieces
+    make_seraphis_tx_squashed_v1(
+            std::move(partial_tx.m_input_images),
+            std::move(partial_tx.m_outputs),
+            std::move(partial_tx.m_balance_proof),
+            std::move(partial_tx.m_image_proofs),
+            std::move(membership_proofs),
+            std::move(partial_tx.m_tx_supplement),
+            semantic_rules_version,
+            tx_out
+        );
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
+    std::vector<SpOutputProposalV1> output_proposals,
+    const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    SpTxSquashedV1 &tx_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
+    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() > 0, "Tried to make tx without any outputs.");
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, output_proposals, 0),
+        "Tried to make tx with unbalanced amounts.");  //TODO: include fee in balance check
+
+    // versioning for proofs
+    std::string version_string;
+    version_string.reserve(3);
+    get_versioning_string(semantic_rules_version, version_string);
+
+    // tx proposal
+    SpTxProposalV1 tx_proposal{std::move(output_proposals)};
+    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
+
+    // partial inputs
+    std::vector<SpTxPartialInputV1> partial_inputs;
+    make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, partial_inputs);
+
+    // membership proofs (input proposals are assumed to line up with membership ref sets)
+    std::vector<SpMembershipProofAlignableV1> tx_membership_proofs_sortable;
+    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
+
+    // partial tx
+    SpTxPartialV1 partial_tx{tx_proposal, std::move(partial_inputs), version_string};
+
+    // line up the the membership proofs with the partial tx's input images (which are sorted)
+    std::vector<SpMembershipProofV1> tx_membership_proofs;
+    align_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images,
+        std::move(tx_membership_proofs_sortable),
+        tx_membership_proofs);
+
+    // finish tx
+    make_seraphis_tx_squashed_v1(std::move(partial_tx), std::move(tx_membership_proofs), semantic_rules_version, tx_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 template <>
-std::shared_ptr<SpTxSquashedV1> make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
+bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
+{
+    if (tx.m_balance_proof.get() == nullptr)
+        return false;
+
+    // validate component counts (num inputs/outputs/etc.)
+    if (!validate_sp_semantics_component_counts_v1(
+        semantic_config_component_counts_v1(tx.m_tx_semantic_rules_version),
+        tx.m_input_images.size(),
+        tx.m_membership_proofs.size(),
+        tx.m_image_proofs.size(),
+        tx.m_outputs.size(),
+        tx.m_supplement.m_output_enote_ephemeral_pubkeys.size(),
+        tx.m_balance_proof->m_bpp_proof.V.size()))
+    {
+        return false;
+    }
+
+    // validate input proof reference set sizes
+    if (!validate_sp_semantics_ref_set_size_v1(
+        semantic_config_ref_set_size_v1(tx.m_tx_semantic_rules_version),
+        tx.m_membership_proofs))
+    {
+        return false;
+    }
+
+    // validate linking tag semantics
+    if (!validate_sp_semantics_input_images_v1(tx.m_input_images))
+    {
+        return false;
+    }
+
+    // validate input images, membershio proof ref sets, and outputs are sorted
+    if (!validate_sp_semantics_sorting_v1(tx.m_membership_proofs, tx.m_input_images, tx.m_outputs))
+    {
+        return false;
+    }
+
+    //TODO: validate memo semantics
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+template <>
+bool validate_tx_linking_tags<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context)
+{
+    // unspentness proof (key images not in ledger)
+    if (!validate_sp_linking_tags_v1(tx.m_input_images, ledger_context))
+    {
+        return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+template <>
+bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const bool defer_batchable)
+{
+    // balance proof
+    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, tx.m_balance_proof, defer_batchable))
+    {
+        return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+template <>
+bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
+    const LedgerContext &ledger_context,
+    const bool defer_batchable)
+{
+    // membership proofs (can be deferred for batching)
+    if (!defer_batchable)
+    {
+        std::vector<const SpMembershipProofV1*> membership_proof_ptrs;
+        std::vector<const SpEnoteImage*> input_image_ptrs;
+        membership_proof_ptrs.reserve(tx.m_membership_proofs.size());
+        input_image_ptrs.reserve(tx.m_input_images.size());
+
+        for (const auto &membership_proof : tx.m_membership_proofs)
+            membership_proof_ptrs.push_back(&membership_proof);
+
+        for (const auto &input_image : tx.m_input_images)
+            input_image_ptrs.push_back(&(input_image.m_core));
+
+        if (!validate_sp_membership_proofs_v1(membership_proof_ptrs, input_image_ptrs, ledger_context))
+        {
+            return false;
+        }
+    }
+
+    // ownership proof (and proof that key images are well-formed)
+    std::string version_string;
+    version_string.reserve(3);
+    get_versioning_string(tx.m_tx_semantic_rules_version, version_string);
+
+    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, tx.m_outputs, tx.m_supplement)};
+
+    if (!validate_sp_composition_proofs_v1(tx.m_image_proofs,
+        tx.m_input_images,
+        image_proofs_message))
+    {
+        return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+template <>
+bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs,
+    const LedgerContext &ledger_context)
+{
+    std::vector<const SpMembershipProofV1*> membership_proof_ptrs;
+    std::vector<const SpEnoteImage*> input_image_ptrs;
+    std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
+    membership_proof_ptrs.reserve(txs.size()*20);  //heuristic... (most tx have 1-2 inputs)
+    input_image_ptrs.reserve(txs.size()*20);
+    range_proof_ptrs.reserve(txs.size());
+
+    // prepare for batch-verification
+    for (const SpTxSquashedV1 *tx : txs)
+    {
+        if (!tx)
+            return false;
+
+        // gather membership proof pieces
+        for (const auto &membership_proof : tx->m_membership_proofs)
+            membership_proof_ptrs.push_back(&membership_proof);
+
+        for (const auto &input_image : tx->m_input_images)
+            input_image_ptrs.push_back(&(input_image.m_core));
+
+        // gather range proofs
+        const std::shared_ptr<const SpBalanceProofV1> balance_proof{tx->m_balance_proof};
+
+        if (balance_proof.get() == nullptr)
+            return false;
+
+        range_proof_ptrs.push_back(&(balance_proof->m_bpp_proof));
+    }
+
+    // batch verify membership proofs
+    if (!validate_sp_membership_proofs_v1(membership_proof_ptrs, input_image_ptrs, ledger_context))
+    {
+        return false;
+    }
+
+    // batch verify range proofs
+    if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
+        return false;
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+template <>
+void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    std::shared_ptr<MockLedgerContext> ledger_context_inout)
+    MockLedgerContext &ledger_context_inout,
+    SpTxSquashedV1 &tx_out)
 {
     CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "Tried to make tx without any outputs.");
@@ -336,62 +424,8 @@ std::shared_ptr<SpTxSquashedV1> make_mock_tx<SpTxSquashedV1>(const SpTxParamPack
         };
 
     // make tx
-    return std::make_shared<SpTxSquashedV1>(input_proposals, output_proposals,
-        membership_ref_sets, SpTxSquashedV1::SemanticRulesVersion::MOCK);
-}
-//-------------------------------------------------------------------------------------------------------------------
-template <>
-bool validate_mock_txs<SpTxSquashedV1>(const std::vector<std::shared_ptr<SpTxSquashedV1>> &txs_to_validate,
-    const std::shared_ptr<const LedgerContext> ledger_context)
-{
-    std::vector<const SpMembershipProofV1*> membership_proof_ptrs;
-    std::vector<const SpEnoteImage*> input_image_ptrs;
-    std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
-    membership_proof_ptrs.reserve(txs_to_validate.size()*20);  //heuristic... (most tx have 1-2 inputs)
-    input_image_ptrs.reserve(txs_to_validate.size()*20);
-    range_proof_ptrs.reserve(txs_to_validate.size());
-
-    for (const std::shared_ptr<SpTxSquashedV1> &tx : txs_to_validate)
-    {
-        if (!tx || tx.use_count() == 0)
-            return false;
-
-        // validate unbatchable parts of tx
-        if (!validate_sp_tx(*tx, ledger_context, true))
-            return false;
-
-
-        /// prepare for batch-verification
-
-        // gather membership proof pieces
-        for (const auto &membership_proof : tx->m_membership_proofs)
-            membership_proof_ptrs.push_back(&membership_proof);
-
-        for (const auto &input_image : tx->m_input_images)
-            input_image_ptrs.push_back(&(input_image.m_core));
-
-        // gather range proofs
-        const std::shared_ptr<const SpBalanceProofV1> balance_proof{tx->m_balance_proof};
-
-        if (balance_proof.get() == nullptr)
-            return false;
-
-        range_proof_ptrs.push_back(&(balance_proof->m_bpp_proof));
-    }
-
-    // batch verify membership proofs
-    if (!validate_sp_membership_proofs_v1(membership_proof_ptrs,
-        input_image_ptrs,
-        ledger_context))
-    {
-        return false;
-    }
-
-    // batch verify range proofs
-    if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
-        return false;
-
-    return true;
+    make_seraphis_tx_squashed_v1(input_proposals, output_proposals, membership_ref_sets,
+        SpTxSquashedV1::SemanticRulesVersion::MOCK, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

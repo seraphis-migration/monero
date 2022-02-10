@@ -60,9 +60,7 @@ struct SpTxGenData
 template <typename SpTxType>
 static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
 {
-    static_assert(std::is_base_of<sp::SpTx, SpTxType>::value, "Invalid mock tx type.");
-
-    std::shared_ptr<sp::MockLedgerContext> ledger_context = std::make_shared<sp::MockLedgerContext>();
+    sp::MockLedgerContext ledger_context{};
 
     for (const auto &gen : gen_data)
     {
@@ -75,22 +73,20 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
             tx_params.ref_set_decomp_m = gen.ref_set_decomp_m;
 
             // make tx
-            std::shared_ptr<SpTxType> tx{
-                    sp::make_mock_tx<SpTxType>(tx_params, gen.input_amounts, gen.output_amounts, ledger_context)
-                };
-            EXPECT_TRUE(tx.get() != nullptr);
+            SpTxType tx;
+            sp::make_mock_tx<SpTxType>(tx_params, gen.input_amounts, gen.output_amounts, ledger_context, tx);
 
             // validate tx
-            EXPECT_TRUE(sp::validate_sp_tx(*tx, ledger_context, false));
+            EXPECT_TRUE(sp::validate_tx(tx, ledger_context, false));
 
             if (gen.test_double_spend)
             {
                 // add key images once validated
-                EXPECT_TRUE(sp::try_add_tx_to_ledger<SpTxType>(ledger_context, *tx));
+                EXPECT_TRUE(sp::try_add_tx_to_ledger<SpTxType>(ledger_context, tx));
 
                 // re-validate tx
                 // - should fail now that key images were added to the ledger
-                EXPECT_FALSE(sp::validate_sp_tx(*tx, ledger_context, false));
+                EXPECT_FALSE(sp::validate_tx(tx, ledger_context, false));
             }
         }
         catch (...)
@@ -103,11 +99,11 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
 template <typename SpTxType>
 static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
 {
-    static_assert(std::is_base_of<sp::SpTx, SpTxType>::value, "Invalid mock tx type.");
-
-    std::shared_ptr<sp::MockLedgerContext> ledger_context = std::make_shared<sp::MockLedgerContext>();
-    std::vector<std::shared_ptr<SpTxType>> txs_to_verify;
+    sp::MockLedgerContext ledger_context{};
+    std::vector<SpTxType> txs_to_verify;
+    std::vector<const SpTxType*> txs_to_verify_ptrs;
     txs_to_verify.reserve(gen_data.size());
+    txs_to_verify_ptrs.reserve(gen_data.size());
     TestType expected_result = TestType::ExpectTrue;
 
     for (const auto &gen : gen_data)
@@ -124,9 +120,9 @@ static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
             tx_params.ref_set_decomp_m = gen.ref_set_decomp_m;
 
             // make tx
-            txs_to_verify.push_back(
-                    sp::make_mock_tx<SpTxType>(tx_params, gen.input_amounts, gen.output_amounts, ledger_context)
-                );
+            txs_to_verify.emplace_back();
+            sp::make_mock_tx<SpTxType>(tx_params, gen.input_amounts, gen.output_amounts, ledger_context, txs_to_verify.back());
+            txs_to_verify_ptrs.push_back(&(txs_to_verify.back()));
         }
         catch (...)
         {
@@ -137,7 +133,7 @@ static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
     try
     {
         // validate tx
-        EXPECT_TRUE(sp::validate_mock_txs<SpTxType>(txs_to_verify, ledger_context));
+        EXPECT_TRUE(sp::validate_txs<SpTxType>(txs_to_verify_ptrs, ledger_context));
     }
     catch (...)
     {

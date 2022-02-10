@@ -52,107 +52,149 @@ namespace sp
 namespace sp
 {
 
+//// concepts: must be implemented by each tx type
+
+/// short description of the tx type
+template <typename SpTxType>    
+std::string get_descriptor();
+
+/// tx format version
+template <typename SpTxType>
+unsigned char get_format_version();
+
+/// transaction validator concepts
+template <typename SpTxType>
+bool validate_tx_semantics(const SpTxType &tx);
+template <typename SpTxType>
+bool validate_tx_linking_tags(const SpTxType &tx, const LedgerContext &ledger_context);
+template <typename SpTxType>
+bool validate_tx_amount_balance(const SpTxType &tx, const bool defer_batchable);
+template <typename SpTxType>
+bool validate_tx_input_proofs(const SpTxType &tx, const LedgerContext &ledger_context, const bool defer_batchable);
+template <typename SpTxType>
+bool validate_txs_batchable(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context);
+
+
+//// Versioning
+
+/// Transaction protocol era: following CryptoNote (1) and RingCT (2)
+constexpr unsigned char TxEraSp{3};
+
+/// Transaction structure types
+enum class TxStructureVersionSp : unsigned char
+{
+    /// mining transaction (TODO)
+    TxTypeSpMining = 0,
+    /// concise grootle in the squashed enote model + separate composition proofs
+    TxTypeSpSquashedV1 = 1
+};
+
+/// get the tx version string: era | format | semantic rules
+inline void get_versioning_string_tx_base(const unsigned char tx_era_version,
+    const unsigned char tx_format_version,
+    const unsigned char tx_semantic_rules_version,
+    std::string &version_string)
+{
+    /// era of the tx (e.g. CryptoNote/RingCT/Seraphis)
+    version_string += static_cast<char>(tx_era_version);
+    /// format version of the tx within its era
+    version_string += static_cast<char>(tx_format_version);
+    /// a tx format's validation rules version
+    version_string += static_cast<char>(tx_semantic_rules_version);
+}
+
+/// get the tx version string for seraphis txs: TxEraSp | format | semantic rules
+inline void get_versioning_string_seraphis_base(const unsigned char tx_format_version,
+    const unsigned char tx_semantic_rules_version,
+    std::string &version_string)
+{
+    get_versioning_string_tx_base(TxEraSp, tx_format_version, tx_semantic_rules_version, version_string);
+}
+
+/// get the tx version string for a specific seraphis tx type (format version is constant per tx type)
+template <typename SpTxType>
+void get_versioning_string(const unsigned char tx_semantic_rules_version, std::string &version_string)
+{
+    get_versioning_string_seraphis_base(get_format_version<SpTxType>(), tx_semantic_rules_version, version_string);
+}
+
+
+//// core validators
+
+/**
+* brief: validate_tx - validate a seraphis transaction
+* param: tx -
+* param: ledger_context -
+* param: defer_batchable - if set, then batchable validation steps shouldn't be executed
+* return: true/false on validation result
+*/
+template <typename SpTxType>
+bool validate_tx(const SpTxType &tx, const LedgerContext &ledger_context, const bool defer_batchable)
+{
+    if (!validate_tx_semantics(tx))
+        return false;
+
+    if (!validate_tx_linking_tags(tx, ledger_context))
+        return false;
+
+    if (!validate_tx_amount_balance(tx, defer_batchable))
+        return false;
+
+    if (!validate_tx_input_proofs(tx, ledger_context, defer_batchable))
+        return false;
+
+    return true;
+}
+/**
+* brief: validate_txs - validate a set of tx (use batching if possible)
+* type: SpTxType - 
+* param: txs -
+* param: ledger_context -
+* return: true/false on verification result
+*/
+template <typename SpTxType>
+bool validate_txs(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context)
+{
+    // validate non-batchable
+    for (const SpTxType *tx : txs)
+    {
+        if (!tx || !validate_tx(*tx, ledger_context, true))
+            return false;
+    }
+
+    // validate batchable
+    if (!validate_txs_batchable(txs, ledger_context))
+        return false;
+
+    return true;
+}
+
+
+//// mock-ups
+
 ////
-// SpTxParamPack - parameter pack for base tx (for unit tests/mockups/etc.)
+// SpTxParamPack - parameter pack (for unit tests/mockups/etc.)
 ///
 struct SpTxParamPack
 {
     std::size_t ref_set_decomp_n;
     std::size_t ref_set_decomp_m;
 };
-
-////
-// SpTx - transaction interface
-///
-struct SpTx
-{
-//constructors
-    /// default constructor
-    SpTx() = default;
-
-    /// normal constructor
-    SpTx(const unsigned char tx_era_version,
-            const unsigned char tx_format_version,
-            const unsigned char tx_semantic_rules_version) :
-        m_tx_era_version{tx_era_version},
-        m_tx_format_version{tx_format_version},
-        m_tx_semantic_rules_version{tx_semantic_rules_version}
-    {}
-
-//destructor: virtual for non-final type
-    virtual ~SpTx() = default;
-
-//member functions
-    /// get size of tx
-    virtual std::size_t get_size_bytes() const = 0;
-
-    /// get a short description of the tx type
-    virtual std::string get_descriptor() const = 0;
-
-    /// get the tx version string: era | format | semantic rules
-    static void get_versioning_string(const unsigned char tx_era_version,
-        const unsigned char tx_format_version,
-        const unsigned char tx_semantic_rules_version,
-        std::string &version_string)
-    {
-        version_string += static_cast<char>(tx_era_version);
-        version_string += static_cast<char>(tx_format_version);
-        version_string += static_cast<char>(tx_semantic_rules_version);
-    }
-    virtual void get_versioning_string(std::string &version_string) const final
-    {
-        get_versioning_string(m_tx_era_version, m_tx_format_version, m_tx_semantic_rules_version, version_string);
-    }
-
-    //get_tx_byte_blob()
-
-    virtual bool validate_tx_semantics() const = 0;
-    virtual bool validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const = 0;
-    // e.g. sum(inputs) == sum(outputs), range proofs
-    virtual bool validate_tx_amount_balance(const bool defer_batchable) const = 0;
-    // e.g. membership, ownership, unspentness proofs
-    virtual bool validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
-        const bool defer_batchable) const = 0;
-
-//member variables
-    /// era of the tx (e.g. CryptoNote/RingCT/Seraphis)
-    unsigned char m_tx_era_version{0};
-    /// format version of the tx within its era
-    unsigned char m_tx_format_version{0};
-    /// a tx format's validation rules version
-    unsigned char m_tx_semantic_rules_version{0};
-};
-
-/**
-* brief: validate_sp_tx - validate a seraphis transaction
-* param: tx -
-* param: ledger_context -
-* param: defer_batchable - if set, then batchable validation steps shouldn't be executed
-* return: true/false on validation result
-*/
-bool validate_sp_tx(const SpTx &tx, const std::shared_ptr<const LedgerContext> ledger_context, const bool defer_batchable);
-
 /**
 * brief: make_mock_tx - make a mock transaction
 * type: SpTxType - 
+* type: SpTxParamsT
 * param: params -
 * param: in_amounts -
 * param: out_amounts -
-* return: the mock tx created
+* inoutparam: ledger_context -
+* outparam: tx_out -
 */
 template <typename SpTxType, typename SpTxParamsT = SpTxParamPack>
-std::shared_ptr<SpTxType> make_mock_tx(const SpTxParamsT &params,
+void make_mock_tx(const SpTxParamsT &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    std::shared_ptr<MockLedgerContext> ledger_context = nullptr);
-/**
-* brief: validate_mock_txs - validate a set of mock tx (use batching if possible)
-* type: SpTxType - 
-* param: txs_to_validate -
-* return: true/false on verification result
-*/
-template <typename SpTxType>
-bool validate_mock_txs(const std::vector<std::shared_ptr<SpTxType>> &txs_to_validate,
-    const std::shared_ptr<const LedgerContext> ledger_context);
+    MockLedgerContext &ledger_context,
+    SpTxType &tx_out);
 
 } //namespace sp

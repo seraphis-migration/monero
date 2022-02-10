@@ -85,19 +85,13 @@ public:
 };
 
 template<typename TxType>
-bool try_add_tx_to_ledger(const std::shared_ptr<LedgerContext> &ledger_context, const TxType &tx_to_add)
-{
-    return false;
-}
+bool try_add_tx_to_ledger(LedgerContext &ledger_context, const TxType &tx_to_add);
 
 template<>
-inline bool try_add_tx_to_ledger<SpTxSquashedV1>(const std::shared_ptr<LedgerContext> &ledger_context,
+inline bool try_add_tx_to_ledger<SpTxSquashedV1>(LedgerContext &ledger_context,
     const SpTxSquashedV1 &tx_to_add)
 {
-    if (!ledger_context || ledger_context.use_count() == 0)
-        return false;
-
-    return ledger_context->try_add_transaction_sp_squashed_v1(tx_to_add);
+    return ledger_context.try_add_transaction_sp_squashed_v1(tx_to_add);
 }
 
 } //namespace sp

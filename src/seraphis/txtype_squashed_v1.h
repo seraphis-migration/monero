@@ -58,97 +58,14 @@ namespace sp
 // Seraphis tx: based on concise grootle membership proofs on squashed enotes,
 //              with separate composition proofs for input images
 ///
-struct SpTxSquashedV1 final : public SpTx
+struct SpTxSquashedV1 final
 {
-    friend class MockLedgerContext;
-
-//member types
-    enum SemanticRulesVersion : unsigned char
+    enum class SemanticRulesVersion : unsigned char
     {
-        MIN = 0,
         MOCK = 0,
-        ONE = 1,
-        MAX = 1
+        ONE = 1
     };
 
-//constructors
-    /// default constructor
-    SpTxSquashedV1() = default;
-
-    /// normal constructor: new tx from pieces
-    SpTxSquashedV1(std::vector<SpEnoteImageV1> input_images,
-        std::vector<SpEnoteV1> outputs,
-        std::shared_ptr<const SpBalanceProofV1> balance_proof,
-        std::vector<SpImageProofV1> image_proofs,
-        std::vector<SpMembershipProofV1> membership_proofs,
-        SpTxSupplementV1 tx_supplement,
-        const SemanticRulesVersion semantic_rules_version) :
-            SpTx{TxEraSp, TxStructureVersionSp::TxTypeSpSquashedV1, semantic_rules_version},  //base class
-            m_input_images{std::move(input_images)},
-            m_outputs{std::move(outputs)},
-            m_balance_proof{std::move(balance_proof)},
-            m_image_proofs{std::move(image_proofs)},
-            m_membership_proofs{std::move(membership_proofs)},
-            m_supplement{std::move(tx_supplement)}
-        {
-            CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble SpTxSquashedV1.");
-            CHECK_AND_ASSERT_THROW_MES(semantic_rules_version <= SemanticRulesVersion::MAX,
-                "Invalid validation rules version.");
-        }
-
-    /// normal constructor: finalize from a partial tx
-    SpTxSquashedV1(SpTxPartialV1 partial_tx,
-        std::vector<SpMembershipProofV1> membership_proofs,
-        const SemanticRulesVersion semantic_rules_version) :
-            SpTxSquashedV1{
-                std::move(partial_tx.m_input_images),
-                std::move(partial_tx.m_outputs),
-                std::move(partial_tx.m_balance_proof),
-                std::move(partial_tx.m_image_proofs),
-                std::move(membership_proofs),
-                std::move(partial_tx.m_tx_supplement),
-                semantic_rules_version
-            }
-    {}
-
-    /// normal constructor: monolithic tx builder (complete tx in one step)
-    SpTxSquashedV1(const std::vector<SpInputProposalV1> &input_proposals,
-        std::vector<SpOutputProposalV1> output_proposals,
-        const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-        const SemanticRulesVersion semantic_rules_version);
-
-    /// normal constructor: from existing tx byte blob
-    //mock tx doesn't do this
-
-//destructor: default
-
-//member functions
-    /// get size of tx
-    std::size_t get_size_bytes() const override;
-
-    /// get a short description of the tx type
-    std::string get_descriptor() const override { return "Sp-Squashed"; }
-
-    /// get the tx version string: era | format | semantic rules
-    static void get_versioning_string(const unsigned char tx_semantic_rules_version,
-        std::string &version_string)
-    {
-        SpTx::get_versioning_string(TxEraSp,
-            TxStructureVersionSp::TxTypeSpSquashedV1,
-            tx_semantic_rules_version,
-            version_string);
-    }
-
-    //get_tx_byte_blob()
-
-    /// validate pieces of the tx
-    bool validate_tx_semantics() const override;
-    bool validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const override;
-    bool validate_tx_amount_balance(const bool defer_batchable) const override;
-    bool validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
-        const bool defer_batchable) const override;
-
-//member variables
     /// tx input images  (spent e-notes)
     std::vector<SpEnoteImageV1> m_input_images;
     /// tx outputs (new e-notes)
@@ -161,7 +78,70 @@ struct SpTxSquashedV1 final : public SpTx
     std::vector<SpMembershipProofV1> m_membership_proofs;
     /// supplemental data for tx
     SpTxSupplementV1 m_supplement;
+
+    /// semantic rules version
+    SemanticRulesVersion m_tx_semantic_rules_version;
+
+    /// get size of tx
+    std::size_t get_size_bytes() const;
 };
+
+//todo
+void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
+    std::vector<SpEnoteV1> outputs,
+    std::shared_ptr<const SpBalanceProofV1> balance_proof,
+    std::vector<SpImageProofV1> image_proofs,
+    std::vector<SpMembershipProofV1> membership_proofs,
+    SpTxSupplementV1 tx_supplement,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    SpTxSquashedV1 &tx_out);
+//todo
+void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
+    std::vector<SpMembershipProofV1> membership_proofs,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    SpTxSquashedV1 &tx_out);
+//todo
+void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
+    std::vector<SpOutputProposalV1> output_proposals,
+    const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    SpTxSquashedV1 &tx_out);
+
+
+//// tx base concept implementations
+
+/// short descriptor of the tx type
+template <>
+inline std::string get_descriptor<SpTxSquashedV1>() { return "Sp-Squashed"; }
+
+/// tx format version
+template <>
+inline unsigned char get_format_version<SpTxSquashedV1>()
+{
+    return static_cast<unsigned char>(TxStructureVersionSp::TxTypeSpSquashedV1);
+}
+
+/// punt for versioning string
+inline void get_versioning_string(const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version,
+    std::string &version_string)
+{
+    get_versioning_string<SpTxSquashedV1>(static_cast<unsigned char>(tx_semantic_rules_version), version_string);
+}
+
+/// transaction validators
+template <>
+bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx);
+template <>
+bool validate_tx_linking_tags<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context);
+template <>
+bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const bool defer_batchable);
+template <>
+bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
+    const LedgerContext &ledger_context,
+    const bool defer_batchable);
+template <>
+bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs,
+    const LedgerContext &ledger_context);
 
 /**
 * brief: make_mock_tx - make a SpTxSquashedV1 transaction (function specialization)
@@ -169,21 +149,13 @@ struct SpTxSquashedV1 final : public SpTx
 * param: in_amounts -
 * param: out_amounts -
 * inoutparam: ledger_context_inout -
-* return: a SpTxSquashedV1 tx
+* outparam: tx_out -
 */
 template <>
-std::shared_ptr<SpTxSquashedV1> make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
+void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    std::shared_ptr<MockLedgerContext> ledger_context_inout);
-/**
-* brief: validate_mock_txs - validate a set of SpTxSquashedV1 transactions (function specialization)
-* param: txs_to_validate -
-* param: ledger_context -
-* return: true/false on validation result
-*/
-template <>
-bool validate_mock_txs<SpTxSquashedV1>(const std::vector<std::shared_ptr<SpTxSquashedV1>> &txs_to_validate,
-    const std::shared_ptr<const LedgerContext> ledger_context);
+    MockLedgerContext &ledger_context_inout,
+    SpTxSquashedV1 &tx_out);
 
 } //namespace sp
