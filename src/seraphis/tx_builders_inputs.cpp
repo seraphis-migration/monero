@@ -364,6 +364,28 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_partial_input_v1(const SpInputProposalV1 &input_proposal,
+    const rct::key &proposal_prefix,
+    SpTxPartialInputV1 &partial_input_out)
+{
+    // prepare input image
+    input_proposal.get_enote_image_v1(partial_input_out.m_input_image);
+
+    // copy misc. proposal info
+    partial_input_out.m_image_address_mask           = input_proposal.m_core.m_address_mask;
+    partial_input_out.m_image_commitment_mask        = input_proposal.m_core.m_commitment_mask;
+    partial_input_out.m_proposal_prefix              = proposal_prefix;
+    partial_input_out.m_input_amount                 = input_proposal.m_core.m_amount;
+    partial_input_out.m_input_amount_blinding_factor = input_proposal.m_core.m_amount_blinding_factor;
+    input_proposal.m_core.get_enote_core(partial_input_out.m_input_enote_core);
+
+    // construct image proof
+    make_v1_tx_image_proof_sp_v1(input_proposal.m_core,
+        partial_input_out.m_input_image.m_core.m_masked_address,
+        partial_input_out.m_proposal_prefix,
+        partial_input_out.m_image_proof);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const rct::key &proposal_prefix,
     std::vector<SpTxPartialInputV1> &partial_inputs_out)
@@ -375,7 +397,10 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input
 
     // make all inputs
     for (const SpInputProposalV1 &input_proposal : input_proposals)
-        partial_inputs_out.emplace_back(input_proposal, proposal_prefix);
+    {
+        partial_inputs_out.emplace_back();
+        make_v1_tx_partial_input_v1(input_proposal, proposal_prefix, partial_inputs_out.back());
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts)

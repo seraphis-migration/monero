@@ -141,6 +141,10 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const SpTxPartialV1 &partial_tx,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out);
+//todo
+void make_v1_tx_partial_input_v1(const SpInputProposalV1 &input_proposal,
+    const rct::key &proposal_prefix,
+    SpTxPartialInputV1 &partial_input_out);
 /**
 * brief: make_v1_tx_partial_inputs_sp_v1 - make a full set of v1 partial inputs
 * param: input_proposals -

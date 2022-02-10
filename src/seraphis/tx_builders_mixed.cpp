@@ -36,11 +36,13 @@
 #include "cryptonote_config.h"
 #include "seraphis_config_temp.h"
 #include "misc_language.h"
+#include "misc_log_ex.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
+#include "tx_builders_inputs.h"
 #include "tx_component_types.h"
 #include "tx_misc_utils.h"
 
@@ -171,6 +173,70 @@ bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &inpu
     out_amounts.emplace_back(transaction_fee);
 
     return balance_check_in_out_amnts(in_amounts, out_amounts);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
+    std::vector<SpTxPartialInputV1> partial_inputs,
+    const std::string &version_string,
+    SpTxPartialV1 &partial_tx_out)
+{
+    /// prepare
+
+    // inputs and proposal must be compatible
+    rct::key proposal_prefix{proposal.get_proposal_prefix(version_string)};
+
+    for (const auto &partial_input : partial_inputs)
+    {
+        CHECK_AND_ASSERT_THROW_MES(proposal_prefix == partial_input.m_proposal_prefix,
+            "Incompatible tx pieces when making partial tx.");
+    }
+
+    // sort the inputs by key image
+    std::sort(partial_inputs.begin(), partial_inputs.end());
+
+
+    /// balance proof
+
+    // get input amounts and image amount commitment blinding factors
+    std::vector<rct::xmr_amount> input_amounts;
+    std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
+    prepare_input_commitment_factors_for_balance_proof_v1(partial_inputs,
+        input_amounts,
+        input_image_amount_commitment_blinding_factors);
+
+    // check balance (TODO: add fee)
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(input_amounts, proposal.m_output_amounts),
+        "Amounts don't balance when making partial tx.");
+
+    // make balance proof
+    make_v1_tx_balance_proof_sp_v1(input_amounts,
+        proposal.m_output_amounts,
+        input_image_amount_commitment_blinding_factors,
+        proposal.m_output_amount_commitment_blinding_factors,
+        partial_tx_out.m_balance_proof);
+
+
+    /// copy misc tx pieces
+
+    // gather tx input parts
+    partial_tx_out.m_input_images.reserve(partial_inputs.size());
+    partial_tx_out.m_image_proofs.reserve(partial_inputs.size());
+    partial_tx_out.m_input_enotes.reserve(partial_inputs.size());
+    partial_tx_out.m_image_address_masks.reserve(partial_inputs.size());
+    partial_tx_out.m_image_commitment_masks.reserve(partial_inputs.size());
+
+    for (auto &partial_input : partial_inputs)
+    {
+        partial_tx_out.m_input_images.emplace_back(partial_input.m_input_image);
+        partial_tx_out.m_image_proofs.emplace_back(std::move(partial_input.m_image_proof));
+        partial_tx_out.m_input_enotes.emplace_back(partial_input.m_input_enote_core);
+        partial_tx_out.m_image_address_masks.emplace_back(partial_input.m_image_address_mask);
+        partial_tx_out.m_image_commitment_masks.emplace_back(partial_input.m_image_commitment_mask);
+    }
+
+    // gather tx output parts
+    partial_tx_out.m_outputs = proposal.m_outputs;
+    partial_tx_out.m_tx_supplement = proposal.m_tx_supplement;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

@@ -85,5 +85,10 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_am
 bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const std::vector<SpOutputProposalV1> &output_proposals,
     const rct::xmr_amount transaction_fee);
+//todo
+void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
+    std::vector<SpTxPartialInputV1> partial_inputs,
+    const std::string &version_string,
+    SpTxPartialV1 &partial_tx_out);
 
 } //namespace sp

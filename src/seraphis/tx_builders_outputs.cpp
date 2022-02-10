@@ -353,6 +353,27 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals, SpTxProposalV1 &proposal_out)
+{
+    // outputs should be sorted by onetime address
+    std::sort(output_proposals.begin(), output_proposals.end());
+
+    // sanity-check semantics
+    check_v1_output_proposals_semantics_sp_v1(output_proposals);
+
+    // make outputs
+    // make tx supplement
+    // prepare for range proofs
+    make_v1_tx_outputs_sp_v1(output_proposals,
+        proposal_out.m_outputs,
+        proposal_out.m_output_amounts,
+        proposal_out.m_output_amount_commitment_blinding_factors,
+        proposal_out.m_tx_supplement);
+
+    // sanity-check semantics
+    check_v1_tx_supplement_semantics_sp_v1(proposal_out.m_tx_supplement, proposal_out.m_outputs.size());
+}
+//-------------------------------------------------------------------------------------------------------------------
 std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts)
 {
     // generate random proposals

@@ -143,6 +143,9 @@ template <>
 bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs,
     const LedgerContext &ledger_context);
 
+
+//// mock-ups
+
 /**
 * brief: make_mock_tx - make a SpTxSquashedV1 transaction (function specialization)
 * param: params -

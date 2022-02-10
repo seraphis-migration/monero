@@ -148,18 +148,6 @@ struct SpMembershipProofAlignableV1 final
 ///
 struct SpTxProposalV1 final
 {
-//constructors
-    /// default constructor
-    SpTxProposalV1() = default;
-
-    /// normal constructor: make a deterministic tx proposal from output proposals
-    SpTxProposalV1(std::vector<SpOutputProposalV1> output_proposals);
-
-//member functions
-    /// message to be signed by input spend proofs
-    rct::key get_proposal_prefix(const std::string &version_string) const;
-
-//member variables
     /// proposed outputs (created from the destinations)
     std::vector<SpEnoteV1> m_outputs;
     /// proposed tx supplement
@@ -167,6 +155,9 @@ struct SpTxProposalV1 final
     /// output amounts and blinding factors (for future balance proofs)
     std::vector<rct::xmr_amount> m_output_amounts;
     std::vector<crypto::secret_key> m_output_amount_commitment_blinding_factors;
+
+    /// message to be signed by input spend proofs
+    rct::key get_proposal_prefix(const std::string &version_string) const;
 };
 
 ////
@@ -178,24 +169,6 @@ struct SpTxProposalV1 final
 ///
 struct SpTxPartialInputV1 final
 {
-//constructors
-    /// default constructor
-    SpTxPartialInputV1() = default;
-
-    /// normal constructor: normal input
-    SpTxPartialInputV1(const SpInputProposalV1 &input_proposal, const rct::key &proposal_prefix);
-
-//destructor: default
-
-    /// less-than operator for sorting
-    bool operator<(const SpTxPartialInputV1 &other_input) const
-    {
-        return m_input_image < other_input.m_input_image;
-    }
-
-//member functions
-
-//member variables
     /// input's image
     SpEnoteImageV1 m_input_image;
     /// input image's proof (demonstrates ownership of the underlying enote, and that the key image is correct)
@@ -213,6 +186,12 @@ struct SpTxPartialInputV1 final
     rct::xmr_amount m_input_amount;
     /// input amount commitment's blinding factor; used for making the balance proof
     crypto::secret_key m_input_amount_blinding_factor;
+
+    /// less-than operator for sorting
+    bool operator<(const SpTxPartialInputV1 &other_input) const
+    {
+        return m_input_image < other_input.m_input_image;
+    }
 };
 
 ////
@@ -222,20 +201,6 @@ struct SpTxPartialInputV1 final
 ///
 struct SpTxPartialV1 final
 {
-//constructors
-    /// default constructor
-    SpTxPartialV1() = default;
-
-    /// normal constructor: standard assembly
-    SpTxPartialV1(const SpTxProposalV1 &proposal,
-        std::vector<SpTxPartialInputV1> inputs,
-        const std::string &version_string);
-
-    /// normal constructor (TODO): assembly from multisig pieces
-
-//destructor: default
-
-//member variables
     /// tx input images  (spent e-notes)
     std::vector<SpEnoteImageV1> m_input_images;
     /// tx outputs (new e-notes)

@@ -101,6 +101,7 @@ static SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1(
 
     if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
     {
+        // note: if n*m exceeds GROOTLE_MAX_MN, there will be an exception thrown
         config.m_decom_n_min = 0;
         config.m_decom_n_max = 100000;
         config.m_decom_m_min = 0;
@@ -212,7 +213,8 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     get_versioning_string(semantic_rules_version, version_string);
 
     // tx proposal
-    SpTxProposalV1 tx_proposal{std::move(output_proposals)};
+    SpTxProposalV1 tx_proposal;
+    make_v1_tx_proposal_v1(std::move(output_proposals), tx_proposal);
     rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
 
     // partial inputs
@@ -224,7 +226,8 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
 
     // partial tx
-    SpTxPartialV1 partial_tx{tx_proposal, std::move(partial_inputs), version_string};
+    SpTxPartialV1 partial_tx;
+    make_v1_tx_partial_v1(tx_proposal, std::move(partial_inputs), version_string, partial_tx);
 
     // line up the the membership proofs with the partial tx's input images (which are sorted)
     std::vector<SpMembershipProofV1> tx_membership_proofs;
