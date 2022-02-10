@@ -59,7 +59,7 @@ class test_concise_grootle
             const std::size_t N = std::pow(n, m);
 
             // Build key vectors
-            M.resize(N, keyV(num_keys));
+            M.resize(N_proofs, keyM(N, keyV(num_keys)));
             std::vector<std::vector<crypto::secret_key>> proof_privkeys;// privkey tuple per-proof (at secret indices in M)
             proof_privkeys.resize(N_proofs, std::vector<crypto::secret_key>(num_keys));
             proof_messages = keyV(N_proofs);  // message per-proof
@@ -67,11 +67,14 @@ class test_concise_grootle
 
             // Random keys
             key temp;
-            for (std::size_t k = 0; k < N; k++)
+            for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
             {
-                for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+                for (std::size_t k = 0; k < N; k++)
                 {
-                    skpkGen(temp, M[k][alpha]);
+                    for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+                    {
+                        skpkGen(temp, M[proof_i][k][alpha]);
+                    }
                 }
             }
 
@@ -82,7 +85,7 @@ class test_concise_grootle
                 for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
                 {
                     // set real-signer index = proof index (kludge)
-                    skpkGen(privkey, M[proof_i][alpha]);  //m_{l, alpha} * G
+                    skpkGen(privkey, M[proof_i][proof_i][alpha]);  //m_{l, alpha} * G
                     proof_messages[proof_i] = skGen();
 
                     // set the first 'num_ident_offsets' commitment offsets equal to identity
@@ -108,7 +111,7 @@ class test_concise_grootle
                 for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
                 {
                     proofs.push_back(
-                        sp::concise_grootle_prove(M,
+                        sp::concise_grootle_prove(M[proof_i],
                             proof_i,
                             proof_offsets[proof_i],
                             proof_privkeys[proof_i],
@@ -148,7 +151,7 @@ class test_concise_grootle
         }
 
     private:
-        keyM M;               // reference set
+        std::vector<keyM> M;               // reference set
         keyM proof_offsets;   // commitment offset tuple per-proof
         keyV proof_messages;  // message per-proof
         std::vector<sp::ConciseGrootleProof> proofs;

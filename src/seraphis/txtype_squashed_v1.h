@@ -92,8 +92,8 @@ struct SpTxSquashedV1 final : public SpTx
             m_supplement{std::move(tx_supplement)}
         {
             CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(), "Failed to assemble SpTxSquashedV1.");
-            CHECK_AND_ASSERT_THROW_MES(semantic_rules_version >= SemanticRulesVersion::MIN &&
-                semantic_rules_version <= SemanticRulesVersion::MAX, "Invalid validation rules version.");
+            CHECK_AND_ASSERT_THROW_MES(semantic_rules_version <= SemanticRulesVersion::MAX,
+                "Invalid validation rules version.");
         }
 
     /// normal constructor: finalize from a partial tx
