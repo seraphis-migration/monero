@@ -34,14 +34,13 @@
 //local headers
 
 //third party headers
-#include "ringct/rctTypes.h"
 
 //standard headers
-#include <memory>
 #include <string>
 #include <vector>
 
 //forward declarations
+namespace rct { using xmr_amount = uint64_t; }
 namespace sp
 {
     class LedgerContext;
@@ -62,7 +61,7 @@ std::string get_descriptor();
 template <typename SpTxType>
 unsigned char get_format_version();
 
-/// transaction validator concepts
+/// transaction validators
 template <typename SpTxType>
 bool validate_tx_semantics(const SpTxType &tx);
 template <typename SpTxType>
