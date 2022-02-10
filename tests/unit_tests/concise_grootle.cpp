@@ -47,7 +47,7 @@ enum GrootleProofType
 bool test_concise_grootle(const std::size_t N_proofs,
     const std::size_t n,
     const std::size_t m,
-    const keyM &M,
+    const std::vector<keyM> &M,
     const keyM &proof_offsets,
     const std::vector<std::vector<crypto::secret_key>> &proof_privkeys,
     const keyV &proof_messages)
@@ -60,7 +60,7 @@ bool test_concise_grootle(const std::size_t N_proofs,
     for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
     {
         proofs.push_back(
-            sp::concise_grootle_prove(M,
+            sp::concise_grootle_prove(M[proof_i],
                 proof_i,
                 proof_offsets[proof_i],
                 proof_privkeys[proof_i],
@@ -95,21 +95,24 @@ bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
         const std::size_t N = std::pow(n, m);
 
         // Build key vectors
-        keyM M;                         // ref set (common)
-        M.resize(N, keyV(num_keys));
+        std::vector<keyM> M;                         // ref sets for each proof
+        M.resize(N_proofs, keyM(N, keyV(num_keys)));
         std::vector<std::vector<crypto::secret_key>> proof_privkeys;// privkey tuple per-proof (at secret indices in M)
         proof_privkeys.resize(N_proofs, std::vector<crypto::secret_key>(num_keys));
         keyV proof_messages = keyV(N_proofs); // message per-proof
         keyM proof_offsets;             // commitment offset tuple per-proof
         proof_offsets.resize(N_proofs, keyV(num_keys));
 
-        // Random keys
+        // Random keys for each proof
         key temp;
-        for (std::size_t k = 0; k < N; k++)
+        for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
         {
-            for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+            for (std::size_t k = 0; k < N; k++)
             {
-                skpkGen(temp, M[k][alpha]);
+                for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+                {
+                    skpkGen(temp, M[proof_i][k][alpha]);
+                }
             }
         }
 
@@ -120,7 +123,7 @@ bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
             for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
                 // set real-signer index = proof index (kludge)
-                skpkGen(privkey, M[proof_i][alpha]);  //m_{l, alpha} * G
+                skpkGen(privkey, M[proof_i][proof_i][alpha]);  //m_{l, alpha} * G
                 proof_messages[proof_i] = skGen();
 
                 // set the first 'num_ident_offsets' commitment offsets equal to identity
@@ -146,6 +149,8 @@ bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
                 if (!test_concise_grootle(N_proofs, n, m, M, proof_offsets, proof_privkeys, proof_messages))
                     return false;
             }
+            else
+                return false;  //no other types currently
         }
         catch (...)
         {
@@ -159,7 +164,7 @@ bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
 TEST(grootle, random)
 {
     //const std::size_t n                   // size base: N = n^m
-    //const std::size_t N_proofs            // number of proofs with common keys to verify in a batch
+    //const std::size_t N_proofs            // number of proofs to verify in a batch
     //const std::size_t num_keys            // number of parallel keys per-proof
     //const std::size_t num_ident_offsets   // number of commitment-to-zero offsets to set to identity element
     //const GrootleProofType type           // proof type to test

@@ -51,7 +51,7 @@
 namespace sp
 {
     struct SpEnoteV1;
-    class SpTxSquashedV1;
+    struct SpTxSquashedV1;
 }
 
 

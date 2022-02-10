@@ -827,6 +827,7 @@ TEST(seraphis, information_recovery_enote_v1_plain)
 
     JamtisPaymentProposalV1 payment_proposal{user_address, amount, enote_privkey};
     SpOutputProposalV1 output_proposal;
+    payment_proposal.get_output_proposal_v1(output_proposal);
 
     // check the enote
     check_is_owned_plain(output_proposal, wallet_spend_pubkey, k_view_balance, j, amount);

@@ -109,9 +109,9 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
     const std::size_t m,
     const rct::key &message);
 /**
-* brief: concise_grootle_verify - verify a batch of concise grootle proofs that share a reference set
+* brief: concise_grootle_verify - verify a batch of concise grootle proofs
 * param: proofs - batch of proofs to verify
-* param: M - (shared) [vec<tuple of commitments>]
+* param: M - (per-proof) vec<[vec<tuple of commitments>]>
 * param: proof_offsets - (per-proof) offsets for commitments to zero at unknown indices in each proof
 * param: n - decomp input set: n^m
 * param: m - ...
@@ -119,7 +119,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
 * return: true/false on verification result
 */
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
-    const rct::keyM &M,
+    const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
     const std::size_t m,

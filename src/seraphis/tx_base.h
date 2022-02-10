@@ -64,9 +64,8 @@ struct SpTxParamPack
 ////
 // SpTx - transaction interface
 ///
-class SpTx
+struct SpTx
 {
-public:
 //constructors
     /// default constructor
     SpTx() = default;
@@ -116,7 +115,6 @@ public:
         const bool defer_batchable) const = 0;
 
 //member variables
-protected:
     /// era of the tx (e.g. CryptoNote/RingCT/Seraphis)
     unsigned char m_tx_era_version;
     /// format version of the tx within its era

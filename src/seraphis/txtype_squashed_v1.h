@@ -58,11 +58,10 @@ namespace sp
 // Seraphis tx: based on concise grootle membership proofs on squashed enotes,
 //              with separate composition proofs for input images
 ///
-class SpTxSquashedV1 final : public SpTx
+struct SpTxSquashedV1 final : public SpTx
 {
     friend class MockLedgerContext;
 
-public:
 //member types
     enum SemanticRulesVersion : unsigned char
     {
@@ -140,12 +139,8 @@ public:
             version_string);
     }
 
-    /// get balance proof
-    const std::shared_ptr<const SpBalanceProofV1> get_balance_proof() const { return m_balance_proof; }
-
     //get_tx_byte_blob()
 
-private:
     /// validate pieces of the tx
     bool validate_tx_semantics() const override;
     bool validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const override;

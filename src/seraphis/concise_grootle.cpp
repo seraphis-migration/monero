@@ -508,7 +508,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
-    const rct::keyM &M,
+    const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
     const std::size_t m,
@@ -526,20 +526,23 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
     // anonymity set size
     const std::size_t N = std::pow(n, m);
 
-    CHECK_AND_ASSERT_THROW_MES(M.size() == N, "Public key vector is wrong size!");
+    CHECK_AND_ASSERT_THROW_MES(M.size() == N_proofs, "Public key vector is wrong size!");
+    for (const rct::keyM &proof_M : M)
+        CHECK_AND_ASSERT_THROW_MES(proof_M.size() == N, "Public key vector is wrong size!");
 
     // inputs line up with proofs
     CHECK_AND_ASSERT_THROW_MES(proof_offsets.size() == N_proofs, "Commitment offsets don't match with input proofs!");
     CHECK_AND_ASSERT_THROW_MES(messages.size() == N_proofs, "Incorrect number of messages!");
 
-    // commitment offsets must line up with input set
+    // commitment offsets must line up with input sets
     const std::size_t num_keys = proof_offsets[0].size();
 
     for (const rct::keyV &C_offsets : proof_offsets)
         CHECK_AND_ASSERT_THROW_MES(C_offsets.size() == num_keys, "Incorrect number of commitment offsets!");
 
-    for (const rct::keyV &tuple : M)
-        CHECK_AND_ASSERT_THROW_MES(tuple.size() == num_keys, "Incorrect number of input keys!");
+    for (const rct::keyM &proof_M : M)
+        for (const rct::keyV &tuple : proof_M)
+            CHECK_AND_ASSERT_THROW_MES(tuple.size() == num_keys, "Incorrect number of input keys!");
 
 
     /// Per-proof checks
@@ -598,9 +601,10 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
     /// per-proof data assembly
     std::size_t skipped_offsets{0};
 
-    for (std::size_t i_proofs = 0; i_proofs < N_proofs; ++i_proofs)
+    for (std::size_t proof_i = 0; proof_i < N_proofs; ++proof_i)
     {
-        const ConciseGrootleProof &proof = *(proofs[i_proofs]);
+        const ConciseGrootleProof &proof = *(proofs[proof_i]);
+        const rct::keyM &proof_M = M[proof_i];
 
         // random weights
         // - to allow verifiying batches of proofs, must weight each proof's components randomly so an adversary doesn't
@@ -615,9 +619,9 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
         // Transcript challenges
         const rct::key mu{
-                compute_base_aggregation_coefficient(messages[i_proofs],
-                    M,
-                    proof_offsets[i_proofs],
+                compute_base_aggregation_coefficient(messages[proof_i],
+                    proof_M,
+                    proof_offsets[proof_i],
                     proof.A,
                     proof.B)
             };
@@ -725,14 +729,14 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
             for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
                 sc_mul(temp.bytes, t_k.bytes, mu_pow[alpha].bytes);  // w2*t_k*mu^alpha
-                data.push_back({temp, M[k][alpha]});
+                data.push_back({temp, proof_M[k][alpha]});
             }
         }
 
         // {C_offsets}
         //   ... - w2*sum_k( t_k )*sum_{alpha}(mu^alpha*C_offsets[alpha]) ...
         // 
-        // proof_offsets[i_proofs][alpha]: -w2*sum_t*mu^alpha
+        // proof_offsets[proof_i][alpha]: -w2*sum_t*mu^alpha
         sc_mul(temp.bytes, MINUS_ONE.bytes, w2.bytes);
         sc_mul(temp.bytes, temp.bytes, sum_t.bytes);  //-w2*sum_t
         rct::key shuttle;
@@ -740,14 +744,14 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
         {
             // optimization: skip if offset == identity
-            if (proof_offsets[i_proofs][alpha] == rct::identity())
+            if (proof_offsets[proof_i][alpha] == rct::identity())
             {
                 ++skipped_offsets;
                 continue;
             }
 
             sc_mul(shuttle.bytes, temp.bytes, mu_pow[alpha].bytes);  //-w2*sum_t*mu^alpha
-            data.push_back({shuttle, proof_offsets[i_proofs][alpha]});
+            data.push_back({shuttle, proof_offsets[proof_i][alpha]});
         }
 
         // {X}

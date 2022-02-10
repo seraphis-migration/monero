@@ -286,46 +286,58 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
-    const std::vector<SpEnoteImageV1> &input_images,
+bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV1*> &membership_proofs,
+    const std::vector<const SpEnoteImage*> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context)
 {
+    std::size_t num_proofs{membership_proofs.size()};
+
     // sanity check
-    if (membership_proofs.size() != input_images.size())
+    if (num_proofs != input_images.size() ||
+        num_proofs == 0)
         return false;
 
-    // validate one proof at a time (no batching - i.e. cannot assume a shared reference set between proofs)
-    std::vector<const sp::ConciseGrootleProof*> proof;
-    rct::keyM membership_proof_keys;
+    // batch-validate proofs
+    std::vector<const sp::ConciseGrootleProof*> proofs;
+    std::vector<rct::keyM> membership_proof_keys;
     rct::keyM offsets;
-    rct::keyV message;
-    offsets.resize(1, rct::keyV(1));
+    rct::keyV messages;
+    proofs.reserve(num_proofs);
+    membership_proof_keys.resize(num_proofs);
+    offsets.resize(num_proofs, rct::keyV(1));
+    messages.reserve(num_proofs);
 
-    for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
+    for (std::size_t proof_index{0}; proof_index < num_proofs; ++proof_index)
     {
-        proof = {&(membership_proofs[input_index].m_concise_grootle_proof)};
+        // sanity check
+        if (!membership_proofs[proof_index] ||
+            !input_images[proof_index])
+            return false;
+
+        proofs.push_back(&(membership_proofs[proof_index]->m_concise_grootle_proof));
 
         // get proof keys from enotes stored in the ledger
-        ledger_context->get_reference_set_proof_elements_sp_v1(membership_proofs[input_index].m_ledger_enote_indices,
-            membership_proof_keys);
+        ledger_context->get_reference_set_proof_elements_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices,
+            membership_proof_keys[proof_index]);
 
         // offset (input image masked keys squashed: Q' = Ko' + C')
-        rct::addKeys(offsets[0][0],
-            input_images[input_index].m_core.m_masked_address,
-            input_images[input_index].m_core.m_masked_commitment);
+        rct::addKeys(offsets[proof_index][0],
+            input_images[proof_index]->m_masked_address,
+            input_images[proof_index]->m_masked_commitment);
 
         // proof message
-        message = {get_tx_membership_proof_message_sp_v1(membership_proofs[input_index].m_ledger_enote_indices)};
+        messages.push_back(get_tx_membership_proof_message_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
+    }
 
-        if (!sp::concise_grootle_verify(proof,
-            membership_proof_keys,
-            offsets,
-            membership_proofs[input_index].m_ref_set_decomp_n,
-            membership_proofs[input_index].m_ref_set_decomp_m,
-            message))
-        {
-            return false;
-        }
+    // batch verify
+    if (!sp::concise_grootle_verify(proofs,
+        membership_proof_keys,
+        offsets,
+        membership_proofs[0]->m_ref_set_decomp_n,
+        membership_proofs[0]->m_ref_set_decomp_m,
+        messages))
+    {
+        return false;
     }
 
     return true;

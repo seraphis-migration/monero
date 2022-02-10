@@ -159,8 +159,8 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 * param: ledger_context -
 * return: true/false on validation result
 */
-bool validate_sp_membership_proofs_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
-    const std::vector<SpEnoteImageV1> &input_images,
+bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV1*> &membership_proofs,
+    const std::vector<const SpEnoteImage*> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context);
 /**
 * brief: validate_sp_composition_proofs_v1 - check that spending tx inputs is authorized by their owners,
