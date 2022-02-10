@@ -45,7 +45,7 @@ extern "C"
 //standard headers
 
 //forward declarations
-
+namespace sp { struct SpEnote; }
 
 namespace sp
 {
@@ -112,24 +112,62 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
     const rct::key &amount_commitment,
     crypto::secret_key &squash_prefix_out);
 /**
-* brief: squash_seraphis_address - make a 'squashed' address in the squashed enote model
+* brief: make_seraphis_squashed_address_key - make a 'squashed' address in the squashed enote model
 *   Ko^t = H(Ko,C) Ko
 * param: onetime_address - Ko
 * param: amount_commitment - C
 * outparam: squashed_address_out - H(Ko,C) Ko
 */
-void squash_seraphis_address(const rct::key &onetime_address,
+void make_seraphis_squashed_address_key(const rct::key &onetime_address,
     const rct::key &amount_commitment,
     rct::key &squashed_address_out);
 /**
-* brief: seraphis_squashed_enote_Q - make a 'squashed' enote in the squashed enote model
+* brief: make_seraphis_squashed_enote_Q - make a 'squashed' enote in the squashed enote model
 *   Q = Ko^t + C^t = H(Ko,C) Ko + C
 * param: onetime_address - Ko
 * param: amount_commitment - C
-* outparam: squashed_enote_out - Q
+* outparam: Q_out - Q
 */
-void seraphis_squashed_enote_Q(const rct::key &onetime_address,
+void make_seraphis_squashed_enote_Q(const rct::key &onetime_address,
     const rct::key &amount_commitment,
-    rct::key &squashed_enote_out);
+    rct::key &Q_out);
+/**
+* brief: make_seraphis_enote_core - make a Seraphis ENote from a pre-made onetime address
+* param: onetime_address -
+* param: amount_blinding_factor -
+* param: amount -
+* outparam: enote_core_out -
+*/
+void make_seraphis_enote_core(const rct::key &onetime_address,
+    const crypto::secret_key &amount_blinding_factor,
+    const rct::xmr_amount amount,
+    SpEnote &enote_core_out);
+/**
+* brief: make_seraphis_enote_core - make a Seraphis ENote by extending an existing address
+* param: extension_privkey -
+* param: initial_address -
+* param: amount_blinding_factor -
+* param: amount -
+* outparam: enote_core_out -
+*/
+void make_seraphis_enote_core(const crypto::secret_key &extension_privkey,
+    const rct::key &initial_address,
+    const crypto::secret_key &amount_blinding_factor,
+    const rct::xmr_amount amount,
+    SpEnote &enote_core_out);
+/**
+* brief: make_seraphis_enote_core - make a Seraphis ENote when all secrets are known
+* param: enote_view_privkey -
+* param: spendbase_privkey -
+* param: amount_blinding_factor -
+* param: amount -
+* outparam: enote_core_out -
+*/
+void make_seraphis_enote_core(const crypto::secret_key &enote_view_privkey,
+    const crypto::secret_key &spendbase_privkey,
+    const crypto::secret_key &amount_blinding_factor,
+    const rct::xmr_amount amount,
+    SpEnote &enote_core_out);
+
 
 } //namespace sp

@@ -214,13 +214,13 @@ rct::xmr_amount encode_jamtis_amount_selfsend(const rct::xmr_amount amount,
 rct::xmr_amount decode_jamtis_amount_selfsend(const rct::xmr_amount encoded_amount,
     const rct::key &sender_receiver_secret);
 /**
-* brief: get_jamtis_nominal_spend_key - get a nominal spend key from a onetime address
+* brief: make_jamtis_nominal_spend_key - make a nominal spend key from a onetime address
 *   K'_1 = Ko - H_n(q) X
 * param: sender_receiver_secret - q
 * param: onetime_address - Ko
 * outparam: nominal_spend_key_out - K'_1
 */
-void get_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
+void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
     const rct::key &onetime_address,
     rct::key &nominal_spend_key_out);
 /**
@@ -285,12 +285,6 @@ bool try_get_jamtis_amount_selfsend(const rct::key &sender_receiver_secret,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out);
-//todo
-void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const crypto::secret_key &address_privkey,
-    const crypto::secret_key &address_extension,
-    crypto::key_image &key_image_out);
 
 } //namespace jamtis
 } //namespace sp

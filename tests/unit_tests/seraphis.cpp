@@ -363,7 +363,7 @@ static std::shared_ptr<sp::SpTxSquashedV1> make_sp_txtype_squashed_v1(const std:
     for (const auto &input_proposal : input_proposals)
     {
         input_enotes.emplace_back();
-        input_proposal.m_core.get_enote_base(input_enotes.back());
+        input_proposal.m_core.get_enote_core(input_enotes.back());
     }
 
     std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
@@ -1152,7 +1152,7 @@ TEST(seraphis, txtype_squashed_v1)
 
     // insert key images to ledger
     for (const auto &tx : txs)
-        sp::add_tx_to_ledger<sp::SpTxSquashedV1>(ledger_context, *tx);
+        EXPECT_TRUE(sp::try_add_tx_to_ledger<sp::SpTxSquashedV1>(ledger_context, *tx));
 
     // validation should fail due to double-spend
     EXPECT_FALSE(sp::validate_mock_txs<sp::SpTxSquashedV1>(txs, ledger_context));

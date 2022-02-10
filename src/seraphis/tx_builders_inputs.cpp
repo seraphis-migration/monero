@@ -171,14 +171,14 @@ void make_v1_tx_image_proof_sp_v1(const SpInputProposal &input_proposal,
     SpImageProofV1 &tx_image_proof_out)
 {
     // the input enote
-    SpEnote input_enote_base;
-    input_proposal.get_enote_base(input_enote_base);
+    SpEnote input_enote_core;
+    input_proposal.get_enote_core(input_enote_core);
 
     // prepare for proof (squashed enote model): y, z
     crypto::secret_key y, z;
     crypto::secret_key squash_prefix;
-    make_seraphis_squash_prefix(input_enote_base.m_onetime_address,
-        input_enote_base.m_amount_commitment,
+    make_seraphis_squash_prefix(input_enote_core.m_onetime_address,
+        input_enote_core.m_amount_commitment,
         squash_prefix);  // H(Ko,C)
 
     sc_mul(&y, &squash_prefix, &(input_proposal.m_enote_view_privkey));  // H(Ko,C) (k_{a, recipient} + k_{a, sender})
@@ -235,7 +235,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
     {
         // Q_i
         // computing this for every enote for every proof is expensive; TODO: copy Q_i from the node record
-        seraphis_squashed_enote_Q(membership_ref_set.m_referenced_enotes[ref_index].m_onetime_address,
+        make_seraphis_squashed_enote_Q(membership_ref_set.m_referenced_enotes[ref_index].m_onetime_address,
             membership_ref_set.m_referenced_enotes[ref_index].m_amount_commitment,
             reference_keys[ref_index][0]);
     }
@@ -282,14 +282,14 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
     SpMembershipProofAlignableV1 &tx_membership_proof_out)
 {
     // save the masked address to later match the membership proof with its input image
-    squash_seraphis_address(
+    make_seraphis_squashed_address_key(
         membership_ref_set.m_referenced_enotes[membership_ref_set.m_real_spend_index_in_set].m_onetime_address,
         membership_ref_set.m_referenced_enotes[membership_ref_set.m_real_spend_index_in_set].m_amount_commitment,
-        tx_membership_proof_out.m_masked_address);
+        tx_membership_proof_out.m_masked_address);  //H(Ko,C) Ko
 
     mask_key(image_address_mask,
         tx_membership_proof_out.m_masked_address,
-        tx_membership_proof_out.m_masked_address);
+        tx_membership_proof_out.m_masked_address);  //t_k G + H(Ko,C) Ko
 
     // make the membership proof
     make_v1_tx_membership_proof_sp_v1(membership_ref_set,
@@ -447,7 +447,7 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     input_enotes.resize(input_proposals.size());
 
     for (std::size_t input_index{0}; input_index< input_proposals.size(); ++input_index)
-        input_proposals[input_index].m_core.get_enote_base(input_enotes[input_index]);
+        input_proposals[input_index].m_core.get_enote_core(input_enotes[input_index]);
 
     return gen_mock_sp_membership_ref_sets_v1(input_enotes, ref_set_decomp_n, ref_set_decomp_m, ledger_context_inout);
 }

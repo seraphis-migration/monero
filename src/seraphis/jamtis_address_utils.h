@@ -96,6 +96,12 @@ bool test_jamtis_nominal_spend_key(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
     const address_index_t j,
     const rct::key &nominal_spend_key);
+//todo
+void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &address_privkey,
+    const crypto::secret_key &address_extension,
+    crypto::key_image &key_image_out);
 
 } //namespace jamtis
 } //namespace sp

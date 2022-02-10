@@ -82,15 +82,17 @@ public:
     void get_reference_set_proof_elements_sp_v1(const std::vector<std::size_t> &indices,
         rct::keyM &proof_elements_out) const override;
     /**
-    * brief: add_transaction_sp_squashed_v1 - add a SpTxSquashedV1 transaction to the ledger
+    * brief: try_add_transaction_sp_squashed_v1 - try to add a SpTxSquashedV1 transaction to the ledger
     * param: tx_to_add -
+    * return: true if adding tx succeeded
     */
-    void add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add) override;
+    bool try_add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add) override;
     /**
-    * brief: add_linking_tag_sp_v1 - add a Seraphis linking tag to the ledger
+    * brief: try_add_linking_tag_sp_v1 - add a Seraphis linking tag to the ledger
     * param: linking_tag -
+    * return: false if linking tag can't be added (duplicate)
     */
-    void add_linking_tag_sp_v1(const crypto::key_image &linking_tag);
+    bool try_add_linking_tag_sp_v1(const crypto::key_image &linking_tag);
     /**
     * brief: add_enote_sp_v1 - add a Seraphis v1 enote to the ledger (and store the squashed enote)
     * param: enote -
@@ -99,7 +101,7 @@ public:
     std::size_t add_enote_sp_v1(const SpEnoteV1 &enote);
 
 private:
-    /// implementations of the above, without internally locking the ledger mutex
+    /// implementations of the above, without internally locking the ledger mutex (all expected to be no-fail)
     bool linking_tag_exists_sp_v1_impl(const crypto::key_image &linking_tag) const;
     void add_linking_tag_sp_v1_impl(const crypto::key_image &linking_tag);
     std::size_t add_enote_sp_v1_impl(const SpEnoteV1 &enote);

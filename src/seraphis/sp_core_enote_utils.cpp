@@ -41,6 +41,7 @@ extern "C"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "sp_core_types.h"
 #include "sp_crypto_utils.h"
 #include "wipeable_string.h"
 
@@ -133,7 +134,7 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
     crypto::hash_to_scalar(hash.data(), hash.size(), squash_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void squash_seraphis_address(const rct::key &onetime_address,
+void make_seraphis_squashed_address_key(const rct::key &onetime_address,
     const rct::key &amount_commitment,
     rct::key &squashed_address_out)
 {
@@ -144,15 +145,55 @@ void squash_seraphis_address(const rct::key &onetime_address,
     rct::scalarmultKey(squashed_address_out, onetime_address, rct::sk2rct(squash_prefix));
 }
 //-------------------------------------------------------------------------------------------------------------------
-void seraphis_squashed_enote_Q(const rct::key &onetime_address,
+void make_seraphis_squashed_enote_Q(const rct::key &onetime_address,
     const rct::key &amount_commitment,
-    rct::key &squashed_enote_out)
+    rct::key &Q_out)
 {
     // Ko^t
-    squash_seraphis_address(onetime_address, amount_commitment, squashed_enote_out);
+    make_seraphis_squashed_address_key(onetime_address, amount_commitment, Q_out);
 
     // Q = Ko^t + C^t
-    rct::addKeys(squashed_enote_out, squashed_enote_out, amount_commitment);
+    rct::addKeys(Q_out, Q_out, amount_commitment);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_enote_core(const rct::key &onetime_address,
+    const crypto::secret_key &amount_blinding_factor,
+    const rct::xmr_amount amount,
+    SpEnote &enote_core_out)
+{
+    // Ko
+    enote_core_out.m_onetime_address = onetime_address;
+
+    // C = x G + a H
+    enote_core_out.m_amount_commitment = rct::commit(amount, rct::sk2rct(amount_blinding_factor));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_enote_core(const crypto::secret_key &extension_privkey,
+    const rct::key &initial_address,
+    const crypto::secret_key &amount_blinding_factor,
+    const rct::xmr_amount amount,
+    SpEnote &enote_core_out)
+{
+    // Ko = k_address_extension X + K
+    enote_core_out.m_onetime_address = initial_address;
+    extend_seraphis_spendkey(extension_privkey, enote_core_out.m_onetime_address);
+
+    // finish making the enote
+    make_seraphis_enote_core(enote_core_out.m_onetime_address, amount_blinding_factor, amount, enote_core_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_enote_core(const crypto::secret_key &enote_view_privkey,
+    const crypto::secret_key &spendbase_privkey,
+    const crypto::secret_key &amount_blinding_factor,
+    const rct::xmr_amount amount,
+    SpEnote &enote_core_out)
+{
+    // spendbase = k_{b, recipient} U
+    rct::key spendbase;
+    make_seraphis_spendbase(spendbase_privkey, spendbase);
+
+    // finish making the enote
+    make_seraphis_enote_core(enote_view_privkey, spendbase, amount_blinding_factor, amount, enote_core_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

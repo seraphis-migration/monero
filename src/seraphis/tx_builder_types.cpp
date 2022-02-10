@@ -119,7 +119,7 @@ SpTxPartialInputV1::SpTxPartialInputV1(const SpInputProposalV1 &input_proposal,
     m_proposal_prefix              = proposal_prefix;
     m_input_amount                 = input_proposal.m_core.m_amount;
     m_input_amount_blinding_factor = input_proposal.m_core.m_amount_blinding_factor;
-    input_proposal.m_core.get_enote_base(m_input_enote_core);
+    input_proposal.m_core.get_enote_core(m_input_enote_core);
 
     // construct image proof
     make_v1_tx_image_proof_sp_v1(input_proposal.m_core,

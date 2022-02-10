@@ -116,11 +116,11 @@ struct SpTx
 
 //member variables
     /// era of the tx (e.g. CryptoNote/RingCT/Seraphis)
-    unsigned char m_tx_era_version;
+    unsigned char m_tx_era_version{0};
     /// format version of the tx within its era
-    unsigned char m_tx_format_version;
+    unsigned char m_tx_format_version{0};
     /// a tx format's validation rules version
-    unsigned char m_tx_semantic_rules_version;
+    unsigned char m_tx_semantic_rules_version{0};
 };
 
 /**

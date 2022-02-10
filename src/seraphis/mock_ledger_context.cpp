@@ -95,10 +95,16 @@ void MockLedgerContext::get_reference_set_proof_elements_sp_v1(const std::vector
     proof_elements_out = std::move(referenced_enotes_squashed);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add)
+bool MockLedgerContext::try_add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add)
 {
     std::lock_guard<std::mutex> lock{m_ledger_mutex};
 
+    // check that linking tags can all be added
+    for (const auto &input_image : tx_to_add.m_input_images)
+    {
+        if (linking_tag_exists_sp_v1_impl(input_image.m_core.m_key_image))
+            return false;
+    }
     // add linking tags
     for (const auto &input_image : tx_to_add.m_input_images)
         this->add_linking_tag_sp_v1_impl(input_image.m_core.m_key_image);
@@ -108,13 +114,18 @@ void MockLedgerContext::add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_
         this->add_enote_sp_v1_impl(output_enote);
 
     // note: for mock ledger, don't store the whole tx
+    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::add_linking_tag_sp_v1(const crypto::key_image &linking_tag)
+bool MockLedgerContext::try_add_linking_tag_sp_v1(const crypto::key_image &linking_tag)
 {
     std::lock_guard<std::mutex> lock{m_ledger_mutex};
 
+    if (linking_tag_exists_sp_v1_impl(linking_tag))
+        return false;
+
     add_linking_tag_sp_v1_impl(linking_tag);
+    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t MockLedgerContext::add_enote_sp_v1(const SpEnoteV1 &enote)
@@ -133,7 +144,7 @@ bool MockLedgerContext::linking_tag_exists_sp_v1_impl(const crypto::key_image &l
 void MockLedgerContext::add_linking_tag_sp_v1_impl(const crypto::key_image &linking_tag)
 {
     CHECK_AND_ASSERT_THROW_MES(!linking_tag_exists_sp_v1_impl(linking_tag),
-        "Tried to add linking tag that already linking_tag_exists_sp_v1.");
+        "Tried to add linking tag that already exists.");  //extra double sanity check
 
     m_sp_linking_tags.insert(linking_tag);
 }
@@ -144,7 +155,7 @@ std::size_t MockLedgerContext::add_enote_sp_v1_impl(const SpEnoteV1 &enote)
     m_sp_enotes[m_sp_enotes.size()] = enote;
 
     // add the squashed enote
-    seraphis_squashed_enote_Q(enote.m_core.m_onetime_address,
+    make_seraphis_squashed_enote_Q(enote.m_core.m_onetime_address,
         enote.m_core.m_amount_commitment,
         m_sp_squashed_enotes[m_sp_enotes.size() - 1]);
 

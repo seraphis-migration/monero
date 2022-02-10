@@ -50,43 +50,6 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnote::make_base_with_onetime_address(const rct::key &onetime_address,
-    const crypto::secret_key &amount_blinding_factor,
-    const rct::xmr_amount amount)
-{
-    // Ko
-    m_onetime_address = onetime_address;
-
-    // C = x G + a H
-    m_amount_commitment = rct::commit(amount, rct::sk2rct(amount_blinding_factor));
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpEnote::make_base_with_address_extension(const crypto::secret_key &extension_privkey,
-        const rct::key &initial_address,
-        const crypto::secret_key &amount_blinding_factor,
-        const rct::xmr_amount amount)
-{
-    // Ko = k_address_extension X + K
-    m_onetime_address = initial_address;
-    extend_seraphis_spendkey(extension_privkey, m_onetime_address);
-
-    // finish making enote base
-    this->make_base_with_onetime_address(m_onetime_address, amount_blinding_factor, amount);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpEnote::make_base_with_privkeys(const crypto::secret_key &enote_view_privkey,
-        const crypto::secret_key &spendbase_privkey,
-        const crypto::secret_key &amount_blinding_factor,
-        const rct::xmr_amount amount)
-{
-    // spendbase = k_{b, recipient} U
-    rct::key spendbase;
-    make_seraphis_spendbase(spendbase_privkey, spendbase);
-
-    // finish making enote base
-    this->make_base_with_address_extension(enote_view_privkey, spendbase, amount_blinding_factor, amount);
-}
-//-------------------------------------------------------------------------------------------------------------------
 void SpEnote::gen()
 {
     // all random
@@ -117,19 +80,19 @@ void SpInputProposal::get_key_image(crypto::key_image &key_image_out) const
     make_seraphis_key_image(m_enote_view_privkey, m_spendbase_privkey, key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpInputProposal::get_enote_base(SpEnote &enote_out) const
+void SpInputProposal::get_enote_core(SpEnote &enote_out) const
 {
-    enote_out.make_base_with_privkeys(m_enote_view_privkey, m_spendbase_privkey, m_amount_blinding_factor, m_amount);
+    make_seraphis_enote_core(m_enote_view_privkey, m_spendbase_privkey, m_amount_blinding_factor, m_amount, enote_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpInputProposal::get_enote_image_squashed_base(SpEnoteImage &image_out) const
+void SpInputProposal::get_enote_image_squashed_core(SpEnoteImage &image_out) const
 {
     // {Ko, C}
     SpEnote enote_temp;
-    this->get_enote_base(enote_temp);
+    this->get_enote_core(enote_temp);
 
     // Ko' = t_k G + H(Ko,C) Ko
-    squash_seraphis_address(enote_temp.m_onetime_address,
+    make_seraphis_squashed_address_key(enote_temp.m_onetime_address,
         enote_temp.m_amount_commitment,
         image_out.m_masked_address);  //H(Ko,C) Ko
     sp::mask_key(m_address_mask, image_out.m_masked_address, image_out.m_masked_address);  //t_k G + H(Ko,C) Ko
@@ -151,9 +114,9 @@ void SpInputProposal::gen(const rct::xmr_amount amount)
     m_commitment_mask = rct::rct2sk(rct::skGen());;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpOutputProposal::get_enote_base(SpEnote &enote_out) const
+void SpOutputProposal::get_enote_core(SpEnote &enote_out) const
 {
-    enote_out.make_base_with_onetime_address(m_onetime_address, m_amount_blinding_factor, m_amount);
+    make_seraphis_enote_core(m_onetime_address, m_amount_blinding_factor, m_amount, enote_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpOutputProposal::gen(const rct::xmr_amount amount)

@@ -77,22 +77,27 @@ public:
     virtual void get_reference_set_proof_elements_sp_v1(const std::vector<std::size_t> &indices,
         rct::keyM &proof_elements_out) const = 0;
     /**
-    * brief: add_transaction_sp_squashed_v1 - add a SpTxSquashedV1 transaction to the ledger
+    * brief: try_add_transaction_sp_squashed_v1 - try to add a SpTxSquashedV1 transaction to the ledger
     * param: tx_to_add -
+    * bool: true if adding tx succeeded
     */
-    virtual void add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add) = 0;
+    virtual bool try_add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add) = 0;
 };
 
 template<typename TxType>
-void add_tx_to_ledger(const std::shared_ptr<LedgerContext> &ledger_context, const TxType &tx_to_add)
-{}
+bool try_add_tx_to_ledger(const std::shared_ptr<LedgerContext> &ledger_context, const TxType &tx_to_add)
+{
+    return false;
+}
 
 template<>
-inline void add_tx_to_ledger<SpTxSquashedV1>(const std::shared_ptr<LedgerContext> &ledger_context,
+inline bool try_add_tx_to_ledger<SpTxSquashedV1>(const std::shared_ptr<LedgerContext> &ledger_context,
     const SpTxSquashedV1 &tx_to_add)
 {
-    if (ledger_context.get() != nullptr)
-        ledger_context->add_transaction_sp_squashed_v1(tx_to_add);
+    if (!ledger_context || ledger_context.use_count() == 0)
+        return false;
+
+    return ledger_context->try_add_transaction_sp_squashed_v1(tx_to_add);
 }
 
 } //namespace sp

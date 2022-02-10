@@ -78,40 +78,6 @@ struct SpEnote final
     }
 
     /**
-    * brief: make_base_with_onetime_address - make a Seraphis ENote from a pre-made onetime address
-    * param: onetime_address -
-    * param: amount_blinding_factor -
-    * param: amount -
-    */
-    void make_base_with_onetime_address(const rct::key &onetime_address,
-        const crypto::secret_key &amount_blinding_factor,
-        const rct::xmr_amount amount);
-
-    /**
-    * brief: make_base_with_address_extension - make a Seraphis ENote by extending an existing address
-    * param: extension_privkey -
-    * param: initial_address -
-    * param: amount_blinding_factor -
-    * param: amount -
-    */
-    void make_base_with_address_extension(const crypto::secret_key &extension_privkey,
-        const rct::key &initial_address,
-        const crypto::secret_key &amount_blinding_factor,
-        const rct::xmr_amount amount);
-
-    /**
-    * brief: make_base_with_privkeys - make a Seraphis ENote when all secrets are known
-    * param: enote_view_privkey -
-    * param: spendbase_privkey -
-    * param: amount_blinding_factor -
-    * param: amount -
-    */
-    void make_base_with_privkeys(const crypto::secret_key &enote_view_privkey,
-        const crypto::secret_key &spendbase_privkey,
-        const crypto::secret_key &amount_blinding_factor,
-        const rct::xmr_amount amount);
-
-    /**
     * brief: gen_base - generate a Seraphis ENote (all random)
     */
     void gen();
@@ -166,7 +132,7 @@ struct SpInputProposal final
     /// t_c
     crypto::secret_key m_commitment_mask;
 
-    /// less-than operator for sorting
+    /// less-than operator for sorting (VERY SLOW: USE WITH CAUTION)
     bool operator<(const SpInputProposal &other_proposal) const;
 
     /**
@@ -176,16 +142,16 @@ struct SpInputProposal final
     void get_key_image(crypto::key_image &key_image_out) const;
 
     /**
-    * brief: get_enote_base - get the enote this input proposal represents
+    * brief: get_enote_core - get the enote this input proposal represents
     * outparam: enote_out -
     */
-    void get_enote_base(SpEnote &enote_out) const;
+    void get_enote_core(SpEnote &enote_out) const;
 
     /**
-    * brief: get_enote_image_squashed_base - get this input's enote image in the squashed enote model
+    * brief: get_enote_image_squashed_core - get this input's enote image in the squashed enote model
     * outparam: image_out -
     */
-    void get_enote_image_squashed_base(SpEnoteImage &image_out) const;
+    void get_enote_image_squashed_core(SpEnoteImage &image_out) const;
 
     /**
     * brief: gen - generate random enote keys
@@ -214,10 +180,10 @@ struct SpOutputProposal final
     }
 
     /**
-    * brief: get_enote_base - get the enote this input proposal represents
+    * brief: get_enote_core - get the enote this input proposal represents
     * outparam: enote_out -
     */
-    void get_enote_base(SpEnote &enote_out) const;
+    void get_enote_core(SpEnote &enote_out) const;
 
     /**
     * brief: gen - generate a random proposal

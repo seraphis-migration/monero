@@ -113,5 +113,28 @@ bool test_jamtis_nominal_spend_key(const rct::key &wallet_spend_pubkey,
     return nominal_spend_key == address_spendkey;
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &address_privkey,
+    const crypto::secret_key &address_extension,
+    crypto::key_image &key_image_out)
+{
+    // KI = (k_m/(k_vb + k^j_a + H_n(q))) U
+
+    // k_b U = k_m U = K_s - k_vb X
+    rct::key master_pubkey{wallet_spend_pubkey};  //K_s
+    crypto::secret_key minus_k_vb{k_view_balance};
+    sc_mul(&minus_k_vb, sp::MINUS_ONE.bytes, &minus_k_vb);  //-k_vb
+    extend_seraphis_spendkey(minus_k_vb, master_pubkey);  // (-k_vb) X + K_s = k_m U
+
+    // k_a_recipient = k_vb + k^j_a
+    crypto::secret_key k_a_recipient;
+    sc_add(&k_a_recipient, &k_view_balance, &address_privkey);  //k_vb + k^j_a
+
+    // k_a_sender = H_n(q)
+    // KI = (1/(k_a_sender + k_a_recipient))*k_b*U
+    make_seraphis_key_image_from_parts(address_extension, k_a_recipient, master_pubkey, key_image_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis
 } //namespace sp
