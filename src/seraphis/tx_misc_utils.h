@@ -48,6 +48,7 @@ namespace sp
 {
 
 /// use operator< to get operator==
+/// WARNING: use with caution, since equality is not always implied by operator< semantics depending on implementation
 ///TODO: really want the spaceship operator instead (C++20)...
 struct equals_from_less final
 {
