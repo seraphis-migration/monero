@@ -69,7 +69,7 @@ address_tag_t cipher_address_index(const rct::key &cipher_key,
 
 /// blowfish_decrypt[k](addr_tag) -> {j, addr_tag_MAC}
 address_index_t decipher_address_index_with_context(const BLOWFISH_CTX &blowfish_context,
-    const address_tag_t addr_tag,
+    address_tag_t addr_tag,
     address_tag_MAC_t &mac_out);
 address_index_t decipher_address_index(const rct::key &cipher_key,
     const address_tag_t addr_tag,

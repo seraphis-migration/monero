@@ -58,12 +58,13 @@ using encrypted_address_tag_secret_t = encrypted_address_tag_t;
 static_assert(sizeof(encrypted_address_tag_secret_t) == sizeof(address_tag_t), "");
 
 /// helper for encrypting/decrypting with the Blowfish block cipher
-struct Blowfish_LR
+struct Blowfish_LR_wrapper
 {
-    std::uint32_t L;
-    std::uint32_t R;
+    unsigned char *bytes_ref;
+
+    std::uint32_t* L_addr() { return reinterpret_cast<std::uint32_t*>(bytes_ref); }
+    std::uint32_t* R_addr() { return reinterpret_cast<std::uint32_t*>(bytes_ref + 4); }
 };
-static_assert(sizeof(Blowfish_LR) == sizeof(address_tag_t), "");
 
 //-------------------------------------------------------------------------------------------------------------------
 // j_canonical = little_endian(j)
@@ -131,15 +132,12 @@ address_tag_t cipher_address_index_with_context(const BLOWFISH_CTX &blowfish_con
     // concatenate index and MAC
     address_tag_t addr_tag{address_index_to_tag(j, mac)};
 
-    // paste the concatenated packet into a Blowfish-compatible format
-    Blowfish_LR addr_tag_formatted;
-    memcpy(&addr_tag_formatted, addr_tag.bytes, sizeof(address_tag_t));
+    // wrap the concatenated packet into a Blowfish-compatible format
+    static_assert(sizeof(address_tag_t) == 8, "");
+    Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
 
     // encrypt the packet
-    Blowfish_Encrypt(&blowfish_context, &(addr_tag_formatted.L), &(addr_tag_formatted.R));
-
-    // paste back into the address tag
-    memcpy(addr_tag.bytes, &addr_tag_formatted, sizeof(address_tag_t));
+    Blowfish_Encrypt(&blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
 
     return addr_tag;
 }
@@ -157,22 +155,18 @@ address_tag_t cipher_address_index(const rct::key &cipher_key,
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_index_t decipher_address_index_with_context(const BLOWFISH_CTX &blowfish_context,
-    const address_tag_t addr_tag,
+    address_tag_t addr_tag,
     address_tag_MAC_t &mac_out)
 {
-    // paste the tag into a Blowfish-compatible format
-    Blowfish_LR addr_tag_formatted;
-    memcpy(&addr_tag_formatted, addr_tag.bytes, sizeof(address_tag_t));
+    // wrap the tag into a Blowfish-compatible format
+    static_assert(sizeof(address_tag_t) == 8, "");
+    Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
 
     // decrypt the tag
-    Blowfish_Decrypt(&blowfish_context, &(addr_tag_formatted.L), &(addr_tag_formatted.R));
-
-    // paste back into an address tag
-    address_tag_t addr_tag_decrypted;
-    memcpy(addr_tag_decrypted.bytes, &addr_tag_formatted, sizeof(address_tag_t));
+    Blowfish_Decrypt(&blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
 
     // convert to {j, MAC}
-    return address_tag_to_index(addr_tag_decrypted, mac_out);
+    return address_tag_to_index(addr_tag, mac_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_index_t decipher_address_index(const rct::key &cipher_key,
