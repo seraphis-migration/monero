@@ -175,7 +175,7 @@ void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     tx_out.m_supplement = std::move(tx_supplement);
     tx_out.m_tx_semantic_rules_version = semantic_rules_version;
 
-    CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(tx_out), "Failed to assemble a SpTxSquashedV1.");
+    CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(tx_out), "Failed to assemble an SpTxSquashedV1.");
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
@@ -194,6 +194,21 @@ void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
             semantic_rules_version,
             tx_out
         );
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
+    std::vector<SpMembershipProofAlignableV1> alignable_membership_proofs,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    SpTxSquashedV1 &tx_out)
+{
+    // line up the the membership proofs with the partial tx's input images (which are sorted)
+    std::vector<SpMembershipProofV1> tx_membership_proofs;
+    align_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images,
+        std::move(alignable_membership_proofs),
+        tx_membership_proofs);
+
+    // finish tx
+    make_seraphis_tx_squashed_v1(std::move(partial_tx), std::move(tx_membership_proofs), semantic_rules_version, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
@@ -222,21 +237,18 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, partial_inputs);
 
     // membership proofs (input proposals are assumed to line up with membership ref sets)
-    std::vector<SpMembershipProofAlignableV1> tx_membership_proofs_sortable;
-    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, tx_membership_proofs_sortable);
+    std::vector<SpMembershipProofAlignableV1> alignable_membership_proofs;
+    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, alignable_membership_proofs);
 
     // partial tx
     SpTxPartialV1 partial_tx;
     make_v1_tx_partial_v1(tx_proposal, std::move(partial_inputs), version_string, partial_tx);
 
-    // line up the the membership proofs with the partial tx's input images (which are sorted)
-    std::vector<SpMembershipProofV1> tx_membership_proofs;
-    align_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images,
-        std::move(tx_membership_proofs_sortable),
-        tx_membership_proofs);
-
     // finish tx
-    make_seraphis_tx_squashed_v1(std::move(partial_tx), std::move(tx_membership_proofs), semantic_rules_version, tx_out);
+    make_seraphis_tx_squashed_v1(std::move(partial_tx),
+        std::move(alignable_membership_proofs),
+        semantic_rules_version,
+        tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>

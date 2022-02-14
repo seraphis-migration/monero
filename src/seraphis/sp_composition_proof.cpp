@@ -67,7 +67,14 @@ struct multisig_binonce_factors
     /// overload operator< for sorting: compare nonce_1 then nonce_2
     bool operator<(const multisig_binonce_factors &other) const
     {
-        return memcmp(this, &other, sizeof(multisig_binonce_factors)) < 0;
+        int nonce_1_comparison{memcmp(nonce_1.bytes, &other.nonce_1.bytes, sizeof(rct::key))};
+    
+        if (nonce_1_comparison < 0)
+            return true;
+        else if (nonce_1_comparison == 0 && memcmp(nonce_2.bytes, &other.nonce_2.bytes, sizeof(rct::key)) < 0)
+            return true;
+        else
+            return false;
     }
     bool operator==(const multisig_binonce_factors &other) const { return equals_from_less{}(*this, other); }
 };
