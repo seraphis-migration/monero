@@ -155,6 +155,7 @@ struct SpTxProposalV1 final
     /// output amounts and blinding factors (for future balance proofs)
     std::vector<rct::xmr_amount> m_output_amounts;
     std::vector<crypto::secret_key> m_output_amount_commitment_blinding_factors;
+    ///TODO: fee? (maybe keep it separate since proposal prefix is independent of fee)
 
     /// message to be signed by input spend proofs
     rct::key get_proposal_prefix(const std::string &version_string) const;
@@ -211,6 +212,7 @@ struct SpTxPartialV1 final
     std::vector<SpImageProofV1> m_image_proofs;
     /// supplemental data for tx
     SpTxSupplementV1 m_tx_supplement;
+    ///TODO: fee
 
     /// input enotes
     std::vector<SpEnote> m_input_enotes;

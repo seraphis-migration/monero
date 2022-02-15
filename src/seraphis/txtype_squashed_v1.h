@@ -66,7 +66,7 @@ struct SpTxSquashedV1 final
         ONE = 1
     };
 
-    /// tx input images  (spent e-notes)
+    /// tx input images (spent e-notes)
     std::vector<SpEnoteImageV1> m_input_images;
     /// tx outputs (new e-notes)
     std::vector<SpEnoteV1> m_outputs;
