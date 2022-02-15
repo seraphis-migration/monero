@@ -119,6 +119,36 @@ int main(int argc, char** argv)
   timer.start();
 
 
+  // grootle tests
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 3, 2, 1, 1, 2);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 1, 1, 2);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 1, 1, 16);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 4, 2, 2, 1, 2);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 5, 2, 2, 1, 2);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 3);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 2);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 16);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 6, 2, 2, 1, 32);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 7, 2, 2, 1, 2);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 2, 8, 2, 2, 1, 2);
+
+  TEST_PERFORMANCE6(filter, p, test_grootle, 3, 3, 2, 2, 1, 2);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 3, 4, 2, 2, 1, 2);
+  TEST_PERFORMANCE6(filter, p, test_grootle, 3, 5, 2, 2, 1, 2);
+
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 3, 2, 1, 1);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 6, 2, 1, 1);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 4, 2, 2, 1);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 5, 2, 2, 1);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 6, 2, 2, 1);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 7, 2, 2, 1);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 8, 2, 2, 1);
+
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 3, 3, 2, 2, 1);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 3, 4, 2, 2, 1);
+  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 3, 5, 2, 2, 1);
+
+
 
   // test hash performance for view tags
   ParamsShuttleViewHash p_view_hash;

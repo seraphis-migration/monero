@@ -462,7 +462,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     CHECK_AND_ASSERT_THROW_MES(m > 1, "Must have m > 1!");
     CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "Size parameters are too large!");
 
-    CHECK_AND_ASSERT_THROW_MES(small_weighting_size >= 3, "Small weight variable size too small!");  //heuristic
+    CHECK_AND_ASSERT_THROW_MES(small_weighting_size >= 1, "Small weight variable size too small!");  //heuristic
 
     // anonymity set size
     const std::size_t N = std::pow(n, m);
