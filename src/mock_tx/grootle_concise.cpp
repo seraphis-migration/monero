@@ -578,7 +578,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
     /// setup 'data': for aggregate multi-exponentiation computation across all proofs
 
-    // per-index storage (WIP):
+    // per-index storage:
     // 0                                  G                             (zA*G, z*G)
     // 1                  2*m*n           alternate(Hi_A[i], Hi_B[i])   {f, f*(xi - f)}
     //    <per-proof, start at 2*m*n + 1>

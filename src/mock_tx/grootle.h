@@ -75,15 +75,14 @@ constexpr std::size_t GROOTLE_MAX_MN{128};
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////
-// Grootle proof
-// TODO: A/B optimization
+// Grootle proof (using A/B optimization from MatRiCT)
 ///
 struct GrootleProof
 {
-    rct::key A, B, C, D;
+    rct::key A, B;
     rct::keyM f;
     rct::keyM X;
-    rct::key zA, zC;
+    rct::key zA;
     rct::keyV z;
 };
 
@@ -152,7 +151,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
 * return: true/false on verification result
 */
 bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
-    const rct::keyM &M,
+    const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
     const std::size_t m,
