@@ -116,6 +116,23 @@ struct MockMembershipProofSpV1 final
 };
 
 ////
+// MockMembershipProofSpV2 - Membership Proof V2
+// - Plain Grootle
+///
+struct MockMembershipProofSpV2 final
+{
+    /// a plain grootle proof
+    sp::GrootleProof m_grootle_proof;
+    /// ledger indices of enotes referenced by the proof
+    std::vector<std::size_t> m_ledger_enote_indices;
+    /// no consensus rules in mockup, store decomp 'ref set size = n^m' explicitly (TODO: move to consensus rule)
+    std::size_t m_ref_set_decomp_n;
+    std::size_t m_ref_set_decomp_m;
+
+    std::size_t get_size_bytes() const;
+};
+
+////
 // MockImageProofSpV1 - ENote Image Proof V1: ownership and unspentness (legitimacy of key image)
 // - Seraphis composition proof
 ///

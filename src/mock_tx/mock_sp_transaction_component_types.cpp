@@ -142,6 +142,23 @@ std::size_t MockMembershipProofSpV1::get_size_bytes() const
     return 32 * num_elements;
 }
 //-------------------------------------------------------------------------------------------------------------------
+std::size_t MockMembershipProofSpV2::get_size_bytes() const
+{
+    std::size_t num_elements{0};
+
+    if (m_grootle_proof.X.size() > 0)
+        num_elements += m_grootle_proof.X.size() * m_grootle_proof.X[0].size();  // X
+
+    if (m_grootle_proof.f.size() > 0)
+        num_elements += m_grootle_proof.f.size() * m_grootle_proof.f[0].size();  // f
+
+    num_elements += 3;  // A, B, zA
+
+    num_elements += m_grootle_proof.z.size();  // z
+
+    return 32 * num_elements;
+}
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t MockImageProofSpV1::get_size_bytes() const
 {
     return 32 * (3 + m_composition_proof.r_i.size() + m_composition_proof.K_t1.size());

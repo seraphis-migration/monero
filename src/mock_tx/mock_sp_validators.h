@@ -121,6 +121,8 @@ bool validate_mock_tx_sp_semantics_component_counts_v3(const std::size_t num_inp
 * return: true/false on validation result
 */
 bool validate_mock_tx_sp_semantics_ref_set_size_v1(const std::vector<MockMembershipProofSpV1> &membership_proofs);
+//todo
+bool validate_mock_tx_sp_semantics_ref_set_size_v2(const std::vector<MockMembershipProofSpV2> &membership_proofs);
 /**
 * brief: validate_mock_tx_sp_semantics_input_images_v1 - check key images are well-formed
 *   - key images are in the prime-order EC subgroup: l*KI == identity
@@ -138,6 +140,9 @@ bool validate_mock_tx_sp_semantics_input_images_v1(const std::vector<MockENoteIm
 * return: true/false on validation result
 */
 bool validate_mock_tx_sp_semantics_sorting_v1(const std::vector<MockMembershipProofSpV1> &membership_proofs,
+    const std::vector<MockENoteImageSpV1> &input_images);
+//todo
+bool validate_mock_tx_sp_semantics_sorting_v2(const std::vector<MockMembershipProofSpV2> &membership_proofs,
     const std::vector<MockENoteImageSpV1> &input_images);
 /**
 * brief: validate_mock_tx_sp_linking_tags_v1 - check tx does not double spend
@@ -220,6 +225,10 @@ bool validate_mock_tx_sp_membership_proofs_v1(const std::vector<const MockMember
 * return: true/false on validation result
 */
 bool validate_mock_tx_sp_membership_proofs_v2(const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
+    const std::vector<const MockENoteImageSpV1*> &input_images,
+    const std::shared_ptr<const LedgerContext> ledger_context);
+//todo
+bool validate_mock_tx_sp_membership_proofs_v3(const std::vector<const MockMembershipProofSpV2*> &membership_proofs,
     const std::vector<const MockENoteImageSpV1*> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context);
 /**

@@ -46,6 +46,7 @@ namespace mock_tx
     struct MockENoteSpV1;
     class MockTxSpConciseV1;
     class MockTxSpMergeV1;
+    class MockTxSpPlainV1;
     class MockTxSpSquashedV1;
 }
 
@@ -89,10 +90,15 @@ public:
     */
     virtual void add_transaction_sp_concise_v1(const MockTxSpConciseV1 &tx_to_add) = 0;
     /**
-    * brief: add_transaction_sp_merge_v1 - add a MockTxSpSquashedV1 transaction to the ledger
+    * brief: add_transaction_sp_merge_v1 - add a MockTxSpMergeV1 transaction to the ledger
     * param: tx_to_add -
     */
     virtual void add_transaction_sp_merge_v1(const MockTxSpMergeV1 &tx_to_add) = 0;
+    /**
+    * brief: add_transaction_sp_plain_v1 - add a MockTxSpPlainV1 transaction to the ledger
+    * param: tx_to_add -
+    */
+    virtual void add_transaction_sp_plain_v1(const MockTxSpPlainV1 &tx_to_add) = 0;
     /**
     * brief: add_transaction_sp_squashed_v1 - add a MockTxSpSquashedV1 transaction to the ledger
     * param: tx_to_add -
@@ -118,6 +124,14 @@ inline void add_tx_to_ledger<MockTxSpMergeV1>(const std::shared_ptr<LedgerContex
 {
     if (ledger_context.get() != nullptr)
         ledger_context->add_transaction_sp_merge_v1(tx_to_add);
+}
+
+template<>
+inline void add_tx_to_ledger<MockTxSpPlainV1>(const std::shared_ptr<LedgerContext> &ledger_context,
+    const MockTxSpPlainV1 &tx_to_add)
+{
+    if (ledger_context.get() != nullptr)
+        ledger_context->add_transaction_sp_plain_v1(tx_to_add);
 }
 
 template<>

@@ -376,6 +376,34 @@ void sort_v1_tx_membership_proofs_sp_v1(const std::vector<MockENoteImageSpV1> &i
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void sort_v2_tx_membership_proofs_sp_v1(const std::vector<MockENoteImageSpV1> &input_images,
+    std::vector<MockMembershipProofSortableSpV2> &tx_membership_proofs_sortable_in,
+    std::vector<MockMembershipProofSpV2> &tx_membership_proofs_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(tx_membership_proofs_sortable_in.size() == input_images.size(),
+        "Mismatch between sortable membership proof count and partial tx input image count.");
+
+    tx_membership_proofs_out.clear();
+    tx_membership_proofs_out.reserve(tx_membership_proofs_sortable_in.size());
+
+    for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
+    {
+        // find the membership proof that matches with the input image at this index
+        auto ordered_membership_proof = 
+            std::find_if(tx_membership_proofs_sortable_in.begin(), tx_membership_proofs_sortable_in.end(),
+                    [&](const MockMembershipProofSortableSpV2 &sortable_proof) -> bool
+                    {
+                        return input_images[input_index].m_masked_address == sortable_proof.m_masked_address;
+                    }
+                );
+
+        CHECK_AND_ASSERT_THROW_MES(ordered_membership_proof != tx_membership_proofs_sortable_in.end(),
+            "Could not find input image to match with a sortable membership proof.");
+
+        tx_membership_proofs_out.emplace_back(std::move(ordered_membership_proof->m_membership_proof));
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<MockInputProposalSpV1> &input_proposals,
     const std::vector<crypto::secret_key> &image_address_masks,
@@ -1000,6 +1028,88 @@ void make_v1_tx_membership_proof_sp_v2(const MockMembershipReferenceSetSpV1 &mem
         message);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_v2_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
+    const crypto::secret_key &image_address_mask,
+    const crypto::secret_key &image_amount_mask,
+    MockMembershipProofSortableSpV2 &tx_membership_proof_out)
+{
+    // make the membership proof
+    make_v2_tx_membership_proof_sp_v1(membership_ref_set,
+        image_address_mask,
+        image_amount_mask,
+        tx_membership_proof_out.m_membership_proof);
+
+    // save the masked address for later matching the membership proof with its input image
+    sp::mask_key(image_address_mask,
+        membership_ref_set.m_referenced_enotes[membership_ref_set.m_real_spend_index_in_set].m_onetime_address,
+        tx_membership_proof_out.m_masked_address);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v2_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
+    const crypto::secret_key &image_address_mask,
+    const crypto::secret_key &image_amount_mask,
+    MockMembershipProofSpV2 &tx_membership_proof_out)
+{
+    /// initial checks
+    std::size_t ref_set_size{
+            ref_set_size_from_decomp(membership_ref_set.m_ref_set_decomp_n, membership_ref_set.m_ref_set_decomp_m)
+        };
+
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_set.m_referenced_enotes.size() == ref_set_size,
+        "Ref set size doesn't match number of referenced enotes");
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_set.m_ledger_enote_indices.size() == ref_set_size,
+        "Ref set size doesn't match number of referenced enotes' ledger indices");
+
+
+    /// miscellaneous components
+    tx_membership_proof_out.m_ledger_enote_indices = membership_ref_set.m_ledger_enote_indices;
+    tx_membership_proof_out.m_ref_set_decomp_n = membership_ref_set.m_ref_set_decomp_n;
+    tx_membership_proof_out.m_ref_set_decomp_m = membership_ref_set.m_ref_set_decomp_m;
+
+
+    /// prepare to make proof
+
+    // public keys referenced by proof
+    rct::keyM referenced_enotes;
+    referenced_enotes.resize(ref_set_size, rct::keyV(2));
+
+    for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
+    {
+        referenced_enotes[ref_index][0] = membership_ref_set.m_referenced_enotes[ref_index].m_onetime_address;
+        referenced_enotes[ref_index][1] = membership_ref_set.m_referenced_enotes[ref_index].m_amount_commitment;
+    }
+
+    // proof offsets
+    rct::keyV image_offsets;
+    image_offsets.resize(2);
+
+    // K'
+    sp::mask_key(image_address_mask, referenced_enotes[membership_ref_set.m_real_spend_index_in_set][0], image_offsets[0]);
+    // C'
+    sp::mask_key(image_amount_mask, referenced_enotes[membership_ref_set.m_real_spend_index_in_set][1], image_offsets[1]);
+
+    // secret key of (K[l] - K') and (C[l] - C')
+    std::vector<crypto::secret_key> image_masks;
+    image_masks.reserve(2);
+    image_masks.emplace_back(image_address_mask);  // t_k
+    image_masks.emplace_back(image_amount_mask);  // t_c
+    sc_mul(&(image_masks[0]), &(image_masks[0]), sp::MINUS_ONE.bytes);  // -t_k
+    sc_mul(&(image_masks[1]), &(image_masks[1]), sp::MINUS_ONE.bytes);  // -t_k
+
+    // proof message
+    rct::key message{get_tx_membership_proof_message_sp_v1(membership_ref_set.m_ledger_enote_indices)};
+
+
+    /// make concise grootle proof
+    tx_membership_proof_out.m_grootle_proof = sp::grootle_prove(referenced_enotes,
+        membership_ref_set.m_real_spend_index_in_set,
+        image_offsets,
+        image_masks,
+        membership_ref_set.m_ref_set_decomp_n,
+        membership_ref_set.m_ref_set_decomp_m,
+        message);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
@@ -1079,6 +1189,28 @@ void make_v1_tx_membership_proofs_sp_v2(const std::vector<MockMembershipReferenc
         make_v1_tx_membership_proof_sp_v2(membership_ref_sets[input_index],
             image_address_masks[input_index],
             image_amount_masks[input_index],
+            tx_membership_proofs_out[input_index]);
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v2_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
+    const std::vector<MockTxPartialInputSpV1> &partial_inputs,
+    std::vector<MockMembershipProofSortableSpV2> &tx_membership_proofs_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_inputs.size(), "Input components size mismatch");
+
+    tx_membership_proofs_out.resize(membership_ref_sets.size());
+
+    for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
+    {
+        CHECK_AND_ASSERT_THROW_MES(membership_ref_sets[input_index].
+                m_referenced_enotes[membership_ref_sets[input_index].m_real_spend_index_in_set].m_onetime_address ==
+            partial_inputs[input_index].m_input_enote.m_onetime_address, 
+            "Membership ref set real spend doesn't match partial input's enote.");
+
+        make_v2_tx_membership_proof_sp_v1(membership_ref_sets[input_index],
+            partial_inputs[input_index].m_image_address_mask,
+            partial_inputs[input_index].m_image_amount_mask,
             tx_membership_proofs_out[input_index]);
     }
 }

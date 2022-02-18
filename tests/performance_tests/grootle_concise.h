@@ -46,7 +46,7 @@ template<std::size_t a_n,
 class test_concise_grootle
 {
     public:
-        static const std::size_t loop_count = 1000;
+        static const std::size_t loop_count = (250/a_n)/num_proofsV;
         static const std::size_t n = a_n;
         static const std::size_t m = a_m;
         static const std::size_t N_proofs = num_proofsV;

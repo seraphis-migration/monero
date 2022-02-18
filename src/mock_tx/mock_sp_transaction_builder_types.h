@@ -115,6 +115,17 @@ struct MockMembershipProofSortableSpV1 final
 };
 
 ////
+// MockMembershipProofSortableSpV2 - Sortable Membership Proof V2
+///
+struct MockMembershipProofSortableSpV2 final
+{
+    /// masked address used in the membership proof (for matching with actual input image)
+    rct::key m_masked_address;
+    /// the membership proof
+    MockMembershipProofSpV2 m_membership_proof;
+};
+
+////
 // MockTxProposalSpV1: set of destinations (and miscellaneous memos), and a balance proof
 // - in this version, balance proofs are independent of inputs (the balance proof itself is implicit, only range proofs
 //   require storage), so a tx's balance proof can be stored in the tx proposal

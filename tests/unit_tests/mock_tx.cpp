@@ -33,6 +33,7 @@
 #include "mock_tx/mock_rct_triptych.h"
 #include "mock_tx/mock_sp_txtype_concise_v1.h"
 #include "mock_tx/mock_sp_txtype_merge_v1.h"
+#include "mock_tx/mock_sp_txtype_plain_v1.h"
 #include "mock_tx/mock_sp_txtype_squashed_v1.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -589,6 +590,21 @@ TEST(mock_tx_batching, seraphis_merge)
 {
     run_mock_tx_test_batch<mock_tx::MockTxSpMergeV1>(get_mock_tx_gen_data_batching());
     run_mock_tx_test_batch<mock_tx::MockTxSpMergeV1>(get_mock_tx_gen_data_batch_splitting());
+}
+
+/////////////////////////////////////////////////////////////////////
+////////////////////////// Seraphis Plain ///////////////////////////
+/////////////////////////////////////////////////////////////////////
+
+TEST(mock_tx, seraphis_plain)
+{
+    run_mock_tx_test<mock_tx::MockTxSpPlainV1>(get_mock_tx_gen_data_misc(true));
+}
+
+TEST(mock_tx_batching, seraphis_plain)
+{
+    run_mock_tx_test_batch<mock_tx::MockTxSpPlainV1>(get_mock_tx_gen_data_batching());
+    run_mock_tx_test_batch<mock_tx::MockTxSpPlainV1>(get_mock_tx_gen_data_batch_splitting());
 }
 
 /////////////////////////////////////////////////////////////////////

@@ -108,6 +108,10 @@ void sort_tx_inputs_sp_v2(std::vector<MockENoteImageSpV1> &input_images_inout,
 void sort_v1_tx_membership_proofs_sp_v1(const std::vector<MockENoteImageSpV1> &input_images,
     std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_sortable_in,
     std::vector<MockMembershipProofSpV1> &tx_membership_proofs_out);
+//todo
+void sort_v2_tx_membership_proofs_sp_v1(const std::vector<MockENoteImageSpV1> &input_images,
+    std::vector<MockMembershipProofSortableSpV2> &tx_membership_proofs_sortable_in,
+    std::vector<MockMembershipProofSpV2> &tx_membership_proofs_out);
 /**
 * brief: prepare_input_commitment_factors_for_balance_proof_v1 - collect input amounts and input image amount
 *   commitment blinding factors
@@ -373,6 +377,15 @@ void make_v1_tx_membership_proof_sp_v2(const MockMembershipReferenceSetSpV1 &mem
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
     MockMembershipProofSpV1 &tx_membership_proof_out);
+//todo
+void make_v2_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
+    const crypto::secret_key &image_address_mask,
+    const crypto::secret_key &image_amount_mask,
+    MockMembershipProofSortableSpV2 &tx_membership_proof_out);
+void make_v2_tx_membership_proof_sp_v1(const MockMembershipReferenceSetSpV1 &membership_ref_set,
+    const crypto::secret_key &image_address_mask,
+    const crypto::secret_key &image_amount_mask,
+    MockMembershipProofSpV2 &tx_membership_proof_out);
 /**
 * brief: make_v1_tx_membership_proofs_sp_v1 - make v1 membership proofs (concise grootle: 1 per input)
 * param: membership_ref_sets -
@@ -402,6 +415,10 @@ void make_v1_tx_membership_proofs_sp_v2(const std::vector<MockMembershipReferenc
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
     std::vector<MockMembershipProofSortableSpV1> &tx_membership_proofs_out);
+//todo
+void make_v2_tx_membership_proofs_sp_v1(const std::vector<MockMembershipReferenceSetSpV1> &membership_ref_sets,
+    const std::vector<MockTxPartialInputSpV1> &partial_inputs,
+    std::vector<MockMembershipProofSortableSpV2> &tx_membership_proofs_out);
 /**
 * brief: make_v1_tx_partial_inputs_sp_v1 - make a full set of v1 partial inputs
 * param: input_proposals -

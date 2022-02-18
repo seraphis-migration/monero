@@ -305,6 +305,34 @@ bool validate_mock_tx_sp_semantics_ref_set_size_v1(const std::vector<MockMembers
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool validate_mock_tx_sp_semantics_ref_set_size_v2(const std::vector<MockMembershipProofSpV2> &membership_proofs)
+{
+    // sanity check
+    if (membership_proofs.size() == 0)
+        return false;
+
+    // TODO: validate ref set decomp equals a versioned config setting
+    std::size_t ref_set_decomp_n{membership_proofs[0].m_ref_set_decomp_n};
+    std::size_t ref_set_decomp_m{membership_proofs[0].m_ref_set_decomp_m};
+
+    for (const auto &proof : membership_proofs)
+    {
+        // proof ref set decomposition (n^m) should match number of referenced enotes
+        std::size_t ref_set_size{ref_set_size_from_decomp(proof.m_ref_set_decomp_n, proof.m_ref_set_decomp_m)};
+
+        if (ref_set_size != proof.m_ledger_enote_indices.size())
+            return false;
+
+        // all proofs should have same ref set decomp (and implicitly: same ref set size)
+        if (proof.m_ref_set_decomp_n != ref_set_decomp_n)
+            return false;
+        if (proof.m_ref_set_decomp_m != ref_set_decomp_m)
+            return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool validate_mock_tx_sp_semantics_input_images_v1(const std::vector<MockENoteImageSpV1> &input_images)
 {
     for (const auto &image : input_images)
@@ -326,6 +354,34 @@ bool validate_mock_tx_sp_semantics_input_images_v1(const std::vector<MockENoteIm
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_mock_tx_sp_semantics_sorting_v1(const std::vector<MockMembershipProofSpV1> &membership_proofs,
+    const std::vector<MockENoteImageSpV1> &input_images)
+{
+    // membership proof referenced enote indices should be sorted (ascending)
+    // note: duplicate references are allowed
+    for (const auto &proof : membership_proofs)
+    {
+        for (std::size_t reference_index{1}; reference_index < proof.m_ledger_enote_indices.size(); ++ reference_index)
+        {
+            if (proof.m_ledger_enote_indices[reference_index - 1] > proof.m_ledger_enote_indices[reference_index])
+                return false;
+        }
+    }
+
+    // input images should be sorted by key image with byte-wise comparisons (ascending)
+    for (std::size_t input_index{1}; input_index < input_images.size(); ++input_index)
+    {
+        if (memcmp(&(input_images[input_index - 1].m_key_image),
+                    &(input_images[input_index].m_key_image),
+                    sizeof(crypto::key_image)) > 0)
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool validate_mock_tx_sp_semantics_sorting_v2(const std::vector<MockMembershipProofSpV2> &membership_proofs,
     const std::vector<MockENoteImageSpV1> &input_images)
 {
     // membership proof referenced enote indices should be sorted (ascending)
@@ -593,6 +649,62 @@ bool validate_mock_tx_sp_membership_proofs_v2(const std::vector<const MockMember
         membership_proofs[0]->m_ref_set_decomp_n,
         membership_proofs[0]->m_ref_set_decomp_m,
         messages))
+    {
+        return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool validate_mock_tx_sp_membership_proofs_v3(const std::vector<const MockMembershipProofSpV2*> &membership_proofs,
+    const std::vector<const MockENoteImageSpV1*> &input_images,
+    const std::shared_ptr<const LedgerContext> ledger_context)
+{
+    std::size_t num_proofs{membership_proofs.size()};
+
+    // sanity check
+    if (num_proofs != input_images.size() ||
+        num_proofs == 0)
+        return false;
+
+    // batch-validate proofs
+    std::vector<const sp::GrootleProof*> proofs;
+    std::vector<rct::keyM> membership_proof_keys;
+    rct::keyM offsets;
+    rct::keyV messages;
+    proofs.reserve(num_proofs);
+    membership_proof_keys.resize(num_proofs);
+    offsets.resize(num_proofs);
+    messages.reserve(num_proofs);
+
+    for (std::size_t proof_index{0}; proof_index < num_proofs; ++proof_index)
+    {
+        // sanity check
+        if (!membership_proofs[proof_index] ||
+            !input_images[proof_index])
+            return false;
+
+        proofs.push_back(&(membership_proofs[proof_index]->m_grootle_proof));
+
+        // get proof keys from enotes stored in the ledger
+        ledger_context->get_reference_set_components_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices,
+            membership_proof_keys[proof_index]);
+
+        // offsets (input image masked keys)
+        offsets[proof_index] = {{input_images[proof_index]->m_masked_address, input_images[proof_index]->m_masked_commitment}};
+
+        // proof message
+        messages.push_back(get_tx_membership_proof_message_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
+    }
+
+    // batch verify
+    if (!sp::grootle_verify(proofs,
+        membership_proof_keys,
+        offsets,
+        membership_proofs[0]->m_ref_set_decomp_n,
+        membership_proofs[0]->m_ref_set_decomp_m,
+        messages,
+        2))
     {
         return false;
     }

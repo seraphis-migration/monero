@@ -53,6 +53,7 @@ namespace mock_tx
     struct MockENoteSpV1;
     class MockTxSpConciseV1;
     class MockTxSpMergeV1;
+    class MockTxSpPlainV1;
     class MockTxSpSquashedV1;
 }
 
@@ -100,6 +101,11 @@ public:
     * param: tx_to_add -
     */
     void add_transaction_sp_merge_v1(const MockTxSpMergeV1 &tx_to_add) override;
+    /**
+    * brief: add_transaction_sp_plain_v1 - add a MockTxSpPlainV1 transaction to the ledger
+    * param: tx_to_add -
+    */
+    void add_transaction_sp_plain_v1(const MockTxSpPlainV1 &tx_to_add) override;
     /**
     * brief: add_transaction_sp_squashed_v1 - add a MockTxSpSquashedV1 transaction to the ledger
     * param: tx_to_add -

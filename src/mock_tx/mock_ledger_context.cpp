@@ -38,6 +38,7 @@
 #include "mock_sp_transaction_component_types.h"
 #include "mock_sp_txtype_concise_v1.h"
 #include "mock_sp_txtype_merge_v1.h"
+#include "mock_sp_txtype_plain_v1.h"
 #include "mock_sp_txtype_squashed_v1.h"
 #include "ringct/rctTypes.h"
 
@@ -133,6 +134,21 @@ void MockLedgerContext::add_transaction_sp_concise_v1(const MockTxSpConciseV1 &t
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::add_transaction_sp_merge_v1(const MockTxSpMergeV1 &tx_to_add)
+{
+    std::lock_guard<std::mutex> lock{m_ledger_mutex};
+
+    // add linking tags
+    for (const auto &input_image : tx_to_add.m_input_images)
+        this->add_linking_tag_sp_v1_impl(input_image.m_key_image);
+
+    // add new enotes
+    for (const auto &output_enote : tx_to_add.m_outputs)
+        this->add_enote_sp_v1_impl(output_enote);
+
+    // note: for mock ledger, don't store the whole tx
+}
+//-------------------------------------------------------------------------------------------------------------------
+void MockLedgerContext::add_transaction_sp_plain_v1(const MockTxSpPlainV1 &tx_to_add)
 {
     std::lock_guard<std::mutex> lock{m_ledger_mutex};
 
