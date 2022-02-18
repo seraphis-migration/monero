@@ -46,15 +46,14 @@ extern "C"
 #include "seraphis_crypto_utils.h"
 
 //third party headers
-#include <boost/thread/lock_guard.hpp>
-#include <boost/thread/mutex.hpp>
 
 //standard headers
 #include <cmath>
+#include <mutex>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
-#define MONERO_DEFAULT_LOG_CATEGORY "grootle"
+#define MONERO_DEFAULT_LOG_CATEGORY "concise_grootle"
 
 namespace sp
 {
@@ -62,7 +61,8 @@ namespace sp
 /// File-scope data
 
 // generators
-static ge_p3 Hi_p3[GROOTLE_MAX_MN];
+static ge_p3 Hi_A_p3[GROOTLE_MAX_MN];
+//static ge_p3 Hi_B_p3[GROOTLE_MAX_MN];
 static ge_p3 G_p3;
 
 // Useful scalar and group constants
@@ -73,8 +73,8 @@ static const rct::key TWO = { {0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} };
 
 // misc
-static std::shared_ptr<rct::pippenger_cached_data> cache;
-static boost::mutex init_mutex;
+static std::shared_ptr<rct::pippenger_cached_data> generator_cache;
+static std::mutex init_mutex;
 
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -82,24 +82,114 @@ static boost::mutex init_mutex;
 //-------------------------------------------------------------------------------------------------------------------
 static void init_gens()
 {
-    boost::lock_guard<boost::mutex> lock(init_mutex);
+    std::lock_guard<std::mutex> lock(init_mutex);
 
     static bool init_done = false;
     if (init_done) return;
 
-    // get Hi generators
+    // Build Hi generators
+    // H_i = keccak_to_pt("grootle Hi", i)
+    const std::string Hi_A_salt(config::HASH_KEY_GROOTLE_Hi);
     for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
     {
-        Hi_p3[i] = get_grootle_Hi_p3_gen(i);
+        std::string hash = Hi_A_salt + tools::get_varint_data(i);
+        hash_to_p3(Hi_A_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
     }
 
-    // pippinger cache of Hi
-    cache = get_grootle_Hi_pippinger_cache_init();
+    //const std::string Hi_B_salt(config::HASH_KEY_GROOTLE_Hi_B);
+    for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
+    {
+//        std::string hash = Hi_B_salt + tools::get_varint_data(i);
+//        hash_to_p3(Hi_B_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
+    }
 
     // get G
     G_p3 = get_G_p3_gen();
 
     init_done = true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+// Initialize cache for fixed generators: Hi_A, Hi_B, G
+//TODO: A/B optimization
+// - The cache pre-converts ge_p3 points to ge_cached, for the first N terms in a pippinger multiexponentiation.
+// - When doing the multiexp, you specify how many of those N terms are actually used (i.e. 'cache_size').
+// - Here: alternate Hi_A, Hi_B to allow variable m*n (the number of Hi_A gens used always equals number of Hi_B gens used).
+// cached: G, Hi_A[0], Hi_B[0], Hi_A[1], Hi_B[1], ..., Hi_A[GROOTLE_MAX_MN], Hi_B[GROOTLE_MAX_MN]
+//-------------------------------------------------------------------------------------------------------------------
+static std::shared_ptr<rct::pippenger_cached_data> get_pippinger_cache_init()
+{
+    init_gens();
+
+    std::vector<rct::MultiexpData> data;
+    data.reserve(1 + 2*GROOTLE_MAX_MN);
+
+    // G
+    //data.push_back({ZERO, G_p3});
+
+    // alternate Hi_A, Hi_B
+    for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
+    {
+        data.push_back({ZERO, Hi_A_p3[i]});
+        //data.push_back({ZERO, Hi_B_p3[i]});
+    }
+    //CHECK_AND_ASSERT_THROW_MES(data.size() == 1 + 2*GROOTLE_MAX_MN, "Bad generator vector size!");
+
+    // initialize multiexponentiation cache
+    return rct::pippenger_init_cache(data, 0, 0);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void init_static()
+{
+    init_gens();
+
+    // pippinger cache of stable generators
+    generator_cache = get_pippinger_cache_init();
+}
+//-------------------------------------------------------------------------------------------------------------------
+// commit to 2 matrices of equal size (TODO)
+// C = x G + {M_A}->Hi_A + {M_B}->Hi_B
+// - mapping strategy: concatenate each 'row', e.g. {{1,2}, {3,4}} -> {1,2,3,4}; there are 'm' rows each of size 'n'
+//-------------------------------------------------------------------------------------------------------------------
+static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
+    const rct::keyM &M_priv_A,  //matrix A
+    //const rct::keyM &M_priv_B,  //matrix B
+    std::vector<rct::MultiexpData> &data_out)
+{
+    const std::size_t m = M_priv_A.size();
+    CHECK_AND_ASSERT_THROW_MES(m > 0, "Bad matrix size!");
+    //CHECK_AND_ASSERT_THROW_MES(m == M_priv_B.size(), "Matrix size mismatch!");
+    const std::size_t n = M_priv_A[0].size();
+    //CHECK_AND_ASSERT_THROW_MES(n == M_priv_B[0].size(), "Matrix size mismatch!");
+    CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "Bad matrix commitment parameters!");
+
+    //data_out.resize(1 + 2*m*n);
+    data_out.resize(1 + m*n);
+    std::size_t offset;
+
+    // mask: x G
+    offset = 0;
+    data_out[offset + 0] = {x, G_p3};
+
+    // map M_A onto Hi_A
+    offset += 1;
+    for (std::size_t j = 0; j < m; ++j)
+    {
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            data_out[offset + j*n + i] = {M_priv_A[j][i], Hi_A_p3[j*n + i]};
+        }
+    }
+return;
+    // map M_B onto Hi_B
+    offset += m*n;
+    for (std::size_t j = 0; j < m; ++j)
+    {
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            //data_out[offset + j*n + i] = {M_priv_B[j][i], Hi_B_p3[j*n + i]};
+        }
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Initialize transcript
@@ -207,7 +297,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     }
 
     // statically initialize Grootle proof generators
-    init_gens();
+    init_static();
 
 
     /// Grootle proof
@@ -216,7 +306,6 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
 
     /// Decomposition sub-proof commitments: A, B, C, D
     std::vector<rct::MultiexpData> data;
-    data.resize(m*n + 1);
 
     // Matrix masks
     rct::key rA = rct::skGen();
@@ -237,7 +326,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
             sc_sub(a[j][0].bytes, a[j][0].bytes, a[j][i].bytes);
         }
     }
-    com_matrix(a, rA, data);
+    grootle_matrix_commitment(rA, a, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.A = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.A == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -257,7 +346,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
             sigma[j][i] = kronecker_delta(decomp_l[j], i);
         }
     }
-    com_matrix(sigma, rB, data);
+    grootle_matrix_commitment(rB, sigma, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.B = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.B == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -275,7 +364,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
             sc_mul(a_sigma[j][i].bytes, a_sigma[j][i].bytes, a[j][i].bytes);
         }
     }
-    com_matrix(a_sigma, rC, data);
+    grootle_matrix_commitment(rC, a_sigma, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.C = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.C == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -290,7 +379,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
             sc_mul(a_sq[j][i].bytes, MINUS_ONE.bytes, a_sq[j][i].bytes);
         }
     }
-    com_matrix(a_sq, rD, data);
+    grootle_matrix_commitment(rD, a_sq, data);
     CHECK_AND_ASSERT_THROW_MES(data.size() == m*n + 1, "Matrix commitment returned unexpected size!");
     proof.D = rct::straus(data);
     CHECK_AND_ASSERT_THROW_MES(!(proof.D == IDENTITY), "Linear combination unexpectedly returned zero!");
@@ -517,7 +606,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
         }
     }
 
-    init_gens();
+    init_static();
     rct::key temp;  //common variable shuttle so only one needs to be allocated
 
 
@@ -535,7 +624,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     // prep terms: {Hi}, G
     for (std::size_t i = 0; i < m*n; ++i)
     {
-        data[i] = {ZERO, Hi_p3[i]};
+        data[i] = {ZERO, Hi_A_p3[i]};
     }
     data[m*n] = {ZERO, G_p3};
 
@@ -816,7 +905,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 
 
     /// Verify all elements sum to zero
-    ge_p3 result = rct::pippenger_p3(data, cache, m*n, rct::get_pippenger_c(data.size()));
+    ge_p3 result = rct::pippenger_p3(data, generator_cache, m*n, rct::get_pippenger_c(data.size()));
     if (ge_p3_is_point_at_infinity_vartime(&result) == 0)
     {
         MERROR("Grootle proof: verification failed!");

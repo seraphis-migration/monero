@@ -142,7 +142,6 @@ public:
 
     //get_tx_byte_blob()
 
-private:
     /// validate pieces of the tx
     bool validate_tx_semantics() const override;
     bool validate_tx_linking_tags(const std::shared_ptr<const LedgerContext> ledger_context) const override;

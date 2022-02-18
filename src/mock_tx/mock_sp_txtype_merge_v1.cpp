@@ -184,12 +184,24 @@ bool MockTxSpMergeV1::validate_tx_amount_balance(const bool defer_batchable) con
 bool MockTxSpMergeV1::validate_tx_input_proofs(const std::shared_ptr<const LedgerContext> ledger_context,
     const bool defer_batchable) const
 {
-    // membership proofs
-    if (!validate_mock_tx_sp_membership_proofs_v1(m_membership_proofs,
-        m_input_images,
-        ledger_context))
+    // membership proofs (can be deferred for batching)
+    if (!defer_batchable)
     {
-        return false;
+        std::vector<const MockMembershipProofSpV1*> membership_proof_ptrs;
+        std::vector<const MockENoteImageSpV1*> input_image_ptrs;
+        membership_proof_ptrs.reserve(m_membership_proofs.size());
+        input_image_ptrs.reserve(m_input_images.size());
+
+        for (const auto &membership_proof : m_membership_proofs)
+            membership_proof_ptrs.push_back(&membership_proof);
+
+        for (const auto &input_image : m_input_images)
+            input_image_ptrs.push_back(&input_image);
+
+        if (!validate_mock_tx_sp_membership_proofs_v1(membership_proof_ptrs, input_image_ptrs, ledger_context))
+        {
+            return false;
+        }
     }
 
     // ownership proof (and proof that key images are well-formed)
@@ -286,30 +298,48 @@ template <>
 bool validate_mock_txs<MockTxSpMergeV1>(const std::vector<std::shared_ptr<MockTxSpMergeV1>> &txs_to_validate,
     const std::shared_ptr<const LedgerContext> ledger_context)
 {
-    std::vector<const rct::BulletproofPlus*> range_proofs;
-    range_proofs.reserve(txs_to_validate.size()*10);
+    std::vector<const MockMembershipProofSpV1*> membership_proof_ptrs;
+    std::vector<const MockENoteImageSpV1*> input_image_ptrs;
+    std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
+    membership_proof_ptrs.reserve(txs_to_validate.size()*20);  //heuristic... (most tx have 1-2 inputs)
+    input_image_ptrs.reserve(txs_to_validate.size()*20);
+    range_proof_ptrs.reserve(txs_to_validate.size());
 
+    // prepare for batch-verification
     for (const auto &tx : txs_to_validate)
     {
-        if (tx.get() == nullptr)
+        if (!tx)
             return false;
 
         // validate unbatchable parts of tx
         if (!tx->validate(ledger_context, true))
             return false;
 
+        // gather membership proof pieces
+        for (const auto &membership_proof : tx->m_membership_proofs)
+            membership_proof_ptrs.push_back(&membership_proof);
+
+        for (const auto &input_image : tx->m_input_images)
+            input_image_ptrs.push_back(&(input_image));
+
         // gather range proofs
-        const std::shared_ptr<const MockBalanceProofSpV2> balance_proof{tx->get_balance_proof()};
+        const std::shared_ptr<const MockBalanceProofSpV2> balance_proof{tx->m_balance_proof};
 
         if (balance_proof.get() == nullptr)
             return false;
 
         for (const auto &range_proof : balance_proof->m_bpp_proofs)
-            range_proofs.push_back(&range_proof);
+            range_proof_ptrs.push_back(&range_proof);
+    }
+
+    // batch verify membership proofs
+    if (!validate_mock_tx_sp_membership_proofs_v1(membership_proof_ptrs, input_image_ptrs, ledger_context))
+    {
+        return false;
     }
 
     // batch verify range proofs
-    if (!rct::bulletproof_plus_VERIFY(range_proofs))
+    if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
         return false;
 
     return true;

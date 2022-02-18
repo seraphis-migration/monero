@@ -137,7 +137,7 @@ std::size_t MockMembershipProofSpV1::get_size_bytes() const
     if (m_concise_grootle_proof.f.size() > 0)
         num_elements += num_elements * m_concise_grootle_proof.f[0].size();  // f
 
-    num_elements += 7;  // A, B, C, D, zA, zC, z
+    num_elements += 4;  // A, B, zA, z
 
     return 32 * num_elements;
 }

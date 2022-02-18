@@ -207,8 +207,8 @@ bool validate_mock_tx_sp_amount_balance_v3(const std::vector<MockENoteImageSpV1>
 * param: ledger_context -
 * return: true/false on validation result
 */
-bool validate_mock_tx_sp_membership_proofs_v1(const std::vector<MockMembershipProofSpV1> &membership_proofs,
-    const std::vector<MockENoteImageSpV1> &input_images,
+bool validate_mock_tx_sp_membership_proofs_v1(const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
+    const std::vector<const MockENoteImageSpV1*> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context);
 /**
 * brief: validate_mock_tx_sp_membership_proofs_v2 - check that tx inputs exist in the ledger
@@ -219,8 +219,8 @@ bool validate_mock_tx_sp_membership_proofs_v1(const std::vector<MockMembershipPr
 * param: ledger_context -
 * return: true/false on validation result
 */
-bool validate_mock_tx_sp_membership_proofs_v2(const std::vector<MockMembershipProofSpV1> &membership_proofs,
-    const std::vector<MockENoteImageSpV1> &input_images,
+bool validate_mock_tx_sp_membership_proofs_v2(const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
+    const std::vector<const MockENoteImageSpV1*> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context);
 /**
 * brief: validate_mock_tx_sp_composition_proofs_v1 - check that spending tx inputs is authorized by their owners,

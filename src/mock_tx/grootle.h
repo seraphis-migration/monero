@@ -29,24 +29,24 @@
 // NOT FOR PRODUCTION
 
 ////
-// Grootle proof: Groth/Bootle parallel one-of-many proof of commitments
+// Grootle proof: Groth/Bootle parallel one-of-many proof of commitments with a concise construction
 // - given a set of equal-sized tuples of EC points S
 // - given a same-sized tuple of EC points (offsets) O
 // - prove DL knowledge with respect to G of the commitment to zero tuple {S_pi - O} for an index \pi
 //   in the set that is unknown to verifiers
+// - uses 'aggregation coefficients', a size reduction technique used in CLSAG/Triptych/Lelantus-Spark-CP-proofs
+// - allows proof batching (around (2*n*m)/(n^m + 2*n*m) amortization speedup possible)
+//   - limitations: assumes each proof uses a different reference set (proofs with the same ref set could be MUCH
+//     faster), can only batch proofs with the same decomposition (n^m) and number of parallel commitments (tuple size)
 //
 // note: to prove DL of a point in S with respect to G directly, set its offset equal to the identity element I
-//
-// - variant 1 (large, fast): grootle         (uses fast verification technique from Lelantus-Spark)
-// - variant 2 (small, slow): concise grootle (uses 'aggregation coefficients' size reduction technique from Triptych)
-//
-// note: variant 1 = variant 2 if S-tuples have only 1 key
 //
 // References:
 // - One-out-of-Many Proofs: Or How to Leak a Secret and Spend a Coin (Groth): https://eprint.iacr.org/2014/764
 // - Short Accountable Ring Signatures Based on DDH (Bootle): https://eprint.iacr.org/2015/643
 // - Triptych (Sarang Noether): https://eprint.iacr.org/2020/018
 // - Lelantus-Spark (Aram Jivanyan, Aaron Feickert [Sarang Noether]): https://eprint.iacr.org/2021/1173
+// - MatRiCT (Esgin et. al): https://eprint.iacr.org/2019/1287.pdf (section 1.3 for A/B optimization)
 ///
 
 
@@ -76,6 +76,7 @@ constexpr std::size_t GROOTLE_MAX_MN{128};
 
 ////
 // Grootle proof
+// TODO: A/B optimization
 ///
 struct GrootleProof
 {
@@ -87,14 +88,14 @@ struct GrootleProof
 };
 
 ////
-// concise Grootle proof (using the aggregation coefficients described in Triptych)
+// concise Grootle proof (using the aggregation coefficients described in Triptych, A/B optimization from MatRiCT)
 ///
 struct ConciseGrootleProof
 {
-    rct::key A, B, C, D;
+    rct::key A, B;
     rct::keyM f;
     rct::keyV X;
-    rct::key zA, zC, z;
+    rct::key zA, z;
 };
 
 
@@ -138,13 +139,6 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
     const std::size_t n,
     const std::size_t m,
     const rct::key &message);
-ConciseGrootleProof concise_grootle_prove_fake(const rct::keyM &M,
-    const std::size_t l,
-    const rct::keyV &C_offsets,
-    const std::vector<crypto::secret_key> &privkeys,
-    const std::size_t n,
-    const std::size_t m,
-    const rct::key &message);
 /**
 * brief: grootle_verify - verify a batch of grootle proofs that share a reference set
 * param: proofs - batch of proofs to verify
@@ -165,9 +159,9 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const rct::keyV &messages,
     const std::size_t small_weighting_size);
 /**
-* brief: concise_grootle_verify - verify a batch of concise grootle proofs that share a reference set
+* brief: concise_grootle_verify - verify a batch of concise grootle proofs
 * param: proofs - batch of proofs to verify
-* param: M - (shared) [vec<tuple of commitments>]
+* param: M - (per-proof) vec<[vec<tuple of commitments>]>
 * param: proof_offsets - (per-proof) offsets for commitments to zero at unknown indices in each proof
 * param: n - decomp input set: n^m
 * param: m - ...
@@ -175,13 +169,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 * return: true/false on verification result
 */
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
-    const rct::keyM &M,
-    const rct::keyM &proof_offsets,
-    const std::size_t n,
-    const std::size_t m,
-    const rct::keyV &messages);
-bool concise_grootle_verify_fake(const std::vector<const ConciseGrootleProof*> &proofs,
-    const rct::keyM &M,
+    const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
     const std::size_t m,

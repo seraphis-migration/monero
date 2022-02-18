@@ -68,7 +68,6 @@ namespace sp
 /// File-scope data
 
 // generators
-static ge_p3 grootle_Hi_p3[GROOTLE_MAX_MN];
 static ge_p3 G_p3;
 static ge_p3 H_p3;
 static ge_p3 U_p3;
@@ -106,15 +105,6 @@ static void init_sp_gens()
     static bool init_done = false;
     if (init_done) return;
 
-    // Build Hi generators
-    // H_i = keccak_to_pt("grootle Hi", i)
-    const std::string Hi_salt(config::HASH_KEY_GROOTLE_Hi);
-    for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
-    {
-        std::string hash = Hi_salt + tools::get_varint_data(i);
-        hash_to_p3(grootle_Hi_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
-    }
-
     // Build U
     // U = keccak_to_pt("seraphis U")
     const std::string U_salt(config::HASH_KEY_SERAPHIS_U);
@@ -134,13 +124,6 @@ static void init_sp_gens()
     ge_frombytes_vartime(&G_p3, rct::G.bytes);
 
     init_done = true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-ge_p3 get_grootle_Hi_p3_gen(const std::size_t i)
-{
-    init_sp_gens();
-
-    return grootle_Hi_p3[i];
 }
 //-------------------------------------------------------------------------------------------------------------------
 ge_p3 get_G_p3_gen()
@@ -183,22 +166,6 @@ rct::key get_X_gen()
     init_sp_gens();
 
     return X;
-}
-//-------------------------------------------------------------------------------------------------------------------
-std::shared_ptr<rct::pippenger_cached_data> get_grootle_Hi_pippinger_cache_init()
-{
-    init_sp_gens();
-
-    std::vector<rct::MultiexpData> data;
-    data.reserve(GROOTLE_MAX_MN);
-    for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
-    {
-        data.push_back({ZERO, grootle_Hi_p3[i]});
-    }
-    CHECK_AND_ASSERT_THROW_MES(data.size() == GROOTLE_MAX_MN, "Bad generator vector size!");
-
-    // initialize multiexponentiation cache
-    return rct::pippenger_init_cache(data, 0, 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key invert(const rct::key &x)
@@ -270,24 +237,6 @@ void decompose(const std::size_t val, const std::size_t base, const std::size_t 
         r_out[size - i - 1] = temp/slot;
         temp -= slot*r_out[size - i - 1];
     }
-}
-//-------------------------------------------------------------------------------------------------------------------
-void com_matrix(const rct::keyM &M_priv, const rct::key &x, std::vector<rct::MultiexpData> &data_out)
-{
-    const std::size_t m = M_priv.size();
-    CHECK_AND_ASSERT_THROW_MES(m > 0, "Bad matrix size!");
-    const std::size_t n = M_priv[0].size();
-    CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "Bad matrix commitment parameters!");
-    CHECK_AND_ASSERT_THROW_MES(data_out.size() == m*n + 1, "Bad matrix commitment result vector size!");
-
-    for (std::size_t j = 0; j < m; ++j)
-    {
-        for (std::size_t i = 0; i < n; ++i)
-        {
-            data_out[j*n + i] = {M_priv[j][i], grootle_Hi_p3[j*n + i]};
-        }
-    }
-    data_out[m*n] = {x, G_p3}; // mask
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key kronecker_delta(const std::size_t x, const std::size_t y)
