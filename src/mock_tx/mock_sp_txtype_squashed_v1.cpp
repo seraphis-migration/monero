@@ -346,7 +346,7 @@ bool validate_mock_txs<MockTxSpSquashedV1>(const std::vector<std::shared_ptr<Moc
     }
 
     // batch verify membership proofs
-    if (!validate_mock_tx_sp_membership_proofs_v1(membership_proof_ptrs, input_image_ptrs, ledger_context))
+    if (!validate_mock_tx_sp_membership_proofs_v2(membership_proof_ptrs, input_image_ptrs, ledger_context))
     {
         return false;
     }
