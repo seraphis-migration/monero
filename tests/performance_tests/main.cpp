@@ -497,7 +497,7 @@ int main(int argc, char** argv)
 
   // TEST 5.2: MockTxSpSquashedV1 {decomp}
   incrementer = {
-      {1, 25}, //batch sizes
+      {1}, //batch sizes
       {0}, //rangeproof splits
       {2}, //in counts
       {2}, //out counts
