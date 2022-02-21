@@ -348,9 +348,9 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 3.2: MockTxSpConciseV1 {decomp}
+  // TEST 3.2: MockTxSpConciseV1 {decomp, batch size 1 vs 25}
   incrementer = {
-      {1}, //batch sizes
+      {1, 25}, //batch sizes
       {0}, //rangeproof splits
       {2}, //in counts
       {2}, //out counts
@@ -477,9 +477,9 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.2: MockTxSpSquashedV1 {decomp}
+  // TEST 5.2: MockTxSpSquashedV1 {decomp, batch size 1 vs 25}
   incrementer = {
-      {1}, //batch sizes
+      {1, 25}, //batch sizes
       {0}, //rangeproof splits
       {2}, //in counts
       {2}, //out counts
