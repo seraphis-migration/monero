@@ -348,9 +348,9 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 3.2: MockTxSpConciseV1 {decomp, batch size 1 vs 25}
+  // TEST 3.2: MockTxSpConciseV1 {decomp}
   incrementer = {
-      {1, 25}, //batch sizes
+      {1}, //batch sizes
       {0}, //rangeproof splits
       {2}, //in counts
       {2}, //out counts
@@ -366,7 +366,25 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 3.3: MockTxSpConciseV1 {outputs, batch size 1}
+    // TEST 3.3: MockTxSpConciseV1 {decomp 2-series, batch 25}
+  incrementer = {
+      {25}, //batch sizes
+      {0}, //rangeproof splits
+      {2}, //in counts
+      {2}, //out counts
+      {2}, //decomp n
+      {12} //decomp m limits
+    };
+  while (incrementer.next(p_mock_tx))
+  {
+    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpConciseV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+  // TEST 3.4: MockTxSpConciseV1 {outputs, batch size 1}
   incrementer = {
       {1}, //batch sizes
       {0}, //rangeproof splits
@@ -388,7 +406,7 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 3.4: MockTxSpConciseV1 {16out, batch sizes 7,15}
+  // TEST 3.5: MockTxSpConciseV1 {16out, batch sizes 7,15}
   incrementer = {
       {7, 15}, //batch sizes
       {0}, //rangeproof splits
@@ -410,7 +428,7 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 3.5: MockTxSpConciseV1 {outputs, batch size 25}
+  // TEST 3.6: MockTxSpConciseV1 {outputs, batch size 25}
   incrementer = {
       {25}, //batch sizes
       {0}, //rangeproof splits
@@ -477,7 +495,7 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.2: MockTxSpSquashedV1 {decomp, batch size 1 vs 25}
+  // TEST 5.2: MockTxSpSquashedV1 {decomp}
   incrementer = {
       {1, 25}, //batch sizes
       {0}, //rangeproof splits
@@ -495,7 +513,25 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.3: MockTxSpSquashedV1 {outputs, batch size 1}
+    // TEST 5.3: MockTxSpSquashedV1 {decomp 2-series, batch size 25}
+  incrementer = {
+      {25}, //batch sizes
+      {0}, //rangeproof splits
+      {2}, //in counts
+      {2}, //out counts
+      {2}, //decomp n
+      {12} //decomp m limits
+    };
+  while (incrementer.next(p_mock_tx))
+  {
+    if (p_mock_tx.n >= 2 && p_mock_tx.m >= 2)
+      TEST_PERFORMANCE1(filter, p_mock_tx, test_mock_tx, mock_tx::MockTxSpSquashedV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+  // TEST 5.4: MockTxSpSquashedV1 {outputs, batch size 1}
   incrementer = {
       {1}, //batch sizes
       {0}, //rangeproof splits
@@ -518,7 +554,7 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.4: MockTxSpSquashedV1 {16in/out, batch sizes 7, 15}
+  // TEST 5.5: MockTxSpSquashedV1 {16in/out, batch sizes 7, 15}
   incrementer = {
       {7, 15}, //batch sizes
       {0}, //rangeproof splits
@@ -541,7 +577,7 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.5: MockTxSpSquashedV1 {outputs, batch size 25}
+  // TEST 5.6: MockTxSpSquashedV1 {outputs, batch size 25}
   incrementer = {
       {25}, //batch sizes
       {0}, //rangeproof splits
