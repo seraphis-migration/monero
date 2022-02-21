@@ -53,6 +53,7 @@
 #pragma once
 
 //local headers
+#include "ringct/multiexp.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -150,6 +151,13 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
 *   (combining elements across proofs for multiexp)
 * return: true/false on verification result
 */
+rct::pippinger_prep_data get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
+    const std::vector<rct::keyM> &M,
+    const rct::keyM &proof_offsets,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::keyV &messages,
+    const std::size_t small_weighting_size);
 bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
@@ -167,6 +175,12 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 * param: message - (per-proof) message to insert in Fiat-Shamir transform hash
 * return: true/false on verification result
 */
+rct::pippinger_prep_data get_concise_grootle_verification_data(const std::vector<const ConciseGrootleProof*> &proofs,
+    const std::vector<rct::keyM> &M,
+    const rct::keyM &proof_offsets,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::keyV &messages);
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
     const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,

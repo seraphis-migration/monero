@@ -128,13 +128,13 @@ static std::shared_ptr<rct::pippenger_cached_data> get_pippinger_cache_init()
     data.reserve(1 + 2*GROOTLE_MAX_MN);
 
     // G
-    data.push_back({ZERO, G_p3});
+    data.emplace_back(ZERO, G_p3);
 
     // alternate Hi_A, Hi_B
     for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
     {
-        data.push_back({ZERO, Hi_A_p3[i]});
-        data.push_back({ZERO, Hi_B_p3[i]});
+        data.emplace_back(ZERO, Hi_A_p3[i]);
+        data.emplace_back(ZERO, Hi_B_p3[i]);
     }
     CHECK_AND_ASSERT_THROW_MES(data.size() == 1 + 2*GROOTLE_MAX_MN, "Bad generator vector size!");
 
@@ -502,7 +502,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     return proof;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
+rct::pippinger_prep_data get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
     const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
@@ -721,10 +721,10 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
         // A: -w1    * A
         // B: -w1*xi * B
         sc_mul(temp.bytes, MINUS_ONE.bytes, w1.bytes);
-        data.push_back({temp, A_p3});  // -w1 * A
+        data.emplace_back(temp, A_p3);  // -w1 * A
 
         sc_mul(temp.bytes, temp.bytes, xi.bytes);
-        data.push_back({temp, B_p3});  // -w1*xi * B
+        data.emplace_back(temp, B_p3);  // -w1*xi * B
 
         // {M_agg}
         //   t_k = mul_all_j(f[j][decomp_k[j]])
@@ -765,8 +765,8 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
             sc_add(sum_t.bytes, sum_t.bytes, t_k.bytes);  // sum_k( t_k )
 
             // add the element
-            //data.push_back({temp, rct::straus_p3(Magg_data)});
-            data.push_back({temp, Key_agg_temp});  //w2*t_k*M_agg[k]
+            //data.emplace_back(temp, rct::straus_p3(Magg_data));
+            data.emplace_back(temp, Key_agg_temp);  //w2*t_k*M_agg[k]
         }
 
         // {C_offsets}
@@ -805,12 +805,12 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
             if (temp_sw.size() == 1)
             {
                 sc_mul(temp.bytes, temp.bytes, temp_sw[0].bytes);  //-sum_t*w2*sw[whatever it is]
-                data.push_back({temp, temp_offsets[0]});
+                data.emplace_back(temp, temp_offsets[0]);
             }
             else
             {
                 multi_exp_vartime_p3(temp_sw, temp_offsets, Key_agg_temp);
-                data.push_back({temp, Key_agg_temp});
+                data.emplace_back(temp, Key_agg_temp);
             }
         }
         else if (skippable_offsets > 0)
@@ -824,7 +824,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
             {
                 // X[alpha][j]: -w2_sw[alpha]*xi^j
                 sc_mul(temp.bytes, w2_sw[alpha].bytes, minus_xi_pow[j].bytes);
-                data.push_back({temp, X_p3[alpha][j]});
+                data.emplace_back(temp, X_p3[alpha][j]);
             }
         }
 
@@ -844,11 +844,27 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     CHECK_AND_ASSERT_THROW_MES(data.size() == max_size - skipped_offset_sets, "Final proof data is incorrect size!");
 
 
+    /// return multiexp data for caller to deal with
+    return rct::pippinger_prep_data{std::move(data), generator_cache, 1 + 2*m*n};
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
+    const std::vector<rct::keyM> &M,
+    const rct::keyM &proof_offsets,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::keyV &messages,
+    const std::size_t small_weighting_size)
+{
+    // build multiexp
+    std::vector<rct::pippinger_prep_data> prep_datas;
+    prep_datas.emplace_back(get_grootle_verification_data(proofs, M, proof_offsets, n, m, messages, small_weighting_size));
+
     /// Verify all elements sum to zero
-    ge_p3 result = rct::pippenger_p3(data, generator_cache, 1 + 2*m*n, rct::get_pippenger_c(data.size()));
+    ge_p3 result = rct::pippenger_p3(prep_datas);
     if (ge_p3_is_point_at_infinity_vartime(&result) == 0)
     {
-        MERROR("Grootle proof: verification failed!");
+        MERROR("Concise Grootle proof: verification failed!");
         return false;
     }
 
