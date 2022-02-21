@@ -817,7 +817,7 @@ try_again:
     };
 
     // Given a batch of range proofs, determine if they are all valid
-    bool bulletproof_plus_VERIFY(const std::vector<const BulletproofPlus*> &proofs)
+    pippenger_prep_data get_bulletproof_plus_verification_data(const std::vector<const BulletproofPlus*> &proofs)
     {
         init_exponents();
 
@@ -843,13 +843,13 @@ try_again:
             const BulletproofPlus &proof = *p;
 
             // Sanity checks
-            CHECK_AND_ASSERT_MES(is_reduced(proof.r1), false, "Input scalar not in range");
-            CHECK_AND_ASSERT_MES(is_reduced(proof.s1), false, "Input scalar not in range");
-            CHECK_AND_ASSERT_MES(is_reduced(proof.d1), false, "Input scalar not in range");
+            CHECK_AND_ASSERT_THROW_MES(is_reduced(proof.r1), "Input scalar not in range");
+            CHECK_AND_ASSERT_THROW_MES(is_reduced(proof.s1), "Input scalar not in range");
+            CHECK_AND_ASSERT_THROW_MES(is_reduced(proof.d1), "Input scalar not in range");
 
-            CHECK_AND_ASSERT_MES(proof.V.size() >= 1, false, "V does not have at least one element");
-            CHECK_AND_ASSERT_MES(proof.L.size() == proof.R.size(), false, "Mismatched L and R sizes");
-            CHECK_AND_ASSERT_MES(proof.L.size() > 0, false, "Empty proof");
+            CHECK_AND_ASSERT_THROW_MES(proof.V.size() >= 1, "V does not have at least one element");
+            CHECK_AND_ASSERT_THROW_MES(proof.L.size() == proof.R.size(), "Mismatched L and R sizes");
+            CHECK_AND_ASSERT_THROW_MES(proof.L.size() > 0, "Empty proof");
 
             max_length = std::max(max_length, proof.L.size());
             nV += proof.V.size();
@@ -860,30 +860,30 @@ try_again:
             rct::key transcript = copy(initial_transcript);
             transcript = transcript_update(transcript, rct::hash_to_scalar(proof.V));
             pd.y = transcript_update(transcript, proof.A);
-            CHECK_AND_ASSERT_MES(!(pd.y == rct::zero()), false, "y == 0");
+            CHECK_AND_ASSERT_THROW_MES(!(pd.y == rct::zero()), "y == 0");
             pd.z = transcript = rct::hash_to_scalar(pd.y);
-            CHECK_AND_ASSERT_MES(!(pd.z == rct::zero()), false, "z == 0");
+            CHECK_AND_ASSERT_THROW_MES(!(pd.z == rct::zero()), "z == 0");
 
             // Determine the number of inner-product rounds based on proof size
             size_t M;
             for (pd.logM = 0; (M = 1<<pd.logM) <= maxM && M < proof.V.size(); ++pd.logM);
-            CHECK_AND_ASSERT_MES(proof.L.size() == 6+pd.logM, false, "Proof is not the expected size");
+            CHECK_AND_ASSERT_THROW_MES(proof.L.size() == 6+pd.logM, "Proof is not the expected size");
             max_logM = std::max(pd.logM, max_logM);
 
             const size_t rounds = pd.logM+logN;
-            CHECK_AND_ASSERT_MES(rounds > 0, false, "Zero rounds");
+            CHECK_AND_ASSERT_THROW_MES(rounds > 0, "Zero rounds");
 
             // The inner-product challenges are computed per round
             pd.challenges.resize(rounds);
             for (size_t j = 0; j < rounds; ++j)
             {
                 pd.challenges[j] = transcript_update(transcript, proof.L[j], proof.R[j]);
-                CHECK_AND_ASSERT_MES(!(pd.challenges[j] == rct::zero()), false, "challenges[j] == 0");
+                CHECK_AND_ASSERT_THROW_MES(!(pd.challenges[j] == rct::zero()), "challenges[j] == 0");
             }
 
             // Final challenge
             pd.e = transcript_update(transcript,proof.A1,proof.B);
-            CHECK_AND_ASSERT_MES(!(pd.e == rct::zero()), false, "e == 0");
+            CHECK_AND_ASSERT_THROW_MES(!(pd.e == rct::zero()), "e == 0");
 
             // Batch scalar inversions
             pd.inv_offset = inv_offset;
@@ -893,7 +893,7 @@ try_again:
             inv_offset += rounds + 1;
             proof_data.push_back(pd);
         }
-        CHECK_AND_ASSERT_MES(max_length < 32, false, "At least one proof is too large");
+        CHECK_AND_ASSERT_THROW_MES(max_length < 32, "At least one proof is too large");
         size_t maxMN = 1u << max_length;
 
         rct::key temp;
@@ -934,7 +934,7 @@ try_again:
             const BulletproofPlus &proof = *p;
             const bp_plus_proof_data_t &pd = proof_data[proof_data_index++];
 
-            CHECK_AND_ASSERT_MES(proof.L.size() == 6+pd.logM, false, "Proof is not the expected size");
+            CHECK_AND_ASSERT_THROW_MES(proof.L.size() == 6+pd.logM, "Proof is not the expected size");
             const size_t M = 1 << pd.logM;
             const size_t MN = M*N;
 
@@ -1038,7 +1038,7 @@ try_again:
 
             // Compute the number of rounds for the inner-product argument
             const size_t rounds = pd.logM+logN;
-            CHECK_AND_ASSERT_MES(rounds > 0, false, "Zero rounds");
+            CHECK_AND_ASSERT_THROW_MES(rounds > 0, "Zero rounds");
 
             const rct::key *challenges_inv = &inverses[pd.inv_offset];
             const rct::key yinv = inverses[pd.inv_offset + rounds];
@@ -1114,7 +1114,18 @@ try_again:
             multiexp_data[i * 2] = {Gi_scalars[i], Gi_p3[i]};
             multiexp_data[i * 2 + 1] = {Hi_scalars[i], Hi_p3[i]};
         }
-        if (!(multiexp(multiexp_data, 2 * maxMN) == rct::identity()))
+
+        // return multiexp data for caller to deal with
+        return rct::pippenger_prep_data{std::move(multiexp_data), pippenger_HiGi_cache, 2 * maxMN};
+    }
+
+    bool bulletproof_plus_VERIFY(const std::vector<const BulletproofPlus*> &proofs)
+    {
+        // build multiexp
+        rct::pippenger_prep_data prep_data{get_bulletproof_plus_verification_data(proofs)};
+
+        // verify all elements sum to zero (use optimized multiexp function)
+        if (!(multiexp(prep_data.data, prep_data.cache_size) == rct::identity()))
         {
             MERROR("Verification failure");
             return false;

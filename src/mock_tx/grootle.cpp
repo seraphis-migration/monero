@@ -502,7 +502,7 @@ GrootleProof grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     return proof;
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::pippinger_prep_data get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
+rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
     const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
@@ -845,7 +845,7 @@ rct::pippinger_prep_data get_grootle_verification_data(const std::vector<const G
 
 
     /// return multiexp data for caller to deal with
-    return rct::pippinger_prep_data{std::move(data), generator_cache, 1 + 2*m*n};
+    return rct::pippenger_prep_data{std::move(data), generator_cache, 1 + 2*m*n};
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
@@ -857,7 +857,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const std::size_t small_weighting_size)
 {
     // build multiexp
-    std::vector<rct::pippinger_prep_data> prep_datas;
+    std::vector<rct::pippenger_prep_data> prep_datas;
     prep_datas.emplace_back(get_grootle_verification_data(proofs, M, proof_offsets, n, m, messages, small_weighting_size));
 
     /// Verify all elements sum to zero

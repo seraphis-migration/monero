@@ -511,7 +511,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     return proof;
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::pippinger_prep_data get_concise_grootle_verification_data(const std::vector<const ConciseGrootleProof*> &proofs,
+rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector<const ConciseGrootleProof*> &proofs,
     const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
@@ -781,7 +781,7 @@ rct::pippinger_prep_data get_concise_grootle_verification_data(const std::vector
 
 
     /// return multiexp data for caller to deal with
-    return rct::pippinger_prep_data{std::move(data), generator_cache, 1 + 2*m*n};
+    return rct::pippenger_prep_data{std::move(data), generator_cache, 1 + 2*m*n};
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
@@ -792,7 +792,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
     const rct::keyV &messages)
 {
     // build multiexp
-    std::vector<rct::pippinger_prep_data> prep_datas;
+    std::vector<rct::pippenger_prep_data> prep_datas;
     prep_datas.emplace_back(get_concise_grootle_verification_data(proofs, M, proof_offsets, n, m, messages));
 
     /// Verify all elements sum to zero

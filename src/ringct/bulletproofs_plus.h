@@ -36,10 +36,13 @@
 namespace rct
 {
 
+struct pippenger_prep_data;
+
 BulletproofPlus bulletproof_plus_PROVE(const rct::key &v, const rct::key &gamma);
 BulletproofPlus bulletproof_plus_PROVE(uint64_t v, const rct::key &gamma);
 BulletproofPlus bulletproof_plus_PROVE(const rct::keyV &v, const rct::keyV &gamma);
 BulletproofPlus bulletproof_plus_PROVE(const std::vector<uint64_t> &v, const rct::keyV &gamma);
+pippenger_prep_data get_bulletproof_plus_verification_data(const std::vector<const BulletproofPlus*> &proofs);
 bool bulletproof_plus_VERIFY(const BulletproofPlus &proof);
 bool bulletproof_plus_VERIFY(const std::vector<const BulletproofPlus*> &proofs);
 bool bulletproof_plus_VERIFY(const std::vector<BulletproofPlus> &proofs);

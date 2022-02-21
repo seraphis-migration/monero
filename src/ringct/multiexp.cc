@@ -608,7 +608,7 @@ size_t pippenger_get_cache_size(const std::shared_ptr<pippenger_cached_data> &ca
   return cache->size * sizeof(*cache->cached);
 }
 
-ge_p3 pippenger_p3(const std::vector<pippinger_prep_data> &prep_data, size_t c)
+ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data, size_t c)
 {
   // set c if undefined
   if (c == 0)
@@ -741,13 +741,13 @@ ge_p3 pippenger_p3(const std::vector<pippinger_prep_data> &prep_data, size_t c)
 
 ge_p3 pippenger_p3(std::vector<MultiexpData> data, const std::shared_ptr<pippenger_cached_data> &cache, const size_t cache_size, const size_t c)
 {
-  std::vector<pippinger_prep_data> prep_data;
+  std::vector<pippenger_prep_data> prep_data;
   prep_data.push_back({std::move(data), cache, cache_size});
 
   return pippenger_p3(prep_data, c);
 }
 
-ge_p3 pippenger_p3(const std::vector<pippinger_prep_data> &prep_data)
+ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data)
 {
   size_t total_data_size{0};
   for (const auto &prep : prep_data)
@@ -764,7 +764,7 @@ rct::key pippenger(std::vector<MultiexpData> data, const std::shared_ptr<pippeng
   return res;
 }
 
-rct::key pippenger(const std::vector<pippinger_prep_data> &prep_data)
+rct::key pippenger(const std::vector<pippenger_prep_data> &prep_data)
 {
   rct::key res;
   ge_p3 result_p3 = pippenger_p3(prep_data);

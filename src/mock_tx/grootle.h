@@ -53,7 +53,6 @@
 #pragma once
 
 //local headers
-#include "ringct/multiexp.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -62,6 +61,7 @@
 #include <vector>
 
 //forward declarations
+namespace rct { struct pippenger_prep_data; }
 
 
 namespace sp
@@ -151,7 +151,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
 *   (combining elements across proofs for multiexp)
 * return: true/false on verification result
 */
-rct::pippinger_prep_data get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
+rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
     const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
@@ -175,7 +175,7 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
 * param: message - (per-proof) message to insert in Fiat-Shamir transform hash
 * return: true/false on verification result
 */
-rct::pippinger_prep_data get_concise_grootle_verification_data(const std::vector<const ConciseGrootleProof*> &proofs,
+rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector<const ConciseGrootleProof*> &proofs,
     const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
