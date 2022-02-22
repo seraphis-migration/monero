@@ -58,9 +58,9 @@ struct pippenger_cached_data;
 
 struct pippenger_prep_data final
 {
-  const std::vector<MultiexpData> data;
-  const std::shared_ptr<pippenger_cached_data> cache;
-  const size_t cache_size;
+  std::vector<MultiexpData> data;
+  std::shared_ptr<pippenger_cached_data> cache;
+  size_t cache_size;
 };
 
 rct::key bos_coster_heap_conv(std::vector<MultiexpData> data);

@@ -43,6 +43,7 @@
 
 //forward declarations
 namespace mock_tx { class LedgerContext; }
+namespace rct { struct pippenger_prep_data; }
 
 
 namespace mock_tx
@@ -212,6 +213,11 @@ bool validate_mock_tx_sp_amount_balance_v3(const std::vector<MockENoteImageSpV1>
 * param: ledger_context -
 * return: true/false on validation result
 */
+bool try_get_mock_tx_sp_membership_proofs_v1_validation_data(
+    const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
+    const std::vector<const MockENoteImageSpV1*> &input_images,
+    const std::shared_ptr<const LedgerContext> ledger_context,
+    rct::pippenger_prep_data &prep_data_out);
 bool validate_mock_tx_sp_membership_proofs_v1(const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
     const std::vector<const MockENoteImageSpV1*> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context);
@@ -224,10 +230,20 @@ bool validate_mock_tx_sp_membership_proofs_v1(const std::vector<const MockMember
 * param: ledger_context -
 * return: true/false on validation result
 */
+bool try_get_mock_tx_sp_membership_proofs_v2_validation_data(
+    const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
+    const std::vector<const MockENoteImageSpV1*> &input_images,
+    const std::shared_ptr<const LedgerContext> ledger_context,
+    rct::pippenger_prep_data &prep_data_out);
 bool validate_mock_tx_sp_membership_proofs_v2(const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
     const std::vector<const MockENoteImageSpV1*> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context);
 //todo
+bool try_get_mock_tx_sp_membership_proofs_v3_validation_data(
+    const std::vector<const MockMembershipProofSpV2*> &membership_proofs,
+    const std::vector<const MockENoteImageSpV1*> &input_images,
+    const std::shared_ptr<const LedgerContext> ledger_context,
+    rct::pippenger_prep_data &prep_data_out);
 bool validate_mock_tx_sp_membership_proofs_v3(const std::vector<const MockMembershipProofSpV2*> &membership_proofs,
     const std::vector<const MockENoteImageSpV1*> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context);

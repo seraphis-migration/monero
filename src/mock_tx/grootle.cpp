@@ -856,15 +856,10 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const rct::keyV &messages,
     const std::size_t small_weighting_size)
 {
-    // build multiexp
-    std::vector<rct::pippenger_prep_data> prep_datas;
-    prep_datas.emplace_back(get_grootle_verification_data(proofs, M, proof_offsets, n, m, messages, small_weighting_size));
-
-    /// Verify all elements sum to zero
-    ge_p3 result = rct::pippenger_p3(prep_datas);
-    if (ge_p3_is_point_at_infinity_vartime(&result) == 0)
+    // build and verify multiexp
+    if (!check_pippenger_data(get_grootle_verification_data(proofs, M, proof_offsets, n, m, messages, small_weighting_size)))
     {
-        MERROR("Concise Grootle proof: verification failed!");
+        MERROR("Grootle proof: verification failed!");
         return false;
     }
 

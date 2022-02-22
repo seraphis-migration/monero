@@ -39,6 +39,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "grootle.h"
+#include "ringct/multiexp.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -203,5 +204,8 @@ void domain_separate_derivation_hash(const std::string &domain_separator,
 * result: true if input key is in prime order EC subgroup
 */
 bool key_domain_is_prime_subgroup(const rct::key &check_key);
+//todo
+bool check_pippenger_data(const std::vector<rct::pippenger_prep_data> &prep_datas);
+bool check_pippenger_data(rct::pippenger_prep_data prep_data);
 
 } //namespace sp

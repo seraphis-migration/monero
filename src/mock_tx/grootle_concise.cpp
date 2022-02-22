@@ -791,13 +791,8 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
     const std::size_t m,
     const rct::keyV &messages)
 {
-    // build multiexp
-    std::vector<rct::pippenger_prep_data> prep_datas;
-    prep_datas.emplace_back(get_concise_grootle_verification_data(proofs, M, proof_offsets, n, m, messages));
-
-    /// Verify all elements sum to zero
-    ge_p3 result = rct::pippenger_p3(prep_datas);
-    if (ge_p3_is_point_at_infinity_vartime(&result) == 0)
+    // build and verify multiexp
+    if (!check_pippenger_data(get_concise_grootle_verification_data(proofs, M, proof_offsets, n, m, messages)))
     {
         MERROR("Concise Grootle proof: verification failed!");
         return false;

@@ -39,6 +39,7 @@
 #include "mock_sp_transaction_utils.h"
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
+#include "ringct/multiexp.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_composition_proof.h"
@@ -544,9 +545,11 @@ bool validate_mock_tx_sp_amount_balance_v3(const std::vector<MockENoteImageSpV1>
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_mock_tx_sp_membership_proofs_v1(const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
+bool try_get_mock_tx_sp_membership_proofs_v1_validation_data(
+    const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
     const std::vector<const MockENoteImageSpV1*> &input_images,
-    const std::shared_ptr<const LedgerContext> ledger_context)
+    const std::shared_ptr<const LedgerContext> ledger_context,
+    rct::pippenger_prep_data &prep_data_out)
 {
     std::size_t num_proofs{membership_proofs.size()};
 
@@ -585,23 +588,32 @@ bool validate_mock_tx_sp_membership_proofs_v1(const std::vector<const MockMember
         messages.push_back(get_tx_membership_proof_message_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
     }
 
-    // batch verify
-    if (!sp::concise_grootle_verify(proofs,
+    // get verification data
+    prep_data_out = sp::get_concise_grootle_verification_data(proofs,
         membership_proof_keys,
         offsets,
         membership_proofs[0]->m_ref_set_decomp_n,
         membership_proofs[0]->m_ref_set_decomp_m,
-        messages))
-    {
-        return false;
-    }
+        messages);
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_mock_tx_sp_membership_proofs_v2(const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
+bool validate_mock_tx_sp_membership_proofs_v1(const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
     const std::vector<const MockENoteImageSpV1*> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context)
+{
+    rct::pippenger_prep_data prep_data;
+    if (!try_get_mock_tx_sp_membership_proofs_v1_validation_data(membership_proofs, input_images, ledger_context, prep_data))
+        return false;
+    return sp::check_pippenger_data(prep_data);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_get_mock_tx_sp_membership_proofs_v2_validation_data(
+    const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
+    const std::vector<const MockENoteImageSpV1*> &input_images,
+    const std::shared_ptr<const LedgerContext> ledger_context,
+    rct::pippenger_prep_data &prep_data_out)
 {
     std::size_t num_proofs{membership_proofs.size()};
 
@@ -642,23 +654,32 @@ bool validate_mock_tx_sp_membership_proofs_v2(const std::vector<const MockMember
         messages.push_back(get_tx_membership_proof_message_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
     }
 
-    // batch verify
-    if (!sp::concise_grootle_verify(proofs,
+    // get verification data
+    prep_data_out = sp::get_concise_grootle_verification_data(proofs,
         membership_proof_keys,
         offsets,
         membership_proofs[0]->m_ref_set_decomp_n,
         membership_proofs[0]->m_ref_set_decomp_m,
-        messages))
-    {
-        return false;
-    }
+        messages);
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_mock_tx_sp_membership_proofs_v3(const std::vector<const MockMembershipProofSpV2*> &membership_proofs,
+bool validate_mock_tx_sp_membership_proofs_v2(const std::vector<const MockMembershipProofSpV1*> &membership_proofs,
     const std::vector<const MockENoteImageSpV1*> &input_images,
     const std::shared_ptr<const LedgerContext> ledger_context)
+{
+    rct::pippenger_prep_data prep_data;
+    if (!try_get_mock_tx_sp_membership_proofs_v2_validation_data(membership_proofs, input_images, ledger_context, prep_data))
+        return false;
+    return sp::check_pippenger_data(prep_data);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_get_mock_tx_sp_membership_proofs_v3_validation_data(
+    const std::vector<const MockMembershipProofSpV2*> &membership_proofs,
+    const std::vector<const MockENoteImageSpV1*> &input_images,
+    const std::shared_ptr<const LedgerContext> ledger_context,
+    rct::pippenger_prep_data &prep_data_out)
 {
     std::size_t num_proofs{membership_proofs.size()};
 
@@ -697,19 +718,26 @@ bool validate_mock_tx_sp_membership_proofs_v3(const std::vector<const MockMember
         messages.push_back(get_tx_membership_proof_message_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
     }
 
-    // batch verify
-    if (!sp::grootle_verify(proofs,
+    // get verification data
+    prep_data_out = sp::get_grootle_verification_data(proofs,
         membership_proof_keys,
         offsets,
         membership_proofs[0]->m_ref_set_decomp_n,
         membership_proofs[0]->m_ref_set_decomp_m,
         messages,
-        2))
-    {
-        return false;
-    }
+        2);
 
     return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool validate_mock_tx_sp_membership_proofs_v3(const std::vector<const MockMembershipProofSpV2*> &membership_proofs,
+    const std::vector<const MockENoteImageSpV1*> &input_images,
+    const std::shared_ptr<const LedgerContext> ledger_context)
+{
+    rct::pippenger_prep_data prep_data;
+    if (!try_get_mock_tx_sp_membership_proofs_v3_validation_data(membership_proofs, input_images, ledger_context, prep_data))
+        return false;
+    return sp::check_pippenger_data(prep_data);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_mock_tx_sp_composition_proofs_v1(const std::vector<MockImageProofSpV1> &image_proofs,
