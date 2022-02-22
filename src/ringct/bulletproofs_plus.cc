@@ -796,7 +796,7 @@ try_again:
     };
 
     // Given a batch of range proofs, determine if they are all valid
-    bool bulletproof_plus_VERIFY(const std::vector<const BulletproofPlus*> &proofs)
+    bool try_get_bulletproof_plus_verification_data(const std::vector<const BulletproofPlus*> &proofs, pippenger_prep_data &prep_data_out)
     {
         init_exponents();
 
@@ -1094,7 +1094,22 @@ try_again:
             multiexp_data[i * 2] = {Gi_scalars[i], Gi_p3[i]};
             multiexp_data[i * 2 + 1] = {Hi_scalars[i], Hi_p3[i]};
         }
-        if (!(multiexp(multiexp_data, 2 * maxMN) == rct::identity()))
+
+        // return multiexp data for caller to deal with
+        prep_data_out = rct::pippenger_prep_data{std::move(multiexp_data), pippenger_HiGi_cache, 2 * maxMN};
+
+        return true;
+    }
+
+    bool bulletproof_plus_VERIFY(const std::vector<const BulletproofPlus*> &proofs)
+    {
+        // build multiexp
+        rct::pippenger_prep_data prep_data;
+        if (!try_get_bulletproof_plus_verification_data(proofs, prep_data))
+            return false;;
+
+        // verify all elements sum to zero (use optimized multiexp function)
+        if (!(multiexp(prep_data.data, prep_data.cache_size) == rct::identity()))
         {
             MERROR("Verification failure");
             return false;

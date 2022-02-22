@@ -61,6 +61,7 @@
 #include <vector>
 
 //forward declarations
+namespace rct { struct pippenger_prep_data; }
 
 
 namespace sp
@@ -118,6 +119,12 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
 * param: message - (per-proof) message to insert in Fiat-Shamir transform hash
 * return: true/false on verification result
 */
+rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector<const ConciseGrootleProof*> &proofs,
+    const std::vector<rct::keyM> &M,
+    const rct::keyM &proof_offsets,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::keyV &messages);
 bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
     const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,

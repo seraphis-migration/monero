@@ -123,13 +123,13 @@ static std::shared_ptr<rct::pippenger_cached_data> get_pippinger_cache_init()
     data.reserve(1 + 2*GROOTLE_MAX_MN);
 
     // G
-    data.push_back({ZERO, G_p3});
+    data.emplace_back(ZERO, G_p3);
 
     // alternate Hi_A, Hi_B
     for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
     {
-        data.push_back({ZERO, Hi_A_p3[i]});
-        data.push_back({ZERO, Hi_B_p3[i]});
+        data.emplace_back(ZERO, Hi_A_p3[i]);
+        data.emplace_back(ZERO, Hi_B_p3[i]);
     }
     CHECK_AND_ASSERT_THROW_MES(data.size() == 1 + 2*GROOTLE_MAX_MN, "Bad generator vector size!");
 
@@ -507,7 +507,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     return proof;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
+rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector<const ConciseGrootleProof*> &proofs,
     const std::vector<rct::keyM> &M,
     const rct::keyM &proof_offsets,
     const std::size_t n,
@@ -574,7 +574,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
 
     /// setup 'data': for aggregate multi-exponentiation computation across all proofs
 
-    // per-index storage (WIP):
+    // per-index storage:
     // 0                                  G                             (zA*G, z*G)
     // 1                  2*m*n           alternate(Hi_A[i], Hi_B[i])   {f, f*(xi - f)}
     //    <per-proof, start at 2*m*n + 1>
@@ -694,10 +694,10 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         // A: -w1    * A
         // B: -w1*xi * B
         sc_mul(temp.bytes, MINUS_ONE.bytes, w1.bytes);
-        data.push_back({temp, A_p3});  // -w1 * A
+        data.emplace_back(temp, A_p3);  // -w1 * A
 
         sc_mul(temp.bytes, temp.bytes, xi.bytes);
-        data.push_back({temp, B_p3});  // -w1*xi * B
+        data.emplace_back(temp, B_p3);  // -w1*xi * B
 
         // {{M}}
         //   t_k = mul_all_j(f[j][decomp_k[j]])
@@ -729,7 +729,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
             for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
                 sc_mul(temp.bytes, t_k.bytes, mu_pow[alpha].bytes);  // w2*t_k*mu^alpha
-                data.push_back({temp, proof_M[k][alpha]});
+                data.emplace_back(temp, proof_M[k][alpha]);
             }
         }
 
@@ -751,7 +751,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
             }
 
             sc_mul(shuttle.bytes, temp.bytes, mu_pow[alpha].bytes);  //-w2*sum_t*mu^alpha
-            data.push_back({shuttle, proof_offsets[proof_i][alpha]});
+            data.emplace_back(shuttle, proof_offsets[proof_i][alpha]);
         }
 
         // {X}
@@ -760,7 +760,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
         {
             // X[j]: -w2*xi^j
             sc_mul(temp.bytes, w2.bytes, minus_xi_pow[j].bytes);
-            data.push_back({temp, X_p3[j]});
+            data.emplace_back(temp, X_p3[j]);
         }
 
         // G
@@ -776,9 +776,19 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
     CHECK_AND_ASSERT_THROW_MES(data.size() == max_size - skipped_offsets, "Final proof data is incorrect size!");
 
 
-    /// Verify all elements sum to zero
-    ge_p3 result = rct::pippenger_p3(data, generator_cache, 1 + 2*m*n, rct::get_pippenger_c(data.size()));
-    if (ge_p3_is_point_at_infinity_vartime(&result) == 0)
+    /// return multiexp data for caller to deal with
+    return rct::pippenger_prep_data{std::move(data), generator_cache, 1 + 2*m*n};
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
+    const std::vector<rct::keyM> &M,
+    const rct::keyM &proof_offsets,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::keyV &messages)
+{
+    // build and verify multiexp
+    if (!check_pippenger_data(get_concise_grootle_verification_data(proofs, M, proof_offsets, n, m, messages)))
     {
         MERROR("Concise Grootle proof: verification failed!");
         return false;

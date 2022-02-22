@@ -38,6 +38,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "ringct/multiexp.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -194,5 +195,8 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
 * result: true if input key is in prime order EC subgroup
 */
 bool key_domain_is_prime_subgroup(const rct::key &check_key);
+//todo
+bool check_pippenger_data(const std::vector<rct::pippenger_prep_data> &prep_datas);
+bool check_pippenger_data(rct::pippenger_prep_data prep_data);
 
 } //namespace sp

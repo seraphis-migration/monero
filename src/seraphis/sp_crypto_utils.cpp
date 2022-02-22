@@ -706,4 +706,22 @@ bool key_domain_is_prime_subgroup(const rct::key &check_key)
     return (ge_p3_is_point_at_infinity_vartime(&check_key_p3) != 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool check_pippenger_data(const std::vector<rct::pippenger_prep_data> &prep_datas)
+{
+    // verify all elements sum to zero
+    ge_p3 result = rct::pippenger_p3(prep_datas);
+    if (ge_p3_is_point_at_infinity_vartime(&result) == 0)
+        return false;
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool check_pippenger_data(rct::pippenger_prep_data prep_data)
+{
+    std::vector<rct::pippenger_prep_data> prep_datas;
+    prep_datas.emplace_back(std::move(prep_data));
+
+    return check_pippenger_data(prep_datas);
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

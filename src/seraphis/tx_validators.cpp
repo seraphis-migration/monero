@@ -281,9 +281,10 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV1*> &membership_proofs,
+bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
-    const LedgerContext &ledger_context)
+    const LedgerContext &ledger_context,
+    rct::pippenger_prep_data &prep_data_out)
 {
     std::size_t num_proofs{membership_proofs.size()};
 
@@ -324,18 +325,25 @@ bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV
         messages.push_back(get_tx_membership_proof_message_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
     }
 
-    // batch verify
-    if (!sp::concise_grootle_verify(proofs,
+    // get verification data
+    prep_data_out = sp::get_concise_grootle_verification_data(proofs,
         membership_proof_keys,
         offsets,
         membership_proofs[0]->m_ref_set_decomp_n,
         membership_proofs[0]->m_ref_set_decomp_m,
-        messages))
-    {
-        return false;
-    }
+        messages);
 
     return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV1*> &membership_proofs,
+    const std::vector<const SpEnoteImage*> &input_images,
+    const LedgerContext &ledger_context)
+{
+    rct::pippenger_prep_data prep_data;
+    if (!try_get_sp_membership_proofs_v1_validation_data(membership_proofs, input_images, ledger_context, prep_data))
+        return false;
+    return check_pippenger_data(std::move(prep_data));
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_proofs,

@@ -38,8 +38,10 @@
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
 #include "ringct/bulletproofs_plus.h"
+#include "ringct/multiexp.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
+#include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
 #include "tx_builders_inputs.h"
 #include "tx_builders_mixed.h"
@@ -386,22 +388,31 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
             input_image_ptrs.push_back(&(input_image.m_core));
 
         // gather range proofs
-        const std::shared_ptr<const SpBalanceProofV1> balance_proof{tx->m_balance_proof};
-
-        if (balance_proof.get() == nullptr)
+        if (tx->m_balance_proof.get() == nullptr)
             return false;
 
-        range_proof_ptrs.push_back(&(balance_proof->m_bpp_proof));
+        range_proof_ptrs.push_back(&(tx->m_balance_proof->m_bpp_proof));
     }
 
-    // batch verify membership proofs
-    if (!validate_sp_membership_proofs_v1(membership_proof_ptrs, input_image_ptrs, ledger_context))
+    // batch verification: collect pippenger data sets
+    std::vector<rct::pippenger_prep_data> prep_datas;
+    prep_datas.resize(2);
+
+    // membership proofs
+    if (!try_get_sp_membership_proofs_v1_validation_data(membership_proof_ptrs,
+        input_image_ptrs,
+        ledger_context,
+        prep_datas[0]))
     {
         return false;
     }
 
-    // batch verify range proofs
-    if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
+    // range proofs
+    if (!rct::try_get_bulletproof_plus_verification_data(range_proof_ptrs, prep_datas[1]))
+        return false;
+
+    // batch verify
+    if (!check_pippenger_data(prep_datas))
         return false;
 
     return true;

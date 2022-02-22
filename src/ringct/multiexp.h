@@ -57,6 +57,13 @@ struct MultiexpData {
 struct straus_cached_data;
 struct pippenger_cached_data;
 
+struct pippenger_prep_data final
+{
+  std::vector<MultiexpData> data;
+  std::shared_ptr<pippenger_cached_data> cache;
+  size_t cache_size;
+};
+
 rct::key bos_coster_heap_conv(std::vector<MultiexpData> data);
 rct::key bos_coster_heap_conv_robust(std::vector<MultiexpData> data);
 std::shared_ptr<straus_cached_data> straus_init_cache(const std::vector<MultiexpData> &data, size_t N =0);
@@ -66,8 +73,11 @@ rct::key straus(const std::vector<MultiexpData> &data, const std::shared_ptr<str
 std::shared_ptr<pippenger_cached_data> pippenger_init_cache(const std::vector<MultiexpData> &data, size_t start_offset = 0, size_t N =0);
 size_t pippenger_get_cache_size(const std::shared_ptr<pippenger_cached_data> &cache);
 size_t get_pippenger_c(size_t N);
-ge_p3 pippenger_p3(const std::vector<MultiexpData> &data, const std::shared_ptr<pippenger_cached_data> &cache = NULL, size_t cache_size = 0, size_t c = 0);
-rct::key pippenger(const std::vector<MultiexpData> &data, const std::shared_ptr<pippenger_cached_data> &cache = NULL, size_t cache_size = 0, size_t c = 0);
+ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data, size_t c);
+ge_p3 pippenger_p3(std::vector<MultiexpData> data, const std::shared_ptr<pippenger_cached_data> &cache = NULL, const size_t cache_size = 0, const size_t c = 0);
+ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data);
+rct::key pippenger(std::vector<MultiexpData> data, const std::shared_ptr<pippenger_cached_data> &cache = NULL, const size_t cache_size = 0, const size_t c = 0);
+rct::key pippenger(const std::vector<pippenger_prep_data> &prep_data);
 
 }
 
