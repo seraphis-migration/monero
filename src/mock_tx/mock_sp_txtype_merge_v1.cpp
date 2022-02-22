@@ -43,6 +43,7 @@
 #include "mock_tx_utils.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctTypes.h"
+#include "seraphis_crypto_utils.h"
 
 //third party headers
 
@@ -332,14 +333,25 @@ bool validate_mock_txs<MockTxSpMergeV1>(const std::vector<std::shared_ptr<MockTx
             range_proof_ptrs.push_back(&range_proof);
     }
 
-    // batch verify membership proofs
-    if (!validate_mock_tx_sp_membership_proofs_v1(membership_proof_ptrs, input_image_ptrs, ledger_context))
+    // batch verification: collect pippenger data sets
+    std::vector<rct::pippenger_prep_data> prep_datas;
+    prep_datas.resize(2);
+
+    // membership proofs
+    if (!try_get_mock_tx_sp_membership_proofs_v1_validation_data(membership_proof_ptrs,
+        input_image_ptrs,
+        ledger_context,
+        prep_datas[0]))
     {
         return false;
     }
 
-    // batch verify range proofs
-    if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
+    // range proofs
+    if (!rct::try_get_bulletproof_plus_verification_data(range_proof_ptrs, prep_datas[1]))
+        return false;
+
+    // batch verify
+    if (!sp::check_pippenger_data(prep_datas))
         return false;
 
     return true;

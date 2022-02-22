@@ -606,7 +606,7 @@ bool validate_mock_tx_sp_membership_proofs_v1(const std::vector<const MockMember
     rct::pippenger_prep_data prep_data;
     if (!try_get_mock_tx_sp_membership_proofs_v1_validation_data(membership_proofs, input_images, ledger_context, prep_data))
         return false;
-    return sp::check_pippenger_data(prep_data);
+    return sp::check_pippenger_data(std::move(prep_data));
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_mock_tx_sp_membership_proofs_v2_validation_data(
@@ -672,7 +672,7 @@ bool validate_mock_tx_sp_membership_proofs_v2(const std::vector<const MockMember
     rct::pippenger_prep_data prep_data;
     if (!try_get_mock_tx_sp_membership_proofs_v2_validation_data(membership_proofs, input_images, ledger_context, prep_data))
         return false;
-    return sp::check_pippenger_data(prep_data);
+    return sp::check_pippenger_data(std::move(prep_data));
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_mock_tx_sp_membership_proofs_v3_validation_data(
@@ -737,7 +737,7 @@ bool validate_mock_tx_sp_membership_proofs_v3(const std::vector<const MockMember
     rct::pippenger_prep_data prep_data;
     if (!try_get_mock_tx_sp_membership_proofs_v3_validation_data(membership_proofs, input_images, ledger_context, prep_data))
         return false;
-    return sp::check_pippenger_data(prep_data);
+    return sp::check_pippenger_data(std::move(prep_data));
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_mock_tx_sp_composition_proofs_v1(const std::vector<MockImageProofSpV1> &image_proofs,
