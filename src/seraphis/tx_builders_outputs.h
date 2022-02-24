@@ -86,7 +86,7 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance/*, TODO: extra memo values*/,
+    const crypto::secret_key &k_view_balance,
     std::vector<SpOutputProposalV1> &output_proposals_inout);
 //todo
 void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals, SpTxProposalV1 &proposal_out);

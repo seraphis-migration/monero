@@ -149,7 +149,7 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_prop
     SpTxSupplementV1 &tx_supplement_inout)
 {
     outputs_out.clear();
-    outputs_out.resize(output_proposals.size());
+    outputs_out.reserve(output_proposals.size());
     output_amounts_out.clear();
     output_amounts_out.reserve(output_proposals.size());
     output_amount_commitment_blinding_factors_out.clear();
@@ -157,12 +157,11 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_prop
     tx_supplement_inout.m_output_enote_ephemeral_pubkeys.clear();
     tx_supplement_inout.m_output_enote_ephemeral_pubkeys.reserve(output_proposals.size());
 
-    for (std::size_t output_index{0}; output_index < output_proposals.size(); ++output_index)
+    for (const SpOutputProposalV1 &proposal : output_proposals)
     {
-        const SpOutputProposalV1 &proposal{output_proposals[output_index]};
-
         // convert to enote
-        proposal.get_enote_v1(outputs_out[output_index]);
+        outputs_out.emplace_back();
+        proposal.get_enote_v1(outputs_out.back());
 
         // prepare for range proofs
         output_amounts_out.emplace_back(proposal.m_core.m_amount);
@@ -181,7 +180,7 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance/*, TODO: extra memo values*/,
+    const crypto::secret_key &k_view_balance,
     std::vector<SpOutputProposalV1> &output_proposals_inout)
 {
     // get change amount
@@ -378,11 +377,12 @@ std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vecto
 {
     // generate random proposals
     std::vector<SpOutputProposalV1> output_proposals;
-    output_proposals.resize(out_amounts.size());
+    output_proposals.reserve(out_amounts.size());
 
-    for (std::size_t output_index{0}; output_index < out_amounts.size(); ++output_index)
+    for (const rct::xmr_amount out_amount : out_amounts)
     {
-        output_proposals[output_index].gen(out_amounts[output_index]);
+        output_proposals.emplace_back();
+        output_proposals.back().gen(out_amount);
     }
 
     // sort them

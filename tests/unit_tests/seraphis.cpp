@@ -118,20 +118,9 @@ static void make_fake_sp_masked_address(crypto::secret_key &mask,
         sc_add(&spendkey_sum, &spendkey_sum, &spendkeys[signer_index]);
     }
 
-    rct::keyV privkeys;
-    rct::keyV pubkeys;
-    privkeys.reserve(3);
-    pubkeys.reserve(2);
-
-    privkeys.push_back(rct::sk2rct(view_stuff));
-    pubkeys.push_back(sp::get_X_gen());
-    privkeys.push_back(rct::sk2rct(spendkey_sum));
-    pubkeys.push_back(sp::get_U_gen());
-    privkeys.push_back(rct::sk2rct(mask));
-    //G implicit
-
     // K' = x G + kv_stuff X + ks U
-    sp::multi_exp(privkeys, pubkeys, masked_address);
+    sp::make_seraphis_spendkey(view_stuff, spendkey_sum, masked_address);
+    sp::mask_key(mask, masked_address, masked_address);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -414,7 +403,6 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     }
     rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, outputs, tx_supplement)};
     make_v1_tx_image_proofs_sp_v1(input_proposals,
-        input_images,
         image_proofs_message,
         tx_image_proofs);
     prepare_input_commitment_factors_for_balance_proof_v1(input_proposals,
@@ -471,100 +459,6 @@ static bool test_info_recovery_addressindex(const sp::jamtis::address_index_t j)
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-TEST(seraphis, multi_exp)
-{
-    rct::key test_key;
-    rct::key check;
-    rct::key temp;
-
-    // works normally
-    for (std::size_t i = 1; i < 5; ++i)
-    {
-        check = rct::identity();
-
-        rct::keyV pubkeys;
-        rct::keyV privkeys;
-        pubkeys.reserve(i);
-        privkeys.reserve(i);
-
-        for (std::size_t j = 0; j < i; ++j)
-        {
-            pubkeys.push_back(rct::pkGen());
-            privkeys.push_back(rct::skGen());
-
-            rct::scalarmultKey(temp, pubkeys.back(), privkeys.back());
-            rct::addKeys(check, check, temp);
-        }
-
-        sp::multi_exp(privkeys, pubkeys, test_key);
-        EXPECT_TRUE(test_key == check);
-        sp::multi_exp_vartime(privkeys, pubkeys, test_key);
-        EXPECT_TRUE(test_key == check);
-    }
-
-    // privkey == 1 optimization works
-    for (std::size_t i = 4; i < 7; ++i)
-    {
-        check = rct::identity();
-
-        rct::keyV pubkeys;
-        rct::keyV privkeys;
-        pubkeys.reserve(i);
-        privkeys.reserve(i);
-
-        for (std::size_t j = 0; j < i; ++j)
-        {
-            pubkeys.push_back(rct::pkGen());
-            if (j < i/2)
-                privkeys.push_back(rct::identity());
-            else
-                privkeys.push_back(rct::skGen());
-
-            rct::scalarmultKey(temp, pubkeys.back(), privkeys.back());
-            rct::addKeys(check, check, temp);
-        }
-
-        sp::multi_exp(privkeys, pubkeys, test_key);
-        EXPECT_TRUE(test_key == check);
-        sp::multi_exp_vartime(privkeys, pubkeys, test_key);
-        EXPECT_TRUE(test_key == check);
-    }
-
-    // pubkey = G optimization works
-    for (std::size_t i = 1; i < 5; ++i)
-    {
-        check = rct::identity();
-
-        rct::keyV pubkeys;
-        rct::keyV privkeys;
-        pubkeys.reserve(i);
-        privkeys.reserve(i);
-
-        for (std::size_t j = 0; j < i; ++j)
-        {
-            privkeys.push_back(rct::skGen());
-
-            if (j < i/2)
-            {
-                pubkeys.push_back(rct::pkGen());
-                rct::scalarmultKey(temp, pubkeys.back(), privkeys.back());
-            }
-            // for j >= i/2 it will be privkey*G
-            else
-            {
-                rct::scalarmultBase(temp, privkeys.back());
-            }
-
-            rct::addKeys(check, check, temp);
-        }
-
-        sp::multi_exp(privkeys, pubkeys, test_key);
-        EXPECT_TRUE(test_key == check);
-        sp::multi_exp_vartime(privkeys, pubkeys, test_key);
-        EXPECT_TRUE(test_key == check);
-    }
-}
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, composition_proof)
 {

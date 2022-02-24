@@ -225,14 +225,10 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
-    const std::shared_ptr<const SpBalanceProofV1> balance_proof,
+    const SpBalanceProofV1 &balance_proof,
     const bool defer_batchable)
 {
-    // sanity check
-    if (!balance_proof || balance_proof.use_count() == 0)
-        return false;
-
-    const rct::BulletproofPlus &range_proofs = balance_proof->m_bpp_proof;
+    const rct::BulletproofPlus &range_proofs = balance_proof.m_bpp_proof;
 
     // sanity check
     if (range_proofs.V.size() == 0)
@@ -241,7 +237,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     // check that amount commitments balance
     if (!validate_sp_amount_balance_equality_check_v1(input_images,
         outputs,
-        balance_proof->m_remainder_blinding_factor))
+        balance_proof.m_remainder_blinding_factor))
         return false;
 
     // check that commitments in range proofs line up with input image and output commitments
@@ -250,7 +246,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 
     for (std::size_t input_commitment_index{0}; input_commitment_index < input_images.size(); ++input_commitment_index)
     {
-        // double check that the two stored copies of input image commitments match
+        // the two stored copies of input image commitments must match
         if (input_images[input_commitment_index].m_core.m_masked_commitment !=
             rct::rct2pk(rct::scalarmult8(range_proofs.V[input_commitment_index])))
         {
@@ -260,7 +256,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 
     for (std::size_t output_commitment_index{0}; output_commitment_index < outputs.size(); ++output_commitment_index)
     {
-        // double check that the two stored copies of output commitments match
+        // the two stored copies of output commitments must match
         if (outputs[output_commitment_index].m_core.m_amount_commitment !=
             rct::rct2pk(rct::scalarmult8(range_proofs.V[input_images.size() + output_commitment_index])))
         {
@@ -272,7 +268,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     if (!defer_batchable)
     {
         std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
-        range_proof_ptrs.push_back(&range_proofs);  //not batched: there is only one range proofs aggregate per tx
+        range_proof_ptrs.emplace_back(&range_proofs);  //not batched: there is only one range proofs aggregate per tx
 
         if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
             return false;
@@ -284,7 +280,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
     const LedgerContext &ledger_context,
-    rct::pippenger_prep_data &prep_data_out)
+    rct::pippenger_prep_data &validation_data_out)
 {
     std::size_t num_proofs{membership_proofs.size()};
 
@@ -293,7 +289,7 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
         num_proofs == 0)
         return false;
 
-    // batch-validate proofs
+    // get batched validation data
     std::vector<const sp::ConciseGrootleProof*> proofs;
     std::vector<rct::keyM> membership_proof_keys;
     rct::keyM offsets;
@@ -310,7 +306,7 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
             !input_images[proof_index])
             return false;
 
-        proofs.push_back(&(membership_proofs[proof_index]->m_concise_grootle_proof));
+        proofs.emplace_back(&(membership_proofs[proof_index]->m_concise_grootle_proof));
 
         // get proof keys from enotes stored in the ledger
         ledger_context.get_reference_set_proof_elements_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices,
@@ -322,11 +318,11 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
             input_images[proof_index]->m_masked_commitment);
 
         // proof message
-        messages.push_back(get_tx_membership_proof_message_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
+        messages.emplace_back(get_tx_membership_proof_message_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
     }
 
     // get verification data
-    prep_data_out = sp::get_concise_grootle_verification_data(proofs,
+    validation_data_out = sp::get_concise_grootle_verification_data(proofs,
         membership_proof_keys,
         offsets,
         membership_proofs[0]->m_ref_set_decomp_n,
@@ -340,10 +336,11 @@ bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV
     const std::vector<const SpEnoteImage*> &input_images,
     const LedgerContext &ledger_context)
 {
-    rct::pippenger_prep_data prep_data;
-    if (!try_get_sp_membership_proofs_v1_validation_data(membership_proofs, input_images, ledger_context, prep_data))
+    rct::pippenger_prep_data validation_data;
+    if (!try_get_sp_membership_proofs_v1_validation_data(membership_proofs, input_images, ledger_context, validation_data))
         return false;
-    return check_pippenger_data(std::move(prep_data));
+
+    return multiexp_is_identity(std::move(validation_data));
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_proofs,

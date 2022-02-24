@@ -88,24 +88,20 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
 /**
 * brief: make_v1_tx_image_proof_sp_v1 - make a v1 tx input image proof (seraphis composition proof) (squashed enote model)
 * param: input_proposal -
-* param: masked_address -
 * param: message -
 * outparam: tx_image_proof_out -
 */
 void make_v1_tx_image_proof_sp_v1(const SpInputProposal &input_proposal,
-    const rct::key &masked_address,
     const rct::key &message,
     SpImageProofV1 &tx_image_proof_out);
 /**
 * brief: make_v1_tx_image_proofs_sp_v1 - make v1 tx input image proofs (seraphis composition proofs: 1 per input)
 *   (squashed enote model)
 * param: input_proposals -
-* param: input_images -
 * param: message -
 * outparam: tx_image_proofs_out -
 */
 void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
-    const std::vector<SpEnoteImageV1> &input_images,
     const rct::key &message,
     std::vector<SpImageProofV1> &tx_image_proofs_out);
 /**
@@ -160,7 +156,7 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input
 * return: set of transaction inputs ready to spend
 */
 std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts);
-/**
+/** //todo
 * brief: gen_mock_sp_membership_ref_sets_v1 - create random reference sets for tx inputs, with real spend at a random index,
 *   and update mock ledger to include all members of the reference set (including squashed enotes)
 * param: input_proposals -
@@ -169,6 +165,11 @@ std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<
 * inoutparam: ledger_context_inout -
 * return: set of membership proof reference sets
 */
+SpMembershipReferenceSetV1 gen_mock_sp_membership_ref_set_v1(
+    const SpEnote &input_enote,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    MockLedgerContext &ledger_context_inout);
 std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     const std::vector<SpEnote> &input_enotes,
     const std::size_t ref_set_decomp_n,

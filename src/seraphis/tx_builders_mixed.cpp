@@ -84,6 +84,7 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     const std::vector<SpEnoteV1> &output_enotes,
     const SpTxSupplementV1 &tx_supplement)
 {
+    // H(crypto project name, version string, output enotes, enote ephemeral pubkeys)
     rct::key hash_result;
     std::string hash;
     hash.reserve(sizeof(CRYPTONOTE_NAME) +
@@ -219,10 +220,15 @@ void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
     /// copy misc tx pieces
 
     // gather tx input parts
+    partial_tx_out.m_input_images.clear();
     partial_tx_out.m_input_images.reserve(partial_inputs.size());
+    partial_tx_out.m_image_proofs.clear();
     partial_tx_out.m_image_proofs.reserve(partial_inputs.size());
+    partial_tx_out.m_input_enotes.clear();
     partial_tx_out.m_input_enotes.reserve(partial_inputs.size());
+    partial_tx_out.m_image_address_masks.clear();
     partial_tx_out.m_image_address_masks.reserve(partial_inputs.size());
+    partial_tx_out.m_image_commitment_masks.clear();
     partial_tx_out.m_image_commitment_masks.reserve(partial_inputs.size());
 
     for (auto &partial_input : partial_inputs)

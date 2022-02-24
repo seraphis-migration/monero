@@ -421,7 +421,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     // {X}: 'encodings' of [p] (i.e. of the real signing index 'l' in the referenced tuple set)
     proof.X = rct::keyV(m);
     rct::key c_zero_nominal_prefix_temp;
-    ge_p3 C_zero_nominal_temp_p3;
+    rct::key C_zero_nominal_temp;
     for (std::size_t j = 0; j < m; ++j)
     {
         std::vector<rct::MultiexpData> data_X;
@@ -433,8 +433,8 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
             for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
                 sc_mul(c_zero_nominal_prefix_temp.bytes, mu_pow[alpha].bytes, p[k][j].bytes);  // p[k][j] * mu^alpha
-                sp::sub_keys_p3(M[k][alpha], C_offsets[alpha], C_zero_nominal_temp_p3);  // M[k][alpha] - C_offset[alpha]
-                data_X.push_back({c_zero_nominal_prefix_temp, C_zero_nominal_temp_p3});
+                rct::subKeys(C_zero_nominal_temp, M[k][alpha], C_offsets[alpha]);  // M[k][alpha] - C_offset[alpha]
+                data_X.push_back({c_zero_nominal_prefix_temp, C_zero_nominal_temp});
             }
         }
 
@@ -788,7 +788,7 @@ bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proof
     const rct::keyV &messages)
 {
     // build and verify multiexp
-    if (!check_pippenger_data(get_concise_grootle_verification_data(proofs, M, proof_offsets, n, m, messages)))
+    if (!multiexp_is_identity(get_concise_grootle_verification_data(proofs, M, proof_offsets, n, m, messages)))
     {
         MERROR("Concise Grootle proof: verification failed!");
         return false;

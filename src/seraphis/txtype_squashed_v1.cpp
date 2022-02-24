@@ -238,7 +238,7 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     std::vector<SpTxPartialInputV1> partial_inputs;
     make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, partial_inputs);
 
-    // membership proofs (input proposals are assumed to line up with membership ref sets)
+    // membership proofs (assumes the caller lined up input proposals with membership ref sets)
     std::vector<SpMembershipProofAlignableV1> alignable_membership_proofs;
     make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, alignable_membership_proofs);
 
@@ -312,8 +312,12 @@ bool validate_tx_linking_tags<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const Le
 template <>
 bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const bool defer_batchable)
 {
+    // sanity check
+    if (!tx.m_balance_proof || tx.m_balance_proof.use_count() == 0)
+        return false;
+
     // balance proof
-    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, tx.m_balance_proof, defer_batchable))
+    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, *(tx.m_balance_proof), defer_batchable))
     {
         return false;
     }
@@ -394,25 +398,25 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
         range_proof_ptrs.push_back(&(tx->m_balance_proof->m_bpp_proof));
     }
 
-    // batch verification: collect pippenger data sets
-    std::vector<rct::pippenger_prep_data> prep_datas;
-    prep_datas.resize(2);
+    // batch verification: collect pippenger data sets for an aggregated multiexponentiation
+    std::vector<rct::pippenger_prep_data> validation_data;
+    validation_data.resize(2);
 
     // membership proofs
     if (!try_get_sp_membership_proofs_v1_validation_data(membership_proof_ptrs,
         input_image_ptrs,
         ledger_context,
-        prep_datas[0]))
+        validation_data[0]))
     {
         return false;
     }
 
     // range proofs
-    if (!rct::try_get_bulletproof_plus_verification_data(range_proof_ptrs, prep_datas[1]))
+    if (!rct::try_get_bulletproof_plus_verification_data(range_proof_ptrs, validation_data[1]))
         return false;
 
     // batch verify
-    if (!check_pippenger_data(prep_datas))
+    if (!multiexp_is_identity(validation_data))
         return false;
 
     return true;

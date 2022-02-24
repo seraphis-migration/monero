@@ -148,7 +148,7 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
 */
 bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
-    const std::shared_ptr<const SpBalanceProofV1> balance_proof,
+    const SpBalanceProofV1 &balance_proof,
     const bool defer_batchable);
 /**
 * brief: validate_sp_membership_proofs_v1 - check that tx inputs exist in the ledger
@@ -157,12 +157,13 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 * param: membership_proofs -
 * param: input_images -
 * param: ledger_context -
+* outparam: validation_data_out -
 * return: true/false on validation result
 */
 bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
     const LedgerContext &ledger_context,
-    rct::pippenger_prep_data &prep_data_out);
+    rct::pippenger_prep_data &validation_data_out);
 bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
     const LedgerContext &ledger_context);

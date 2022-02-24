@@ -134,10 +134,10 @@ struct SpInputProposal final
     void get_enote_core(SpEnote &enote_out) const;
 
     /**
-    * brief: get_enote_image_squashed_core - get this input's enote image in the squashed enote model
+    * brief: get_enote_image_core - get this input's enote image in the squashed enote model
     * outparam: image_out -
     */
-    void get_enote_image_squashed_core(SpEnoteImage &image_out) const;
+    void get_enote_image_core(SpEnoteImage &image_out) const;
 
     /**
     * brief: gen - generate random enote keys

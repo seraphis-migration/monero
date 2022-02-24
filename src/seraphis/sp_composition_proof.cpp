@@ -317,6 +317,11 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     rct::key part_t1, part_t2, part_ki;
     ge_p3 K_p3, K_t1_p3, K_t2_p3, KI_p3;
 
+    ge_cached temp_cache;
+    ge_p1p1 temp_p1p1;
+    ge_p2 temp_p2;
+    ge_dsmp temp_dsmp;
+
     // get K
     CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&K_p3, K.bytes) == 0,
         "ge_frombytes_vartime failed!");
@@ -330,24 +335,26 @@ bool sp_composition_verify(const SpCompositionProof &proof,
         "ge_frombytes_vartime failed!");
 
     // K_t2 = K_t1 - X - KI
-    multi_exp_vartime_p3({rct::identity(), MINUS_ONE, MINUS_ONE},
-        {K_t1_p3, get_X_p3_gen(), KI_p3},
-        K_t2_p3);
+    ge_p3_to_cached(&temp_cache, &get_X_p3_gen());
+    ge_sub(&temp_p1p1, &K_t1_p3, &temp_cache);  //K_t1 - X
+    ge_p1p1_to_p3(&K_t2_p3, &temp_p1p1);
+    ge_p3_to_cached(&temp_cache, &KI_p3);
+    ge_sub(&temp_p1p1, &K_t2_p3, &temp_cache);  //(K_t1 - X) - KI
+    ge_p1p1_to_p3(&K_t2_p3, &temp_p1p1);
 
     // K_t1 part: [r_t1 * K + c * K_t1]
-    multi_exp_vartime({proof.r_t1, proof.c},
-        {K_p3, K_t1_p3},
-        part_t1);
+    ge_dsm_precomp(temp_dsmp, &K_t1_p3);
+    ge_double_scalarmult_precomp_vartime(&temp_p2, proof.r_t1.bytes, &K_p3, proof.c.bytes, temp_dsmp);
+    ge_tobytes(part_t1.bytes, &temp_p2);
 
     // K_t2 part: [r_t2 * G + c * K_t2]
-    multi_exp_vartime({proof.c, proof.r_t2},
-        {K_t2_p3/*, G is implicit*/},
-        part_t2);
+    ge_double_scalarmult_base_vartime(&temp_p2, proof.c.bytes, &K_t2_p3, proof.r_t2.bytes);
+    ge_tobytes(part_t2.bytes, &temp_p2);
 
     // KI part:   [r_ki * U + c * KI  ]
-    multi_exp_vartime({proof.r_ki, proof.c},
-        {get_U_p3_gen(), KI_p3},
-        part_ki);
+    ge_dsm_precomp(temp_dsmp, &KI_p3);
+    ge_double_scalarmult_precomp_vartime(&temp_p2, proof.r_ki.bytes, &(get_U_p3_gen()), proof.c.bytes, temp_dsmp);
+    ge_tobytes(part_ki.bytes, &temp_p2);
 
 
     /// compute nominal challenge

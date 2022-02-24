@@ -67,7 +67,7 @@ struct SpInputProposalV1 final
     */
     void get_enote_image_v1(SpEnoteImageV1 &image_out) const
     {
-        return m_core.get_enote_image_squashed_core(image_out.m_core);
+        return m_core.get_enote_image_core(image_out.m_core);
     }
 
     /// generate a v1 input (all random; does not support info recovery)

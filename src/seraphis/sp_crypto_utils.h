@@ -144,33 +144,6 @@ rct::key small_scalar_gen(const std::size_t size_bytes);
 void generate_proof_nonce(const rct::key &base, rct::key &nonce_out, rct::key &nonce_pub_out);
 void generate_proof_nonce(const rct::key &base, crypto::secret_key &nonce_out, rct::key &nonce_pub_out);
 /**
-* brief: multi_exp/multi_exp_p3 - EC multiexp operation with arbitrary element count
-*   - optimization: if a privkey == 1, skips the scalar mul operation
-*   - optimization2: if privkeys.size() > pubkeys.size(), the trailing privkeys will all be 'p * G'
-* 
-* TODO: these are ugly, fixme
-* 
-* param: privkeys - a, b, ..., m, ..., n
-* param: pubkeys - A, B, ..., M
-* outparam: result_out - aA + bB + ... + mM + ... + n*G
-*/
-void multi_exp(const rct::keyV &privkeys, const rct::keyV &pubkeys, rct::key &result_out);
-void multi_exp(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, rct::key &result_out);
-void multi_exp_p3(const rct::keyV &privkeys, const rct::keyV &pubkeys, ge_p3 &result_out);
-void multi_exp_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, ge_p3 &result_out);
-void multi_exp_vartime(const rct::keyV &privkeys, const rct::keyV &pubkeys, rct::key &result_out);
-void multi_exp_vartime(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, rct::key &result_out);
-void multi_exp_vartime_p3(const rct::keyV &privkeys, const rct::keyV &pubkeys, ge_p3 &result_out);
-void multi_exp_vartime_p3(const rct::keyV &privkeys, const std::vector<ge_p3> &pubkeys, ge_p3 &result_out);
-/**
-* brief: sub_keys_p3 - subtract two keys and get back a ge_p3 representation of the point
-*   A - B
-* param: A - key A
-* param: B - key B
-* outparam: result_out - 'A - B'
-*/
-void sub_keys_p3(const rct::key &A, const rct::key &B, ge_p3 &result_out);
-/**
 * brief: subtract_secret_key_vectors - subtract one vector of secret keys from another
 *   sum(A) - sum(B)
 * param: keys_A - first vector (addors)
@@ -196,7 +169,7 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
 */
 bool key_domain_is_prime_subgroup(const rct::key &check_key);
 //todo
-bool check_pippenger_data(const std::vector<rct::pippenger_prep_data> &prep_datas);
-bool check_pippenger_data(rct::pippenger_prep_data prep_data);
+bool multiexp_is_identity(const std::vector<rct::pippenger_prep_data> &multiexp_data_sets);
+bool multiexp_is_identity(rct::pippenger_prep_data multiexp_data_set);
 
 } //namespace sp

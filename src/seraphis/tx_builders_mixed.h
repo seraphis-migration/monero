@@ -52,7 +52,7 @@ namespace sp
 
 /**
 * brief: get_tx_image_proof_message_sp_v1 - message for tx image proofs
-*   - H(crypto project name, version string, output enotes, enote pubkeys)
+*   - H(crypto project name, version string, output enotes, enote ephemeral pubkeys)
 * param: version_string -
 * param: output_enotes -
 * param: tx_supplement -

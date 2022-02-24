@@ -103,7 +103,7 @@ rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &e
     hash = CRYPTONOTE_NAME;
     // all referenced enote ledger indices
     char converted_index[(sizeof(std::size_t) * 8 + 6) / 7];
-    char* end;
+    char *end;
     for (const std::size_t index : enote_ledger_indices)
     {
         // TODO: append real ledger references
@@ -167,13 +167,16 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proof_sp_v1(const SpInputProposal &input_proposal,
-    const rct::key &masked_address,
     const rct::key &message,
     SpImageProofV1 &tx_image_proof_out)
 {
     // the input enote
     SpEnote input_enote_core;
     input_proposal.get_enote_core(input_enote_core);
+
+    // the input enote image
+    SpEnoteImage input_enote_image_core;
+    input_proposal.get_enote_image_core(input_enote_image_core);
 
     // prepare for proof (squashed enote model): y, z
     crypto::secret_key y, z;
@@ -183,30 +186,26 @@ void make_v1_tx_image_proof_sp_v1(const SpInputProposal &input_proposal,
         squash_prefix);  // H(Ko,C)
 
     sc_mul(&y, &squash_prefix, &(input_proposal.m_enote_view_privkey));  // H(Ko,C) (k_{a, recipient} + k_{a, sender})
-    sc_mul(&z, &squash_prefix, &(input_proposal.m_spendbase_privkey));  // H(Ko,C) k_{b, recipient}
+    sc_mul(&z, &squash_prefix, &(input_proposal.m_spendbase_privkey));   // H(Ko,C) k_{b, recipient}
 
     // make seraphis composition proof
     tx_image_proof_out.m_composition_proof =
-        sp_composition_prove(message, masked_address, input_proposal.m_address_mask, y, z);
+        sp_composition_prove(message, input_enote_image_core.m_masked_address, input_proposal.m_address_mask, y, z);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
-    const std::vector<SpEnoteImageV1> &input_images,
     const rct::key &message,
     std::vector<SpImageProofV1> &tx_image_proofs_out)
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make image proofs for 0 inputs.");
-    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() == input_images.size(), "Input components size mismatch");
 
     tx_image_proofs_out.clear();
-    tx_image_proofs_out.resize(input_proposals.size());
+    tx_image_proofs_out.reserve(input_proposals.size());
 
-    for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
+    for (const SpInputProposalV1 &input_proposal : input_proposals)
     {
-        make_v1_tx_image_proof_sp_v1(input_proposals[input_index].m_core,
-            input_images[input_index].m_core.m_masked_address,
-            message,
-            tx_image_proofs_out[input_index]);
+        tx_image_proofs_out.emplace_back();
+        make_v1_tx_image_proof_sp_v1(input_proposal.m_core, message, tx_image_proofs_out.back());
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -241,7 +240,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
             reference_keys[ref_index][0]);
     }
 
-    // proof offsets
+    // proof offsets (only one in the squashed enote model)
     rct::keyV image_offsets;
     image_offsets.resize(1);
 
@@ -381,7 +380,6 @@ void make_v1_tx_partial_input_v1(const SpInputProposalV1 &input_proposal,
 
     // construct image proof
     make_v1_tx_image_proof_sp_v1(input_proposal.m_core,
-        partial_input_out.m_input_image.m_core.m_masked_address,
         partial_input_out.m_proposal_prefix,
         partial_input_out.m_image_proof);
 }
@@ -407,14 +405,56 @@ std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<
 {
     // generate random inputs
     std::vector<SpInputProposalV1> input_proposals;
-    input_proposals.resize(in_amounts.size());
+    input_proposals.reserve(in_amounts.size());
 
-    for (std::size_t input_index{0}; input_index < in_amounts.size(); ++input_index)
+    for (const rct::xmr_amount in_amount : in_amounts)
     {
-        input_proposals[input_index].gen(in_amounts[input_index]);
+        input_proposals.emplace_back();
+        input_proposals.back().gen(in_amount);
     }
 
     return input_proposals;
+}
+//-------------------------------------------------------------------------------------------------------------------
+SpMembershipReferenceSetV1 gen_mock_sp_membership_ref_set_v1(
+    const SpEnote &input_enote,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    MockLedgerContext &ledger_context_inout)
+{
+    SpMembershipReferenceSetV1 reference_set;
+
+    std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};  // n^m
+
+    reference_set.m_ref_set_decomp_n = ref_set_decomp_n;
+    reference_set.m_ref_set_decomp_m = ref_set_decomp_m;
+    reference_set.m_real_spend_index_in_set = crypto::rand_idx(ref_set_size);  // pi
+
+    reference_set.m_ledger_enote_indices.resize(ref_set_size);
+    reference_set.m_referenced_enotes.resize(ref_set_size);
+
+    for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
+    {
+        // add real input at pi
+        if (ref_index == reference_set.m_real_spend_index_in_set)
+        {
+            reference_set.m_referenced_enotes[ref_index] = input_enote;
+        }
+        // add dummy enote
+        else
+        {
+            reference_set.m_referenced_enotes[ref_index].gen();
+        }
+
+        // insert referenced enote into mock ledger (also, record squashed enote)
+        // note: in a real context, you would instead 'get' the enote's index from the ledger, and error if not found
+        SpEnoteV1 temp_enote;
+        temp_enote.m_core = reference_set.m_referenced_enotes[ref_index];
+
+        reference_set.m_ledger_enote_indices[ref_index] = ledger_context_inout.add_enote_sp_v1(temp_enote);
+    }
+    
+    return reference_set;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
@@ -424,39 +464,13 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     MockLedgerContext &ledger_context_inout)
 {
     std::vector<SpMembershipReferenceSetV1> reference_sets;
-    reference_sets.resize(input_enotes.size());
+    reference_sets.reserve(input_enotes.size());
 
-    std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};  // n^m
-
-    for (std::size_t input_index{0}; input_index < input_enotes.size(); ++input_index)
+    for (const SpEnote &input_enote : input_enotes)
     {
-        reference_sets[input_index].m_ref_set_decomp_n = ref_set_decomp_n;
-        reference_sets[input_index].m_ref_set_decomp_m = ref_set_decomp_m;
-        reference_sets[input_index].m_real_spend_index_in_set = crypto::rand_idx(ref_set_size);  // pi
-
-        reference_sets[input_index].m_ledger_enote_indices.resize(ref_set_size);
-        reference_sets[input_index].m_referenced_enotes.resize(ref_set_size);
-
-        for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
-        {
-            // add real input at pi
-            if (ref_index == reference_sets[input_index].m_real_spend_index_in_set)
-            {
-                reference_sets[input_index].m_referenced_enotes[ref_index] = input_enotes[input_index];
-            }
-            // add dummy enote
-            else
-            {
-                reference_sets[input_index].m_referenced_enotes[ref_index].gen();
-            }
-
-            // insert referenced enote into mock ledger (also, record squashed enote)
-            // note: in a real context, you would instead 'get' the enote's index from the ledger, and error if not found
-            SpEnoteV1 temp_enote;
-            temp_enote.m_core = reference_sets[input_index].m_referenced_enotes[ref_index];
-
-            reference_sets[input_index].m_ledger_enote_indices[ref_index] = ledger_context_inout.add_enote_sp_v1(temp_enote);
-        }
+        reference_sets.emplace_back(
+                gen_mock_sp_membership_ref_set_v1(input_enote, ref_set_decomp_n, ref_set_decomp_m, ledger_context_inout)
+            );
     }
 
     return reference_sets;
@@ -469,10 +483,13 @@ std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
     MockLedgerContext &ledger_context_inout)
 {
     std::vector<SpEnote> input_enotes;
-    input_enotes.resize(input_proposals.size());
+    input_enotes.reserve(input_proposals.size());
 
-    for (std::size_t input_index{0}; input_index< input_proposals.size(); ++input_index)
-        input_proposals[input_index].m_core.get_enote_core(input_enotes[input_index]);
+    for (const SpInputProposalV1 &input_proposal : input_proposals)
+    {
+        input_enotes.emplace_back();
+        input_proposal.m_core.get_enote_core(input_enotes.back());
+    }
 
     return gen_mock_sp_membership_ref_sets_v1(input_enotes, ref_set_decomp_n, ref_set_decomp_m, ledger_context_inout);
 }

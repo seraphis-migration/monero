@@ -85,7 +85,7 @@ void SpInputProposal::get_enote_core(SpEnote &enote_out) const
     make_seraphis_enote_core(m_enote_view_privkey, m_spendbase_privkey, m_amount_blinding_factor, m_amount, enote_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpInputProposal::get_enote_image_squashed_core(SpEnoteImage &image_out) const
+void SpInputProposal::get_enote_image_core(SpEnoteImage &image_out) const
 {
     // {Ko, C}
     SpEnote enote_temp;
