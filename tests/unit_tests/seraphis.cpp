@@ -54,6 +54,7 @@ extern "C"
 #include "seraphis/tx_builders_mixed.h"
 #include "seraphis/tx_builders_outputs.h"
 #include "seraphis/tx_component_types.h"
+#include "seraphis/tx_extra.h"
 #include "seraphis/tx_misc_utils.h"
 #include "seraphis/txtype_squashed_v1.h"
 
@@ -1025,6 +1026,68 @@ TEST(seraphis, finalize_v1_output_proposal_set_sp_v1)
     check_is_owned_selfsend(out_proposals[0], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
     check_is_owned_selfsend(out_proposals[1], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
     check_is_owned_selfsend(out_proposals[2], keys, j_change, 1, JamtisSelfSendMAC::CHANGE);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis, tx_extra)
+{
+    /// make elements
+    std::vector<sp::ExtraFieldElement> extra_field_elements;
+    extra_field_elements.resize(3);
+
+    // rct::key
+    extra_field_elements[0].m_type = 1;
+    extra_field_elements[0].m_value.resize(32);
+    memcpy(extra_field_elements[0].m_value.data(), rct::identity().bytes, 32);
+
+    // std::uint64_t
+    std::uint64_t one{1};
+    extra_field_elements[1].m_type = 2;
+    extra_field_elements[1].m_value.resize(8);
+    memcpy(extra_field_elements[1].m_value.data(), &one, 8);
+
+    // std::uint64_t
+    extra_field_elements[2].m_type = 0;
+    extra_field_elements[2].m_value.resize(8);
+    memcpy(extra_field_elements[2].m_value.data(), &one, 8);
+
+
+    /// make an extra field
+    sp::TxExtra tx_extra;
+    sp::make_tx_extra(std::move(extra_field_elements), tx_extra);
+
+
+    /// validate field and recover elemeents
+    extra_field_elements.clear();
+    EXPECT_TRUE(sp::try_get_extra_field_elements(tx_extra, extra_field_elements));
+    EXPECT_TRUE(extra_field_elements.size() == 3);
+    EXPECT_TRUE(extra_field_elements[0].m_type == 0);
+    EXPECT_TRUE(extra_field_elements[0].m_value.size() == 8);
+    std::uint64_t element0;
+    memcpy(&element0, extra_field_elements[0].m_value.data(), 8);
+    EXPECT_TRUE(element0 == one);
+    EXPECT_TRUE(extra_field_elements[1].m_type == 1);
+    EXPECT_TRUE(extra_field_elements[1].m_value.size() == 32);
+    rct::key element1;
+    memcpy(element1.bytes, extra_field_elements[1].m_value.data(), 32);
+    EXPECT_TRUE(element1 == rct::identity());
+    EXPECT_TRUE(extra_field_elements[2].m_type == 2);
+    EXPECT_TRUE(extra_field_elements[2].m_value.size() == 8);
+    std::uint64_t element2;
+    memcpy(&element2, extra_field_elements[2].m_value.data(), 8);
+    EXPECT_TRUE(element2 == one);
+
+
+    /// adding a byte to the end causes failure
+    tx_extra.push_back(0);
+    extra_field_elements.clear();
+    EXPECT_FALSE(sp::try_get_extra_field_elements(tx_extra, extra_field_elements));
+
+
+    /// removing 2 bytes causes failure
+    tx_extra.pop_back();
+    tx_extra.pop_back();
+    extra_field_elements.clear();
+    EXPECT_FALSE(sp::try_get_extra_field_elements(tx_extra, extra_field_elements));
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, txtype_squashed_v1)

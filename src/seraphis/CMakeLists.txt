@@ -45,6 +45,7 @@ set(seraphis_sources
   tx_builders_mixed.cpp
   tx_builders_outputs.cpp
   tx_component_types.cpp
+  tx_extra.cpp
   tx_misc_utils.cpp
   tx_validators.cpp
   txtype_squashed_v1.cpp)

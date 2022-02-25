@@ -56,7 +56,7 @@ struct SpInputProposalV1 final
     /// core of the proposal
     SpInputProposal m_core;
 
-     /// less-than operator for sorting
+    /// less-than operator for sorting
     bool operator<(const SpInputProposalV1 &other_proposal) const
     {
         return m_core < other_proposal.m_core;
