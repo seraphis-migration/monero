@@ -28,9 +28,6 @@
 
 // NOT FOR PRODUCTION
 
-// Core implementation details for making Jamtis privkeys
-// - Jamtis is a specification for Seraphis-compatible addresses
-
 #pragma once
 
 //local headers
@@ -58,7 +55,7 @@ constexpr address_index_t MAX_ADDRESS_INDEX{(address_index_t{1} << 8*ADDRESS_IND
 constexpr std::size_t ADDRESS_TAG_MAC_BYTES{1};  //if > 1, then endianness must be preserved
 using address_tag_MAC_t = unsigned char;
 
-/// index ciphered with view-balance key: addr_tag = enc(little_endian(j) || little_endian(addr_tag_MAC))
+/// index ciphered with view-balance key: addr_tag = enc[k_vb](little_endian(j) || little_endian(addr_tag_MAC))
 struct address_tag_t final
 {
     unsigned char bytes[ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES];
@@ -109,7 +106,6 @@ enum class JamtisSelfSendMAC : address_tag_MAC_t
     SELF_SPEND = 1
 };
 
-/// overload equality operators for convenience
 inline bool operator==(const JamtisSelfSendMAC a, const address_tag_MAC_t b)
 {
     return static_cast<address_tag_MAC_t>(a) == b;

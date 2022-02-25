@@ -26,8 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Seraphis component types
 // NOT FOR PRODUCTION
+
+// Seraphis component types
 
 #pragma once
 
@@ -50,7 +51,7 @@ namespace sp
 {
 
 ////
-// SpEnoteV1 - v1 enote
+// SpEnoteV1
 ///
 struct SpEnoteV1 final
 {
@@ -72,7 +73,7 @@ struct SpEnoteV1 final
 
     /**
     * brief: append_to_string - convert enote to a string and append to existing string
-    *   str += Ko || C || enc(a) || view_tag || addr_tag
+    *   str += Ko || C || enc(a) || view_tag || addr_tag_enc
     * inoutparam: str_inout - enote contents concatenated to a string
     */
     void append_to_string(std::string &str_inout) const;
@@ -90,7 +91,7 @@ struct SpEnoteV1 final
 };
 
 ////
-// SpEnoteImageV1 - ENote Image V1
+// SpEnoteImageV1
 ///
 struct SpEnoteImageV1 final
 {
@@ -107,7 +108,7 @@ struct SpEnoteImageV1 final
 };
 
 ////
-// SpMembershipProofV1 - Membership Proof V1
+// SpMembershipProofV1
 // - Concise Grootle
 ///
 struct SpMembershipProofV1 final
@@ -116,7 +117,7 @@ struct SpMembershipProofV1 final
     sp::ConciseGrootleProof m_concise_grootle_proof;
     /// ledger indices of enotes referenced by the proof
     std::vector<std::size_t> m_ledger_enote_indices;
-    /// no consensus rules in mockup, store decomp 'ref set size = n^m' explicitly (TODO: move to consensus rule)
+    /// ref set size = n^m
     std::size_t m_ref_set_decomp_n;
     std::size_t m_ref_set_decomp_m;
 
@@ -124,7 +125,8 @@ struct SpMembershipProofV1 final
 };
 
 ////
-// SpImageProofV1 - ENote Image Proof V1: ownership and unspentness (legitimacy of key image)
+// SpImageProofV1
+// - ownership and unspentness (legitimacy of key image)
 // - Seraphis composition proof
 ///
 struct SpImageProofV1 final
@@ -136,8 +138,8 @@ struct SpImageProofV1 final
 };
 
 ////
-// SpBalanceProofV1 - Balance Proof V1
-// - balance proof: implicit with a remainder blinding factor: [sum(inputs) + remainder_blinding_factor*G == sum(outputs)]
+// SpBalanceProofV1
+// - balance proof: implicit with a remainder blinding factor: [sum(inputs) == sum(outputs) + remainder_blinding_factor*G]
 // - range proof: Bulletproofs+
 ///
 struct SpBalanceProofV1 final
@@ -151,10 +153,11 @@ struct SpBalanceProofV1 final
 };
 
 ////
-// SpTxSupplementV1 - supplementary info about a tx
-// - enote pubkeys: may not line up 1:1 with output enotes, so store in separate field
-// - tx memo
-// - tx fee
+// SpTxSupplementV1
+// - supplementary info about a tx
+//   - enote ephemeral pubkeys: may not line up 1:1 with output enotes, so store in separate field
+//   - tx memo
+//   - tx fee
 ///
 struct SpTxSupplementV1 final
 {

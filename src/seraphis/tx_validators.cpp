@@ -268,7 +268,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     if (!defer_batchable)
     {
         std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
-        range_proof_ptrs.emplace_back(&range_proofs);  //not batched: there is only one range proofs aggregate per tx
+        range_proof_ptrs.emplace_back(&range_proofs);  //note: there is only one range proofs aggregate per tx
 
         if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
             return false;
@@ -336,10 +336,12 @@ bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV
     const std::vector<const SpEnoteImage*> &input_images,
     const LedgerContext &ledger_context)
 {
+    // get multiexponentiation data set representing all the membership proofs
     rct::pippenger_prep_data validation_data;
     if (!try_get_sp_membership_proofs_v1_validation_data(membership_proofs, input_images, ledger_context, validation_data))
         return false;
 
+    // check that the membership proof multiexp data resolves to the identity element
     return multiexp_is_identity(std::move(validation_data));
 }
 //-------------------------------------------------------------------------------------------------------------------

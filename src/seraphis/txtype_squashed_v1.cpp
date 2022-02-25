@@ -54,8 +54,8 @@
 
 //standard headers
 #include <algorithm>
-#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -141,8 +141,7 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
     size += m_outputs.size() * SpEnoteV1::get_size_bytes();
 
     // balance proof
-    if (m_balance_proof.get() != nullptr)
-        size += m_balance_proof->get_size_bytes();
+    size += m_balance_proof.get_size_bytes();
 
     // membership proofs
     // - assumes all have the same size
@@ -162,7 +161,7 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     std::vector<SpEnoteV1> outputs,
-    std::shared_ptr<const SpBalanceProofV1> balance_proof,
+    SpBalanceProofV1 balance_proof,
     std::vector<SpImageProofV1> image_proofs,
     std::vector<SpMembershipProofV1> membership_proofs,
     SpTxSupplementV1 tx_supplement,
@@ -256,9 +255,6 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
 template <>
 bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
 {
-    if (tx.m_balance_proof.get() == nullptr)
-        return false;
-
     // validate component counts (num inputs/outputs/etc.)
     if (!validate_sp_semantics_component_counts_v1(
         semantic_config_component_counts_v1(tx.m_tx_semantic_rules_version),
@@ -267,7 +263,7 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
         tx.m_image_proofs.size(),
         tx.m_outputs.size(),
         tx.m_supplement.m_output_enote_ephemeral_pubkeys.size(),
-        tx.m_balance_proof->m_bpp_proof.V.size()))
+        tx.m_balance_proof.m_bpp_proof.V.size()))
     {
         return false;
     }
@@ -312,12 +308,8 @@ bool validate_tx_linking_tags<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const Le
 template <>
 bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const bool defer_batchable)
 {
-    // sanity check
-    if (!tx.m_balance_proof || tx.m_balance_proof.use_count() == 0)
-        return false;
-
     // balance proof
-    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, *(tx.m_balance_proof), defer_batchable))
+    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, tx.m_balance_proof, defer_batchable))
     {
         return false;
     }
@@ -392,10 +384,7 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
             input_image_ptrs.push_back(&(input_image.m_core));
 
         // gather range proofs
-        if (tx->m_balance_proof.get() == nullptr)
-            return false;
-
-        range_proof_ptrs.push_back(&(tx->m_balance_proof->m_bpp_proof));
+        range_proof_ptrs.push_back(&(tx->m_balance_proof.m_bpp_proof));
     }
 
     // batch verification: collect pippenger data sets for an aggregated multiexponentiation

@@ -94,7 +94,7 @@ const rct::key& get_X_gen();
 */
 rct::key invert(const rct::key &x);
 /**
-* brief: invert - decompose an integer with a fixed base and size
+* brief: decompose - decompose an integer with a fixed base and size
 *   val -> [_, _, ... ,_]
 *   - num slots = 'size'
 *   - numeric base = 'base'
@@ -106,7 +106,7 @@ rct::key invert(const rct::key &x);
 */
 void decompose(const std::size_t val, const std::size_t base, const std::size_t size, std::vector<std::size_t> &r_out);
 /**
-* brief: delta - Kronecker delta
+* brief: kronecker_delta - Kronecker delta
 * param: x - first integer
 * param: y - second integer
 * return: 1 if x == y, else 0
@@ -129,9 +129,9 @@ rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m);
 */
 rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows, const bool negate_all = false);
 /**
-* brief: small_scalar_gen - Generate a curve scalar of arbitrary size (in bytes).
+* brief: small_scalar_gen - Generate a curve scalar of arbitrary maximum size (in bytes).
 *   WARNING: NOT FOR USE WITH CRYPTOGRAPHIC SECRETS
-* param: size_bytes - size of the scalar to generate
+* param: size_bytes - maximum value of the scalar to generate, as bytes (e.g. size_bytes = 1 means max_scalar = 255)
 * return: generated scalar
 */
 rct::key small_scalar_gen(const std::size_t size_bytes);
@@ -168,7 +168,12 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
 * result: true if input key is in prime order EC subgroup
 */
 bool key_domain_is_prime_subgroup(const rct::key &check_key);
-//todo
+/**
+* brief: multiexp_is_identity - check that a set/sets of pippenger multiexponentiation data points resolve to identity
+*    a A + b B + ... ?= 0
+* param: multiexp_data_set(s) - multiexp data to resolve with pippenger
+* result: true if multiexponentiating the data results in the identity element
+*/
 bool multiexp_is_identity(const std::vector<rct::pippenger_prep_data> &multiexp_data_sets);
 bool multiexp_is_identity(rct::pippenger_prep_data multiexp_data_set);
 

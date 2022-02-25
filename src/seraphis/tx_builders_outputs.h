@@ -26,8 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Seraphis tx-builder/component-builder implementations
 // NOT FOR PRODUCTION
+
+// Seraphis tx-builder/component-builder implementations
 
 #pragma once
 
@@ -52,24 +53,25 @@ namespace sp
 {
 
 /**
-* brief: get_tx_membership_proof_message_sp_v1 - message for membership proofs
-*   - H(crypto project name, enote ledger references)
-* TODO: use a real reference system instead of plain indices
-* param - enote_ledger_indices
-* return: empty message for a membership proof
+* brief: check_v1_output_proposals_semantics_sp_v1 - check semantics of a set of output proposals
+*   - if 2 proposals, should be 1 unique enote ephemeral pubkey
+*   - if >2 proposals, should be 1 unique enote ephemeral pubkey per output
+*   - proposals should be sorted
+*   - proposals should have unique onetime addresses
+* param - output_proposals -
 */
 void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposalV1> &output_proposals);
 /**
-* brief: get_tx_membership_proof_message_sp_v1 - message for membership proofs
-*   - H(crypto project name, enote ledger references)
-* TODO: use a real reference system instead of plain indices
-* param - enote_ledger_indices
-* return: empty message for a membership proof
+* brief: check_v1_tx_supplement_semantics_sp_v1 - check semantics of a tx supplement
+*   - if num_outputs == 2, should be 1 enote ephemeral pubkey
+*   - if num_outputs > 2, should be 'num_outputs' enote ephemeral pubkeys
+*   - all enote ephemeral pubkeys should be unique
+* param - tx_supplement -
+* param - num_outputs -
 */
 void check_v1_tx_supplement_semantics_sp_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs);
 /**
 * brief: make_v1_tx_outputs_sp_v1 - make v1 tx outputs
-*   TODO: special treatment of change dest for 2-out tx (expect both outputs to have same enote pub key, only store 1)
 * param: destinations -
 * outparam: outputs_out -
 * outparam: output_amounts_out -
@@ -81,19 +83,33 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_prop
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
     SpTxSupplementV1 &tx_supplement_inout);
-//todo
+/**
+* brief: finalize_v1_output_proposal_set_sp_v1 - finalize a set of output proposals
+*   - add a change output if necessary
+*   - add a dummy output if appropriate
+* param: total_input_amount -
+* param: transaction_fee -
+* param: change_destination -
+* param: wallet_spend_pubkey -
+* param: k_view_balance -
+* inoutparam: output_proposals_inout -
+*/
 void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_t &total_input_amount,
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<SpOutputProposalV1> &output_proposals_inout);
-//todo
+/**
+* brief: make_v1_tx_proposal_v1 - make v1 tx proposal (set of outputs that can be incorporated in a full tx)
+* param: output_proposals -
+* outparam: proposal_out --
+*/
 void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals, SpTxProposalV1 &proposal_out);
 /**
-* brief: gen_mock_sp_destinations_v1 - create random mock destinations
+* brief: gen_mock_sp_output_proposals_v1 - create random output proposals
 * param: out_amounts -
-* return: set of generated destinations
+* return: set of generated output proposals
 */
 std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts);
 

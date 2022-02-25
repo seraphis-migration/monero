@@ -26,8 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// misc. utility functions for seraphis transactions
 // NOT FOR PRODUCTION
+
+// misc. utility functions for seraphis transactions
 
 #pragma once
 
@@ -48,7 +49,7 @@ namespace sp
 {
 
 /// use operator< to get operator==
-/// WARNING: use with caution, since equality is not always implied by operator< semantics depending on implementation
+/// WARNING: use with caution, since equality is not always implied by operator<, depending on implementation
 ///TODO: really want the spaceship operator instead (C++20)...
 struct equals_from_less final
 {

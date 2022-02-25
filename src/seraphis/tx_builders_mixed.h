@@ -26,8 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Seraphis tx-builder/component-builder implementations
 // NOT FOR PRODUCTION
+
+// Seraphis tx-builder/component-builder implementations
 
 #pragma once
 
@@ -40,7 +41,6 @@
 //third party headers
 
 //standard headers
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -62,8 +62,8 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     const std::vector<SpEnoteV1> &output_enotes,
     const SpTxSupplementV1 &tx_supplement);
 /**
-* brief: make_v1_tx_balance_proof_sp_v1 - make v1 tx balance proof (BP+ for range proofs; balance is implicit)
-*   - range proofs for input image amount commitments and output commitments (squashed enote model)
+* brief: make_v1_tx_balance_proof_sp_v1 - make v1 tx balance proof (BP+ for range proofs; balance check is sum-to-zero)
+*   - range proofs: for input image amount commitments and output commitments (squashed enote model)
 * param: input_amounts -
 * param: output_amounts -
 * param: input_image_amount_commitment_blinding_factors -
@@ -74,18 +74,24 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_am
     const std::vector<rct::xmr_amount> &output_amounts,
     const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
-    std::shared_ptr<const SpBalanceProofV1> &balance_proof_out);
+    SpBalanceProofV1 &balance_proof_out);
 /**
-* brief: balance_check_in_out_amnts_sp_v1 - wrapper on balance_check_in_out_amnts()
+* brief: balance_check_in_out_amnts_sp_v1 - verify that input amounts equal output amounts + fee
 * param: input_proposals -
-* param: destinations -
+* param: output_proposals -
 * param: transaction_fee -
-* return: true if amounts balance between inputs and outputs
+* return: true if amounts balance between inputs and outputs (plus fee)
 */
 bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const std::vector<SpOutputProposalV1> &output_proposals,
     const rct::xmr_amount transaction_fee);
-//todo
+/**
+* brief: make_v1_tx_partial_v1 - make v1 partial transaction (everything ready for a full tx except membership proofs)
+* param: proposal -
+* param: partial_inputs -
+* param: version_string -
+* outparam: partial_tx_out -
+*/
 void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
     std::vector<SpTxPartialInputV1> partial_inputs,
     const std::string &version_string,

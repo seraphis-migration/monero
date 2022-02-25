@@ -174,7 +174,7 @@ struct SpCompositionProofMultisigPartial
 /**
 * brief: sp_composition_prove - create a Seraphis composition proof
 * param: message - message to insert in Fiat-Shamir transform hash
-* param: K - main proof key
+* param: K - main proof key = x G + y X + z U
 * param: x - secret key
 * param: y - secret key
 * param: z - secret key
@@ -189,8 +189,8 @@ SpCompositionProof sp_composition_prove(const rct::key &message,
 * brief: sp_composition_verify - verify a Seraphis composition proof
 * param: proof - proof to verify
 * param: message - message to insert in Fiat-Shamir transform hash
-* param: K - main proof key
-* param: KI - proof key image
+* param: K - main proof key = x G + y X + z U
+* param: KI - proof key image = (z/y) U
 * return: true/false on verification result
 */
 bool sp_composition_verify(const SpCompositionProof &proof,

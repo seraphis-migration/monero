@@ -26,8 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Seraphis transaction-builder helper types
 // NOT FOR PRODUCTION
+
+// Seraphis transaction-builder helper types
 
 #pragma once
 
@@ -155,7 +156,6 @@ struct SpTxProposalV1 final
     /// output amounts and blinding factors (for future balance proofs)
     std::vector<rct::xmr_amount> m_output_amounts;
     std::vector<crypto::secret_key> m_output_amount_commitment_blinding_factors;
-    ///TODO: fee? (maybe keep it separate since proposal prefix is independent of fee)
 
     /// message to be signed by input spend proofs
     rct::key get_proposal_prefix(const std::string &version_string) const;
@@ -207,7 +207,7 @@ struct SpTxPartialV1 final
     /// tx outputs (new e-notes)
     std::vector<SpEnoteV1> m_outputs;
     /// balance proof (balance proof and range proofs)
-    std::shared_ptr<const SpBalanceProofV1> m_balance_proof;
+    SpBalanceProofV1 m_balance_proof;
     /// composition proofs: ownership/unspentness for each input
     std::vector<SpImageProofV1> m_image_proofs;
     /// supplemental data for tx

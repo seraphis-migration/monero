@@ -26,8 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Seraphis tx validator implementations
 // NOT FOR PRODUCTION
+
+// Seraphis tx validator implementations
 
 #pragma once
 
@@ -69,13 +70,12 @@ struct SemanticConfigRefSetSizeV1 final
 
 /**
 * brief: validate_sp_semantics_component_counts_v1 - check tx component counts are valid
+*   - min_inputs <= num(input images) <= max_inputs
 *   - num(membership proofs) == num(image proofs) == num(input images)
-*   - num(outputs) >= 1
+*   - min_outputs <= num(outputs) <= max_outputs
 *   - num(range proofs) == num(input images) + num(outputs)
-*   - num(enote pubkeys) == num(outputs)  // TODO: if (num(outputs) == 2), num(enote pubkeys) ?= 1
-* 
-*   - differences from v1:
-*     - input image amount commitments also have range proofs
+*   - if (num(outputs) == 2), num(enote pubkeys) == 1, else num(enote pubkeys) == num(outputs)
+*
 * param: config -
 * param: num_input_images -
 * param: num_membership_proofs -
@@ -94,6 +94,8 @@ bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCoun
     const std::size_t num_range_proofs);
 /**
 * brief: validate_sp_semantics_ref_set_size_v1 - check membership proofs have consistent reference set sizes
+*   - decomp_n_min <= decomp_n <= decom_n_max
+*   - decomp_m_min <= decomp_m <= decom_m_max
 *   - num(refd enotes) == ref set size
 * param: config
 * param: membership_proofs -
@@ -104,7 +106,7 @@ bool validate_sp_semantics_ref_set_size_v1(const SemanticConfigRefSetSizeV1 &con
 /**
 * brief: validate_sp_semantics_input_images_v1 - check key images are well-formed
 *   - key images are in the prime-order EC subgroup: l*KI == identity
-*   - masked address and masked commitment are not identity
+*   - key image, masked address, and masked commitment are not identity
 * param: input_images -
 * return: true/false on validation result
 */
@@ -113,7 +115,9 @@ bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &in
 * brief: validate_sp_semantics_sorting_v1 - check tx components are properly sorted
 *   - membership proof referenced enote indices are sorted (ascending)
 *   - input images sorted by key image with byte-wise comparisons (ascending)
+*   - input key images are all unique
 *   - output enotes sorted by onetime addresses with byte-wise comparisons (ascending)
+*   - onetime addresses are all unique (ensures sorting is deterministic)
 * param: membership_proofs -
 * param: input_images -
 * param: outputs -
@@ -125,11 +129,10 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
 /**
 * brief: validate_sp_linking_tags_v1 - check tx does not double spend
 *   - no key image duplicates in ledger
-*   - no key image duplicates in tx
-* note: checking duplicates in tx pool could be embedded in the ledger context implementation
+* TODO: checking duplicates in tx pool could be embedded in the ledger context implementation
 *       - e.g. derive from the main ledger context a 'tx pool and ledger context', then virtual overload the key image
 *         check to also check the tx pool
-* note2: similarly, when appending a block, you could have a derived ledger context that checks for in-block duplicates
+* TODO: similarly, when appending a block, you could have a derived ledger context that checks for in-block duplicates
 * param: input_images -
 * param: ledger_context -
 * return: true/false on validation result
@@ -151,13 +154,12 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     const SpBalanceProofV1 &balance_proof,
     const bool defer_batchable);
 /**
-* brief: validate_sp_membership_proofs_v1 - check that tx inputs exist in the ledger
-*   - try to get referenced enotes from ledger in 'squashed enote' form (NOT txpool)
+* brief: validate_sp_membership_proofs_v1 - verify that tx inputs exist in the ledger
+*   - try to get referenced enotes from ledger in 'squashed enote' form (TODO: NOT txpool)
 *   - check concise grootle proofs (membership proofs)
 * param: membership_proofs -
 * param: input_images -
 * param: ledger_context -
-* outparam: validation_data_out -
 * return: true/false on validation result
 */
 bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpMembershipProofV1*> &membership_proofs,

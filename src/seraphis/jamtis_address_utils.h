@@ -53,7 +53,7 @@ namespace jamtis
 {
 
 /**
-* brief: make_jamtis_spendkey_extension -
+* brief: make_jamtis_spendkey_extension - k^j_x
 *   - k^j_x = H_n[s_ga](j)
 * param: s_generate_address - s_ga
 * param: j - address index
@@ -63,7 +63,7 @@ void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
     const address_index_t j,
     crypto::secret_key &extension_out);
 /**
-* brief: make_jamtis_address_privkey -
+* brief: make_jamtis_address_privkey - k^j_a
 *   - k^j_a = H_n[s_ga](j)
 * param: s_generate_address - s_ga
 * param: j - address index
@@ -73,7 +73,7 @@ void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
     const address_index_t j,
     crypto::secret_key &address_privkey_out);
 /**
-* brief: make_jamtis_address_spend_key -
+* brief: make_jamtis_address_spend_key - K_1
 *   - K_1 = k^j_x X + K_s
 * param: wallet_spend_pubkey - K_s
 * param: s_generate_address - s_ga
@@ -96,7 +96,15 @@ bool test_jamtis_nominal_spend_key(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
     const address_index_t j,
     const rct::key &nominal_spend_key);
-//todo
+/**
+* brief: make_seraphis_key_image_jamtis_style - KI
+*   - KI = (k_m/(k_vb + k^j_a + H_n(q))) U
+* param: wallet_spend_pubkey - K_s = k_vb X + k_m U
+* param: k_view_balance - k_vb
+* param: address_privkey - k^j_a
+* param: address_extension - H_n(q)
+* outparam: key_image_out - KI
+*/
 void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &address_privkey,

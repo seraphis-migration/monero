@@ -375,7 +375,7 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals, Sp
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts)
 {
-    // generate random proposals
+    // generate random output proposals
     std::vector<SpOutputProposalV1> output_proposals;
     output_proposals.reserve(out_amounts.size());
 

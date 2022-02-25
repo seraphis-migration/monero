@@ -371,7 +371,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     // tx components
     std::vector<SpEnoteImageV1> input_images;
     std::vector<SpEnoteV1> outputs;
-    std::shared_ptr<const SpBalanceProofV1> balance_proof;
+    SpBalanceProofV1 balance_proof;
     std::vector<SpImageProofV1> tx_image_proofs;
     std::vector<SpMembershipProofAlignableV1> tx_membership_proofs_alignable;
     std::vector<SpMembershipProofV1> tx_membership_proofs;

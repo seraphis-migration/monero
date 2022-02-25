@@ -26,8 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Seraphis tx-builder/component-builder implementations
 // NOT FOR PRODUCTION
+
+// Seraphis tx-builder/component-builder implementations
 
 #pragma once
 
@@ -64,8 +65,8 @@ void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &inpu
 * brief: get_tx_membership_proof_message_sp_v1 - message for membership proofs
 *   - H(crypto project name, enote ledger references)
 * TODO: use a real reference system instead of plain indices
-* param - enote_ledger_indices
-* return: empty message for a membership proof
+* param - enote_ledger_indices -
+* return: the message to sign in a membership proof
 */
 rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &enote_ledger_indices);
 /**
@@ -86,7 +87,7 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     std::vector<rct::xmr_amount> &input_amounts_out,
     std::vector<crypto::secret_key> &blinding_factors_out);
 /**
-* brief: make_v1_tx_image_proof_sp_v1 - make a v1 tx input image proof (seraphis composition proof) (squashed enote model)
+* brief: make_v1_tx_image_proof_sp_v1 - make a seraphis composition proof in the squashed enote model
 * param: input_proposal -
 * param: message -
 * outparam: tx_image_proof_out -
@@ -95,8 +96,7 @@ void make_v1_tx_image_proof_sp_v1(const SpInputProposal &input_proposal,
     const rct::key &message,
     SpImageProofV1 &tx_image_proof_out);
 /**
-* brief: make_v1_tx_image_proofs_sp_v1 - make v1 tx input image proofs (seraphis composition proofs: 1 per input)
-*   (squashed enote model)
+* brief: make_v1_tx_image_proofs_sp_v1 - make a set of seraphis composition proofs in the squashed enote model
 * param: input_proposals -
 * param: message -
 * outparam: tx_image_proofs_out -
@@ -105,7 +105,7 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_p
     const rct::key &message,
     std::vector<SpImageProofV1> &tx_image_proofs_out);
 /**
-* brief: make_v1_tx_membership_proof_sp_v1 - make a v1 membership proof (concise grootle) (squashed enote model)
+* brief: make_v1_tx_membership_proof_sp_v1 - make a concise grootle membership proof in the squashed enote model
 * param: membership_ref_set -
 * param: image_address_mask -
 * param: image_amount_mask -
@@ -120,8 +120,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
     const crypto::secret_key &image_amount_mask,
     SpMembershipProofAlignableV1 &tx_membership_proof_out);
 /**
-* brief: make_v1_tx_membership_proofs_sp_v1 - make v1 membership proofs (concise grootle: 1 per input)
-*   (squashed enote model)
+* brief: make_v1_tx_membership_proofs_sp_v1 - make a set of concise grootle membership proofs in the squashed enote model
 * param: membership_ref_sets -
 * param: image_address_masks -
 * param: image_amount_masks -
@@ -137,7 +136,12 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
 void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const SpTxPartialV1 &partial_tx,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out);
-//todo
+/**
+* brief: make_v1_tx_partial_input_v1 - make a v1 partial input
+* param: input_proposal -
+* param: proposal_prefix -
+* outparam: partial_input_out -
+*/
 void make_v1_tx_partial_input_v1(const SpInputProposalV1 &input_proposal,
     const rct::key &proposal_prefix,
     SpTxPartialInputV1 &partial_input_out);
@@ -157,13 +161,13 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input
 */
 std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts);
 /** //todo
-* brief: gen_mock_sp_membership_ref_sets_v1 - create random reference sets for tx inputs, with real spend at a random index,
+* brief: gen_mock_sp_membership_ref_set_v1 - create a random reference set for an enote, with real spend at a random index,
 *   and update mock ledger to include all members of the reference set (including squashed enotes)
-* param: input_proposals -
+* param: input_enote -
 * param: ref_set_decomp_n -
 * param: ref_set_decomp_m -
 * inoutparam: ledger_context_inout -
-* return: set of membership proof reference sets
+* return: a reference set that can be used to make a membership proof
 */
 SpMembershipReferenceSetV1 gen_mock_sp_membership_ref_set_v1(
     const SpEnote &input_enote,

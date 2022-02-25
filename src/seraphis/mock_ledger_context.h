@@ -26,10 +26,11 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// NOT FOR PRODUCTION
+
 // Mock ledger context: for testing
 // note: In a real ledger, new enotes and new linking tags from a tx must be committed in ONE atomic operation. Otherwise,
 //       the order of linking tags and enotes may be misaligned.
-// NOT FOR PRODUCTION
 
 #pragma once
 

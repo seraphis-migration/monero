@@ -26,8 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Seraphis base non-tx types
 // NOT FOR PRODUCTION
+
+// Seraphis base types
 
 #pragma once
 
@@ -82,7 +83,7 @@ struct SpEnote final
 ///
 struct SpEnoteImage final
 {
-    /// Ko' = t_k G + (k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U
+    /// Ko' = t_k G + H(Ko,C)*[(k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U]   (in the squashed enote model)
     rct::key m_masked_address;
     /// C' = (t_c + x) G + a H
     rct::key m_masked_commitment;

@@ -26,8 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// Interface for interacting with a ledger when validating a tx.
 // NOT FOR PRODUCTION
+
+// Interface for interacting with a ledger when validating a tx.
 
 #pragma once
 

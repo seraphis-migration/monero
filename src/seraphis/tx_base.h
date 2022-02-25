@@ -26,8 +26,9 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// base tx interface
 // NOT FOR PRODUCTION
+
+// base tx interface
 
 #pragma once
 
@@ -51,15 +52,15 @@ namespace sp
 namespace sp
 {
 
-//// concepts: must be implemented by each tx type
+//// must be implemented by each tx type
 
-/// short description of the tx type
-template <typename SpTxType>    
+/// short description of the tx type (e.g. 'Sp-Squashed-V1')
+template <typename SpTxType>
 std::string get_descriptor();
 
-/// tx format version
+/// tx structure version (e.g. from struct TxStructureVersionSp)
 template <typename SpTxType>
-unsigned char get_format_version();
+unsigned char get_structure_version();
 
 /// transaction validators
 template <typename SpTxType>
@@ -79,42 +80,42 @@ bool validate_txs_batchable(const std::vector<const SpTxType*> &txs, const Ledge
 /// Transaction protocol era: following CryptoNote (1) and RingCT (2)
 constexpr unsigned char TxEraSp{3};
 
-/// Transaction structure types
+/// Transaction structure types: tx types within era 'TxEraSp'
 enum class TxStructureVersionSp : unsigned char
 {
     /// mining transaction (TODO)
     TxTypeSpMining = 0,
-    /// concise grootle in the squashed enote model + separate composition proofs
+    /// concise grootle in the squashed enote model + seraphis composition proofs + BP+ range proofs with p > 0 balance proof
     TxTypeSpSquashedV1 = 1
 };
 
 /// get the tx version string: era | format | semantic rules
 inline void get_versioning_string_tx_base(const unsigned char tx_era_version,
-    const unsigned char tx_format_version,
+    const unsigned char tx_structure_version,
     const unsigned char tx_semantic_rules_version,
     std::string &version_string)
 {
     /// era of the tx (e.g. CryptoNote/RingCT/Seraphis)
     version_string += static_cast<char>(tx_era_version);
-    /// format version of the tx within its era
-    version_string += static_cast<char>(tx_format_version);
+    /// structure version of the tx within its era
+    version_string += static_cast<char>(tx_structure_version);
     /// a tx format's validation rules version
     version_string += static_cast<char>(tx_semantic_rules_version);
 }
 
 /// get the tx version string for seraphis txs: TxEraSp | format | semantic rules
-inline void get_versioning_string_seraphis_base(const unsigned char tx_format_version,
+inline void get_versioning_string_seraphis_base(const unsigned char tx_structure_version,
     const unsigned char tx_semantic_rules_version,
     std::string &version_string)
 {
-    get_versioning_string_tx_base(TxEraSp, tx_format_version, tx_semantic_rules_version, version_string);
+    get_versioning_string_tx_base(TxEraSp, tx_structure_version, tx_semantic_rules_version, version_string);
 }
 
-/// get the tx version string for a specific seraphis tx type (format version is constant per tx type)
+/// get the tx version string for a specific seraphis tx type
 template <typename SpTxType>
 void get_versioning_string(const unsigned char tx_semantic_rules_version, std::string &version_string)
 {
-    get_versioning_string_seraphis_base(get_format_version<SpTxType>(), tx_semantic_rules_version, version_string);
+    get_versioning_string_seraphis_base(get_structure_version<SpTxType>(), tx_semantic_rules_version, version_string);
 }
 
 
@@ -182,7 +183,7 @@ struct SpTxParamPack
 /**
 * brief: make_mock_tx - make a mock transaction
 * type: SpTxType - 
-* type: SpTxParamsT
+* type: SpTxParamsT -
 * param: params -
 * param: in_amounts -
 * param: out_amounts -

@@ -26,9 +26,10 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// NOT FOR PRODUCTION
+
 // Seraphis implemented with concise Grootle membership proofs on squashed enotes and separate
 //     composition proofs for each input image
-// NOT FOR PRODUCTION
 
 #pragma once
 
@@ -44,7 +45,6 @@
 //third party headers
 
 //standard headers
-#include <memory>
 #include <string>
 #include <vector>
 
@@ -71,7 +71,7 @@ struct SpTxSquashedV1 final
     /// tx outputs (new e-notes)
     std::vector<SpEnoteV1> m_outputs;
     /// balance proof (balance proof and range proofs)
-    std::shared_ptr<const SpBalanceProofV1> m_balance_proof;
+    SpBalanceProofV1 m_balance_proof;
     /// composition proofs: ownership/key-image-legitimacy for each input
     std::vector<SpImageProofV1> m_image_proofs;
     /// concise Grootle proofs on squashed enotes: membership for each input
@@ -86,26 +86,27 @@ struct SpTxSquashedV1 final
     std::size_t get_size_bytes() const;
 };
 
-//todo
+/**
+* brief: make_seraphis_tx_squashed_v1 - make an SpTxSquashedV1 transaction
+* ...
+* outparam: tx_out -
+*/
 void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     std::vector<SpEnoteV1> outputs,
-    std::shared_ptr<const SpBalanceProofV1> balance_proof,
+    SpBalanceProofV1 balance_proof,
     std::vector<SpImageProofV1> image_proofs,
     std::vector<SpMembershipProofV1> membership_proofs,
     SpTxSupplementV1 tx_supplement,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);
-//todo
 void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
     std::vector<SpMembershipProofV1> membership_proofs,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);
-//todo
 void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
     std::vector<SpMembershipProofAlignableV1> alignable_membership_proofs,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);
-//todo
 void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
     std::vector<SpOutputProposalV1> output_proposals,
     const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
@@ -117,16 +118,16 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
 
 /// short descriptor of the tx type
 template <>
-inline std::string get_descriptor<SpTxSquashedV1>() { return "Sp-Squashed"; }
+inline std::string get_descriptor<SpTxSquashedV1>() { return "Sp-Squashed-V1"; }
 
-/// tx format version
+/// tx structure version
 template <>
-inline unsigned char get_format_version<SpTxSquashedV1>()
+inline unsigned char get_structure_version<SpTxSquashedV1>()
 {
     return static_cast<unsigned char>(TxStructureVersionSp::TxTypeSpSquashedV1);
 }
 
-/// punt for versioning string
+/// versioning string for an SpTxSquashedV1 tx
 inline void get_versioning_string(const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version,
     std::string &version_string)
 {
@@ -152,7 +153,7 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
 //// mock-ups
 
 /**
-* brief: make_mock_tx - make a SpTxSquashedV1 transaction (function specialization)
+* brief: make_mock_tx - make an SpTxSquashedV1 transaction
 * param: params -
 * param: in_amounts -
 * param: out_amounts -
