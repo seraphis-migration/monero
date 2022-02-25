@@ -103,14 +103,19 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
 /**
 * brief: make_v1_tx_proposal_v1 - make v1 tx proposal (set of outputs that can be incorporated in a full tx)
 * param: output_proposals -
+* param: additional_memo_elements -
 * outparam: proposal_out --
 */
-void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals, SpTxProposalV1 &proposal_out);
+void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
+    std::vector<ExtraFieldElement> additional_memo_elements,
+    SpTxProposalV1 &proposal_out);
 /**
 * brief: gen_mock_sp_output_proposals_v1 - create random output proposals
 * param: out_amounts -
+* param: num_random_memo_elements -
 * return: set of generated output proposals
 */
-std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts);
+std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts,
+    const std::size_t num_random_memo_elements);
 
 } //namespace sp

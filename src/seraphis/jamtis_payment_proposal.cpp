@@ -98,13 +98,19 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
 
     // encrypted amount: enc_amount = a ^ H_8(q, 8 r G)
     output_proposal_out.m_encoded_amount = encode_jamtis_amount_plain(m_amount, q, amount_baked_key);
+
+    // memo elements
+    output_proposal_out.m_memo_elements = m_memo_elements;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount)
+void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount, const std::size_t num_random_memo_elements)
 {
     m_destination.gen();
     m_amount = amount;
     m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+    m_memo_elements.resize(num_random_memo_elements);
+    for (ExtraFieldElement &element: m_memo_elements)
+        element.gen();
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const
@@ -164,15 +170,23 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
 
     // encrypted amount: enc_amount = a ^ H_8(q)  //note: no baked key
     output_proposal_out.m_encoded_amount = encode_jamtis_amount_selfsend(m_amount, q);
+
+    // memo elements
+    output_proposal_out.m_memo_elements = m_memo_elements;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount, const JamtisSelfSendMAC type)
+void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount,
+    const JamtisSelfSendMAC type,
+    const std::size_t num_random_memo_elements)
 {
     m_destination.gen();
     m_amount = amount;
     m_type = type;
     m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
     m_viewbalance_privkey = rct::rct2sk(rct::skGen());
+    m_memo_elements.resize(num_random_memo_elements);
+    for (ExtraFieldElement &element: m_memo_elements)
+        element.gen();
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool is_self_send_output_proposal(const SpOutputProposalV1 &proposal,

@@ -177,8 +177,9 @@ bool validate_txs(const std::vector<const SpTxType*> &txs, const LedgerContext &
 ///
 struct SpTxParamPack
 {
-    std::size_t ref_set_decomp_n;
-    std::size_t ref_set_decomp_m;
+    std::size_t ref_set_decomp_n{0};
+    std::size_t ref_set_decomp_m{0};
+    std::size_t num_random_memo_elements{0};
 };
 /**
 * brief: make_mock_tx - make a mock transaction

@@ -110,6 +110,7 @@ void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
 void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
     std::vector<SpOutputProposalV1> output_proposals,
     const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    std::vector<ExtraFieldElement> additional_memo_elements,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);
 

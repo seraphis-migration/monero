@@ -73,11 +73,17 @@ struct ExtraFieldElement final
 
     /// convert to bytes: varint(type) || varint(length) || value
     void append_bytes(std::vector<unsigned char> &bytes_inout) const;
+
+    /// generate a random extra field element
+    void gen();
 };
 
 //todo
 void make_tx_extra(std::vector<ExtraFieldElement> elements, TxExtra &tx_extra_out);
 //todo
 bool try_get_extra_field_elements(const TxExtra &tx_extra, std::vector<ExtraFieldElement> &elements_out);
+//todo
+void accumulate_extra_field_elements(const std::vector<ExtraFieldElement> &elements_to_add,
+    std::vector<ExtraFieldElement> &elements_inout);
 
 } //namespace sp

@@ -37,6 +37,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
 #include "tx_component_types.h"
+#include "tx_extra.h"
 
 //third party headers
 
@@ -92,7 +93,8 @@ struct SpOutputProposalV1 final
     /// addr_tag_enc
     jamtis::encrypted_address_tag_t m_addr_tag_enc;
 
-    ///TODO: misc memo suggestion (fields to add to memo)
+    /// memo elements to add to the tx memo
+    std::vector<ExtraFieldElement> m_memo_elements;
 
     /// less-than operator for sorting
     bool operator<(const SpOutputProposalV1 &other_proposal) const
@@ -106,8 +108,9 @@ struct SpOutputProposalV1 final
     /**
     * brief: gen - generate a V1 Destination (random)
     * param: amount -
+    * param: num_random_memo_elements -
     */
-    void gen(const rct::xmr_amount amount);
+    void gen(const rct::xmr_amount amount, const std::size_t num_random_memo_elements);
 };
 
 ////

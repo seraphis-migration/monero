@@ -215,6 +215,7 @@ void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
 void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
     std::vector<SpOutputProposalV1> output_proposals,
     const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    std::vector<ExtraFieldElement> additional_memo_elements,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
 {
@@ -230,7 +231,7 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
 
     // tx proposal
     SpTxProposalV1 tx_proposal;
-    make_v1_tx_proposal_v1(std::move(output_proposals), tx_proposal);
+    make_v1_tx_proposal_v1(std::move(output_proposals), std::move(additional_memo_elements), tx_proposal);
     rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
 
     // partial inputs
@@ -282,8 +283,11 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
         return false;
     }
 
-    // validate input images, membershio proof ref sets, and outputs are sorted
-    if (!validate_sp_semantics_sorting_v1(tx.m_membership_proofs, tx.m_input_images, tx.m_outputs))
+    // validate input images, membershio proof ref sets, outputs, and memo elements are sorted
+    if (!validate_sp_semantics_sorting_v1(tx.m_membership_proofs,
+        tx.m_input_images,
+        tx.m_outputs,
+        tx.m_supplement.m_tx_extra))
     {
         return false;
     }
@@ -428,7 +432,9 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
     std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(in_amounts)};
 
     // make mock outputs
-    std::vector<SpOutputProposalV1> output_proposals{gen_mock_sp_output_proposals_v1(out_amounts)};
+    std::vector<SpOutputProposalV1> output_proposals{
+            gen_mock_sp_output_proposals_v1(out_amounts, params.num_random_memo_elements)
+        };
 
     // for 2-out tx, the enote ephemeral pubkey is shared by both outputs
     if (output_proposals.size() == 2)
@@ -442,9 +448,15 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
                 ledger_context_inout)
         };
 
+    // make additional mock memo elements
+    std::vector<ExtraFieldElement> additional_memo_elements;
+    additional_memo_elements.resize(params.num_random_memo_elements);
+    for (ExtraFieldElement &element : additional_memo_elements)
+        element.gen();
+
     // make tx
     make_seraphis_tx_squashed_v1(input_proposals, output_proposals, membership_ref_sets,
-        SpTxSquashedV1::SemanticRulesVersion::MOCK, tx_out);
+        std::move(additional_memo_elements), SpTxSquashedV1::SemanticRulesVersion::MOCK, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

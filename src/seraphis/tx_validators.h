@@ -118,14 +118,17 @@ bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &in
 *   - input key images are all unique
 *   - output enotes sorted by onetime addresses with byte-wise comparisons (ascending)
 *   - onetime addresses are all unique (ensures sorting is deterministic)
+*   - extra field is in sorted TLV (Type-Length-Value) format
 * param: membership_proofs -
 * param: input_images -
 * param: outputs -
+* param: tx_extra -
 * return: true/false on validation result
 */
 bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
     const std::vector<SpEnoteImageV1> &input_images,
-    const std::vector<SpEnoteV1> &outputs);
+    const std::vector<SpEnoteV1> &outputs,
+    const TxExtra &tx_extra);
 /**
 * brief: validate_sp_linking_tags_v1 - check tx does not double spend
 *   - no key image duplicates in ledger

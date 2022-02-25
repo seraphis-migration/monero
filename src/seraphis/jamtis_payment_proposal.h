@@ -39,6 +39,7 @@
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
+#include "tx_extra.h"
 
 //third party headers
 
@@ -66,7 +67,9 @@ struct JamtisPaymentProposalV1 final
 
     /// enote ephemeral privkey: r
     crypto::secret_key m_enote_ephemeral_privkey;
-    ///TODO: misc memo suggestion (fields to add to memo)
+    
+    /// memo elements to add to the tx memo
+    std::vector<ExtraFieldElement> m_memo_elements;
 
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
@@ -77,8 +80,9 @@ struct JamtisPaymentProposalV1 final
     /**
     * brief: gen - generate a random proposal
     * param: amount -
+    * param: num_random_memo_elements -
     */
-    void gen(const rct::xmr_amount amount);
+    void gen(const rct::xmr_amount amount, const std::size_t num_random_memo_elements);
 };
 
 ////
@@ -99,7 +103,9 @@ struct JamtisPaymentProposalSelfSendV1 final
     crypto::secret_key m_enote_ephemeral_privkey;
     /// view-balance privkey: k_vb
     crypto::secret_key m_viewbalance_privkey;
-    ///TODO: misc memo suggestion (fields to add to memo)
+
+    /// memo elements to add to the tx memo
+    std::vector<ExtraFieldElement> m_memo_elements;
 
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
@@ -110,8 +116,12 @@ struct JamtisPaymentProposalSelfSendV1 final
     /**
     * brief: gen - generate a random proposal
     * param: amount -
+    * param: type -
+    * param: num_random_memo_elements
     */
-    void gen(const rct::xmr_amount amount, const JamtisSelfSendMAC type);
+    void gen(const rct::xmr_amount amount,
+        const JamtisSelfSendMAC type,
+        const std::size_t num_random_memo_elements);
 };
 
 /**

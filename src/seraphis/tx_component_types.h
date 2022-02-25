@@ -39,6 +39,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
 #include "sp_core_types.h"
+#include "tx_extra.h"
 
 //third party headers
 
@@ -163,7 +164,8 @@ struct SpTxSupplementV1 final
 {
     /// Ke: enote ephemeral pubkeys for outputs
     rct::keyV m_output_enote_ephemeral_pubkeys;
-    //TODO - tx memo: none in mockup
+    /// tx memo
+    TxExtra m_tx_extra;
     //TODO - fee: none in mockup
 
     std::size_t get_size_bytes() const;

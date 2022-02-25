@@ -29,6 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
+#include "crypto/crypto.h"
 #include "tx_extra.h"
 
 //local headers
@@ -119,6 +120,13 @@ void ExtraFieldElement::append_bytes(TxExtra &bytes_inout) const
     memcpy(bytes_inout.data() + bytes_inout.size() - m_value.size(), m_value.data(), m_value.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
+void ExtraFieldElement::gen()
+{
+    m_type = crypto::rand_idx(static_cast<std::size_t>(-1));
+    m_value.resize(crypto::rand_idx(static_cast<std::size_t>(101)));  //limit random field to 100 bytes for performance
+    crypto::rand(m_value.size(), m_value.data());
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_tx_extra(std::vector<ExtraFieldElement> elements, TxExtra &tx_extra_out)
 {
     tx_extra_out.clear();
@@ -148,6 +156,15 @@ bool try_get_extra_field_elements(const TxExtra &tx_extra, std::vector<ExtraFiel
     }
 
     return element_position == tx_extra.size();  //if we didn't consume all extra bytes, then the field is malformed
+}
+//-------------------------------------------------------------------------------------------------------------------
+void accumulate_extra_field_elements(const std::vector<ExtraFieldElement> &elements_to_add,
+    std::vector<ExtraFieldElement> &elements_inout)
+{
+    elements_inout.resize(elements_inout.size() + elements_to_add.size());
+    memcpy(elements_inout.data() + elements_inout.size() - elements_to_add.size(),
+        elements_to_add.data(),
+        elements_to_add.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

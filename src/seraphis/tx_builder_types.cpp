@@ -63,7 +63,7 @@ void SpOutputProposalV1::get_enote_v1(SpEnoteV1 &enote_out) const
     enote_out.m_addr_tag_enc = m_addr_tag_enc;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpOutputProposalV1::gen(const rct::xmr_amount amount)
+void SpOutputProposalV1::gen(const rct::xmr_amount amount, const std::size_t num_random_memo_elements)
 {
     // gen base of destination
     m_core.gen(amount);
@@ -72,6 +72,9 @@ void SpOutputProposalV1::gen(const rct::xmr_amount amount)
     m_encoded_amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));
     m_view_tag = crypto::rand_idx(static_cast<jamtis::view_tag_t>(-1));
     crypto::rand(sizeof(m_addr_tag_enc), m_addr_tag_enc.bytes);
+    m_memo_elements.resize(num_random_memo_elements);
+    for (ExtraFieldElement &element: m_memo_elements)
+        element.gen();
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key SpTxProposalV1::get_proposal_prefix(const std::string &version_string) const

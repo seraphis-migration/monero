@@ -217,7 +217,7 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
             // - 0 amount
             // - make sure the final proposal set will have 1 unique enote ephemeral pubkey
             output_proposals_inout.emplace_back();
-            output_proposals_inout.back().gen(0);
+            output_proposals_inout.back().gen(0, 0);
             output_proposals_inout.back().m_enote_ephemeral_pubkey = output_proposals_inout[0].m_enote_ephemeral_pubkey;
         }
         else if /*change_amount > 0 &&*/
@@ -254,7 +254,7 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
             // add a normal dummy output
             // - 0 amount
             output_proposals_inout.emplace_back();
-            output_proposals_inout.back().gen(0);
+            output_proposals_inout.back().gen(0, 0);
 
             // add a normal change output
             // - 'change' amount
@@ -280,7 +280,7 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
             // add a normal dummy output
             // - 0 amount
             output_proposals_inout.emplace_back();
-            output_proposals_inout.back().gen(0);
+            output_proposals_inout.back().gen(0, 0);
         }
         else //(change_amount > 0)
         {
@@ -352,7 +352,9 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals, SpTxProposalV1 &proposal_out)
+void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
+    std::vector<ExtraFieldElement> additional_memo_elements,
+    SpTxProposalV1 &proposal_out)
 {
     // outputs should be sorted by onetime address
     std::sort(output_proposals.begin(), output_proposals.end());
@@ -369,11 +371,18 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals, Sp
         proposal_out.m_output_amount_commitment_blinding_factors,
         proposal_out.m_tx_supplement);
 
+    // add all memo fields to the tx supplement
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
+        accumulate_extra_field_elements(output_proposal.m_memo_elements, additional_memo_elements);
+
+    make_tx_extra(std::move(additional_memo_elements), proposal_out.m_tx_supplement.m_tx_extra);
+
     // sanity-check semantics
     check_v1_tx_supplement_semantics_sp_v1(proposal_out.m_tx_supplement, proposal_out.m_outputs.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts)
+std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts,
+    const std::size_t num_random_memo_elements)
 {
     // generate random output proposals
     std::vector<SpOutputProposalV1> output_proposals;
@@ -382,7 +391,7 @@ std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vecto
     for (const rct::xmr_amount out_amount : out_amounts)
     {
         output_proposals.emplace_back();
-        output_proposals.back().gen(out_amount);
+        output_proposals.back().gen(out_amount, num_random_memo_elements);
     }
 
     // sort them

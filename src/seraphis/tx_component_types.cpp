@@ -103,7 +103,7 @@ std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=f
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSupplementV1::get_size_bytes() const
 {
-    return 32 * m_output_enote_ephemeral_pubkeys.size();
+    return 32 * m_output_enote_ephemeral_pubkeys.size() + m_tx_extra.size();
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

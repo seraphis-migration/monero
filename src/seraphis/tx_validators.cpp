@@ -42,6 +42,7 @@
 #include "sp_crypto_utils.h"
 #include "tx_builders_inputs.h"
 #include "tx_component_types.h"
+#include "tx_extra.h"
 #include "tx_misc_utils.h"
 
 //third party headers
@@ -186,7 +187,8 @@ bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &in
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
     const std::vector<SpEnoteImageV1> &input_images,
-    const std::vector<SpEnoteV1> &outputs)
+    const std::vector<SpEnoteV1> &outputs,
+    const TxExtra &tx_extra)
 {
     // membership proof referenced enote indices should be sorted (ascending)
     // note: duplicate references are allowed
@@ -206,6 +208,13 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
     if (!std::is_sorted(outputs.begin(), outputs.end()))
         return false;
     if (std::adjacent_find(outputs.begin(), outputs.end(), equals_from_less{}) != outputs.end())
+        return false;
+
+    // tx extra fields should be in sorted TLV (Type-Length-Value) format
+    std::vector<ExtraFieldElement> extra_field_elements;
+    if (!try_get_extra_field_elements(tx_extra, extra_field_elements))
+        return false;
+    if (!std::is_sorted(extra_field_elements.begin(), extra_field_elements.end()))
         return false;
 
     return true;

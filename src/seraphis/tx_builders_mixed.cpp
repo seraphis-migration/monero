@@ -83,13 +83,14 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     const std::vector<SpEnoteV1> &output_enotes,
     const SpTxSupplementV1 &tx_supplement)
 {
-    // H(crypto project name, version string, output enotes, enote ephemeral pubkeys)
+    // H(crypto project name, version string, output enotes, enote ephemeral pubkeys, memos)
     rct::key hash_result;
     std::string hash;
     hash.reserve(sizeof(CRYPTONOTE_NAME) +
         version_string.size() +
         output_enotes.size()*SpEnoteV1::get_size_bytes() +
-        tx_supplement.m_output_enote_ephemeral_pubkeys.size());
+        tx_supplement.m_output_enote_ephemeral_pubkeys.size() +
+        tx_supplement.m_tx_extra.size());
     hash = CRYPTONOTE_NAME;
     hash += version_string;
     for (const auto &output_enote : output_enotes)
@@ -98,8 +99,9 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     }
     for (const auto &enote_pubkey : tx_supplement.m_output_enote_ephemeral_pubkeys)
     {
-        hash.append((const char*) enote_pubkey.bytes, sizeof(enote_pubkey));
+        hash.append(reinterpret_cast<const char*>(enote_pubkey.bytes), sizeof(enote_pubkey));
     }
+    hash.append(reinterpret_cast<const char*>(tx_supplement.m_tx_extra.data()), tx_supplement.m_tx_extra.size());
 
     rct::hash_to_scalar(hash_result, hash.data(), hash.size());
 
