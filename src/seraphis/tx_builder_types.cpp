@@ -72,9 +72,12 @@ void SpOutputProposalV1::gen(const rct::xmr_amount amount, const std::size_t num
     m_encoded_amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));
     m_view_tag = crypto::rand_idx(static_cast<jamtis::view_tag_t>(-1));
     crypto::rand(sizeof(m_addr_tag_enc), m_addr_tag_enc.bytes);
-    m_memo_elements.resize(num_random_memo_elements);
-    for (ExtraFieldElement &element: m_memo_elements)
+
+    std::vector<ExtraFieldElement> memo_elements;
+    memo_elements.resize(num_random_memo_elements);
+    for (ExtraFieldElement &element: memo_elements)
         element.gen();
+    make_tx_extra(std::move(memo_elements), m_partial_memo);
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key SpTxProposalV1::get_proposal_prefix(const std::string &version_string) const

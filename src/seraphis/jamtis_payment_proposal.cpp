@@ -100,7 +100,7 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
     output_proposal_out.m_encoded_amount = encode_jamtis_amount_plain(m_amount, q, amount_baked_key);
 
     // memo elements
-    output_proposal_out.m_memo_elements = m_memo_elements;
+    output_proposal_out.m_partial_memo = m_partial_memo;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount, const std::size_t num_random_memo_elements)
@@ -108,9 +108,12 @@ void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount, const std::size_
     m_destination.gen();
     m_amount = amount;
     m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
-    m_memo_elements.resize(num_random_memo_elements);
-    for (ExtraFieldElement &element: m_memo_elements)
+
+    std::vector<ExtraFieldElement> memo_elements;
+    memo_elements.resize(num_random_memo_elements);
+    for (ExtraFieldElement &element: memo_elements)
         element.gen();
+    make_tx_extra(std::move(memo_elements), m_partial_memo);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const
@@ -172,7 +175,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     output_proposal_out.m_encoded_amount = encode_jamtis_amount_selfsend(m_amount, q);
 
     // memo elements
-    output_proposal_out.m_memo_elements = m_memo_elements;
+    output_proposal_out.m_partial_memo = m_partial_memo;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount,
@@ -184,9 +187,12 @@ void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount,
     m_type = type;
     m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
     m_viewbalance_privkey = rct::rct2sk(rct::skGen());
-    m_memo_elements.resize(num_random_memo_elements);
-    for (ExtraFieldElement &element: m_memo_elements)
+
+    std::vector<ExtraFieldElement> memo_elements;
+    memo_elements.resize(num_random_memo_elements);
+    for (ExtraFieldElement &element: memo_elements)
         element.gen();
+    make_tx_extra(std::move(memo_elements), m_partial_memo);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool is_self_send_output_proposal(const SpOutputProposalV1 &proposal,

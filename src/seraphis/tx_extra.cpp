@@ -34,6 +34,7 @@
 
 //local headers
 #include "common/varint.h"
+#include "misc_log_ex.h"
 #include "span.h"
 
 //third party headers
@@ -165,6 +166,15 @@ void accumulate_extra_field_elements(const std::vector<ExtraFieldElement> &eleme
     memcpy(elements_inout.data() + elements_inout.size() - elements_to_add.size(),
         elements_to_add.data(),
         elements_to_add.size());
+}
+//-------------------------------------------------------------------------------------------------------------------
+void accumulate_extra_field_elements(const TxExtra &partial_memo,
+    std::vector<ExtraFieldElement> &elements_inout)
+{
+    std::vector<ExtraFieldElement> temp_memo_elements;
+    CHECK_AND_ASSERT_THROW_MES(try_get_extra_field_elements(partial_memo, temp_memo_elements),
+        "Could not accumultate extra field elements: malformed partial memo.");
+    accumulate_extra_field_elements(temp_memo_elements, elements_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

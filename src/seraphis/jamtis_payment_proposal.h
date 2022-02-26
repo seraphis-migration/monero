@@ -69,7 +69,7 @@ struct JamtisPaymentProposalV1 final
     crypto::secret_key m_enote_ephemeral_privkey;
     
     /// memo elements to add to the tx memo
-    std::vector<ExtraFieldElement> m_memo_elements;
+    TxExtra m_partial_memo;
 
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
@@ -105,7 +105,7 @@ struct JamtisPaymentProposalSelfSendV1 final
     crypto::secret_key m_viewbalance_privkey;
 
     /// memo elements to add to the tx memo
-    std::vector<ExtraFieldElement> m_memo_elements;
+    TxExtra m_partial_memo;
 
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal

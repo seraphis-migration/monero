@@ -85,5 +85,7 @@ bool try_get_extra_field_elements(const TxExtra &tx_extra, std::vector<ExtraFiel
 //todo
 void accumulate_extra_field_elements(const std::vector<ExtraFieldElement> &elements_to_add,
     std::vector<ExtraFieldElement> &elements_inout);
+void accumulate_extra_field_elements(const TxExtra &partial_memo,
+    std::vector<ExtraFieldElement> &elements_inout);
 
 } //namespace sp

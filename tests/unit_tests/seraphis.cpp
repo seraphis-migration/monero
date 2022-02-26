@@ -405,7 +405,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
         output_amount_commitment_blinding_factors,
         tx_supplement);
     for (const SpOutputProposalV1 &output_proposal : output_proposals)
-        accumulate_extra_field_elements(output_proposal.m_memo_elements, additional_memo_elements);
+        accumulate_extra_field_elements(output_proposal.m_partial_memo, additional_memo_elements);
     make_tx_extra(std::move(additional_memo_elements), tx_supplement.m_tx_extra);
     for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
     {

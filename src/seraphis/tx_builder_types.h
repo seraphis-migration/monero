@@ -94,7 +94,7 @@ struct SpOutputProposalV1 final
     jamtis::encrypted_address_tag_t m_addr_tag_enc;
 
     /// memo elements to add to the tx memo
-    std::vector<ExtraFieldElement> m_memo_elements;
+    TxExtra m_partial_memo;
 
     /// less-than operator for sorting
     bool operator<(const SpOutputProposalV1 &other_proposal) const

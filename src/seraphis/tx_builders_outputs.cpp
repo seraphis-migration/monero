@@ -373,7 +373,7 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
 
     // add all memo fields to the tx supplement
     for (const SpOutputProposalV1 &output_proposal : output_proposals)
-        accumulate_extra_field_elements(output_proposal.m_memo_elements, additional_memo_elements);
+        accumulate_extra_field_elements(output_proposal.m_partial_memo, additional_memo_elements);
 
     make_tx_extra(std::move(additional_memo_elements), proposal_out.m_tx_supplement.m_tx_extra);
 
