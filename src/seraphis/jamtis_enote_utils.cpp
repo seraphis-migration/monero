@@ -157,7 +157,6 @@ view_tag_t make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_VIEW_TAG};
 
     // view_tag = H_1(K_d, Ko)
-    // TODO: consider using a simpler/cheaper hash function for view tags
     epee::wipeable_string data;
     get_doublekey_hash_data(&sender_receiver_DH_derivation, onetime_address.bytes, data);
 

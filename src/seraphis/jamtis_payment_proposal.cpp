@@ -38,6 +38,8 @@
 #include "jamtis_core_utils.h"
 #include "jamtis_enote_utils.h"
 #include "jamtis_support_types.h"
+#include "memwipe.h"
+#include "misc_language.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -64,11 +66,13 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
         );
 
     // derived key: K_d = 8*r*K_2
-    crypto::key_derivation K_d;  //TODO: add wiper?
+    crypto::key_derivation K_d;
+    auto Kd_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&K_d, sizeof(K_d)); });
     crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
 
     // sender-receiver shared secret: q = H_32(K_d)
-    rct::key q;  //TODO: add wiper?
+    rct::key q;
+    auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
     make_jamtis_sender_receiver_secret_plain(K_d, q);
 
     // encrypt address tag: addr_tag_enc = addr_tag(blowfish(j || mac)) ^ H_8(q)
@@ -84,7 +88,8 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
     output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address);
 
     // enote amount baked key: 8 r G
-    crypto::key_derivation amount_baked_key;  //TODO: add wiper?
+    crypto::key_derivation amount_baked_key;
+    auto bk_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&amount_baked_key, sizeof(rct::key)); });
     make_jamtis_amount_baked_key_plain_sender(m_enote_ephemeral_privkey, amount_baked_key);
 
     // amount blinding factor: y = H_n(q, 8 r G)

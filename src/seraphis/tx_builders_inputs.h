@@ -160,7 +160,7 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input
 * return: set of transaction inputs ready to spend
 */
 std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts);
-/** //todo
+/**
 * brief: gen_mock_sp_membership_ref_set_v1 - create a random reference set for an enote, with real spend at a random index,
 *   and update mock ledger to include all members of the reference set (including squashed enotes)
 * param: input_enote -

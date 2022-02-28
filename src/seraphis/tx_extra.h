@@ -78,11 +78,24 @@ struct ExtraFieldElement final
     void gen();
 };
 
-//todo
+/**
+* brief: make_tx_extra - make a tx extra
+* param: elements -
+* outparam: tx_extra_out -
+*/
 void make_tx_extra(std::vector<ExtraFieldElement> elements, TxExtra &tx_extra_out);
-//todo
+/**
+* brief: try_get_extra_field_elements - try to deserialize a tx extra into extra field elements
+* param: tx_extra -
+* outparam: elements_out -
+* return: true if deserializing succeeds
+*/
 bool try_get_extra_field_elements(const TxExtra &tx_extra, std::vector<ExtraFieldElement> &elements_out);
-//todo
+/**
+* brief: accumulate_extra_field_elements - append extra field elements to an existing set of elements
+* param: elements_to_add -
+* inoutparam: elements_inoutt -
+*/
 void accumulate_extra_field_elements(const std::vector<ExtraFieldElement> &elements_to_add,
     std::vector<ExtraFieldElement> &elements_inout);
 void accumulate_extra_field_elements(const TxExtra &partial_memo,

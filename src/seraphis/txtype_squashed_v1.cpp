@@ -71,7 +71,7 @@ static SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(
 {
     SemanticConfigComponentCountsV1 config{};
 
-    //TODO: in the squashed model, inputs + outputs must be <= the BP+ pre-generated generator array size
+    //TODO: in the squashed model, inputs + outputs must be <= the BP+ pre-generated generator array size ('maxM')
     if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
     {
         config.m_min_inputs = 1;
@@ -287,7 +287,7 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
         return false;
     }
 
-    // validate input images, membershio proof ref sets, outputs, and memo elements are sorted
+    // validate input images, membershio proof ref sets, outputs, and memo elements are sorted (and memo can be deserialized)
     if (!validate_sp_semantics_sorting_v1(tx.m_membership_proofs,
         tx.m_input_images,
         tx.m_outputs,
@@ -295,8 +295,6 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
     {
         return false;
     }
-
-    //TODO: validate memo semantics
 
     return true;
 }

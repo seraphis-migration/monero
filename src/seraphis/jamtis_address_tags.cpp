@@ -41,6 +41,8 @@ extern "C"
 #include "int-util.h"
 #include "jamtis_hash_functions.h"
 #include "jamtis_support_types.h"
+#include "memwipe.h"
+#include "misc_language.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
 
@@ -147,7 +149,8 @@ address_tag_t cipher_address_index(const rct::key &cipher_key,
     const address_tag_MAC_t mac)
 {
     // prepare to encrypt the index and MAC
-    BLOWFISH_CTX blowfish_context;  //TODO: must be wrapped in a wiper
+    BLOWFISH_CTX blowfish_context;
+    auto bfc_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&blowfish_context, sizeof(BLOWFISH_CTX)); });
     Blowfish_Init(&blowfish_context, cipher_key.bytes, sizeof(rct::key));
 
     // encrypt it
@@ -174,7 +177,8 @@ address_index_t decipher_address_index(const rct::key &cipher_key,
     address_tag_MAC_t &mac_out)
 {
     // prepare to decrypt the tag
-    BLOWFISH_CTX blowfish_context;  //TODO: must be wrapped in a wiper
+    BLOWFISH_CTX blowfish_context;
+    auto bfc_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&blowfish_context, sizeof(BLOWFISH_CTX)); });
     Blowfish_Init(&blowfish_context, cipher_key.bytes, sizeof(rct::key));
 
     // decrypt it
