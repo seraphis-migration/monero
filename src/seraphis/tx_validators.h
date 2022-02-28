@@ -145,15 +145,17 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
 * brief: validate_sp_amount_balance_v1 - check that amounts balance in the tx (inputs = outputs)
 *   - check BP+ range proofs on input image amount commitments and output commitments (e.g. for squashed enote model)
 *     - do not check these if 'defer_batchable' is set; BP+ range proofs can be batch-verified
-*   - check sum(input image masked commitments) == sum(output commitments) + remainder*G
+*   - check sum(input image masked commitments) == sum(output commitments) + fee*H + remainder*G
 * param: input_images -
 * param: outputs -
+* param: transaction_fee -
 * param: balance_proof -
 * param: defer_batchable -
 * return: true/false on validation result
 */
 bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
+    const rct::xmr_amount transaction_fee,
     const SpBalanceProofV1 &balance_proof,
     const bool defer_batchable);
 /**

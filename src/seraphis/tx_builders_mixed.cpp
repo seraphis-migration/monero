@@ -110,11 +110,16 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_amounts,
     const std::vector<rct::xmr_amount> &output_amounts,
+    const rct::xmr_amount transaction_fee,
     const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
     SpBalanceProofV1 &balance_proof_out)
 {
     // for squashed enote model
+
+    // check balance
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(input_amounts, output_amounts, transaction_fee),
+        "Amounts don't balance when making balance proof.");
 
     // combine inputs and outputs
     std::vector<rct::xmr_amount> amounts;
@@ -156,7 +161,7 @@ bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &inpu
     std::vector<rct::xmr_amount> in_amounts;
     std::vector<rct::xmr_amount> out_amounts;
     in_amounts.reserve(input_proposals.size());
-    out_amounts.reserve(output_proposals.size() + 1);
+    out_amounts.reserve(output_proposals.size());
 
     for (const auto &input_proposal : input_proposals)
     {
@@ -167,16 +172,19 @@ bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &inpu
         out_amounts.emplace_back(output_proposal.m_core.m_amount);
     }
 
-    out_amounts.emplace_back(transaction_fee);
-
-    return balance_check_in_out_amnts(in_amounts, out_amounts);
+    return balance_check_in_out_amnts(in_amounts, out_amounts, transaction_fee);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
     std::vector<SpTxPartialInputV1> partial_inputs,
+    const rct::xmr_amount transaction_fee,
     const std::string &version_string,
     SpTxPartialV1 &partial_tx_out)
 {
+    // reset tx
+    partial_tx_out = SpTxPartialV1{};
+
+
     /// prepare
 
     // inputs and proposal must be compatible
@@ -201,13 +209,10 @@ void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
         input_amounts,
         input_image_amount_commitment_blinding_factors);
 
-    // check balance (TODO: add fee)
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(input_amounts, proposal.m_output_amounts),
-        "Amounts don't balance when making partial tx.");
-
     // make balance proof
     make_v1_tx_balance_proof_sp_v1(input_amounts,
         proposal.m_output_amounts,
+        transaction_fee,
         input_image_amount_commitment_blinding_factors,
         proposal.m_output_amount_commitment_blinding_factors,
         partial_tx_out.m_balance_proof);
@@ -216,15 +221,10 @@ void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
     /// copy misc tx pieces
 
     // gather tx input parts
-    partial_tx_out.m_input_images.clear();
     partial_tx_out.m_input_images.reserve(partial_inputs.size());
-    partial_tx_out.m_image_proofs.clear();
     partial_tx_out.m_image_proofs.reserve(partial_inputs.size());
-    partial_tx_out.m_input_enotes.clear();
     partial_tx_out.m_input_enotes.reserve(partial_inputs.size());
-    partial_tx_out.m_image_address_masks.clear();
     partial_tx_out.m_image_address_masks.reserve(partial_inputs.size());
-    partial_tx_out.m_image_commitment_masks.clear();
     partial_tx_out.m_image_commitment_masks.reserve(partial_inputs.size());
 
     for (auto &partial_input : partial_inputs)
@@ -239,6 +239,7 @@ void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
     // gather tx output parts
     partial_tx_out.m_outputs = proposal.m_outputs;
     partial_tx_out.m_tx_supplement = proposal.m_tx_supplement;
+    partial_tx_out.m_tx_fee = transaction_fee;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

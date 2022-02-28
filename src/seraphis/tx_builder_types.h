@@ -215,7 +215,8 @@ struct SpTxPartialV1 final
     std::vector<SpImageProofV1> m_image_proofs;
     /// supplemental data for tx
     SpTxSupplementV1 m_tx_supplement;
-    ///TODO: fee
+    /// fee
+    rct::xmr_amount m_tx_fee;
 
     /// input enotes
     std::vector<SpEnote> m_input_enotes;

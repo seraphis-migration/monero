@@ -90,7 +90,8 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool balance_check_in_out_amnts(const std::vector<rct::xmr_amount> &input_amounts,
-    const std::vector<rct::xmr_amount> &output_amounts)
+    const std::vector<rct::xmr_amount> &output_amounts,
+    const rct::xmr_amount transaction_fee)
 {
     using boost::multiprecision::uint128_t;
     uint128_t input_sum{0};
@@ -101,6 +102,7 @@ bool balance_check_in_out_amnts(const std::vector<rct::xmr_amount> &input_amount
 
     for (const auto amnt : output_amounts)
         output_sum += amnt;
+    output_sum += transaction_fee;
 
     return input_sum == output_sum;
 }

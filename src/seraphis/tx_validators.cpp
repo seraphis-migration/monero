@@ -62,12 +62,13 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
+    const rct::xmr_amount transaction_fee,
     const rct::key &remainder_blinding_factor)
 {
     rct::keyV input_image_amount_commitments;
     rct::keyV output_commitments;
     input_image_amount_commitments.reserve(input_images.size());
-    output_commitments.reserve(outputs.size() +
+    output_commitments.reserve(outputs.size() + 1 +
         (remainder_blinding_factor == rct::zero() ? 0 : 1));
 
     for (const auto &input_image : input_images)
@@ -76,10 +77,12 @@ static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpEno
     for (const auto &output : outputs)
         output_commitments.emplace_back(output.m_core.m_amount_commitment);
 
+    output_commitments.emplace_back(rct::commit(transaction_fee, rct::zero()));
+
     if (!(remainder_blinding_factor == rct::zero()))
         output_commitments.emplace_back(rct::scalarmultBase(remainder_blinding_factor));
 
-    // sum(input masked commitments) ?= sum(output commitments) + remainder_blinding_factor*G
+    // sum(input masked commitments) ?= sum(output commitments) + transaction_fee*H + remainder_blinding_factor*G
     return balance_check_equality(input_image_amount_commitments, output_commitments);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -234,6 +237,7 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
+    const rct::xmr_amount transaction_fee,
     const SpBalanceProofV1 &balance_proof,
     const bool defer_batchable)
 {
@@ -246,6 +250,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     // check that amount commitments balance
     if (!validate_sp_amount_balance_equality_check_v1(input_images,
         outputs,
+        transaction_fee,
         balance_proof.m_remainder_blinding_factor))
         return false;
 

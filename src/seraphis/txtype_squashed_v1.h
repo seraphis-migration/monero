@@ -78,6 +78,8 @@ struct SpTxSquashedV1 final
     std::vector<SpMembershipProofV1> m_membership_proofs;
     /// supplemental data for tx
     SpTxSupplementV1 m_supplement;
+    /// the transaction fee
+    rct::xmr_amount m_fee;
 
     /// semantic rules version
     SemanticRulesVersion m_tx_semantic_rules_version;
@@ -97,6 +99,7 @@ void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     std::vector<SpImageProofV1> image_proofs,
     std::vector<SpMembershipProofV1> membership_proofs,
     SpTxSupplementV1 tx_supplement,
+    const rct::xmr_amount transaction_fee,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);
 void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
@@ -109,6 +112,7 @@ void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
     SpTxSquashedV1 &tx_out);
 void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
     std::vector<SpOutputProposalV1> output_proposals,
+    const rct::xmr_amount transaction_fee,
     const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     std::vector<ExtraFieldElement> additional_memo_elements,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
@@ -165,6 +169,7 @@ template <>
 void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
+    const rct::xmr_amount transaction_fee,
     MockLedgerContext &ledger_context_inout,
     SpTxSquashedV1 &tx_out);
 

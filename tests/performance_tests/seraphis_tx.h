@@ -264,7 +264,7 @@ public:
 
                 // make tx
                 m_txs.emplace_back();
-                sp::make_mock_tx<SpTxType>(tx_params, input_amounts, output_amounts, *m_ledger_contex, m_txs.back());
+                sp::make_mock_tx<SpTxType>(tx_params, input_amounts, output_amounts, 0, *m_ledger_contex, m_txs.back());
                 m_tx_ptrs.push_back(&(m_txs.back()));
             }
             catch (...)

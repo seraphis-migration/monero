@@ -158,7 +158,6 @@ struct SpBalanceProofV1 final
 // - supplementary info about a tx
 //   - enote ephemeral pubkeys: may not line up 1:1 with output enotes, so store in separate field
 //   - tx memo
-//   - tx fee
 ///
 struct SpTxSupplementV1 final
 {
@@ -166,7 +165,6 @@ struct SpTxSupplementV1 final
     rct::keyV m_output_enote_ephemeral_pubkeys;
     /// tx memo
     TxExtra m_tx_extra;
-    //TODO - fee: none in mockup
 
     std::size_t get_size_bytes() const;
 };

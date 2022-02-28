@@ -165,6 +165,7 @@ void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     std::vector<SpImageProofV1> image_proofs,
     std::vector<SpMembershipProofV1> membership_proofs,
     SpTxSupplementV1 tx_supplement,
+    const rct::xmr_amount transaction_fee,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
 {
@@ -174,6 +175,7 @@ void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     tx_out.m_image_proofs = std::move(image_proofs);
     tx_out.m_membership_proofs = std::move(membership_proofs);
     tx_out.m_supplement = std::move(tx_supplement);
+    tx_out.m_fee = transaction_fee;
     tx_out.m_tx_semantic_rules_version = semantic_rules_version;
 
     CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(tx_out), "Failed to assemble an SpTxSquashedV1.");
@@ -192,6 +194,7 @@ void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
             std::move(partial_tx.m_image_proofs),
             std::move(membership_proofs),
             std::move(partial_tx.m_tx_supplement),
+            partial_tx.m_tx_fee,
             semantic_rules_version,
             tx_out
         );
@@ -214,6 +217,7 @@ void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
     std::vector<SpOutputProposalV1> output_proposals,
+    const rct::xmr_amount transaction_fee,
     const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     std::vector<ExtraFieldElement> additional_memo_elements,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
@@ -221,8 +225,8 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(output_proposals.size() > 0, "Tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, output_proposals, 0),
-        "Tried to make tx with unbalanced amounts.");  //TODO: include fee in balance check
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, output_proposals, transaction_fee),
+        "Tried to make tx with unbalanced amounts.");
 
     // versioning for proofs
     std::string version_string;
@@ -244,7 +248,7 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
 
     // partial tx
     SpTxPartialV1 partial_tx;
-    make_v1_tx_partial_v1(tx_proposal, std::move(partial_inputs), version_string, partial_tx);
+    make_v1_tx_partial_v1(tx_proposal, std::move(partial_inputs), transaction_fee, version_string, partial_tx);
 
     // finish tx
     make_seraphis_tx_squashed_v1(std::move(partial_tx),
@@ -313,7 +317,7 @@ template <>
 bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const bool defer_batchable)
 {
     // balance proof
-    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, tx.m_balance_proof, defer_batchable))
+    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, tx.m_fee, tx.m_balance_proof, defer_batchable))
     {
         return false;
     }
@@ -419,12 +423,13 @@ template <>
 void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
+    const rct::xmr_amount transaction_fee,
     MockLedgerContext &ledger_context_inout,
     SpTxSquashedV1 &tx_out)
 {
     CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "Tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts),
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts, transaction_fee),
         "Tried to make tx with unbalanced amounts.");
 
     // make mock inputs
@@ -455,7 +460,7 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
         element.gen();
 
     // make tx
-    make_seraphis_tx_squashed_v1(input_proposals, output_proposals, membership_ref_sets,
+    make_seraphis_tx_squashed_v1(input_proposals, output_proposals, transaction_fee, membership_ref_sets,
         std::move(additional_memo_elements), SpTxSquashedV1::SemanticRulesVersion::MOCK, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------

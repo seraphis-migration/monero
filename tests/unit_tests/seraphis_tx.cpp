@@ -53,6 +53,7 @@ struct SpTxGenData
     std::size_t ref_set_decomp_m{1};
     std::vector<rct::xmr_amount> input_amounts;
     std::vector<rct::xmr_amount> output_amounts;
+    rct::xmr_amount transaction_fee{0};
     TestType expected_result{TestType::ExpectTrue};
     bool test_double_spend{false};
 };
@@ -74,7 +75,12 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
 
             // make tx
             SpTxType tx;
-            sp::make_mock_tx<SpTxType>(tx_params, gen.input_amounts, gen.output_amounts, ledger_context, tx);
+            sp::make_mock_tx<SpTxType>(tx_params,
+                gen.input_amounts,
+                gen.output_amounts,
+                gen.transaction_fee,
+                ledger_context,
+                tx);
 
             // validate tx
             EXPECT_TRUE(sp::validate_tx(tx, ledger_context, false));
@@ -121,7 +127,12 @@ static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
 
             // make tx
             txs_to_verify.emplace_back();
-            sp::make_mock_tx<SpTxType>(tx_params, gen.input_amounts, gen.output_amounts, ledger_context, txs_to_verify.back());
+            sp::make_mock_tx<SpTxType>(tx_params,
+                gen.input_amounts,
+                gen.output_amounts,
+                gen.transaction_fee,
+                ledger_context,
+                txs_to_verify.back());
             txs_to_verify_ptrs.push_back(&(txs_to_verify.back()));
         }
         catch (...)
@@ -153,6 +164,20 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         temp.expected_result = TestType::ExpectTrue;
         temp.input_amounts.push_back(1);
         temp.output_amounts.push_back(1);
+        temp.ref_set_decomp_n = 2;
+        temp.ref_set_decomp_m = 3;
+        temp.test_double_spend = test_double_spend;
+
+        gen_data.push_back(temp);
+    }
+
+    // 1-in/1-out non-zero fee
+    {
+        SpTxGenData temp;
+        temp.expected_result = TestType::ExpectTrue;
+        temp.input_amounts.push_back(2);
+        temp.output_amounts.push_back(1);
+        temp.transaction_fee = 1;
         temp.ref_set_decomp_n = 2;
         temp.ref_set_decomp_m = 3;
         temp.test_double_spend = test_double_spend;
@@ -310,10 +335,11 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_batching()
 
     for (auto &gen : gen_data)
     {
-        gen.input_amounts.push_back(2);
+        gen.input_amounts.push_back(3);
         gen.input_amounts.push_back(1);
         gen.output_amounts.push_back(2);
         gen.output_amounts.push_back(1);
+        gen.transaction_fee = 1;
         gen.ref_set_decomp_n = 2;
         gen.ref_set_decomp_m = 3;
     }

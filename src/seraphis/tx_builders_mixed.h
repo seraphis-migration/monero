@@ -66,12 +66,14 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
 *   - range proofs: for input image amount commitments and output commitments (squashed enote model)
 * param: input_amounts -
 * param: output_amounts -
+* param: transaction_fee -
 * param: input_image_amount_commitment_blinding_factors -
 * param: output_amount_commitment_blinding_factors -
 * outparam: balance_proof_out -
 */
 void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_amounts,
     const std::vector<rct::xmr_amount> &output_amounts,
+    const rct::xmr_amount transaction_fee,
     const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
     const std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors,
     SpBalanceProofV1 &balance_proof_out);
@@ -89,11 +91,13 @@ bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &inpu
 * brief: make_v1_tx_partial_v1 - make v1 partial transaction (everything ready for a full tx except membership proofs)
 * param: proposal -
 * param: partial_inputs -
+* param: transaction_fee -
 * param: version_string -
 * outparam: partial_tx_out -
 */
 void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
     std::vector<SpTxPartialInputV1> partial_inputs,
+    const rct::xmr_amount transaction_fee,
     const std::string &version_string,
     SpTxPartialV1 &partial_tx_out);
 

@@ -320,6 +320,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     const std::size_t num_random_memo_elements,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
+    const rct::xmr_amount transaction_fee,
     const sp::SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     sp::MockLedgerContext &ledger_context_inout,
     sp::SpTxSquashedV1 &tx_out)
@@ -329,7 +330,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
 
     CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "Tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts),
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts, transaction_fee),
         "Tried to make tx with unbalanced amounts.");
 
     // make mock inputs
@@ -423,6 +424,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
         input_image_amount_commitment_blinding_factors);
     make_v1_tx_balance_proof_sp_v1(input_amounts, //note: must range proof input image commitments in squashed enote model
         output_amounts,
+        transaction_fee,
         input_image_amount_commitment_blinding_factors,
         output_amount_commitment_blinding_factors,
         balance_proof);
@@ -434,7 +436,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
 
     make_seraphis_tx_squashed_v1(std::move(input_images), std::move(outputs),
         std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),
-        std::move(tx_supplement), semantic_rules_version, tx_out);
+        std::move(tx_supplement), transaction_fee, semantic_rules_version, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -1121,14 +1123,14 @@ TEST(seraphis, txtype_squashed_v1)
 
     for (int i{0}; i < num_ins_outs; ++i)
     {
-        in_amounts.push_back(2);
+        in_amounts.push_back(3);  //tx_fee = num_ins_outs
         out_amounts.push_back(2);
     }
 
     for (std::size_t tx_index{0}; tx_index < num_txs; ++tx_index)
     {
         txs.emplace_back();
-        make_sp_txtype_squashed_v1(2, 3, 3, in_amounts, out_amounts,
+        make_sp_txtype_squashed_v1(2, 3, 3, in_amounts, out_amounts, rct::xmr_amount{num_ins_outs},
             sp::SpTxSquashedV1::SemanticRulesVersion::MOCK, ledger_context, txs.back());
         tx_ptrs.push_back(&(txs.back()));
     }

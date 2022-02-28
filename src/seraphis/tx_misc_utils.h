@@ -88,12 +88,14 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
 bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2);
 /**
 * brief: balance_check_in_out_amnts - balance check between two sets of amounts
-*   - i.e. sum(inputs) ?= sum(outputs)
+*   - i.e. sum(inputs) ?= sum(outputs) + transaction_fee
 * param: input_amounts -
 * param: output_amounts -
+* param: transaction_fee -
 * return: true/false on balance check result
 */
 bool balance_check_in_out_amnts(const std::vector<rct::xmr_amount> &input_amounts,
-    const std::vector<rct::xmr_amount> &output_amounts);
+    const std::vector<rct::xmr_amount> &output_amounts,
+    const rct::xmr_amount transaction_fee);
 
 } //namespace sp

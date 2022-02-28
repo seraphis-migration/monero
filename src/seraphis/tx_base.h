@@ -188,6 +188,7 @@ struct SpTxParamPack
 * param: params -
 * param: in_amounts -
 * param: out_amounts -
+* param: transaction_fee -
 * inoutparam: ledger_context -
 * outparam: tx_out -
 */
@@ -195,6 +196,7 @@ template <typename SpTxType, typename SpTxParamsT = SpTxParamPack>
 void make_mock_tx(const SpTxParamsT &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
+    const rct::xmr_amount transaction_fee,
     MockLedgerContext &ledger_context,
     SpTxType &tx_out);
 
