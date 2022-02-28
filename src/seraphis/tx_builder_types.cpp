@@ -84,7 +84,7 @@ rct::key SpTxProposalV1::get_proposal_prefix(const std::string &version_string) 
 {
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to get proposal prefix for a tx proposal with no outputs!");
 
-    return get_tx_image_proof_message_sp_v1(version_string, m_outputs, m_tx_supplement);
+    return get_tx_image_proof_message_v1(version_string, m_outputs, m_tx_supplement);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

@@ -62,7 +62,7 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 // check that all enote ephemeral pubkeys in an output proposal set are unique
 //-------------------------------------------------------------------------------------------------------------------
-static bool check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(const std::vector<SpOutputProposalV1> &output_proposals)
+static bool check_output_proposal_set_unique_ephemeral_pubkeys_v1(const std::vector<SpOutputProposalV1> &output_proposals)
 {
     for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
     {
@@ -79,7 +79,7 @@ static bool check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(const std::
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposalV1> &output_proposals)
+void check_v1_output_proposals_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals)
 {
     CHECK_AND_ASSERT_THROW_MES(output_proposals.size() >= 1,
         "Semantics check output proposals v1: insufficient outputs.");
@@ -97,7 +97,7 @@ void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposa
     {
         for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
         {
-            CHECK_AND_ASSERT_THROW_MES(check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(output_proposals),
+            CHECK_AND_ASSERT_THROW_MES(check_output_proposal_set_unique_ephemeral_pubkeys_v1(output_proposals),
                 "Semantics check output proposals v1: there are >2 outputs but their enote ephemeral pubkeys aren't all "
                 "unique.");
         }
@@ -113,7 +113,7 @@ void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposa
         "Semantics check output proposals v1: output onetime addresses are not all unique.");
 }
 //-------------------------------------------------------------------------------------------------------------------
-void check_v1_tx_supplement_semantics_sp_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs)
+void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs)
 {
     // there may be either 1 or 3+ enote pubkeys
     if (num_outputs == 2)
@@ -142,7 +142,7 @@ void check_v1_tx_supplement_semantics_sp_v1(const SpTxSupplementV1 &tx_supplemen
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_proposals,
+void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     std::vector<SpEnoteV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
@@ -176,7 +176,7 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_prop
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_t &total_input_amount,
+void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &total_input_amount,
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const rct::key &wallet_spend_pubkey,
@@ -326,7 +326,7 @@ void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_
     }
     else //(output_proposals_inout.size() > 2)
     {
-        CHECK_AND_ASSERT_THROW_MES(check_output_proposal_set_unique_ephemeral_pubkeys_sp_v1(output_proposals_inout),
+        CHECK_AND_ASSERT_THROW_MES(check_output_proposal_set_unique_ephemeral_pubkeys_v1(output_proposals_inout),
             "Finalize output proposals: there are >2 outputs but their enote ephemeral pubkeys aren't all unique.");
 
         if (change_amount == 0)
@@ -360,12 +360,12 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
     std::sort(output_proposals.begin(), output_proposals.end());
 
     // sanity-check semantics
-    check_v1_output_proposals_semantics_sp_v1(output_proposals);
+    check_v1_output_proposals_semantics_v1(output_proposals);
 
     // make outputs
     // make tx supplement
     // prepare for range proofs
-    make_v1_tx_outputs_sp_v1(output_proposals,
+    make_v1_outputs_v1(output_proposals,
         proposal_out.m_outputs,
         proposal_out.m_output_amounts,
         proposal_out.m_output_amount_commitment_blinding_factors,
@@ -378,7 +378,7 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
     make_tx_extra(std::move(additional_memo_elements), proposal_out.m_tx_supplement.m_tx_extra);
 
     // sanity-check semantics
-    check_v1_tx_supplement_semantics_sp_v1(proposal_out.m_tx_supplement, proposal_out.m_outputs.size());
+    check_v1_tx_supplement_semantics_v1(proposal_out.m_tx_supplement, proposal_out.m_outputs.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts,

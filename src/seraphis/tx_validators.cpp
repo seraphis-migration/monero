@@ -228,7 +228,7 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
     // check no duplicates in ledger context
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
     {
-        if (ledger_context.linking_tag_exists_sp_v1(input_images[input_index].m_core.m_key_image))
+        if (ledger_context.linking_tag_exists_v1(input_images[input_index].m_core.m_key_image))
             return false;
     }
 
@@ -323,7 +323,7 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
         proofs.emplace_back(&(membership_proofs[proof_index]->m_concise_grootle_proof));
 
         // get proof keys from enotes stored in the ledger
-        ledger_context.get_reference_set_proof_elements_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices,
+        ledger_context.get_reference_set_proof_elements_v1(membership_proofs[proof_index]->m_ledger_enote_indices,
             membership_proof_keys[proof_index]);
 
         // offset (input image masked keys squashed: Q' = Ko' + C')
@@ -332,7 +332,7 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
             input_images[proof_index]->m_masked_commitment);
 
         // proof message
-        messages.emplace_back(get_tx_membership_proof_message_sp_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
+        messages.emplace_back(get_tx_membership_proof_message_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
     }
 
     // get verification data

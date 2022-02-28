@@ -181,7 +181,7 @@ void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(tx_out), "Failed to assemble an SpTxSquashedV1.");
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
+void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
     std::vector<SpMembershipProofV1> membership_proofs,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
@@ -200,14 +200,14 @@ void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
         );
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
+void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
     std::vector<SpMembershipProofAlignableV1> alignable_membership_proofs,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
 {
     // line up the the membership proofs with the partial tx's input images (which are sorted)
     std::vector<SpMembershipProofV1> tx_membership_proofs;
-    align_v1_tx_membership_proofs_sp_v1(partial_tx.m_input_images,
+    align_v1_membership_proofs_v1(partial_tx.m_input_images,
         std::move(alignable_membership_proofs),
         tx_membership_proofs);
 
@@ -225,7 +225,7 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(output_proposals.size() > 0, "Tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_sp_v1(input_proposals, output_proposals, transaction_fee),
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_v1(input_proposals, output_proposals, transaction_fee),
         "Tried to make tx with unbalanced amounts.");
 
     // versioning for proofs
@@ -239,16 +239,16 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
 
     // partial inputs
-    std::vector<SpTxPartialInputV1> partial_inputs;
-    make_v1_tx_partial_inputs_sp_v1(input_proposals, proposal_prefix, partial_inputs);
+    std::vector<SpPartialInputV1> partial_inputs;
+    make_v1_partial_inputs_v1(input_proposals, proposal_prefix, partial_inputs);
 
     // membership proofs (assumes the caller lined up input proposals with membership ref sets)
     std::vector<SpMembershipProofAlignableV1> alignable_membership_proofs;
-    make_v1_tx_membership_proofs_sp_v1(membership_ref_sets, partial_inputs, alignable_membership_proofs);
+    make_v1_membership_proofs_v1(membership_ref_sets, partial_inputs, alignable_membership_proofs);
 
     // partial tx
-    SpTxPartialV1 partial_tx;
-    make_v1_tx_partial_v1(tx_proposal, std::move(partial_inputs), transaction_fee, version_string, partial_tx);
+    SpPartialTxV1 partial_tx;
+    make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), transaction_fee, version_string, partial_tx);
 
     // finish tx
     make_seraphis_tx_squashed_v1(std::move(partial_tx),
@@ -353,7 +353,7 @@ bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
     version_string.reserve(3);
     get_versioning_string(tx.m_tx_semantic_rules_version, version_string);
 
-    rct::key image_proofs_message{get_tx_image_proof_message_sp_v1(version_string, tx.m_outputs, tx.m_supplement)};
+    rct::key image_proofs_message{get_tx_image_proof_message_v1(version_string, tx.m_outputs, tx.m_supplement)};
 
     if (!validate_sp_composition_proofs_v1(tx.m_image_proofs,
         tx.m_input_images,

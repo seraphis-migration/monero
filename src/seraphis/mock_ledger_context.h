@@ -63,24 +63,24 @@ class MockLedgerContext final : public LedgerContext
 {
 public:
     /**
-    * brief: linking_tag_exists_sp_v1 - checks if a Seraphis linking tag exists in the ledger
+    * brief: linking_tag_exists_v1 - checks if a Seraphis linking tag exists in the ledger
     * param: linking_tag -
     * return: true/false on check result
     */
-    bool linking_tag_exists_sp_v1(const crypto::key_image &linking_tag) const override;
+    bool linking_tag_exists_v1(const crypto::key_image &linking_tag) const override;
     /**
-    * brief: get_reference_set_sp_v1 - gets Seraphis enotes stored in the ledger
+    * brief: get_reference_set_v1 - gets Seraphis enotes stored in the ledger
     * param: indices -
     * outparam: enotes_out - 
     */
-    void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
+    void get_reference_set_v1(const std::vector<std::size_t> &indices,
         std::vector<SpEnoteV1> &enotes_out) const override;
     /**
-    * brief: get_reference_set_proof_elements_sp_v1 - gets Seraphis squashed enotes stored in the ledger
+    * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the ledger
     * param: indices -
     * outparam: proof_elements_out - {{squashed enote}}
     */
-    void get_reference_set_proof_elements_sp_v1(const std::vector<std::size_t> &indices,
+    void get_reference_set_proof_elements_v1(const std::vector<std::size_t> &indices,
         rct::keyM &proof_elements_out) const override;
     /**
     * brief: try_add_transaction_sp_squashed_v1 - try to add a SpTxSquashedV1 transaction to the ledger
@@ -89,23 +89,23 @@ public:
     */
     bool try_add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add) override;
     /**
-    * brief: try_add_linking_tag_sp_v1 - add a Seraphis linking tag to the ledger
+    * brief: try_add_linking_tag_v1 - add a Seraphis linking tag to the ledger
     * param: linking_tag -
     * return: false if linking tag can't be added (duplicate)
     */
-    bool try_add_linking_tag_sp_v1(const crypto::key_image &linking_tag);
+    bool try_add_linking_tag_v1(const crypto::key_image &linking_tag);
     /**
-    * brief: add_enote_sp_v1 - add a Seraphis v1 enote to the ledger (and store the squashed enote)
+    * brief: add_enote_v1 - add a Seraphis v1 enote to the ledger (and store the squashed enote)
     * param: enote -
     * return: index in the ledger of the enote just added
     */
-    std::size_t add_enote_sp_v1(const SpEnoteV1 &enote);
+    std::size_t add_enote_v1(const SpEnoteV1 &enote);
 
 private:
     /// implementations of the above, without internally locking the ledger mutex (all expected to be no-fail)
-    bool linking_tag_exists_sp_v1_impl(const crypto::key_image &linking_tag) const;
-    void add_linking_tag_sp_v1_impl(const crypto::key_image &linking_tag);
-    std::size_t add_enote_sp_v1_impl(const SpEnoteV1 &enote);
+    bool linking_tag_exists_v1_impl(const crypto::key_image &linking_tag) const;
+    void add_linking_tag_v1_impl(const crypto::key_image &linking_tag);
+    std::size_t add_enote_v1_impl(const SpEnoteV1 &enote);
 
     /// Ledger mutex (mutable for use in const member functions)
     mutable std::mutex m_ledger_mutex;

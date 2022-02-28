@@ -67,7 +67,7 @@ extern "C"
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &input_images,
+void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_images,
     std::vector<SpMembershipProofAlignableV1> tx_membership_proofs_alignable,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out)
 {
@@ -94,7 +94,7 @@ void align_v1_tx_membership_proofs_sp_v1(const std::vector<SpEnoteImageV1> &inpu
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::key get_tx_membership_proof_message_sp_v1(const std::vector<std::size_t> &enote_ledger_indices)
+rct::key get_tx_membership_proof_message_v1(const std::vector<std::size_t> &enote_ledger_indices)
 {
     rct::key hash_result;
     std::string hash;
@@ -145,7 +145,7 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
 }
 //-------------------------------------------------------------------------------------------------------------------
 void prepare_input_commitment_factors_for_balance_proof_v1(
-    const std::vector<SpTxPartialInputV1> &partial_inputs,
+    const std::vector<SpPartialInputV1> &partial_inputs,
     std::vector<rct::xmr_amount> &input_amounts_out,
     std::vector<crypto::secret_key> &blinding_factors_out)
 {
@@ -166,7 +166,7 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_image_proof_sp_v1(const SpInputProposal &input_proposal,
+void make_v1_image_proof_v1(const SpInputProposal &input_proposal,
     const rct::key &message,
     SpImageProofV1 &tx_image_proof_out)
 {
@@ -193,7 +193,7 @@ void make_v1_tx_image_proof_sp_v1(const SpInputProposal &input_proposal,
         sp_composition_prove(message, input_enote_image_core.m_masked_address, input_proposal.m_address_mask, y, z);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
+void make_v1_image_proofs_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const rct::key &message,
     std::vector<SpImageProofV1> &tx_image_proofs_out)
 {
@@ -205,11 +205,11 @@ void make_v1_tx_image_proofs_sp_v1(const std::vector<SpInputProposalV1> &input_p
     for (const SpInputProposalV1 &input_proposal : input_proposals)
     {
         tx_image_proofs_out.emplace_back();
-        make_v1_tx_image_proof_sp_v1(input_proposal.m_core, message, tx_image_proofs_out.back());
+        make_v1_image_proof_v1(input_proposal.m_core, message, tx_image_proofs_out.back());
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
+void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
     SpMembershipProofV1 &tx_membership_proof_out)
@@ -257,7 +257,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
     sc_mul(&(image_masks[0]), &(image_masks[0]), MINUS_ONE.bytes);  // -(t_k + t_c)
 
     // proof message
-    rct::key message{get_tx_membership_proof_message_sp_v1(membership_ref_set.m_ledger_enote_indices)};
+    rct::key message{get_tx_membership_proof_message_v1(membership_ref_set.m_ledger_enote_indices)};
 
 
     /// make concise grootle proof
@@ -276,7 +276,7 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
     tx_membership_proof_out.m_ref_set_decomp_m = membership_ref_set.m_ref_set_decomp_m;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
+void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
     SpMembershipProofAlignableV1 &tx_membership_proof_out)
@@ -292,13 +292,13 @@ void make_v1_tx_membership_proof_sp_v1(const SpMembershipReferenceSetV1 &members
         tx_membership_proof_out.m_masked_address);  //t_k G + H(Ko,C) Ko
 
     // make the membership proof
-    make_v1_tx_membership_proof_sp_v1(membership_ref_set,
+    make_v1_membership_proof_v1(membership_ref_set,
         image_address_mask,
         image_amount_mask,
         tx_membership_proof_out.m_membership_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
     std::vector<SpMembershipProofAlignableV1> &tx_membership_proofs_out)
@@ -311,15 +311,15 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
 
     for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
     {
-        make_v1_tx_membership_proof_sp_v1(membership_ref_sets[input_index],
+        make_v1_membership_proof_v1(membership_ref_sets[input_index],
             image_address_masks[input_index],
             image_amount_masks[input_index],
             tx_membership_proofs_out[input_index]);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-    const std::vector<SpTxPartialInputV1> &partial_inputs,
+void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    const std::vector<SpPartialInputV1> &partial_inputs,
     std::vector<SpMembershipProofAlignableV1> &tx_membership_proofs_out)
 {
     CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_inputs.size(), "Input components size mismatch");
@@ -334,15 +334,15 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
             partial_inputs[input_index].m_input_enote_core.m_onetime_address, 
             "Membership ref set real spend doesn't match partial input's enote.");
 
-        make_v1_tx_membership_proof_sp_v1(membership_ref_sets[input_index],
+        make_v1_membership_proof_v1(membership_ref_sets[input_index],
             partial_inputs[input_index].m_image_address_mask,
             partial_inputs[input_index].m_image_commitment_mask,
             tx_membership_proofs_out[input_index]);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-    const SpTxPartialV1 &partial_tx,
+void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    const SpPartialTxV1 &partial_tx,
     std::vector<SpMembershipProofV1> &tx_membership_proofs_out)
 {
     // note: ref sets are assumed to be pre-sorted, so sortable membership proofs are not needed
@@ -356,16 +356,16 @@ void make_v1_tx_membership_proofs_sp_v1(const std::vector<SpMembershipReferenceS
 
     for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
     {
-        make_v1_tx_membership_proof_sp_v1(membership_ref_sets[input_index],
+        make_v1_membership_proof_v1(membership_ref_sets[input_index],
             partial_tx.m_image_address_masks[input_index],
             partial_tx.m_image_commitment_masks[input_index],
             tx_membership_proofs_out[input_index]);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_partial_input_v1(const SpInputProposalV1 &input_proposal,
+void make_v1_partial_input_v1(const SpInputProposalV1 &input_proposal,
     const rct::key &proposal_prefix,
-    SpTxPartialInputV1 &partial_input_out)
+    SpPartialInputV1 &partial_input_out)
 {
     // prepare input image
     input_proposal.get_enote_image_v1(partial_input_out.m_input_image);
@@ -379,14 +379,14 @@ void make_v1_tx_partial_input_v1(const SpInputProposalV1 &input_proposal,
     input_proposal.m_core.get_enote_core(partial_input_out.m_input_enote_core);
 
     // construct image proof
-    make_v1_tx_image_proof_sp_v1(input_proposal.m_core,
+    make_v1_image_proof_v1(input_proposal.m_core,
         partial_input_out.m_proposal_prefix,
         partial_input_out.m_image_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
+void make_v1_partial_inputs_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const rct::key &proposal_prefix,
-    std::vector<SpTxPartialInputV1> &partial_inputs_out)
+    std::vector<SpPartialInputV1> &partial_inputs_out)
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Can't make partial tx inputs without any input proposals");
 
@@ -397,7 +397,7 @@ void make_v1_tx_partial_inputs_sp_v1(const std::vector<SpInputProposalV1> &input
     for (const SpInputProposalV1 &input_proposal : input_proposals)
     {
         partial_inputs_out.emplace_back();
-        make_v1_tx_partial_input_v1(input_proposal, proposal_prefix, partial_inputs_out.back());
+        make_v1_partial_input_v1(input_proposal, proposal_prefix, partial_inputs_out.back());
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -451,7 +451,7 @@ SpMembershipReferenceSetV1 gen_mock_sp_membership_ref_set_v1(
         SpEnoteV1 temp_enote;
         temp_enote.m_core = reference_set.m_referenced_enotes[ref_index];
 
-        reference_set.m_ledger_enote_indices[ref_index] = ledger_context_inout.add_enote_sp_v1(temp_enote);
+        reference_set.m_ledger_enote_indices[ref_index] = ledger_context_inout.add_enote_v1(temp_enote);
     }
     
     return reference_set;

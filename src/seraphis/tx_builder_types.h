@@ -165,13 +165,13 @@ struct SpTxProposalV1 final
 };
 
 ////
-// SpTxPartialInputV1
+// SpPartialInputV1
 // - enote spent
 // - cached amount and amount blinding factor, image masks (for balance and membership proofs)
 // - spend proof for input (and proof the input's key image is properly constructed)
 // - proposal prefix (spend proof msg) [for consistency checks when handling this object]
 ///
-struct SpTxPartialInputV1 final
+struct SpPartialInputV1 final
 {
     /// input's image
     SpEnoteImageV1 m_input_image;
@@ -192,18 +192,18 @@ struct SpTxPartialInputV1 final
     crypto::secret_key m_input_amount_blinding_factor;
 
     /// less-than operator for sorting
-    bool operator<(const SpTxPartialInputV1 &other_input) const
+    bool operator<(const SpPartialInputV1 &other_input) const
     {
         return m_input_image < other_input.m_input_image;
     }
 };
 
 ////
-// SpTxPartialV1: everything needed for a tx except input membership proofs
+// SpPartialTxV1: everything needed for a tx except input membership proofs
 //
 // TODO: from multisig - multisigproposal.txproposal, multisig inputs + extra inputs, balance proof
 ///
-struct SpTxPartialV1 final
+struct SpPartialTxV1 final
 {
     /// tx input images  (spent e-notes)
     std::vector<SpEnoteImageV1> m_input_images;

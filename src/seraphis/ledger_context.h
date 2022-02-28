@@ -58,24 +58,24 @@ public:
     /// default destructor
     virtual ~LedgerContext() = default;
     /**
-    * brief: linking_tag_exists_sp_v1 - checks if a Seraphis linking tag exists in the ledger
+    * brief: linking_tag_exists_v1 - checks if a Seraphis linking tag exists in the ledger
     * param: linking_tag -
     * return: true/false on check result
     */
-    virtual bool linking_tag_exists_sp_v1(const crypto::key_image &linking_tag) const = 0;
+    virtual bool linking_tag_exists_v1(const crypto::key_image &linking_tag) const = 0;
     /**
-    * brief: get_reference_set_sp_v1 - gets Seraphis enotes stored in the ledger
+    * brief: get_reference_set_v1 - gets Seraphis enotes stored in the ledger
     * param: indices -
     * outparam: enotes_out - 
     */
-    virtual void get_reference_set_sp_v1(const std::vector<std::size_t> &indices,
+    virtual void get_reference_set_v1(const std::vector<std::size_t> &indices,
         std::vector<SpEnoteV1> &enotes_out) const = 0;
     /**
-    * brief: get_reference_set_proof_elements_sp_v1 - gets Seraphis squashed enotes stored in the ledger
+    * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the ledger
     * param: indices -
     * outparam: proof_elements_out - {{squashed enote}}
     */
-    virtual void get_reference_set_proof_elements_sp_v1(const std::vector<std::size_t> &indices,
+    virtual void get_reference_set_proof_elements_v1(const std::vector<std::size_t> &indices,
         rct::keyM &proof_elements_out) const = 0;
     /**
     * brief: try_add_transaction_sp_squashed_v1 - try to add a SpTxSquashedV1 transaction to the ledger

@@ -79,7 +79,7 @@ static auto convert_skv_to_rctv(const std::vector<crypto::secret_key> &skv, rct:
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
+rct::key get_tx_image_proof_message_v1(const std::string &version_string,
     const std::vector<SpEnoteV1> &output_enotes,
     const SpTxSupplementV1 &tx_supplement)
 {
@@ -108,7 +108,7 @@ rct::key get_tx_image_proof_message_sp_v1(const std::string &version_string,
     return hash_result;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_amounts,
+void make_v1_balance_proof_v1(const std::vector<rct::xmr_amount> &input_amounts,
     const std::vector<rct::xmr_amount> &output_amounts,
     const rct::xmr_amount transaction_fee,
     const std::vector<crypto::secret_key> &input_image_amount_commitment_blinding_factors,
@@ -154,7 +154,7 @@ void make_v1_tx_balance_proof_sp_v1(const std::vector<rct::xmr_amount> &input_am
     balance_proof_out.m_remainder_blinding_factor = rct::sk2rct(remainder_blinding_factor);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &input_proposals,
+bool balance_check_in_out_amnts_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const std::vector<SpOutputProposalV1> &output_proposals,
     const rct::xmr_amount transaction_fee)
 {
@@ -175,14 +175,14 @@ bool balance_check_in_out_amnts_sp_v1(const std::vector<SpInputProposalV1> &inpu
     return balance_check_in_out_amnts(in_amounts, out_amounts, transaction_fee);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
-    std::vector<SpTxPartialInputV1> partial_inputs,
+void make_v1_partial_tx_v1(const SpTxProposalV1 &proposal,
+    std::vector<SpPartialInputV1> partial_inputs,
     const rct::xmr_amount transaction_fee,
     const std::string &version_string,
-    SpTxPartialV1 &partial_tx_out)
+    SpPartialTxV1 &partial_tx_out)
 {
     // reset tx
-    partial_tx_out = SpTxPartialV1{};
+    partial_tx_out = SpPartialTxV1{};
 
 
     /// prepare
@@ -210,7 +210,7 @@ void make_v1_tx_partial_v1(const SpTxProposalV1 &proposal,
         input_image_amount_commitment_blinding_factors);
 
     // make balance proof
-    make_v1_tx_balance_proof_sp_v1(input_amounts,
+    make_v1_balance_proof_v1(input_amounts,
         proposal.m_output_amounts,
         transaction_fee,
         input_image_amount_commitment_blinding_factors,

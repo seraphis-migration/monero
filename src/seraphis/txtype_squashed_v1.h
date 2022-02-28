@@ -102,11 +102,11 @@ void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     const rct::xmr_amount transaction_fee,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);
-void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
+void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
     std::vector<SpMembershipProofV1> membership_proofs,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);
-void make_seraphis_tx_squashed_v1(SpTxPartialV1 partial_tx,
+void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
     std::vector<SpMembershipProofAlignableV1> alignable_membership_proofs,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);

@@ -53,38 +53,38 @@ namespace sp
 {
 
 /**
-* brief: check_v1_output_proposals_semantics_sp_v1 - check semantics of a set of output proposals
+* brief: check_v1_output_proposals_semantics_v1 - check semantics of a set of output proposals
 *   - if 2 proposals, should be 1 unique enote ephemeral pubkey
 *   - if >2 proposals, should be 1 unique enote ephemeral pubkey per output
 *   - proposals should be sorted
 *   - proposals should have unique onetime addresses
 * param - output_proposals -
 */
-void check_v1_output_proposals_semantics_sp_v1(const std::vector<SpOutputProposalV1> &output_proposals);
+void check_v1_output_proposals_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals);
 /**
-* brief: check_v1_tx_supplement_semantics_sp_v1 - check semantics of a tx supplement
+* brief: check_v1_tx_supplement_semantics_v1 - check semantics of a tx supplement
 *   - if num_outputs == 2, should be 1 enote ephemeral pubkey
 *   - if num_outputs > 2, should be 'num_outputs' enote ephemeral pubkeys
 *   - all enote ephemeral pubkeys should be unique
 * param - tx_supplement -
 * param - num_outputs -
 */
-void check_v1_tx_supplement_semantics_sp_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs);
+void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs);
 /**
-* brief: make_v1_tx_outputs_sp_v1 - make v1 tx outputs
+* brief: make_v1_outputs_v1 - make v1 tx outputs
 * param: destinations -
 * outparam: outputs_out -
 * outparam: output_amounts_out -
 * outparam: output_amount_commitment_blinding_factors_out -
 * inoutparam: tx_supplement_inout -
 */
-void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_proposals,
+void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     std::vector<SpEnoteV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
     SpTxSupplementV1 &tx_supplement_inout);
 /**
-* brief: finalize_v1_output_proposal_set_sp_v1 - finalize a set of output proposals
+* brief: finalize_v1_output_proposal_set_v1 - finalize a set of output proposals
 *   - add a change output if necessary
 *   - add a dummy output if appropriate
 * param: total_input_amount -
@@ -94,7 +94,7 @@ void make_v1_tx_outputs_sp_v1(const std::vector<SpOutputProposalV1> &output_prop
 * param: k_view_balance -
 * inoutparam: output_proposals_inout -
 */
-void finalize_v1_output_proposal_set_sp_v1(const boost::multiprecision::uint128_t &total_input_amount,
+void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &total_input_amount,
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const rct::key &wallet_spend_pubkey,
