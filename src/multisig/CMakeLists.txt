@@ -30,7 +30,8 @@ set(multisig_sources
   multisig.cpp
   multisig_account.cpp
   multisig_account_kex_impl.cpp
-  multisig_kex_msg.cpp)
+  multisig_kex_msg.cpp
+  multisig_signer_set_filter.cpp)
 
 set(multisig_headers)
 
