@@ -28,8 +28,8 @@
 
 #pragma once
 
+#include "crypto/crypto.h"
 #include "cryptonote_config.h"
-#include "ringct/rctTypes.h"
 
 #include <cstdint>
 #include <vector>
@@ -83,8 +83,8 @@ namespace multisig
   * param: threshold - number of signers a filter can represent
   * outparam: aggregate_filter_out - an aggregate filter that maps the signer list to the allowed signer list
   */
-  void allowed_multisig_signers_to_aggregate_filter(const std::vector<rct::key> &signer_list,
-    const std::vector<rct::key> &allowed_signers,
+  void allowed_multisig_signers_to_aggregate_filter(const std::vector<crypto::public_key> &signer_list,
+    const std::vector<crypto::public_key> &allowed_signers,
     const std::uint32_t threshold,
     signer_set_filter &aggregate_filter_out);
     /**
@@ -94,8 +94,8 @@ namespace multisig
   * param: filter - signer set filter
   * outparam: filtered_signers_out - a filtered set of multisig signer ids
   */
-  void get_filtered_multisig_signers(const std::vector<rct::key> &signer_list,
+  void get_filtered_multisig_signers(const std::vector<crypto::public_key> &signer_list,
     const std::uint32_t threshold,
     const signer_set_filter filter,
-    std::vector<rct::key> &filtered_signers_out);
+    std::vector<crypto::public_key> &filtered_signers_out);
 } //namespace multisig

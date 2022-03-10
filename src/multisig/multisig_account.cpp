@@ -29,13 +29,19 @@
 #include "multisig_account.h"
 
 #include "crypto/crypto.h"
+extern "C"
+{
+#include "crypto/crypto-ops.h"
+}
 #include "cryptonote_config.h"
 #include "include_base_utils.h"
 #include "multisig.h"
 #include "multisig_kex_msg.h"
+#include "multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -69,6 +75,7 @@ namespace multisig
     const crypto::secret_key &base_privkey,
     const crypto::secret_key &base_common_privkey,
     std::vector<crypto::secret_key> multisig_privkeys,
+    multisig_keyshare_origins_map_t keyshare_origins_map,
     const crypto::secret_key &common_privkey,
     const crypto::public_key &multisig_pubkey,
     const crypto::public_key &common_pubkey,
@@ -78,6 +85,7 @@ namespace multisig
       m_base_privkey{base_privkey},
       m_base_common_privkey{base_common_privkey},
       m_multisig_privkeys{std::move(multisig_privkeys)},
+      m_keyshare_to_origins_map{std::move(keyshare_origins_map)},
       m_common_privkey{common_privkey},
       m_multisig_pubkey{multisig_pubkey},
       m_common_pubkey{common_pubkey},
@@ -88,6 +96,13 @@ namespace multisig
     CHECK_AND_ASSERT_THROW_MES(kex_rounds_complete > 0, "multisig account: can't reconstruct account if its kex wasn't initialized");
     CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_base_privkey, m_base_pubkey),
       "Failed to derive public key");
+    m_multisig_keyshare_pubkeys.reserve(m_multisig_privkeys.size());
+    for (const crypto::secret_key &multisig_privkey : m_multisig_privkeys)
+    {
+      m_multisig_keyshare_pubkeys.emplace_back();
+      CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(multisig_privkey, m_multisig_keyshare_pubkeys.back()),
+        "Failed to derive public key");
+    }
     set_multisig_config(threshold, std::move(signers));
 
     // kex rounds should not exceed post-kex verification round
@@ -189,6 +204,49 @@ namespace multisig
     multisig_account temp_account{*this};
     temp_account.kex_update_impl(expanded_msgs);
     *this = std::move(temp_account);
+  }
+  //----------------------------------------------------------------------------------------------------------------------
+  // multisig_account: EXTERNAL
+  //----------------------------------------------------------------------------------------------------------------------
+  bool multisig_account::try_get_aggregate_signing_key(const signer_set_filter filter, crypto::secret_key &aggregate_key_out)
+  {
+    CHECK_AND_ASSERT_THROW_MES(multisig_is_ready(), "multisig account: tried to get signing key, but account isn't ready.");
+    CHECK_AND_ASSERT_THROW_MES(m_multisig_privkeys.size() == m_multisig_keyshare_pubkeys.size(),
+      "multisig account: tried to get signing key, but there is a mismatch between multisig privkeys and pubkeys.");
+
+    // filter the signer list to get group of signers
+    std::vector<crypto::public_key> filtered_signers;
+    get_filtered_multisig_signers(m_signers, m_threshold, filter, filtered_signers);
+    CHECK_AND_ASSERT_THROW_MES(std::is_sorted(filtered_signers.begin(), filtered_signers.end()),
+      "multisig account: filtered signers are unsorted.");
+
+    // check that self is in this group of signers
+    auto self_location{std::find(filtered_signers.begin(), filtered_signers.end(), m_base_pubkey)};
+
+    if (self_location == filtered_signers.end())
+      return false;
+
+    // accumulate keyshares that other signers whose ids are lower in the filtered list won't be contributing
+    aggregate_key_out = rct::rct2sk(rct::zero());
+
+    for (std::size_t key_index{0}; key_index < m_multisig_privkeys.size(); ++key_index)
+    {
+      const auto &origins{m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[key_index]]};
+
+      if (std::find_if(origins.begin(), origins.end(),
+          [&](const crypto::public_key &origin) -> bool
+          {
+            return std::find(filtered_signers.begin(), self_location, origin) == self_location;
+          }
+        ) == origins.end())
+      {
+        sc_add((unsigned char*)(&aggregate_key_out),
+          (const unsigned char*)(&aggregate_key_out),
+          (const unsigned char*)(&m_multisig_privkeys[key_index]));
+      }
+    }
+
+    return true;
   }
   //----------------------------------------------------------------------------------------------------------------------
   // EXTERNAL

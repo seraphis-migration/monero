@@ -30,6 +30,7 @@
 
 #include "crypto/crypto.h"
 #include "multisig_kex_msg.h"
+#include "multisig_signer_set_filter.h"
 
 #include <cstdint>
 #include <string>
@@ -77,6 +78,7 @@ namespace multisig
   */
   using multisig_keyset_map_memsafe_t = 
     std::unordered_map<crypto::public_key_memsafe, std::unordered_set<crypto::public_key>>;
+  using multisig_keyshare_origins_map_t = std::unordered_map<crypto::public_key, std::unordered_set<crypto::public_key>>;
 
   class multisig_account final
   {
@@ -101,6 +103,7 @@ namespace multisig
       const crypto::secret_key &base_privkey,
       const crypto::secret_key &base_common_privkey,
       std::vector<crypto::secret_key> multisig_privkeys,
+      multisig_keyshare_origins_map_t keyshare_origins_map,
       const crypto::secret_key &common_privkey,
       const crypto::public_key &multisig_pubkey,
       const crypto::public_key &common_pubkey,
@@ -196,6 +199,16 @@ namespace multisig
     void finalize_kex_update(const std::uint32_t kex_rounds_required,
       multisig_keyset_map_memsafe_t result_keys_to_origins_map);
 
+  //account use functions
+    /**
+    * brief: try_get_aggregate_signing_key - Get an aggregate privkey corresponding to a filtered list of signers.
+    *   - For each privkey share that the local signer has, it only contributes that privkey if it's signer id
+    *     is ordered lowest in the filtered list.
+    * param: filter - filter for selecting signers out of the signer list for creating a signature
+    * outparam: aggregate_key_out - local signer's privkey contribution to a multisig signing event
+    */
+    bool try_get_aggregate_signing_key(const signer_set_filter filter, crypto::secret_key &aggregate_key_out);
+
   //member variables
   private:
     /// misc. account details
@@ -214,14 +227,17 @@ namespace multisig
 
     /// core multisig account keys
     // the account's private key shares of the multisig address
-    // TODO: also record which other signers have these privkeys, to enable aggregation signing (instead of round-robin)
     std::vector<crypto::secret_key> m_multisig_privkeys;
+    std::vector<crypto::public_key> m_multisig_keyshare_pubkeys;
     // a privkey owned by all multisig participants (e.g. a cryptonote view key)
     crypto::secret_key m_common_privkey;
     // the multisig public key (e.g. a cryptonote spend key)
     crypto::public_key m_multisig_pubkey;
     // the common public key (e.g. a view spend key)
     crypto::public_key m_common_pubkey;
+
+    /// records which other signers have each of the local signer's multisig privkeys
+    multisig_keyshare_origins_map_t m_keyshare_to_origins_map;
 
     /// kex variables
     // number of key exchange rounds that have been completed (all messages for the round collected and processed)

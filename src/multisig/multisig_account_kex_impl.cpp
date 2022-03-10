@@ -29,6 +29,10 @@
 #include "multisig_account.h"
 
 #include "crypto/crypto.h"
+extern "C"
+{
+#include "crypto/crypto-ops.h"
+}
 #include "cryptonote_config.h"
 #include "include_base_utils.h"
 #include "multisig.h"
@@ -712,15 +716,36 @@ namespace multisig
       result_keys.reserve(result_keys_to_origins_map.size());
 
       for (const auto &result_key_and_origins : result_keys_to_origins_map)
-      {
         result_keys.emplace_back(result_key_and_origins.first);
+
+      // save pre-aggregation privkeys as pubkeys for migrating the origins map below
+      std::vector<crypto::public_key> preagg_keyshares;
+      preagg_keyshares.reserve(m_multisig_privkeys.size());
+      for (const crypto::secret_key &multisig_privkey : m_multisig_privkeys)
+      {
+        preagg_keyshares.emplace_back();
+        CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(multisig_privkey, preagg_keyshares.back()),
+          "Failed to derive public key");
       }
 
       // compute final aggregate key, update local multisig privkeys with aggregation coefficients applied
       m_multisig_pubkey = generate_multisig_aggregate_key(std::move(result_keys), m_multisig_privkeys);
 
-      // no longer need the account's pubkeys saved for this round (they were only used to build exclude_pubkeys)
-      // TODO: record [pre-aggregation pubkeys : origins] map for aggregation-style signing
+      // 1) convert keyshares to pubkeys for convenience when assembling aggregate keys
+      // 2) record [post-aggregation pubkeys : origins] map for aggregation-style signing
+      m_multisig_keyshare_pubkeys.resize(m_multisig_privkeys.size());
+
+      for (std::size_t keyshare_index{0}; keyshare_index < m_multisig_privkeys.size(); ++keyshare_index)
+      {
+        CHECK_AND_ASSERT_THROW_MES(
+            crypto::secret_key_to_public_key(m_multisig_privkeys[keyshare_index], m_multisig_keyshare_pubkeys[keyshare_index]),
+            "Failed to derive public key"
+          );
+
+        m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[keyshare_index]] =
+          std::move(m_kex_keys_to_origins_map[preagg_keyshares[keyshare_index]]);
+      }
+
       m_kex_keys_to_origins_map.clear();
 
       // save keys that should be recommended to other signers

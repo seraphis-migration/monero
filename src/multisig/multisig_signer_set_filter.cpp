@@ -28,8 +28,8 @@
 
 #include "multisig_signer_set_filter.h"
 
+#include "crypto/crypto.h"
 #include "misc_log_ex.h"
-#include "ringct/rctTypes.h"
 
 #include <boost/math/special_functions/binomial.hpp>
 
@@ -199,8 +199,8 @@ namespace multisig
     }
   }
   //----------------------------------------------------------------------------------------------------------------------
-  void allowed_multisig_signers_to_aggregate_filter(const std::vector<rct::key> &signer_list,
-    const std::vector<rct::key> &allowed_signers,
+  void allowed_multisig_signers_to_aggregate_filter(const std::vector<crypto::public_key> &signer_list,
+    const std::vector<crypto::public_key> &allowed_signers,
     const std::uint32_t threshold,
     signer_set_filter &aggregate_filter_out)
   {
@@ -210,7 +210,7 @@ namespace multisig
       allowed_signers.size() >= threshold,
       "Invalid number of allowed signers when making multisig signer filters.");
 
-    for (const rct::key &allowed_signer : allowed_signers)
+    for (const crypto::public_key &allowed_signer : allowed_signers)
     {
       CHECK_AND_ASSERT_THROW_MES(std::find(signer_list.begin(), signer_list.end(), allowed_signer) != signer_list.end(),
         "Unknown allowed signer when making multisig signer filters.");
@@ -226,10 +226,10 @@ namespace multisig
     }
   }
   //----------------------------------------------------------------------------------------------------------------------
-  void get_filtered_multisig_signers(const std::vector<rct::key> &signer_list,
+  void get_filtered_multisig_signers(const std::vector<crypto::public_key> &signer_list,
     const std::uint32_t threshold,
     const signer_set_filter filter,
-    std::vector<rct::key> &filtered_signers_out)
+    std::vector<crypto::public_key> &filtered_signers_out)
   {
     CHECK_AND_ASSERT_THROW_MES(validate_multisig_signer_set_filter(signer_list.size(), threshold, filter),
       "Invalid signer set filter when filtering a list of multisig signers.");

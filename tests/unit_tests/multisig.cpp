@@ -225,13 +225,13 @@ static void make_wallets(std::vector<tools::wallet2>& wallets, unsigned int M)
 }
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
-static void make_multisig_signer_list(const std::uint32_t num_signers, std::vector<rct::key> &signer_list_out)
+static void make_multisig_signer_list(const std::uint32_t num_signers, std::vector<crypto::public_key> &signer_list_out)
 {
   signer_list_out.clear();
   signer_list_out.reserve(num_signers);
 
   for (std::uint32_t i{0}; i < num_signers; ++i)
-    signer_list_out.emplace_back(rct::pkGen());
+    signer_list_out.emplace_back(rct::rct2pk(rct::pkGen()));
 }
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
@@ -239,9 +239,9 @@ static void test_multisig_signer_set_filter(const std::uint32_t num_signers, con
 {
   using namespace multisig;
 
-  std::vector<rct::key> signer_list;
-  std::vector<rct::key> allowed_signers;
-  std::vector<rct::key> filtered_signers;
+  std::vector<crypto::public_key> signer_list;
+  std::vector<crypto::public_key> allowed_signers;
+  std::vector<crypto::public_key> filtered_signers;
   signer_set_filter aggregate_filter;
   std::vector<signer_set_filter> filters;
 
@@ -452,9 +452,9 @@ TEST(multisig, multisig_signer_set_filter)
 
   using namespace multisig;
 
-  std::vector<rct::key> signer_list;
-  std::vector<rct::key> allowed_signers;
-  std::vector<rct::key> filtered_signers;
+  std::vector<crypto::public_key> signer_list;
+  std::vector<crypto::public_key> allowed_signers;
+  std::vector<crypto::public_key> filtered_signers;
   signer_set_filter aggregate_filter;
   std::vector<signer_set_filter> filters;
   std::uint32_t num_signers{4};
