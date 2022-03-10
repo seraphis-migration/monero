@@ -60,14 +60,42 @@ namespace multisig
     const signer_set_filter filter);
   bool validate_multisig_signer_set_filters(const std::uint32_t num_signers,
     const std::uint32_t threshold,
-    const std::vector<signer_set_filter> &sets);
+    const std::vector<signer_set_filter> &filters);
   /**
-  * brief: get_multisig_signers_from_set - Filter a signer list using a signer_set_filter.
+  * brief: aggregate_multisig_signer_set_filter_to_permutations - Extract filters from an aggregate filter.
+  *   - An aggregate filter is bitwise-or between all contained filters.
+  * param: num_signers - total number of signers the filter acts on
+  * param: threshold - number of signers a filter can represent
+  * param: aggregate_filter - signer set filter contains 1 or more actual filters
+  * outparam: filter_permutations_out - all the filters that can be extracted from the aggregate filter
+  */
+  void aggregate_multisig_signer_set_filter_to_permutations(const std::uint32_t num_signers,
+    const std::uint32_t threshold,
+    const signer_set_filter aggregate_filter,
+    std::vector<signer_set_filter> &filter_permutations_out);
+  /**
+  * brief: get_filtered_multisig_signers - Filter a signer list using a signer_set_filter.
   * param: signer_list - list of signer ids
+  * param: threshold - number of signers a filter can represent
   * param: filter - signer set filter
   * outparam: filtered_signers_out - a filtered set of multisig signer ids
   */
-  void get_multisig_signers_from_set(const std::vector<rct::key> &signer_list,
+  void get_filtered_multisig_signers(const std::vector<rct::key> &signer_list,
+    const std::uint32_t threshold,
     const signer_set_filter filter,
     std::vector<rct::key> &filtered_signers_out);
+  /**
+  * brief: allowed_multisig_signers_to_aggregate_filter - Represent a set of multisig signers as an aggregate filter.
+  *   - Every permutation of 'threshold' number of signers from the allowed set is a separate signer set that can
+  *     collaborate on a multisig signature. Dis-aggregating the aggregate filter will provide filters corresponding
+  *     to each of those sets.
+  * param: signer_list - list of signer ids
+  * param: allowed_signers - the signers from the signer list that should be represented in the filter
+  * param: threshold - number of signers a filter can represent
+  * outparam: aggregate_filter_out - an aggregate filter that maps the signer list to the allowed signer list
+  */
+  void allowed_multisig_signers_to_aggregate_filter(const std::vector<rct::key> &signer_list,
+    const std::vector<rct::key> &allowed_signers,
+    const std::uint32_t threshold,
+    signer_set_filter &aggregate_filter_out);
 } //namespace multisig

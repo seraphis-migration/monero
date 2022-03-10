@@ -47,7 +47,7 @@ namespace multisig
 {
   //----------------------------------------------------------------------------------------------------------------------
   //----------------------------------------------------------------------------------------------------------------------
-  static bool check_multisig_config(const std::uint32_t num_signers,
+  static bool check_multisig_config_for_filter(const std::uint32_t num_signers,
     const std::uint32_t threshold)
   {
     if (num_signers > 8*sizeof(signer_set_filter))
@@ -131,7 +131,7 @@ namespace multisig
     const signer_set_filter filter)
   {
     // the filter should only have flags set for possible signers
-    if (!check_multisig_config(num_signers, threshold))
+    if (!check_multisig_config_for_filter(num_signers, threshold))
       return false;
     if ((filter >> num_signers) != 0)
       return false;
@@ -161,7 +161,7 @@ namespace multisig
     const signer_set_filter aggregate_filter,
     std::vector<signer_set_filter> &filter_permutations_out)
   {
-    CHECK_AND_ASSERT_THROW_MES(check_multisig_config(num_signers, threshold),
+    CHECK_AND_ASSERT_THROW_MES(check_multisig_config_for_filter(num_signers, threshold),
       "Invalid multisig config when getting filter permutations");
 
     const std::uint32_t num_flags_set{get_num_flags_set(aggregate_filter)};
@@ -181,7 +181,12 @@ namespace multisig
     {
       // if found a match, map the bit pattern onto the aggregate filter
       if (get_num_flags_set(reference_filter) == threshold)
+      {
         filter_permutations_out.emplace_back(reference_filter_to_filter(reference_filter, aggregate_filter));
+
+        CHECK_AND_ASSERT_THROW_MES(validate_multisig_signer_set_filter(num_signers, threshold, filter_permutations_out.back()),
+          "Invalid multisig set filter extracted from aggregate filter.");
+      }
 
       ++reference_filter;
     }
@@ -211,7 +216,7 @@ namespace multisig
     const std::uint32_t threshold,
     signer_set_filter &aggregate_filter_out)
   {
-    CHECK_AND_ASSERT_THROW_MES(check_multisig_config(signer_list.size(), threshold),
+    CHECK_AND_ASSERT_THROW_MES(check_multisig_config_for_filter(signer_list.size(), threshold),
       "Invalid multisig config when making multisig signer filters.");
     CHECK_AND_ASSERT_THROW_MES(allowed_signers.size() <= signer_list.size() &&
       allowed_signers.size() >= threshold,
