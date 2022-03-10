@@ -29,6 +29,7 @@
 #include "crypto/crypto.h"
 #include "multisig/multisig_account.h"
 #include "multisig/multisig_kex_msg.h"
+#include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
 #include "wallet/wallet2.h"
 
@@ -66,6 +67,8 @@ static const struct
 
 static const size_t KEYS_COUNT = 5;
 
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 static void make_wallet(unsigned int idx, tools::wallet2 &wallet)
 {
   ASSERT_TRUE(idx < sizeof(test_addresses) / sizeof(test_addresses[0]));
@@ -89,7 +92,8 @@ static void make_wallet(unsigned int idx, tools::wallet2 &wallet)
     ASSERT_TRUE(0);
   }
 }
-
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 static std::vector<std::string> exchange_round(std::vector<tools::wallet2>& wallets, const std::vector<std::string>& infos)
 {
   std::vector<std::string> new_infos;
@@ -102,7 +106,8 @@ static std::vector<std::string> exchange_round(std::vector<tools::wallet2>& wall
 
   return new_infos;
 }
-
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 static void check_results(const std::vector<std::string> &intermediate_infos,
   std::vector<tools::wallet2>& wallets,
   std::uint32_t M)
@@ -166,7 +171,8 @@ static void check_results(const std::vector<std::string> &intermediate_infos,
   EXPECT_EQ(wallets[0].get_account().get_keys().m_account_address.m_spend_public_key, rct::rct2pk(composite_pubkey));
   wallets[0].encrypt_keys("");
 }
-
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 static void make_wallets(std::vector<tools::wallet2>& wallets, unsigned int M)
 {
   ASSERT_TRUE(wallets.size() > 1 && wallets.size() <= KEYS_COUNT);
@@ -217,6 +223,74 @@ static void make_wallets(std::vector<tools::wallet2>& wallets, unsigned int M)
 
   check_results(intermediate_infos, wallets, M);
 }
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static void make_multisig_signer_list(const std::uint32_t num_signers, std::vector<rct::key> &signer_list_out)
+{
+  signer_list_out.clear();
+  signer_list_out.reserve(num_signers);
+
+  for (std::uint32_t i{0}; i < num_signers; ++i)
+    signer_list_out.emplace_back(rct::pkGen());
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static void test_multisig_signer_set_filter(const std::uint32_t num_signers, const std::uint32_t threshold)
+{
+  using namespace multisig;
+
+  std::vector<rct::key> signer_list;
+  std::vector<rct::key> allowed_signers;
+  std::vector<rct::key> filtered_signers;
+  signer_set_filter aggregate_filter;
+  std::vector<signer_set_filter> filters;
+
+  make_multisig_signer_list(num_signers, signer_list);
+
+  // all signers are allowed
+  allowed_signers = signer_list;
+  EXPECT_NO_THROW(allowed_multisig_signers_to_aggregate_filter(signer_list, allowed_signers, threshold, aggregate_filter));
+  EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(num_signers, threshold, aggregate_filter, filters));
+  for (const signer_set_filter filter : filters)
+  {
+    EXPECT_NO_THROW(get_filtered_multisig_signers(signer_list, threshold, filter, filtered_signers));
+    EXPECT_TRUE(filtered_signers.size() == threshold);
+  }
+
+  // num_signers - 1 signers are allowed
+  if (num_signers > threshold)
+  {
+    allowed_signers.pop_back();
+    EXPECT_NO_THROW(allowed_multisig_signers_to_aggregate_filter(signer_list, allowed_signers, threshold, aggregate_filter));
+    EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(num_signers, threshold, aggregate_filter, filters));
+    for (const signer_set_filter filter : filters)
+    {
+      EXPECT_NO_THROW(get_filtered_multisig_signers(signer_list, threshold, filter, filtered_signers));
+      EXPECT_TRUE(filtered_signers.size() == threshold);
+    }
+  }
+
+  // threshold signers are allowed
+  while (allowed_signers.size() > threshold)
+    allowed_signers.pop_back();
+
+  EXPECT_NO_THROW(allowed_multisig_signers_to_aggregate_filter(signer_list, allowed_signers, threshold, aggregate_filter));
+  EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(num_signers, threshold, aggregate_filter, filters));
+  for (const signer_set_filter filter : filters)
+  {
+    EXPECT_NO_THROW(get_filtered_multisig_signers(signer_list, threshold, filter, filtered_signers));
+    EXPECT_TRUE(filtered_signers.size() == threshold);
+  }
+
+  // < threshold signers are allowed
+  if (threshold > 0)
+  {
+    allowed_signers.pop_back();
+    EXPECT_ANY_THROW(allowed_multisig_signers_to_aggregate_filter(signer_list, allowed_signers, threshold, aggregate_filter));
+  }
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 
 TEST(multisig, make_1_2)
 {
@@ -338,4 +412,39 @@ TEST(multisig, multisig_kex_msg)
   EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[1], msg_rnd2_reverse.get_msg_pubkeys()[1]);
   EXPECT_EQ(msg_rnd2.get_msg_privkey(), crypto::null_skey);
   EXPECT_EQ(msg_rnd2.get_msg_privkey(), msg_rnd2_reverse.get_msg_privkey());
+}
+
+TEST(multisig, multisig_signer_set_filter)
+{
+  using namespace multisig;
+
+  // 0 signers, 0 threshold
+  test_multisig_signer_set_filter(0, 0);
+
+  // 1 signer, 0 threshold
+  test_multisig_signer_set_filter(1, 0);
+
+  // 1 signer, 1 threshold
+  test_multisig_signer_set_filter(1, 1);
+
+  // 2 signers, 0 threshold
+  test_multisig_signer_set_filter(2, 0);
+
+  // 2 signers, 1 threshold
+  test_multisig_signer_set_filter(2, 1);
+
+  // 2 signers, 2 threshold
+  test_multisig_signer_set_filter(2, 2);
+
+  // 3 signers, 1 threshold
+  test_multisig_signer_set_filter(3, 1);
+
+  // 3 signers, 2 threshold
+  test_multisig_signer_set_filter(3, 2);
+
+  // 3 signers, 3 threshold
+  test_multisig_signer_set_filter(3, 3);
+
+  // 7 signers, 3 threshold
+  test_multisig_signer_set_filter(7, 3);
 }

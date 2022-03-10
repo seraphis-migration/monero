@@ -74,17 +74,6 @@ namespace multisig
     const signer_set_filter aggregate_filter,
     std::vector<signer_set_filter> &filter_permutations_out);
   /**
-  * brief: get_filtered_multisig_signers - Filter a signer list using a signer_set_filter.
-  * param: signer_list - list of signer ids
-  * param: threshold - number of signers a filter can represent
-  * param: filter - signer set filter
-  * outparam: filtered_signers_out - a filtered set of multisig signer ids
-  */
-  void get_filtered_multisig_signers(const std::vector<rct::key> &signer_list,
-    const std::uint32_t threshold,
-    const signer_set_filter filter,
-    std::vector<rct::key> &filtered_signers_out);
-  /**
   * brief: allowed_multisig_signers_to_aggregate_filter - Represent a set of multisig signers as an aggregate filter.
   *   - Every permutation of 'threshold' number of signers from the allowed set is a separate signer set that can
   *     collaborate on a multisig signature. Dis-aggregating the aggregate filter will provide filters corresponding
@@ -98,4 +87,15 @@ namespace multisig
     const std::vector<rct::key> &allowed_signers,
     const std::uint32_t threshold,
     signer_set_filter &aggregate_filter_out);
+    /**
+  * brief: get_filtered_multisig_signers - Filter a signer list using a signer_set_filter.
+  * param: signer_list - list of signer ids
+  * param: threshold - number of signers a filter can represent
+  * param: filter - signer set filter
+  * outparam: filtered_signers_out - a filtered set of multisig signer ids
+  */
+  void get_filtered_multisig_signers(const std::vector<rct::key> &signer_list,
+    const std::uint32_t threshold,
+    const signer_set_filter filter,
+    std::vector<rct::key> &filtered_signers_out);
 } //namespace multisig

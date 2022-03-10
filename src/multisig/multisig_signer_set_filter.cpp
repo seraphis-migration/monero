@@ -106,17 +106,24 @@ namespace multisig
     signer_set_filter temp_filter{0};
     std::uint32_t agg_filter_position{0};
 
-    while (reference_filter)
+    // find the first set bit in the aggregate filter
+    while (aggregate_filter && !(aggregate_filter & 1))
     {
+      aggregate_filter >>= 1;
+      ++agg_filter_position;
+    }
+
+    while (reference_filter && aggregate_filter)
+    {
+      // set the return filter's flag at the aggregate filter position if the reference filter's top flag is set
+      temp_filter |= ((reference_filter & 1) << agg_filter_position);
+
       // find the next set bit in the aggregate filter
-      while (aggregate_filter && !(aggregate_filter & 1))
+      do
       {
         aggregate_filter >>= 1;
         ++agg_filter_position;
-      }
-
-      // set the return filter's flag at the aggregate filter position if the reference filter's top flag is set
-      temp_filter |= ((reference_filter & 1) << agg_filter_position);
+      } while (aggregate_filter && !(aggregate_filter & 1));
 
       // remove the reference filter's last flag
       reference_filter >>= 1;
@@ -192,25 +199,6 @@ namespace multisig
     }
   }
   //----------------------------------------------------------------------------------------------------------------------
-  void get_filtered_multisig_signers(const std::vector<rct::key> &signer_list,
-    const std::uint32_t threshold,
-    const signer_set_filter filter,
-    std::vector<rct::key> &filtered_signers_out)
-  {
-    CHECK_AND_ASSERT_THROW_MES(validate_multisig_signer_set_filter(signer_list.size(), threshold, filter),
-      "Invalid signer set filter when filtering a list of multisig signers.");
-
-    filtered_signers_out.clear();
-    filtered_signers_out.reserve(threshold);
-
-    // filter the signer list
-    for (std::size_t signer_index{0}; signer_index < signer_list.size(); ++signer_index)
-    {
-      if ((filter >> signer_index) & 1)
-        filtered_signers_out.emplace_back(signer_list[signer_index]);
-    }
-  }
-  //----------------------------------------------------------------------------------------------------------------------
   void allowed_multisig_signers_to_aggregate_filter(const std::vector<rct::key> &signer_list,
     const std::vector<rct::key> &allowed_signers,
     const std::uint32_t threshold,
@@ -235,6 +223,25 @@ namespace multisig
     {
       if (std::find(allowed_signers.begin(), allowed_signers.end(), signer_list[signer_index]) != allowed_signers.end())
         aggregate_filter_out |= signer_set_filter{1} << signer_index;
+    }
+  }
+  //----------------------------------------------------------------------------------------------------------------------
+  void get_filtered_multisig_signers(const std::vector<rct::key> &signer_list,
+    const std::uint32_t threshold,
+    const signer_set_filter filter,
+    std::vector<rct::key> &filtered_signers_out)
+  {
+    CHECK_AND_ASSERT_THROW_MES(validate_multisig_signer_set_filter(signer_list.size(), threshold, filter),
+      "Invalid signer set filter when filtering a list of multisig signers.");
+
+    filtered_signers_out.clear();
+    filtered_signers_out.reserve(threshold);
+
+    // filter the signer list
+    for (std::size_t signer_index{0}; signer_index < signer_list.size(); ++signer_index)
+    {
+      if ((filter >> signer_index) & 1)
+        filtered_signers_out.emplace_back(signer_list[signer_index]);
     }
   }
   //----------------------------------------------------------------------------------------------------------------------
