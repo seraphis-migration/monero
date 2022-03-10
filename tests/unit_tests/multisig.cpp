@@ -447,4 +447,39 @@ TEST(multisig, multisig_signer_set_filter)
 
   // 7 signers, 3 threshold
   test_multisig_signer_set_filter(7, 3);
+
+  // check that signer set permutations have the expected members: 4 signers, 2 threshold, 3 allowed
+
+  using namespace multisig;
+
+  std::vector<rct::key> signer_list;
+  std::vector<rct::key> allowed_signers;
+  std::vector<rct::key> filtered_signers;
+  signer_set_filter aggregate_filter;
+  std::vector<signer_set_filter> filters;
+  std::uint32_t num_signers{4};
+  std::uint32_t threshold{2};
+
+  make_multisig_signer_list(num_signers, signer_list);
+
+  allowed_signers = signer_list;
+  allowed_signers.pop_back();
+  EXPECT_NO_THROW(allowed_multisig_signers_to_aggregate_filter(signer_list, allowed_signers, threshold, aggregate_filter));
+  EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(num_signers, threshold, aggregate_filter, filters));
+  EXPECT_TRUE(filters.size() == 3);
+
+  EXPECT_NO_THROW(get_filtered_multisig_signers(signer_list, threshold, filters[0], filtered_signers));
+  EXPECT_TRUE(filtered_signers.size() == threshold);
+  EXPECT_TRUE(filtered_signers[0] == signer_list[0]);
+  EXPECT_TRUE(filtered_signers[1] == signer_list[1]);
+
+  EXPECT_NO_THROW(get_filtered_multisig_signers(signer_list, threshold, filters[1], filtered_signers));
+  EXPECT_TRUE(filtered_signers.size() == threshold);
+  EXPECT_TRUE(filtered_signers[0] == signer_list[0]);
+  EXPECT_TRUE(filtered_signers[1] == signer_list[2]);
+
+  EXPECT_NO_THROW(get_filtered_multisig_signers(signer_list, threshold, filters[2], filtered_signers));
+  EXPECT_TRUE(filtered_signers.size() == threshold);
+  EXPECT_TRUE(filtered_signers[0] == signer_list[1]);
+  EXPECT_TRUE(filtered_signers[1] == signer_list[2]);
 }
