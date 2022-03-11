@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "account_generator_era.h"
 #include "crypto/crypto.h"
 #include "multisig_kex_msg.h"
 #include "multisig_signer_set_filter.h"
@@ -95,7 +96,8 @@ namespace multisig
     *    - the first kex msg transmits the local base_common_privkey to other participants, for creating the group's common_privkey
     */
     multisig_account(const crypto::secret_key &base_privkey,
-      const crypto::secret_key &base_common_privkey);
+      const crypto::secret_key &base_common_privkey,
+      const cryptonote::account_generator_era era);
 
     // reconstruct from full account details (not recommended)
     multisig_account(const std::uint32_t threshold,
@@ -109,7 +111,8 @@ namespace multisig
       const crypto::public_key &common_pubkey,
       const std::uint32_t kex_rounds_complete,
       multisig_keyset_map_memsafe_t kex_origins_map,
-      std::string next_round_kex_message);
+      std::string next_round_kex_message,
+      const cryptonote::account_generator_era era);
 
     // copy constructor: default
 
@@ -119,6 +122,8 @@ namespace multisig
   //overloaded operators: none
 
   //getters
+    // get account era
+    cryptonote::account_generator_era get_era() { return m_account_era; }
     // get threshold
     std::uint32_t get_threshold() const { return m_threshold; }
     // get signers
@@ -211,6 +216,9 @@ namespace multisig
 
   //member variables
   private:
+    /// which era this account is calibrated for
+    cryptonote::account_generator_era m_account_era;
+
     /// misc. account details
     // [M] minimum number of co-signers to sign a message with the aggregate pubkey
     std::uint32_t m_threshold{0};

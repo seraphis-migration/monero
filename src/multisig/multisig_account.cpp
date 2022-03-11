@@ -56,7 +56,9 @@ namespace multisig
   // multisig_account: EXTERNAL
   //----------------------------------------------------------------------------------------------------------------------
   multisig_account::multisig_account(const crypto::secret_key &base_privkey,
-    const crypto::secret_key &base_common_privkey) :
+    const crypto::secret_key &base_common_privkey,
+    const cryptonote::account_generator_era era) :
+      m_account_era{era},
       m_base_privkey{base_privkey},
       m_base_common_privkey{base_common_privkey},
       m_multisig_pubkey{rct::rct2pk(rct::identity())},
@@ -81,7 +83,9 @@ namespace multisig
     const crypto::public_key &common_pubkey,
     const std::uint32_t kex_rounds_complete,
     multisig_keyset_map_memsafe_t kex_origins_map,
-    std::string next_round_kex_message) :
+    std::string next_round_kex_message,
+    const cryptonote::account_generator_era era) :
+      m_account_era{era},
       m_base_privkey{base_privkey},
       m_base_common_privkey{base_common_privkey},
       m_multisig_privkeys{std::move(multisig_privkeys)},

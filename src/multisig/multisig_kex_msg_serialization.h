@@ -39,8 +39,11 @@
 
 namespace multisig
 {
-  /// round 1 kex message
-  struct multisig_kex_msg_serializable_round1
+  ////
+  // round 1 kex message
+  // - legacy: use signing_pubkey as a msg_pubkey directly
+  ///
+  struct multisig_kex_msg_serializable_round1_legacy
   {
     // privkey stored in msg
     crypto::secret_key msg_privkey;
@@ -51,6 +54,26 @@ namespace multisig
 
     BEGIN_SERIALIZE()
       FIELD(msg_privkey)
+      FIELD(signing_pubkey)
+      FIELD(signature)
+    END_SERIALIZE()
+  };
+
+  /// round 1 kex message
+  struct multisig_kex_msg_serializable_round1
+  {
+    // privkey stored in msg
+    crypto::secret_key msg_privkey;
+    // pubkey stored in msg
+    crypto::public_key msg_pubkey;
+    // pubkey used to sign this msg
+    crypto::public_key signing_pubkey;
+    // message signature
+    crypto::signature signature;
+
+    BEGIN_SERIALIZE()
+      FIELD(msg_privkey)
+      FIELD(msg_pubkey)
       FIELD(signing_pubkey)
       FIELD(signature)
     END_SERIALIZE()

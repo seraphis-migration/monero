@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "account_generator_era.h"
 #include "crypto/crypto.h"
 
 #include <cstdint>
@@ -57,7 +58,8 @@ namespace multisig
     multisig_kex_msg() = default;
 
     // construct from info
-    multisig_kex_msg(const std::uint32_t round,
+    multisig_kex_msg(const std::uint32_t version,
+      const std::uint32_t round,
       const crypto::secret_key &signing_privkey,
       std::vector<crypto::public_key> msg_pubkeys,
       const crypto::secret_key &msg_privkey = crypto::null_skey);
@@ -83,6 +85,8 @@ namespace multisig
     const crypto::secret_key& get_msg_privkey() const { return m_msg_privkey; }
     // get msg signing pubkey
     const crypto::public_key& get_signing_pubkey() const { return m_signing_pubkey; }
+    // get msg version
+    std::uint32_t get_version() const { return m_version; }
 
   private:
     // msg_to_sign = versioning-domain-sep | kex_round | signing_pubkey | expand(msg_pubkeys) | OPTIONAL msg_privkey
@@ -96,6 +100,8 @@ namespace multisig
   private:
     // message as string
     std::string m_msg;
+    // kex message version
+    std::uint32_t m_version;
 
     // key exchange round this msg was produced for
     std::uint32_t m_kex_round;
@@ -106,4 +112,14 @@ namespace multisig
     // pubkey used to sign this msg
     crypto::public_key m_signing_pubkey;
   };
+
+  std::uint32_t get_kex_msg_version(const cryptonote::account_generator_era era)
+  {
+    if (era == cryptonote::account_generator_era::cryptonote)
+      return 2;
+    else if (era == cryptonote::account_generator_era::seraphis)
+      return 3;
+    else
+      return 0;  //error
+  }
 } //namespace multisig
