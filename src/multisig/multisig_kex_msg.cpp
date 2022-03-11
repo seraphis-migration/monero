@@ -51,10 +51,10 @@ extern "C"
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "multisig"
 
-// legacy multisig
+// pre-rework multisig (deprecated)
 const boost::string_ref MULTISIG_KEX_V1_MAGIC{"MultisigV1"};
 const boost::string_ref MULTISIG_KEX_MSG_V1_MAGIC{"MultisigxV1"};
-// post-rework multisig kex (cryptonote/ringct)
+// cryptonote/ringct multisig kex
 const boost::string_ref MULTISIG_KEX_MSG_V2_MAGIC_1{"MultisigxV2R1"};  //round 1
 const boost::string_ref MULTISIG_KEX_MSG_V2_MAGIC_N{"MultisigxV2Rn"};  //round n > 1
 // seraphis multisig kex
@@ -64,6 +64,7 @@ const boost::string_ref MULTISIG_KEX_MSG_V3_MAGIC_N{"MultisigxV3Rn"};  //round n
 namespace multisig
 {
   //----------------------------------------------------------------------------------------------------------------------
+  // INTERNAL
   //----------------------------------------------------------------------------------------------------------------------
   static void set_kex_msg_magic(const std::uint32_t version, const std::uint32_t kex_round, std::string &msg_out)
   {
@@ -85,6 +86,7 @@ namespace multisig
     }
   }
   //----------------------------------------------------------------------------------------------------------------------
+  // INTERNAL
   //----------------------------------------------------------------------------------------------------------------------
   static std::uint32_t get_message_version(const std::string &original_msg)
   {
@@ -104,9 +106,10 @@ namespace multisig
     return 0;
   }
   //----------------------------------------------------------------------------------------------------------------------
+  // INTERNAL
   //----------------------------------------------------------------------------------------------------------------------
   static bool try_get_message_no_magic(const std::string &original_msg,
-    const std::string &magic,
+    const boost::string_ref &magic,
     std::string &msg_no_magic_out)
   {
     // abort if magic doesn't match the message
@@ -120,6 +123,7 @@ namespace multisig
     return true;
   }
   //----------------------------------------------------------------------------------------------------------------------
+  // INTERNAL
   //----------------------------------------------------------------------------------------------------------------------
   static bool try_get_message_no_magic_round1(const std::string &original_msg, std::string &msg_no_magic_out)
   {
@@ -127,6 +131,7 @@ namespace multisig
       try_get_message_no_magic(original_msg, MULTISIG_KEX_MSG_V3_MAGIC_1, msg_no_magic_out);
   }
   //----------------------------------------------------------------------------------------------------------------------
+  // INTERNAL
   //----------------------------------------------------------------------------------------------------------------------
   static bool try_get_message_no_magic_roundN(const std::string &original_msg, std::string &msg_no_magic_out)
   {
@@ -154,11 +159,7 @@ namespace multisig
     {
       CHECK_AND_ASSERT_THROW_MES(sc_check((const unsigned char*)&msg_privkey) == 0 &&
         msg_privkey != crypto::null_skey, "Invalid msg privkey.");
-
-      if (version == 2)
-        CHECK_AND_ASSERT_THROW_MES(msg_pubkeys.size() == 0, "In v2, round 1, expect zero msg pubkeys.");
-      else
-        CHECK_AND_ASSERT_THROW_MES(msg_pubkeys.size() == 1, "In v3+, round 1, expect one msg pubkey.");
+      CHECK_AND_ASSERT_THROW_MES(msg_pubkeys.size() == 1, "In round 1, expect one msg pubkey.");
 
       m_msg_privkey = msg_privkey;
     }
@@ -301,18 +302,20 @@ namespace multisig
 
     // deserialize the message
     std::string msg_no_magic;
-    crypto::signature msg_signature;
 
-    bool round1{try_get_message_no_magic_round1(m_msg, msg_no_magic)};
+    bool round1{false};
     bool roundN{false};
-
-    if (!round1)
-      roundN = try_get_message_no_magic_roundN(m_msg, msg_no_magic);
-
+    if (try_get_message_no_magic_round1(m_msg, msg_no_magic))
+      round1 = true;
+    else if (try_get_message_no_magic_roundN(m_msg, msg_no_magic))
+      roundN = true;
     CHECK_AND_ASSERT_THROW_MES(round1 || roundN, "Could not remove magic from kex message.");
-    binary_archive<false> b_archive{epee::strspan<std::uint8_t>(msg_no_magic)};
+
+    binary_archive<false> archived_msg{epee::strspan<std::uint8_t>(msg_no_magic)};
 
     // extract data from the message
+    crypto::signature msg_signature;
+
     if (round1)
     {
       // round 1 message
@@ -321,7 +324,7 @@ namespace multisig
         // round 1: legacy
         multisig_kex_msg_serializable_round1_legacy kex_msg_rnd1;
 
-        if (::serialization::serialize(b_archive, kex_msg_rnd1))
+        if (::serialization::serialize(archived_msg, kex_msg_rnd1))
         {
           // in round 1 the message stores a private ancillary key component for the multisig account
           // that will be shared by all participants (e.g. a shared private view key)
@@ -338,7 +341,7 @@ namespace multisig
         // round 1: current
         multisig_kex_msg_serializable_round1 kex_msg_rnd1;
 
-        if (::serialization::serialize(b_archive, kex_msg_rnd1))
+        if (::serialization::serialize(archived_msg, kex_msg_rnd1))
         {
           // in round 1 the message stores a private ancillary key component for the multisig account
           // that will be shared by all participants (e.g. a shared private view key)
@@ -356,7 +359,7 @@ namespace multisig
       // round >1 message
       multisig_kex_msg_serializable_general kex_msg_general;
 
-      if (::serialization::serialize(b_archive, kex_msg_general))
+      if (::serialization::serialize(archived_msg, kex_msg_general))
       {
         m_kex_round      = kex_msg_general.kex_round;
         m_msg_privkey    = crypto::null_skey;
@@ -387,6 +390,19 @@ namespace multisig
     crypto::hash signed_msg{get_msg_to_sign()};
     CHECK_AND_ASSERT_THROW_MES(crypto::check_signature(signed_msg, m_signing_pubkey, msg_signature),
       "Multisig kex msg signature invalid.");
+  }
+  //----------------------------------------------------------------------------------------------------------------------
+  // EXTERNAL
+  //----------------------------------------------------------------------------------------------------------------------
+  bool check_kex_msg_versions(const std::vector<multisig_kex_msg> &messages, const std::uint32_t expected_version)
+  {
+    for (const multisig_kex_msg &msg : messages)
+    {
+      if (msg.get_version() != expected_version)
+        return false;
+    }
+
+    return true;
   }
   //----------------------------------------------------------------------------------------------------------------------
 } //namespace multisig

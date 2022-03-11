@@ -187,21 +187,25 @@ namespace multisig
     * brief: initialize_kex_update - Helper for kex_update_impl()
     *    - Collect the local signer's shared keys to ignore in incoming messages, build the aggregate ancillary key
     *      if appropriate.
+    * param: generators - generators this account uses
     * param: expanded_msgs - set of multisig kex messages to process
     * param: kex_rounds_required - number of rounds required for kex (not including post-kex verification round)
     * outparam: exclude_pubkeys_out - keys held by the local account corresponding to round 'current_round'
     *    - If 'current_round' is the final round, these are the local account's shares of the final aggregate key.
     */
-    void initialize_kex_update(const std::vector<multisig_kex_msg> &expanded_msgs,
+    void initialize_kex_update(const cryptonote::account_generators &generators,
+      const std::vector<multisig_kex_msg> &expanded_msgs,
       const std::uint32_t kex_rounds_required,
       std::vector<crypto::public_key> &exclude_pubkeys_out);
     /**
     * brief: finalize_kex_update - Helper for kex_update_impl()
-    * param: kex_rounds_required - number of rounds required for kex (not including post-kex verification round)
+    * param: generators - generators this account uses
+    * param: kex_rounds_required - number of rounds required for kex
     * param: result_keys_to_origins_map - map between keys for the next round and the other participants they correspond to
     * inoutparam: temp_account_inout - account to perform last update steps on
     */
-    void finalize_kex_update(const std::uint32_t kex_rounds_required,
+    void finalize_kex_update(const cryptonote::account_generators &generators,
+      const std::uint32_t kex_rounds_required,
       multisig_keyset_map_memsafe_t result_keys_to_origins_map);
 
   //account use functions

@@ -28,6 +28,7 @@
 
 #include "multisig_account.h"
 
+#include "account_generator_era.h"
 #include "crypto/crypto.h"
 extern "C"
 {
@@ -63,11 +64,15 @@ namespace multisig
       m_base_common_privkey{base_common_privkey},
       m_multisig_pubkey{rct::rct2pk(rct::identity())},
       m_common_pubkey{rct::rct2pk(rct::identity())},
-      m_kex_rounds_complete{0},
-      m_next_round_kex_message{multisig_kex_msg{1, base_privkey, std::vector<crypto::public_key>{}, base_common_privkey}.get_msg()}
+      m_kex_rounds_complete{0}
   {
     CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_base_privkey, m_base_pubkey),
       "Failed to derive public key");
+
+    // prepare initial kex message
+    rct::key initial_pubkey{rct::scalarmultKey(get_primary_generator(m_account_era), rct::sk2rct(m_base_privkey))};
+    m_next_round_kex_message =
+      multisig_kex_msg{get_kex_msg_version(era), 1, base_privkey, {rct::rct2pk(initial_pubkey)}, base_common_privkey}.get_msg();
   }
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL
@@ -190,6 +195,8 @@ namespace multisig
     const std::vector<multisig_kex_msg> &expanded_msgs_rnd1)
   {
     CHECK_AND_ASSERT_THROW_MES(!account_is_active(), "multisig account: tried to initialize kex, but already initialized");
+    CHECK_AND_ASSERT_THROW_MES(check_kex_msg_versions(expanded_msgs_rnd1, get_kex_msg_version(m_account_era)),
+      "multisig account: tried to initialize kex with messages that have incompatible versions");
 
     // only mutate account if update succeeds
     multisig_account temp_account{*this};
@@ -204,6 +211,8 @@ namespace multisig
   {
     CHECK_AND_ASSERT_THROW_MES(account_is_active(), "multisig account: tried to update kex, but kex isn't initialized yet.");
     CHECK_AND_ASSERT_THROW_MES(!multisig_is_ready(), "multisig account: tried to update kex, but kex is already complete.");
+    CHECK_AND_ASSERT_THROW_MES(check_kex_msg_versions(expanded_msgs, get_kex_msg_version(m_account_era)),
+      "multisig account: tried to update kex with messages that have incompatible versions");
 
     multisig_account temp_account{*this};
     temp_account.kex_update_impl(expanded_msgs);

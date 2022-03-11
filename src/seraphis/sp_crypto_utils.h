@@ -49,6 +49,10 @@ extern "C"
 
 //forward declarations
 
+static inline unsigned char* to_data(crypto::ec_scalar &scalar) { return &reinterpret_cast<unsigned char &>(scalar); }
+static inline const unsigned char* to_data(const crypto::ec_scalar &scalar) { return &reinterpret_cast<const unsigned char &>(scalar); }
+static inline unsigned char* to_data(crypto::ec_point &point) { return &reinterpret_cast<unsigned char &>(point); }
+static inline const unsigned char* to_data(const crypto::ec_point &point) { return &reinterpret_cast<const unsigned char &>(point); }
 
 namespace crypto
 {

@@ -28,7 +28,8 @@
 
 #pragma once
 
-#include "rct/rctTypes.h"
+#include "ringct/rctOps.h"
+#include "ringct/rctTypes.h"
 #include "seraphis/sp_crypto_utils.h"
 
 
@@ -37,9 +38,8 @@ namespace cryptonote
 
 enum class account_generator_era
 {
-  unknown = 0,  //default constructed eras will be 'unknown'
-  cryptonote = 1,
-  ringct = 1,
+  unknown = 0,
+  cryptonote = 1,  //and ringct
   seraphis = 2
 };
 
@@ -49,27 +49,27 @@ struct account_generators
   rct::key secondary;  //e.g. for view key
 };
 
-const rct::key& get_primary_generator(const account_generator_era era)
+inline const rct::key& get_primary_generator(const account_generator_era era)
 {
   if (era == account_generator_era::cryptonote)
     return rct::G;
   else if (era == account_generator_era::seraphis)
     return sp::get_U_gen();
   else
-    return rct::zero();  //error
+    return rct::Z;  //error
 }
 
-const rct::key& get_secondary_generator(const account_generator_era era)
+inline const rct::key& get_secondary_generator(const account_generator_era era)
 {
   if (era == account_generator_era::cryptonote)
     return rct::G;
   else if (era == account_generator_era::seraphis)
     return sp::get_X_gen();
   else
-    return rct::zero();  //error
+    return rct::Z;  //error
 }
 
-account_generators get_account_generators(const account_generator_era era)
+inline account_generators get_account_generators(const account_generator_era era)
 {
   return account_generators{get_primary_generator(era), get_secondary_generator(era)};
 }

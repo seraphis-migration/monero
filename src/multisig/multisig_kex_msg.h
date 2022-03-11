@@ -113,6 +113,7 @@ namespace multisig
     crypto::public_key m_signing_pubkey;
   };
 
+  //todo
   std::uint32_t get_kex_msg_version(const cryptonote::account_generator_era era)
   {
     if (era == cryptonote::account_generator_era::cryptonote)
@@ -122,4 +123,8 @@ namespace multisig
     else
       return 0;  //error
   }
+
+  //todo
+  bool check_kex_msg_versions(const std::vector<multisig_kex_msg> &messages, const std::uint32_t expected_version);
+
 } //namespace multisig

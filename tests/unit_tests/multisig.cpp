@@ -27,6 +27,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "crypto/crypto.h"
+#include "multisig/account_generator_era.h"
 #include "multisig/multisig_account.h"
 #include "multisig/multisig_kex_msg.h"
 #include "multisig/multisig_signer_set_filter.h"
@@ -350,68 +351,77 @@ TEST(multisig, multisig_kex_msg)
   while (ancillary_skey == crypto::null_skey)
     ancillary_skey = rct::rct2sk(rct::skGen());
 
+  // default version
+  const std::uint32_t v{get_kex_msg_version(cryptonote::account_generator_era::cryptonote)};
+
   // misc. edge cases
   EXPECT_NO_THROW((multisig_kex_msg{}));
   EXPECT_ANY_THROW((multisig_kex_msg{multisig_kex_msg{}.get_msg()}));
   EXPECT_ANY_THROW((multisig_kex_msg{"abc"}));
-  EXPECT_ANY_THROW((multisig_kex_msg{0, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
-  EXPECT_ANY_THROW((multisig_kex_msg{1, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
-  EXPECT_ANY_THROW((multisig_kex_msg{1, signing_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
-  EXPECT_ANY_THROW((multisig_kex_msg{1, crypto::null_skey, std::vector<crypto::public_key>{}, ancillary_skey}));
+  EXPECT_ANY_THROW((multisig_kex_msg{v, 0, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
+  EXPECT_ANY_THROW((multisig_kex_msg{v, 1, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
+  EXPECT_ANY_THROW((multisig_kex_msg{v, 1, signing_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
+  EXPECT_ANY_THROW((multisig_kex_msg{v, 1, crypto::null_skey, std::vector<crypto::public_key>{}, ancillary_skey}));
+  EXPECT_ANY_THROW((multisig_kex_msg{v, 1, signing_skey, std::vector<crypto::public_key>{}, ancillary_skey}));
 
   // test that messages are both constructible and reversible
 
   // round 1
   EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{1, signing_skey, std::vector<crypto::public_key>{}, ancillary_skey}.get_msg()
-    }));
-  EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{1, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey}.get_msg()
+      multisig_kex_msg{v, 1, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey}.get_msg()
     }));
 
   // round 2
   EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{2, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey}.get_msg()
+      multisig_kex_msg{v, 2, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey}.get_msg()
     }));
   EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{2, signing_skey, std::vector<crypto::public_key>{pubkey1}, crypto::null_skey}.get_msg()
+      multisig_kex_msg{v, 2, signing_skey, std::vector<crypto::public_key>{pubkey1}, crypto::null_skey}.get_msg()
     }));
   EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2}, ancillary_skey}.get_msg()
+      multisig_kex_msg{v, 2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2}, ancillary_skey}.get_msg()
     }));
   EXPECT_NO_THROW((multisig_kex_msg{
-      multisig_kex_msg{2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2, pubkey3}, crypto::null_skey}.get_msg()
+      multisig_kex_msg{v, 2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2, pubkey3}, crypto::null_skey}.get_msg()
     }));
 
-  // test that keys can be recovered if stored in a message and the message's reverse
+  // prepare: test that keys can be recovered if stored in a message and the message's reverse
+  auto test_recovery = [&](const std::uint32_t v)
+  {
+    // round 1
+    multisig_kex_msg msg_rnd1{v, 1, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey};
+    multisig_kex_msg msg_rnd1_reverse{msg_rnd1.get_msg()};
+    EXPECT_EQ(msg_rnd1.get_version(), v);
+    EXPECT_EQ(msg_rnd1.get_round(), 1);
+    EXPECT_EQ(msg_rnd1.get_round(), msg_rnd1_reverse.get_round());
+    EXPECT_EQ(msg_rnd1.get_signing_pubkey(), signing_pubkey);
+    EXPECT_EQ(msg_rnd1.get_signing_pubkey(), msg_rnd1_reverse.get_signing_pubkey());
+    EXPECT_EQ(msg_rnd1.get_msg_pubkeys().size(), 1);
+    EXPECT_EQ(msg_rnd1.get_msg_pubkeys().size(), msg_rnd1_reverse.get_msg_pubkeys().size());
+    EXPECT_EQ(msg_rnd1.get_msg_privkey(), ancillary_skey);
+    EXPECT_EQ(msg_rnd1.get_msg_privkey(), msg_rnd1_reverse.get_msg_privkey());
 
-  // round 1
-  multisig_kex_msg msg_rnd1{1, signing_skey, std::vector<crypto::public_key>{pubkey1}, ancillary_skey};
-  multisig_kex_msg msg_rnd1_reverse{msg_rnd1.get_msg()};
-  EXPECT_EQ(msg_rnd1.get_round(), 1);
-  EXPECT_EQ(msg_rnd1.get_round(), msg_rnd1_reverse.get_round());
-  EXPECT_EQ(msg_rnd1.get_signing_pubkey(), signing_pubkey);
-  EXPECT_EQ(msg_rnd1.get_signing_pubkey(), msg_rnd1_reverse.get_signing_pubkey());
-  EXPECT_EQ(msg_rnd1.get_msg_pubkeys().size(), 0);
-  EXPECT_EQ(msg_rnd1.get_msg_pubkeys().size(), msg_rnd1_reverse.get_msg_pubkeys().size());
-  EXPECT_EQ(msg_rnd1.get_msg_privkey(), ancillary_skey);
-  EXPECT_EQ(msg_rnd1.get_msg_privkey(), msg_rnd1_reverse.get_msg_privkey());
+    // round 2
+    multisig_kex_msg msg_rnd2{v, 2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2}, ancillary_skey};
+    multisig_kex_msg msg_rnd2_reverse{msg_rnd2.get_msg()};
+    EXPECT_EQ(msg_rnd2.get_version(), v);
+    EXPECT_EQ(msg_rnd2.get_round(), 2);
+    EXPECT_EQ(msg_rnd2.get_round(), msg_rnd2_reverse.get_round());
+    EXPECT_EQ(msg_rnd2.get_signing_pubkey(), signing_pubkey);
+    EXPECT_EQ(msg_rnd2.get_signing_pubkey(), msg_rnd2_reverse.get_signing_pubkey());
+    ASSERT_EQ(msg_rnd2.get_msg_pubkeys().size(), 2);
+    ASSERT_EQ(msg_rnd2.get_msg_pubkeys().size(), msg_rnd2_reverse.get_msg_pubkeys().size());
+    EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[0], pubkey1);
+    EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[1], pubkey2);
+    EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[0], msg_rnd2_reverse.get_msg_pubkeys()[0]);
+    EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[1], msg_rnd2_reverse.get_msg_pubkeys()[1]);
+    EXPECT_EQ(msg_rnd2.get_msg_privkey(), crypto::null_skey);
+    EXPECT_EQ(msg_rnd2.get_msg_privkey(), msg_rnd2_reverse.get_msg_privkey());
+  }
 
-  // round 2
-  multisig_kex_msg msg_rnd2{2, signing_skey, std::vector<crypto::public_key>{pubkey1, pubkey2}, ancillary_skey};
-  multisig_kex_msg msg_rnd2_reverse{msg_rnd2.get_msg()};
-  EXPECT_EQ(msg_rnd2.get_round(), 2);
-  EXPECT_EQ(msg_rnd2.get_round(), msg_rnd2_reverse.get_round());
-  EXPECT_EQ(msg_rnd2.get_signing_pubkey(), signing_pubkey);
-  EXPECT_EQ(msg_rnd2.get_signing_pubkey(), msg_rnd2_reverse.get_signing_pubkey());
-  ASSERT_EQ(msg_rnd2.get_msg_pubkeys().size(), 2);
-  ASSERT_EQ(msg_rnd2.get_msg_pubkeys().size(), msg_rnd2_reverse.get_msg_pubkeys().size());
-  EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[0], pubkey1);
-  EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[1], pubkey2);
-  EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[0], msg_rnd2_reverse.get_msg_pubkeys()[0]);
-  EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[1], msg_rnd2_reverse.get_msg_pubkeys()[1]);
-  EXPECT_EQ(msg_rnd2.get_msg_privkey(), crypto::null_skey);
-  EXPECT_EQ(msg_rnd2.get_msg_privkey(), msg_rnd2_reverse.get_msg_privkey());
+  // test that all versions work
+  EXPECT_NO_THROW(test_recovery(get_kex_msg_version(cryptonote::account_generator_era::cryptonote)));
+  EXPECT_NO_THROW(test_recovery(get_kex_msg_version(cryptonote::account_generator_era::seraphis)));
 }
 
 TEST(multisig, multisig_signer_set_filter)
