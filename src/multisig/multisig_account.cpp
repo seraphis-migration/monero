@@ -234,7 +234,7 @@ namespace multisig
       "multisig account: filtered signers are unsorted.");
 
     // check that self is in this group of signers
-    auto self_location{std::find(filtered_signers.begin(), filtered_signers.end(), m_base_pubkey)};
+    auto self_location = std::find(filtered_signers.begin(), filtered_signers.end(), m_base_pubkey);
 
     if (self_location == filtered_signers.end())
       return false;
@@ -244,7 +244,7 @@ namespace multisig
 
     for (std::size_t key_index{0}; key_index < m_multisig_privkeys.size(); ++key_index)
     {
-      const auto &origins{m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[key_index]]};
+      const auto &origins = m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[key_index]];
 
       if (std::find_if(origins.begin(), origins.end(),
           [&](const crypto::public_key &origin) -> bool
