@@ -291,7 +291,7 @@ bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_derivation
     // K'^s_t = Ko_t - H(q_t) X
     crypto::secret_key k_a_extender;
     sp::jamtis::make_jamtis_onetime_address_extension(sender_receiver_secret_out, k_a_extender);  // H(q_t)
-    sc_mul(&k_a_extender, sp::MINUS_ONE.bytes, &k_a_extender);  // -H(q_t)
+    sc_mul(to_bytes(k_a_extender), sp::MINUS_ONE.bytes, to_bytes(k_a_extender));  // -H(q_t)
     nominal_spend_key_out = onetime_address;  // Ko_t
     sp::extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
 

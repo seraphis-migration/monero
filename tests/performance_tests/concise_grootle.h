@@ -93,7 +93,7 @@ class test_concise_grootle
                     if (alpha + 1 > num_ident_offsets)
                     {
                         skpkGen(offset_privkey, proof_offsets[proof_i][alpha]);  //c_{alpha} * G
-                        sc_sub(&(proof_privkeys[proof_i][alpha]), privkey.bytes, offset_privkey.bytes); //m - c [commitment to zero]
+                        sc_sub(to_bytes(proof_privkeys[proof_i][alpha]), privkey.bytes, offset_privkey.bytes); //m - c [commitment to zero]
                     }
                     else
                     {
