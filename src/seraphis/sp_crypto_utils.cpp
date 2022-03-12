@@ -342,13 +342,13 @@ void subtract_secret_key_vectors(const std::vector<crypto::secret_key> &keys_A,
     // add keys_A
     for (const auto &key_A : keys_A)
     {
-        sc_add(&result_out, &result_out, &key_A);
+        sc_add(to_bytes(result_out), to_bytes(result_out), to_bytes(key_A));
     }
 
     // subtract keys_B
     for (const auto &key_B : keys_B)
     {
-        sc_sub(&result_out, &result_out, &key_B);
+        sc_sub(to_bytes(result_out), to_bytes(result_out), to_bytes(key_B));
     }
 }
 //-------------------------------------------------------------------------------------------------------------------

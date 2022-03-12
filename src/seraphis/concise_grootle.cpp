@@ -484,7 +484,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     proof.z = ZERO;
     for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
     {
-        sc_muladd(proof.z.bytes, mu_pow[alpha].bytes, &(privkeys[alpha]), proof.z.bytes);  //z += mu^alpha*privkey[alpha]
+        sc_muladd(proof.z.bytes, mu_pow[alpha].bytes, to_bytes(privkeys[alpha]), proof.z.bytes);  //z += mu^alpha*privkey[alpha]
     }
     sc_mul(proof.z.bytes, proof.z.bytes, xi_pow[m].bytes);  //z *= xi^m
 

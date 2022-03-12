@@ -65,10 +65,10 @@ void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
     address_tag_t raw_address_index{address_index_to_tag(j, 0)};
 
     jamtis_derive_key(domain_separator,
-        &s_generate_address,
+        to_bytes(s_generate_address),
         raw_address_index.bytes,
         ADDRESS_INDEX_BYTES,
-        &extension_out);
+        to_bytes(extension_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
@@ -81,10 +81,10 @@ void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
     address_tag_t raw_address_index{address_index_to_tag(j, 0)};
 
     jamtis_derive_key(domain_separator,
-        &s_generate_address,
+        to_bytes(s_generate_address),
         raw_address_index.bytes,
         ADDRESS_INDEX_BYTES,
-        &address_privkey_out);
+        to_bytes(address_privkey_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_address_spend_key(const rct::key &wallet_spend_pubkey,
@@ -124,12 +124,12 @@ void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
     // k_b U = k_m U = K_s - k_vb X
     rct::key master_pubkey{wallet_spend_pubkey};  //K_s
     crypto::secret_key minus_k_vb{k_view_balance};
-    sc_mul(&minus_k_vb, sp::MINUS_ONE.bytes, &minus_k_vb);  //-k_vb
+    sc_mul(to_bytes(minus_k_vb), sp::MINUS_ONE.bytes, to_bytes(minus_k_vb));  //-k_vb
     extend_seraphis_spendkey(minus_k_vb, master_pubkey);  // (-k_vb) X + K_s = k_m U
 
     // k_a_recipient = k_vb + k^j_a
     crypto::secret_key k_a_recipient;
-    sc_add(&k_a_recipient, &k_view_balance, &address_privkey);  //k_vb + k^j_a
+    sc_add(to_bytes(k_a_recipient), to_bytes(k_view_balance), to_bytes(address_privkey));  //k_vb + k^j_a
 
     // k_a_sender = H_n(q)
     // KI = (1/(k_a_sender + k_a_recipient))*k_b*U

@@ -58,7 +58,7 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_key_image(const crypto::secret_key &y, const rct::key &zU, crypto::key_image &key_image_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "y must be nonzero for making a key image!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(y)), "y must be nonzero for making a key image!");
     CHECK_AND_ASSERT_THROW_MES(!(zU == rct::identity()), "zU must not be identity element for making a key image!");
 
     // KI = (z/y)*U
@@ -70,8 +70,8 @@ void make_seraphis_key_image(const crypto::secret_key &y, const rct::key &zU, cr
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_key_image(const crypto::secret_key &y, const crypto::secret_key &z, crypto::key_image &key_image_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "y must be nonzero for making a key image!");
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z), "z must be nonzero for making a key image!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(y)), "y must be nonzero for making a key image!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(z)), "z must be nonzero for making a key image!");
 
     // KI = (z/y)*U
     rct::key zU{rct::scalarmultKey(sp::get_U_gen(), rct::sk2rct(z))}; // z U
@@ -85,7 +85,7 @@ void make_seraphis_key_image(const crypto::secret_key &k_a_sender,
 {
     // KI = (k_b/(k_a_sender + k_a_recipient))*U
     crypto::secret_key k_a_combined;
-    sc_add(&k_a_combined, &k_a_sender, &k_a_recipient);
+    sc_add(to_bytes(k_a_combined), to_bytes(k_a_sender), to_bytes(k_a_recipient));
 
     make_seraphis_key_image(k_a_combined, k_bU, key_image_out);
 }

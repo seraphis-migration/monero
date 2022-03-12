@@ -417,7 +417,7 @@ TEST(multisig, multisig_kex_msg)
     EXPECT_EQ(msg_rnd2.get_msg_pubkeys()[1], msg_rnd2_reverse.get_msg_pubkeys()[1]);
     EXPECT_EQ(msg_rnd2.get_msg_privkey(), crypto::null_skey);
     EXPECT_EQ(msg_rnd2.get_msg_privkey(), msg_rnd2_reverse.get_msg_privkey());
-  }
+  };
 
   // test that all versions work
   EXPECT_NO_THROW(test_recovery(get_kex_msg_version(cryptonote::account_generator_era::cryptonote)));

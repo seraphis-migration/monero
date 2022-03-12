@@ -116,7 +116,7 @@ static void make_fake_sp_masked_address(crypto::secret_key &mask,
     {
         make_secret_key(spendkeys[signer_index]);
 
-        sc_add(&spendkey_sum, &spendkey_sum, &spendkeys[signer_index]);
+        sc_add(to_bytes(spendkey_sum), to_bytes(spendkey_sum), to_bytes(spendkeys[signer_index]));
     }
 
     // K' = x G + kv_stuff X + ks U
@@ -548,7 +548,7 @@ TEST(seraphis, composition_proof_multisig)
                 // add z pieces together from all signers to build the key image
                 crypto::secret_key z{rct::rct2sk(rct::zero())};
                 for (const auto &z_piece : z_pieces)
-                    sc_add(&z, &z, &z_piece);
+                    sc_add(to_bytes(z), to_bytes(z), to_bytes(z_piece));
 
                 sp::make_seraphis_key_image(y, z, KI);
 
@@ -641,7 +641,7 @@ TEST(seraphis, information_recovery_keyimage)
     make_secret_key(y);
     k_a_sender = y;
     k_a_recipient = y;
-    sc_add(&y, &y, &y);
+    sc_add(to_bytes(y), to_bytes(y), to_bytes(y));
     make_secret_key(z);
     sp::make_seraphis_spendbase(z, zU);
     sp::make_seraphis_spendbase(z, k_bU);
@@ -652,8 +652,8 @@ TEST(seraphis, information_recovery_keyimage)
 
     rct::key wallet_spend_pubkey{k_bU};
     crypto::secret_key k_view_balance, address_privkey;
-    sc_add(&k_view_balance, &y, &y);  // k_vb = 2*(2*y)
-    sc_mul(&address_privkey, sp::MINUS_ONE.bytes, &k_a_sender);  // k^j_a = -y
+    sc_add(to_bytes(k_view_balance), to_bytes(y), to_bytes(y));  // k_vb = 2*(2*y)
+    sc_mul(to_bytes(address_privkey), sp::MINUS_ONE.bytes, to_bytes(k_a_sender));  // k^j_a = -y
     sp::extend_seraphis_spendkey(k_view_balance, wallet_spend_pubkey);  // 4*y X + z U
     sp::jamtis::make_seraphis_key_image_jamtis_style(wallet_spend_pubkey,
         k_view_balance,

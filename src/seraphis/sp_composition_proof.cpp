@@ -166,12 +166,12 @@ static void compute_responses(const rct::key &challenge,
 
     // r_t2 = alpha_t2 - c * (x / y)
     r_t2_out = invert(rct::sk2rct(y));  // 1 / y
-    sc_mul(r_t2_out.bytes, r_t2_out.bytes, &x);  // x / y
+    sc_mul(r_t2_out.bytes, r_t2_out.bytes, to_bytes(x));  // x / y
     sc_mulsub(r_t2_out.bytes, challenge.bytes, r_t2_out.bytes, alpha_t2.bytes);  // alpha_t2 - c * (x / y)
 
     // r_ki = alpha_ki - c * (z / y)
     r_ki_out = invert(rct::sk2rct(y));  // 1 / y
-    sc_mul(r_ki_out.bytes, r_ki_out.bytes, &z);  // z / y
+    sc_mul(r_ki_out.bytes, r_ki_out.bytes, to_bytes(z));  // z / y
     sc_mulsub(r_ki_out.bytes, challenge.bytes, r_ki_out.bytes, alpha_ki.bytes);  // alpha_ki - c * (z / y)
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -225,11 +225,11 @@ SpCompositionProof sp_composition_prove(const rct::key &message,
     CHECK_AND_ASSERT_THROW_MES(!(K == rct::identity()), "Bad proof key (K identity)!");
 
     // x == 0 is allowed
-    CHECK_AND_ASSERT_THROW_MES(sc_check(&x) == 0, "Bad private key (x)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "Bad private key (y zero)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(&y) == 0, "Bad private key (y)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z), "Bad private key (z zero)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(&z) == 0, "Bad private key (z)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(x)) == 0, "Bad private key (x)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(y)), "Bad private key (y zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(y)) == 0, "Bad private key (y)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(z)), "Bad private key (z zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(z)) == 0, "Bad private key (z)!");
 
     // verify the input key matches the input private keys
     rct::key temp_K;
@@ -417,18 +417,18 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     CHECK_AND_ASSERT_THROW_MES(!(rct::ki2rct(proposal.KI) == rct::identity()), "Bad proof key (KI identity)!");
 
     // x == 0 is allowed
-    CHECK_AND_ASSERT_THROW_MES(sc_check(&x) == 0, "Bad private key (x)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&y), "Bad private key (y zero)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(&y) == 0, "Bad private key (y)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&z_e), "Bad private key (z zero)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(&z_e) == 0, "Bad private key (z)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(x)) == 0, "Bad private key (x)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(y)), "Bad private key (y zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(y)) == 0, "Bad private key (y)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(z_e)), "Bad private key (z zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(z_e)) == 0, "Bad private key (z)!");
 
     CHECK_AND_ASSERT_THROW_MES(num_signers == signer_nonces_pub_2.size(), "Signer nonces mismatch!");
 
-    CHECK_AND_ASSERT_THROW_MES(sc_check(&local_nonce_1_priv) == 0, "Bad private key (local_nonce_1_priv)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&local_nonce_1_priv), "Bad private key (local_nonce_1_priv zero)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(&local_nonce_2_priv) == 0, "Bad private key (local_nonce_2_priv)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(&local_nonce_2_priv), "Bad private key (local_nonce_2_priv zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(local_nonce_1_priv)) == 0, "Bad private key (local_nonce_1_priv)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(local_nonce_1_priv)), "Bad private key (local_nonce_1_priv zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(local_nonce_2_priv)) == 0, "Bad private key (local_nonce_2_priv)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(local_nonce_2_priv)), "Bad private key (local_nonce_2_priv zero)!");
 
     // prepare participant nonces
     std::vector<multisig_binonce_factors> signer_nonces_pub_mul8;
@@ -517,7 +517,10 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
     /// responses
     crypto::secret_key merged_nonce_KI_priv;  // alpha_1_local + rho * alpha_2_local
-    sc_muladd(&merged_nonce_KI_priv, &local_nonce_2_priv, binonce_merge_factor.bytes, &local_nonce_1_priv);
+    sc_muladd(to_bytes(merged_nonce_KI_priv),
+        to_bytes(local_nonce_2_priv),
+        binonce_merge_factor.bytes,
+        to_bytes(local_nonce_1_priv));
 
     compute_responses(partial_sig.c,
             rct::sk2rct(proposal.signature_nonce_K_t1),

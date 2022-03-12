@@ -114,15 +114,7 @@ namespace multisig
   };
 
   //todo
-  std::uint32_t get_kex_msg_version(const cryptonote::account_generator_era era)
-  {
-    if (era == cryptonote::account_generator_era::cryptonote)
-      return 2;
-    else if (era == cryptonote::account_generator_era::seraphis)
-      return 3;
-    else
-      return 0;  //error
-  }
+  std::uint32_t get_kex_msg_version(const cryptonote::account_generator_era era);
 
   //todo
   bool check_kex_msg_versions(const std::vector<multisig_kex_msg> &messages, const std::uint32_t expected_version);

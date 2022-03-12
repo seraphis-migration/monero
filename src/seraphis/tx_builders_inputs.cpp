@@ -135,9 +135,9 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     for (std::size_t input_index{0}; input_index < input_proposals.size(); ++input_index)
     {
         // input image amount commitment blinding factor: t_c + x
-        sc_add(&(blinding_factors_out[input_index]),
-            &(image_address_masks[input_index]),  // t_c
-            &(input_proposals[input_index].m_core.m_amount_blinding_factor));  // x
+        sc_add(to_bytes(blinding_factors_out[input_index]),
+            to_bytes(image_address_masks[input_index]),  // t_c
+            to_bytes(input_proposals[input_index].m_core.m_amount_blinding_factor));  // x
 
         // input amount: a
         input_amounts_out.emplace_back(input_proposals[input_index].m_core.m_amount);
@@ -157,9 +157,9 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     for (std::size_t input_index{0}; input_index < partial_inputs.size(); ++input_index)
     {
         // input image amount commitment blinding factor: t_c + x
-        sc_add(&(blinding_factors_out[input_index]),
-            &(partial_inputs[input_index].m_image_commitment_mask),  // t_c
-            &(partial_inputs[input_index].m_input_amount_blinding_factor));  // x
+        sc_add(to_bytes(blinding_factors_out[input_index]),
+            to_bytes(partial_inputs[input_index].m_image_commitment_mask),  // t_c
+            to_bytes(partial_inputs[input_index].m_input_amount_blinding_factor));  // x
 
         // input amount: a
         input_amounts_out.emplace_back(partial_inputs[input_index].m_input_amount);
@@ -185,8 +185,8 @@ void make_v1_image_proof_v1(const SpInputProposal &input_proposal,
         input_enote_core.m_amount_commitment,
         squash_prefix);  // H(Ko,C)
 
-    sc_mul(&y, &squash_prefix, &(input_proposal.m_enote_view_privkey));  // H(Ko,C) (k_{a, recipient} + k_{a, sender})
-    sc_mul(&z, &squash_prefix, &(input_proposal.m_spendbase_privkey));   // H(Ko,C) k_{b, recipient}
+    sc_mul(to_bytes(y), to_bytes(squash_prefix), to_bytes(input_proposal.m_enote_view_privkey));  // H(Ko,C) (k_{a, recipient} + k_{a, sender})
+    sc_mul(to_bytes(z), to_bytes(squash_prefix), to_bytes(input_proposal.m_spendbase_privkey));   // H(Ko,C) k_{b, recipient}
 
     // make seraphis composition proof
     tx_image_proof_out.m_composition_proof =
@@ -246,7 +246,7 @@ void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_re
 
     // Q'
     crypto::secret_key squashed_enote_mask;
-    sc_add(&squashed_enote_mask, &image_address_mask, &image_amount_mask);  // t_k + t_c
+    sc_add(to_bytes(squashed_enote_mask), to_bytes(image_address_mask), to_bytes(image_amount_mask));  // t_k + t_c
     mask_key(squashed_enote_mask,
         reference_keys[membership_ref_set.m_real_spend_index_in_set][0],
         image_offsets[0]);  // Q'
@@ -254,7 +254,7 @@ void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_re
     // secret key of (Q[l] - Q')
     std::vector<crypto::secret_key> image_masks;
     image_masks.emplace_back(squashed_enote_mask);  // t_k + t_c
-    sc_mul(&(image_masks[0]), &(image_masks[0]), MINUS_ONE.bytes);  // -(t_k + t_c)
+    sc_mul(to_bytes(image_masks[0]), to_bytes(image_masks[0]), MINUS_ONE.bytes);  // -(t_k + t_c)
 
     // proof message
     rct::key message{get_tx_membership_proof_message_v1(membership_ref_set.m_ledger_enote_indices)};

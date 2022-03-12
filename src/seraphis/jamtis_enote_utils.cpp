@@ -109,10 +109,10 @@ static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::xmr_amount origina
 
     // ret = H_8(q, 8 r G) XOR_64 original
     epee::wipeable_string data;
-    get_doublekey_hash_data(sender_receiver_secret.bytes, &baked_key, data);
+    get_doublekey_hash_data(sender_receiver_secret.bytes, to_bytes(baked_key), data);
 
     crypto::secret_key hash_result;
-    jamtis_hash8(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), &hash_result);
+    jamtis_hash8(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), to_bytes(hash_result));
 
     rct::xmr_amount mask;
     memcpy(&mask, &hash_result, 8);
@@ -132,7 +132,7 @@ static rct::xmr_amount enc_dec_jamtis_amount_selfsend(const rct::xmr_amount orig
 
     // ret = H_8(q) XOR_64 original
     crypto::secret_key hash_result;
-    jamtis_hash8(domain_separator, sender_receiver_secret.bytes, sizeof(crypto::secret_key), &hash_result);
+    jamtis_hash8(domain_separator, sender_receiver_secret.bytes, sizeof(crypto::secret_key), to_bytes(hash_result));
 
     rct::xmr_amount mask;
     memcpy(&mask, &hash_result, 8);
@@ -158,7 +158,7 @@ view_tag_t make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH
 
     // view_tag = H_1(K_d, Ko)
     epee::wipeable_string data;
-    get_doublekey_hash_data(&sender_receiver_DH_derivation, onetime_address.bytes, data);
+    get_doublekey_hash_data(to_bytes(sender_receiver_DH_derivation), onetime_address.bytes, data);
 
     view_tag_t view_tag;
     jamtis_hash1(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), &view_tag);
@@ -187,7 +187,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &send
 
     // q = H_32(DH_derivation)
     jamtis_hash32(domain_separator,
-        &sender_receiver_DH_derivation,
+        to_bytes(sender_receiver_DH_derivation),
         sizeof(crypto::key_derivation),
         sender_receiver_secret_out.bytes);
 }
@@ -213,7 +213,7 @@ void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_vie
 
     // q = H_32[k_vb](K_e)
     jamtis_derive_secret(domain_separator,
-        &k_view_balance,
+        to_bytes(k_view_balance),
         enote_ephemeral_pubkey.bytes,
         sizeof(rct::key),
         sender_receiver_secret_out.bytes);
@@ -225,7 +225,7 @@ void make_jamtis_onetime_address_extension(const rct::key &sender_receiver_secre
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION};
 
     // k_{a, sender} = H_n(q)
-    jamtis_hash_scalar(domain_separator, sender_receiver_secret.bytes, sizeof(rct::key), &sender_extension_out);
+    jamtis_hash_scalar(domain_separator, sender_receiver_secret.bytes, sizeof(rct::key), to_bytes(sender_extension_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_onetime_address(const rct::key &sender_receiver_secret,
@@ -265,9 +265,9 @@ void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_se
 
     // x = H_n(q, 8 r G)
     epee::wipeable_string data;
-    get_doublekey_hash_data(sender_receiver_secret.bytes, &baked_key, data);  //q || 8 r G
+    get_doublekey_hash_data(sender_receiver_secret.bytes, to_bytes(baked_key), data);  //q || 8 r G
 
-    jamtis_hash_scalar(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), &mask_out);
+    jamtis_hash_scalar(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), to_bytes(mask_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver_secret,
@@ -276,7 +276,7 @@ void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF};
 
     // x = H_n(q)
-    jamtis_hash_scalar(domain_separator, sender_receiver_secret.bytes, sizeof(rct::key), &mask_out);
+    jamtis_hash_scalar(domain_separator, sender_receiver_secret.bytes, sizeof(rct::key), to_bytes(mask_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::xmr_amount encode_jamtis_amount_plain(const rct::xmr_amount amount,
@@ -316,7 +316,7 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
     // K'_1 = Ko - H_n(q) X
     crypto::secret_key extension;
     make_jamtis_onetime_address_extension(sender_receiver_secret, extension);  //H_n(q)
-    sc_mul(&extension, sp::MINUS_ONE.bytes, &extension);  // -H_n(q)
+    sc_mul(to_bytes(extension), sp::MINUS_ONE.bytes, to_bytes(extension));  // -H_n(q)
     nominal_spend_key_out = onetime_address;  // Ko_t
     extend_seraphis_spendkey(extension, nominal_spend_key_out);  // (-H(q_t)) X + Ko_t
 }
