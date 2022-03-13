@@ -115,11 +115,11 @@ bool test_jamtis_nominal_spend_key(const rct::key &wallet_spend_pubkey,
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    const crypto::secret_key &address_privkey,
+    const crypto::secret_key &spendkey_extension,
     const crypto::secret_key &address_extension,
     crypto::key_image &key_image_out)
 {
-    // KI = (k_m/(k_vb + k^j_a + H_n(q))) U
+    // KI = (k_m/(H_n(q) + k^j_x + k_vb)) U
 
     // k_b U = k_m U = K_s - k_vb X
     rct::key master_pubkey{wallet_spend_pubkey};  //K_s
@@ -127,9 +127,9 @@ void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
     sc_mul(to_bytes(minus_k_vb), sp::MINUS_ONE.bytes, to_bytes(minus_k_vb));  //-k_vb
     extend_seraphis_spendkey(minus_k_vb, master_pubkey);  // (-k_vb) X + K_s = k_m U
 
-    // k_a_recipient = k_vb + k^j_a
+    // k_a_recipient = k^j_x + k_vb
     crypto::secret_key k_a_recipient;
-    sc_add(to_bytes(k_a_recipient), to_bytes(k_view_balance), to_bytes(address_privkey));  //k_vb + k^j_a
+    sc_add(to_bytes(k_a_recipient), to_bytes(spendkey_extension), to_bytes(k_view_balance));  //k^j_x + k_vb
 
     // k_a_sender = H_n(q)
     // KI = (1/(k_a_sender + k_a_recipient))*k_b*U

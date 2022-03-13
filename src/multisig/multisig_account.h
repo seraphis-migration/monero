@@ -184,6 +184,11 @@ namespace multisig
     /**
     * brief: add_signer_recommendations - Update keyshare-to-origins map with a specific signer's recommendations.
     *    - Used to recover the keyshare-to-origins map if it is lost.
+    *    - Note: It is not a security problem if the recommended keys vector is unvalidated. A malicious signer has
+    *            other ways to prevent the local account from co-signing a message with them. The malicious
+    *            signer CANNOT prevent the local account from co-signing messages with M-1 honest other signers by
+    *            recommending a dishonest key vector.
+    *    - TODO: use a multisig msg to pass in this information (strong invariant: signature on keys with signer id)
     * param: signer - a non-local signer ('origin')
     * param: recommended_keys - keyshares recommended by the non-local signer
     */

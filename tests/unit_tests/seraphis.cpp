@@ -651,14 +651,14 @@ TEST(seraphis, information_recovery_keyimage)
     sp::make_seraphis_key_image(k_a_sender, k_a_recipient, k_bU, key_image3);
 
     rct::key wallet_spend_pubkey{k_bU};
-    crypto::secret_key k_view_balance, address_privkey;
+    crypto::secret_key k_view_balance, spendkey_extension;
     sc_add(to_bytes(k_view_balance), to_bytes(y), to_bytes(y));  // k_vb = 2*(2*y)
-    sc_mul(to_bytes(address_privkey), sp::MINUS_ONE.bytes, to_bytes(k_a_sender));  // k^j_a = -y
+    sc_mul(to_bytes(spendkey_extension), sp::MINUS_ONE.bytes, to_bytes(k_a_sender));  // k^j_x = -y
     sp::extend_seraphis_spendkey(k_view_balance, wallet_spend_pubkey);  // 4*y X + z U
     sp::jamtis::make_seraphis_key_image_jamtis_style(wallet_spend_pubkey,
         k_view_balance,
-        address_privkey,
-        address_privkey,
+        spendkey_extension,
+        spendkey_extension,
         key_image_jamtis);  // -y X + -y X + (4*y X + z U) -> (z/2y) U
 
     EXPECT_TRUE(key_image1 == key_image2);
