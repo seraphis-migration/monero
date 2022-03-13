@@ -250,7 +250,7 @@ static void test_multisig_signer_set_filter(const std::uint32_t num_signers, con
 
   // all signers are allowed
   allowed_signers = signer_list;
-  EXPECT_NO_THROW(allowed_multisig_signers_to_aggregate_filter(signer_list, allowed_signers, threshold, aggregate_filter));
+  EXPECT_NO_THROW(multisig_signers_to_filter(signer_list, allowed_signers, aggregate_filter));
   EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(num_signers, threshold, aggregate_filter, filters));
   for (const signer_set_filter filter : filters)
   {
@@ -262,7 +262,7 @@ static void test_multisig_signer_set_filter(const std::uint32_t num_signers, con
   if (num_signers > threshold)
   {
     allowed_signers.pop_back();
-    EXPECT_NO_THROW(allowed_multisig_signers_to_aggregate_filter(signer_list, allowed_signers, threshold, aggregate_filter));
+    EXPECT_NO_THROW(multisig_signers_to_filter(signer_list, allowed_signers, aggregate_filter));
     EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(num_signers, threshold, aggregate_filter, filters));
     for (const signer_set_filter filter : filters)
     {
@@ -275,7 +275,7 @@ static void test_multisig_signer_set_filter(const std::uint32_t num_signers, con
   while (allowed_signers.size() > threshold)
     allowed_signers.pop_back();
 
-  EXPECT_NO_THROW(allowed_multisig_signers_to_aggregate_filter(signer_list, allowed_signers, threshold, aggregate_filter));
+  EXPECT_NO_THROW(multisig_signers_to_filter(signer_list, allowed_signers, aggregate_filter));
   EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(num_signers, threshold, aggregate_filter, filters));
   for (const signer_set_filter filter : filters)
   {
@@ -283,11 +283,12 @@ static void test_multisig_signer_set_filter(const std::uint32_t num_signers, con
     EXPECT_TRUE(filtered_signers.size() == threshold);
   }
 
-  // < threshold signers are allowed
+  // < threshold signers are not allowed
   if (threshold > 0)
   {
     allowed_signers.pop_back();
-    EXPECT_ANY_THROW(allowed_multisig_signers_to_aggregate_filter(signer_list, allowed_signers, threshold, aggregate_filter));
+    EXPECT_NO_THROW(multisig_signers_to_filter(signer_list, allowed_signers, aggregate_filter));
+    EXPECT_ANY_THROW(aggregate_multisig_signer_set_filter_to_permutations(num_signers, threshold, aggregate_filter, filters));
   }
 }
 //----------------------------------------------------------------------------------------------------------------------
@@ -474,7 +475,7 @@ TEST(multisig, multisig_signer_set_filter)
 
   allowed_signers = signer_list;
   allowed_signers.pop_back();
-  EXPECT_NO_THROW(allowed_multisig_signers_to_aggregate_filter(signer_list, allowed_signers, threshold, aggregate_filter));
+  EXPECT_NO_THROW(multisig_signers_to_filter(signer_list, allowed_signers, aggregate_filter));
   EXPECT_NO_THROW(aggregate_multisig_signer_set_filter_to_permutations(num_signers, threshold, aggregate_filter, filters));
   EXPECT_TRUE(filters.size() == 3);
 

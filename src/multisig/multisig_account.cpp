@@ -66,6 +66,7 @@ namespace multisig
       m_common_pubkey{rct::rct2pk(rct::identity())},
       m_kex_rounds_complete{0}
   {
+    // initialize base pubkey
     CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_base_privkey, m_base_pubkey),
       "Failed to derive public key");
 
@@ -103,15 +104,29 @@ namespace multisig
       m_next_round_kex_message{std::move(next_round_kex_message)}
   {
     CHECK_AND_ASSERT_THROW_MES(kex_rounds_complete > 0, "multisig account: can't reconstruct account if its kex wasn't initialized");
+    
+    // initialize base pubkey
     CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_base_privkey, m_base_pubkey),
       "Failed to derive public key");
+
+    // initialize keyshare pubkeys and keyshare map
     m_multisig_keyshare_pubkeys.reserve(m_multisig_privkeys.size());
+    rct::key primary_generator(get_primary_generator(m_account_era));
     for (const crypto::secret_key &multisig_privkey : m_multisig_privkeys)
     {
-      m_multisig_keyshare_pubkeys.emplace_back();
-      CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(multisig_privkey, m_multisig_keyshare_pubkeys.back()),
-        "Failed to derive public key");
+      m_multisig_keyshare_pubkeys.emplace_back(rct::rct2pk(rct::scalarmultKey(primary_generator, rct::sk2rct(multisig_privkey))));
+      m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys.back()];  //this will add any missing keyshares
     }
+
+    // add all signers available for aggregation-style signing
+    signer_set_filter temp_filter;
+    for (const auto &keyshare_to_origins : m_keyshare_to_origins_map)
+    {
+      multisig_signers_to_filter(m_signers, keyshare_to_origins.second, temp_filter);
+      m_available_signers_for_aggregation |= temp_filter;
+    }
+
+    // set config
     set_multisig_config(threshold, std::move(signers));
 
     // kex rounds should not exceed post-kex verification round
@@ -186,6 +201,11 @@ namespace multisig
     // set
     m_threshold = threshold;
     m_signers = std::move(signers);
+
+    // add self as available for aggregation-style signing
+    signer_set_filter temp_filter;
+    multisig_signer_to_filter(m_signers, m_base_pubkey, temp_filter);
+    m_available_signers_for_aggregation |= temp_filter;
   }
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL
@@ -221,11 +241,42 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL
   //----------------------------------------------------------------------------------------------------------------------
+  void multisig_account::add_signer_recommendations(const crypto::public_key &signer,
+    const std::vector<crypto::public_key> &recommended_keys)
+  {
+    CHECK_AND_ASSERT_THROW_MES(multisig_is_ready(),
+      "multisig account: tried to add signer recommendations, but account isn't ready.");
+    CHECK_AND_ASSERT_THROW_MES(std::find(m_signers.begin(), m_signers.end(), signer) != m_signers.end(),
+      "multisig account: tried to add signer recommendations, but signer is unknown.");
+
+    // add signer to 'available signers'
+    signer_set_filter new_signer_flag;
+    multisig_signer_to_filter(m_signers, signer, new_signer_flag);
+    m_available_signers_for_aggregation |= new_signer_flag;
+
+    // for each local keyshare that the other signer also recommends, add that signer as an 'origin'
+    for (const crypto::public_key &keyshare : recommended_keys)
+    {
+      // skip keyshares that the local account doesn't have
+      if (m_keyshare_to_origins_map.find(keyshare) == m_keyshare_to_origins_map.end())
+        continue;
+
+      m_keyshare_to_origins_map[keyshare].insert(signer);
+    }
+  }
+  //----------------------------------------------------------------------------------------------------------------------
+  // multisig_account: EXTERNAL
+  //----------------------------------------------------------------------------------------------------------------------
   bool multisig_account::try_get_aggregate_signing_key(const signer_set_filter filter, crypto::secret_key &aggregate_key_out)
   {
     CHECK_AND_ASSERT_THROW_MES(multisig_is_ready(), "multisig account: tried to get signing key, but account isn't ready.");
     CHECK_AND_ASSERT_THROW_MES(m_multisig_privkeys.size() == m_multisig_keyshare_pubkeys.size(),
       "multisig account: tried to get signing key, but there is a mismatch between multisig privkeys and pubkeys.");
+
+    // check that local signer is able to make an aggregate key with all signers in input filter
+    // (also check if local signer is in input filter)
+    if ((filter & m_available_signers_for_aggregation) != filter)
+      return false;
 
     // filter the signer list to get group of signers
     std::vector<crypto::public_key> filtered_signers;
@@ -233,11 +284,10 @@ namespace multisig
     CHECK_AND_ASSERT_THROW_MES(std::is_sorted(filtered_signers.begin(), filtered_signers.end()),
       "multisig account: filtered signers are unsorted.");
 
-    // check that self is in this group of signers
+    // find local signer's location in filtered set
     auto self_location = std::find(filtered_signers.begin(), filtered_signers.end(), m_base_pubkey);
-
-    if (self_location == filtered_signers.end())
-      return false;
+    CHECK_AND_ASSERT_THROW_MES(self_location != filtered_signers.end(),
+      "multisig_account: local signer unexpectedly not in filtered signers despite filter match (bug).");
 
     // accumulate keyshares that other signers whose ids are lower in the filtered list won't be contributing
     aggregate_key_out = rct::rct2sk(rct::zero());

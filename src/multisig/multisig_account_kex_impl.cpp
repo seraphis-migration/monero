@@ -38,6 +38,7 @@ extern "C"
 #include "include_base_utils.h"
 #include "multisig.h"
 #include "multisig_kex_msg.h"
+#include "multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
 
 #include <boost/math/special_functions/binomial.hpp>
@@ -736,17 +737,25 @@ namespace multisig
       // compute final aggregate key, update local multisig privkeys with aggregation coefficients applied
       m_multisig_pubkey = generate_multisig_aggregate_key(generators.primary, std::move(result_keys), m_multisig_privkeys);
 
-      // 1) convert keyshares to pubkeys for convenience when assembling aggregate keys
-      // 2) record [post-aggregation pubkeys : origins] map for aggregation-style signing
+      // prepare for aggregation-style signing
       m_multisig_keyshare_pubkeys.resize(m_multisig_privkeys.size());
+      signer_set_filter temp_filter;
 
       for (std::size_t keyshare_index{0}; keyshare_index < m_multisig_privkeys.size(); ++keyshare_index)
       {
+        // 1) convert keyshares to pubkeys for convenience when assembling aggregate keys
         m_multisig_keyshare_pubkeys[keyshare_index] =
           rct::rct2pk(rct::scalarmultKey(generators.primary, rct::sk2rct(m_multisig_privkeys[keyshare_index])));
 
+        // 2) record [post-aggregation pubkeys : origins] map for aggregation-style signing
         m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[keyshare_index]] =
           std::move(m_kex_keys_to_origins_map[preagg_keyshares[keyshare_index]]);
+
+        // 3) update 'available signers' for aggregation-style signing
+        multisig_signers_to_filter(m_signers,
+          m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[keyshare_index]],
+          temp_filter);
+        m_available_signers_for_aggregation |= temp_filter;
       }
 
       m_kex_keys_to_origins_map.clear();

@@ -142,6 +142,8 @@ namespace multisig
     const crypto::public_key& get_multisig_pubkey() const { return m_multisig_pubkey; }
     // get common pubkey
     const crypto::public_key& get_common_pubkey() const { return m_common_pubkey; }
+    // get keyshare to origins map
+    const keyshare_origins_map_t& get_keyshares_to_origins_map() const { return m_keyshare_to_origins_map; }
     // get kex rounds complete
     std::uint32_t get_kex_rounds_complete() const { return m_kex_rounds_complete; }
     // get kex keys to origins map
@@ -179,6 +181,14 @@ namespace multisig
     * param: expanded_msgs - kex messages corresponding to the account's 'in progress' round
     */
     void kex_update(const std::vector<multisig_kex_msg> &expanded_msgs);
+    /**
+    * brief: add_signer_recommendations - Update keyshare-to-origins map with a specific signer's recommendations.
+    *    - Used to recover the keyshare-to-origins map if it is lost.
+    * param: signer - a non-local signer ('origin')
+    * param: recommended_keys - keyshares recommended by the non-local signer
+    */
+    void add_signer_recommendations(const crypto::public_key &signer,
+      const std::vector<crypto::public_key> &recommended_keys);
 
   private:
     // implementation of kex_update() (non-transactional)
@@ -209,6 +219,7 @@ namespace multisig
       multisig_keyset_map_memsafe_t result_keys_to_origins_map);
 
   //account use functions
+  public:
     /**
     * brief: try_get_aggregate_signing_key - Get an aggregate privkey corresponding to a filtered list of signers.
     *   - For each privkey share that the local signer has, it only contributes that privkey if it's signer id
@@ -231,8 +242,9 @@ namespace multisig
 
     /// local participant's personal keys
     // base keypair of the participant
-    // - used for signing messages, as the initial base key for key exchange, and to make DH derivations for key exchange
+    // - used for signing messages, to make the initial base key for key exchange, and to make DH derivations for key exchange
     crypto::secret_key m_base_privkey;
+    // - used for signing messages (base_privkey * G)
     crypto::public_key m_base_pubkey;
     // common base privkey, used to produce the aggregate common privkey
     crypto::secret_key m_base_common_privkey;
@@ -250,6 +262,8 @@ namespace multisig
 
     /// records which other signers have each of the local signer's multisig privkeys
     multisig_keyshare_origins_map_t m_keyshare_to_origins_map;
+    /// helper filter that records which other signers are present in m_keyshare_to_origins_map
+    signer_set_filter m_available_signers_for_aggregation;
 
     /// kex variables
     // number of key exchange rounds that have been completed (all messages for the round collected and processed)
