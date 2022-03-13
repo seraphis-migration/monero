@@ -5008,9 +5008,9 @@ std::string wallet2::make_multisig(const epee::wipeable_string &password,
 
   // create multisig account
   multisig::multisig_account multisig_account{
+      cryptonote::account_generator_era::cryptonote,
       multisig::get_multisig_blinded_secret_key(get_account().get_keys().m_spend_secret_key),
-      multisig::get_multisig_blinded_secret_key(get_account().get_keys().m_view_secret_key),
-      cryptonote::account_generator_era::cryptonote
+      multisig::get_multisig_blinded_secret_key(get_account().get_keys().m_view_secret_key)
     };
 
   // open initial kex messages, validate them, extract signers
@@ -5136,6 +5136,7 @@ std::string wallet2::exchange_multisig_keys(const epee::wipeable_string &passwor
     kex_origins_map[derivation];
 
   multisig::multisig_account multisig_account{
+      cryptonote::account_generator_era::cryptonote,
       m_multisig_threshold,
       m_multisig_signers,
       get_account().get_keys().m_spend_secret_key,
@@ -5147,8 +5148,7 @@ std::string wallet2::exchange_multisig_keys(const epee::wipeable_string &passwor
       m_account_public_address.m_view_public_key,
       m_multisig_rounds_passed,
       std::move(kex_origins_map),
-      "",
-      cryptonote::account_generator_era::cryptonote
+      ""
     };
 
   // update multisig kex
@@ -5214,12 +5214,12 @@ std::string wallet2::get_multisig_first_kex_msg() const
 {
   // create multisig account
   multisig::multisig_account multisig_account{
+    // generators to use (spend: G, view: G)
+      cryptonote::account_generator_era::cryptonote,
       // k_base = H(normal private spend key)
       multisig::get_multisig_blinded_secret_key(get_account().get_keys().m_spend_secret_key),
       // k_view = H(normal private view key)
-      multisig::get_multisig_blinded_secret_key(get_account().get_keys().m_view_secret_key),
-      // generators to use (spend: G, view: G)
-      cryptonote::account_generator_era::cryptonote
+      multisig::get_multisig_blinded_secret_key(get_account().get_keys().m_view_secret_key)
     };
 
   return multisig_account.get_next_kex_round_msg();

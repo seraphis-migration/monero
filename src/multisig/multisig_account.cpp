@@ -56,9 +56,9 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL
   //----------------------------------------------------------------------------------------------------------------------
-  multisig_account::multisig_account(const crypto::secret_key &base_privkey,
-    const crypto::secret_key &base_common_privkey,
-    const cryptonote::account_generator_era era) :
+  multisig_account::multisig_account(const cryptonote::account_generator_era era,
+    const crypto::secret_key &base_privkey,
+    const crypto::secret_key &base_common_privkey) :
       m_account_era{era},
       m_base_privkey{base_privkey},
       m_base_common_privkey{base_common_privkey},
@@ -77,7 +77,8 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL
   //----------------------------------------------------------------------------------------------------------------------
-  multisig_account::multisig_account(const std::uint32_t threshold,
+  multisig_account::multisig_account(const cryptonote::account_generator_era era,
+    const std::uint32_t threshold,
     std::vector<crypto::public_key> signers,
     const crypto::secret_key &base_privkey,
     const crypto::secret_key &base_common_privkey,
@@ -88,8 +89,7 @@ namespace multisig
     const crypto::public_key &common_pubkey,
     const std::uint32_t kex_rounds_complete,
     multisig_keyset_map_memsafe_t kex_origins_map,
-    std::string next_round_kex_message,
-    const cryptonote::account_generator_era era) :
+    std::string next_round_kex_message) :
       m_account_era{era},
       m_base_privkey{base_privkey},
       m_base_common_privkey{base_common_privkey},

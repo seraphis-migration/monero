@@ -95,12 +95,13 @@ namespace multisig
     *    - the local account's kex msgs are signed with the base_privkey
     *    - the first kex msg transmits the local base_common_privkey to other participants, for creating the group's common_privkey
     */
-    multisig_account(const crypto::secret_key &base_privkey,
-      const crypto::secret_key &base_common_privkey,
-      const cryptonote::account_generator_era era);
+    multisig_account(const cryptonote::account_generator_era era,
+      const crypto::secret_key &base_privkey,
+      const crypto::secret_key &base_common_privkey);
 
     // reconstruct from full account details (not recommended)
-    multisig_account(const std::uint32_t threshold,
+    multisig_account(const cryptonote::account_generator_era era,
+      const std::uint32_t threshold,
       std::vector<crypto::public_key> signers,
       const crypto::secret_key &base_privkey,
       const crypto::secret_key &base_common_privkey,
@@ -111,8 +112,7 @@ namespace multisig
       const crypto::public_key &common_pubkey,
       const std::uint32_t kex_rounds_complete,
       multisig_keyset_map_memsafe_t kex_origins_map,
-      std::string next_round_kex_message,
-      const cryptonote::account_generator_era era);
+      std::string next_round_kex_message);
 
     // copy constructor: default
 
