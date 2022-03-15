@@ -177,8 +177,9 @@ namespace multisig
       num_flags_set >= threshold,
       "Invalid aggregate multisig signer set filter when getting filter permutations.");
 
+    const std::uint32_t expected_num_permutations(n_choose_k(num_flags_set, threshold));
     filter_permutations_out.clear();
-    filter_permutations_out.reserve(n_choose_k(num_flags_set, threshold));
+    filter_permutations_out.reserve(expected_num_permutations);
 
     // start the permutation search at the filter where the first 'threshold' signers in the aggregate filter are set
     signer_set_filter reference_filter{get_squashed_full_filter(threshold)};
@@ -198,6 +199,10 @@ namespace multisig
     //note2: do-while pattern let's us use == to exit the loop, which
     //       supports the case where the test condition is filter::MAX
     } while (reference_filter++ < get_squashed_full_filter(num_flags_set));
+
+    // sanity check
+    CHECK_AND_ASSERT_THROW_MES(filter_permutations_out.size() == expected_num_permutations,
+      "Invalid number of permutations when disaggregating a signer set filter. (bug)");
   }
   //----------------------------------------------------------------------------------------------------------------------
   void multisig_signers_to_filter(const std::vector<crypto::public_key> &allowed_signers,

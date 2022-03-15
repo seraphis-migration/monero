@@ -191,6 +191,11 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
                     partial_sigs.back()));
             }
 
+            // sanity checks
+            EXPECT_TRUE(signer_nonces_1_pubs.size() == threshold);
+            EXPECT_TRUE(signer_nonces_2_pubs.size() == threshold);
+            EXPECT_TRUE(partial_sigs.size() == threshold);
+
             // make proof
             proof = sp::sp_composition_prove_multisig_final(partial_sigs);
 
