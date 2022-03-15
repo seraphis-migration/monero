@@ -268,7 +268,7 @@ namespace multisig
     /// records which other signers have each of the local signer's multisig privkeys
     multisig_keyshare_origins_map_t m_keyshare_to_origins_map;
     /// helper filter that records which other signers are present in m_keyshare_to_origins_map
-    signer_set_filter m_available_signers_for_aggregation;
+    signer_set_filter m_available_signers_for_aggregation{0};
 
     /// kex variables
     // number of key exchange rounds that have been completed (all messages for the round collected and processed)

@@ -357,8 +357,8 @@ TEST(multisig, multisig_kex_msg)
 
   // misc. edge cases
   EXPECT_NO_THROW((multisig_kex_msg{}));
-  EXPECT_ANY_THROW((multisig_kex_msg{multisig_kex_msg{}.get_msg()}));
-  EXPECT_ANY_THROW((multisig_kex_msg{"abc"}));
+  EXPECT_NO_THROW((multisig_kex_msg{multisig_kex_msg{}.get_msg()}));
+  EXPECT_NO_THROW((multisig_kex_msg{"abc"}));
   EXPECT_ANY_THROW((multisig_kex_msg{v, 0, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
   EXPECT_ANY_THROW((multisig_kex_msg{v, 1, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
   EXPECT_ANY_THROW((multisig_kex_msg{v, 1, signing_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));

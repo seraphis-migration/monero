@@ -118,7 +118,7 @@ namespace multisig
       m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys.back()];  //this will add any missing keyshares
     }
 
-    // add all signers available for aggregation-style signing
+    // add all other signers available for aggregation-style signing
     signer_set_filter temp_filter;
     for (const auto &keyshare_to_origins : m_keyshare_to_origins_map)
     {
@@ -202,10 +202,19 @@ namespace multisig
     m_threshold = threshold;
     m_signers = std::move(signers);
 
-    // add self as available for aggregation-style signing
-    signer_set_filter temp_filter;
-    multisig_signer_to_filter(m_base_pubkey, m_signers, temp_filter);
-    m_available_signers_for_aggregation |= temp_filter;
+    // set signers available by default for aggregation-style signing
+    if (m_threshold == m_signers.size())
+    {
+      // N-of-N: all signers
+      m_available_signers_for_aggregation = static_cast<signer_set_filter>(-1);
+    }
+    else
+    {
+      // M-of-N: local signer
+      signer_set_filter temp_filter;
+      multisig_signer_to_filter(m_base_pubkey, m_signers, temp_filter);
+      m_available_signers_for_aggregation |= temp_filter;
+    }
   }
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL
@@ -302,7 +311,7 @@ namespace multisig
       if (std::find_if(origins.begin(), origins.end(),
           [&](const crypto::public_key &origin) -> bool
           {
-            return std::find(filtered_signers.begin(), self_location, origin) == self_location;
+            return std::find(filtered_signers.begin(), self_location, origin) != self_location;
           }
         ) == origins.end())
       {

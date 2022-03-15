@@ -81,6 +81,7 @@ set(unit_tests_sources
   scaling_2021.cpp
   serialization.cpp
   seraphis.cpp
+  seraphis_multisig.cpp
   seraphis_tx.cpp
   sha256.cpp
   slow_memmem.cpp

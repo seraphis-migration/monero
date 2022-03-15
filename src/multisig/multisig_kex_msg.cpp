@@ -90,7 +90,6 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   static std::uint32_t get_message_version(const std::string &original_msg)
   {
-    CHECK_AND_ASSERT_THROW_MES(original_msg.size() > 0, "Kex message unexpectedly empty.");
     CHECK_AND_ASSERT_THROW_MES(original_msg.substr(0, MULTISIG_KEX_V1_MAGIC.size()) != MULTISIG_KEX_V1_MAGIC,
       "V1 multisig kex messages are deprecated (unsafe).");
     CHECK_AND_ASSERT_THROW_MES(original_msg.substr(0, MULTISIG_KEX_MSG_V1_MAGIC.size()) != MULTISIG_KEX_MSG_V1_MAGIC,
@@ -299,6 +298,13 @@ namespace multisig
   {
     // set message version
     m_version = get_message_version(m_msg);
+
+    // early return on unversioned messages
+    if (m_version == 0)
+    {
+      m_msg = "";
+      return;
+    }
 
     // deserialize the message
     std::string msg_no_magic;
