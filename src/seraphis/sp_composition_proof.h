@@ -66,11 +66,13 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
 
 //standard headers
+#include <unordered_map>
 #include <vector>
 
 //forward declarations
@@ -141,6 +143,23 @@ struct SpCompositionProofMultisigPrep
     // signature nonce pubkey: alpha_{ki,2,e}*U
     rct::key signature_nonce_2_KI_pub;
 };
+
+////
+// Multisig nonce record
+// - store a multisig participant's nonces for multiple signing attempts
+//   - multiple messages to sign
+//   - multiple signer groups per message
+//
+// [message : [filter, nonces]]
+///
+using SpCompositionProofMultisigNonceRecord =
+    std::unordered_map<
+            rct::key,                                //message
+            std::unordered_map<
+                    multisig::signer_set_filter,      //filter representing a signer group
+                    SpCompositionProofMultisigPrep   //nonces
+                >
+        >;
 
 ////
 // Multisig partially signed composition proof (from one multisig participant)
@@ -242,6 +261,29 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     const rct::keyV &signer_nonces_pub_2,
     const crypto::secret_key &local_nonce_1_priv,
     const crypto::secret_key &local_nonce_2_priv);
+/**
+* brief: try_get_sp_composition_multisig_partial_sig - make a partial signature using a nonce record (nonce safety guarantee)
+*        proof
+*   - caller must validate 'proposal'
+*       - is the key image well-made?
+*       - is the main key legitimate?
+*       - is the message correct?
+* param: ...(see sp_composition_multisig_partial_sig())
+* param: filter - filter representing a multisig signer group that is supposedly working on this signature
+* inoutparam: nonce_record_inout - a record of nonces for makeing partial signatures; used nonces will be cleared
+* outparam: partial_sig_out - the partial signature
+* return: true if creating the partial signature succeeded
+*/
+bool try_get_sp_composition_multisig_partial_sig(
+    const SpCompositionProofMultisigProposal &proposal,
+    const crypto::secret_key &x,
+    const crypto::secret_key &y,
+    const crypto::secret_key &z_e,
+    const rct::keyV &signer_nonces_pub_1,
+    const rct::keyV &signer_nonces_pub_2,
+    const multisig::signer_set_filter filter,
+    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpCompositionProofMultisigPartial &partial_sig_out);
 /**
 * brief: sp_composition_prove_multisig_final - create a Seraphis composition proof from multisig partial signatures
 * param: partial_sigs - partial signatures from enough multisig participants to complete a full proof

@@ -126,9 +126,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
             filter_permutations);
 
         // each signer prepares for each signer group it is a member of
-        std::vector<std::vector<sp::SpCompositionProofMultisigPrep>> signer_preps(num_signers);
-        std::vector<std::vector<rct::key>> signer_nonces_1_pubs(filter_permutations.size());
-        std::vector<std::vector<rct::key>> signer_nonces_2_pubs(filter_permutations.size());
+        std::vector<sp::SpCompositionProofMultisigNonceRecord> signer_nonce_records(num_signers);
 
         for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
         {
@@ -139,56 +137,62 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
                         filter_permutations[filter_index]))
                     continue;
 
-                signer_preps[signer_index].emplace_back(sp::sp_composition_multisig_init());
-
-                signer_nonces_1_pubs[filter_index].reserve(threshold);
-                signer_nonces_2_pubs[filter_index].reserve(threshold);
-                signer_nonces_1_pubs[filter_index].emplace_back(
-                    signer_preps[signer_index].back().signature_nonce_1_KI_pub);
-                signer_nonces_2_pubs[filter_index].emplace_back(
-                    signer_preps[signer_index].back().signature_nonce_2_KI_pub);
+                sp::SpCompositionProofMultisigPrep prep_temp{sp::sp_composition_multisig_init()};
+                signer_nonce_records[signer_index][proposal.message][filter_permutations[filter_index]] = prep_temp;
             }
         }
 
-        // each signer partially signs for each signer group it is a member of
+        // complete and validate each signature attempt
+        std::vector<sp::SpCompositionProofMultisigPartial> partial_sigs;
+        std::vector<rct::key> signer_nonces_1_pubs;
+        std::vector<rct::key> signer_nonces_2_pubs;
         crypto::secret_key z_temp;
-        std::size_t filter_groups_consumed;
-        std::vector<std::vector<sp::SpCompositionProofMultisigPartial>> partial_sigs(filter_permutations.size());
-
-        for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
-        {
-            filter_groups_consumed = 0;
-
-            for (std::size_t filter_index{0}; filter_index < filter_permutations.size(); ++filter_index)
-            {
-                if (!accounts[signer_index].try_get_aggregate_signing_key(filter_permutations[filter_index], z_temp))
-                    continue;
-
-                partial_sigs[filter_index].reserve(threshold);
-                partial_sigs[filter_index].emplace_back(
-                        sp::sp_composition_multisig_partial_sig(
-                            proposal,
-                            x,
-                            accounts[signer_index].get_common_privkey(),
-                            z_temp,
-                            signer_nonces_1_pubs[filter_index],
-                            signer_nonces_2_pubs[filter_index],
-                            signer_preps[signer_index][filter_groups_consumed].signature_nonce_1_KI_priv,
-                            signer_preps[signer_index][filter_groups_consumed].signature_nonce_2_KI_priv
-                        )
-                    );
-
-                ++filter_groups_consumed;
-            }
-        }
-
-        // assemble and verify the proof for each permutation
         sp::SpCompositionProof proof;
 
-        for (const auto &partial_sigs_for_proof : partial_sigs)
+        for (const multisig::signer_set_filter filter : filter_permutations)
         {
+            signer_nonces_1_pubs.clear();
+            signer_nonces_2_pubs.clear();
+            partial_sigs.clear();
+            signer_nonces_1_pubs.reserve(threshold);
+            signer_nonces_2_pubs.reserve(threshold);
+            partial_sigs.reserve(threshold);
+
+            // assemble nonce pubkeys for this signing attempt
+            for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
+            {
+                if (!multisig::signer_is_in_filter(accounts[signer_index].get_base_pubkey(),
+                        accounts[signer_index].get_signers(),
+                        filter))
+                    continue;
+
+                const auto &prep = signer_nonce_records[signer_index][proposal.message][filter];
+
+                signer_nonces_1_pubs.emplace_back(prep.signature_nonce_1_KI_pub);
+                signer_nonces_2_pubs.emplace_back(prep.signature_nonce_2_KI_pub);
+            }
+
+            // each signer partially signs for this attempt
+            for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
+            {
+                if (!accounts[signer_index].try_get_aggregate_signing_key(filter, z_temp))
+                    continue;
+
+                partial_sigs.emplace_back();
+                EXPECT_TRUE(try_get_sp_composition_multisig_partial_sig(
+                    proposal,
+                    x,
+                    accounts[signer_index].get_common_privkey(),
+                    z_temp,
+                    signer_nonces_1_pubs,
+                    signer_nonces_2_pubs,
+                    filter,
+                    signer_nonce_records[signer_index],
+                    partial_sigs.back()));
+            }
+
             // make proof
-            proof = sp::sp_composition_prove_multisig_final(partial_sigs_for_proof);
+            proof = sp::sp_composition_prove_multisig_final(partial_sigs);
 
             // verify proof
             if (!sp::sp_composition_verify(proof, message, K, KI))

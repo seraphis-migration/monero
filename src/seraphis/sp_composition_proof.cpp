@@ -539,6 +539,49 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     return partial_sig;
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool try_get_sp_composition_multisig_partial_sig(
+    const SpCompositionProofMultisigProposal &proposal,
+    const crypto::secret_key &x,
+    const crypto::secret_key &y,
+    const crypto::secret_key &z_e,
+    const rct::keyV &signer_nonces_pub_1,
+    const rct::keyV &signer_nonces_pub_2,
+    const multisig::signer_set_filter filter,
+    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpCompositionProofMultisigPartial &partial_sig_out)
+{
+    // early return if there are no nonces to make a partial signature with
+    if (nonce_record_inout.find(proposal.message) == nonce_record_inout.end())
+        return false;
+    if (nonce_record_inout[proposal.message].find(filter) == nonce_record_inout[proposal.message].end())
+        return false;
+
+    // make the partial signature
+    SpCompositionProofMultisigPartial partial_sig_temp{
+            sp_composition_multisig_partial_sig(
+                proposal,
+                x,
+                y,
+                z_e,
+                signer_nonces_pub_1,
+                signer_nonces_pub_2,
+                nonce_record_inout[proposal.message][filter].signature_nonce_1_KI_priv,
+                nonce_record_inout[proposal.message][filter].signature_nonce_2_KI_priv)
+        };
+
+    // clear the used nonces
+    nonce_record_inout[proposal.message].erase(filter);
+
+    // cleanup
+    if (nonce_record_inout[proposal.message].empty())
+        nonce_record_inout.erase(proposal.message);
+
+    // set the output partial sig AFTER used nonces are cleared, in case of exception
+    partial_sig_out = std::move(partial_sig_temp);
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
 SpCompositionProof sp_composition_prove_multisig_final(const std::vector<SpCompositionProofMultisigPartial> &partial_sigs)
 {
     /// input checks and initialization
