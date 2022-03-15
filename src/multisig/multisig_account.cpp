@@ -122,7 +122,7 @@ namespace multisig
     signer_set_filter temp_filter;
     for (const auto &keyshare_to_origins : m_keyshare_to_origins_map)
     {
-      multisig_signers_to_filter(m_signers, keyshare_to_origins.second, temp_filter);
+      multisig_signers_to_filter(keyshare_to_origins.second, m_signers, temp_filter);
       m_available_signers_for_aggregation |= temp_filter;
     }
 
@@ -204,7 +204,7 @@ namespace multisig
 
     // add self as available for aggregation-style signing
     signer_set_filter temp_filter;
-    multisig_signer_to_filter(m_signers, m_base_pubkey, temp_filter);
+    multisig_signer_to_filter(m_base_pubkey, m_signers, temp_filter);
     m_available_signers_for_aggregation |= temp_filter;
   }
   //----------------------------------------------------------------------------------------------------------------------
@@ -251,7 +251,7 @@ namespace multisig
 
     // add signer to 'available signers'
     signer_set_filter new_signer_flag;
-    multisig_signer_to_filter(m_signers, signer, new_signer_flag);
+    multisig_signer_to_filter(signer, m_signers, new_signer_flag);
     m_available_signers_for_aggregation |= new_signer_flag;
 
     // for each local keyshare that the other signer also recommends, add that signer as an 'origin'
@@ -280,7 +280,7 @@ namespace multisig
 
     // filter the signer list to get group of signers
     std::vector<crypto::public_key> filtered_signers;
-    get_filtered_multisig_signers(m_signers, m_threshold, filter, filtered_signers);
+    get_filtered_multisig_signers(filter, m_threshold, m_signers, filtered_signers);
     CHECK_AND_ASSERT_THROW_MES(std::is_sorted(filtered_signers.begin(), filtered_signers.end()),
       "multisig account: filtered signers are unsorted.");
 

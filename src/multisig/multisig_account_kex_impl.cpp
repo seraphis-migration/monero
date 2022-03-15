@@ -752,8 +752,8 @@ namespace multisig
           std::move(m_kex_keys_to_origins_map[preagg_keyshares[keyshare_index]]);
 
         // 3) update 'available signers' for aggregation-style signing
-        multisig_signers_to_filter(m_signers,
-          m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[keyshare_index]],
+        multisig_signers_to_filter(m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[keyshare_index]],
+          m_signers,
           temp_filter);
         m_available_signers_for_aggregation |= temp_filter;
       }

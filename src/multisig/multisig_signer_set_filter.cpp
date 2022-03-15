@@ -47,8 +47,8 @@ namespace multisig
 {
   //----------------------------------------------------------------------------------------------------------------------
   //----------------------------------------------------------------------------------------------------------------------
-  static bool check_multisig_config_for_filter(const std::uint32_t num_signers,
-    const std::uint32_t threshold)
+  static bool check_multisig_config_for_filter(const std::uint32_t threshold,
+    const std::uint32_t num_signers)
   {
     if (num_signers > 8*sizeof(signer_set_filter))
       return false;
@@ -133,12 +133,12 @@ namespace multisig
   }
   //----------------------------------------------------------------------------------------------------------------------
   //----------------------------------------------------------------------------------------------------------------------
-  bool validate_multisig_signer_set_filter(const std::uint32_t num_signers,
-    const std::uint32_t threshold,
+  bool validate_multisig_signer_set_filter(const std::uint32_t threshold,
+    const std::uint32_t num_signers,
     const signer_set_filter filter)
   {
     // the filter should only have flags set for possible signers
-    if (!check_multisig_config_for_filter(num_signers, threshold))
+    if (!check_multisig_config_for_filter(threshold, num_signers))
       return false;
     if ((filter >> num_signers) != 0)
       return false;
@@ -150,25 +150,25 @@ namespace multisig
     return true;
   }
   //----------------------------------------------------------------------------------------------------------------------
-  bool validate_multisig_signer_set_filters(const std::uint32_t num_signers,
-    const std::uint32_t threshold,
+  bool validate_multisig_signer_set_filters(const std::uint32_t threshold,
+    const std::uint32_t num_signers,
     const std::vector<signer_set_filter> &filters)
   {
     for (const signer_set_filter filter : filters)
     {
-      if (!validate_multisig_signer_set_filter(num_signers, threshold, filter))
+      if (!validate_multisig_signer_set_filter(threshold, num_signers, filter))
         return false;
     }
 
     return true;
   }
   //----------------------------------------------------------------------------------------------------------------------
-  void aggregate_multisig_signer_set_filter_to_permutations(const std::uint32_t num_signers,
-    const std::uint32_t threshold,
+  void aggregate_multisig_signer_set_filter_to_permutations(const std::uint32_t threshold,
+    const std::uint32_t num_signers,
     const signer_set_filter aggregate_filter,
     std::vector<signer_set_filter> &filter_permutations_out)
   {
-    CHECK_AND_ASSERT_THROW_MES(check_multisig_config_for_filter(num_signers, threshold),
+    CHECK_AND_ASSERT_THROW_MES(check_multisig_config_for_filter(threshold, num_signers),
       "Invalid multisig config when getting filter permutations");
 
     const std::uint32_t num_flags_set{get_num_flags_set(aggregate_filter)};
@@ -191,7 +191,7 @@ namespace multisig
       {
         filter_permutations_out.emplace_back(reference_filter_to_filter(reference_filter, aggregate_filter));
 
-        CHECK_AND_ASSERT_THROW_MES(validate_multisig_signer_set_filter(num_signers, threshold, filter_permutations_out.back()),
+        CHECK_AND_ASSERT_THROW_MES(validate_multisig_signer_set_filter(threshold, num_signers, filter_permutations_out.back()),
           "Invalid multisig set filter extracted from aggregate filter.");
       }
     //note: post-increment the reference filter so the filter 'just used' is tested
@@ -200,11 +200,11 @@ namespace multisig
     } while (reference_filter++ < get_squashed_full_filter(num_flags_set));
   }
   //----------------------------------------------------------------------------------------------------------------------
-  void multisig_signers_to_filter(const std::vector<crypto::public_key> &signer_list,
-    const std::vector<crypto::public_key> &allowed_signers,
+  void multisig_signers_to_filter(const std::vector<crypto::public_key> &allowed_signers,
+    const std::vector<crypto::public_key> &signer_list,
     signer_set_filter &aggregate_filter_out)
   {
-    CHECK_AND_ASSERT_THROW_MES(check_multisig_config_for_filter(signer_list.size(), 0),
+    CHECK_AND_ASSERT_THROW_MES(check_multisig_config_for_filter(0, signer_list.size()),
       "Invalid multisig config when making multisig signer filters.");
     CHECK_AND_ASSERT_THROW_MES(allowed_signers.size() <= signer_list.size(),
       "Invalid number of allowed signers when making multisig signer filters.");
@@ -225,8 +225,8 @@ namespace multisig
     }
   }
   //----------------------------------------------------------------------------------------------------------------------
-  void multisig_signers_to_filter(const std::vector<crypto::public_key> &signer_list,
-    const std::unordered_set<crypto::public_key> &allowed_signers,
+  void multisig_signers_to_filter(const std::unordered_set<crypto::public_key> &allowed_signers,
+    const std::vector<crypto::public_key> &signer_list,
     signer_set_filter &aggregate_filter_out)
   {
     // convert: unordered_set -> vector
@@ -235,23 +235,23 @@ namespace multisig
     for (const crypto::public_key &allowed_signer : allowed_signers)
       allowed_signers_temp.emplace_back(allowed_signer);
 
-    multisig_signers_to_filter(signer_list, allowed_signers_temp, aggregate_filter_out);
+    multisig_signers_to_filter(allowed_signers_temp, signer_list, aggregate_filter_out);
   }
   //----------------------------------------------------------------------------------------------------------------------
-  void multisig_signer_to_filter(const std::vector<crypto::public_key> &signer_list,
-    const crypto::public_key &allowed_signer,
+  void multisig_signer_to_filter(const crypto::public_key &allowed_signer,
+    const std::vector<crypto::public_key> &signer_list,
     signer_set_filter &aggregate_filter_out)
   {
     std::vector<crypto::public_key> allowed_signers_temp = {allowed_signer};
-    multisig_signers_to_filter(signer_list, allowed_signers_temp, aggregate_filter_out);
+    multisig_signers_to_filter(allowed_signers_temp, signer_list, aggregate_filter_out);
   }
   //----------------------------------------------------------------------------------------------------------------------
-  void get_filtered_multisig_signers(const std::vector<crypto::public_key> &signer_list,
+  void get_filtered_multisig_signers(const signer_set_filter filter,
     const std::uint32_t threshold,
-    const signer_set_filter filter,
+    const std::vector<crypto::public_key> &signer_list,
     std::vector<crypto::public_key> &filtered_signers_out)
   {
-    CHECK_AND_ASSERT_THROW_MES(validate_multisig_signer_set_filter(signer_list.size(), threshold, filter),
+    CHECK_AND_ASSERT_THROW_MES(validate_multisig_signer_set_filter(threshold, signer_list.size(), filter),
       "Invalid signer set filter when filtering a list of multisig signers.");
 
     filtered_signers_out.clear();

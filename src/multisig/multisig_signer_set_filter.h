@@ -51,16 +51,16 @@ namespace multisig
   * brief: validate_multisig_signer_set_filter - Check that a signer set is valid.
   *   - Only possible signers are flagged.
   *   - Only 'threshold' number of signers are flagged.
-  * param: num_signers - number of participants in multisig (N)
   * param: threshold - threshold of multisig (M)
+  * param: num_signers - number of participants in multisig (N)
   * param: filter - a set of multisig signers to test validity of
   * return: true/false on validation result
   */
-  bool validate_multisig_signer_set_filter(const std::uint32_t num_signers,
-    const std::uint32_t threshold,
+  bool validate_multisig_signer_set_filter(const std::uint32_t threshold,
+    const std::uint32_t num_signers,
     const signer_set_filter filter);
-  bool validate_multisig_signer_set_filters(const std::uint32_t num_signers,
-    const std::uint32_t threshold,
+  bool validate_multisig_signer_set_filters(const std::uint32_t threshold,
+    const std::uint32_t num_signers,
     const std::vector<signer_set_filter> &filters);
   /**
   * brief: aggregate_multisig_signer_set_filter_to_permutations - Extract filters from an aggregate filter.
@@ -68,39 +68,39 @@ namespace multisig
   *   - Every permutation of 'threshold' number of signers from the aggregate set is a separate signer set that can
   *     collaborate on a multisig signature. Dis-aggregating the aggregate filter provides filters corresponding
   *     to each of those sets.
-  * param: num_signers - total number of signers the filter acts on
   * param: threshold - number of signers a filter can represent
+  * param: num_signers - total number of signers the filter acts on
   * param: aggregate_filter - signer set filter contains 1 or more actual filters
   * outparam: filter_permutations_out - all the filters that can be extracted from the aggregate filter
   */
-  void aggregate_multisig_signer_set_filter_to_permutations(const std::uint32_t num_signers,
-    const std::uint32_t threshold,
+  void aggregate_multisig_signer_set_filter_to_permutations(const std::uint32_t threshold,
+    const std::uint32_t num_signers,
     const signer_set_filter aggregate_filter,
     std::vector<signer_set_filter> &filter_permutations_out);
   /**
   * brief: multisig_signers_to_filter - Represent a set of multisig signers as an aggregate filter.
-  * param: signer_list - list of signer ids
   * param: allowed_signers - the signers from the signer list that should be represented in the filter
+  * param: signer_list - list of signer ids
   * outparam: aggregate_filter_out - an aggregate filter that maps the signer list to the allowed signer list
   */
-  void multisig_signers_to_filter(const std::vector<crypto::public_key> &signer_list,
-    const std::vector<crypto::public_key> &allowed_signers,
+  void multisig_signers_to_filter(const std::vector<crypto::public_key> &allowed_signers,
+    const std::vector<crypto::public_key> &signer_list,
     signer_set_filter &aggregate_filter_out);
-  void multisig_signers_to_filter(const std::vector<crypto::public_key> &signer_list,
-    const std::unordered_set<crypto::public_key> &allowed_signers,
+  void multisig_signers_to_filter(const std::unordered_set<crypto::public_key> &allowed_signers,
+    const std::vector<crypto::public_key> &signer_list,
     signer_set_filter &aggregate_filter_out);
-  void multisig_signer_to_filter(const std::vector<crypto::public_key> &signer_list,
-    const crypto::public_key &allowed_signer,
+  void multisig_signer_to_filter(const crypto::public_key &allowed_signer,
+    const std::vector<crypto::public_key> &signer_list,
     signer_set_filter &aggregate_filter_out);
     /**
   * brief: get_filtered_multisig_signers - Filter a signer list using a signer_set_filter.
-  * param: signer_list - list of signer ids
-  * param: threshold - number of signers a filter can represent
   * param: filter - signer set filter
+  * param: threshold - number of signers a filter can represent
+  * param: signer_list - list of signer ids
   * outparam: filtered_signers_out - a filtered set of multisig signer ids
   */
-  void get_filtered_multisig_signers(const std::vector<crypto::public_key> &signer_list,
+  void get_filtered_multisig_signers(const signer_set_filter filter,
     const std::uint32_t threshold,
-    const signer_set_filter filter,
+    const std::vector<crypto::public_key> &signer_list,
     std::vector<crypto::public_key> &filtered_signers_out);
 } //namespace multisig
