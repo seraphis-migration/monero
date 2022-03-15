@@ -274,15 +274,18 @@ namespace multisig
       "multisig account: tried to get signing key, but there is a mismatch between multisig privkeys and pubkeys.");
 
     // check that local signer is able to make an aggregate key with all signers in input filter
-    // (also check if local signer is in input filter)
     if ((filter & m_available_signers_for_aggregation) != filter)
+      return false;
+
+    // check if local signer is in input filter
+    if (!signer_is_in_filter(m_base_pubkey, m_signers, filter))
       return false;
 
     // filter the signer list to get group of signers
     std::vector<crypto::public_key> filtered_signers;
     get_filtered_multisig_signers(filter, m_threshold, m_signers, filtered_signers);
     CHECK_AND_ASSERT_THROW_MES(std::is_sorted(filtered_signers.begin(), filtered_signers.end()),
-      "multisig account: filtered signers are unsorted.");
+      "multisig account: filtered signers are unsorted (bug).");
 
     // find local signer's location in filtered set
     auto self_location = std::find(filtered_signers.begin(), filtered_signers.end(), m_base_pubkey);

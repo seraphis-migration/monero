@@ -265,4 +265,13 @@ namespace multisig
     }
   }
   //----------------------------------------------------------------------------------------------------------------------
+  bool signer_is_in_filter(const crypto::public_key &signer,
+    const std::vector<crypto::public_key> &signer_list,
+    const signer_set_filter test_filter)
+  {
+    signer_set_filter temp_filter;
+    multisig_signer_to_filter(signer, signer_list, temp_filter);
+    return temp_filter & test_filter;
+  }
+  //----------------------------------------------------------------------------------------------------------------------
 } //namespace multisig

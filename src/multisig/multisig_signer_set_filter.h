@@ -103,4 +103,13 @@ namespace multisig
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &signer_list,
     std::vector<crypto::public_key> &filtered_signers_out);
+  /**
+  * brief: signer_is_in_filter - Check if a signer is in a filter.
+  * param: signer - signer to check
+  * param: signer_list - list of signer ids to look for the signer in
+  * param: test_filter - filter to apply to the signer list
+  */
+  bool signer_is_in_filter(const crypto::public_key &signer,
+    const std::vector<crypto::public_key> &signer_list,
+    const signer_set_filter test_filter);
 } //namespace multisig

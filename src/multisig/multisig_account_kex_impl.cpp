@@ -353,29 +353,19 @@ namespace multisig
       if (expanded_msg.get_signing_pubkey() == own_pubkey)
         continue;
 
-      // in round 1, only the signing pubkey is treated as a msg pubkey
-      if (round == 1)
+      // copy all pubkeys from message into list
+      for (const auto &pubkey : expanded_msg.get_msg_pubkeys())
       {
+        // ignore own pubkey
+        if (pubkey == own_pubkey)
+          continue;
+
+        // ignore pubkeys in 'ignore' set
+        if (std::find(exclude_pubkeys.begin(), exclude_pubkeys.end(), pubkey) != exclude_pubkeys.end())
+          continue;
+
         // note: ignores duplicates
-        sanitized_pubkeys_out[expanded_msg.get_signing_pubkey()].insert(expanded_msg.get_signing_pubkey());
-      }
-      // in other rounds, only the msg pubkeys are treated as msg pubkeys
-      else
-      {
-        // copy all pubkeys from message into list
-        for (const auto &pubkey : expanded_msg.get_msg_pubkeys())
-        {
-          // ignore own pubkey
-          if (pubkey == own_pubkey)
-            continue;
-
-          // ignore pubkeys in 'ignore' set
-          if (std::find(exclude_pubkeys.begin(), exclude_pubkeys.end(), pubkey) != exclude_pubkeys.end())
-            continue;
-
-          // note: ignores duplicates
-          sanitized_pubkeys_out[pubkey].insert(expanded_msg.get_signing_pubkey());
-        }
+        sanitized_pubkeys_out[pubkey].insert(expanded_msg.get_signing_pubkey());
       }
     }
 
