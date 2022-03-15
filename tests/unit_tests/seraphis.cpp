@@ -101,38 +101,16 @@ static void make_jamtis_keys(jamtis_keys &keys_out)
 //-------------------------------------------------------------------------------------------------------------------
 static void make_fake_sp_masked_address(crypto::secret_key &mask,
     crypto::secret_key &view_stuff,
-    std::vector<crypto::secret_key> &spendkeys,
-    rct::key &masked_address)
-{
-    const std::size_t num_signers{spendkeys.size()};
-    EXPECT_TRUE(num_signers > 0);
-
-    make_secret_key(mask);
-    make_secret_key(view_stuff);
-
-    // for multisig, there can be multiple signers
-    crypto::secret_key spendkey_sum{rct::rct2sk(rct::zero())};
-    for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
-    {
-        make_secret_key(spendkeys[signer_index]);
-
-        sc_add(to_bytes(spendkey_sum), to_bytes(spendkey_sum), to_bytes(spendkeys[signer_index]));
-    }
-
-    // K' = x G + kv_stuff X + ks U
-    sp::make_seraphis_spendkey(view_stuff, spendkey_sum, masked_address);
-    sp::mask_key(mask, masked_address, masked_address);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void make_fake_sp_masked_address(crypto::secret_key &mask,
-    crypto::secret_key &view_stuff,
     crypto::secret_key &spendkey,
     rct::key &masked_address)
 {
-    std::vector<crypto::secret_key> spendkeys = {spendkey};
-    make_fake_sp_masked_address(mask, view_stuff, spendkeys, masked_address);
-    spendkey = spendkeys[0];
+    make_secret_key(mask);
+    make_secret_key(view_stuff);
+    make_secret_key(spendkey);
+
+    // K' = x G + kv_stuff X + ks U
+    sp::make_seraphis_spendkey(view_stuff, spendkey, masked_address);
+    sp::mask_key(mask, masked_address, masked_address);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -513,121 +491,6 @@ TEST(seraphis, composition_proof)
     catch (...)
     {
         EXPECT_TRUE(false);
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
-TEST(seraphis, composition_proof_multisig)
-{
-    rct::key K;
-    rct::keyV signer_nonces_1_pubs, signer_nonces_2_pubs;
-    crypto::key_image KI;
-    crypto::secret_key x, y;
-    std::vector<crypto::secret_key> z_pieces;
-    rct::key message{rct::zero()};
-    std::vector<sp::SpCompositionProofMultisigPrep> signer_preps;
-    std::vector<sp::SpCompositionProofMultisigPartial> partial_sigs;
-    sp::SpCompositionProof proof;
-
-    // check: works even if x = 0 (kludge test)
-    // check: range of co-signers works (1-3 signers)
-    for (const bool test_x_0 : {true, false})
-    {
-        for (std::size_t num_signers{1}; num_signers < 4; ++num_signers)
-        {
-            z_pieces.resize(num_signers);
-            signer_preps.resize(num_signers);
-            signer_nonces_1_pubs.resize(num_signers);
-            signer_nonces_2_pubs.resize(num_signers);
-            partial_sigs.resize(num_signers);
-
-            try
-            {
-                // note: each signer gets their own z value
-                make_fake_sp_masked_address(x, y, z_pieces, K);
-
-                // add z pieces together from all signers to build the key image
-                crypto::secret_key z{rct::rct2sk(rct::zero())};
-                for (const auto &z_piece : z_pieces)
-                    sc_add(to_bytes(z), to_bytes(z), to_bytes(z_piece));
-
-                sp::make_seraphis_key_image(y, z, KI);
-
-                // kludge test: remove x component
-                if (test_x_0)
-                {
-                    rct::key xG;
-                    rct::scalarmultBase(xG, rct::sk2rct(x));
-                    rct::subKeys(K, K, xG);
-                    x = rct::rct2sk(rct::zero());
-                }
-
-                // tx proposer: make proposal
-                sp::SpCompositionProofMultisigProposal proposal{sp::sp_composition_multisig_proposal(message, K, KI)};
-
-                // all participants: signature openers
-                for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
-                {
-                    signer_preps[signer_index] = sp::sp_composition_multisig_init();
-                    signer_nonces_1_pubs[signer_index] = signer_preps[signer_index].signature_nonce_1_KI_pub;
-                    signer_nonces_2_pubs[signer_index] = signer_preps[signer_index].signature_nonce_2_KI_pub;
-                }
-
-                // all participants: respond
-                for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
-                {
-                    partial_sigs[signer_index] = sp::sp_composition_multisig_partial_sig(
-                            proposal,
-                            x,
-                            y,
-                            z_pieces[signer_index],
-                            signer_nonces_1_pubs,
-                            signer_nonces_2_pubs,
-                            signer_preps[signer_index].signature_nonce_1_KI_priv,
-                            signer_preps[signer_index].signature_nonce_2_KI_priv
-                        );
-                }
-
-                // assemble proof
-                proof = sp::sp_composition_prove_multisig_final(partial_sigs);
-
-                // verify proof
-                EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
-
-
-                /// test: rearranging nonces between signers makes a valid proof
-
-                // all participants: respond
-                for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
-                {
-                    if (signer_index == 1)
-                    {
-                        std::swap(signer_nonces_1_pubs[0], signer_nonces_1_pubs[1]);
-                        std::swap(signer_nonces_2_pubs[0], signer_nonces_2_pubs[1]);
-                    }
-
-                    partial_sigs[signer_index] = sp::sp_composition_multisig_partial_sig(
-                            proposal,
-                            x,
-                            y,
-                            z_pieces[signer_index],
-                            signer_nonces_1_pubs,
-                            signer_nonces_2_pubs,
-                            signer_preps[signer_index].signature_nonce_1_KI_priv,
-                            signer_preps[signer_index].signature_nonce_2_KI_priv
-                        );
-                }
-
-                // assemble proof again
-                proof = sp::sp_composition_prove_multisig_final(partial_sigs);
-
-                // verify proof again
-                EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
-            }
-            catch (...)
-            {
-                EXPECT_TRUE(false);
-            }
-        }
     }
 }
 //-------------------------------------------------------------------------------------------------------------------

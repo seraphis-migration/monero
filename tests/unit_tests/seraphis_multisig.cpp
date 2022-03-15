@@ -204,7 +204,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-TEST(seraphis, composition_proof_multisig2)
+TEST(seraphis_multisig, composition_proof_multisig)
 {
     // test various account combinations
     EXPECT_TRUE(composition_proof_multisig_test(1, 2, rct::rct2sk(rct::skGen())));
