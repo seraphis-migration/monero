@@ -132,6 +132,21 @@ namespace multisig
     return temp_filter;
   }
   //----------------------------------------------------------------------------------------------------------------------
+  // - assumes input signer is a member of the list
+  //----------------------------------------------------------------------------------------------------------------------
+  static std::size_t signer_index_in_list(const crypto::public_key &signer, const std::vector<crypto::public_key> &signer_list)
+  {
+    std::size_t signer_index{0};
+    for (const crypto::public_key &other_signer : signer_list)
+    {
+      if (signer == other_signer)
+        break;
+      ++signer_index;
+    }
+
+    return signer_index;
+  }
+  //----------------------------------------------------------------------------------------------------------------------
   //----------------------------------------------------------------------------------------------------------------------
   bool validate_multisig_signer_set_filter(const std::uint32_t threshold,
     const std::uint32_t num_signers,
@@ -223,11 +238,8 @@ namespace multisig
     // make aggregate filter from all allowed signers
     aggregate_filter_out = 0;
 
-    for (std::size_t signer_index{0}; signer_index < signer_list.size(); ++signer_index)
-    {
-      if (std::find(allowed_signers.begin(), allowed_signers.end(), signer_list[signer_index]) != allowed_signers.end())
-        aggregate_filter_out |= signer_set_filter{1} << signer_index;
-    }
+    for (const crypto::public_key &allowed_signer : allowed_signers)
+      aggregate_filter_out |= signer_set_filter{1} << signer_index_in_list(allowed_signer, signer_list);
   }
   //----------------------------------------------------------------------------------------------------------------------
   void multisig_signers_to_filter(const std::unordered_set<crypto::public_key> &allowed_signers,
@@ -247,8 +259,7 @@ namespace multisig
     const std::vector<crypto::public_key> &signer_list,
     signer_set_filter &aggregate_filter_out)
   {
-    std::vector<crypto::public_key> allowed_signers_temp = {allowed_signer};
-    multisig_signers_to_filter(allowed_signers_temp, signer_list, aggregate_filter_out);
+    multisig_signers_to_filter(std::vector<crypto::public_key>{allowed_signer}, signer_list, aggregate_filter_out);
   }
   //----------------------------------------------------------------------------------------------------------------------
   void get_filtered_multisig_signers(const signer_set_filter filter,

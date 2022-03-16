@@ -73,7 +73,13 @@ namespace multisig
     // prepare initial kex message
     rct::key initial_pubkey{rct::scalarmultKey(get_primary_generator(m_account_era), rct::sk2rct(m_base_privkey))};
     m_next_round_kex_message =
-      multisig_kex_msg{get_kex_msg_version(era), 1, base_privkey, {rct::rct2pk(initial_pubkey)}, base_common_privkey}.get_msg();
+      multisig_kex_msg{
+        get_kex_msg_version(era),
+        1,
+        base_privkey,
+        {rct::rct2pk(initial_pubkey)},
+        base_common_privkey
+      }.get_msg();
   }
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL
@@ -103,44 +109,46 @@ namespace multisig
       m_kex_keys_to_origins_map{std::move(kex_origins_map)},
       m_next_round_kex_message{std::move(next_round_kex_message)}
   {
-    CHECK_AND_ASSERT_THROW_MES(kex_rounds_complete > 0, "multisig account: can't reconstruct account if its kex wasn't initialized");
-    
-    // initialize base pubkey
+    // 1) initialize base pubkey
     CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_base_privkey, m_base_pubkey),
       "Failed to derive public key");
 
-    // initialize keyshare pubkeys and keyshare map
+    // 2) initialize keyshare pubkeys and keyshare map
     m_multisig_keyshare_pubkeys.reserve(m_multisig_privkeys.size());
     rct::key primary_generator(get_primary_generator(m_account_era));
     for (const crypto::secret_key &multisig_privkey : m_multisig_privkeys)
     {
-      m_multisig_keyshare_pubkeys.emplace_back(rct::rct2pk(rct::scalarmultKey(primary_generator, rct::sk2rct(multisig_privkey))));
+      m_multisig_keyshare_pubkeys.emplace_back(
+          rct::rct2pk(rct::scalarmultKey(primary_generator, rct::sk2rct(multisig_privkey)))
+        );
       m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys.back()];  //this will add any missing keyshares
     }
 
-    // add all other signers available for aggregation-style signing
-    signer_set_filter temp_filter;
-    for (const auto &keyshare_to_origins : m_keyshare_to_origins_map)
-    {
-      multisig_signers_to_filter(keyshare_to_origins.second, m_signers, temp_filter);
-      m_available_signers_for_aggregation |= temp_filter;
-    }
-
-    // set config
+    // 3) set config
     set_multisig_config(threshold, std::move(signers));
 
-    // kex rounds should not exceed post-kex verification round
+    // - kex rounds should not exceed post-kex verification round
     const std::uint32_t kex_rounds_required{multisig_kex_rounds_required(m_signers.size(), m_threshold)};
     CHECK_AND_ASSERT_THROW_MES(m_kex_rounds_complete <= kex_rounds_required + 1,
       "multisig account: tried to reconstruct account, but kex rounds complete counter is invalid.");
 
-    // once an account is done with kex, the 'next kex msg' is always the post-kex verification message
+    // 4. once an account is done with kex, the 'next kex msg' is always the post-kex verification message
     //   i.e. the multisig account pubkey signed by the signer's privkey AND the common pubkey
     if (main_kex_rounds_done())
     {
       m_next_round_kex_message = multisig_kex_msg{kex_rounds_required + 1,
         m_base_privkey,
         std::vector<crypto::public_key>{m_multisig_pubkey, m_common_pubkey}}.get_msg();
+    }
+
+    // 5) final checks
+    CHECK_AND_ASSERT_THROW_MES(m_kex_rounds_complete > 0,
+      "multisig account: can't reconstruct account if its kex wasn't initialized");
+
+    if (multisig_is_ready())
+    {
+      CHECK_AND_ASSERT_THROW_MES(!(m_multisig_pubkey == crypto::null_pkey),
+        "multisig account: tried to reconstruct a finalized account, but the multisig pubkey is null");
     }
   }
   //----------------------------------------------------------------------------------------------------------------------
@@ -176,14 +184,16 @@ namespace multisig
   void multisig_account::set_multisig_config(const std::size_t threshold, std::vector<crypto::public_key> signers)
   {
     // validate
-    CHECK_AND_ASSERT_THROW_MES(threshold > 0 && threshold <= signers.size(), "multisig account: tried to set invalid threshold.");
+    CHECK_AND_ASSERT_THROW_MES(threshold > 0 && threshold <= signers.size(),
+      "multisig account: tried to set invalid threshold.");
     CHECK_AND_ASSERT_THROW_MES(signers.size() >= 2 && signers.size() <= config::MULTISIG_MAX_SIGNERS,
       "multisig account: tried to set invalid number of signers.");
 
     for (auto signer_it = signers.begin(); signer_it != signers.end(); ++signer_it)
     {
       // signer pubkeys must be in main subgroup, and not identity
-      CHECK_AND_ASSERT_THROW_MES(rct::isInMainSubgroup(rct::pk2rct(*signer_it)) && !(*signer_it == rct::rct2pk(rct::identity())),
+      CHECK_AND_ASSERT_THROW_MES(rct::isInMainSubgroup(rct::pk2rct(*signer_it)) &&
+          !(*signer_it == rct::rct2pk(rct::identity())),
         "multisig account: tried to set signers, but a signer pubkey is invalid.");
     }
 

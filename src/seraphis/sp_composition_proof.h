@@ -248,26 +248,6 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 /////////////////////////////////////////////// Multisig ///////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool record_has_nonces(const rct::key &message,
-    const multisig::signer_set_filter &filter,
-    const SpCompositionProofMultisigNonceRecord &nonce_record);
-bool try_add_nonces_to_record(const rct::key &message,
-    const multisig::signer_set_filter &filter,
-    const SpCompositionProofMultisigPrep &prep,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout);
-bool try_get_recorded_nonce_privkeys(const rct::key &message,
-    const multisig::signer_set_filter &filter,
-    const SpCompositionProofMultisigNonceRecord &nonce_record,
-    crypto::secret_key &nonce_privkey_1_out,
-    crypto::secret_key &nonce_privkey_2_out);
-bool try_get_recorded_nonce_pubkeys(const rct::key &message,
-    const multisig::signer_set_filter &filter,
-    const SpCompositionProofMultisigNonceRecord &nonce_record,
-    rct::key &nonce_pubkey_1_out,
-    rct::key &nonce_pubkey_2_out);
-void remove_nonces_from_record(const rct::key &message,
-    const multisig::signer_set_filter &filter,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout);
 /**
 * brief: sp_composition_multisig_proposal - propose to make a multisig Seraphis composition proof
 * param: message - message to insert in the proof's Fiat-Shamir transform hash
