@@ -138,7 +138,9 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
                     continue;
 
                 sp::SpCompositionProofMultisigPrep prep_temp{sp::sp_composition_multisig_init()};
-                signer_nonce_records[signer_index][proposal.message][filter_permutations[filter_index]] = prep_temp;
+                EXPECT_TRUE(signer_nonce_records[signer_index].try_add_nonces(proposal.message,
+                    filter_permutations[filter_index],
+                    prep_temp));
             }
         }
 
@@ -166,10 +168,13 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
                         filter))
                     continue;
 
-                const auto &prep = signer_nonce_records[signer_index][proposal.message][filter];
+                signer_nonces_1_pubs.emplace_back();
+                signer_nonces_2_pubs.emplace_back();
 
-                signer_nonces_1_pubs.emplace_back(prep.signature_nonce_1_KI_pub);
-                signer_nonces_2_pubs.emplace_back(prep.signature_nonce_2_KI_pub);
+                EXPECT_TRUE(signer_nonce_records[signer_index].try_get_recorded_nonce_pubkeys(proposal.message,
+                    filter,
+                    signer_nonces_1_pubs.back(),
+                    signer_nonces_2_pubs.back()));
             }
 
             // each signer partially signs for this attempt

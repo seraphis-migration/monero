@@ -88,7 +88,7 @@ namespace sp
 ////
 // Seraphis composition proof
 ///
-struct SpCompositionProof
+struct SpCompositionProof final
 {
     // challenge
     rct::key c;
@@ -108,7 +108,7 @@ struct SpCompositionProof
 // WARNING: must only use a 'proposal' to make ONE 'signature' (or signature attempt),
 //          after that the opening privkeys should be deleted immediately
 ///
-struct SpCompositionProofMultisigProposal
+struct SpCompositionProofMultisigProposal final
 {
     // message
     rct::key message;
@@ -132,7 +132,7 @@ struct SpCompositionProofMultisigProposal
 //          after that the opening nonce privkeys should be deleted immediately
 // WARNING2: the nonce privkeys are for local storage, only the pubkeys should be transmitted to other multisig participants
 ///
-struct SpCompositionProofMultisigPrep
+struct SpCompositionProofMultisigPrep final
 {
     // signature nonce privkey: alpha_{ki,1,e}
     crypto::secret_key signature_nonce_1_KI_priv;
@@ -149,24 +149,51 @@ struct SpCompositionProofMultisigPrep
 // - store a multisig participant's nonces for multiple signing attempts
 //   - multiple messages to sign
 //   - multiple signer groups per message
-//
-// [message : [filter, nonces]]
 ///
-using SpCompositionProofMultisigNonceRecord =
+class SpCompositionProofMultisigNonceRecord final
+{
+public:
+//constructors: default
+//member functions
+    /// true if there is a record
+    bool has_record(const rct::key &message,
+        const multisig::signer_set_filter &filter) const;
+    /// true if successfully added nonces
+    bool try_add_nonces(const rct::key &message,
+        const multisig::signer_set_filter &filter,
+        const SpCompositionProofMultisigPrep &prep);
+    /// true if found privkeys
+    bool try_get_recorded_nonce_privkeys(const rct::key &message,
+        const multisig::signer_set_filter &filter,
+        crypto::secret_key &nonce_privkey_1_out,
+        crypto::secret_key &nonce_privkey_2_out) const;
+    /// true if found pubkeys
+    bool try_get_recorded_nonce_pubkeys(const rct::key &message,
+        const multisig::signer_set_filter &filter,
+        rct::key &nonce_pubkey_1_out,
+        rct::key &nonce_pubkey_2_out) const;
+    /// true if removed a record
+    bool try_remove_record(const rct::key &message,
+        const multisig::signer_set_filter &filter);
+
+//member variables
+private:
+    // [message : [filter, nonces]]
     std::unordered_map<
             rct::key,                                //message
             std::unordered_map<
                     multisig::signer_set_filter,      //filter representing a signer group
                     SpCompositionProofMultisigPrep   //nonces
                 >
-        >;
+        > m_record;
+};
 
 ////
 // Multisig partially signed composition proof (from one multisig participant)
 // - multisig assumes only proof component KI is subject to multisig signing (key z is split between signers)
 // - store signature opening for KI component (response r_ki)
 ///
-struct SpCompositionProofMultisigPartial
+struct SpCompositionProofMultisigPartial final
 {
     // message
     rct::key message;
@@ -221,6 +248,26 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 /////////////////////////////////////////////// Multisig ///////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+bool record_has_nonces(const rct::key &message,
+    const multisig::signer_set_filter &filter,
+    const SpCompositionProofMultisigNonceRecord &nonce_record);
+bool try_add_nonces_to_record(const rct::key &message,
+    const multisig::signer_set_filter &filter,
+    const SpCompositionProofMultisigPrep &prep,
+    SpCompositionProofMultisigNonceRecord &nonce_record_inout);
+bool try_get_recorded_nonce_privkeys(const rct::key &message,
+    const multisig::signer_set_filter &filter,
+    const SpCompositionProofMultisigNonceRecord &nonce_record,
+    crypto::secret_key &nonce_privkey_1_out,
+    crypto::secret_key &nonce_privkey_2_out);
+bool try_get_recorded_nonce_pubkeys(const rct::key &message,
+    const multisig::signer_set_filter &filter,
+    const SpCompositionProofMultisigNonceRecord &nonce_record,
+    rct::key &nonce_pubkey_1_out,
+    rct::key &nonce_pubkey_2_out);
+void remove_nonces_from_record(const rct::key &message,
+    const multisig::signer_set_filter &filter,
+    SpCompositionProofMultisigNonceRecord &nonce_record_inout);
 /**
 * brief: sp_composition_multisig_proposal - propose to make a multisig Seraphis composition proof
 * param: message - message to insert in the proof's Fiat-Shamir transform hash
