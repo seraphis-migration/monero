@@ -154,6 +154,20 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL
   //----------------------------------------------------------------------------------------------------------------------
+  std::vector<crypto::public_key> multisig_account::get_signers_available_for_aggregation_signing() const
+  {
+    // get all signers who the local signer can perform aggregation-style signing with
+    std::vector<crypto::public_key> available_signers;
+    get_filtered_multisig_signers(m_available_signers_for_aggregation,
+      get_num_flags_set(m_available_signers_for_aggregation),
+      m_signers,
+      available_signers);
+
+    return available_signers;
+  }
+  //----------------------------------------------------------------------------------------------------------------------
+  // multisig_account: EXTERNAL
+  //----------------------------------------------------------------------------------------------------------------------
   bool multisig_account::account_is_active() const
   {
     return m_kex_rounds_complete > 0;
@@ -187,26 +201,25 @@ namespace multisig
     CHECK_AND_ASSERT_THROW_MES(threshold > 0 && threshold <= signers.size(),
       "multisig account: tried to set invalid threshold.");
     CHECK_AND_ASSERT_THROW_MES(signers.size() >= 2 && signers.size() <= config::MULTISIG_MAX_SIGNERS,
-      "multisig account: tried to set invalid number of signers.");
-
-    for (auto signer_it = signers.begin(); signer_it != signers.end(); ++signer_it)
-    {
-      // signer pubkeys must be in main subgroup, and not identity
-      CHECK_AND_ASSERT_THROW_MES(rct::isInMainSubgroup(rct::pk2rct(*signer_it)) &&
-          !(*signer_it == rct::rct2pk(rct::identity())),
-        "multisig account: tried to set signers, but a signer pubkey is invalid.");
-    }
-
-    // own pubkey should be in signers list
-    CHECK_AND_ASSERT_THROW_MES(std::find(signers.begin(), signers.end(), m_base_pubkey) != signers.end(),
-      "multisig account: tried to set signers, but did not find the account's base pubkey in signer list.");
+      "multisig account: tried to set invalid number of signers (" << signers.size() << ").");
 
     // sort signers
     std::sort(signers.begin(), signers.end());
 
     // signers should all be unique
     CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(signers.begin(), signers.end()) == signers.end(),
-      "multisig account: tried to set signers, but there are duplicate signers unexpectedly.");
+      "multisig account: tried to set signers, but found a duplicate signer unexpectedly.");
+
+    for (const crypto::public_key &signer : signers)
+    {
+      // signer pubkeys must be in main subgroup, and not identity
+      CHECK_AND_ASSERT_THROW_MES(rct::isInMainSubgroup(rct::pk2rct(signer)) && !(signer == rct::rct2pk(rct::identity())),
+        "multisig account: tried to set signers, but a signer pubkey is invalid.");
+    }
+
+    // own pubkey should be in signers list
+    CHECK_AND_ASSERT_THROW_MES(std::find(signers.begin(), signers.end(), m_base_pubkey) != signers.end(),
+      "multisig account: tried to set signers, but did not find the account's base pubkey in signer list.");
 
     // set
     m_threshold = threshold;

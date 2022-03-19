@@ -32,6 +32,7 @@
 #include "crypto/crypto.h"
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 
@@ -42,16 +43,14 @@ namespace multisig
   // - can parse and validate an input message
   // - can construct and sign a new message
   //
-  // msg_content = kex_round | signing_pubkey | expand(msg_pubkeys) | OPTIONAL msg_privkey
-  // msg_to_sign = versioning-domain-sep | msg_content
-  // msg = versioning-domain-sep | b58(msg_content | crypto_sig[signing_privkey](msg_to_sign))
+  // msg_content = kex_round || signing_pubkey || expand(msg_pubkeys) || OPTIONAL msg_privkey
+  // msg_to_sign = versioning-domain-sep || msg_content
+  // msg = versioning-domain-sep || b58(msg_content || crypto_sig[signing_privkey](msg_to_sign))
   //
   // note: round 1 messages will contain a private key (e.g. for the aggregate multisig private view key)
   ///
   class multisig_kex_msg final
   {
-  //member types: none
-
   //constructors
   public:
     // default constructor
@@ -89,9 +88,10 @@ namespace multisig
     std::uint32_t get_version() const { return m_version; }
 
   private:
-    // msg_to_sign = versioning-domain-sep | kex_round | signing_pubkey | expand(msg_pubkeys) | OPTIONAL msg_privkey
+    // msg_to_sign = versioning-domain-sep || kex_round || signing_pubkey || expand(msg_pubkeys) || OPTIONAL msg_privkey
+    // - signed by the signing pubkey
     crypto::hash get_msg_to_sign() const;
-    // set: msg string based on msg contents, signing pubkey based on input privkey
+    // set: msg string based on msg contents, signing pubkey defined from input privkey
     void construct_msg(const crypto::secret_key &signing_privkey);
     // parse msg string into parts, validate contents and signature
     void parse_and_validate_msg();
@@ -109,6 +109,7 @@ namespace multisig
     std::vector<crypto::public_key> m_msg_pubkeys;
     // privkey stored in msg (if kex round 1)
     crypto::secret_key m_msg_privkey;
+
     // pubkey used to sign this msg
     crypto::public_key m_signing_pubkey;
   };

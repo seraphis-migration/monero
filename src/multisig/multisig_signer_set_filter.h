@@ -48,6 +48,12 @@ namespace multisig
   static_assert(8*sizeof(signer_set_filter) == config::MULTISIG_MAX_SIGNERS, "");
 
   /**
+  * brief: get_num_flags_set - Count how many flags are set in a filter.
+  * param: filter - a set of signer flags
+  * return: number of flags set in the filter
+  */
+  std::uint32_t get_num_flags_set(signer_set_filter filter);
+  /**
   * brief: validate_multisig_signer_set_filter - Check that a signer set is valid.
   *   - Only possible signers are flagged.
   *   - Only 'threshold' number of signers are flagged.

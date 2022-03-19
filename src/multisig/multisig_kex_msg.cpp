@@ -44,6 +44,7 @@ extern "C"
 #include <boost/utility/string_ref.hpp> 
 
 #include <sstream>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -193,8 +194,8 @@ namespace multisig
   crypto::hash multisig_kex_msg::get_msg_to_sign() const
   {
     ////
-    // msg_content = kex_round | signing_pubkey | expand(msg_pubkeys) | OPTIONAL msg_privkey
-    // sign_msg = versioning-domain-sep | msg_content
+    // msg_content = kex_round || signing_pubkey || expand(msg_pubkeys) || OPTIONAL msg_privkey
+    // sign_msg = versioning-domain-sep || msg_content
     ///
 
     std::string data;
@@ -239,9 +240,9 @@ namespace multisig
   void multisig_kex_msg::construct_msg(const crypto::secret_key &signing_privkey)
   {
     ////
-    // msg_content = kex_round | signing_pubkey | expand(msg_pubkeys) | OPTIONAL msg_privkey
-    // sign_msg = versioning-domain-sep | msg_content
-    // msg = versioning-domain-sep | serialize(msg_content | crypto_sig[signing_privkey](sign_msg))
+    // msg_content = kex_round || signing_pubkey || expand(msg_pubkeys) || OPTIONAL msg_privkey
+    // sign_msg = versioning-domain-sep || msg_content
+    // msg = versioning-domain-sep || serialize(msg_content || crypto_sig[signing_privkey](sign_msg))
     ///
 
     // sign the message

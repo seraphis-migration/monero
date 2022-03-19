@@ -79,17 +79,6 @@ namespace multisig
     return static_cast<std::uint32_t>(std::round(fp_result));
   }
   //----------------------------------------------------------------------------------------------------------------------
-  //----------------------------------------------------------------------------------------------------------------------
-  static std::uint32_t get_num_flags_set(signer_set_filter filter)
-  {
-    // note: will compile to 'popcnt' on supporting architectures (std::popcount needs C++20)
-    std::uint32_t set_flags_count{0};
-    for (; filter != 0; filter &= filter - 1)
-      ++set_flags_count;
-
-    return set_flags_count;
-  }
-  //----------------------------------------------------------------------------------------------------------------------
   // get filter with least significant 'num_bits' flags set
   //----------------------------------------------------------------------------------------------------------------------
   static signer_set_filter get_squashed_full_filter(const std::uint32_t num_bits)
@@ -147,6 +136,16 @@ namespace multisig
     return signer_index;
   }
   //----------------------------------------------------------------------------------------------------------------------
+  //----------------------------------------------------------------------------------------------------------------------
+  std::uint32_t get_num_flags_set(signer_set_filter filter)
+  {
+    // note: will compile to 'popcnt' on supporting architectures (std::popcount needs C++20)
+    std::uint32_t set_flags_count{0};
+    for (; filter != 0; filter &= filter - 1)
+      ++set_flags_count;
+
+    return set_flags_count;
+  }
   //----------------------------------------------------------------------------------------------------------------------
   bool validate_multisig_signer_set_filter(const std::uint32_t threshold,
     const std::uint32_t num_signers,

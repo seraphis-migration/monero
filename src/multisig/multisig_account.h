@@ -30,6 +30,7 @@
 
 #include "account_generator_era.h"
 #include "crypto/crypto.h"
+#include "multisig_account_era_conversion_msg.h"
 #include "multisig_kex_msg.h"
 #include "multisig_signer_set_filter.h"
 
@@ -128,6 +129,8 @@ namespace multisig
     std::uint32_t get_threshold() const { return m_threshold; }
     // get signers
     const std::vector<crypto::public_key>& get_signers() const { return m_signers; }
+    // get signers who are available for aggregation-style signing
+    std::vector<crypto::public_key> get_signers_available_for_aggregation_signing() const;
     // get base privkey
     const crypto::secret_key& get_base_privkey() const { return m_base_privkey; }
     // get base pubkey
@@ -150,6 +153,8 @@ namespace multisig
     const multisig_keyset_map_memsafe_t& get_kex_keys_to_origins_map() const { return m_kex_keys_to_origins_map; }
     // get the kex msg for the next round
     const std::string& get_next_kex_round_msg() const { return m_next_round_kex_message; }
+    //TODO: get account era conversion message for converting this account to 'new_era'
+    multisig_account_era_conversion_msg get_account_era_conversion_msg(const cryptonote::account_generator_era new_era) const;
 
   //account status functions
     // account has been intialized, and the account holder can use the 'common' key
@@ -161,7 +166,7 @@ namespace multisig
 
   //account helpers
   private:
-    // set the threshold (M) and signers (N)
+    // set the threshold (M) and signers (N), and initialize the 'available signers for aggregation signing' filter
     void set_multisig_config(const std::size_t threshold, std::vector<crypto::public_key> signers);
 
   //account mutators: key exchange to set up account
@@ -184,10 +189,18 @@ namespace multisig
     /**
     * brief: add_signer_recommendations - Update keyshare-to-origins map with a specific signer's recommendations.
     *    - Used to recover the keyshare-to-origins map if it is lost.
-    *    - Note: It is not a security problem if the recommended keys vector is unvalidated. A malicious signer has
-    *            other ways to prevent the local account from co-signing a message with them. The malicious
-    *            signer CANNOT prevent the local account from co-signing messages with M-1 honest other signers by
-    *            recommending a dishonest key vector.
+    *    - Note: It is not a security problem if the recommended keys vector is unvalidated. A malicious signer could
+    *            provide an invalid keyshare recommendation list, which would likely prevent the local signer from
+    *            successfully completing signatures with that signer, BUT malicious signers have
+    *            other ways to prevent the local account from co-signing a message with them.
+    *            It worth also noting that:
+    *            1) The malicious signer recommending invalid keyshares CANNOT prevent the local account from co-signing
+    *               messages with M-1 honest other signers.
+    *            2) Not validating keyshare lists may make it difficult to properly track down which signer caused a given
+    *               signature attempt to fail. However, effective validation would require messages from all signers
+    *               in order to do something like evaluate_multisig_kex_round_msgs(). Unfortunately, requiring > M signers
+    *               to recover aggregation-style signing would violate the invariant that a multisig account should only
+    *               require M honest signers to work once account setup is complete.
     *    - TODO: use a multisig msg to pass in this information (strong invariant: signature on keys with signer id)
     * param: signer - a non-local signer ('origin')
     * param: recommended_keys - keyshares recommended by the non-local signer
@@ -292,4 +305,14 @@ namespace multisig
   * return: number of kex rounds required
   */
   std::uint32_t multisig_kex_rounds_required(const std::uint32_t num_signers, const std::uint32_t threshold);
+
+  //todo
+  // - new era != old era
+  // - need at least M - 1 other signers (all members of account)
+  // - verify old multisig pubkey can be recomputed from local keyshares + unique sent keyshares
+  // - make keyshare_origins_map with local keyshares mapped to matching recommendations from input list
+  //   - can be extended with add_signer_recommendations() later on
+  multisig_account get_multisig_account_with_new_generator_era(const multisig_account &original_account,
+    const cryptonote::account_generator_era new_era,
+    const std::vector<multisig_account_era_conversion_msg> &expanded_msgs);
 } //namespace multisig
