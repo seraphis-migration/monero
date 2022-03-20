@@ -64,8 +64,6 @@ namespace multisig
     multisig_account_era_conversion_msg(const crypto::secret_key &signing_privkey,
       const cryptonote::account_generator_era old_account_era,
       const cryptonote::account_generator_era new_account_era,
-      std::vector<crypto::public_key> old_keyshares,
-      std::vector<crypto::public_key> new_keyshares,
       const std::vector<crypto::secret_key> &keyshare_privkeys);
 
     // construct from string
@@ -82,9 +80,9 @@ namespace multisig
     // get msg string
     const std::string& get_msg() const { return m_msg; }
     // get generator era of old account
-    cryptonote::account_generator_era get_old_era() { return m_old_account_era; }
+    cryptonote::account_generator_era get_old_era() const { return m_old_account_era; }
     // get generator era of new account
-    cryptonote::account_generator_era get_new_era() { return m_new_account_era; }
+    cryptonote::account_generator_era get_new_era() const { return m_new_account_era; }
     // get the msg signer's old keyshares
     const std::vector<crypto::public_key>& get_old_keyshares() const { return m_old_keyshares; }
     // get the msg signer's new keyshares

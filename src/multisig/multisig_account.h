@@ -107,10 +107,10 @@ namespace multisig
       const crypto::secret_key &base_privkey,
       const crypto::secret_key &base_common_privkey,
       std::vector<crypto::secret_key> multisig_privkeys,
-      multisig_keyshare_origins_map_t keyshare_origins_map,
       const crypto::secret_key &common_privkey,
       const crypto::public_key &multisig_pubkey,
       const crypto::public_key &common_pubkey,
+      multisig_keyshare_origins_map_t keyshare_origins_map,
       const std::uint32_t kex_rounds_complete,
       multisig_keyset_map_memsafe_t kex_origins_map,
       std::string next_round_kex_message);
@@ -124,7 +124,7 @@ namespace multisig
 
   //getters
     // get account era
-    cryptonote::account_generator_era get_era() { return m_account_era; }
+    cryptonote::account_generator_era get_era() const { return m_account_era; }
     // get threshold
     std::uint32_t get_threshold() const { return m_threshold; }
     // get signers
@@ -189,11 +189,11 @@ namespace multisig
     /**
     * brief: add_signer_recommendations - Update keyshare-to-origins map with a specific signer's recommendations.
     *    - Used to recover the keyshare-to-origins map if it is lost.
-    *    - Note: It is not a security problem if the recommended keys vector is unvalidated. A malicious signer could
+    *    - Note: It is not a security problem if the recommended keys vector is unvalidated. A malicious signer COULD
     *            provide an invalid keyshare recommendation list, which would likely prevent the local signer from
     *            successfully completing signatures with that signer, BUT malicious signers have
     *            other ways to prevent the local account from co-signing a message with them.
-    *            It worth also noting that:
+    *            It is worth noting that:
     *            1) The malicious signer recommending invalid keyshares CANNOT prevent the local account from co-signing
     *               messages with M-1 honest other signers.
     *            2) Not validating keyshare lists may make it difficult to properly track down which signer caused a given
@@ -201,12 +201,11 @@ namespace multisig
     *               in order to do something like evaluate_multisig_kex_round_msgs(). Unfortunately, requiring > M signers
     *               to recover aggregation-style signing would violate the invariant that a multisig account should only
     *               require M honest signers to work once account setup is complete.
-    *    - TODO: use a multisig msg to pass in this information (strong invariant: signature on keys with signer id)
-    * param: signer - a non-local signer ('origin')
-    * param: recommended_keys - keyshares recommended by the non-local signer
+    * param: conversion_msg - a conversion message from a non-local signer ('origin') with recommended keyshares
+    *        (we abuse the conversion msg api instead of implementing an entirely new msg format and plumbing for this
+    *        method that primarly exists to help legacy accounts)
     */
-    void add_signer_recommendations(const crypto::public_key &signer,
-      const std::vector<crypto::public_key> &recommended_keys);
+    void add_signer_recommendations(const multisig_account_era_conversion_msg &conversion_msg);
 
   private:
     // implementation of kex_update() (non-transactional)
@@ -314,5 +313,5 @@ namespace multisig
   //   - can be extended with add_signer_recommendations() later on
   multisig_account get_multisig_account_with_new_generator_era(const multisig_account &original_account,
     const cryptonote::account_generator_era new_era,
-    const std::vector<multisig_account_era_conversion_msg> &expanded_msgs);
+    const std::vector<multisig_account_era_conversion_msg> &conversion_msgs);
 } //namespace multisig

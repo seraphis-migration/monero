@@ -37,6 +37,7 @@ extern "C"
 #include "cryptonote_config.h"
 #include "include_base_utils.h"
 #include "multisig.h"
+#include "multisig_account_era_conversion_msg.h"
 #include "multisig_kex_msg.h"
 #include "multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
@@ -90,10 +91,10 @@ namespace multisig
     const crypto::secret_key &base_privkey,
     const crypto::secret_key &base_common_privkey,
     std::vector<crypto::secret_key> multisig_privkeys,
-    multisig_keyshare_origins_map_t keyshare_origins_map,
     const crypto::secret_key &common_privkey,
     const crypto::public_key &multisig_pubkey,
     const crypto::public_key &common_pubkey,
+    multisig_keyshare_origins_map_t keyshare_origins_map,
     const std::uint32_t kex_rounds_complete,
     multisig_keyset_map_memsafe_t kex_origins_map,
     std::string next_round_kex_message) :
@@ -101,10 +102,10 @@ namespace multisig
       m_base_privkey{base_privkey},
       m_base_common_privkey{base_common_privkey},
       m_multisig_privkeys{std::move(multisig_privkeys)},
-      m_keyshare_to_origins_map{std::move(keyshare_origins_map)},
       m_common_privkey{common_privkey},
       m_multisig_pubkey{multisig_pubkey},
       m_common_pubkey{common_pubkey},
+      m_keyshare_to_origins_map{std::move(keyshare_origins_map)},
       m_kex_rounds_complete{kex_rounds_complete},
       m_kex_keys_to_origins_map{std::move(kex_origins_map)},
       m_next_round_kex_message{std::move(next_round_kex_message)}
@@ -164,6 +165,15 @@ namespace multisig
       available_signers);
 
     return available_signers;
+  }
+  //----------------------------------------------------------------------------------------------------------------------
+  // multisig_account: EXTERNAL
+  //----------------------------------------------------------------------------------------------------------------------
+  multisig_account_era_conversion_msg multisig_account::get_account_era_conversion_msg(
+    const cryptonote::account_generator_era new_era) const
+  {
+    //todo
+    return multisig_account_era_conversion_msg{};
   }
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL
@@ -273,18 +283,27 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL
   //----------------------------------------------------------------------------------------------------------------------
-  void multisig_account::add_signer_recommendations(const crypto::public_key &signer,
-    const std::vector<crypto::public_key> &recommended_keys)
+  void multisig_account::add_signer_recommendations(const multisig_account_era_conversion_msg &conversion_msg)
   {
     CHECK_AND_ASSERT_THROW_MES(multisig_is_ready(),
       "multisig account: tried to add signer recommendations, but account isn't ready.");
-    CHECK_AND_ASSERT_THROW_MES(std::find(m_signers.begin(), m_signers.end(), signer) != m_signers.end(),
-      "multisig account: tried to add signer recommendations, but signer is unknown.");
+    CHECK_AND_ASSERT_THROW_MES(std::find(m_signers.begin(), m_signers.end(), conversion_msg.get_signing_pubkey()) !=
+      m_signers.end(), "multisig account: tried to add signer recommendations, but signer is unknown.");
+    CHECK_AND_ASSERT_THROW_MES(conversion_msg.get_old_era() == m_account_era || conversion_msg.get_new_era() ==
+      m_account_era, "multisig account: tried to add signer recommendations, but input msg doesn't match the account era.");
 
     // add signer to 'available signers'
     signer_set_filter new_signer_flag;
-    multisig_signer_to_filter(signer, m_signers, new_signer_flag);
+    multisig_signer_to_filter(conversion_msg.get_signing_pubkey(), m_signers, new_signer_flag);
     m_available_signers_for_aggregation |= new_signer_flag;
+
+    // abuse conversion msg api to get keyshares we care about
+    // note: prior assert ensures one of these conditions will be true
+    const std::vector<crypto::public_key> &recommended_keys{
+        m_account_era == conversion_msg.get_old_era()
+        ? conversion_msg.get_old_keyshares()
+        : conversion_msg.get_new_keyshares()  //m_era == conversion_msg.get_new_era()
+      };
 
     // for each local keyshare that the other signer also recommends, add that signer as an 'origin'
     for (const crypto::public_key &keyshare : recommended_keys)
@@ -293,7 +312,7 @@ namespace multisig
       if (m_keyshare_to_origins_map.find(keyshare) == m_keyshare_to_origins_map.end())
         continue;
 
-      m_keyshare_to_origins_map[keyshare].insert(signer);
+      m_keyshare_to_origins_map[keyshare].insert(conversion_msg.get_signing_pubkey());
     }
   }
   //----------------------------------------------------------------------------------------------------------------------
@@ -354,6 +373,110 @@ namespace multisig
     CHECK_AND_ASSERT_THROW_MES(num_signers >= threshold, "num_signers must be >= threshold");
     CHECK_AND_ASSERT_THROW_MES(threshold >= 1, "threshold must be >= 1");
     return num_signers - threshold + 1;
+  }
+  //----------------------------------------------------------------------------------------------------------------------
+  // EXTERNAL
+  //----------------------------------------------------------------------------------------------------------------------
+  multisig_account get_multisig_account_with_new_generator_era(const multisig_account &original_account,
+    const cryptonote::account_generator_era new_era,
+    const std::vector<multisig_account_era_conversion_msg> &conversion_msgs)
+  {
+    // validate original account
+    CHECK_AND_ASSERT_THROW_MES(original_account.multisig_is_ready(), "Failed to make a multisig account with new "
+      "generator era. Account has not completed the setup ceremony (key exchange).");
+    CHECK_AND_ASSERT_THROW_MES(new_era != original_account.get_era(), "Failed to make a multisig account with new "
+      "generator era. Account is already era (" << static_cast<int>(new_era) << ").");
+
+    // add local keyshares to old and new keyshare sets (abuse conversion msg API for convenience)
+    // - and save them to a new keyshare map
+    std::unordered_set<crypto::public_key> old_keyshares;
+    std::unordered_set<crypto::public_key> new_keyshares;
+    multisig_account::keyshare_origins_map_t keyshare_origins_map;
+    const multisig_account_era_conversion_msg local_conversion_msg{original_account.get_account_era_conversion_msg(new_era)};
+
+    const std::vector<crypto::public_key> &local_old_keyshares = local_conversion_msg.get_old_keyshares();
+    for (const crypto::public_key &local_old_keyshare : local_old_keyshares)
+        old_keyshares.insert(local_old_keyshare);
+
+    const std::vector<crypto::public_key> &local_new_keyshares = local_conversion_msg.get_new_keyshares();
+    for (const crypto::public_key &local_new_keyshare : local_new_keyshares)
+    {
+        new_keyshares.insert(local_new_keyshare);
+        keyshare_origins_map[local_new_keyshare];
+    }
+
+    // validate input messages and collect their keyshares
+    const std::vector<crypto::public_key> &signers{original_account.get_signers()};
+    std::unordered_set<crypto::public_key> msg_signers;
+
+    for (const multisig_account_era_conversion_msg &msg : conversion_msgs)
+    {
+      // skip the local signer so it doesn't get added as an origin to the keyshare_origins_map
+      if (msg.get_signing_pubkey() == original_account.get_base_pubkey())
+        continue;
+
+      CHECK_AND_ASSERT_THROW_MES(msg.get_old_era() == original_account.get_era(), "Failed to make a multisig account with "
+        "new generator era. Conversion message's old era (" << static_cast<int>(msg.get_old_era()) << ") doesn't match "
+        "account to convert (" << static_cast<int>(original_account.get_era()) << ").");
+      CHECK_AND_ASSERT_THROW_MES(msg.get_new_era() == new_era, "Failed to make a multisig account with "
+        "new generator era. Conversion message's new era (" << static_cast<int>(msg.get_new_era()) << ") doesn't match "
+        "expected new era (" <<static_cast<int>(new_era) << ").");
+      CHECK_AND_ASSERT_THROW_MES(std::find(signers.begin(), signers.end(), msg.get_signing_pubkey()) != signers.end(),
+        "Failed to make a multisig account with new generator era. Conversion message from unknown signer.");
+      msg_signers.insert(msg.get_signing_pubkey());
+
+      // collect old keyshares to verify that the old multisig pubkey can be reproduced
+      const std::vector<crypto::public_key> &msg_old_keyshares = msg.get_old_keyshares();
+      for (const crypto::public_key &msg_old_keyshare : msg_old_keyshares)
+        old_keyshares.insert(msg_old_keyshare);
+
+      // collect new keyshares to construct the new multisig pubkey
+      // - and save the msg signing key as an origin if the keyshare will be shared with the new account
+      const std::vector<crypto::public_key> &msg_new_keyshares = msg.get_new_keyshares();
+      for (const crypto::public_key &msg_new_keyshare : msg_new_keyshares)
+      {
+        new_keyshares.insert(msg_new_keyshare);
+
+        if (keyshare_origins_map.find(msg_new_keyshare) != keyshare_origins_map.end())
+          keyshare_origins_map[msg_new_keyshare].insert(msg.get_signing_pubkey());
+      }
+    }
+
+    // there should be at least threshold signers involved in converting an account
+    msg_signers.insert(original_account.get_base_pubkey());
+    CHECK_AND_ASSERT_THROW_MES(msg_signers.size() >= original_account.get_threshold(), "Failed to make a multisig account with"
+      "new generator era. Need conversion messages from more members of the multisig group (have: " << msg_signers.size() <<
+      ", need: " << original_account.get_threshold() <<").");
+
+    // reproduce old multisig pubkey
+    rct::key old_pubkey_recomputed{rct::identity()};
+    for (const crypto::public_key &old_keyshare : old_keyshares)
+      rct::addKeys(old_pubkey_recomputed, old_pubkey_recomputed, rct::pk2rct(old_keyshare));
+
+    CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(old_pubkey_recomputed) == original_account.get_multisig_pubkey(),
+      "Failed to make a multisig account with new generator era. Could not reproduce the account's original pubkey from "
+      "conversion msgs.");
+
+    // construct new multisig pubkey (new keyshares are 1:1 with old keyshares according to conversion msg invariants,
+    //   so if the old pubkey was preproduced then the new pubkey will have the expected cross-generator DL equivalence)
+    rct::key new_multisig_pubkey{rct::identity()};
+    for (const crypto::public_key &new_keyshare : new_keyshares)
+      rct::addKeys(new_multisig_pubkey, new_multisig_pubkey, rct::pk2rct(new_keyshare));
+
+    // return new account with new era but same privkeys as old account
+    return multisig_account{new_era,
+        original_account.get_threshold(),
+        original_account.get_signers(),
+        original_account.get_base_privkey(),
+        original_account.get_base_common_privkey(),
+        original_account.get_multisig_privkeys(),
+        original_account.get_common_privkey(),
+        rct::rct2pk(new_multisig_pubkey),
+        original_account.get_common_pubkey(),
+        std::move(keyshare_origins_map),
+        original_account.get_kex_rounds_complete(),
+        multisig_account::kex_origins_map_t{},  //only accounts that completed kex can be converted
+        ""};
   }
   //----------------------------------------------------------------------------------------------------------------------
 } //namespace multisig
