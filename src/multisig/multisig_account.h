@@ -311,7 +311,8 @@ namespace multisig
   // - verify old multisig pubkey can be recomputed from local keyshares + unique sent keyshares
   // - make keyshare_origins_map with local keyshares mapped to matching recommendations from input list
   //   - can be extended with add_signer_recommendations() later on
-  multisig_account get_multisig_account_with_new_generator_era(const multisig_account &original_account,
+  void get_multisig_account_with_new_generator_era(const multisig_account &original_account,
     const cryptonote::account_generator_era new_era,
-    const std::vector<multisig_account_era_conversion_msg> &conversion_msgs);
+    const std::vector<multisig_account_era_conversion_msg> &conversion_msgs,
+    multisig_account &new_account_out);
 } //namespace multisig

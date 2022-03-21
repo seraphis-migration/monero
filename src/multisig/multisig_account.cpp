@@ -377,9 +377,10 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   // EXTERNAL
   //----------------------------------------------------------------------------------------------------------------------
-  multisig_account get_multisig_account_with_new_generator_era(const multisig_account &original_account,
+  void get_multisig_account_with_new_generator_era(const multisig_account &original_account,
     const cryptonote::account_generator_era new_era,
-    const std::vector<multisig_account_era_conversion_msg> &conversion_msgs)
+    const std::vector<multisig_account_era_conversion_msg> &conversion_msgs,
+    multisig_account &new_account_out)
   {
     // validate original account
     CHECK_AND_ASSERT_THROW_MES(original_account.multisig_is_ready(), "Failed to make a multisig account with new "
@@ -464,7 +465,8 @@ namespace multisig
       rct::addKeys(new_multisig_pubkey, new_multisig_pubkey, rct::pk2rct(new_keyshare));
 
     // return new account with new era but same privkeys as old account
-    return multisig_account{new_era,
+    // note: this is safe even if new_account_out and original_account are the same object
+    new_account_out = multisig_account{new_era,
         original_account.get_threshold(),
         original_account.get_signers(),
         original_account.get_base_privkey(),
@@ -475,7 +477,7 @@ namespace multisig
         original_account.get_common_pubkey(),
         std::move(keyshare_origins_map),
         original_account.get_kex_rounds_complete(),
-        multisig_account::kex_origins_map_t{},  //only accounts that completed kex can be converted
+        multisig_account::kex_origins_map_t{},  //note: only accounts that completed kex can be converted
         ""};
   }
   //----------------------------------------------------------------------------------------------------------------------
