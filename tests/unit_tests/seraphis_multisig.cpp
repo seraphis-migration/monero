@@ -29,6 +29,7 @@
 #include "crypto/crypto.h"
 #include "multisig/account_generator_era.h"
 #include "multisig/multisig_account.h"
+#include "multisig/multisig_account_era_conversion_msg.h"
 #include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -91,6 +92,24 @@ static void make_multisig_accounts(const cryptonote::account_generator_era accou
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void convert_multisig_accounts(const cryptonote::account_generator_era new_era,
+    std::vector<multisig::multisig_account> &accounts_inout)
+{
+    if (accounts_inout.size() == 0 || new_era == accounts_inout[0].get_era())
+        return;
+
+    // collect messages
+    std::vector<multisig::multisig_account_era_conversion_msg> conversion_msgs;
+    conversion_msgs.reserve(accounts_inout.size());
+    for (const multisig::multisig_account &account : accounts_inout)
+        conversion_msgs.emplace_back(account.get_account_era_conversion_msg(new_era));
+
+    // convert accounts to 'new_era'
+    for (multisig::multisig_account &account : accounts_inout)
+        get_multisig_account_with_new_generator_era(account, new_era, conversion_msgs, account);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static bool composition_proof_multisig_test(const std::uint32_t threshold,
     const std::uint32_t num_signers,
     const crypto::secret_key &x)
@@ -98,8 +117,10 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
     try
     {
         // prepare multisig accounts (for seraphis)
+        // - use 'converted' accounts to verify that old cryptonote accounts can be converted to seraphis accounts that work
         std::vector<multisig::multisig_account> accounts;
-        make_multisig_accounts(cryptonote::account_generator_era::seraphis, threshold, num_signers, accounts);
+        make_multisig_accounts(cryptonote::account_generator_era::cryptonote, threshold, num_signers, accounts);
+        convert_multisig_accounts(cryptonote::account_generator_era::seraphis, accounts);
         if (accounts.size() == 0)
             return false;
 
