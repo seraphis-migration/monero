@@ -226,6 +226,53 @@ static void make_wallets(std::vector<tools::wallet2>& wallets, unsigned int M)
 
   check_results(intermediate_infos, wallets, M);
 }
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void make_multisig_accounts(const cryptonote::account_generator_era account_era,
+    const std::uint32_t threshold,
+    const std::uint32_t num_signers,
+    std::vector<multisig::multisig_account> &accounts_out)
+{
+  std::vector<crypto::public_key> signers;
+  std::vector<multisig::multisig_kex_msg> current_round_msgs;
+  std::vector<multisig::multisig_kex_msg> next_round_msgs;
+  accounts_out.clear();
+  accounts_out.reserve(num_signers);
+  signers.reserve(num_signers);
+  next_round_msgs.reserve(accounts_out.size());
+
+  // create multisig accounts for each signer
+  for (std::size_t account_index{0}; account_index < num_signers; ++account_index)
+  {
+    // create account [[ROUND 0]]
+    accounts_out.emplace_back(account_era, rct::rct2sk(rct::skGen()), rct::rct2sk(rct::skGen()));
+
+    // collect signer
+    signers.emplace_back(accounts_out.back().get_base_pubkey());
+
+    // collect account's first kex msg
+    next_round_msgs.emplace_back(accounts_out.back().get_next_kex_round_msg());
+  }
+
+  // perform key exchange rounds until the accounts are ready
+  while (accounts_out.size() && !accounts_out[0].multisig_is_ready())
+  {
+    current_round_msgs = std::move(next_round_msgs);
+    next_round_msgs.clear();
+    next_round_msgs.reserve(accounts_out.size());
+
+    for (multisig::multisig_account &account : accounts_out)
+    {
+        // initialize or update account
+        if (!account.account_is_active())
+            account.initialize_kex(threshold, signers, current_round_msgs);  //[[ROUND 1]]
+        else
+            account.kex_update(current_round_msgs);  //[[ROUND 2+]]
+
+        next_round_msgs.emplace_back(account.get_next_kex_round_msg());
+    }
+  }
+}
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 static void make_multisig_signer_list(const std::uint32_t num_signers, std::vector<crypto::public_key> &signer_list_out)
@@ -612,4 +659,59 @@ TEST(multisig, multisig_conversion_msg)
   EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::cryptonote, cryptonote::account_generator_era::seraphis));
   EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::seraphis, cryptonote::account_generator_era::cryptonote));
   EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::seraphis, cryptonote::account_generator_era::seraphis));
+}
+
+TEST(multisig, multisig_account_conversions)
+{
+  std::vector<multisig::multisig_account> accounts;
+  multisig::multisig_account converted_account;
+  std::vector<multisig::multisig_account_era_conversion_msg> conversion_msgs;
+
+  const auto cn_era = cryptonote::account_generator_era::cryptonote;
+  const auto sp_era = cryptonote::account_generator_era::seraphis;
+
+  // 1-of-2
+  EXPECT_NO_THROW(make_multisig_accounts(cn_era, 1, 2, accounts));
+  conversion_msgs.clear();
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(sp_era)));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], sp_era, conversion_msgs, converted_account));
+  EXPECT_EQ(converted_account.get_era(), sp_era);
+
+  // 2-of-2: cryptonote -> seraphis
+  EXPECT_NO_THROW(make_multisig_accounts(cn_era, 2, 2, accounts));
+  conversion_msgs.clear();
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(sp_era)));
+  EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(sp_era)));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_EQ(converted_account.get_era(), sp_era);
+
+  // 2-of-2: cryptonote -> cryptonote
+  conversion_msgs.clear();
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(cn_era)));
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(cn_era)));
+  EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], cn_era, conversion_msgs, converted_account));
+
+  // 2-of-2: seraphis -> cryptonote
+  EXPECT_NO_THROW(make_multisig_accounts(sp_era, 2, 2, accounts));
+  conversion_msgs.clear();
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(cn_era)));
+  EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], cn_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], cn_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(cn_era)));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], cn_era, conversion_msgs, converted_account));
+  EXPECT_EQ(converted_account.get_era(), cn_era);
+
+  // 2-of-3: cryptonote -> seraphis
+  EXPECT_NO_THROW(make_multisig_accounts(cn_era, 2, 3, accounts));
+  conversion_msgs.clear();
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(sp_era)));
+  EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(sp_era)));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[2], sp_era, conversion_msgs, converted_account));
+  EXPECT_EQ(converted_account.get_era(), sp_era);
 }
