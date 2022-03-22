@@ -238,7 +238,8 @@ namespace multisig
     if (m_threshold == m_signers.size())
     {
       // N-of-N: all signers
-      m_available_signers_for_aggregation = static_cast<signer_set_filter>(-1);
+      m_available_signers_for_aggregation =
+        static_cast<signer_set_filter>(-1) >> (8*sizeof(signer_set_filter) - m_signers.size());
     }
     else
     {
@@ -390,7 +391,7 @@ namespace multisig
       "generator era. Account is already era (" << static_cast<int>(new_era) << ").");
 
     // add local keyshares to old and new keyshare sets (abuse conversion msg API for convenience)
-    // - and save them to a new keyshare map
+    // - and save them to a new keyshare map (and preserve existing recommendations)
     std::unordered_set<crypto::public_key> old_keyshares;
     std::unordered_set<crypto::public_key> new_keyshares;
     multisig_account::keyshare_origins_map_t keyshare_origins_map;
@@ -401,10 +402,17 @@ namespace multisig
         old_keyshares.insert(local_old_keyshare);
 
     const std::vector<crypto::public_key> &local_new_keyshares = local_conversion_msg.get_new_keyshares();
-    for (const crypto::public_key &local_new_keyshare : local_new_keyshares)
+    const multisig_account::keyshare_origins_map_t &original_keyshare_origins_map = original_account.get_keyshares_to_origins_map();
+    for (std::size_t keyshare_index{0}; keyshare_index < local_new_keyshares.size(); ++keyshare_index)
     {
-        new_keyshares.insert(local_new_keyshare);
-        keyshare_origins_map[local_new_keyshare];
+        new_keyshares.insert(local_new_keyshares[keyshare_index]);
+
+        // copy over old recommendations
+        // NOTE: assumes the conversion message preserves ordering between old/new keyshares
+        keyshare_origins_map[local_new_keyshares[keyshare_index]].insert(
+            original_keyshare_origins_map.at(local_old_keyshares[keyshare_index]).begin(),
+            original_keyshare_origins_map.at(local_old_keyshares[keyshare_index]).end()
+          );
     }
 
     // validate input messages and collect their keyshares
@@ -446,7 +454,7 @@ namespace multisig
 
     // there should be at least threshold signers involved in converting an account
     msg_signers.insert(original_account.get_base_pubkey());
-    CHECK_AND_ASSERT_THROW_MES(msg_signers.size() >= original_account.get_threshold(), "Failed to make a multisig account with"
+    CHECK_AND_ASSERT_THROW_MES(msg_signers.size() >= original_account.get_threshold(), "Failed to make a multisig account with "
       "new generator era. Need conversion messages from more members of the multisig group (have: " << msg_signers.size() <<
       ", need: " << original_account.get_threshold() <<").");
 

@@ -684,6 +684,8 @@ TEST(multisig, multisig_account_conversions)
   EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(sp_era)));
   EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
   EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(converted_account.get_signers_available_for_aggregation_signing());
+  EXPECT_TRUE(converted_account.get_signers_available_for_aggregation_signing() == converted_account.get_signers());
   EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(sp_era)));
   EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
   EXPECT_EQ(converted_account.get_era(), sp_era);
@@ -710,7 +712,12 @@ TEST(multisig, multisig_account_conversions)
   EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(sp_era)));
   EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
   EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], sp_era, conversion_msgs, converted_account));
-  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[2], sp_era, conversion_msgs, converted_account));;
+  // check that signer recommendations are preserved even if only 'threshold - 1' accounts participants in conversion
+  EXPECT_NO_THROW(converted_account.get_signers_available_for_aggregation_signing());
+  EXPECT_TRUE(converted_account.get_signers_available_for_aggregation_signing() == converted_account.get_signers());
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[2], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(converted_account.get_signers_available_for_aggregation_signing());
+  EXPECT_TRUE(converted_account.get_signers_available_for_aggregation_signing() == converted_account.get_signers());
   EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(sp_era)));
   EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
   EXPECT_EQ(converted_account.get_era(), sp_era);
