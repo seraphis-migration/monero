@@ -28,10 +28,12 @@
 
 #include "crypto/crypto.h"
 #include "multisig/account_generator_era.h"
+#include "multisig/dual_base_vector_proof.h"
 #include "multisig/multisig_account.h"
 #include "multisig/multisig_kex_msg.h"
 #include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
+#include "seraphis/sp_crypto_utils.h"
 #include "wallet/wallet2.h"
 
 #include "gtest/gtest.h"
@@ -495,4 +497,42 @@ TEST(multisig, multisig_signer_set_filter)
   EXPECT_TRUE(filtered_signers.size() == threshold);
   EXPECT_TRUE(filtered_signers[0] == signer_list[1]);
   EXPECT_TRUE(filtered_signers[1] == signer_list[2]);
+}
+
+//todo: move to better-suited file?
+TEST(multisig, dual_base_vector_proof)
+{
+  crypto::DualBaseVectorProof proof;
+
+  auto make_keys =
+    [](const std::size_t num_keys) -> std::vector<crypto::secret_key>
+    {
+      std::vector<crypto::secret_key> skeys;
+      skeys.reserve(num_keys);
+      for (std::size_t i{0}; i < num_keys; ++i) { skeys.emplace_back(rct::rct2sk(rct::skGen())); }
+      return skeys;
+    };
+
+  // G, G, 0 keys
+  EXPECT_ANY_THROW(proof = crypto::dual_base_vector_prove(rct::G, rct::G, make_keys(0), rct::zero()));
+
+  // G, G, 1 key
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(rct::G, rct::G, make_keys(1), rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::G, rct::G));
+
+  // G, G, 2 keys
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(rct::G, rct::G, make_keys(2), rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::G, rct::G));
+
+  // G, U, 2 keys
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(rct::G, sp::get_U_gen(), make_keys(2), rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::G, sp::get_U_gen()));
+
+  // U, G, 3 keys
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(sp::get_U_gen(), rct::G, make_keys(3), rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, sp::get_U_gen(), rct::G));
+
+  // U, U, 3 keys
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(sp::get_U_gen(), sp::get_U_gen(), make_keys(3), rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, sp::get_U_gen(), sp::get_U_gen()));
 }
