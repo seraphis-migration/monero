@@ -32,7 +32,6 @@
 #include "sp_composition_proof.h"
 
 //local headers
-#include "common/varint.h"
 #include "crypto/crypto.h"
 extern "C"
 {
