@@ -288,6 +288,8 @@ namespace multisig
       "multisig account: tried to add signer recommendations, but account isn't ready.");
     CHECK_AND_ASSERT_THROW_MES(std::find(m_signers.begin(), m_signers.end(), conversion_msg.get_signing_pubkey()) !=
       m_signers.end(), "multisig account: tried to add signer recommendations, but signer is unknown.");
+    CHECK_AND_ASSERT_THROW_MES(!(conversion_msg.get_signing_pubkey() == m_base_pubkey),
+      "multisig account: tried to add signer recommendations, conversion msg is from self.");
     CHECK_AND_ASSERT_THROW_MES(conversion_msg.get_old_era() == m_account_era || conversion_msg.get_new_era() ==
       m_account_era, "multisig account: tried to add signer recommendations, but input msg doesn't match the account era.");
 

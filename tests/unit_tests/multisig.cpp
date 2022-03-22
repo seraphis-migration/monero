@@ -709,9 +709,59 @@ TEST(multisig, multisig_account_conversions)
   conversion_msgs.clear();
   EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[0].get_account_era_conversion_msg(sp_era)));
   EXPECT_ANY_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], sp_era, conversion_msgs, converted_account));
+  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[2], sp_era, conversion_msgs, converted_account));;
   EXPECT_NO_THROW(conversion_msgs.emplace_back(accounts[1].get_account_era_conversion_msg(sp_era)));
   EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[0], sp_era, conversion_msgs, converted_account));
-  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[1], sp_era, conversion_msgs, converted_account));
-  EXPECT_NO_THROW(get_multisig_account_with_new_generator_era(accounts[2], sp_era, conversion_msgs, converted_account));
   EXPECT_EQ(converted_account.get_era(), sp_era);
+}
+
+TEST(multisig, multisig_signer_recommendations_recovery)
+{
+  std::vector<multisig::multisig_account> accounts;
+  multisig::multisig_account converted_account;
+  multisig::multisig_account_era_conversion_msg conversion_msg;
+
+  const auto cn_era = cryptonote::account_generator_era::cryptonote;
+
+  // 2-of-3: can recover signer recommendations for aggregation if lost
+  EXPECT_NO_THROW(make_multisig_accounts(cn_era, 2, 3, accounts));
+
+  // reset account to remove keyshare map
+  accounts[0] = multisig::multisig_account{
+      accounts[0].get_era(),
+      accounts[0].get_threshold(),
+      accounts[0].get_signers(),
+      accounts[0].get_base_privkey(),
+      accounts[0].get_base_common_privkey(),
+      accounts[0].get_multisig_privkeys(),
+      accounts[0].get_common_privkey(),
+      accounts[0].get_multisig_pubkey(),
+      accounts[0].get_common_pubkey(),
+      multisig::multisig_account::keyshare_origins_map_t{},  //remove keyshare map
+      accounts[0].get_kex_rounds_complete(),
+      multisig::multisig_account::kex_origins_map_t{},
+      ""
+    };
+
+  // now only self is available for aggregation signing
+  std::vector<crypto::public_key> available_signers{accounts[0].get_signers_available_for_aggregation_signing()};
+  EXPECT_TRUE(available_signers.size() == 1);
+  EXPECT_TRUE(available_signers[0] == accounts[0].get_base_pubkey());
+
+  // add player 1
+  EXPECT_NO_THROW(conversion_msg = accounts[1].get_account_era_conversion_msg(cn_era));
+  EXPECT_NO_THROW(accounts[0].add_signer_recommendations(conversion_msg));
+
+  // now self and player 1 are available
+  available_signers = accounts[0].get_signers_available_for_aggregation_signing();
+  EXPECT_TRUE(available_signers.size() == 2);
+
+  // add player 2
+  EXPECT_NO_THROW(conversion_msg = accounts[2].get_account_era_conversion_msg(cn_era));
+  EXPECT_NO_THROW(accounts[0].add_signer_recommendations(conversion_msg));
+
+  // now everyone is available for aggregation signing
+  available_signers = accounts[0].get_signers_available_for_aggregation_signing();
+  EXPECT_TRUE(available_signers == accounts[0].get_signers());
 }
