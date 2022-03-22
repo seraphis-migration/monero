@@ -257,6 +257,8 @@ namespace multisig
     else CHECK_AND_ASSERT_THROW_MES(false, "Deserializing conversion msg failed.");
 
     // checks
+    pkv_to_rctv(m_old_keyshares, dualbase_proof.V_1);
+    pkv_to_rctv(m_new_keyshares, dualbase_proof.V_2);
     rct::key G_1{get_primary_generator(m_old_era)};
     rct::key G_2{get_primary_generator(m_new_era)};
     CHECK_AND_ASSERT_THROW_MES(!(G_1 == rct::Z), "Unknown conversion msg old era.");
@@ -268,8 +270,6 @@ namespace multisig
       "Message signing key was not in prime subgroup.");
 
     // validate dualbase proof
-    pkv_to_rctv(m_old_keyshares, dualbase_proof.V_1);
-    pkv_to_rctv(m_new_keyshares, dualbase_proof.V_2);
     get_proof_msg(MULTISIG_CONVERSION_MSG_MAGIC_V1, m_signing_pubkey, m_old_era, m_new_era, dualbase_proof.m);
     CHECK_AND_ASSERT_THROW_MES(crypto::dual_base_vector_verify(dualbase_proof, G_1, G_2),
       "Conversion message dualbase proof invalid.");

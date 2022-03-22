@@ -30,6 +30,7 @@ set(multisig_sources
   dual_base_vector_proof.cpp
   multisig.cpp
   multisig_account.cpp
+  multisig_account_era_conversion_msg.cpp
   multisig_account_kex_impl.cpp
   multisig_kex_msg.cpp
   multisig_signer_set_filter.cpp)

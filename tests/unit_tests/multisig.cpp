@@ -361,8 +361,7 @@ TEST(multisig, multisig_kex_msg)
   EXPECT_NO_THROW((multisig_kex_msg{}));
   EXPECT_EQ(multisig_kex_msg{}.get_version(), 0);
   EXPECT_NO_THROW((multisig_kex_msg{multisig_kex_msg{}.get_msg()}));
-  EXPECT_NO_THROW((multisig_kex_msg{"abc"}));
-  EXPECT_EQ(multisig_kex_msg{"abc"}.get_version(), 0);
+  EXPECT_ANY_THROW((multisig_kex_msg{"abc"}));
   EXPECT_ANY_THROW((multisig_kex_msg{v, 0, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
   EXPECT_ANY_THROW((multisig_kex_msg{v, 1, crypto::null_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
   EXPECT_ANY_THROW((multisig_kex_msg{v, 1, signing_skey, std::vector<crypto::public_key>{}, crypto::null_skey}));
@@ -535,4 +534,82 @@ TEST(multisig, dual_base_vector_proof)
   // U, U, 3 keys
   EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(sp::get_U_gen(), sp::get_U_gen(), make_keys(3), rct::zero()));
   EXPECT_TRUE(crypto::dual_base_vector_verify(proof, sp::get_U_gen(), sp::get_U_gen()));
+}
+
+TEST(multisig, multisig_conversion_msg)
+{
+  using namespace multisig;
+
+  std::vector<crypto::secret_key> privkeys;
+  for (std::size_t i{0}; i < 3; ++i)
+    privkeys.emplace_back(rct::rct2sk(rct::skGen()));
+
+  crypto::secret_key signing_skey{rct::rct2sk(rct::skGen())};
+  crypto::public_key signing_pubkey;
+  crypto::secret_key_to_public_key(signing_skey, signing_pubkey);
+
+  // misc. edge cases
+  const auto zero = static_cast<cryptonote::account_generator_era>(0);
+  const auto one = static_cast<cryptonote::account_generator_era>(1);
+
+  EXPECT_NO_THROW((multisig_account_era_conversion_msg{}));
+  EXPECT_NO_THROW((multisig_account_era_conversion_msg{multisig_account_era_conversion_msg{}.get_msg()}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{"abc"}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{crypto::null_skey, zero, zero, std::vector<crypto::secret_key>{}}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{crypto::null_skey, one, one, std::vector<crypto::secret_key>{}}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{signing_skey, zero, zero, std::vector<crypto::secret_key>{}}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{crypto::null_skey, one, one, privkeys}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{signing_skey, zero, zero, privkeys}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{signing_skey, zero, one, privkeys}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{signing_skey, one, zero, privkeys}));
+  EXPECT_ANY_THROW((multisig_account_era_conversion_msg{signing_skey, one, one, std::vector<crypto::secret_key>{}}));
+
+  // test that messages are both constructible and reversible
+  EXPECT_NO_THROW((multisig_account_era_conversion_msg{
+      multisig_account_era_conversion_msg{signing_skey, one, one, std::vector<crypto::secret_key>{privkeys[0]}}.get_msg()
+    }));
+  EXPECT_NO_THROW((multisig_account_era_conversion_msg{
+      multisig_account_era_conversion_msg{signing_skey, one, one, privkeys}.get_msg()
+    }));
+
+  // test that message contents can be recovered if stored in a message and the message's reverse
+  auto test_recovery = [&](const cryptonote::account_generator_era old_era, const cryptonote::account_generator_era new_era)
+  {
+    std::vector<crypto::public_key> expected_old_keyshares;
+    std::vector<crypto::public_key> expected_new_keyshares;
+    expected_old_keyshares.reserve(privkeys.size());
+    expected_new_keyshares.reserve(privkeys.size());
+    for (const crypto::secret_key &privkey : privkeys)
+    {
+      expected_old_keyshares.emplace_back(
+          rct::rct2pk(rct::scalarmultKey(cryptonote::get_primary_generator(old_era), rct::sk2rct(privkey)))
+        );
+      expected_new_keyshares.emplace_back(
+          rct::rct2pk(rct::scalarmultKey(cryptonote::get_primary_generator(new_era), rct::sk2rct(privkey)))
+        );
+    }
+
+    multisig_account_era_conversion_msg recovery_test_msg{signing_skey, old_era, new_era, privkeys};
+    multisig_account_era_conversion_msg recovery_test_msg_reverse{recovery_test_msg.get_msg()};
+    EXPECT_EQ(recovery_test_msg.get_old_era(), old_era);
+    EXPECT_EQ(recovery_test_msg_reverse.get_old_era(), old_era);
+    EXPECT_EQ(recovery_test_msg.get_new_era(), new_era);
+    EXPECT_EQ(recovery_test_msg_reverse.get_new_era(), new_era);
+    EXPECT_EQ(recovery_test_msg.get_signing_pubkey(), signing_pubkey);
+    EXPECT_EQ(recovery_test_msg.get_signing_pubkey(), recovery_test_msg_reverse.get_signing_pubkey());
+    EXPECT_EQ(recovery_test_msg.get_old_keyshares().size(), privkeys.size());
+    EXPECT_EQ(recovery_test_msg.get_old_keyshares(), recovery_test_msg_reverse.get_old_keyshares());
+    EXPECT_EQ(recovery_test_msg.get_old_keyshares().size(), recovery_test_msg.get_new_keyshares().size());
+    EXPECT_EQ(recovery_test_msg.get_new_keyshares(), recovery_test_msg_reverse.get_new_keyshares());
+    EXPECT_EQ(recovery_test_msg.get_new_keyshares(), expected_new_keyshares);
+    EXPECT_EQ(recovery_test_msg.get_old_keyshares(), expected_old_keyshares);
+    if (old_era == new_era)
+      EXPECT_EQ(recovery_test_msg.get_new_keyshares(), recovery_test_msg.get_old_keyshares());
+  };
+
+  // test all version combinations
+  EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::cryptonote, cryptonote::account_generator_era::cryptonote));
+  EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::cryptonote, cryptonote::account_generator_era::seraphis));
+  EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::seraphis, cryptonote::account_generator_era::cryptonote));
+  EXPECT_NO_THROW(test_recovery(cryptonote::account_generator_era::seraphis, cryptonote::account_generator_era::seraphis));
 }

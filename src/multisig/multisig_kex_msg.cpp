@@ -297,15 +297,13 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   void multisig_kex_msg::parse_and_validate_msg()
   {
+    // early return on empty messages
+    if (m_msg == "")
+      return;
+
     // set message version
     m_version = get_message_version(m_msg);
-
-    // early return on unversioned messages
-    if (m_version == 0)
-    {
-      m_msg = "";
-      return;
-    }
+    CHECK_AND_ASSERT_THROW_MES(m_version != 0, "Kex message is invalid.");
 
     // deserialize the message
     std::string msg_no_magic;
