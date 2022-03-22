@@ -28,6 +28,7 @@
 
 #pragma once
 
+#include "account_generator_era.h"
 #include "crypto/crypto.h"
 #include "serialization/containers.h"
 #include "serialization/crypto.h"
@@ -95,6 +96,35 @@ namespace multisig
       VARINT_FIELD(kex_round)
       FIELD(msg_pubkeys)
       FIELD(signing_pubkey)
+      FIELD(signature)
+    END_SERIALIZE()
+  };
+
+  /// multisig account era conversion message
+  struct multisig_conversion_msg_serializable
+  {
+    // old era
+    cryptonote::account_generator_era old_era;
+    // new era
+    cryptonote::account_generator_era new_era;
+    // old keyshares
+    std::vector<crypto::public_key> old_keyshares;
+    // new keyshares
+    std::vector<crypto::public_key> new_keyshares;
+    // pubkey used to sign this msg
+    crypto::public_key signing_pubkey;
+    // dual base vector proof (challenge/response abuse crypto::signature structure)
+    crypto::signature dual_base_vector_proof_partial;
+    // message signature
+    crypto::signature signature;
+
+    BEGIN_SERIALIZE()
+      VARINT_FIELD(old_era)
+      VARINT_FIELD(new_era)
+      FIELD(old_keyshares)
+      FIELD(new_keyshares)
+      FIELD(signing_pubkey)
+      FIELD(dual_base_vector_proof_partial)
       FIELD(signature)
     END_SERIALIZE()
   };

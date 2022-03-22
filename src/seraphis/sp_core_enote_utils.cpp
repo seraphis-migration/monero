@@ -120,7 +120,7 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
 {
     static const std::string domain_separator{config::HASH_KEY_SERAPHIS_SQUASHED_ENOTE};
 
-    // H("domain-sep", Ko, C)
+    // H_n("domain-sep", Ko, C)
     std::string hash;
     hash.reserve(domain_separator.size() + 2*sizeof(rct::key));
     hash = domain_separator;
@@ -135,7 +135,7 @@ void make_seraphis_squashed_address_key(const rct::key &onetime_address,
     const rct::key &amount_commitment,
     rct::key &squashed_address_out)
 {
-    // Ko^t = H(Ko,C) Ko
+    // Ko^t = H_n(Ko,C) Ko
     crypto::secret_key squash_prefix;
     make_seraphis_squash_prefix(onetime_address, amount_commitment, squash_prefix);
 

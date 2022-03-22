@@ -195,11 +195,11 @@ static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
 static void transcript_init(rct::key &transcript_out)
 {
     std::string salt(config::HASH_KEY_CONCISE_GROOTLE_TRANSCRIPT);
-    rct::hash_to_scalar(transcript_out, salt.data(), salt.size());
+    rct::cn_fast_hash(transcript_out, salt.data(), salt.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Base aggregation coefficient for concise structure
-// mu = H(H("domain-sep"), message, {{M}}, {C_offsets}, A, B)
+// mu = H_n(H("domain-sep"), message, {{M}}, {C_offsets}, A, B)
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     const rct::keyM &M,
@@ -241,7 +241,7 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge
-// c = H(message, {X})
+// c = H_n(message, {X})
 //
 // note: in practice, this extends the concise structure's aggregation coefficient (i.e. message = mu)
 // note2: in Triptych notation, c == xi

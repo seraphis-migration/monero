@@ -153,7 +153,7 @@ namespace multisig
     const multisig_keyset_map_memsafe_t& get_kex_keys_to_origins_map() const { return m_kex_keys_to_origins_map; }
     // get the kex msg for the next round
     const std::string& get_next_kex_round_msg() const { return m_next_round_kex_message; }
-    //TODO: get account era conversion message for converting this account to 'new_era'
+    // get account era conversion message for converting this account to 'new_era'
     multisig_account_era_conversion_msg get_account_era_conversion_msg(const cryptonote::account_generator_era new_era) const;
 
   //account status functions

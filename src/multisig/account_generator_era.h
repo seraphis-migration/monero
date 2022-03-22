@@ -36,7 +36,7 @@
 namespace cryptonote
 {
 
-enum class account_generator_era
+enum class account_generator_era : unsigned char
 {
   unknown = 0,
   cryptonote = 1,  //and ringct

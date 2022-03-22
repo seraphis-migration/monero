@@ -172,8 +172,7 @@ namespace multisig
   multisig_account_era_conversion_msg multisig_account::get_account_era_conversion_msg(
     const cryptonote::account_generator_era new_era) const
   {
-    //todo
-    return multisig_account_era_conversion_msg{};
+    return multisig_account_era_conversion_msg{m_base_privkey, m_account_era, new_era, m_multisig_privkeys};
   }
   //----------------------------------------------------------------------------------------------------------------------
   // multisig_account: EXTERNAL

@@ -79,12 +79,12 @@ rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows)
 static void transcript_init(rct::key &transcript)
 {
     std::string salt(config::HASH_KEY_CRYPTO_DUAL_BASE_VECTOR_PROOF);
-    rct::hash_to_scalar(transcript, salt.data(), salt.size());
+    rct::cn_fast_hash(transcript, salt.data(), salt.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Aggregation coefficient 'mu' for concise structure
 //
-// mu = H(H("domain-sep"), message, {V_1}, {V_2})
+// mu = H_n(H("domain-sep"), message, {V_1}, {V_2})
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     const rct::keyV &V_1,
@@ -119,7 +119,7 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
 // challenge_message = H(message)
 //
 // note: in practice, this extends the aggregation coefficient (i.e. message = mu)
-// challenge_message = H(H(H("domain-sep"), message, {V_1}, {V_2}))
+// challenge_message = H_n(H_n(H("domain-sep"), message, {V_1}, {V_2}))
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge_message(const rct::key &message)
 {
@@ -135,7 +135,7 @@ static rct::key compute_challenge_message(const rct::key &message)
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge
-// c = H(challenge_message, [V_1 proof key], [V_2 proof key])
+// c = H_n(challenge_message, [V_1 proof key], [V_2 proof key])
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge(const rct::key &message,
     const rct::key &V_1_proofkey,

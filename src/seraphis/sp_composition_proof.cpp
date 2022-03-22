@@ -84,7 +84,7 @@ struct multisig_binonce_factors
 static void transcript_init(rct::key &transcript)
 {
     std::string salt(config::HASH_KEY_SP_COMPOSITION_PROOF_TRANSCRIPT);
-    rct::hash_to_scalar(transcript, salt.data(), salt.size());
+    rct::cn_fast_hash(transcript, salt.data(), salt.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge message
@@ -113,7 +113,7 @@ static rct::key compute_challenge_message(const rct::key &message,
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
 
     // challenge_message
-    rct::hash_to_scalar(challenge_message, hash.data(), hash.size());
+    rct::cn_fast_hash(challenge_message, hash.data(), hash.size());
 
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge_message.bytes), "Transcript challenge_message must be nonzero!");
 
@@ -121,7 +121,7 @@ static rct::key compute_challenge_message(const rct::key &message,
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge
-// c = H(challenge_message, [K_t1 proof key], [K_t2 proof key], [KI proof key])
+// c = H_n(challenge_message, [K_t1 proof key], [K_t2 proof key], [KI proof key])
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge(const rct::key &message,
     const rct::key &K_t1_proofkey,
@@ -189,7 +189,7 @@ static void compute_K_t1_for_proof(const crypto::secret_key &y,
 }
 //-------------------------------------------------------------------------------------------------------------------
 // MuSig2--style bi-nonce signing merge factor
-// rho_e = H("domain-sep", m, alpha_1_1, alpha_2_1, ..., alpha_1_N, alpha_2_N)
+// rho_e = H_n("domain-sep", m, alpha_1_1, alpha_2_1, ..., alpha_1_N, alpha_2_N)
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key multisig_binonce_merge_factor(const rct::key &message,
     const std::vector<multisig_binonce_factors> &nonces)

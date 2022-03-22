@@ -103,17 +103,17 @@ void extend_seraphis_spendkey(const crypto::secret_key &k_a_extender, rct::key &
 void make_seraphis_spendkey(const crypto::secret_key &k_a, const crypto::secret_key &k_b, rct::key &spendkey_out);
 /**
 * brief: make_seraphis_squash_prefix - make the prefix for squashing an enote in the squashed enote model
-*   H(Ko,C)
+*   H_n(Ko,C)
 * param: onetime_address - Ko
 * param: amount_commitment - C
-* outparam: squash_prefix_out - H(Ko,C)
+* outparam: squash_prefix_out - H_n(Ko,C)
 */
 void make_seraphis_squash_prefix(const rct::key &onetime_address,
     const rct::key &amount_commitment,
     crypto::secret_key &squash_prefix_out);
 /**
 * brief: make_seraphis_squashed_address_key - make a 'squashed' address in the squashed enote model
-*   Ko^t = H(Ko,C) Ko
+*   Ko^t = H_n(Ko,C) Ko
 * param: onetime_address - Ko
 * param: amount_commitment - C
 * outparam: squashed_address_out - H(Ko,C) Ko
@@ -123,7 +123,7 @@ void make_seraphis_squashed_address_key(const rct::key &onetime_address,
     rct::key &squashed_address_out);
 /**
 * brief: make_seraphis_squashed_enote_Q - make a 'squashed' enote in the squashed enote model
-*   Q = Ko^t + C^t = H(Ko,C) Ko + C
+*   Q = Ko^t + C^t = H_n(Ko,C) Ko + C
 * param: onetime_address - Ko
 * param: amount_commitment - C
 * outparam: Q_out - Q

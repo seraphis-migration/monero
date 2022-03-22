@@ -27,7 +27,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "multisig_kex_msg.h"
-#include "multisig_kex_msg_serialization.h"
+#include "multisig_msg_serialization.h"
 
 #include "common/base58.h"
 #include "crypto/crypto.h"
@@ -67,7 +67,7 @@ namespace multisig
   //----------------------------------------------------------------------------------------------------------------------
   // INTERNAL
   //----------------------------------------------------------------------------------------------------------------------
-  static void set_kex_msg_magic(const std::uint32_t version, const std::uint32_t kex_round, std::string &msg_out)
+  static void set_msg_magic(const std::uint32_t version, const std::uint32_t kex_round, std::string &msg_out)
   {
     msg_out.clear();
 
@@ -202,7 +202,7 @@ namespace multisig
     data.reserve(MULTISIG_KEX_MSG_V2_MAGIC_1.size() + 4 + 32*(1 + (m_kex_round == 1 ? 1 : 0) + m_msg_pubkeys.size()));
 
     // versioning domain-sep
-    set_kex_msg_magic(m_version, m_kex_round, data);
+    set_msg_magic(m_version, m_kex_round, data);
 
     // kex_round as little-endian bytes
     for (std::size_t i{0}; i < 4; ++i)
@@ -289,7 +289,7 @@ namespace multisig
     }
 
     // make the message
-    set_kex_msg_magic(m_version, m_kex_round, m_msg);
+    set_msg_magic(m_version, m_kex_round, m_msg);
     m_msg.append(tools::base58::encode(serialized_msg_ss.str()));
   }
   //----------------------------------------------------------------------------------------------------------------------
