@@ -744,7 +744,6 @@ TEST(multisig, multisig_signer_recommendations_recovery)
       accounts[0].get_multisig_privkeys(),
       accounts[0].get_common_privkey(),
       accounts[0].get_multisig_pubkey(),
-      accounts[0].get_common_pubkey(),
       multisig::multisig_account::keyshare_origins_map_t{},  //remove keyshare map
       accounts[0].get_kex_rounds_complete(),
       multisig::multisig_account::kex_origins_map_t{},

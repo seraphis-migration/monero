@@ -5129,7 +5129,6 @@ std::string wallet2::exchange_multisig_keys(const epee::wipeable_string &passwor
     expanded_msgs.emplace_back(msg);
 
   // reconstruct multisig account
-  crypto::public_key dummy;
   multisig::multisig_keyset_map_memsafe_t kex_origins_map;
 
   for (const auto &derivation : m_multisig_derivations)
@@ -5144,7 +5143,6 @@ std::string wallet2::exchange_multisig_keys(const epee::wipeable_string &passwor
       get_account().get_keys().m_multisig_keys,
       get_account().get_keys().m_view_secret_key,
       m_account_public_address.m_spend_public_key,
-      m_account_public_address.m_view_public_key,
       multisig::multisig_keyshare_origins_map_t{},  //keyshare to origins map: not used
       m_multisig_rounds_passed,
       std::move(kex_origins_map),

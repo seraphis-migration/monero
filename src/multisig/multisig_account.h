@@ -109,7 +109,6 @@ namespace multisig
       std::vector<crypto::secret_key> multisig_privkeys,
       const crypto::secret_key &common_privkey,
       const crypto::public_key &multisig_pubkey,
-      const crypto::public_key &common_pubkey,
       multisig_keyshare_origins_map_t keyshare_origins_map,
       const std::uint32_t kex_rounds_complete,
       multisig_keyset_map_memsafe_t kex_origins_map,

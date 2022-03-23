@@ -93,7 +93,6 @@ namespace multisig
     std::vector<crypto::secret_key> multisig_privkeys,
     const crypto::secret_key &common_privkey,
     const crypto::public_key &multisig_pubkey,
-    const crypto::public_key &common_pubkey,
     multisig_keyshare_origins_map_t keyshare_origins_map,
     const std::uint32_t kex_rounds_complete,
     multisig_keyset_map_memsafe_t kex_origins_map,
@@ -104,15 +103,19 @@ namespace multisig
       m_multisig_privkeys{std::move(multisig_privkeys)},
       m_common_privkey{common_privkey},
       m_multisig_pubkey{multisig_pubkey},
-      m_common_pubkey{common_pubkey},
       m_keyshare_to_origins_map{std::move(keyshare_origins_map)},
       m_kex_rounds_complete{kex_rounds_complete},
       m_kex_keys_to_origins_map{std::move(kex_origins_map)},
       m_next_round_kex_message{std::move(next_round_kex_message)}
   {
-    // 1) initialize base pubkey
+    CHECK_AND_ASSERT_THROW_MES(account_is_active(), "multisig account: cannot reconstruct an uninitialized account.");
+
+    // 1) initialize base pubkey and common pubkey
     CHECK_AND_ASSERT_THROW_MES(crypto::secret_key_to_public_key(m_base_privkey, m_base_pubkey),
       "Failed to derive public key");
+
+    m_common_pubkey =
+      rct::rct2pk(rct::scalarmultKey(cryptonote::get_secondary_generator(m_account_era), rct::sk2rct(m_common_privkey)));
 
     // 2) initialize keyshare pubkeys and keyshare map
     m_multisig_keyshare_pubkeys.reserve(m_multisig_privkeys.size());
@@ -483,7 +486,6 @@ namespace multisig
         original_account.get_multisig_privkeys(),
         original_account.get_common_privkey(),
         rct::rct2pk(new_multisig_pubkey),
-        original_account.get_common_pubkey(),
         std::move(keyshare_origins_map),
         original_account.get_kex_rounds_complete(),
         multisig_account::kex_origins_map_t{},  //note: only accounts that completed kex can be converted
