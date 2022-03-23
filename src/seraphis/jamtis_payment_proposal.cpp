@@ -130,7 +130,8 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
         );
 
     // sender-receiver shared secret: q = H_32[k_vb](K_e)  //note: K_e not K_d
-    rct::key q;  //add wiper?
+    rct::key q;
+    auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
     make_jamtis_sender_receiver_secret_selfsend(m_viewbalance_privkey,
             output_proposal_out.m_enote_ephemeral_pubkey,
             q
@@ -212,7 +213,8 @@ bool is_self_send_output_proposal(const SpOutputProposalV1 &proposal,
     crypto::key_derivation K_d;
     crypto::generate_key_derivation(rct::rct2pk(proposal.m_enote_ephemeral_pubkey), findreceived_key, K_d);
 
-    rct::key q;  //add wiper?
+    rct::key q;
+    auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
     rct::key nominal_spendkey;
 
     if(!try_get_jamtis_nominal_spend_key_selfsend(K_d,

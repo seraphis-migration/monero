@@ -115,20 +115,13 @@ rct::keyV convolve(const rct::keyV &x, const rct::keyV &y, const std::size_t m);
 */
 rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows, const bool negate_all = false);
 /**
-* brief: small_scalar_gen - Generate a curve scalar of arbitrary maximum size (in bytes).
-*   WARNING: NOT FOR USE WITH CRYPTOGRAPHIC SECRETS
-* param: size_bytes - maximum value of the scalar to generate, as bytes (e.g. size_bytes = 1 means max_scalar = 255)
-* return: generated scalar
-*/
-rct::key small_scalar_gen(const std::size_t size_bytes);
-/**
 * brief: generate_proof_nonce - generate a random scalar and corresponding pubkey for use in a Schnorr-like signature opening
 * param: base - base EC pubkey for the nonce term
 * outparam: nonce_out - private key 'nonce'
 * outparam: nonce_pub_out - public key 'nonce * base'
 */
-void generate_proof_nonce(const rct::key &base, rct::key &nonce_out, rct::key &nonce_pub_out);
 void generate_proof_nonce(const rct::key &base, crypto::secret_key &nonce_out, rct::key &nonce_pub_out);
+void generate_proof_nonce(const rct::key &base, rct::key &nonce_out, rct::key &nonce_pub_out);
 /**
 * brief: subtract_secret_key_vectors - subtract one vector of secret keys from another
 *   sum(A) - sum(B)

@@ -609,13 +609,8 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
         // random weights
         // - to allow verifiying batches of proofs, must weight each proof's components randomly so an adversary doesn't
         //   gain an advantage if >1 of their proofs are being validated in a batch
-        rct::key w1 = ZERO;  // decomp:        w1*[ A + xi*B == dual_matrix_commit(zA, f, f*(xi - f)) ]
-        rct::key w2 = ZERO;  // main stuff:    w2*[ ... - zG == 0 ]
-        while (w1 == ZERO || w2 == ZERO)
-        {
-            w1 = small_scalar_gen(32);
-            w2 = small_scalar_gen(32);
-        }
+        rct::key w1{rct::skGen()};  // decomp:        w1*[ A + xi*B == dual_matrix_commit(zA, f, f*(xi - f)) ]
+        rct::key w2{rct::skGen()};  // main stuff:    w2*[ ... - zG == 0 ]
 
         // Transcript challenges
         const rct::key mu{

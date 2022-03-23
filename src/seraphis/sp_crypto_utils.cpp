@@ -48,13 +48,11 @@ extern "C"
 #include "wipeable_string.h"
 
 //third party headers
-#include <boost/lexical_cast.hpp>
-#include <boost/thread/lock_guard.hpp>
-#include <boost/thread/mutex.hpp>
 
 //standard headers
 #include <array>
 #include <cmath>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -81,7 +79,7 @@ static const rct::key ONE = rct::identity();
 static const rct::key IDENTITY = rct::identity();
 
 // misc
-static boost::mutex init_mutex;
+static std::mutex init_mutex;
 
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -100,7 +98,7 @@ static rct::key sm(rct::key y, int n, const rct::key &x)
 //-------------------------------------------------------------------------------------------------------------------
 static void init_sp_gens()
 {
-    boost::lock_guard<boost::mutex> lock(init_mutex);
+    std::lock_guard<std::mutex> lock(init_mutex);
 
     static bool init_done = false;
     if (init_done) return;
@@ -123,49 +121,42 @@ static void init_sp_gens()
     hash_to_p3(X_p3, rct::hash2rct(crypto::cn_fast_hash(X_salt.data(), X_salt.size())));
     ge_p3_tobytes(X.bytes, &X_p3);
 
-
     init_done = true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 const ge_p3& get_G_p3_gen()
 {
     init_sp_gens();
-
     return G_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
 const ge_p3& get_H_p3_gen()
 {
     init_sp_gens();
-
     return H_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
 const ge_p3& get_U_p3_gen()
 {
     init_sp_gens();
-
     return U_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
 const ge_p3& get_X_p3_gen()
 {
     init_sp_gens();
-
     return X_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
 const rct::key& get_U_gen()
 {
     init_sp_gens();
-
     return U;
 }
 //-------------------------------------------------------------------------------------------------------------------
 const rct::key& get_X_gen()
 {
     init_sp_gens();
-
     return X;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -290,36 +281,6 @@ rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows, c
     return pows;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// WARNING: NOT FOR USE WITH CRYPTOGRAPHIC SECRETS
-//-------------------------------------------------------------------------------------------------------------------
-rct::key small_scalar_gen(const std::size_t size_bytes)
-{
-    if (size_bytes == 0)
-        return rct::zero();
-
-    rct::key result{ZERO};
-
-    while (result == ZERO)
-    {
-        result = rct::skGen();
-
-        // clear all bytes above size desired
-        for (std::size_t byte_index = size_bytes; byte_index < 32; ++byte_index)
-        {
-            result.bytes[byte_index] = 0x00;
-        }
-    }
-
-    return result;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void generate_proof_nonce(const rct::key &base, rct::key &nonce_out, rct::key &nonce_pub_out)
-{
-    crypto::secret_key temp;
-    generate_proof_nonce(base, temp, nonce_pub_out);
-    nonce_out = rct::sk2rct(temp);
-}
-//-------------------------------------------------------------------------------------------------------------------
 void generate_proof_nonce(const rct::key &base, crypto::secret_key &nonce_out, rct::key &nonce_pub_out)
 {
     CHECK_AND_ASSERT_THROW_MES(!(base == rct::identity()), "Bad base for generating proof nonce!");
@@ -333,6 +294,13 @@ void generate_proof_nonce(const rct::key &base, crypto::secret_key &nonce_out, r
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void generate_proof_nonce(const rct::key &base, rct::key &nonce_out, rct::key &nonce_pub_out)
+{
+    crypto::secret_key temp;
+    generate_proof_nonce(base, temp, nonce_pub_out);
+    nonce_out = rct::sk2rct(temp);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void subtract_secret_key_vectors(const std::vector<crypto::secret_key> &keys_A,
     const std::vector<crypto::secret_key> &keys_B,
     crypto::secret_key &result_out)
@@ -340,16 +308,12 @@ void subtract_secret_key_vectors(const std::vector<crypto::secret_key> &keys_A,
     result_out = rct::rct2sk(rct::zero());
 
     // add keys_A
-    for (const auto &key_A : keys_A)
-    {
+    for (const crypto::secret_key &key_A : keys_A)
         sc_add(to_bytes(result_out), to_bytes(result_out), to_bytes(key_A));
-    }
 
     // subtract keys_B
-    for (const auto &key_B : keys_B)
-    {
+    for (const crypto::secret_key &key_B : keys_B)
         sc_sub(to_bytes(result_out), to_bytes(result_out), to_bytes(key_B));
-    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &masked_key_out)
@@ -362,8 +326,7 @@ bool key_domain_is_prime_subgroup(const rct::key &check_key)
 {
     // l*K ?= identity
     ge_p3 check_key_p3;
-    CHECK_AND_ASSERT_THROW_MES_L1(ge_frombytes_vartime(&check_key_p3, check_key.bytes) == 0,
-            "ge_frombytes_vartime failed at " + boost::lexical_cast<std::string>(__LINE__));
+    CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&check_key_p3, check_key.bytes) == 0, "ge_frombytes_vartime failed");
     ge_scalarmult_p3(&check_key_p3, rct::curveOrder().bytes, &check_key_p3);
 
     return (ge_p3_is_point_at_infinity_vartime(&check_key_p3) != 0);

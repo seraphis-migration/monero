@@ -82,7 +82,6 @@ namespace multisig
   static void set_msg_magic(std::string &msg_out)
   {
     msg_out.clear();
-
     msg_out.append(MULTISIG_CONVERSION_MSG_MAGIC_V1.data(), MULTISIG_CONVERSION_MSG_MAGIC_V1.size());
   }
   //----------------------------------------------------------------------------------------------------------------------
