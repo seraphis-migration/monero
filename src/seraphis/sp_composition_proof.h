@@ -157,35 +157,42 @@ public:
 //member functions
     /// true if there is a record
     bool has_record(const rct::key &message,
+        const crypto::key_image &key_image,
         const multisig::signer_set_filter &filter) const;
     /// true if successfully added nonces
     bool try_add_nonces(const rct::key &message,
+        const crypto::key_image &key_image,
         const multisig::signer_set_filter &filter,
         const SpCompositionProofMultisigPrep &prep);
     /// true if found privkeys
     bool try_get_recorded_nonce_privkeys(const rct::key &message,
+        const crypto::key_image &key_image,
         const multisig::signer_set_filter &filter,
         crypto::secret_key &nonce_privkey_1_out,
         crypto::secret_key &nonce_privkey_2_out) const;
     /// true if found pubkeys
     bool try_get_recorded_nonce_pubkeys(const rct::key &message,
+        const crypto::key_image &key_image,
         const multisig::signer_set_filter &filter,
         rct::key &nonce_pubkey_1_out,
         rct::key &nonce_pubkey_2_out) const;
     /// true if removed a record
     bool try_remove_record(const rct::key &message,
+        const crypto::key_image &key_image,
         const multisig::signer_set_filter &filter);
 
 //member variables
 private:
     // [message : [filter, nonces]]
     std::unordered_map<
-            rct::key,                                //message
+            rct::key,                                    //message
             std::unordered_map<
-                    multisig::signer_set_filter,      //filter representing a signer group
-                    SpCompositionProofMultisigPrep   //nonces
-                >
-        > m_record;
+                crypto::key_image,                       //key image
+                std::unordered_map<
+                        multisig::signer_set_filter,     //filter representing a signer group
+                        SpCompositionProofMultisigPrep   //nonces
+                    >
+            >> m_record;
 };
 
 ////

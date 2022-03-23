@@ -369,63 +369,71 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 bool SpCompositionProofMultisigNonceRecord::has_record(const rct::key &message,
+    const crypto::key_image &key_image,
     const multisig::signer_set_filter &filter) const
 {
     return m_record.find(message) != m_record.end() &&
-        m_record.at(message).find(filter) != m_record.at(message).end();
+        m_record.at(message).find(key_image) != m_record.at(message).end() &&
+        m_record.at(message).at(key_image).find(filter) != m_record.at(message).at(key_image).end();
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpCompositionProofMultisigNonceRecord::try_add_nonces(const rct::key &message,
+    const crypto::key_image &key_image,
     const multisig::signer_set_filter &filter,
     const SpCompositionProofMultisigPrep &prep)
 {
-    if (has_record(message, filter))
+    if (has_record(message, key_image, filter))
         return false;
 
     // add record
-    m_record[message][filter] = prep;
+    m_record[message][key_image][filter] = prep;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpCompositionProofMultisigNonceRecord::try_get_recorded_nonce_privkeys(const rct::key &message,
+    const crypto::key_image &key_image,
     const multisig::signer_set_filter &filter,
     crypto::secret_key &nonce_privkey_1_out,
     crypto::secret_key &nonce_privkey_2_out) const
 {
-    if (!has_record(message, filter))
+    if (!has_record(message, key_image, filter))
         return false;
 
     // privkeys
-    nonce_privkey_1_out = m_record.at(message).at(filter).signature_nonce_1_KI_priv;
-    nonce_privkey_2_out = m_record.at(message).at(filter).signature_nonce_2_KI_priv;
+    nonce_privkey_1_out = m_record.at(message).at(key_image).at(filter).signature_nonce_1_KI_priv;
+    nonce_privkey_2_out = m_record.at(message).at(key_image).at(filter).signature_nonce_2_KI_priv;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpCompositionProofMultisigNonceRecord::try_get_recorded_nonce_pubkeys(const rct::key &message,
+    const crypto::key_image &key_image,
     const multisig::signer_set_filter &filter,
     rct::key &nonce_pubkey_1_out,
     rct::key &nonce_pubkey_2_out) const
 {
-    if (!has_record(message, filter))
+    if (!has_record(message, key_image, filter))
         return false;
 
     // pubkeys
-    nonce_pubkey_1_out = m_record.at(message).at(filter).signature_nonce_1_KI_pub;
-    nonce_pubkey_2_out = m_record.at(message).at(filter).signature_nonce_2_KI_pub;
+    nonce_pubkey_1_out = m_record.at(message).at(key_image).at(filter).signature_nonce_1_KI_pub;
+    nonce_pubkey_2_out = m_record.at(message).at(key_image).at(filter).signature_nonce_2_KI_pub;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpCompositionProofMultisigNonceRecord::try_remove_record(const rct::key &message,
+    const crypto::key_image &key_image,
     const multisig::signer_set_filter &filter)
 {
-    if (!has_record(message, filter))
+    if (!has_record(message, key_image, filter))
         return false;
 
     // cleanup
-    m_record[message].erase(filter);
+    m_record[message][key_image].erase(filter);
+    if (m_record[message][key_image].empty())
+        m_record[message].erase(key_image);
     if (m_record[message].empty())
         m_record.erase(message);
 
@@ -620,8 +628,14 @@ bool try_get_sp_composition_multisig_partial_sig(
     // get the nonce privkeys to sign with
     crypto::secret_key nonce_privkey_1;
     crypto::secret_key nonce_privkey_2;
-    if (!nonce_record_inout.try_get_recorded_nonce_privkeys(proposal.message, filter, nonce_privkey_1, nonce_privkey_2))
+    if (!nonce_record_inout.try_get_recorded_nonce_privkeys(proposal.message,
+        proposal.KI,
+        filter,
+        nonce_privkey_1,
+        nonce_privkey_2))
+    {
         return false;
+    }
 
     // make the partial signature
     SpCompositionProofMultisigPartial partial_sig_temp{
@@ -637,7 +651,7 @@ bool try_get_sp_composition_multisig_partial_sig(
         };
 
     // clear the used nonces
-    CHECK_AND_ASSERT_THROW_MES(nonce_record_inout.try_remove_record(proposal.message, filter),
+    CHECK_AND_ASSERT_THROW_MES(nonce_record_inout.try_remove_record(proposal.message, proposal.KI, filter),
         "Failed to clear nonces from nonce record (aborting partial signature)!");
 
     // set the output partial sig AFTER used nonces are cleared, in case of exception

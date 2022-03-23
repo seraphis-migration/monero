@@ -51,7 +51,7 @@ namespace sp
 {
 
 ////
-// SpMultisigInputProposalV1
+// SpMultisigInputProposalV1: propose a tx input to be signed with multisig
 ///
 struct SpMultisigInputProposalV1 final
 {
@@ -98,7 +98,8 @@ struct SpMultisigInputProposalV1 final
 };
 
 ////
-// SpMultisigTxProposalV1
+// SpMultisigTxProposalV1: propose to fund a set of outputs with multisig inputs
+// - total input amount can be less than total output amount (additional inputs should be provided from elsewhere)
 ///
 struct SpMultisigTxProposalV1 final
 {
@@ -106,13 +107,14 @@ struct SpMultisigTxProposalV1 final
     std::vector<JamtisPaymentProposalV1> m_explicit_payments;
     /// tx outputs with unknown addresses (may include self-sends and dummy outputs)
     std::vector<SpOutputProposalV1> m_opaque_payments;
-    /// memo elements to add to the tx memo
+    /// miscellaneous memo elements to add to the tx memo
     TxExtra m_partial_memo;
     /// tx inputs to sign with multisig
     std::vector<SpMultisigInputProposalV1> m_input_proposals;
     /// multisig composition proof proposals for the proposed inputs
     std::vector<SpCompositionProofMultisigProposal> m_multisig_input_proof_proposals;
-    /// sets of multisig signers who should participate in signing this proposal (an aggregate representation) (optimization)
+    /// all multisig signers who should participate in signing this proposal
+    /// - the set may be larger than 'threshold', in which case every permutation of 'threshold' signers will attempt to sign
     multisig::signer_set_filter m_aggregate_signer_set_filter;
 };
 
@@ -125,7 +127,7 @@ struct SpMultisigInputInitV1 final
 {
     /// proposal prefix (represents the set of destinations and memos; will be signed by this input's image proof)
     rct::key m_proposal_prefix;
-    /// key image of the enote image this initializer corresponds to
+    /// key image of the enote image this initializer corresponds to (for tracking)
     rct::key m_key_image;
 
     /// sets of multisig signers this initializer lines up with (an aggregate representation)

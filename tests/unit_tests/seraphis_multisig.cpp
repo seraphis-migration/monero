@@ -160,6 +160,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
 
                 sp::SpCompositionProofMultisigPrep prep_temp{sp::sp_composition_multisig_init()};
                 EXPECT_TRUE(signer_nonce_records[signer_index].try_add_nonces(proposal.message,
+                    proposal.KI,
                     filter_permutations[filter_index],
                     prep_temp));
             }
@@ -193,6 +194,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
                 signer_nonces_2_pubs.emplace_back();
 
                 EXPECT_TRUE(signer_nonce_records[signer_index].try_get_recorded_nonce_pubkeys(proposal.message,
+                    proposal.KI,
                     filter,
                     signer_nonces_1_pubs.back(),
                     signer_nonces_2_pubs.back()));
