@@ -51,7 +51,8 @@ namespace sp
 {
 
 ////
-// SpMultisigInputProposalV1: propose a tx input to be signed with multisig
+// SpMultisigInputProposalV1
+// - propose a tx input to be signed with multisig
 ///
 struct SpMultisigInputProposalV1 final
 {
@@ -98,7 +99,8 @@ struct SpMultisigInputProposalV1 final
 };
 
 ////
-// SpMultisigTxProposalV1: propose to fund a set of outputs with multisig inputs
+// SpMultisigTxProposalV1
+// - propose to fund a set of outputs with multisig inputs
 // - total input amount can be less than total output amount (additional inputs should be provided from elsewhere)
 ///
 struct SpMultisigTxProposalV1 final
@@ -128,7 +130,7 @@ struct SpMultisigInputInitV1 final
     /// proposal prefix (represents the set of destinations and memos; will be signed by this input's image proof)
     rct::key m_proposal_prefix;
     /// key image of the enote image this initializer corresponds to (for tracking)
-    rct::key m_key_image;
+    crypto::key_image m_key_image;
 
     /// sets of multisig signers this initializer lines up with (an aggregate representation)
     multisig::signer_set_filter m_aggregate_signer_set_filter;
@@ -142,13 +144,14 @@ struct SpMultisigInputInitV1 final
 
 ////
 // SpMultisigInputResponseV1
+// - partially signed input; combine partial signatures to complete the image proof for a partial input
 ///
 struct SpMultisigInputResponseV1 final
 {
     /// proposal prefix (represents the set of destinations and memos; signed by this composition proof)
     rct::key m_proposal_prefix;
     /// key image of the enote image this partial response corresponds to
-    rct::key m_key_image;
+    crypto::key_image m_key_image;
 
     /// partial signature for the enote image's composition proof
     SpCompositionProofMultisigPartial m_partial_signature;
