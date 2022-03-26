@@ -110,7 +110,7 @@ void reduce_seraphis_spendkey(const crypto::secret_key &k_a_reducer, rct::key &s
     // K = K_original - k_a_reducer X
     crypto::secret_key extension;
 
-    sc_mul(to_bytes(extension), sp::MINUS_ONE.bytes, to_bytes(extension));  // -k_a_reducer
+    sc_mul(to_bytes(extension), sp::MINUS_ONE.bytes, to_bytes(k_a_reducer));  // -k_a_reducer
     extend_seraphis_spendkey(extension, spendkey_inout);  // (-k_a_reducer) X + Ko_t
 }
 //-------------------------------------------------------------------------------------------------------------------
