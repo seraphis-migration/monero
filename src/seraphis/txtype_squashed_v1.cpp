@@ -201,7 +201,7 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
-    std::vector<SpMembershipProofAlignableV1> alignable_membership_proofs,
+    std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
 {
@@ -243,7 +243,7 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     make_v1_partial_inputs_v1(input_proposals, proposal_prefix, partial_inputs);
 
     // membership proofs (assumes the caller lined up input proposals with membership ref sets)
-    std::vector<SpMembershipProofAlignableV1> alignable_membership_proofs;
+    std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
     make_v1_membership_proofs_v1(membership_ref_sets, partial_inputs, alignable_membership_proofs);
 
     // partial tx

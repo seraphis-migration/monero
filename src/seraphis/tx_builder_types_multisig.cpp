@@ -128,13 +128,13 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_o
         tx_proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposalV1 &proposal)
+void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposalV1 &input_proposal)
 {
     // input amount components should be able to reproduce the amount commitment
     rct::key reconstructed_amount_commitment{
-            rct::commit(proposal.m_input_amount, rct::sk2rct(proposal.m_input_amount_blinding_factor))
+            rct::commit(input_proposal.m_input_amount, rct::sk2rct(input_proposal.m_input_amount_blinding_factor))
         };
-    CHECK_AND_ASSERT_THROW_MES(reconstructed_amount_commitment == proposal.m_core.m_enote.m_core.m_amount_commitment,
+    CHECK_AND_ASSERT_THROW_MES(reconstructed_amount_commitment == input_proposal.m_core.m_enote.m_core.m_amount_commitment,
         "multisig input proposal: could not reconstruct the amount commitment.");
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -147,18 +147,15 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
     SpMultisigInputProposalV1 &proposal_out)
 {
     // add components
-    SpMultisigInputProposalV1 temp_proposal;
+    proposal_out.m_core.m_enote = enote;
+    proposal_out.m_core.m_address_mask = address_mask;
+    proposal_out.m_core.m_commitment_mask = commitment_mask;
+    proposal_out.m_enote_view_privkey = enote_view_privkey;
+    proposal_out.m_input_amount = input_amount;
+    proposal_out.m_input_amount_blinding_factor = input_amount_blinding_factor;
 
-    temp_proposal.m_core.m_enote = enote;
-    temp_proposal.m_core.m_address_mask = address_mask;
-    temp_proposal.m_core.m_commitment_mask = commitment_mask;
-    temp_proposal.m_enote_view_privkey = enote_view_privkey;
-    temp_proposal.m_input_amount = input_amount;
-    temp_proposal.m_input_amount_blinding_factor = input_amount_blinding_factor;
-
-    // make sure it is well-formed before setting the output
-    check_v1_multisig_input_proposal_semantics_v1(temp_proposal);
-    proposal_out = std::move(temp_proposal);
+    // make sure it is well-formed
+    check_v1_multisig_input_proposal_semantics_v1(proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
@@ -197,7 +194,8 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     for (const rct::xmr_amount out_amount : tx_proposal.m_output_amounts)
         output_sum += out_amount;
 
-    CHECK_AND_ASSERT_THROW_MES(input_sum <= output_sum, "multisig tx proposal: input amount exceeds proposed output amount.");
+    CHECK_AND_ASSERT_THROW_MES(input_sum <= output_sum,
+        "multisig tx proposal: input amount exceeds proposed output amount.");
 
     // input proposals line up 1:1 with input proof proposals
     CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() ==
@@ -232,41 +230,42 @@ void make_v1_multisig_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpMultisigTxProposalV1 &proposal_out)
 {
-    SpMultisigTxProposalV1 temp_proposal;
-
     // add miscellaneous components
-    temp_proposal.m_explicit_payments = std::move(explicit_payments);
-    temp_proposal.m_opaque_payments = std::move(opaque_payments);
-    temp_proposal.m_partial_memo = std::move(partial_memo);
-    temp_proposal.m_input_proposals = std::move(input_proposals);
-    temp_proposal.m_aggregate_signer_set_filter = aggregate_signer_set_filter;
+    proposal_out.m_explicit_payments = std::move(explicit_payments);
+    proposal_out.m_opaque_payments = std::move(opaque_payments);
+    proposal_out.m_partial_memo = std::move(partial_memo);
+    proposal_out.m_input_proposals = std::move(input_proposals);
+    proposal_out.m_aggregate_signer_set_filter = aggregate_signer_set_filter;
 
     // get proposal prefix (it is safe to do this before preparing composition proofs)
     SpTxProposalV1 tx_proposal;
-    temp_proposal.get_v1_tx_proposal_v1(tx_proposal);
+    proposal_out.get_v1_tx_proposal_v1(tx_proposal);
     rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
 
     // prepare composition proofs for each input
-    temp_proposal.m_input_proof_proposals.clear();
-    temp_proposal.m_input_proof_proposals.reserve(temp_proposal.m_input_proposals.size());
+    proposal_out.m_input_proof_proposals.clear();
+    proposal_out.m_input_proof_proposals.reserve(proposal_out.m_input_proposals.size());
     SpEnote enote_core_temp;
     SpEnoteImage enote_image_temp;
 
-    for (const SpMultisigInputProposalV1 &input_proposal : temp_proposal.m_input_proposals)
+    for (const SpMultisigInputProposalV1 &input_proposal : proposal_out.m_input_proposals)
     {
         input_proposal.get_enote_core(enote_core_temp);
         input_proposal.get_enote_image(enote_image_temp);
-        temp_proposal.m_input_proof_proposals.emplace_back(
+        proposal_out.m_input_proof_proposals.emplace_back(
                 sp_composition_multisig_proposal(proposal_prefix,
                     enote_core_temp.m_onetime_address,
                     enote_image_temp.m_key_image)
             );
     }
 
-    // make sure the proposal is well-formed before setting output
-    check_v1_multisig_tx_proposal_semantics_v1(temp_proposal, version_string);
-
-    proposal_out = std::move(temp_proposal);
+    // make sure the proposal is well-formed
+    check_v1_multisig_tx_proposal_semantics_v1(proposal_out, version_string);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void check_v1_multisig_input_init_semantics_v1(const SpMultisigInputInitV1 &input_init)
+{
+    //todo
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_input_init_v1(const crypto::public_key &signer_id,
@@ -289,6 +288,11 @@ void make_v1_multisig_input_inits_v1(const crypto::public_key &signer_id,
     std::vector<SpMultisigInputInitV1> &input_inits_out)
 {
 
+}
+//-------------------------------------------------------------------------------------------------------------------
+void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigV1 &input_partial_sig)
+{
+    //todo
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_input_partial_sig_v1(const multisig::multisig_account &signer_account,

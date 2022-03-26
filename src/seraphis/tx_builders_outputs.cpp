@@ -81,8 +81,7 @@ static bool check_output_proposal_set_unique_ephemeral_pubkeys_v1(const std::vec
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_output_proposals_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals)
 {
-    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() >= 1,
-        "Semantics check output proposals v1: insufficient outputs.");
+    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() >= 1, "Semantics check output proposals v1: insufficient outputs.");
 
     // if 2 proposals, must be a shared enote ephemeral pubkey
     if (output_proposals.size() == 2)
@@ -167,7 +166,8 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
         output_amount_commitment_blinding_factors_out.emplace_back(proposal.m_core.m_amount_blinding_factor);
 
         // copy non-duplicate enote pubkeys to tx supplement
-        if (std::find(tx_supplement_inout.m_output_enote_ephemeral_pubkeys.begin(), tx_supplement_inout.m_output_enote_ephemeral_pubkeys.end(),
+        if (std::find(tx_supplement_inout.m_output_enote_ephemeral_pubkeys.begin(),
+            tx_supplement_inout.m_output_enote_ephemeral_pubkeys.end(),
             proposal.m_enote_ephemeral_pubkey) == tx_supplement_inout.m_output_enote_ephemeral_pubkeys.end())
         {
             tx_supplement_inout.m_output_enote_ephemeral_pubkeys.emplace_back(proposal.m_enote_ephemeral_pubkey);
@@ -319,8 +319,8 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
         {
             CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: there are 2 outputs that share "
                 "an enote ephemeral pubkey, but a non-zero change amount. In >2-out txs, all enote ephemeral pubkeys should "
-                "be unique, so adding a change output isn't feasible here. You need to make independent output proposals, or "
-                "avoid calling this function (not recommended).");
+                "be unique, so adding a change output isn't feasible here. You need to make independent output proposals, "
+                "or avoid calling this function (not recommended).");
         }
     }
     else //(output_proposals_inout.size() > 2)
@@ -355,8 +355,6 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
     SpTxProposalV1 &proposal_out)
 {
-    SpTxProposalV1 temp_proposal;
-
     // outputs should be sorted by onetime address
     std::sort(output_proposals.begin(), output_proposals.end());
 
@@ -367,22 +365,19 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
     // make tx supplement
     // prepare for range proofs
     make_v1_outputs_v1(output_proposals,
-        temp_proposal.m_outputs,
-        temp_proposal.m_output_amounts,
-        temp_proposal.m_output_amount_commitment_blinding_factors,
-        temp_proposal.m_tx_supplement);
+        proposal_out.m_outputs,
+        proposal_out.m_output_amounts,
+        proposal_out.m_output_amount_commitment_blinding_factors,
+        proposal_out.m_tx_supplement);
 
     // add all memo fields to the tx supplement
     for (const SpOutputProposalV1 &output_proposal : output_proposals)
         accumulate_extra_field_elements(output_proposal.m_partial_memo, additional_memo_elements);
 
-    make_tx_extra(std::move(additional_memo_elements), temp_proposal.m_tx_supplement.m_tx_extra);
+    make_tx_extra(std::move(additional_memo_elements), proposal_out.m_tx_supplement.m_tx_extra);
 
     // sanity-check semantics
-    check_v1_tx_supplement_semantics_v1(temp_proposal.m_tx_supplement, temp_proposal.m_outputs.size());
-
-    // only set output when guaranteed to succeed
-    proposal_out = std::move(temp_proposal);
+    check_v1_tx_supplement_semantics_v1(proposal_out.m_tx_supplement, proposal_out.m_outputs.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts,

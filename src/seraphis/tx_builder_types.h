@@ -131,11 +131,11 @@ struct SpMembershipReferenceSetV1 final
 };
 
 ////
-// SpMembershipProofAlignableV1 - Alignable Membership Proof V1
+// SpAlignableMembershipProofV1 - Alignable Membership Proof V1
 // - the masked address can be used to match this membership proof with its input image
 //   - note: matching can fail if a masked address is reused in a tx, but that is almost definitely an implementation error!
 ///
-struct SpMembershipProofAlignableV1 final
+struct SpAlignableMembershipProofV1 final
 {
     /// masked address used in the membership proof (for matching with actual input image)
     rct::key m_masked_address;
@@ -143,7 +143,7 @@ struct SpMembershipProofAlignableV1 final
     SpMembershipProofV1 m_membership_proof;
 
     /// overloaded operator for aligning
-    bool operator==(const SpMembershipProofAlignableV1 &other) const { return m_masked_address == other.m_masked_address; }
+    bool operator==(const SpAlignableMembershipProofV1 &other) const { return m_masked_address == other.m_masked_address; }
     bool operator==(const rct::key &other_masked_address) const { return m_masked_address == other_masked_address; }
 };
 
@@ -224,5 +224,21 @@ struct SpPartialTxV1 final
     std::vector<crypto::secret_key> m_image_address_masks;
     std::vector<crypto::secret_key> m_image_commitment_masks;
 };
+
+// need these for validating externally-sourced objects (e.g. deserialized, custom construction, etc.)
+//todo
+void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposal);
+//todo
+void check_v1_output_proposal_semantics_v1(const SpOutputProposalV1 &output_proposal);
+//todo
+void check_v1_membership_reference_set_semantics_v1(const SpMembershipReferenceSetV1 &reference_set);
+//todo
+void check_v1_alignable_membership_proof_semantics_v1(const SpMembershipReferenceSetV1 &reference_set);
+//todo
+void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal);
+//todo
+void check_v1_partial_input_semantics_v1(const SpPartialInputV1 &partial_input);
+//todo
+void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx);
 
 } //namespace sp

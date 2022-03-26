@@ -361,7 +361,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     std::vector<SpEnoteV1> outputs;
     SpBalanceProofV1 balance_proof;
     std::vector<SpImageProofV1> tx_image_proofs;
-    std::vector<SpMembershipProofAlignableV1> tx_membership_proofs_alignable;
+    std::vector<SpAlignableMembershipProofV1> tx_alignable_membership_proofs;
     std::vector<SpMembershipProofV1> tx_membership_proofs;
     SpTxSupplementV1 tx_supplement;
 
@@ -409,8 +409,8 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     make_v1_membership_proofs_v1(membership_ref_sets,
         image_address_masks,
         image_amount_masks,
-        tx_membership_proofs_alignable);  //alignable membership proofs could theoretically be inputs as well
-    align_v1_membership_proofs_v1(input_images, std::move(tx_membership_proofs_alignable), tx_membership_proofs);
+        tx_alignable_membership_proofs);  //alignable membership proofs could theoretically be inputs as well
+    align_v1_membership_proofs_v1(input_images, std::move(tx_alignable_membership_proofs), tx_membership_proofs);
 
     make_seraphis_tx_squashed_v1(std::move(input_images), std::move(outputs),
         std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),

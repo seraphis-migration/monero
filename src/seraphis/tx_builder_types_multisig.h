@@ -185,6 +185,7 @@ struct SpMultisigInputInitV1 final
 };
 
 //temp
+void check_v1_multisig_input_init_semantics_v1(const SpMultisigInputInitV1 &input_init);
 void make_v1_multisig_input_init_v1(const crypto::public_key &signer_id,
     const std::vector<crypto::public_key> &multisig_signers,
     const std::uint32_t threshold,
@@ -224,6 +225,7 @@ struct SpMultisigInputPartialSigV1 final
 //temp
 // - should be 'loose': make as many responses as possible, ignore signer sets that don't have nonces in the record
 //   (in case earlier responses removed nonces from the record)
+void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigV1 &input_partial_sig);
 void make_v1_multisig_input_partial_sig_v1(const multisig::multisig_account &signer_account,
     const SpMultisigInputProposalV1 &input_proposal,
     const crypto::secret_key &input_enote_view_privkey,
