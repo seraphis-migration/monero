@@ -53,8 +53,8 @@ namespace sp
 // - returns false if could not get an element
 //-------------------------------------------------------------------------------------------------------------------
 static bool try_get_extra_field_element(const epee::span<const unsigned char> &tx_extra,
-    ExtraFieldElement &element_out,
-    std::size_t &element_position_inout)
+    std::size_t &element_position_inout,
+    ExtraFieldElement &element_out)
 {
     //TODO: simplify this function?
     if (element_position_inout >= tx_extra.size())
@@ -149,7 +149,7 @@ bool try_get_extra_field_elements(const TxExtra &tx_extra, std::vector<ExtraFiel
     {
         elements_out.emplace_back();
 
-        if (!try_get_extra_field_element(tx_extra_span, elements_out.back(), element_position))
+        if (!try_get_extra_field_element(tx_extra_span, element_position, elements_out.back()))
         {
             elements_out.pop_back();
             return false;

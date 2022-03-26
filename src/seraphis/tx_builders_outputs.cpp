@@ -144,7 +144,7 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     std::vector<SpEnoteV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
-    SpTxSupplementV1 &tx_supplement_inout)
+    std::vector<rct::key> &output_enote_ephemeral_pubkeys_out)
 {
     outputs_out.clear();
     outputs_out.reserve(output_proposals.size());
@@ -152,8 +152,8 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     output_amounts_out.reserve(output_proposals.size());
     output_amount_commitment_blinding_factors_out.clear();
     output_amount_commitment_blinding_factors_out.reserve(output_proposals.size());
-    tx_supplement_inout.m_output_enote_ephemeral_pubkeys.clear();
-    tx_supplement_inout.m_output_enote_ephemeral_pubkeys.reserve(output_proposals.size());
+    output_enote_ephemeral_pubkeys_out.clear();
+    output_enote_ephemeral_pubkeys_out.reserve(output_proposals.size());
 
     for (const SpOutputProposalV1 &proposal : output_proposals)
     {
@@ -166,11 +166,11 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
         output_amount_commitment_blinding_factors_out.emplace_back(proposal.m_core.m_amount_blinding_factor);
 
         // copy non-duplicate enote pubkeys to tx supplement
-        if (std::find(tx_supplement_inout.m_output_enote_ephemeral_pubkeys.begin(),
-            tx_supplement_inout.m_output_enote_ephemeral_pubkeys.end(),
-            proposal.m_enote_ephemeral_pubkey) == tx_supplement_inout.m_output_enote_ephemeral_pubkeys.end())
+        if (std::find(output_enote_ephemeral_pubkeys_out.begin(),
+            output_enote_ephemeral_pubkeys_out.end(),
+            proposal.m_enote_ephemeral_pubkey) == output_enote_ephemeral_pubkeys_out.end())
         {
-            tx_supplement_inout.m_output_enote_ephemeral_pubkeys.emplace_back(proposal.m_enote_ephemeral_pubkey);
+            output_enote_ephemeral_pubkeys_out.emplace_back(proposal.m_enote_ephemeral_pubkey);
         }
     }
 }
@@ -368,7 +368,7 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
         proposal_out.m_outputs,
         proposal_out.m_output_amounts,
         proposal_out.m_output_amount_commitment_blinding_factors,
-        proposal_out.m_tx_supplement);
+        proposal_out.m_tx_supplement.m_output_enote_ephemeral_pubkeys);
 
     // add all memo fields to the tx supplement
     for (const SpOutputProposalV1 &output_proposal : output_proposals)

@@ -76,13 +76,13 @@ void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, 
 * outparam: outputs_out -
 * outparam: output_amounts_out -
 * outparam: output_amount_commitment_blinding_factors_out -
-* inoutparam: tx_supplement_inout -
+* outparam: output_enote_ephemeral_pubkeys_out -
 */
 void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     std::vector<SpEnoteV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
-    SpTxSupplementV1 &tx_supplement_inout);
+    std::vector<rct::key> &output_enote_ephemeral_pubkeys_out);
 /**
 * brief: finalize_v1_output_proposal_set_v1 - finalize a set of output proposals
 *   - add a change output if necessary

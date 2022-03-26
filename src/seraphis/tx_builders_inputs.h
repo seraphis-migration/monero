@@ -62,13 +62,13 @@ void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_imag
     std::vector<SpAlignableMembershipProofV1> membership_proofs_sortable,
     std::vector<SpMembershipProofV1> &membership_proofs_out);
 /**
-* brief: get_membership_proof_message_v1 - message for membership proofs
+* brief: get_tx_membership_proof_message_v1 - message for membership proofs
 *   - H(crypto project name, enote ledger references)
 * TODO: use a real reference system instead of plain indices
 * param - enote_ledger_indices -
 * return: the message to sign in a membership proof
 */
-rct::key get_membership_proof_message_v1(const std::vector<std::size_t> &enote_ledger_indices);
+rct::key get_tx_membership_proof_message_v1(const std::vector<std::size_t> &enote_ledger_indices);
 /**
 * brief: prepare_input_commitment_factors_for_balance_proof_v1 - collect input amounts and input image amount
 *   commitment blinding factors

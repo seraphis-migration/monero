@@ -455,7 +455,7 @@ SpMembershipReferenceSetV1 gen_mock_sp_membership_ref_set_v1(
 
         reference_set.m_ledger_enote_indices[ref_index] = ledger_context_inout.add_enote_v1(temp_enote);
     }
-    
+
     return reference_set;
 }
 //-------------------------------------------------------------------------------------------------------------------

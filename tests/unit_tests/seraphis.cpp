@@ -382,7 +382,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
         outputs,
         output_amounts,
         output_amount_commitment_blinding_factors,
-        tx_supplement);
+        tx_supplement.m_output_enote_ephemeral_pubkeys);
     for (const SpOutputProposalV1 &output_proposal : output_proposals)
         accumulate_extra_field_elements(output_proposal.m_partial_memo, additional_memo_elements);
     make_tx_extra(std::move(additional_memo_elements), tx_supplement.m_tx_extra);
