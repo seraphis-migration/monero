@@ -119,7 +119,7 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
 // challenge_message = H(message)
 //
 // note: in practice, this extends the aggregation coefficient (i.e. message = mu)
-// challenge_message = H_n(H_n(H("domain-sep"), message, {V_1}, {V_2}))
+// challenge_message = H(H_n(H("domain-sep"), message, {V_1}, {V_2}))
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge_message(const rct::key &message)
 {
@@ -127,7 +127,7 @@ static rct::key compute_challenge_message(const rct::key &message)
     std::string hash;
     hash.append(reinterpret_cast<const char*>(message.bytes), sizeof(rct::key));
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
-    rct::hash_to_scalar(challenge, hash.data(), hash.size());
+    rct::cn_fast_hash(challenge, hash.data(), hash.size());
 
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
 

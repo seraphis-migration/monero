@@ -38,7 +38,7 @@
 //    G1, G2: assumed to be ed25519 generators
 // 1. proof nonce and challenge
 //    mu = H_n(H("domain-sep"), m, {V_1}, {V_2})  aggregation coefficient
-//    cm = H_n(mu)                                challenge message
+//    cm = H(mu)                                  challenge message
 //    a = rand()                                  prover nonce
 //    c = H_n(cm, [a*G1], [a*G2])
 // 2. aggregate response
