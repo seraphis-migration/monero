@@ -55,20 +55,20 @@ namespace sp
 * brief: align_v1_membership_proofs_v1 - rearrange membership proofs so they line up with a set of input images
 *   sort order: key images ascending with byte-wise comparisons
 * param: input_images -
-* inparam: tx_membership_proofs_sortable -
-* outparam: tx_membership_proofs_out -
+* inparam: membership_proofs_sortable -
+* outparam: membership_proofs_out -
 */
 void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_images,
-    std::vector<SpAlignableMembershipProofV1> tx_membership_proofs_sortable,
-    std::vector<SpMembershipProofV1> &tx_membership_proofs_out);
+    std::vector<SpAlignableMembershipProofV1> membership_proofs_sortable,
+    std::vector<SpMembershipProofV1> &membership_proofs_out);
 /**
-* brief: get_tx_membership_proof_message_v1 - message for membership proofs
+* brief: get_membership_proof_message_v1 - message for membership proofs
 *   - H(crypto project name, enote ledger references)
 * TODO: use a real reference system instead of plain indices
 * param - enote_ledger_indices -
 * return: the message to sign in a membership proof
 */
-rct::key get_tx_membership_proof_message_v1(const std::vector<std::size_t> &enote_ledger_indices);
+rct::key get_membership_proof_message_v1(const std::vector<std::size_t> &enote_ledger_indices);
 /**
 * brief: prepare_input_commitment_factors_for_balance_proof_v1 - collect input amounts and input image amount
 *   commitment blinding factors
@@ -90,51 +90,51 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
 * brief: make_v1_image_proof_v1 - make a seraphis composition proof in the squashed enote model
 * param: input_proposal -
 * param: message -
-* outparam: tx_image_proof_out -
+* outparam: image_proof_out -
 */
 void make_v1_image_proof_v1(const SpInputProposal &input_proposal,
     const rct::key &message,
-    SpImageProofV1 &tx_image_proof_out);
+    SpImageProofV1 &image_proof_out);
 /**
 * brief: make_v1_image_proofs_v1 - make a set of seraphis composition proofs in the squashed enote model
 * param: input_proposals -
 * param: message -
-* outparam: tx_image_proofs_out -
+* outparam: image_proofs_out -
 */
 void make_v1_image_proofs_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const rct::key &message,
-    std::vector<SpImageProofV1> &tx_image_proofs_out);
+    std::vector<SpImageProofV1> &image_proofs_out);
 /**
 * brief: make_v1_membership_proof_v1 - make a concise grootle membership proof in the squashed enote model
 * param: membership_ref_set -
 * param: image_address_mask -
 * param: image_amount_mask -
-* outparam: tx_membership_proof_out -
+* outparam: membership_proof_out -
 */
 void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
-    SpMembershipProofV1 &tx_membership_proof_out);
+    SpMembershipProofV1 &membership_proof_out);
 void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
-    SpAlignableMembershipProofV1 &tx_alignable_membership_proof_out);
+    SpAlignableMembershipProofV1 &talignable_membership_proof_out);
 /**
 * brief: make_v1_membership_proofs_v1 - make a set of concise grootle membership proofs in the squashed enote model
 * param: membership_ref_sets -
 * param: partial_tx -
-* outparam: tx_membership_proofs_out -
+* outparam: membership_proofs_out -
 */
 void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const SpPartialTxV1 &partial_tx,
-    std::vector<SpMembershipProofV1> &tx_membership_proofs_out);
+    std::vector<SpMembershipProofV1> &membership_proofs_out);
 void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
-    std::vector<SpAlignableMembershipProofV1> &tx_alignable_membership_proof_out);
+    std::vector<SpAlignableMembershipProofV1> &talignable_membership_proof_out);
 void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const std::vector<SpPartialInputV1> &partial_inputs,
-    std::vector<SpAlignableMembershipProofV1> &tx_alignable_membership_proof_out);
+    std::vector<SpAlignableMembershipProofV1> &talignable_membership_proof_out);
 /**
 * brief: make_v1_partial_input_v1 - make a v1 partial input
 * param: input_proposal -
