@@ -316,9 +316,8 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
     // K'_1 = Ko - H_n(q) X
     crypto::secret_key extension;
     make_jamtis_onetime_address_extension(sender_receiver_secret, extension);  //H_n(q)
-    sc_mul(to_bytes(extension), sp::MINUS_ONE.bytes, to_bytes(extension));  // -H_n(q)
-    nominal_spend_key_out = onetime_address;  // Ko_t
-    extend_seraphis_spendkey(extension, nominal_spend_key_out);  // (-H(q_t)) X + Ko_t
+    nominal_spend_key_out = onetime_address;  //Ko_t
+    reduce_seraphis_spendkey(extension, nominal_spend_key_out);  //(-H(q_t)) X + Ko_t
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender_receiver_DH_derivation,

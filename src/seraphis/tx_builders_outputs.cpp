@@ -118,8 +118,7 @@ void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, 
     // there may be either 1 or 3+ enote pubkeys
     if (num_outputs == 2)
     {
-        CHECK_AND_ASSERT_THROW_MES(tx_supplement.m_output_enote_ephemeral_pubkeys.size() == 1 ||
-                tx_supplement.m_output_enote_ephemeral_pubkeys.size() >= 3,
+        CHECK_AND_ASSERT_THROW_MES(tx_supplement.m_output_enote_ephemeral_pubkeys.size() == 1,
             "Semantics check tx supplement v1: there must be 1 enote pubkey if there are 2 outputs.");
     }
     else if (num_outputs >= 3)
@@ -356,6 +355,8 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
     SpTxProposalV1 &proposal_out)
 {
+    SpTxProposalV1 temp_proposal;
+
     // outputs should be sorted by onetime address
     std::sort(output_proposals.begin(), output_proposals.end());
 
@@ -366,19 +367,22 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
     // make tx supplement
     // prepare for range proofs
     make_v1_outputs_v1(output_proposals,
-        proposal_out.m_outputs,
-        proposal_out.m_output_amounts,
-        proposal_out.m_output_amount_commitment_blinding_factors,
-        proposal_out.m_tx_supplement);
+        temp_proposal.m_outputs,
+        temp_proposal.m_output_amounts,
+        temp_proposal.m_output_amount_commitment_blinding_factors,
+        temp_proposal.m_tx_supplement);
 
     // add all memo fields to the tx supplement
     for (const SpOutputProposalV1 &output_proposal : output_proposals)
         accumulate_extra_field_elements(output_proposal.m_partial_memo, additional_memo_elements);
 
-    make_tx_extra(std::move(additional_memo_elements), proposal_out.m_tx_supplement.m_tx_extra);
+    make_tx_extra(std::move(additional_memo_elements), temp_proposal.m_tx_supplement.m_tx_extra);
 
     // sanity-check semantics
-    check_v1_tx_supplement_semantics_v1(proposal_out.m_tx_supplement, proposal_out.m_outputs.size());
+    check_v1_tx_supplement_semantics_v1(temp_proposal.m_tx_supplement, temp_proposal.m_outputs.size());
+
+    // only set output when guaranteed to succeed
+    proposal_out = std::move(temp_proposal);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts,

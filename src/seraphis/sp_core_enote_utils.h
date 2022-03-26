@@ -94,6 +94,13 @@ void make_seraphis_spendbase(const crypto::secret_key &spendbase_privkey, rct::k
 */
 void extend_seraphis_spendkey(const crypto::secret_key &k_a_extender, rct::key &spendkey_inout);
 /**
+* brief: reduce_seraphis_spendkey - remove private key material from a Seraphis spendkey (or onetime address)
+*   K = K_original - k_a_reducer X
+* param: k_a_reducer - material to remove from the existing pubkey
+* inoutparam: spendkey_inout - [in: K_original] [out: K_original - k_a_reducer X]
+*/
+void reduce_seraphis_spendkey(const crypto::secret_key &k_a_reducer, rct::key &spendkey_inout);
+/**
 * brief: make_seraphis_spendkey - create a Seraphis spendkey (or onetime address)
 *   K = k_a X + k_b U
 * param: view_privkey - k_a

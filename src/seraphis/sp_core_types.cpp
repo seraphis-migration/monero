@@ -76,7 +76,7 @@ bool SpInputProposal::operator<(const SpInputProposal &other_proposal) const
 //-------------------------------------------------------------------------------------------------------------------
 void SpInputProposal::get_key_image(crypto::key_image &key_image_out) const
 {
-    // KI = k_a X + k_a U
+    // KI = k_b/k_a U
     make_seraphis_key_image(m_enote_view_privkey, m_spendbase_privkey, key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------

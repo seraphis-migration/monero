@@ -34,10 +34,12 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "jamtis_payment_proposal.h"
 #include "multisig/multisig_account.h"
 #include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
+#include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_extra.h"
 
@@ -53,31 +55,44 @@ namespace sp
 {
 
 ////
-// SpMultisigInputProposalV1
-// - propose a tx input to be signed with multisig
+// SpMultisigPublicInputProposalV1
+// - propose a tx input to be signed with multisig (for sending to other multisig participants)
 ///
-struct SpMultisigInputProposalV1 final
+struct SpMultisigPublicInputProposalV1 final
 {
     /// enote to spend
     SpEnoteV1 m_enote;
 
-    /// a: input amount
-    rct::xmr_amount m_input_amount;
-    /// x: input amount commitment's blinding factor
-    crypto::secret_key m_input_amount_blinding_factor;
     /// t_k
     crypto::secret_key m_address_mask;
     /// t_c
     crypto::secret_key m_commitment_mask;
+};
+
+////
+// SpMultisigInputProposalV1
+// - proposed tx input to be signed with multisig (convenience struct, for internal use)
+///
+struct SpMultisigInputProposalV1 final
+{
+    /// enote proposed as a tx input
+    SpMultisigPublicInputProposalV1 m_core;
+
+    /// k_{a, sender} + k_{a, recipient}
+    crypto::secret_key m_enote_view_privkey;
+    /// a: input amount
+    rct::xmr_amount m_input_amount;
+    /// x: input amount commitment's blinding factor
+    crypto::secret_key m_input_amount_blinding_factor;
 
     /// less-than operator for sorting (VERY SLOW: USE WITH CAUTION)
-    bool operator<(const SpInputProposal &other_proposal) const;
+    bool operator<(const SpMultisigInputProposalV1 &other_proposal) const;
 
     /**
     * brief: get_key_image - get this input's key image
     * outparam: key_image_out - KI
     */
-    void get_key_image(const crypto::secret_key &enote_view_privkey, crypto::key_image &key_image_out) const;
+    void get_key_image(crypto::key_image &key_image_out) const;
 
     /**
     * brief: get_enote_core - get the enote this input proposal represents
@@ -86,30 +101,26 @@ struct SpMultisigInputProposalV1 final
     void get_enote_core(SpEnote &enote_out) const;
 
     /**
-    * brief: get_enote_image_v1 - get this input's enote image in the squashed enote model
+    * brief: get_enote_image - get this input's enote image in the squashed enote model
     * outparam: image_out -
     */
-    void get_enote_image_v1(SpEnoteImageV1 &image_out) const;
-
-    /// less-than operator for sorting
-    bool operator<(const SpMultisigInputProposalV1 &other_proposal) const
-    {
-        //return m_core < other_proposal.m_core;
-    }
-
-    /**
-    * brief: gen - generate random enote keys
-    * param: amount -
-    */
-    void gen(const rct::xmr_amount amount);
+    void get_enote_image(SpEnoteImage &image_out) const;
 };
 
 //temp
+void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposalV1 &input_proposal);
 void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
+    const crypto::secret_key &enote_view_privkey,
+    const rct::xmr_amount &input_amount,
+    const crypto::secret_key &input_amount_blinding_factor,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpMultisigInputProposalV1 &proposal_out);
-void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote, SpMultisigInputProposalV1 &proposal_out);
+void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
+    const crypto::secret_key &enote_view_privkey,
+    const rct::xmr_amount &input_amount,
+    const crypto::secret_key &input_amount_blinding_factor,
+    SpMultisigInputProposalV1 &proposal_out);
 
 ////
 // SpMultisigTxProposalV1
@@ -119,7 +130,7 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote, SpMultisigInputP
 struct SpMultisigTxProposalV1 final
 {
     /// tx outputs with known addresses
-    std::vector<JamtisPaymentProposalV1> m_explicit_payments;
+    std::vector<jamtis::JamtisPaymentProposalV1> m_explicit_payments;
     /// tx outputs with unknown addresses (may include self-sends and dummy outputs)
     std::vector<SpOutputProposalV1> m_opaque_payments;
     /// miscellaneous memo elements to add to the tx memo
@@ -133,21 +144,17 @@ struct SpMultisigTxProposalV1 final
     multisig::signer_set_filter m_aggregate_signer_set_filter;
 
     //todo: convert to plain tx proposal
-    void get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_out);
+    void get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_out) const;
 };
 
 //temp
-void make_v1_multisig_tx_proposal_v1(JamtisPaymentProposalV1 explicit_payments,
-    SpOutputProposalV1 opaque_payments,
+void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::string &version_string);
+void make_v1_multisig_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
+    std::vector<SpOutputProposalV1> opaque_payments,
     TxExtra partial_memo,
+    const std::string &version_string,
     std::vector<SpMultisigInputProposalV1> input_proposals,
-    const multisig::signer_set_filter aggregate_signer_set_filter,
-    SpMultisigTxProposalV1 &proposal_out);
-void make_v1_multisig_tx_proposal_v1(JamtisPaymentProposalV1 explicit_payments,
-    SpOutputProposalV1 opaque_payments,
-    TxExtra partial_memo,
-    const std::vector<SpEnoteV1> &input_enote_proposals,
-    const std::vector<crypto::secret_key> &input_enote_view_privkeys,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpMultisigTxProposalV1 &proposal_out);
 

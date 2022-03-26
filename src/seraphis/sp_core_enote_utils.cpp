@@ -105,6 +105,15 @@ void extend_seraphis_spendkey(const crypto::secret_key &k_a_extender, rct::key &
     rct::addKeys(spendkey_inout, extender_key, spendkey_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void reduce_seraphis_spendkey(const crypto::secret_key &k_a_reducer, rct::key &spendkey_inout)
+{
+    // K = K_original - k_a_reducer X
+    crypto::secret_key extension;
+
+    sc_mul(to_bytes(extension), sp::MINUS_ONE.bytes, to_bytes(extension));  // -k_a_reducer
+    extend_seraphis_spendkey(extension, spendkey_inout);  // (-k_a_reducer) X + Ko_t
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_spendkey(const crypto::secret_key &k_a, const crypto::secret_key &k_b, rct::key &spendkey_out)
 {
     // K = k_a X + k_b U
