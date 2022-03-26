@@ -245,7 +245,6 @@ void make_v1_multisig_input_partial_sigs_multiple_inputs_v1(const multisig::mult
     std::unordered_map<crypto::key_image, std::vector<SpMultisigInputPartialSigV1>> &input_partial_sigs_out);
 
 void make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposal,
-    const crypto::secret_key &input_enote_view_privkey,  //use to verify that key images match for 'correct by construction'
     const std::vector<SpMultisigInputPartialSigV1> &input_partial_sigs,
     SpPartialInputV1 &partial_input_out);
 

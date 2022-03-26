@@ -84,7 +84,7 @@ constexpr unsigned char TxEraSp{3};
 enum class TxStructureVersionSp : unsigned char
 {
     /// mining transaction (TODO)
-    TxTypeSpMining = 0,
+    TxTypeSpMiningV1 = 0,
     /// concise grootle in the squashed enote model + seraphis composition proofs + BP+ range proofs with p > 0 balance proof
     TxTypeSpSquashedV1 = 1
 };
@@ -93,29 +93,30 @@ enum class TxStructureVersionSp : unsigned char
 inline void get_versioning_string_tx_base(const unsigned char tx_era_version,
     const unsigned char tx_structure_version,
     const unsigned char tx_semantic_rules_version,
-    std::string &version_string)
+    std::string &version_string_out)
 {
+    version_string_out.clear();
     /// era of the tx (e.g. CryptoNote/RingCT/Seraphis)
-    version_string += static_cast<char>(tx_era_version);
+    version_string_out += static_cast<char>(tx_era_version);
     /// structure version of the tx within its era
-    version_string += static_cast<char>(tx_structure_version);
+    version_string_out += static_cast<char>(tx_structure_version);
     /// a tx format's validation rules version
-    version_string += static_cast<char>(tx_semantic_rules_version);
+    version_string_out += static_cast<char>(tx_semantic_rules_version);
 }
 
 /// get the tx version string for seraphis txs: TxEraSp | format | semantic rules
 inline void get_versioning_string_seraphis_base(const unsigned char tx_structure_version,
     const unsigned char tx_semantic_rules_version,
-    std::string &version_string)
+    std::string &version_string_out)
 {
-    get_versioning_string_tx_base(TxEraSp, tx_structure_version, tx_semantic_rules_version, version_string);
+    get_versioning_string_tx_base(TxEraSp, tx_structure_version, tx_semantic_rules_version, version_string_out);
 }
 
 /// get the tx version string for a specific seraphis tx type
 template <typename SpTxType>
-void get_versioning_string(const unsigned char tx_semantic_rules_version, std::string &version_string)
+void get_versioning_string(const unsigned char tx_semantic_rules_version, std::string &version_string_out)
 {
-    get_versioning_string_seraphis_base(get_structure_version<SpTxType>(), tx_semantic_rules_version, version_string);
+    get_versioning_string_seraphis_base(get_structure_version<SpTxType>(), tx_semantic_rules_version, version_string_out);
 }
 
 
@@ -189,7 +190,7 @@ struct SpTxParamPack
 * param: in_amounts -
 * param: out_amounts -
 * param: transaction_fee -
-* inoutparam: ledger_context -
+* inoutparam: ledger_context_inout -
 * outparam: tx_out -
 */
 template <typename SpTxType, typename SpTxParamsT = SpTxParamPack>
@@ -197,7 +198,7 @@ void make_mock_tx(const SpTxParamsT &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
     const rct::xmr_amount transaction_fee,
-    MockLedgerContext &ledger_context,
+    MockLedgerContext &ledger_context_inout,
     SpTxType &tx_out);
 
 } //namespace sp

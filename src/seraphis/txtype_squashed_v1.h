@@ -134,9 +134,9 @@ inline unsigned char get_structure_version<SpTxSquashedV1>()
 
 /// versioning string for an SpTxSquashedV1 tx
 inline void get_versioning_string(const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version,
-    std::string &version_string)
+    std::string &version_string_out)
 {
-    get_versioning_string<SpTxSquashedV1>(static_cast<unsigned char>(tx_semantic_rules_version), version_string);
+    get_versioning_string<SpTxSquashedV1>(static_cast<unsigned char>(tx_semantic_rules_version), version_string_out);
 }
 
 /// transaction validators
