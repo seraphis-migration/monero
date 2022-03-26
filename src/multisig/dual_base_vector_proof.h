@@ -31,6 +31,25 @@
 // - demonstrates knowledge of all k_1, k_2, k_3, ...
 // - demonstrates that members of V_1 have a 1:1 discrete-log equivalence with the members of V_2, across generators G1, G2
 //
+// proof outline
+// 0. preliminaries
+//    H(...)   = keccak(...) -> 32 bytes    hash to 32 bytes
+//    H_n(...) = H(...) mod l               hash to ed25519 scalar
+//    G1, G2: assumed to be ed25519 generators
+// 1. proof nonce and challenge
+//    mu = H_n(H("domain-sep"), m, {V_1}, {V_2})  aggregation coefficient
+//    cm = H_n(mu)                                challenge message
+//    a = rand()                                  prover nonce
+//    c = H_n(cm, [a*G1], [a*G2])
+// 2. aggregate response
+//    r = a - sum_i(mu^i * k_i)
+// 3. proof: {m, c, r, {V_1}, {V_2}}
+//
+// verification
+// 1. mu, cm = ...
+// 2. c' = H_n(cm, [r*G1 + sum_i(mu^i*V_1[i])], [r*G2 + sum_i(mu^i*V_2[i])])
+// 3. if (c' == c) then the proof is valid
+//
 // note: uses 'concise' technique for smaller proofs, with the powers-of-aggregation coefficient approach from Triptych
 //
 // References:
