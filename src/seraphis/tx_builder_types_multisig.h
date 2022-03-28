@@ -35,7 +35,6 @@
 //local headers
 #include "crypto/crypto.h"
 #include "jamtis_payment_proposal.h"
-#include "multisig/multisig_account.h"
 #include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
@@ -109,32 +108,6 @@ struct SpMultisigInputProposalV1 final
     void get_enote_image(SpEnoteImage &image_out) const;
 };
 
-//temp
-void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposalV1 &input_proposal);
-void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
-    const crypto::secret_key &enote_view_privkey,
-    const rct::xmr_amount &input_amount,
-    const crypto::secret_key &input_amount_blinding_factor,
-    const crypto::secret_key &address_mask,
-    const crypto::secret_key &commitment_mask,
-    SpMultisigInputProposalV1 &proposal_out);
-void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
-    const crypto::secret_key &enote_view_privkey,
-    const rct::xmr_amount &input_amount,
-    const crypto::secret_key &input_amount_blinding_factor,
-    SpMultisigInputProposalV1 &proposal_out);
-void make_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1 &proposal_core,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    SpMultisigInputProposalV1 &proposal_out);
-void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    SpMultisigInputProposalV1 &proposal_out);
-
 ////
 // SpMultisigTxProposalV1
 // - propose to fund a set of outputs with multisig inputs
@@ -159,19 +132,6 @@ struct SpMultisigTxProposalV1 final
     /// convert to plain tx proposal
     void get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_out) const;
 };
-
-//temp
-void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const std::string &version_string);
-void make_v1_multisig_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
-    std::vector<SpOutputProposalV1> opaque_payments,
-    TxExtra partial_memo,
-    const std::string &version_string,
-    std::vector<SpMultisigInputProposalV1> input_proposals,
-    const multisig::signer_set_filter aggregate_signer_set_filter,
-    SpMultisigTxProposalV1 &proposal_out);
 
 ////
 // SpMultisigInputInitV1
@@ -200,23 +160,6 @@ struct SpMultisigInputInitV1 final
     std::vector<rct::key> signature_nonce_2_KI_pub;
 };
 
-//temp
-void check_v1_multisig_input_init_semantics_v1(const SpMultisigInputInitV1 &input_init);
-void make_v1_multisig_input_init_v1(const crypto::public_key &signer_id,
-    const std::vector<crypto::public_key> &multisig_signers,
-    const std::uint32_t threshold,
-    const rct::key &proposal_prefix,
-    const crypto::key_image &key_image,
-    const multisig::signer_set_filter aggregate_signer_set_filter,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    SpMultisigInputInitV1 &input_init_out);
-void make_v1_multisig_input_inits_v1(const crypto::public_key &signer_id,
-    const std::vector<crypto::public_key> &multisig_signers,
-    const std::uint32_t threshold,
-    const SpMultisigTxProposalV1 &tx_proposal,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    std::vector<SpMultisigInputInitV1> &input_inits_out);
-
 ////
 // SpMultisigInputPartialSigV1
 // - partially signed input; combine partial signatures to complete the image proof for a partial input
@@ -234,36 +177,5 @@ struct SpMultisigInputPartialSigV1 final
     /// set of multisig signers this partial signature corresponds to
     multisig::signer_set_filter m_signer_set_filter;
 };
-
-//static std::unordered_map<crypto::key_image, std::vector<SpMultisigInputInitV1>> organize_by_key_image(
-//    std::vector<SpMultisigInputInitV1> input_inits);
-
-//temp
-// - should be 'loose': make as many responses as possible, ignore signer sets that don't have nonces in the record
-//   (in case earlier responses removed nonces from the record)
-void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigV1 &input_partial_sig);
-void make_v1_multisig_input_partial_sig_v1(const multisig::multisig_account &signer_account,
-    const SpMultisigInputProposalV1 &input_proposal,
-    const crypto::secret_key &input_enote_view_privkey,
-    const rct::key &proposal_prefix,
-    const multisig::signer_set_filter signer_set_filter,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    SpMultisigInputPartialSigV1 &input_partial_sig_out);
-void make_v1_multisig_input_partial_sigs_single_input_v1(const multisig::multisig_account &signer_account,
-    const SpMultisigInputProposalV1 &input_proposal,
-    const crypto::secret_key &input_enote_view_privkey,
-    const std::vector<SpMultisigInputInitV1> &input_inits,  //including from self
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    std::vector<SpMultisigInputPartialSigV1> &input_partial_sigs_out);
-void make_v1_multisig_input_partial_sigs_multiple_inputs_v1(const multisig::multisig_account &signer_account,
-    const std::vector<SpMultisigInputProposalV1> &input_proposals,
-    const std::unordered_map<crypto::key_image, crypto::secret_key> &input_enote_view_privkeys,
-    const std::vector<SpMultisigInputInitV1> &input_inits,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    std::unordered_map<crypto::key_image, std::vector<SpMultisigInputPartialSigV1>> &input_partial_sigs_out);
-
-void make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposal,
-    const std::vector<SpMultisigInputPartialSigV1> &input_partial_sigs,
-    SpPartialInputV1 &partial_input_out);
 
 } //namespace sp

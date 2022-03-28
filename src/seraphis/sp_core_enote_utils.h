@@ -57,7 +57,7 @@ namespace sp
 * param: zU - pubkey z U (e.g. the base spend key 'ks U')
 * outparam: key_image_out - KI
 */
-void make_seraphis_key_image(const crypto::secret_key &y, const rct::key &zU, crypto::key_image &key_image_out);
+void make_seraphis_key_image(const crypto::secret_key &y, const crypto::public_key &zU, crypto::key_image &key_image_out);
 /**
 * brief: make_seraphis_key_image - create a Seraphis key image from private keys 'y' and 'z'
 *   KI = (z/y)*U
@@ -77,7 +77,7 @@ void make_seraphis_key_image(const crypto::secret_key &y, const crypto::secret_k
 */
 void make_seraphis_key_image(const crypto::secret_key &k_a_sender,
     const crypto::secret_key &k_a_recipient,
-    const rct::key &k_bU,
+    const crypto::public_key &k_bU,
     crypto::key_image &key_image_out);
 /**
 * brief: make_seraphis_spendbase - create the base part of a Seraphis spendkey

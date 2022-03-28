@@ -131,7 +131,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
 
         // make the corresponding key image: (z/y) U
         crypto::key_image KI;
-        sp::make_seraphis_key_image(accounts[0].get_common_privkey(), rct::pk2rct(accounts[0].get_multisig_pubkey()), KI);
+        sp::make_seraphis_key_image(accounts[0].get_common_privkey(), accounts[0].get_multisig_pubkey(), KI);
 
         // tx proposer: make proposal and specify which other signers should try to co-sign (all of them)
         rct::key message{rct::zero()};

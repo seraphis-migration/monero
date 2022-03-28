@@ -116,7 +116,7 @@ bool test_jamtis_nominal_spend_key(const rct::key &wallet_spend_pubkey,
 void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &spendkey_extension,
-    const crypto::secret_key &address_extension,
+    const crypto::secret_key &sender_extension,
     crypto::key_image &key_image_out)
 {
     // KI = (k_m/(H_n(q) + k^j_x + k_vb)) U
@@ -133,7 +133,7 @@ void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
 
     // k_a_sender = H_n(q)
     // KI = (1/(k_a_sender + k_a_recipient))*k_b*U
-    make_seraphis_key_image(address_extension, k_a_recipient, master_pubkey, key_image_out);
+    make_seraphis_key_image(sender_extension, k_a_recipient, rct::rct2pk(master_pubkey), key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

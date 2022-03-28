@@ -357,8 +357,8 @@ TEST(seraphis, information_recovery_keyimage)
     sp::make_seraphis_spendbase(z, k_bU);
 
     sp::make_seraphis_key_image(y, z, key_image1);  // y X + y X + z U -> (z/2y) U
-    sp::make_seraphis_key_image(y, zU, key_image2);
-    sp::make_seraphis_key_image(k_a_sender, k_a_recipient, k_bU, key_image3);
+    sp::make_seraphis_key_image(y, rct::rct2pk(zU), key_image2);
+    sp::make_seraphis_key_image(k_a_sender, k_a_recipient, rct::rct2pk(k_bU), key_image3);
 
     rct::key wallet_spend_pubkey{k_bU};
     crypto::secret_key k_view_balance, spendkey_extension;

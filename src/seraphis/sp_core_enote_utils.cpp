@@ -56,14 +56,15 @@ extern "C"
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_key_image(const crypto::secret_key &y, const rct::key &zU, crypto::key_image &key_image_out)
+void make_seraphis_key_image(const crypto::secret_key &y, const crypto::public_key &zU, crypto::key_image &key_image_out)
 {
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(y)), "y must be nonzero for making a key image!");
-    CHECK_AND_ASSERT_THROW_MES(!(zU == rct::identity()), "zU must not be identity element for making a key image!");
+    CHECK_AND_ASSERT_THROW_MES(!(rct::pk2rct(zU) == rct::identity()),
+        "zU must not be identity element for making a key image!");
 
     // KI = (z/y)*U
     rct::key temp{sp::invert(rct::sk2rct(y))}; // 1/y
-    rct::scalarmultKey(temp, zU, temp); // (z/y)*U
+    rct::scalarmultKey(temp, rct::pk2rct(zU), temp); // (z/y)*U
 
     key_image_out = rct::rct2ki(temp);
 }
@@ -75,12 +76,12 @@ void make_seraphis_key_image(const crypto::secret_key &y, const crypto::secret_k
 
     // KI = (z/y)*U
     rct::key zU{rct::scalarmultKey(sp::get_U_gen(), rct::sk2rct(z))}; // z U
-    make_seraphis_key_image(y, zU, key_image_out);
+    make_seraphis_key_image(y, rct::rct2pk(zU), key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_key_image(const crypto::secret_key &k_a_sender,
     const crypto::secret_key &k_a_recipient,
-    const rct::key &k_bU,
+    const crypto::public_key &k_bU,
     crypto::key_image &key_image_out)
 {
     // KI = (k_b/(k_a_sender + k_a_recipient))*U

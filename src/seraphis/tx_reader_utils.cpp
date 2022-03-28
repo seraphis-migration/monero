@@ -175,7 +175,7 @@ bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermedia
         record_out.m_enote_view_privkey);
 
     // make key image
-    make_seraphis_key_image(record_out.m_enote_view_privkey, wallet_spend_pubkey, record_out.m_key_image);
+    make_seraphis_key_image(record_out.m_enote_view_privkey, rct::rct2pk(wallet_spend_pubkey), record_out.m_key_image);
 
     // copy enote and set type
     record_out.m_enote = intermediate_record.m_enote;

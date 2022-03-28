@@ -52,7 +52,7 @@ namespace sp
 
 ////
 // SpIntermediateEnoteRecordV1
-// - info extracted from a v1 enote using a jamtis find-received key (jamtis plain variant)
+// - info extracted from a v1 enote using a jamtis find-received key (jamtis 'plain' enote type only)
 ///
 struct SpIntermediateEnoteRecordV1 final
 {

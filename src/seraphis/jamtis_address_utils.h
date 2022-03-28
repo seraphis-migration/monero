@@ -102,13 +102,13 @@ bool test_jamtis_nominal_spend_key(const rct::key &wallet_spend_pubkey,
 * param: wallet_spend_pubkey - K_s = k_vb X + k_m U
 * param: k_view_balance - k_vb
 * param: spendkey_extension - k^j_x
-* param: address_extension - H_n(q)
+* param: sender_extension - H_n(q)
 * outparam: key_image_out - KI
 */
 void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &spendkey_extension,
-    const crypto::secret_key &address_extension,
+    const crypto::secret_key &sender_extension,
     crypto::key_image &key_image_out);
 
 } //namespace jamtis
