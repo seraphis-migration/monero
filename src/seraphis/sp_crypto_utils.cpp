@@ -283,6 +283,7 @@ rct::keyV powers_of_scalar(const rct::key &scalar, const std::size_t num_pows, c
 //-------------------------------------------------------------------------------------------------------------------
 void generate_proof_nonce(const rct::key &base, crypto::secret_key &nonce_out, rct::key &nonce_pub_out)
 {
+    // make proof nonce as crypto::secret_key
     CHECK_AND_ASSERT_THROW_MES(!(base == rct::identity()), "Bad base for generating proof nonce!");
 
     nonce_out = rct::rct2sk(ZERO);
@@ -296,6 +297,7 @@ void generate_proof_nonce(const rct::key &base, crypto::secret_key &nonce_out, r
 //-------------------------------------------------------------------------------------------------------------------
 void generate_proof_nonce(const rct::key &base, rct::key &nonce_out, rct::key &nonce_pub_out)
 {
+    // make proof nonce as rct::key
     crypto::secret_key temp;
     generate_proof_nonce(base, temp, nonce_pub_out);
     nonce_out = rct::sk2rct(temp);

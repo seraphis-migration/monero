@@ -73,13 +73,13 @@ rct::key get_tx_membership_proof_message_v1(const std::vector<std::size_t> &enot
 * brief: prepare_input_commitment_factors_for_balance_proof_v1 - collect input amounts and input image amount
 *   commitment blinding factors
 * param: input_proposals -
-* param: image_address_masks -
+* param: image_amount_masks -
 * outparam: input_amounts_out -
 * outparam: blinding_factors_out -
 */
 void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<SpInputProposalV1> &input_proposals,
-    const std::vector<crypto::secret_key> &image_address_masks,
+    const std::vector<crypto::secret_key> &image_amount_masks,
     std::vector<rct::xmr_amount> &input_amounts_out,
     std::vector<crypto::secret_key> &blinding_factors_out);
 void prepare_input_commitment_factors_for_balance_proof_v1(

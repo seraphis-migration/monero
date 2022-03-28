@@ -94,6 +94,7 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out);
+
 bool try_get_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const rct::key &wallet_spend_pubkey,

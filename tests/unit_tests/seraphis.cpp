@@ -126,7 +126,7 @@ static void check_is_owned(const sp::SpOutputProposalV1 &test_proposal,
     sp::SpEnoteV1 enote;
     test_proposal.get_enote_v1(enote);
 
-    // check using built-in tool
+    // try to extract information from the enote (only succeeds if enote is owned)
     sp::SpEnoteRecordV1 enote_record;
     EXPECT_TRUE(sp::try_get_enote_record_v1(enote,
         test_proposal.m_enote_ephemeral_pubkey,
