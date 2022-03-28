@@ -56,6 +56,27 @@
 
 namespace sp
 {
+//----------------------------------------------------------------------------------------------------------------------
+// TODO: move to a 'math' library, with unit tests
+//----------------------------------------------------------------------------------------------------------------------
+static std::uint32_t n_choose_k(const std::uint32_t n, const std::uint32_t k)
+{
+    static_assert(std::numeric_limits<std::int32_t>::digits <= std::numeric_limits<double>::digits,
+        "n_choose_k requires no rounding issues when converting between int32 <-> double.");
+
+    if (n < k)
+        return 0;
+
+    double fp_result = boost::math::binomial_coefficient<double>(n, k);
+
+    if (fp_result < 0)
+        return 0;
+
+    if (fp_result > std::numeric_limits<std::int32_t>::max())  // note: std::round() returns std::int32_t
+        return 0;
+
+    return static_cast<std::uint32_t>(std::round(fp_result));
+}
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static std::unordered_map<crypto::key_image, std::vector<SpMultisigInputInitV1>> organize_by_key_image(
@@ -114,13 +135,7 @@ static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxP
     }
 
     // signer set filter must be valid (at least 'threshold' signers allowed, format is valid)
-    const std::uint32_t num_signers_requested{
-            multisig::get_num_flags_set(multisig_tx_proposal.m_aggregate_signer_set_filter)
-        };
-    CHECK_AND_ASSERT_THROW_MES(num_signers_requested >= threshold,
-        "multisig tx proposal: insufficient signers requested (requested: " << num_signers_requested <<
-        ", minimum needed: " << threshold << ").");
-    CHECK_AND_ASSERT_THROW_MES(multisig::validate_multisig_signer_set_filter(num_signers_requested,
+    CHECK_AND_ASSERT_THROW_MES(multisig::validate_aggregate_multisig_signer_set_filter(threshold,
             num_signers,
             multisig_tx_proposal.m_aggregate_signer_set_filter),
         "multisig tx proposal: invalid aggregate signer set filter.");
@@ -322,14 +337,42 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
         proposal_prefix);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void check_v1_multisig_input_init_semantics_v1(const SpMultisigInputInitV1 &input_init)
+void check_v1_multisig_input_init_semantics_v1(const SpMultisigInputInitV1 &input_init,
+    const std::uint32_t threshold,
+    const std::vector<crypto::public_key> &multisig_signers)
 {
-    //todo
+    // input init's signer must be known and permitted by the aggregate filter
+    CHECK_AND_ASSERT_THROW_MES(std::find(multisig_signers.begin(), multisig_signers.end(), input_init.m_signer_id) !=
+        multisig_signers.end(), "multisig input initializer: initializer from unknown signer.");
+    CHECK_AND_ASSERT_THROW_MES(multisig::signer_is_in_filter(input_init.m_signer_id,
+            multisig_signers,
+            input_init.m_aggregate_signer_set_filter),
+        "multisig input initializer: signer is not eligible unexpectedly.");
+
+    // signer set filter must be valid (at least 'threshold' signers allowed, format is valid)
+    CHECK_AND_ASSERT_THROW_MES(multisig::validate_aggregate_multisig_signer_set_filter(threshold,
+            multisig_signers.size(),
+            input_init.m_aggregate_signer_set_filter),
+        "multisig tx proposal: invalid aggregate signer set filter.");
+
+    // nonces should match
+    CHECK_AND_ASSERT_THROW_MES(m_signature_nonce_1_KI_pubs.size() == m_signature_nonce_2_KI_pubs.size(),
+        "multisig input initializer: nonce sets don't match.");
+
+    // should be one nonce set per signer set that contains the signer
+    // - there are 'num signers requested' choose 'threshold' total signer sets
+    // - remove our signer, then choose 'threshold - 1' signers from the remaining 'num signers requested - 1'
+    const std::uint32_t num_sets_with_signer_expected(
+            n_choose_k(multisig::get_num_flags_set(input_init.m_aggregate_signer_set_filter) - 1, threshold - 1)
+        );
+
+    CHECK_AND_ASSERT_THROW_MES(m_signature_nonce_1_KI_pubs.size() == num_sets_with_signer_expected,
+        "multisig input initializer: don't have expected number of nonce sets (one per signer set with signer).");
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_input_init_v1(const crypto::public_key &signer_id,
-    const std::vector<crypto::public_key> &multisig_signers,
     const std::uint32_t threshold,
+    const std::vector<crypto::public_key> &multisig_signers,
     const rct::key &proposal_prefix,
     const crypto::key_image &key_image,
     const multisig::signer_set_filter aggregate_signer_set_filter,
@@ -340,8 +383,8 @@ void make_v1_multisig_input_init_v1(const crypto::public_key &signer_id,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_input_inits_v1(const crypto::public_key &signer_id,
-    const std::vector<crypto::public_key> &multisig_signers,
     const std::uint32_t threshold,
+    const std::vector<crypto::public_key> &multisig_signers,
     const SpMultisigTxProposalV1 &tx_proposal,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     std::vector<SpMultisigInputInitV1> &input_inits_out)

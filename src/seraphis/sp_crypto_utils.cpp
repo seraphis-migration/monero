@@ -79,7 +79,7 @@ static const rct::key ONE = rct::identity();
 static const rct::key IDENTITY = rct::identity();
 
 // misc
-static std::mutex init_mutex;
+static std::once_flag init_gens_once_flag;
 
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -98,30 +98,28 @@ static rct::key sm(rct::key y, int n, const rct::key &x)
 //-------------------------------------------------------------------------------------------------------------------
 static void init_sp_gens()
 {
-    std::lock_guard<std::mutex> lock(init_mutex);
+    std::call_once(init_gens_once_flag,
+        [&](){
 
-    static bool init_done = false;
-    if (init_done) return;
+        // Build G
+        ge_frombytes_vartime(&G_p3, rct::G.bytes);
 
-    // Build G
-    ge_frombytes_vartime(&G_p3, rct::G.bytes);
+        // Build H
+        ge_frombytes_vartime(&H_p3, rct::H.bytes);
 
-    // Build H
-    ge_frombytes_vartime(&H_p3, rct::H.bytes);
+        // Build U
+        // U = keccak_to_pt("seraphis U")
+        const std::string U_salt(config::HASH_KEY_SERAPHIS_U);
+        hash_to_p3(U_p3, rct::hash2rct(crypto::cn_fast_hash(U_salt.data(), U_salt.size())));
+        ge_p3_tobytes(U.bytes, &U_p3);
 
-    // Build U
-    // U = keccak_to_pt("seraphis U")
-    const std::string U_salt(config::HASH_KEY_SERAPHIS_U);
-    hash_to_p3(U_p3, rct::hash2rct(crypto::cn_fast_hash(U_salt.data(), U_salt.size())));
-    ge_p3_tobytes(U.bytes, &U_p3);
+        // Build X
+        // X = keccak_to_pt("seraphis X")
+        const std::string X_salt(config::HASH_KEY_SERAPHIS_X);
+        hash_to_p3(X_p3, rct::hash2rct(crypto::cn_fast_hash(X_salt.data(), X_salt.size())));
+        ge_p3_tobytes(X.bytes, &X_p3);
 
-    // Build X
-    // X = keccak_to_pt("seraphis X")
-    const std::string X_salt(config::HASH_KEY_SERAPHIS_X);
-    hash_to_p3(X_p3, rct::hash2rct(crypto::cn_fast_hash(X_salt.data(), X_salt.size())));
-    ge_p3_tobytes(X.bytes, &X_p3);
-
-    init_done = true;
+    });
 }
 //-------------------------------------------------------------------------------------------------------------------
 const ge_p3& get_G_p3_gen()

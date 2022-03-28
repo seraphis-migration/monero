@@ -74,7 +74,7 @@ static const rct::key TWO = { {0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0
 
 // misc
 static std::shared_ptr<rct::pippenger_cached_data> generator_cache;
-static std::mutex init_mutex;
+static std::once_flag init_gens_once_flag, init_static_once_flag;
 
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -82,31 +82,29 @@ static std::mutex init_mutex;
 //-------------------------------------------------------------------------------------------------------------------
 static void init_gens()
 {
-    std::lock_guard<std::mutex> lock(init_mutex);
+    std::call_once(init_gens_once_flag,
+        [&](){
 
-    static bool init_done = false;
-    if (init_done) return;
+        // Build Hi generators
+        // H_i = keccak_to_pt("grootle Hi", i)
+        const std::string Hi_A_salt(config::HASH_KEY_GROOTLE_Hi_A);
+        for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
+        {
+            std::string hash = Hi_A_salt + tools::get_varint_data(i);
+            hash_to_p3(Hi_A_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
+        }
 
-    // Build Hi generators
-    // H_i = keccak_to_pt("grootle Hi", i)
-    const std::string Hi_A_salt(config::HASH_KEY_GROOTLE_Hi_A);
-    for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
-    {
-        std::string hash = Hi_A_salt + tools::get_varint_data(i);
-        hash_to_p3(Hi_A_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
-    }
+        const std::string Hi_B_salt(config::HASH_KEY_GROOTLE_Hi_B);
+        for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
+        {
+            std::string hash = Hi_B_salt + tools::get_varint_data(i);
+            hash_to_p3(Hi_B_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
+        }
 
-    const std::string Hi_B_salt(config::HASH_KEY_GROOTLE_Hi_B);
-    for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
-    {
-        std::string hash = Hi_B_salt + tools::get_varint_data(i);
-        hash_to_p3(Hi_B_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
-    }
+        // get G
+        G_p3 = get_G_p3_gen();
 
-    // get G
-    G_p3 = get_G_p3_gen();
-
-    init_done = true;
+    });
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Initialize cache for fixed generators: Hi_A, Hi_B, G
@@ -140,10 +138,15 @@ static std::shared_ptr<rct::pippenger_cached_data> get_pippinger_cache_init()
 //-------------------------------------------------------------------------------------------------------------------
 static void init_static()
 {
-    init_gens();
+    std::call_once(init_static_once_flag,
+        [&](){
 
-    // pippinger cache of stable generators
-    generator_cache = get_pippinger_cache_init();
+        init_gens();
+
+        // pippinger cache of stable generators
+        generator_cache = get_pippinger_cache_init();
+
+    });
 }
 //-------------------------------------------------------------------------------------------------------------------
 // commit to 2 matrices of equal size

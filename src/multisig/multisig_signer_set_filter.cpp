@@ -177,6 +177,16 @@ namespace multisig
     return true;
   }
   //----------------------------------------------------------------------------------------------------------------------
+  bool validate_aggregate_multisig_signer_set_filter(const std::uint32_t threshold,
+    const std::uint32_t num_signers,
+    const signer_set_filter aggregate_filter)
+  {
+    const std::uint32_t num_signers_requested{get_num_flags_set(aggregate_filter)};
+
+    return (num_signers_requested < threshold) &&
+      validate_multisig_signer_set_filter(num_signers_requested, num_signers, aggregate_filter);
+  }
+  //----------------------------------------------------------------------------------------------------------------------
   void aggregate_multisig_signer_set_filter_to_permutations(const std::uint32_t threshold,
     const std::uint32_t num_signers,
     const signer_set_filter aggregate_filter,

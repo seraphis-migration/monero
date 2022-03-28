@@ -155,9 +155,9 @@ struct SpMultisigInputInitV1 final
     /// - all permutations of the aggregate filter that don't include the signer id are ignored
     /// - WARNING: ordering is dependent on the permutation generator
     // alpha_{ki,1,e}*U
-    std::vector<rct::key> signature_nonce_1_KI_pub;
+    std::vector<rct::key> m_signature_nonce_1_KI_pubs;
     // alpha_{ki,2,e}*U
-    std::vector<rct::key> signature_nonce_2_KI_pub;
+    std::vector<rct::key> m_signature_nonce_2_KI_pubs;
 };
 
 ////

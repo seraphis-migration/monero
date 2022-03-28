@@ -69,6 +69,18 @@ namespace multisig
     const std::uint32_t num_signers,
     const std::vector<signer_set_filter> &filters);
   /**
+  * brief: validate_aggregate_multisig_signer_set_filter - Check that an aggregate signer set is valid.
+  *   - Only possible signers are flagged.
+  *   - At least 'threshold' number of signers are flagged.
+  * param: threshold - threshold of multisig (M)
+  * param: num_signers - number of participants in multisig (N)
+  * param: aggregate_filter - an aggregate set of multisig signers to test validity of
+  * return: true/false on validation result
+  */
+  bool validate_aggregate_multisig_signer_set_filter(const std::uint32_t threshold,
+    const std::uint32_t num_signers,
+    const signer_set_filter aggregate_filter);
+  /**
   * brief: aggregate_multisig_signer_set_filter_to_permutations - Extract filters from an aggregate filter.
   *   - An aggregate filter is bitwise-or between all contained filters.
   *   - Every permutation of 'threshold' number of signers from the aggregate set is a separate signer set that can
