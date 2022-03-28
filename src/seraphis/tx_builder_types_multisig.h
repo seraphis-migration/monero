@@ -62,6 +62,8 @@ struct SpMultisigPublicInputProposalV1 final
 {
     /// enote to spend
     SpEnoteV1 m_enote;
+    /// the enote's ephemeral pubkey
+    rct::key m_enote_ephemeral_pubkey;
 
     /// t_k
     crypto::secret_key m_address_mask;
@@ -110,6 +112,7 @@ struct SpMultisigInputProposalV1 final
 //temp
 void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposalV1 &input_proposal);
 void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
     const crypto::secret_key &enote_view_privkey,
     const rct::xmr_amount &input_amount,
     const crypto::secret_key &input_amount_blinding_factor,
@@ -117,9 +120,19 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
     const crypto::secret_key &commitment_mask,
     SpMultisigInputProposalV1 &proposal_out);
 void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
     const crypto::secret_key &enote_view_privkey,
     const rct::xmr_amount &input_amount,
     const crypto::secret_key &input_amount_blinding_factor,
+    SpMultisigInputProposalV1 &proposal_out);
+void make_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1 &proposal_core,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    SpMultisigInputProposalV1 &proposal_out);
+void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     SpMultisigInputProposalV1 &proposal_out);
 
 ////
@@ -136,19 +149,21 @@ struct SpMultisigTxProposalV1 final
     /// miscellaneous memo elements to add to the tx memo
     TxExtra m_partial_memo;
     /// tx inputs to sign with multisig
-    std::vector<SpMultisigInputProposalV1> m_input_proposals;
+    std::vector<SpMultisigPublicInputProposalV1> m_input_proposals;
     /// composition proof proposals for each input proposal
     std::vector<SpCompositionProofMultisigProposal> m_input_proof_proposals;
     /// all multisig signers who should participate in signing this proposal
     /// - the set may be larger than 'threshold', in which case every permutation of 'threshold' signers will attempt to sign
     multisig::signer_set_filter m_aggregate_signer_set_filter;
 
-    //todo: convert to plain tx proposal
+    /// convert to plain tx proposal
     void get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_out) const;
 };
 
 //temp
 void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     const std::string &version_string);
 void make_v1_multisig_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
     std::vector<SpOutputProposalV1> opaque_payments,
@@ -176,8 +191,9 @@ struct SpMultisigInputInitV1 final
     /// all multisig signers who should participate in attempting to make this composition proof
     multisig::signer_set_filter m_aggregate_signer_set_filter;
 
-    /// signature nonce pubkeys for each signer set that includes the specified signer id
+    /// signature nonce pubkeys for each signer set that includes the specified signer id (i.e. each tx attempt)
     /// - all permutations of the aggregate filter that don't include the signer id are ignored
+    /// - WARNING: ordering is dependent on the permutation generator
     // alpha_{ki,1,e}*U
     std::vector<rct::key> signature_nonce_1_KI_pub;
     // alpha_{ki,2,e}*U

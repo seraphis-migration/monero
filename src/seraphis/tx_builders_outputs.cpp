@@ -79,7 +79,7 @@ static bool check_output_proposal_set_unique_ephemeral_pubkeys_v1(const std::vec
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-void check_v1_output_proposals_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals)
+void check_v1_output_proposal_set_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals)
 {
     CHECK_AND_ASSERT_THROW_MES(output_proposals.size() >= 1, "Semantics check output proposals v1: insufficient outputs.");
 
@@ -359,7 +359,7 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
     std::sort(output_proposals.begin(), output_proposals.end());
 
     // sanity-check semantics
-    check_v1_output_proposals_semantics_v1(output_proposals);
+    check_v1_output_proposal_set_semantics_v1(output_proposals);
 
     // make outputs
     // make tx supplement

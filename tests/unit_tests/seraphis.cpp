@@ -164,12 +164,14 @@ static void check_is_owned_plain(const sp::SpEnoteV1 &test_enote,
 
     // 2. try to recover the amount
     rct::xmr_amount recovered_amount;
+    crypto::secret_key recovered_amount_blinding_factor;
     EXPECT_TRUE(
             try_get_jamtis_amount_plain(sender_receiver_secret,
                 amount_baked_key,
                 test_enote.m_core.m_amount_commitment,
                 test_enote.m_encoded_amount,
-                recovered_amount)
+                recovered_amount,
+                recovered_amount_blinding_factor)
         );
     EXPECT_TRUE(recovered_amount == amount_expected);
 
@@ -251,11 +253,13 @@ static void check_is_owned_selfsend(const sp::SpEnoteV1 &test_enote,
 
     // 1. try to recover the amount
     rct::xmr_amount recovered_amount;
+    crypto::secret_key recovered_amount_blinding_factor;
     EXPECT_TRUE(
             try_get_jamtis_amount_selfsend(sender_receiver_secret,
                 test_enote.m_core.m_amount_commitment,
                 test_enote.m_encoded_amount,
-                recovered_amount)
+                recovered_amount,
+                recovered_amount_blinding_factor)
         );
     EXPECT_TRUE(recovered_amount == amount_expected);
 

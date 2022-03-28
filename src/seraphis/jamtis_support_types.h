@@ -114,6 +114,11 @@ inline bool operator==(const address_tag_MAC_t a, const JamtisSelfSendMAC b) { r
 inline bool operator!=(const JamtisSelfSendMAC a, const address_tag_MAC_t b) { return !(a == b); }
 inline bool operator!=(const address_tag_MAC_t a, const JamtisSelfSendMAC b) { return !(a == b); }
 
+bool is_known_self_send_MAC(const address_tag_MAC_t mac)
+{
+    return mac == JamtisSelfSendMAC::CHANGE || mac == JamtisSelfSendMAC::SELF_SPEND;
+}
+
 /// jamtis view tags
 using view_tag_t = unsigned char;
 

@@ -367,15 +367,15 @@ bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
     const crypto::key_derivation &baked_key,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
-    rct::xmr_amount &amount_out)
+    rct::xmr_amount &amount_out,
+    crypto::secret_key &amount_blinding_factor_out)
 {
     // a' = dec(enc_a)
     rct::xmr_amount nominal_amount{decode_jamtis_amount_plain(encoded_amount, sender_receiver_secret, baked_key)};
 
     // C' = x' G + a' H
-    crypto::secret_key nominal_amount_blinding_factor;
-    make_jamtis_amount_blinding_factor_plain(sender_receiver_secret, baked_key, nominal_amount_blinding_factor);  // x'
-    rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(nominal_amount_blinding_factor));
+    make_jamtis_amount_blinding_factor_plain(sender_receiver_secret, baked_key, amount_blinding_factor_out);  // x'
+    rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(amount_blinding_factor_out));
 
     // check that recomputed commitment matches original commitment
     if (!(nominal_amount_commitment == amount_commitment))
@@ -389,15 +389,15 @@ bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
 bool try_get_jamtis_amount_selfsend(const rct::key &sender_receiver_secret,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
-    rct::xmr_amount &amount_out)
+    rct::xmr_amount &amount_out,
+    crypto::secret_key &amount_blinding_factor_out)
 {
     // a' = dec(enc_a)
     rct::xmr_amount nominal_amount{decode_jamtis_amount_selfsend(encoded_amount, sender_receiver_secret)};
 
     // C' = x' G + a' H
-    crypto::secret_key nominal_amount_blinding_factor;
-    make_jamtis_amount_blinding_factor_selfsend(sender_receiver_secret, nominal_amount_blinding_factor);  // x'
-    rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(nominal_amount_blinding_factor));
+    make_jamtis_amount_blinding_factor_selfsend(sender_receiver_secret, amount_blinding_factor_out);  // x'
+    rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(amount_blinding_factor_out));
 
     // check that recomputed commitment matches original commitment
     if (!(nominal_amount_commitment == amount_commitment))

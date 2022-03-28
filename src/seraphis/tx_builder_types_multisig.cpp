@@ -59,6 +59,52 @@ static std::unordered_map<crypto::key_image, std::vector<SpMultisigInputInitV1>>
     return std::unordered_map<crypto::key_image, std::vector<SpMultisigInputInitV1>>{};
 }
 //-------------------------------------------------------------------------------------------------------------------
+// finalize checking multisig tx proposal semantics
+// - doesn't validate onetime addresses and enote ephemeral pubkeys (these require the expensive get_v1_tx_proposal_v1())
+//-------------------------------------------------------------------------------------------------------------------
+static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::vector<rct::xmr_amount> &out_amounts,
+    const rct::key &proposal_prefix)
+{
+    // output amounts >= input amounts (note: equality in real txs is unlikely due to tx fees)
+    using boost::multiprecision::uint128_t;
+    uint128_t input_sum{0};
+    uint128_t output_sum{0};
+
+    for (const SpMultisigInputProposalV1 &input_proposal : multisig_tx_proposal.m_input_proposals)
+        input_sum += input_proposal.m_input_amount;
+
+    for (const rct::xmr_amount out_amount : out_amounts)
+        output_sum += out_amount;
+
+    CHECK_AND_ASSERT_THROW_MES(input_sum <= output_sum,
+        "multisig tx proposal: input amount exceeds proposed output amount.");
+
+    // input proposals line up 1:1 with input proof proposals
+    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() ==
+        multisig_tx_proposal.m_input_proof_proposals.size(),
+        "multisig tx proposal: input proposals don't line up with input proposal proofs.");
+
+    SpEnote enote_core_temp;
+    SpEnoteImage enote_image_temp;
+    for (std::size_t input_index{0}; input_index < multisig_tx_proposal.m_input_proposals.size(); ++input_index)
+    {
+        // input proof proposal messages all equal proposal prefix of core tx proposal
+        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].message == proposal_prefix,
+            "multisig tx proposal: input proof proposal does not match the tx proposal (different proposal prefix).");
+
+        // input proof proposal keys and key images all line up 1:1 and match with input proposals
+        multisig_tx_proposal.m_input_proposals[input_index].get_enote_core(enote_core_temp);
+        multisig_tx_proposal.m_input_proposals[input_index].get_enote_image(enote_image_temp);
+        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].K ==
+            enote_core_temp.m_onetime_address,
+            "multisig tx proposal: input proof proposal does not match input proposal (different onetime addresses).");
+        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].KI ==
+            enote_image_temp.m_key_image,
+            "multisig tx proposal: input proof proposal does not match input proposal (different key images).");
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 bool SpMultisigInputProposalV1::operator<(const SpMultisigInputProposalV1 &other_proposal) const
 {
@@ -183,43 +229,8 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
     rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
 
-    // output amounts >= input amounts (note: equality in real txs is unlikely due to tx fees)
-    using boost::multiprecision::uint128_t;
-    uint128_t input_sum{0};
-    uint128_t output_sum{0};
-
-    for (const SpMultisigInputProposalV1 &input_proposal : multisig_tx_proposal.m_input_proposals)
-        input_sum += input_proposal.m_input_amount;
-
-    for (const rct::xmr_amount out_amount : tx_proposal.m_output_amounts)
-        output_sum += out_amount;
-
-    CHECK_AND_ASSERT_THROW_MES(input_sum <= output_sum,
-        "multisig tx proposal: input amount exceeds proposed output amount.");
-
-    // input proposals line up 1:1 with input proof proposals
-    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() ==
-        multisig_tx_proposal.m_input_proof_proposals.size(),
-        "multisig tx proposal: input proposals don't line up with input proposal proofs.");
-
-    SpEnote enote_core_temp;
-    SpEnoteImage enote_image_temp;
-    for (std::size_t input_index{0}; input_index < multisig_tx_proposal.m_input_proposals.size(); ++input_index)
-    {
-        // input proof proposal messages all equal proposal prefix of core tx proposal
-        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].message == proposal_prefix,
-            "multisig tx proposal: input proof proposal does not match the tx proposal (different proposal prefix).");
-
-        // input proof proposal keys and key images all line up 1:1 and match with input proposals
-        multisig_tx_proposal.m_input_proposals[input_index].get_enote_core(enote_core_temp);
-        multisig_tx_proposal.m_input_proposals[input_index].get_enote_image(enote_image_temp);
-        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].K ==
-            enote_core_temp.m_onetime_address,
-            "multisig tx proposal: input proof proposal does not match input proposal (different onetime addresses).");
-        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].KI ==
-            enote_image_temp.m_key_image,
-            "multisig tx proposal: input proof proposal does not match input proposal (different key images).");
-    }
+    // finish the checks
+    check_v1_multisig_tx_proposal_semantics_v1_final(multisig_tx_proposal, tx_proposal.m_output_amounts, proposal_prefix);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
@@ -260,7 +271,7 @@ void make_v1_multisig_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1
     }
 
     // make sure the proposal is well-formed
-    check_v1_multisig_tx_proposal_semantics_v1(proposal_out, version_string);
+    check_v1_multisig_tx_proposal_semantics_v1_final(proposal_out, tx_proposal.m_output_amounts, proposal_prefix);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_input_init_semantics_v1(const SpMultisigInputInitV1 &input_init)

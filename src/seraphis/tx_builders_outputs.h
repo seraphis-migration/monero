@@ -53,14 +53,14 @@ namespace sp
 {
 
 /**
-* brief: check_v1_output_proposals_semantics_v1 - check semantics of a set of output proposals
+* brief: check_v1_output_proposal_set_semantics_v1 - check semantics of a set of output proposals
 *   - if 2 proposals, should be 1 unique enote ephemeral pubkey
 *   - if >2 proposals, should be 1 unique enote ephemeral pubkey per output
 *   - proposals should be sorted
 *   - proposals should have unique onetime addresses
 * param - output_proposals -
 */
-void check_v1_output_proposals_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals);
+void check_v1_output_proposal_set_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals);
 /**
 * brief: check_v1_tx_supplement_semantics_v1 - check semantics of a tx supplement
 *   - if num_outputs == 2, should be 1 enote ephemeral pubkey

@@ -265,13 +265,15 @@ bool try_get_jamtis_nominal_spend_key_selfsend(const crypto::key_derivation &sen
 * param: amount_commitment - C = x G + a H
 * param: encoded_amount - enc_a
 * outparam: amount_out - a' = dec(enc_a)
+* outparam: amount_blinding_factor_out - x'
 * return: true if successfully recomputed the amount commitment (C' = x' G + a' H ?= C)
 */
 bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
     const crypto::key_derivation &baked_key,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
-    rct::xmr_amount &amount_out);
+    rct::xmr_amount &amount_out,
+    crypto::secret_key &amount_blinding_factor_out);
 /**
 * brief: try_get_jamtis_amount_selfsend - test recreating the amount commitment; if it is recreate-able, return the amount
 *    (for a self-send enote)
@@ -279,12 +281,14 @@ bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
 * param: amount_commitment - C = x G + a H
 * param: encoded_amount - enc_a
 * outparam: amount_out - a' = dec(enc_a)
+* outparam: amount_blinding_factor_out - x'
 * return: true if successfully recomputed the amount commitment (C' = x' G + a' H ?= C)
 */
 bool try_get_jamtis_amount_selfsend(const rct::key &sender_receiver_secret,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
-    rct::xmr_amount &amount_out);
+    rct::xmr_amount &amount_out,
+    crypto::secret_key &amount_blinding_factor_out);
 
 } //namespace jamtis
 } //namespace sp
