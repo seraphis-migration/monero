@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "tx_reader_utils.h"
+#include "tx_record_utils.h"
 
 //local headers
 #include "crypto/crypto.h"
@@ -48,7 +48,7 @@ extern "C"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_component_types.h"
-#include "tx_reader_types.h"
+#include "tx_record_types.h"
 
 //third party headers
 

@@ -40,7 +40,7 @@
 #include "sp_core_types.h"
 #include "tx_component_types.h"
 #include "tx_extra.h"
-#include "tx_reader_types.h"
+#include "tx_record_types.h"
 
 //third party headers
 

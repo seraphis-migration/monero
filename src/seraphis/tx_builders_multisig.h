@@ -42,6 +42,7 @@
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_extra.h"
+#include "tx_record_types.h"
 
 //third party headers
 
@@ -53,6 +54,12 @@
 
 namespace sp
 {
+
+void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    SpMultisigPublicInputProposalV1 &proposal_out);
 
 //temp
 void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposalV1 &input_proposal);
@@ -70,26 +77,29 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::xmr_amount &input_amount,
     const crypto::secret_key &input_amount_blinding_factor,
     SpMultisigInputProposalV1 &proposal_out);
-void make_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1 &proposal_core,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
+void make_v1_multisig_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
     SpMultisigInputProposalV1 &proposal_out);
-void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
+bool try_get_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1 &proposal_core,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpMultisigInputProposalV1 &proposal_out);
 
 //temp
 void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::uint32_t threshold,
+    const std::uint32_t num_signers,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::string &version_string);
-void make_v1_multisig_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
+void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
+    const std::uint32_t num_signers,
+    std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
     std::vector<SpOutputProposalV1> opaque_payments,
     TxExtra partial_memo,
     const std::string &version_string,
-    std::vector<SpMultisigInputProposalV1> input_proposals,
+    const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpMultisigTxProposalV1 &proposal_out);
 
