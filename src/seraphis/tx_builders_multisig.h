@@ -29,6 +29,13 @@
 // NOT FOR PRODUCTION
 
 // Seraphis transaction-builder helper types for multisig
+// WARNING: Passing a semantic check here, or successfully making a component, does not guarantee that the
+//          component is well-formed (i.e. can ultimately be used to make a valid transaction). The checks should be
+//          considered sanity checks that only a malicious implementation can/will circumvent. Note that multisig
+//          is only assumed to work when a threshold of honest players are interacting.
+//          - If users encounter tx construction failures, it may be necessary to identify malicious player(s) and
+//            exclude them.
+//          - TODO: Provide better ways to track down malicious players (more informative exceptions?).
 
 #pragma once
 

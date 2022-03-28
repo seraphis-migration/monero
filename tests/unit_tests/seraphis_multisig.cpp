@@ -160,7 +160,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
 
                 sp::SpCompositionProofMultisigPrep prep_temp{sp::sp_composition_multisig_init()};
                 EXPECT_TRUE(signer_nonce_records[signer_index].try_add_nonces(proposal.message,
-                    proposal.KI,
+                    proposal.K,
                     filter_permutations[filter_index],
                     prep_temp));
             }
@@ -168,18 +168,15 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
 
         // complete and validate each signature attempt
         std::vector<sp::SpCompositionProofMultisigPartial> partial_sigs;
-        std::vector<rct::key> signer_nonces_1_pubs;
-        std::vector<rct::key> signer_nonces_2_pubs;
+        std::vector<SpCompositionProofMultisigPubNonces> signer_nonces_pubs;
         crypto::secret_key z_temp;
         sp::SpCompositionProof proof;
 
         for (const multisig::signer_set_filter filter : filter_permutations)
         {
-            signer_nonces_1_pubs.clear();
-            signer_nonces_2_pubs.clear();
+            signer_nonces_pubs.clear();
             partial_sigs.clear();
-            signer_nonces_1_pubs.reserve(threshold);
-            signer_nonces_2_pubs.reserve(threshold);
+            signer_nonces_pubs.reserve(threshold);
             partial_sigs.reserve(threshold);
 
             // assemble nonce pubkeys for this signing attempt
@@ -190,14 +187,12 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
                         filter))
                     continue;
 
-                signer_nonces_1_pubs.emplace_back();
-                signer_nonces_2_pubs.emplace_back();
+                signer_nonces_pubs.emplace_back();
 
                 EXPECT_TRUE(signer_nonce_records[signer_index].try_get_recorded_nonce_pubkeys(proposal.message,
-                    proposal.KI,
+                    proposal.K,
                     filter,
-                    signer_nonces_1_pubs.back(),
-                    signer_nonces_2_pubs.back()));
+                    signer_nonces_pubs.back()));
             }
 
             // each signer partially signs for this attempt
@@ -212,16 +207,14 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
                     x,
                     accounts[signer_index].get_common_privkey(),
                     z_temp,
-                    signer_nonces_1_pubs,
-                    signer_nonces_2_pubs,
+                    signer_nonces_pubs,
                     filter,
                     signer_nonce_records[signer_index],
                     partial_sigs.back()));
             }
 
             // sanity checks
-            EXPECT_TRUE(signer_nonces_1_pubs.size() == threshold);
-            EXPECT_TRUE(signer_nonces_2_pubs.size() == threshold);
+            EXPECT_TRUE(signer_nonces_pubs.size() == threshold);
             EXPECT_TRUE(partial_sigs.size() == threshold);
 
             // make proof

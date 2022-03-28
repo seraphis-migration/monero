@@ -145,8 +145,8 @@ struct SpMultisigInputInitV1 final
     crypto::public_key m_signer_id;
     /// proposal prefix (represents the set of destinations and memos; will be signed by this input's image proof)
     rct::key m_proposal_prefix;
-    /// key image of the enote image this initializer corresponds to (for tracking)
-    crypto::key_image m_key_image;
+    /// onetime address of the enote this initializer corresponds to (for tracking)
+    rct::key m_onetime_address;
 
     /// all multisig signers who should participate in attempting to make this composition proof
     multisig::signer_set_filter m_aggregate_signer_set_filter;
@@ -158,6 +158,30 @@ struct SpMultisigInputInitV1 final
     std::vector<rct::key> m_signature_nonce_1_KI_pubs;
     // alpha_{ki,2,e}*U
     std::vector<rct::key> m_signature_nonce_2_KI_pubs;
+};
+
+////
+// SpMultisigInputInitV1
+// - initialize seraphis composition proofs for a set of enote images
+// - for each enote image:
+//   - has proof nonce pairs for multiple sets of multisig signers (represented by an aggregate filter)
+//   - only signer sets that include 'signer_id' have initializer nonces
+///
+struct SpMultisigInputInitSetV1 final
+{
+    /// id of signer who made this input initializer
+    crypto::public_key m_signer_id;
+    /// proposal prefix (represents the set of destinations and memos; will be signed by this input's image proof)
+    rct::key m_proposal_prefix;
+
+    /// all multisig signers who should participate in attempting to make this composition proof
+    multisig::signer_set_filter m_aggregate_signer_set_filter;
+
+    // map [masked address : {alpha_{ki,1,e}*U, alpha_{ki,2,e}*U}]
+    // - key: masked addresses for enote images to sign
+    // - value: signature nonce pubkeys for each signer set that includes the specified signer id (i.e. each tx attempt)
+    //   - WARNING: ordering is dependent on the permutation generator
+    std::unordered_map<rct::key, std::vector<SpCompositionProofMultisigPubNonces>> m_input_inits;
 };
 
 ////

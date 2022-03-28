@@ -157,16 +157,23 @@ struct SpCompositionProofMultisigProposal final
 //          after that the opening nonce privkeys should be deleted immediately
 // WARNING2: the nonce privkeys are for local storage, only the pubkeys should be transmitted to other multisig participants
 ///
+struct SpCompositionProofMultisigPubNonces final
+{
+    // signature nonce pubkey: alpha_{ki,1,e}*U
+    rct::key signature_nonce_1_KI_pub;
+    // signature nonce pubkey: alpha_{ki,2,e}*U
+    rct::key signature_nonce_2_KI_pub;
+};
+
 struct SpCompositionProofMultisigPrep final
 {
     // signature nonce privkey: alpha_{ki,1,e}
     crypto::secret_key signature_nonce_1_KI_priv;
-    // signature nonce pubkey: alpha_{ki,1,e}*U
-    rct::key signature_nonce_1_KI_pub;
     // signature nonce privkey: alpha_{ki,2,e}
     crypto::secret_key signature_nonce_2_KI_priv;
+    // signature nonce pubkey: alpha_{ki,1,e}*U
     // signature nonce pubkey: alpha_{ki,2,e}*U
-    rct::key signature_nonce_2_KI_pub;
+    SpCompositionProofMultisigPubNonces signature_nonces_KI_pub;
 };
 
 ////
@@ -182,28 +189,27 @@ public:
 //member functions
     /// true if there is a record
     bool has_record(const rct::key &message,
-        const crypto::key_image &key_image,
+        const rct::key &proof_key,
         const multisig::signer_set_filter &filter) const;
     /// true if successfully added nonces
     bool try_add_nonces(const rct::key &message,
-        const crypto::key_image &key_image,
+        const rct::key &proof_key,
         const multisig::signer_set_filter &filter,
         const SpCompositionProofMultisigPrep &prep);
     /// true if found privkeys
     bool try_get_recorded_nonce_privkeys(const rct::key &message,
-        const crypto::key_image &key_image,
+        const rct::key &proof_key,
         const multisig::signer_set_filter &filter,
         crypto::secret_key &nonce_privkey_1_out,
         crypto::secret_key &nonce_privkey_2_out) const;
     /// true if found pubkeys
     bool try_get_recorded_nonce_pubkeys(const rct::key &message,
-        const crypto::key_image &key_image,
+        const rct::key &proof_key,
         const multisig::signer_set_filter &filter,
-        rct::key &nonce_pubkey_1_out,
-        rct::key &nonce_pubkey_2_out) const;
+        SpCompositionProofMultisigPubNonces &nonce_pubkeys_out) const;
     /// true if removed a record
     bool try_remove_record(const rct::key &message,
-        const crypto::key_image &key_image,
+        const rct::key &proof_key,
         const multisig::signer_set_filter &filter);
 
 //member variables
@@ -212,7 +218,7 @@ private:
     std::unordered_map<
             rct::key,                                    //message
             std::unordered_map<
-                crypto::key_image,                       //key image
+                rct::key,                                //proof key
                 std::unordered_map<
                         multisig::signer_set_filter,     //filter representing a signer group
                         SpCompositionProofMultisigPrep   //nonces
@@ -306,8 +312,7 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init();
 * param: x - secret key
 * param: y - secret key
 * param: z_e - secret key of multisig signer e
-* param: signer_nonces_pub_1 - signature nonce pubkeys alpha_{ki,1,e}*U from all signers (including local signer)
-* param: signer_nonces_pub_2 - signature nonce pubkeys alpha_{ki,2,e}*U from all signers (including local signer)
+* param: signer_pub_nonces - signature nonce pubkeys {alpha_{ki,1,e}*U,  alpha_{ki,2,e}*U} from all signers (including local signer)
 * param: local_nonce_1_priv - alpha_{ki,1,e} for local signer
 * param: local_nonce_2_priv - alpha_{ki,2,e} for local signer
 * return: partially signed Seraphis composition proof
@@ -316,8 +321,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     const crypto::secret_key &x,
     const crypto::secret_key &y,
     const crypto::secret_key &z_e,
-    const rct::keyV &signer_nonces_pub_1,
-    const rct::keyV &signer_nonces_pub_2,
+    const std::vector<SpCompositionProofMultisigPubNonces> &signer_pub_nonces,
     const crypto::secret_key &local_nonce_1_priv,
     const crypto::secret_key &local_nonce_2_priv);
 /**
@@ -338,8 +342,7 @@ bool try_get_sp_composition_multisig_partial_sig(
     const crypto::secret_key &x,
     const crypto::secret_key &y,
     const crypto::secret_key &z_e,
-    const rct::keyV &signer_nonces_pub_1,
-    const rct::keyV &signer_nonces_pub_2,
+    const std::vector<SpCompositionProofMultisigPubNonces> &signer_pub_nonces,
     const multisig::signer_set_filter filter,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     SpCompositionProofMultisigPartial &partial_sig_out);
