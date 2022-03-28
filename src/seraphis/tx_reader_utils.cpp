@@ -32,11 +32,12 @@
 #include "tx_reader_utils.h"
 
 //local headers
+#include "crypto/crypto.h"
+#include "seraphis/jamtis_support_types.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
-#include "crypto/crypto.h"
 #include "device/device.hpp"
 #include "jamtis_address_tags.h"
 #include "jamtis_address_utils.h"
@@ -285,7 +286,7 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     // copy enote and set type
     record_out.m_enote = enote;
     record_out.m_enote_ephemeral_pubkey = enote_ephemeral_pubkey;
-    record_out.m_type = static_cast<jamtis::JamtisEnoteType>(enote_tag_mac);
+    record_out.m_type = jamtis::self_send_MAC_to_type(static_cast<jamtis::JamtisSelfSendMAC>(enote_tag_mac));
 
     return true;
 }

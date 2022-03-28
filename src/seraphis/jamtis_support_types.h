@@ -94,9 +94,10 @@ static_assert(
 /// jamtis enote types
 enum class JamtisEnoteType : unsigned int
 {
-    PLAIN = 0,
-    CHANGE = 1,
-    SELF_SPEND = 2
+    UNKNOWN = 0,
+    PLAIN = 1,
+    CHANGE = 2,
+    SELF_SPEND = 3
 };
 
 /// jamtis self-send MACs, used to define enote-construction procedure for self-sends
@@ -114,9 +115,16 @@ inline bool operator==(const address_tag_MAC_t a, const JamtisSelfSendMAC b) { r
 inline bool operator!=(const JamtisSelfSendMAC a, const address_tag_MAC_t b) { return !(a == b); }
 inline bool operator!=(const address_tag_MAC_t a, const JamtisSelfSendMAC b) { return !(a == b); }
 
-bool is_known_self_send_MAC(const address_tag_MAC_t mac)
+inline bool is_known_self_send_MAC(const address_tag_MAC_t mac)
 {
     return mac == JamtisSelfSendMAC::CHANGE || mac == JamtisSelfSendMAC::SELF_SPEND;
+}
+
+inline JamtisEnoteType self_send_MAC_to_type(const JamtisSelfSendMAC mac)
+{
+    if (mac == JamtisSelfSendMAC::CHANGE) return JamtisEnoteType::CHANGE;
+    else if (mac == JamtisSelfSendMAC::SELF_SPEND) return JamtisEnoteType::SELF_SPEND;
+    else return JamtisEnoteType::UNKNOWN;
 }
 
 /// jamtis view tags

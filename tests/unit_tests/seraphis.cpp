@@ -56,6 +56,8 @@ extern "C"
 #include "seraphis/tx_component_types.h"
 #include "seraphis/tx_extra.h"
 #include "seraphis/tx_misc_utils.h"
+#include "seraphis/tx_reader_types.h"
+#include "seraphis/tx_reader_utils.h"
 #include "seraphis/txtype_squashed_v1.h"
 
 #include "boost/multiprecision/cpp_int.hpp"
@@ -114,186 +116,27 @@ static void make_fake_sp_masked_address(crypto::secret_key &mask,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void check_is_owned_plain(const sp::SpEnoteV1 &test_enote,
+static void check_is_owned(const sp::SpOutputProposalV1 &test_proposal,
     const jamtis_keys &keys,
-    const rct::key &enote_ephemeral_pubkey,
-    const sp::jamtis::address_index_t j_expected,
-    const rct::xmr_amount amount_expected)
-{
-    using namespace sp;
-    using namespace jamtis;
-
-    /// try to reproduce spend key (and recover address index)
-
-    // 1. sender-receiver secret, nominal spend key
-    rct::key sender_receiver_secret;
-    crypto::key_derivation derivation;
-
-    hw::get_device("default").generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey),
-        keys.k_fr,
-        derivation);
-
-    rct::key nominal_recipient_spendkey;
-
-    EXPECT_TRUE(try_get_jamtis_nominal_spend_key_plain(derivation,
-        test_enote.m_core.m_onetime_address,
-        test_enote.m_view_tag,
-        sender_receiver_secret,
-        nominal_recipient_spendkey));
-
-    // 2. decrypt encrypted address tag
-    address_tag_t decrypted_addr_tag{decrypt_address_tag(sender_receiver_secret, test_enote.m_addr_tag_enc)};
-
-    // 3. decipher address tag
-    address_tag_MAC_t enote_tag_mac;
-    EXPECT_TRUE(decipher_address_index(rct::sk2rct(keys.s_ct), decrypted_addr_tag, enote_tag_mac) == j_expected);
-    EXPECT_TRUE(enote_tag_mac == 0);
-
-    // 4. check nominal spend key
-    EXPECT_TRUE(test_jamtis_nominal_spend_key(keys.K_1_base, keys.s_ga, j_expected, nominal_recipient_spendkey));
-
-
-    /// try to recover amount
-
-    // 1. make baked key
-    crypto::secret_key address_privkey;
-    make_jamtis_address_privkey(keys.s_ga, j_expected, address_privkey);
-
-    crypto::key_derivation amount_baked_key;
-    make_jamtis_amount_baked_key_plain_recipient(address_privkey, enote_ephemeral_pubkey, amount_baked_key);
-
-    // 2. try to recover the amount
-    rct::xmr_amount recovered_amount;
-    crypto::secret_key recovered_amount_blinding_factor;
-    EXPECT_TRUE(
-            try_get_jamtis_amount_plain(sender_receiver_secret,
-                amount_baked_key,
-                test_enote.m_core.m_amount_commitment,
-                test_enote.m_encoded_amount,
-                recovered_amount,
-                recovered_amount_blinding_factor)
-        );
-    EXPECT_TRUE(recovered_amount == amount_expected);
-
-
-    /// check: can reproduce sender-receiver secret
-    rct::key sender_receiver_secret_reproduced;
-    make_jamtis_sender_receiver_secret_plain(keys.k_fr,
-        enote_ephemeral_pubkey,
-        hw::get_device("default"),
-        sender_receiver_secret_reproduced);
-    EXPECT_TRUE(sender_receiver_secret_reproduced == sender_receiver_secret);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void check_is_owned_plain(const sp::SpOutputProposalV1 &test_proposal,
-    const jamtis_keys &keys,
-    const sp::jamtis::address_index_t j_expected,
-    const rct::xmr_amount amount_expected)
-{
-    using namespace sp;
-    using namespace jamtis;
-
-    // convert to enote
-    SpEnoteV1 plain_enote;
-    test_proposal.get_enote_v1(plain_enote);
-
-    // full check
-    check_is_owned_plain(plain_enote,
-        keys,
-        test_proposal.m_enote_ephemeral_pubkey,
-        j_expected,
-        amount_expected);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void check_is_owned_selfsend(const sp::SpEnoteV1 &test_enote,
-    const jamtis_keys &keys,
-    const rct::key &enote_ephemeral_pubkey,
     const sp::jamtis::address_index_t j_expected,
     const rct::xmr_amount amount_expected,
-    const sp::jamtis::JamtisSelfSendMAC type_expected)
+    const sp::jamtis::JamtisEnoteType type_expected)
 {
-    using namespace sp;
-    using namespace jamtis;
+    // convert to enote
+    sp::SpEnoteV1 enote;
+    test_proposal.get_enote_v1(enote);
 
-    /// try to reproduce spend key (and recover address index)
-
-    // 1. sender-receiver secret, nominal spend key
-    rct::key sender_receiver_secret;
-    crypto::key_derivation derivation;
-
-    hw::get_device("default").generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey),
-        keys.k_fr,
-        derivation);
-
-    rct::key nominal_recipient_spendkey;
-
-    EXPECT_TRUE(try_get_jamtis_nominal_spend_key_selfsend(derivation,
-        test_enote.m_core.m_onetime_address,
-        test_enote.m_view_tag,
+    // check using built-in tool
+    sp::SpEnoteRecordV1 enote_record;
+    EXPECT_TRUE(sp::try_get_enote_record_v1(enote,
+        test_proposal.m_enote_ephemeral_pubkey,
+        keys.K_1_base,
         keys.k_vb,
-        enote_ephemeral_pubkey,
-        sender_receiver_secret,
-        nominal_recipient_spendkey));
+        enote_record));
 
-    // 2. decrypt encrypted address tag
-    address_tag_t decrypted_addr_tag{decrypt_address_tag(sender_receiver_secret, test_enote.m_addr_tag_enc)};
-
-    // 3. convert raw address tag to address index
-    address_tag_MAC_t enote_tag_mac;
-    EXPECT_TRUE(address_tag_to_index(decrypted_addr_tag, enote_tag_mac) == j_expected);
-    EXPECT_TRUE(enote_tag_mac == type_expected);
-
-    // 4. check nominal spend key
-    EXPECT_TRUE(test_jamtis_nominal_spend_key(keys.K_1_base, keys.s_ga, j_expected, nominal_recipient_spendkey));
-
-
-    /// try to recover amount
-
-    // 1. try to recover the amount
-    rct::xmr_amount recovered_amount;
-    crypto::secret_key recovered_amount_blinding_factor;
-    EXPECT_TRUE(
-            try_get_jamtis_amount_selfsend(sender_receiver_secret,
-                test_enote.m_core.m_amount_commitment,
-                test_enote.m_encoded_amount,
-                recovered_amount,
-                recovered_amount_blinding_factor)
-        );
-    EXPECT_TRUE(recovered_amount == amount_expected);
-
-
-    /// check: can reproduce sender-receiver secret
-    rct::key sender_receiver_secret_reproduced;
-    make_jamtis_sender_receiver_secret_selfsend(keys.k_vb,
-        enote_ephemeral_pubkey,
-        sender_receiver_secret_reproduced);
-    EXPECT_TRUE(sender_receiver_secret_reproduced == sender_receiver_secret);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void check_is_owned_selfsend(const sp::SpOutputProposalV1 &test_proposal,
-    const jamtis_keys &keys,
-    const sp::jamtis::address_index_t j_expected,
-    const rct::xmr_amount amount_expected,
-    const sp::jamtis::JamtisSelfSendMAC type_expected)
-{
-    using namespace sp;
-    using namespace jamtis;
-
-    // convert to enote
-    EXPECT_TRUE(is_self_send_output_proposal(test_proposal, keys.K_1_base, keys.k_vb));  //redundant check
-    SpEnoteV1 self_spend_enote;
-    test_proposal.get_enote_v1(self_spend_enote);
-
-    // full check
-    check_is_owned_selfsend(self_spend_enote,
-        keys,
-        test_proposal.m_enote_ephemeral_pubkey,
-        j_expected,
-        amount_expected,
-        type_expected);
+    EXPECT_TRUE(enote_record.m_type == type_expected);
+    EXPECT_TRUE(enote_record.m_amount == amount_expected);
+    EXPECT_TRUE(enote_record.m_address_index == j_expected);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -631,7 +474,7 @@ TEST(seraphis, information_recovery_enote_v1_plain)
     payment_proposal.get_output_proposal_v1(output_proposal);
 
     // check the enote
-    check_is_owned_plain(output_proposal, keys, j, amount);
+    check_is_owned(output_proposal, keys, j, amount, JamtisEnoteType::PLAIN);
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, information_recovery_enote_v1_selfsend)
@@ -666,7 +509,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     payment_proposal_selfspend.get_output_proposal_v1(output_proposal);
 
     // check the enote
-    check_is_owned_selfsend(output_proposal, keys, j, amount, JamtisSelfSendMAC::SELF_SPEND);
+    check_is_owned(output_proposal, keys, j, amount, JamtisEnoteType::SELF_SPEND);
 
     // make a change enote paying to address
     amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));
@@ -680,7 +523,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     payment_proposal_change.get_output_proposal_v1(output_proposal);
 
     // check the enote
-    check_is_owned_selfsend(output_proposal, keys, j, amount, JamtisSelfSendMAC::CHANGE);
+    check_is_owned(output_proposal, keys, j, amount, JamtisEnoteType::CHANGE);
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, finalize_v1_output_proposal_set_v1)
@@ -710,13 +553,13 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     make_secret_key(self_spend_payment_proposal.m_enote_ephemeral_privkey);
     self_spend_payment_proposal.m_viewbalance_privkey = keys.k_vb;
     self_spend_payment_proposal.get_output_proposal_v1(self_spend_proposal_amnt_1);
-    check_is_owned_selfsend(self_spend_proposal_amnt_1, keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
+    check_is_owned(self_spend_proposal_amnt_1, keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     JamtisPaymentProposalSelfSendV1 self_spend_payment_proposal2{self_spend_payment_proposal};
     SpOutputProposalV1 self_spend_proposal2_amnt_1;
     make_secret_key(self_spend_payment_proposal2.m_enote_ephemeral_privkey);
     self_spend_payment_proposal2.get_output_proposal_v1(self_spend_proposal2_amnt_1);
-    check_is_owned_selfsend(self_spend_proposal2_amnt_1, keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
+    check_is_owned(self_spend_proposal2_amnt_1, keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     /// test cases
     boost::multiprecision::uint128_t in_amount{0};
@@ -747,7 +590,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[0].gen(1, 0);  //change = 1
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 2);
-    check_is_owned_selfsend(out_proposals[1], keys, j_change, 1, JamtisSelfSendMAC::CHANGE);
+    check_is_owned(out_proposals[1], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
     // 2 normal outputs, 0 change: 3 outputs (1 dummy)
     in_amount = 2 + fee;
@@ -792,7 +635,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[2].gen(1, 0);  //change = 1
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 4);
-    check_is_owned_selfsend(out_proposals[3], keys, j_change, 1, JamtisSelfSendMAC::CHANGE);
+    check_is_owned(out_proposals[3], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
     // 1 self-send output, 0 change: 2 outputs (1 dummy)
     in_amount = 1 + fee;
@@ -800,7 +643,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[0] = self_spend_proposal_amnt_1;
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 2);
-    check_is_owned_selfsend(out_proposals[0], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
+    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
     EXPECT_FALSE(is_self_send_output_proposal(out_proposals[1], keys.K_1_base, keys.k_vb));  //dummy
 
     // 1 self-send output, >0 change: 3 outputs (1 dummy, 1 change)
@@ -809,9 +652,9 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[0] = self_spend_proposal_amnt_1;  //change = 1
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned_selfsend(out_proposals[0], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
+    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
     EXPECT_FALSE(is_self_send_output_proposal(out_proposals[1], keys.K_1_base, keys.k_vb));  //dummy
-    check_is_owned_selfsend(out_proposals[2], keys, j_change, 1, JamtisSelfSendMAC::CHANGE);
+    check_is_owned(out_proposals[2], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
     // 1 self-send output & 1 normal output (shared ephemeral pubkey), 0 change: 2 outputs
     in_amount = 2 + fee;
@@ -837,7 +680,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[1].gen(1, 0);
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned_selfsend(out_proposals[0], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
+    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
     EXPECT_FALSE(is_self_send_output_proposal(out_proposals[2], keys.K_1_base, keys.k_vb));
 
     // 1 self-send output, 1 normal output, >0 change: 3 outputs (1 change)
@@ -847,8 +690,8 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[1].gen(1, 0);  //change = 1
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned_selfsend(out_proposals[0], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
-    check_is_owned_selfsend(out_proposals[2], keys, j_change, 1, JamtisSelfSendMAC::CHANGE);
+    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(out_proposals[2], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
     // 1 self-send output, 2 normal outputs, 0 change: 3 outputs
     in_amount = 3 + fee;
@@ -858,7 +701,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[2].gen(1, 0);
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned_selfsend(out_proposals[0], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
+    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     // 1 self-send output, 2 normal outputs, >0 change: 4 outputs (1 change)
     in_amount = 4 + fee;
@@ -868,8 +711,8 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[2].gen(1, 0);  //change = 1
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 4);
-    check_is_owned_selfsend(out_proposals[0], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
-    check_is_owned_selfsend(out_proposals[3], keys, j_change, 1, JamtisSelfSendMAC::CHANGE);
+    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(out_proposals[3], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
     // 2 self-send outputs (shared ephemeral pubkey), 0 change: error
     in_amount = 2 + fee;
@@ -892,8 +735,8 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[1] = self_spend_proposal2_amnt_1;
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned_selfsend(out_proposals[0], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
-    check_is_owned_selfsend(out_proposals[1], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
+    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(out_proposals[1], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
     EXPECT_FALSE(is_self_send_output_proposal(out_proposals[2], keys.K_1_base, keys.k_vb));
 
     // 2 self-send outputs, >0 change: 3 outputs (1 change)
@@ -903,9 +746,9 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[1] = self_spend_proposal2_amnt_1;  //change = 1
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned_selfsend(out_proposals[0], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
-    check_is_owned_selfsend(out_proposals[1], keys, j_selfspend, 1, JamtisSelfSendMAC::SELF_SPEND);
-    check_is_owned_selfsend(out_proposals[2], keys, j_change, 1, JamtisSelfSendMAC::CHANGE);
+    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(out_proposals[1], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(out_proposals[2], keys, j_change, 1, JamtisEnoteType::CHANGE);
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, tx_extra)
