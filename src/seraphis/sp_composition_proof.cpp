@@ -416,7 +416,7 @@ bool SpCompositionProofMultisigNonceRecord::try_get_recorded_nonce_pubkeys(const
         return false;
 
     // pubkeys
-    nonce_pubkeys_out= m_record.at(message).at(proof_key).at(filter);
+    nonce_pubkeys_out = m_record.at(message).at(proof_key).at(filter).signature_nonces_KI_pub;
 
     return true;
 }
@@ -498,8 +498,6 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(y)) == 0, "Bad private key (y)!");
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(z_e)), "Bad private key (z zero)!");
     CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(z_e)) == 0, "Bad private key (z)!");
-
-    CHECK_AND_ASSERT_THROW_MES(num_signers == signer_nonces_pub_2.size(), "Signer nonces mismatch!");
 
     CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(local_nonce_1_priv)) == 0, "Bad private key (local_nonce_1_priv)!");
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(local_nonce_1_priv)), "Bad private key (local_nonce_1_priv zero)!");

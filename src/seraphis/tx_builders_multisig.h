@@ -47,6 +47,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
 #include "tx_builder_types.h"
+#include "tx_builder_types_multisig.h"
 #include "tx_component_types.h"
 #include "tx_extra.h"
 #include "tx_record_types.h"
@@ -98,34 +99,35 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     const std::uint32_t threshold,
     const std::uint32_t num_signers,
     const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const std::string &version_string);
+    const crypto::secret_key &k_view_balance);
 void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     const std::uint32_t num_signers,
     std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
     std::vector<SpOutputProposalV1> opaque_payments,
     TxExtra partial_memo,
-    const std::string &version_string,
+    std::string version_string,
     const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpMultisigTxProposalV1 &proposal_out);
 
 //temp
-void check_v1_multisig_input_init_semantics_v1(const SpMultisigInputInitV1 &input_init);
-void make_v1_multisig_input_init_v1(const crypto::public_key &signer_id,
-    const std::vector<crypto::public_key> &multisig_signers,
+void check_v1_multisig_input_init_set_semantics_v1(const SpMultisigInputInitSetV1 &input_init_set,
     const std::uint32_t threshold,
+    const std::vector<crypto::public_key> &multisig_signers);
+void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
+    const std::uint32_t threshold,
+    const std::vector<crypto::public_key> &multisig_signers,
     const rct::key &proposal_prefix,
-    const crypto::key_image &key_image,
+    const rct::keyV &masked_addresses,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    SpMultisigInputInitV1 &input_init_out);
-void make_v1_multisig_input_inits_v1(const crypto::public_key &signer_id,
-    const std::vector<crypto::public_key> &multisig_signers,
+    SpMultisigInputInitSetV1 &input_init_set_out);
+void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const std::uint32_t threshold,
-    const SpMultisigTxProposalV1 &tx_proposal,
+    const std::vector<crypto::public_key> &multisig_signers,
+    const SpMultisigTxProposalV1 &multisig_tx_proposal,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    std::vector<SpMultisigInputInitV1> &input_inits_out);
+    SpMultisigInputInitSetV1 &input_init_set_out);
 
 //temp
 // - should be 'loose': make as many responses as possible, ignore signer sets that don't have nonces in the record

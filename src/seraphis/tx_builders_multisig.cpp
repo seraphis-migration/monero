@@ -261,19 +261,18 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     const std::uint32_t threshold,
     const std::uint32_t num_signers,
     const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const std::string &version_string)
+    const crypto::secret_key &k_view_balance)
 {
     // convert to a plain tx proposal to check the following
     // - unique onetime addresses
     // - if only 2 outputs, should be 1 unique enote ephemeral pubkey, otherwise 1:1 with outputs and all unique
     SpTxProposalV1 tx_proposal;
     multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
-    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
+    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string)};
 
     // convert the public input proposals
     std::vector<SpMultisigInputProposalV1> converted_input_proposals;
-    converted_input_proposals.reserve(multisig_tx_proposal.m_input_proposals);
+    converted_input_proposals.reserve(multisig_tx_proposal.m_input_proposals.size());
 
     for (const SpMultisigPublicInputProposalV1 &input_proposal : multisig_tx_proposal.m_input_proposals)
     {
@@ -299,7 +298,7 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
     std::vector<SpOutputProposalV1> opaque_payments,
     TxExtra partial_memo,
-    const std::string &version_string,
+    std::string version_string,
     const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpMultisigTxProposalV1 &proposal_out)
@@ -309,11 +308,12 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     proposal_out.m_opaque_payments = std::move(opaque_payments);
     proposal_out.m_partial_memo = std::move(partial_memo);
     proposal_out.m_aggregate_signer_set_filter = aggregate_signer_set_filter;
+    proposal_out.m_version_string = std::move(version_string);
 
     // get proposal prefix (it is safe to do this as soon as the outputs and memo are set)
     SpTxProposalV1 tx_proposal;
     proposal_out.get_v1_tx_proposal_v1(tx_proposal);
-    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
+    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(proposal_out.m_version_string)};
 
     // prepare composition proofs for each input
     proposal_out.m_input_proof_proposals.clear();
@@ -346,169 +346,139 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
         proposal_prefix);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void check_v1_multisig_input_init_semantics_v1(const SpMultisigInputInitV1 &input_init,
+void check_v1_multisig_input_init_set_semantics_v1(const SpMultisigInputInitSetV1 &input_init_set,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers)
 {
     // input init's signer must be known and permitted by the aggregate filter
-    CHECK_AND_ASSERT_THROW_MES(std::find(multisig_signers.begin(), multisig_signers.end(), input_init.m_signer_id) !=
+    CHECK_AND_ASSERT_THROW_MES(std::find(multisig_signers.begin(), multisig_signers.end(), input_init_set.m_signer_id) !=
         multisig_signers.end(), "multisig input initializer: initializer from unknown signer.");
-    CHECK_AND_ASSERT_THROW_MES(multisig::signer_is_in_filter(input_init.m_signer_id,
+    CHECK_AND_ASSERT_THROW_MES(multisig::signer_is_in_filter(input_init_set.m_signer_id,
             multisig_signers,
-            input_init.m_aggregate_signer_set_filter),
+            input_init_set.m_aggregate_signer_set_filter),
         "multisig input initializer: signer is not eligible unexpectedly.");
 
     // signer set filter must be valid (at least 'threshold' signers allowed, format is valid)
     CHECK_AND_ASSERT_THROW_MES(multisig::validate_aggregate_multisig_signer_set_filter(threshold,
             multisig_signers.size(),
-            input_init.m_aggregate_signer_set_filter),
+            input_init_set.m_aggregate_signer_set_filter),
         "multisig tx proposal: invalid aggregate signer set filter.");
 
-    // nonces should match
-    CHECK_AND_ASSERT_THROW_MES(m_signature_nonce_1_KI_pubs.size() == m_signature_nonce_2_KI_pubs.size(),
-        "multisig input initializer: nonce sets don't match.");
-
-    // should be one nonce set per signer set that contains the signer
-    // - there are 'num signers requested' choose 'threshold' total signer sets
+    // for each enote image to sign, there should be one nonce set (signing attemp) per signer set that contains the signer
+    // - there are 'num signers requested' choose 'threshold' total signer sets per enote image
     // - remove our signer, then choose 'threshold - 1' signers from the remaining 'num signers requested - 1'
     const std::uint32_t num_sets_with_signer_expected(
-            n_choose_k(multisig::get_num_flags_set(input_init.m_aggregate_signer_set_filter) - 1, threshold - 1)
+            n_choose_k(multisig::get_num_flags_set(input_init_set.m_aggregate_signer_set_filter) - 1, threshold - 1)
         );
 
-    CHECK_AND_ASSERT_THROW_MES(m_signature_nonce_1_KI_pubs.size() == num_sets_with_signer_expected,
-        "multisig input initializer: don't have expected number of nonce sets (one per signer set with signer).");
+    for (const auto &init : input_init_set.m_input_inits)
+    {
+        CHECK_AND_ASSERT_THROW_MES(init.second.size() == num_sets_with_signer_expected,
+            "multisig input initializer: don't have expected number of nonce sets (one per signer set with signer).");
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_multisig_input_init_v1(const crypto::public_key &signer_id,
+void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers,
     const rct::key &proposal_prefix,
-    const rct::key &masked_address,
+    const rct::keyV &masked_addresses,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    SpMultisigInputInitV1 &input_init_out)
+    SpMultisigInputInitSetV1 &input_init_set_out)
 {
     // set components
-    input_init_out.m_signer_id = signer_id;
-    input_init_out.m_proposal_prefix = proposal_prefix;
-    input_init_out.m_masked_address = masked_address;
-    input_init_out.m_aggregate_signer_set_filter = aggregate_signer_set_filter;
+    input_init_set_out.m_signer_id = signer_id;
+    input_init_set_out.m_proposal_prefix = proposal_prefix;
+    input_init_set_out.m_aggregate_signer_set_filter = aggregate_signer_set_filter;
 
-    // add nonces for every possible signer set that includes the signer
-    std::vector<signer_set_filter> filter_permutations;
-    multisig::aggregate_multisig_signer_set_filter_to_permutations(threshold,
-        multisig_signers.size(),
-        aggregate_signer_set_filter,
-        filter_permutations);
-
-    input_init_out.m_signature_nonce_1_KI_pubs.clear();
-    input_init_out.m_signature_nonce_2_KI_pubs.clear();
-    input_init_out.m_signature_nonce_1_KI_pubs.reserve(
+    // prepare input init nonce map
+    const std::uint32_t num_sets_with_signer_expected{
             n_choose_k(multisig::get_num_flags_set(aggregate_signer_set_filter) - 1, threshold - 1)
-        );
-    input_init_out.m_signature_nonce_2_KI_pubs.reserve(input_init_out.m_signature_nonce_1_KI_pubs.capacity());
+        };
 
-    for (const signer_set_filter filter : filter_permutations)
-    {
-        // ignore filters that don't include the signer
-        if (!multisig::signer_is_in_filter(input_init.m_signer_id, multisig_signers, filter))
-            continue;
-
-        // note: ignore failures to add nonces (using existing nonces is allowed)
-        nonce_record_inout.try_add_nonces(proposal_prefix, masked_address, filter, sp_composition_multisig_init());
-
-        // record the nonce pubkeys (should not fail)
-        input_init_out.m_signature_nonce_1_KI_pubs.emplace_back();
-        input_init_out.m_signature_nonce_2_KI_pubs.emplace_back();
-        CHECK_AND_ASSERT_THROW_MES(nonce_record_inout.try_get_recorded_nonce_pubkeys(proposal_prefix,
-                masked_address,
-                filter,
-                input_init_out.m_signature_nonce_1_KI_pubs.back(),
-                input_init_out.m_signature_nonce_2_KI_pubs.back()),
-            "multisig input init: could not get nonce pubkeys from nonce record (can fail if onetime address malformed).");
-    }
-
-    // check that the input initializer is well formed
-    check_v1_multisig_input_init_semantics_v1(input_init_out, threshold, multisig_signers);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_multisig_input_inits_v1(const crypto::public_key &signer_id,
-    const std::uint32_t threshold,
-    const std::vector<crypto::public_key> &multisig_signers,
-    const rct::key &proposal_prefix,
-    rct::keyV masked_addresses,
-    const multisig::signer_set_filter aggregate_signer_set_filter,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    std::vector<SpMultisigInputInitV1> &input_inits_out)
-{
-    // make multisig input inits
-
-    // validate: need at least one input, inputs should be unique
-    CHECK_AND_ASSERT_THROW_MES(masked_addresses.size() > 0, "multisig input initializers: no inputs to initialize.");
-
-    std::sort(masked_addresses.begin(), masked_addresses.end());
-    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(masked_addresses.begin(), masked_addresses.end()) ==
-            masked_addresses.end(),
-        "multisig input initializers: inputs are not unique (found duplicate masked address).");
-
-    // make the inits
-    input_inits_out.clear();
-    input_inits_out.reserve(masked_addresses.size());
-
+    input_init_set_out.m_input_inits.clear();
     for (const rct::key &masked_address : masked_addresses)
     {
-        // enforce canonical proof keys to ensure the prior duplicate check worked
+        // enforce canonical proof keys
         // NOTE: This is only a sanity check, as the underlying onetime addresses could contain duplicates (just with
         //       different masks).
         CHECK_AND_ASSERT_THROW_MES(key_domain_is_prime_subgroup(masked_address),
             "multisig input initializer: found enote image address with non-canonical representation!");
 
-        input_inits_out.emplace_back();
-        make_v1_multisig_input_init_v1(signer_id,
-            threshold,
-            multisig_signers,
-            proposal_prefix,
-            masked_address,
-            aggregate_signer_set_filter,
-            nonce_record_inout,
-            input_inits_out.back());
+        input_init_set_out.m_input_inits[masked_address].reserve(num_sets_with_signer_expected);
     }
+
+    CHECK_AND_ASSERT_THROW_MES(input_init_set_out.m_input_inits.size() == masked_addresses.size(),
+        "multisig input initializer: found duplicate masked address (only unique enote images allowed).");
+
+    // add nonces for every possible signer set that includes the signer
+    std::vector<multisig::signer_set_filter> filter_permutations;
+    multisig::aggregate_multisig_signer_set_filter_to_permutations(threshold,
+        multisig_signers.size(),
+        aggregate_signer_set_filter,
+        filter_permutations);
+
+    for (const multisig::signer_set_filter filter : filter_permutations)
+    {
+        // ignore filters that don't include the signer
+        if (!multisig::signer_is_in_filter(input_init_set_out.m_signer_id, multisig_signers, filter))
+            continue;
+
+        // add nonces for each enote image we want to attempt to sign with this signer set
+        for (const rct::key &masked_address : masked_addresses)
+        {
+            // note: ignore failures to add nonces (using existing nonces is allowed)
+            nonce_record_inout.try_add_nonces(proposal_prefix, masked_address, filter, sp_composition_multisig_init());
+
+            // record the nonce pubkeys (should not fail)
+            input_init_set_out.m_input_inits[masked_address].emplace_back();
+            CHECK_AND_ASSERT_THROW_MES(nonce_record_inout.try_get_recorded_nonce_pubkeys(proposal_prefix,
+                    masked_address,
+                    filter,
+                    input_init_set_out.m_input_inits[masked_address].back()),
+                "multisig input init: could not get nonce pubkeys from nonce record (bug).");
+        }
+    }
+
+    // check that the input initializer is well formed
+    check_v1_multisig_input_init_set_semantics_v1(input_init_set_out, threshold, multisig_signers);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_multisig_input_inits_v1(const crypto::public_key &signer_id,
+void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers,
-    const std::vector<SpMultisigPublicInputProposalV1> &input_proposals,
+    const SpMultisigTxProposalV1 &multisig_tx_proposal,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    std::vector<SpMultisigInputInitV1> &input_inits_out)
+    SpMultisigInputInitSetV1 &input_init_set_out)
 {
-    // make multisig input inits from input proposals
-    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "multisig input initializers: no inputs to initialize.");
+    // make multisig input inits from a tx proposal
+    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() > 0,
+        "multisig input initializer: no inputs to initialize.");
 
-    rct::key proposal_prefix{input_proposals[0].m_proposal_prefix};
-    multisig::signer_set_filter aggregate_signer_set_filter{input_proposals[0].m_aggregate_signer_set_filter};
+    // make proposal prefix
+    SpTxProposalV1 tx_proposal;
+    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
+    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string)};
+
+    // prepare masked addresses
     rct::keyV masked_addresses;
-    masked_addresses.reserve(input_proposals.size());
+    masked_addresses.reserve(multisig_tx_proposal.m_input_proposals.size());
 
-    for (const SpMultisigPublicInputProposalV1 &input_proposal : input_proposals)
+    for (const SpMultisigPublicInputProposalV1 &input_proposal : multisig_tx_proposal.m_input_proposals)
     {
-        CHECK_AND_ASSERT_THROW_MES(input_proposal.m_proposal_prefix == proposal_prefix,
-            "multisig input initializers: proposal prefix mismatch.");
-        CHECK_AND_ASSERT_THROW_MES(input_proposal.m_aggregate_signer_set_filter == aggregate_signer_set_filter,
-            "multisig input initializers: aggregate signer set mismatch mismatch.");
-
         masked_addresses.emplace_back();
         mask_key(input_proposal.m_address_mask, input_proposal.m_enote.m_core.m_onetime_address, masked_addresses.back());
     }
 
-    make_v1_multisig_input_inits_v1(signer_id,
+    make_v1_multisig_input_init_set_v1(signer_id,
         threshold,
         multisig_signers,
         proposal_prefix,
-        std::move(masked_addresses),
-        aggregate_signer_set_filter,
+        masked_addresses,
+        multisig_tx_proposal.m_aggregate_signer_set_filter,
         nonce_record_inout,
-        input_inits_out);
+        input_init_set_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigV1 &input_partial_sig)

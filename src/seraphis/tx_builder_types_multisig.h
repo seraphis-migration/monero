@@ -38,6 +38,7 @@
 #include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
+#include "sp_composition_proof.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_extra.h"
@@ -129,6 +130,9 @@ struct SpMultisigTxProposalV1 final
     /// - the set may be larger than 'threshold', in which case every permutation of 'threshold' signers will attempt to sign
     multisig::signer_set_filter m_aggregate_signer_set_filter;
 
+    /// encoding of tx version
+    std::string m_version_string;
+
     /// convert to plain tx proposal
     void get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_out) const;
 };
@@ -163,24 +167,24 @@ struct SpMultisigInputInitV1 final
 ////
 // SpMultisigInputInitV1
 // - initialize seraphis composition proofs for a set of enote images
-// - for each enote image:
+// - each enote image:
 //   - has proof nonce pairs for multiple sets of multisig signers (represented by an aggregate filter)
 //   - only signer sets that include 'signer_id' have initializer nonces
 ///
 struct SpMultisigInputInitSetV1 final
 {
-    /// id of signer who made this input initializer
+    /// id of signer who made this input initializer set
     crypto::public_key m_signer_id;
-    /// proposal prefix (represents the set of destinations and memos; will be signed by this input's image proof)
+    /// proposal prefix (represents the set of destinations and memos; will be signed by the image proofs)
     rct::key m_proposal_prefix;
 
-    /// all multisig signers who should participate in attempting to make this composition proof
+    /// all multisig signers who should participate in attempting to make these composition proofs
     multisig::signer_set_filter m_aggregate_signer_set_filter;
 
     // map [masked address : {alpha_{ki,1,e}*U, alpha_{ki,2,e}*U}]
     // - key: masked addresses for enote images to sign
     // - value: signature nonce pubkeys for each signer set that includes the specified signer id (i.e. each tx attempt)
-    //   - WARNING: ordering is dependent on the permutation generator
+    //   - WARNING: ordering is dependent on the signer set filter permutation generator
     std::unordered_map<rct::key, std::vector<SpCompositionProofMultisigPubNonces>> m_input_inits;
 };
 

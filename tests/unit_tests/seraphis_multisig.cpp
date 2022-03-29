@@ -168,7 +168,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
 
         // complete and validate each signature attempt
         std::vector<sp::SpCompositionProofMultisigPartial> partial_sigs;
-        std::vector<SpCompositionProofMultisigPubNonces> signer_nonces_pubs;
+        std::vector<sp::SpCompositionProofMultisigPubNonces> signer_nonces_pubs;
         crypto::secret_key z_temp;
         sp::SpCompositionProof proof;
 
