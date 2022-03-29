@@ -139,33 +139,6 @@ struct SpMultisigTxProposalV1 final
 
 ////
 // SpMultisigInputInitV1
-// - initialize a seraphis composition proof for an enote image
-// - has proof nonce pairs for multiple sets of multisig signers (represented by an aggregate filter)
-// - only signer sets that include 'signer_id' will be initialized
-///
-struct SpMultisigInputInitV1 final
-{
-    /// id of signer who made this input initializer
-    crypto::public_key m_signer_id;
-    /// proposal prefix (represents the set of destinations and memos; will be signed by this input's image proof)
-    rct::key m_proposal_prefix;
-    /// onetime address of the enote this initializer corresponds to (for tracking)
-    rct::key m_onetime_address;
-
-    /// all multisig signers who should participate in attempting to make this composition proof
-    multisig::signer_set_filter m_aggregate_signer_set_filter;
-
-    /// signature nonce pubkeys for each signer set that includes the specified signer id (i.e. each tx attempt)
-    /// - all permutations of the aggregate filter that don't include the signer id are ignored
-    /// - WARNING: ordering is dependent on the permutation generator
-    // alpha_{ki,1,e}*U
-    std::vector<rct::key> m_signature_nonce_1_KI_pubs;
-    // alpha_{ki,2,e}*U
-    std::vector<rct::key> m_signature_nonce_2_KI_pubs;
-};
-
-////
-// SpMultisigInputInitV1
 // - initialize seraphis composition proofs for a set of enote images
 // - each enote image:
 //   - has proof nonce pairs for multiple sets of multisig signers (represented by an aggregate filter)
@@ -177,7 +150,6 @@ struct SpMultisigInputInitSetV1 final
     crypto::public_key m_signer_id;
     /// proposal prefix (represents the set of destinations and memos; will be signed by the image proofs)
     rct::key m_proposal_prefix;
-
     /// all multisig signers who should participate in attempting to make these composition proofs
     multisig::signer_set_filter m_aggregate_signer_set_filter;
 
@@ -189,21 +161,20 @@ struct SpMultisigInputInitSetV1 final
 };
 
 ////
-// SpMultisigInputPartialSigV1
-// - partially signed input; combine partial signatures to complete the image proof for a partial input
+// SpMultisigInputPartialSigSetV1
+// - set of partially signed inputs; combine partial signatures to complete the image proof for a partial input
 ///
-struct SpMultisigInputPartialSigV1 final
+struct SpMultisigInputPartialSigSetV1 final
 {
-    /// proposal prefix (represents the set of destinations and memos; signed by this composition proof)
+    /// id of signer who made these partial signatures
+    crypto::public_key m_signer_id;
+    /// proposal prefix (represents the set of destinations and memos; signed by these composition proofs)
     rct::key m_proposal_prefix;
-    /// key image of the enote image this partial response corresponds to
-    crypto::key_image m_key_image;
-
-    /// partial signature for the enote image's composition proof
-    SpCompositionProofMultisigPartial m_partial_signature;
-
-    /// set of multisig signers this partial signature corresponds to
+    /// set of multisig signers these partial signatures correspond to
     multisig::signer_set_filter m_signer_set_filter;
+
+    // partial signatures for the masked addresses in a set of enote images
+    std::vector<SpCompositionProofMultisigPartial> m_partial_signatures;
 };
 
 } //namespace sp
