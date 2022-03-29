@@ -46,6 +46,7 @@ namespace sp
 {
     class LedgerContext;
     class MockLedgerContext;
+    struct SpTxSquashedV1;
 }
 
 
@@ -121,6 +122,7 @@ void get_versioning_string(const unsigned char tx_semantic_rules_version, std::s
 
 
 //// core validators
+/// - note: all specializations must be defined explicitly to prevent overload injection
 
 /**
 * brief: validate_tx - validate a seraphis transaction
@@ -130,7 +132,9 @@ void get_versioning_string(const unsigned char tx_semantic_rules_version, std::s
 * return: true/false on validation result
 */
 template <typename SpTxType>
-bool validate_tx(const SpTxType &tx, const LedgerContext &ledger_context, const bool defer_batchable)
+bool validate_tx(const SpTxType &tx, const LedgerContext &ledger_context, const bool defer_batchable);
+template <typename SpTxType>
+bool validate_tx_impl(const SpTxType &tx, const LedgerContext &ledger_context, const bool defer_batchable)
 {
     if (!validate_tx_semantics(tx))
         return false;
@@ -154,7 +158,9 @@ bool validate_tx(const SpTxType &tx, const LedgerContext &ledger_context, const 
 * return: true/false on verification result
 */
 template <typename SpTxType>
-bool validate_txs(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context)
+bool validate_txs(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context);
+template <typename SpTxType>
+bool validate_txs_impl(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context)
 {
     // validate non-batchable
     for (const SpTxType *tx : txs)
@@ -168,6 +174,21 @@ bool validate_txs(const std::vector<const SpTxType*> &txs, const LedgerContext &
         return false;
 
     return true;
+}
+
+/// SpTxSquashedV1
+template <>
+inline bool validate_tx<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
+    const LedgerContext &ledger_context,
+    const bool defer_batchable)
+{
+    return validate_tx_impl<SpTxSquashedV1>(tx, ledger_context, defer_batchable);
+}
+template <>
+inline bool validate_txs<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs,
+    const LedgerContext &ledger_context)
+{
+    return validate_txs_impl<SpTxSquashedV1>(txs, ledger_context);
 }
 
 
