@@ -29,6 +29,7 @@
 // NOT FOR PRODUCTION
 
 // base tx interface
+// WARNING: this file MUST NOT acquire more includes (may open a hole for overload injection)
 
 #pragma once
 
@@ -123,8 +124,8 @@ void get_versioning_string(const unsigned char tx_semantic_rules_version, std::s
 
 //// core validators
 /// - note: specialize the validate_tx functions with definitions in tx_base.cpp, so the validate_tx_impl functions
-//          will be explicitly instantiated using the formulas written below (this way maliciously injected overloads
-//          of the validate_tx_impl functions won't be available to the compiler when defining the validate_tx functions)
+///         will be explicitly instantiated using the formulas written below (this way maliciously injected overloads
+///         of the validate_tx_impl functions won't be available to the compiler when defining the validate_tx functions)
 
 /**
 * brief: validate_tx - validate a seraphis transaction

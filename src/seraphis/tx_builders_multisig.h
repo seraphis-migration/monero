@@ -89,6 +89,9 @@ bool try_get_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1
     SpMultisigInputProposalV1 &proposal_out);
 
 //temp
+// unvalidated preconditions:
+// - input/output counts match the desired tx semantic rules version
+// - inputs have unique key images
 void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const std::uint32_t threshold,
     const std::uint32_t num_signers,
@@ -105,6 +108,9 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     SpMultisigTxProposalV1 &proposal_out);
 
 //temp
+// unvalidated preconditions:
+// - input count matches the desired tx semantic rules version
+// - inputs have unique key images
 void check_v1_multisig_input_init_set_semantics_v1(const SpMultisigInputInitSetV1 &input_init_set,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers);
@@ -126,29 +132,16 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
 //temp
 // - should be 'loose': make as many responses as possible, ignore signer sets that don't have nonces in the record
 //   (in case earlier responses removed nonces from the record)
-void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigV1 &input_partial_sig);
-void make_v1_multisig_input_partial_sig_v1(const multisig::multisig_account &signer_account,
-    const SpMultisigInputProposalV1 &input_proposal,
-    const crypto::secret_key &input_enote_view_privkey,
-    const rct::key &proposal_prefix,
-    const multisig::signer_set_filter signer_set_filter,
+void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigSetV1 &input_partial_sig);
+bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_account &signer_account,
+    const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const SpMultisigInputInitSetV1 &local_input_init_set,
+    std::vector<SpMultisigInputInitSetV1> other_input_init_sets,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    SpMultisigInputPartialSigV1 &input_partial_sig_out);
-void make_v1_multisig_input_partial_sigs_single_input_v1(const multisig::multisig_account &signer_account,
-    const SpMultisigInputProposalV1 &input_proposal,
-    const crypto::secret_key &input_enote_view_privkey,
-    const std::vector<SpMultisigInputInitV1> &input_inits,  //including from self
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    std::vector<SpMultisigInputPartialSigV1> &input_partial_sigs_out);
-void make_v1_multisig_input_partial_sigs_multiple_inputs_v1(const multisig::multisig_account &signer_account,
-    const std::vector<SpMultisigInputProposalV1> &input_proposals,
-    const std::unordered_map<crypto::key_image, crypto::secret_key> &input_enote_view_privkeys,
-    const std::vector<SpMultisigInputInitV1> &input_inits,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
-    std::unordered_map<crypto::key_image, std::vector<SpMultisigInputPartialSigV1>> &input_partial_sigs_out);
+    std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sig_sets_out);
 
 void make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposal,
-    const std::vector<SpMultisigInputPartialSigV1> &input_partial_sigs,
+    const std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sigs,
     SpPartialInputV1 &partial_input_out);
 
 } //namespace sp

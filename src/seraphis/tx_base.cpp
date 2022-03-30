@@ -36,6 +36,7 @@
 //third party headers
 
 //standard headers
+#include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
@@ -44,16 +45,13 @@ namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-bool validate_tx<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
-    const LedgerContext &ledger_context,
-    const bool defer_batchable)
+bool validate_tx<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context, const bool defer_batchable)
 {
     return validate_tx_impl<SpTxSquashedV1>(tx, ledger_context, defer_batchable);
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-bool validate_txs<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs,
-    const LedgerContext &ledger_context)
+bool validate_txs<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs, const LedgerContext &ledger_context)
 {
     return validate_txs_impl<SpTxSquashedV1>(txs, ledger_context);
 }

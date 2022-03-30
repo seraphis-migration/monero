@@ -135,6 +135,9 @@ struct SpMultisigTxProposalV1 final
 
     /// convert to plain tx proposal
     void get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_out) const;
+
+    /// get the tx proposal prefix that will be signed by input composition proofs
+    rct::key get_proposal_prefix_v1() const;
 };
 
 ////

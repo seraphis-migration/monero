@@ -243,7 +243,7 @@ namespace multisig
     * param: filter - filter for selecting signers out of the signer list for creating a signature
     * outparam: aggregate_key_out - local signer's privkey contribution to a multisig signing event
     */
-    bool try_get_aggregate_signing_key(const signer_set_filter filter, crypto::secret_key &aggregate_key_out);
+    bool try_get_aggregate_signing_key(const signer_set_filter filter, crypto::secret_key &aggregate_key_out) const;
 
   //member variables
   private:

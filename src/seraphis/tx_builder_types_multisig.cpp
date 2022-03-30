@@ -122,4 +122,11 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_o
         tx_proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
+rct::key SpMultisigTxProposalV1::get_proposal_prefix_v1() const
+{
+    SpTxProposalV1 tx_proposal;
+    this->get_v1_tx_proposal_v1(tx_proposal);
+    return tx_proposal.get_proposal_prefix(m_version_string);
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp
