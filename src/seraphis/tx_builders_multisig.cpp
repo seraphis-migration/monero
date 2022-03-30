@@ -86,26 +86,13 @@ static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxP
     const std::uint32_t threshold,
     const std::uint32_t num_signers,
     const std::vector<SpMultisigInputProposalV1> &converted_input_proposals,
-    const std::vector<rct::xmr_amount> &out_amounts,
     const rct::key &proposal_prefix)
 {
     // should be at least 1 input and 1 output
     CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() > 0, "multisig tx proposal: no inputs.");
-    CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "multisig tx proposal: no outputs.");
-
-    // output amounts >= input amounts (note: equality in real txs is unlikely due to tx fees)
-    using boost::multiprecision::uint128_t;
-    uint128_t input_sum{0};
-    uint128_t output_sum{0};
-
-    for (const SpMultisigInputProposalV1 &input_proposal : converted_input_proposals)
-        input_sum += input_proposal.m_input_amount;
-
-    for (const rct::xmr_amount out_amount : out_amounts)
-        output_sum += out_amount;
-
-    CHECK_AND_ASSERT_THROW_MES(input_sum <= output_sum,
-        "multisig tx proposal: input amount exceeds proposed output amount.");
+    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_explicit_payments.size() +
+            multisig_tx_proposal.m_opaque_payments.size() > 0,
+        "multisig tx proposal: no outputs.");
 
     // input proposals line up 1:1 with input proof proposals, each input has a unique key image
     CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() ==
@@ -302,9 +289,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     // convert to a plain tx proposal to check the following
     // - unique onetime addresses
     // - if only 2 outputs, should be 1 unique enote ephemeral pubkey, otherwise 1:1 with outputs and all unique
-    SpTxProposalV1 tx_proposal;
-    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
-    const rct::key proposal_prefix{tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string)};
+    const rct::key proposal_prefix{multisig_tx_proposal.get_proposal_prefix_v1()};
 
     // convert the public input proposals
     std::vector<SpMultisigInputProposalV1> converted_input_proposals;
@@ -325,7 +310,6 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
         threshold,
         num_signers,
         converted_input_proposals,
-        tx_proposal.m_output_amounts,
         proposal_prefix);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -346,10 +330,8 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     proposal_out.m_aggregate_signer_set_filter = aggregate_signer_set_filter;
     proposal_out.m_version_string = std::move(version_string);
 
-    // get proposal prefix (it is safe to do this as soon as the outputs and memo are set)
-    SpTxProposalV1 tx_proposal;
-    proposal_out.get_v1_tx_proposal_v1(tx_proposal);
-    const rct::key proposal_prefix{tx_proposal.get_proposal_prefix(proposal_out.m_version_string)};
+    // get proposal prefix (it is safe to do this as soon as the outputs, memo, and version are set)
+    const rct::key proposal_prefix{proposal_out.get_proposal_prefix_v1()};
 
     // prepare composition proofs for each input
     proposal_out.m_input_proof_proposals.clear();
@@ -378,7 +360,6 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
         threshold,
         num_signers,
         full_input_proposals,
-        tx_proposal.m_output_amounts,
         proposal_prefix);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -714,6 +695,8 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
                 }
 
                 // final sanity check
+                // - if this throws, then the signer's nonces for this filter/proposal/input_set combo will be
+                //   completely lost; however, if it does throw then this signing attempt was futile to begin with
                 check_v1_multisig_input_partial_sig_semantics_v1(input_partial_sig_sets_out.back());
             }
             catch (...)
