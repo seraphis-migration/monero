@@ -89,8 +89,8 @@ rct::key get_tx_image_proof_message_v1(const std::string &version_string,
     hash.reserve(sizeof(CRYPTONOTE_NAME) +
         version_string.size() +
         output_enotes.size()*SpEnoteV1::get_size_bytes() +
-        tx_supplement.m_output_enote_ephemeral_pubkeys.size() +
-        tx_supplement.m_tx_extra.size());
+        tx_supplement.get_size_bytes());
+
     hash = CRYPTONOTE_NAME;
     hash += version_string;
     for (const auto &output_enote : output_enotes)

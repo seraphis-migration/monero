@@ -122,7 +122,9 @@ void get_versioning_string(const unsigned char tx_semantic_rules_version, std::s
 
 
 //// core validators
-/// - note: all specializations must be defined explicitly to prevent overload injection
+/// - note: specialize the validate_tx functions with definitions in tx_base.cpp, so the validate_tx_impl functions
+//          will be explicitly instantiated using the formulas written below (this way maliciously injected overloads
+//          of the validate_tx_impl functions won't be available to the compiler when defining the validate_tx functions)
 
 /**
 * brief: validate_tx - validate a seraphis transaction
@@ -178,18 +180,9 @@ bool validate_txs_impl(const std::vector<const SpTxType*> &txs, const LedgerCont
 
 /// SpTxSquashedV1
 template <>
-inline bool validate_tx<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
-    const LedgerContext &ledger_context,
-    const bool defer_batchable)
-{
-    return validate_tx_impl<SpTxSquashedV1>(tx, ledger_context, defer_batchable);
-}
+bool validate_tx<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context, const bool defer_batchable);
 template <>
-inline bool validate_txs<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs,
-    const LedgerContext &ledger_context)
-{
-    return validate_txs_impl<SpTxSquashedV1>(txs, ledger_context);
-}
+bool validate_txs<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs, const LedgerContext &ledger_context);
 
 
 //// mock-ups

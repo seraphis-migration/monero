@@ -79,12 +79,6 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpMultisigInputProposalV1 &proposal_out);
-void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
-    const crypto::secret_key &enote_view_privkey,
-    const rct::xmr_amount &input_amount,
-    const crypto::secret_key &input_amount_blinding_factor,
-    SpMultisigInputProposalV1 &proposal_out);
 void make_v1_multisig_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,

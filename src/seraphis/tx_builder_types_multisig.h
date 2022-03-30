@@ -130,7 +130,7 @@ struct SpMultisigTxProposalV1 final
     /// - the set may be larger than 'threshold', in which case every permutation of 'threshold' signers will attempt to sign
     multisig::signer_set_filter m_aggregate_signer_set_filter;
 
-    /// encoding of tx version
+    /// encoding of intended tx version
     std::string m_version_string;
 
     /// convert to plain tx proposal

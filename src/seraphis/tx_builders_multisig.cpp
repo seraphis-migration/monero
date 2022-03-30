@@ -96,6 +96,10 @@ static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxP
     const std::vector<rct::xmr_amount> &out_amounts,
     const rct::key &proposal_prefix)
 {
+    // should be at least 1 input and 1 output
+    CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() > 0, "multisig tx proposal: no inputs.");
+    CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "multisig tx proposal: no outputs.");
+
     // output amounts >= input amounts (note: equality in real txs is unlikely due to tx fees)
     using boost::multiprecision::uint128_t;
     uint128_t input_sum{0};
@@ -199,24 +203,6 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
 
     // make sure it is well-formed
     check_v1_multisig_input_proposal_semantics_v1(proposal_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
-    const crypto::secret_key &enote_view_privkey,
-    const rct::xmr_amount &input_amount,
-    const crypto::secret_key &input_amount_blinding_factor,
-    SpMultisigInputProposalV1 &proposal_out)
-{
-    // make multisig input proposal with new masks
-    make_v1_multisig_input_proposal_v1(enote,
-        enote_ephemeral_pubkey,
-        enote_view_privkey,
-        input_amount,
-        input_amount_blinding_factor,
-        rct::rct2sk(rct::skGen()),
-        rct::rct2sk(rct::skGen()),
-        proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
@@ -337,7 +323,7 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     for (const SpMultisigInputProposalV1 &full_input_proposal : full_input_proposals)
         proposal_out.m_input_proposals.emplace_back(full_input_proposal.m_core);
 
-    // make sure the proposal is well-formed
+    // sanity check the proposal contents
     check_v1_multisig_tx_proposal_semantics_v1_final(proposal_out,
         threshold,
         num_signers,
