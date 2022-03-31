@@ -83,15 +83,23 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpMultisigInputProposalV1 &proposal_out);
-bool try_get_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1 &proposal_core,
+bool try_get_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1 &public_input_proposal,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpMultisigInputProposalV1 &proposal_out);
+bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicInputProposalV1> &public_input_proposals,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    std::vector<SpMultisigInputProposalV1> &converted_input_proposals_out);
 
 //temp
 // unvalidated preconditions:
 // - input/output counts match the desired tx semantic rules version
 // - inputs have unique key images
+void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const rct::xmr_amount desired_fee);
 void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const std::uint32_t threshold,
     const std::uint32_t num_signers,
@@ -130,8 +138,6 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     SpMultisigInputInitSetV1 &input_init_set_out);
 
 //temp
-// - should be 'loose': make as many responses as possible, ignore signer sets that don't have nonces in the record
-//   (in case earlier responses removed nonces from the record)
 void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigSetV1 &input_partial_sig);
 bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_account &signer_account,
     const SpMultisigTxProposalV1 &multisig_tx_proposal,
