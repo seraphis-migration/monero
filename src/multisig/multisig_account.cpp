@@ -353,14 +353,10 @@ namespace multisig
 
     for (std::size_t key_index{0}; key_index < m_multisig_privkeys.size(); ++key_index)
     {
-      const std::unordered_set<crypto::public_key> empty_set;
-      const auto &origins = [&]() -> const std::unordered_set<crypto::public_key>&
-        {
-          if (m_keyshare_to_origins_map.find(m_multisig_keyshare_pubkeys[key_index]) != m_keyshare_to_origins_map.end())
-            return m_keyshare_to_origins_map.at(m_multisig_keyshare_pubkeys[key_index]);
-          else
-            return empty_set;
-        }();
+      const auto &origins =
+        m_keyshare_to_origins_map.find(m_multisig_keyshare_pubkeys[key_index]) != m_keyshare_to_origins_map.end()
+        ? m_keyshare_to_origins_map.at(m_multisig_keyshare_pubkeys[key_index])
+        : std::unordered_set<crypto::public_key>{};
 
       if (std::find_if(origins.begin(), origins.end(),
           [&](const crypto::public_key &origin) -> bool

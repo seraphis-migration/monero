@@ -129,4 +129,19 @@ rct::key SpMultisigTxProposalV1::get_proposal_prefix_v1() const
     return tx_proposal.get_proposal_prefix(m_version_string);
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool SpMultisigInputInitSetV1::try_get_nonces(const rct::key &masked_address,
+    const std::size_t nonces_index,
+    SpCompositionProofMultisigPubNonces &nonces_out) const
+{
+    if (m_input_inits.find(masked_address) == m_input_inits.end())
+        return false;
+
+    if (m_input_inits.at(masked_address).size() <= nonces_index)
+        return false;
+
+    nonces_out = m_input_inits.at(masked_address)[nonces_index];
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

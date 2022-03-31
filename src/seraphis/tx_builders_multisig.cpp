@@ -566,8 +566,12 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
 
     /// prepare for signing
 
+    // save local signer as filter
+    multisig::signer_set_filter local_signer_filter;
+    multisig::multisig_signer_to_filter(signer_account.get_base_pubkey(), multisig_signers, local_signer_filter);
+
     // add local signer to init sets
-    other_input_init_sets.emplace_back(local_input_init_set);
+    other_input_init_sets.emplace_back(std::move(local_input_init_set));
 
     // collect available signers
     std::vector<crypto::public_key> available_signers;
@@ -634,9 +638,10 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
 
     for (const multisig::signer_set_filter filter : filter_permutations)
     {
-        // for filters that contain only available signers, make a partial signature set
+        // for filters that contain only available signers (and include the local signer), make a partial signature set
         // - throw on failure so the partial sig set can be rolled back
-        if ((filter & available_signers_filter) == filter)
+        if ((filter & available_signers_filter) == filter &&
+            (filter & local_signer_filter))
         {
             input_partial_sig_sets_out.emplace_back();
             try
@@ -660,18 +665,15 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
                         if ((available_signers_as_filters[signer_index] & filter) == 0)
                             continue;
 
-                        // crazy indexing:
+                        // indexing:
                         // - this signer's init set
                         // - select the input we are working on (via this input's masked address)
                         // - select the nonces that line up with the signer's nonce tracker
-                        CHECK_AND_ASSERT_THROW_MES(other_input_init_sets[signer_index].
-                            m_input_inits[input_masked_addresses[input_index]].size() >
-                            signer_nonce_trackers[signer_index], "");  //sanity check: prior semantic checks should prevent this
-
-                        signer_pub_nonces_temp.emplace_back(
-                                other_input_init_sets[signer_index].
-                                    m_input_inits[input_masked_addresses[input_index]][signer_nonce_trackers[signer_index]]
-                            );
+                        signer_pub_nonces_temp.emplace_back();
+                        if (!other_input_init_sets[signer_index].try_get_nonces(input_masked_addresses[input_index],
+                                signer_nonce_trackers[signer_index],
+                                signer_pub_nonces_temp.back()))
+                            throw;
                     }
 
                     // sanity check
