@@ -42,8 +42,10 @@ set(seraphis_sources
   sp_crypto_utils.cpp
   tx_base.cpp
   tx_builder_types.cpp
+  tx_builder_types_multisig.cpp
   tx_builders_inputs.cpp
   tx_builders_mixed.cpp
+  tx_builders_multisig.cpp
   tx_builders_outputs.cpp
   tx_component_types.cpp
   tx_extra.cpp

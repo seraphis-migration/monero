@@ -71,7 +71,7 @@ bool SpInputProposal::operator<(const SpInputProposal &other_proposal) const
     crypto::key_image this_KI, other_KI;
     this->get_key_image(this_KI);
     other_proposal.get_key_image(other_KI);
-    return memcmp(&this_KI, &other_KI, sizeof(rct::key)) < 0;
+    return this_KI < other_KI;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpInputProposal::get_key_image(crypto::key_image &key_image_out) const
