@@ -138,7 +138,8 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     SpMultisigInputInitSetV1 &input_init_set_out);
 
 //temp
-void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigSetV1 &input_partial_sig);
+void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigSetV1 &input_partial_sig_set,
+    const std::vector<crypto::public_key> &multisig_signers);
 bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_account &signer_account,
     const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const SpMultisigInputInitSetV1 &local_input_init_set,
@@ -146,8 +147,16 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sig_sets_out);
 
-void make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposal,
-    const std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sigs,
+//temp
+bool try_make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposal,
+    const rct::key &expected_proposal_prefix,
+    const std::vector<SpCompositionProofMultisigPartial> &input_proof_partial_sigs,
     SpPartialInputV1 &partial_input_out);
+void make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::vector<crypto::public_key> &multisig_signers,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    std::vector<SpMultisigInputPartialSigSetV1> input_partial_sigs,
+    std::vector<SpPartialInputV1> &partial_inputs_out);
 
 } //namespace sp

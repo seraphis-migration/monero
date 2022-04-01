@@ -69,6 +69,18 @@ struct SpMultisigPublicInputProposalV1 final
     crypto::secret_key m_address_mask;
     /// t_c
     crypto::secret_key m_commitment_mask;
+
+    /**
+    * brief: get_masked_address - get this input's image's masked address
+    * outparam: masked_address_out - Ko'
+    */
+    void get_masked_address(rct::key &masked_address_out) const;
+
+    /**
+    * brief: get_squash_prefix - get this input's enote's squash prefix
+    * outparam: squash_prefix_out - H(Ko, C)
+    */
+    void get_squash_prefix(crypto::secret_key &squash_prefix_out) const;
 };
 
 ////

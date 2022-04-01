@@ -54,6 +54,23 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
+void SpMultisigPublicInputProposalV1::get_masked_address(rct::key &masked_address_out) const
+{
+    // Ko' = t_k G + H(Ko,C) Ko
+    make_seraphis_squashed_address_key(m_enote.m_core.m_onetime_address,
+        m_enote.m_core.m_amount_commitment,
+        masked_address_out);  //H(Ko,C) Ko
+    sp::mask_key(m_address_mask,
+        masked_address_out,
+        masked_address_out);  //t_k G + H(Ko,C) Ko
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpMultisigPublicInputProposalV1::get_squash_prefix(crypto::secret_key &squash_prefix_out) const
+{
+    // H(Ko,C)
+    make_seraphis_squash_prefix(m_enote.m_core.m_onetime_address, m_enote.m_core.m_amount_commitment, squash_prefix_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool SpMultisigInputProposalV1::operator<(const SpMultisigInputProposalV1 &other_proposal) const
 {
     crypto::key_image this_KI, other_KI;
@@ -83,12 +100,7 @@ void SpMultisigInputProposalV1::get_enote_image(SpEnoteImage &image_out) const
     this->get_enote_core(enote_temp);
 
     // Ko' = t_k G + H(Ko,C) Ko
-    make_seraphis_squashed_address_key(enote_temp.m_onetime_address,
-        enote_temp.m_amount_commitment,
-        image_out.m_masked_address);  //H(Ko,C) Ko
-    sp::mask_key(m_core.m_address_mask,
-        image_out.m_masked_address,
-        image_out.m_masked_address);  //t_k G + H(Ko,C) Ko
+    m_core.get_masked_address(image_out.m_masked_address);
 
     // C' = t_c G + C
     sp::mask_key(m_core.m_commitment_mask, enote_temp.m_amount_commitment, image_out.m_masked_commitment);
