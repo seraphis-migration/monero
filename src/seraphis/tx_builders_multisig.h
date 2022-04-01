@@ -95,7 +95,6 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
 //temp
 // unvalidated preconditions:
 // - input/output counts match the desired tx semantic rules version
-// - inputs have unique key images
 void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
@@ -118,7 +117,7 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
 //temp
 // unvalidated preconditions:
 // - input count matches the desired tx semantic rules version
-// - inputs have unique key images
+// - inputs have unique key images (can use check_v1_multisig_tx_proposal_semantics_v1() to ensure this)
 void check_v1_multisig_input_init_set_semantics_v1(const SpMultisigInputInitSetV1 &input_init_set,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers);

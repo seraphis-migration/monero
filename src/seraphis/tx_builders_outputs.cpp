@@ -87,7 +87,7 @@ void check_v1_output_proposal_set_semantics_v1(const std::vector<SpOutputProposa
     if (output_proposals.size() == 2)
     {
         CHECK_AND_ASSERT_THROW_MES(output_proposals[0].m_enote_ephemeral_pubkey == 
-            output_proposals[1].m_enote_ephemeral_pubkey,
+                output_proposals[1].m_enote_ephemeral_pubkey,
             "Semantics check output proposals v1: there are 2 outputs but they don't share an enote ephemeral pubkey.");
     }
 
@@ -110,6 +110,13 @@ void check_v1_output_proposal_set_semantics_v1(const std::vector<SpOutputProposa
     CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(output_proposals.begin(), output_proposals.end(), equals_from_less{})
             == output_proposals.end(),
         "Semantics check output proposals v1: output onetime addresses are not all unique.");
+
+    // proposal onetime addresses should be canonical (sanity check so our tx outputs don't have duplicate key images)
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
+    {
+        CHECK_AND_ASSERT_THROW_MES(output_proposal.m_core.onetime_address_is_canonical(),
+            "Semantics check output proposals v1: an output onetime address is not in the prime subgroup.");
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs)

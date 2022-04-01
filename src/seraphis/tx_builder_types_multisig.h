@@ -99,9 +99,6 @@ struct SpMultisigInputProposalV1 final
     /// x: input amount commitment's blinding factor
     crypto::secret_key m_input_amount_blinding_factor;
 
-    /// less-than operator for sorting (VERY SLOW: USE WITH CAUTION)
-    bool operator<(const SpMultisigInputProposalV1 &other_proposal) const;
-
     /**
     * brief: get_key_image - get this input's key image
     * outparam: key_image_out - KI

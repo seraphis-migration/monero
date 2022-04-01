@@ -114,6 +114,11 @@ void SpInputProposal::gen(const rct::xmr_amount amount)
     m_commitment_mask = rct::rct2sk(rct::skGen());;
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool SpOutputProposal::onetime_address_is_canonical() const
+{
+    return key_domain_is_prime_subgroup(m_onetime_address);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void SpOutputProposal::get_enote_core(SpEnote &enote_out) const
 {
     make_seraphis_enote_core(m_onetime_address, m_amount_blinding_factor, m_amount, enote_out);

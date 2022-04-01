@@ -93,7 +93,7 @@ struct SpEnoteImage final
     /// less-than operator for sorting
     bool operator<(const SpEnoteImage &other_image) const
     {
-        return memcmp(&m_key_image, &other_image.m_key_image, sizeof(crypto::key_image)) < 0;
+        return m_key_image < other_image.m_key_image;
     }
 
     static std::size_t get_size_bytes() { return 32*3; }
@@ -165,6 +165,9 @@ struct SpOutputProposal final
     {
         return memcmp(&m_onetime_address, &other_proposal.m_onetime_address, sizeof(rct::key)) < 0;
     }
+
+    /// check if the onetime address is canonical
+    bool onetime_address_is_canonical() const;
 
     /**
     * brief: get_enote_core - get the enote this input proposal represents

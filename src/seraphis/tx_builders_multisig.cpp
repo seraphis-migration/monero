@@ -103,7 +103,6 @@ static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxP
         "multisig tx proposal: input proposals don't line up with input proposal proofs.");
 
     SpEnote enote_core_temp;
-    SpEnoteImage enote_image_temp;
     std::vector<crypto::key_image> key_images;
     key_images.reserve(converted_input_proposals.size());
 
@@ -115,15 +114,18 @@ static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxP
 
         // input proof proposal keys and key images all line up 1:1 and match with input proposals
         converted_input_proposals[input_index].get_enote_core(enote_core_temp);
-        converted_input_proposals[input_index].get_enote_image(enote_image_temp);
+        key_images.emplace_back();
+        converted_input_proposals[input_index].get_key_image(key_images.back());
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].K ==
-            enote_core_temp.m_onetime_address,
+                enote_core_temp.m_onetime_address,
             "multisig tx proposal: input proof proposal does not match input proposal (different onetime addresses).");
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].KI ==
-            enote_image_temp.m_key_image,
+                key_images.back(),
             "multisig tx proposal: input proof proposal does not match input proposal (different key images).");
 
-        key_images.emplace_back(enote_image_temp.m_key_image);
+        // check that the key image obtained is canonical
+        CHECK_AND_ASSERT_THROW_MES(key_domain_is_prime_subgroup(rct::ki2rct(key_images.back())),
+            "multisig tx proposal: an input's key image is not in the prime subgroup.");
     }
 
     std::sort(key_images.begin(), key_images.end());
@@ -693,16 +695,17 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     // - we want to track through each signers' vectors as we go through the full set of 'filter_permutations'
     std::vector<std::size_t> signer_nonce_trackers(available_signers.size(), 0);
 
+    std::vector<SpCompositionProofMultisigPubNonces> signer_pub_nonces_temp;
+    signer_pub_nonces_temp.reserve(signer_account.get_threshold());
+
+    crypto::secret_key enote_view_privkey_with_squash_prefix, z_temp, z_temp_with_squash_prefix;
+
     const std::uint32_t expected_partial_sig_sets{
             n_choose_k(available_signers.size() - 1, signer_account.get_threshold() - 1)
         };
-    std::uint32_t aborted_partial_sig_sets{0};
     input_partial_sig_sets_out.clear();
     input_partial_sig_sets_out.reserve(expected_partial_sig_sets);
-    crypto::secret_key enote_view_privkey_with_squash_prefix;
-    crypto::secret_key z_temp, z_temp_with_squash_prefix;
-    std::vector<SpCompositionProofMultisigPubNonces> signer_pub_nonces_temp;
-    signer_pub_nonces_temp.reserve(signer_account.get_threshold());
+    std::uint32_t aborted_partial_sig_sets{0};
 
     for (const multisig::signer_set_filter filter : filter_permutations)
     {
@@ -848,11 +851,6 @@ void make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposa
     std::vector<SpMultisigInputPartialSigSetV1> input_partial_sigs,
     std::vector<SpPartialInputV1> &partial_inputs_out)
 {
-    std::unordered_map<multisig::signer_set_filter, std::unordered_set<crypto::public_key>> collected_signers_per_filter;
-    std::unordered_map<multisig::signer_set_filter,  //signing group
-        std::unordered_map<rct::key,                 //masked address
-            std::vector<SpCompositionProofMultisigPartial>>> collected_sigs_per_key_per_filter;
-
     // convert to full input proposals so key images are available
     std::vector<SpMultisigInputProposalV1> converted_input_proposals;
     CHECK_AND_ASSERT_THROW_MES(try_get_v1_multisig_input_proposals_v1(multisig_tx_proposal.m_input_proposals,
@@ -867,33 +865,39 @@ void make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposa
     std::unordered_map<rct::key, SpMultisigInputProposalV1> mapped_converted_input_proposals;
     rct::key temp_masked_address;
 
-    for (SpMultisigInputProposalV1 &input_proposal : converted_input_proposals)
+    for (const SpMultisigInputProposalV1 &input_proposal : converted_input_proposals)
     {
         input_proposal.m_core.get_masked_address(temp_masked_address);
         expected_masked_addresses.insert(temp_masked_address);
-        mapped_converted_input_proposals[temp_masked_address] = std::move(input_proposal);
+        mapped_converted_input_proposals[temp_masked_address] = input_proposal;
     }
 
     // get expected proposal prefix
     const rct::key expected_proposal_prefix{multisig_tx_proposal.get_proposal_prefix_v1()};
 
-    // filter the partial signatures into a map
+    // filter the partial signatures into maps
+    std::unordered_map<multisig::signer_set_filter, std::unordered_set<crypto::public_key>> collected_signers_per_filter;
+    std::unordered_map<multisig::signer_set_filter,  //signing group
+        std::unordered_map<rct::key,                 //masked address
+            std::vector<SpCompositionProofMultisigPartial>>> collected_sigs_per_key_per_filter;
+
     for (SpMultisigInputPartialSigSetV1 &input_partial_sig : input_partial_sigs)
     {
         // skip sig sets with unknown proposal prefixes
         if (!(input_partial_sig.m_proposal_prefix == expected_proposal_prefix))
             continue;
 
-        // skip sig sets that look like duplicates (same signer group and signer)
-        if (collected_signers_per_filter[input_partial_sig.m_signer_set_filter].find(input_partial_sig.m_signer_id) !=
-                collected_signers_per_filter[input_partial_sig.m_signer_set_filter].end())
-            continue;
-
         // skip sig sets that are invalid
         try { check_v1_multisig_input_partial_sig_semantics_v1(input_partial_sig, multisig_signers); }
         catch (...) { continue; }
 
-        // add signer to this filter
+        // skip sig sets that look like duplicates (same signer group and signer)
+        // - do this after checking sig set validity to avoid inserting invalid filters into the collected signers map
+        if (collected_signers_per_filter[input_partial_sig.m_signer_set_filter].find(input_partial_sig.m_signer_id) !=
+                collected_signers_per_filter[input_partial_sig.m_signer_set_filter].end())
+            continue;
+
+        // record that this signer/filter combo has been used
         collected_signers_per_filter[input_partial_sig.m_signer_set_filter].insert(input_partial_sig.m_signer_id);
 
         // record the partial sigs
@@ -909,6 +913,7 @@ void make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposa
     }
 
     // try to make one partial input per masked address
+    partial_inputs_out.reserve(expected_masked_addresses.size());
     std::unordered_set<rct::key> masked_addresses_with_partial_inputs;
 
     for (const auto &signer_group_partial_sigs : collected_sigs_per_key_per_filter)
@@ -920,7 +925,7 @@ void make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposa
                     masked_addresses_with_partial_inputs.end())
                 continue;
 
-            // make the partial input
+            // try to make the partial input
             partial_inputs_out.emplace_back();
 
             if (!try_make_v1_partial_input_v1(mapped_converted_input_proposals[masked_address_partial_sigs.first],
@@ -928,6 +933,8 @@ void make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposa
                     masked_address_partial_sigs.second,
                     partial_inputs_out.back()))
                 partial_inputs_out.pop_back();
+            else
+                masked_addresses_with_partial_inputs.insert(masked_address_partial_sigs.first);
         }
     }
 }

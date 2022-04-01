@@ -137,6 +137,12 @@ static void check_is_owned(const sp::SpOutputProposalV1 &test_proposal,
     EXPECT_TRUE(enote_record.m_type == type_expected);
     EXPECT_TRUE(enote_record.m_amount == amount_expected);
     EXPECT_TRUE(enote_record.m_address_index == j_expected);
+
+    rct::key spendkey_base{keys.K_1_base};
+    sp::reduce_seraphis_spendkey(keys.k_vb, spendkey_base);
+    crypto::key_image reproduced_key_image;
+    sp::make_seraphis_key_image(enote_record.m_enote_view_privkey, rct::rct2pk(spendkey_base), reproduced_key_image);
+    EXPECT_TRUE(enote_record.m_key_image == reproduced_key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

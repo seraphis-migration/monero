@@ -335,6 +335,8 @@ namespace crypto {
 
   inline bool operator<(const public_key &p1, const public_key &p2) { return memcmp(&p1, &p2, sizeof(public_key)) < 0; }
   inline bool operator>(const public_key &p1, const public_key &p2) { return p2 < p1; }
+  inline bool operator<(const key_image &p1, const key_image &p2) { return memcmp(&p1, &p2, sizeof(key_image)) < 0; }
+  inline bool operator>(const key_image &p1, const key_image &p2) { return p2 < p1; }
 }
 
 CRYPTO_MAKE_HASHABLE(public_key)
