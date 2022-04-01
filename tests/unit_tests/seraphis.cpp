@@ -851,13 +851,13 @@ TEST(seraphis, txtype_squashed_v1)
         tx_ptrs.push_back(&(txs.back()));
     }
 
-    EXPECT_TRUE(sp::validate_txs<sp::SpTxSquashedV1>(tx_ptrs, ledger_context));
+    EXPECT_TRUE(sp::validate_txs(tx_ptrs, ledger_context));
 
     // insert key images to ledger
     for (const sp::SpTxSquashedV1 &tx : txs)
         EXPECT_TRUE(sp::try_add_tx_to_ledger<sp::SpTxSquashedV1>(ledger_context, tx));
 
     // validation should fail due to double-spend
-    EXPECT_FALSE(sp::validate_txs<sp::SpTxSquashedV1>(tx_ptrs, ledger_context));
+    EXPECT_FALSE(sp::validate_txs(tx_ptrs, ledger_context));
 }
 //-------------------------------------------------------------------------------------------------------------------

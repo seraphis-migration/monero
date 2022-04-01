@@ -62,7 +62,7 @@ namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void make_enote_view_privkey(const crypto::secret_key &k_view_balance,
+static void make_enote_view_privkey_helper(const crypto::secret_key &k_view_balance,
     const crypto::secret_key &s_generate_address,
     const jamtis::address_index_t j,
     const rct::key &sender_receiver_secret,
@@ -80,6 +80,18 @@ static void make_enote_view_privkey(const crypto::secret_key &k_view_balance,
     sc_add(to_bytes(enote_view_privkey_out), to_bytes(spendkey_extension), to_bytes(enote_view_privkey_out));
     // H_n(q) + k^j_x + k_vb
     sc_add(to_bytes(enote_view_privkey_out), to_bytes(sender_extension), to_bytes(enote_view_privkey_out));
+}
+//-------------------------------------------------------------------------------------------------------------------    
+//-------------------------------------------------------------------------------------------------------------------
+static void make_seraphis_key_image_helper(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &enote_view_privkey,
+    crypto::key_image &key_image_out)
+{
+    // make key image: k_m/k_a U
+    rct::key wallet_spend_pubkey_base{wallet_spend_pubkey};  //k_vb X + k_m U
+    reduce_seraphis_spendkey(k_view_balance, wallet_spend_pubkey_base);  //k_m U
+    make_seraphis_key_image(enote_view_privkey, rct::rct2pk(wallet_spend_pubkey_base), key_image_out);  //k_m/k_a U
 }
 //-------------------------------------------------------------------------------------------------------------------    
 //-------------------------------------------------------------------------------------------------------------------
@@ -168,16 +180,17 @@ bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermedia
         return false;
 
     // construct enote view privkey: k_a = H_n(q) + k^j_x + k_vb
-    make_enote_view_privkey(k_view_balance,
+    make_enote_view_privkey_helper(k_view_balance,
         s_generate_address,
         record_out.m_address_index,
         intermediate_record.m_nominal_sender_receiver_secret,
         record_out.m_enote_view_privkey);
 
-    // make key image
-    rct::key wallet_spend_pubkey_base{wallet_spend_pubkey};
-    reduce_seraphis_spendkey(k_view_balance, wallet_spend_pubkey_base);
-    make_seraphis_key_image(record_out.m_enote_view_privkey, rct::rct2pk(wallet_spend_pubkey_base), record_out.m_key_image);
+    // make key image: k_m/k_a U
+    make_seraphis_key_image_helper(wallet_spend_pubkey,
+        k_view_balance,
+        record_out.m_enote_view_privkey,
+        record_out.m_key_image);
 
     // copy enote and set type
     record_out.m_enote = intermediate_record.m_enote;
@@ -279,16 +292,17 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
         return false;
 
     // construct enote view privkey: k_a = H_n(q) + k^j_x + k_vb
-    make_enote_view_privkey(k_view_balance,
+    make_enote_view_privkey_helper(k_view_balance,
         s_generate_address,
         record_out.m_address_index,
         sender_receiver_secret,
         record_out.m_enote_view_privkey);
 
     // make key image: k_m/k_a U
-    rct::key wallet_spend_pubkey_base{wallet_spend_pubkey};  //k_vb X + k_m U
-    reduce_seraphis_spendkey(k_view_balance, wallet_spend_pubkey_base);  //k_m U
-    make_seraphis_key_image(record_out.m_enote_view_privkey, rct::rct2pk(wallet_spend_pubkey_base), record_out.m_key_image);
+    make_seraphis_key_image_helper(wallet_spend_pubkey,
+        k_view_balance,
+        record_out.m_enote_view_privkey,
+        record_out.m_key_image);
 
     // copy enote and set type
     record_out.m_enote = enote;

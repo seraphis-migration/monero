@@ -48,6 +48,7 @@
 #include "tx_record_utils.h"
 
 //third party headers
+#include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
 #include <unordered_map>
@@ -304,6 +305,55 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
+    const rct::xmr_amount transaction_fee,
+    const jamtis::JamtisDestinationV1 &change_destination,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const std::vector<jamtis::JamtisPaymentProposalV1> &explicit_payments,
+    std::vector<SpOutputProposalV1> &opaque_payments_inout)
+{
+    // collect total input amount
+    boost::multiprecision::uint128_t total_input_amount{0};
+
+    for (const SpMultisigInputProposalV1 &input_proposal : full_input_proposals)
+        total_input_amount += input_proposal.m_input_amount;
+
+    // copy existing output proposals
+    std::vector<SpOutputProposalV1> output_proposals_temp;
+    output_proposals_temp.reserve(opaque_payments_inout.size() + explicit_payments.size() + 2);  //finalize adds 2 at most
+    output_proposals_temp = opaque_payments_inout;
+
+    // add explicit payments to output proposal set
+    for (const jamtis::JamtisPaymentProposalV1 &jamtis_payment_proposal : explicit_payments)
+    {
+        output_proposals_temp.emplace_back();
+        jamtis_payment_proposal.get_output_proposal_v1(output_proposals_temp.back());
+    }
+
+    // save number of output proposals so we know how many get added
+    const std::size_t num_original_payments{output_proposals_temp.size()};
+
+    // finalize the output proposal set
+    finalize_v1_output_proposal_set_v1(total_input_amount,
+        transaction_fee,
+        change_destination,
+        wallet_spend_pubkey,
+        k_view_balance,
+        output_proposals_temp);
+
+    CHECK_AND_ASSERT_THROW_MES(output_proposals_temp.size() >= num_original_payments,
+        "finalize multisig output proposals: finalizing output proposals reduced number of proposals (bug).");
+
+    // add new output proposals to the original opaque output set
+    opaque_payments_inout.reserve(opaque_payments_inout.size() + output_proposals_temp.size() - num_original_payments);
+
+    for (std::size_t output_proposal_index{num_original_payments};
+            output_proposal_index < output_proposals_temp.size();
+            ++output_proposal_index)
+        opaque_payments_inout.emplace_back(output_proposals_temp[output_proposal_index]);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
@@ -332,11 +382,16 @@ void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::string &expected_version_string,
     const std::uint32_t threshold,
     const std::uint32_t num_signers,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance)
 {
+    // proposal should contain expected tx version encoding
+    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_version_string == expected_version_string,
+        "multisig tx proposal: intended tx version encoding is invalid.");
+
     // convert to a plain tx proposal to check the following
     // - unique onetime addresses
     // - if only 2 outputs, should be 1 unique enote ephemeral pubkey, otherwise 1:1 with outputs and all unique
@@ -349,7 +404,6 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
             k_view_balance,
             converted_input_proposals),
         "multisig tx proposal: could not extract data from an input proposal (maybe input not owned by user).");
-
 
     // finish the checks
     check_v1_multisig_tx_proposal_semantics_v1_final(multisig_tx_proposal,

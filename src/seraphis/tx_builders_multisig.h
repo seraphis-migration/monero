@@ -63,6 +63,7 @@
 namespace sp
 {
 
+//temp
 void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::secret_key &address_mask,
@@ -93,6 +94,16 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
     std::vector<SpMultisigInputProposalV1> &converted_input_proposals_out);
 
 //temp
+// if your multisig tx proposal will have a full amount balance with tx fee
+void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &input_proposals,
+    const rct::xmr_amount transaction_fee,
+    const jamtis::JamtisDestinationV1 &change_destination,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const std::vector<jamtis::JamtisPaymentProposalV1> &explicit_payments,
+    std::vector<SpOutputProposalV1> &output_proposals_inout);
+
+//temp
 // unvalidated preconditions:
 // - input/output counts match the desired tx semantic rules version
 void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
@@ -100,6 +111,7 @@ void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 
     const crypto::secret_key &k_view_balance,
     const rct::xmr_amount desired_fee);
 void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::string &expected_version_string,
     const std::uint32_t threshold,
     const std::uint32_t num_signers,
     const rct::key &wallet_spend_pubkey,

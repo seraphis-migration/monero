@@ -144,7 +144,7 @@ static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
     try
     {
         // validate tx
-        EXPECT_TRUE(sp::validate_txs<SpTxType>(txs_to_verify_ptrs, ledger_context));
+        EXPECT_TRUE(sp::validate_txs(txs_to_verify_ptrs, ledger_context));
     }
     catch (...)
     {

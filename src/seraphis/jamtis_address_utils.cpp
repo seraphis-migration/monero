@@ -122,10 +122,8 @@ void make_seraphis_key_image_jamtis_style(const rct::key &wallet_spend_pubkey,
     // KI = (k_m/(H_n(q) + k^j_x + k_vb)) U
 
     // k_b U = k_m U = K_s - k_vb X
-    rct::key master_pubkey{wallet_spend_pubkey};  //K_s
-    crypto::secret_key minus_k_vb{k_view_balance};
-    sc_mul(to_bytes(minus_k_vb), sp::MINUS_ONE.bytes, to_bytes(minus_k_vb));  //-k_vb
-    extend_seraphis_spendkey(minus_k_vb, master_pubkey);  // (-k_vb) X + K_s = k_m U
+    rct::key master_pubkey{wallet_spend_pubkey};  //K_s = k_vb X + k_m U
+    reduce_seraphis_spendkey(k_view_balance, master_pubkey);  //k_m U
 
     // k_a_recipient = k^j_x + k_vb
     crypto::secret_key k_a_recipient;

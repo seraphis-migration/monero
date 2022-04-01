@@ -123,19 +123,19 @@ void get_versioning_string(const unsigned char tx_semantic_rules_version, std::s
 
 
 //// core validators
-/// - note: specialize the validate_tx functions with definitions in tx_base.cpp, so the validate_tx_impl functions
+/// - note: specialize the following functions with definitions in tx_base.cpp, so the validate_tx_impl functions
 ///         will be explicitly instantiated using the formulas written below (this way maliciously injected overloads
-///         of the validate_tx_impl functions won't be available to the compiler when defining the validate_tx functions)
+///         of the validate_tx_impl functions won't be available to the compiler)
+/// bool validate_tx(const SpTxType &tx, const LedgerContext &ledger_context, const bool defer_batchable);
+/// bool validate_txs(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context);
 
 /**
-* brief: validate_tx - validate a seraphis transaction
+* brief: validate_tx_impl - validate a seraphis transaction
 * param: tx -
 * param: ledger_context -
 * param: defer_batchable - if set, then batchable validation steps shouldn't be executed
 * return: true/false on validation result
 */
-template <typename SpTxType>
-bool validate_tx(const SpTxType &tx, const LedgerContext &ledger_context, const bool defer_batchable);
 template <typename SpTxType>
 bool validate_tx_impl(const SpTxType &tx, const LedgerContext &ledger_context, const bool defer_batchable)
 {
@@ -154,14 +154,12 @@ bool validate_tx_impl(const SpTxType &tx, const LedgerContext &ledger_context, c
     return true;
 }
 /**
-* brief: validate_txs - validate a set of tx (use batching if possible)
+* brief: validate_txs_impl - validate a set of tx (use batching if possible)
 * type: SpTxType - 
 * param: txs -
 * param: ledger_context -
 * return: true/false on verification result
 */
-template <typename SpTxType>
-bool validate_txs(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context);
 template <typename SpTxType>
 bool validate_txs_impl(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context)
 {
@@ -180,10 +178,8 @@ bool validate_txs_impl(const std::vector<const SpTxType*> &txs, const LedgerCont
 }
 
 /// SpTxSquashedV1
-template <>
-bool validate_tx<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context, const bool defer_batchable);
-template <>
-bool validate_txs<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs, const LedgerContext &ledger_context);
+bool validate_tx(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context, const bool defer_batchable);
+bool validate_txs(const std::vector<const SpTxSquashedV1*> &txs, const LedgerContext &ledger_context);
 
 
 //// mock-ups

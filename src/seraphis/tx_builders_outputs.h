@@ -84,7 +84,7 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
     std::vector<rct::key> &output_enote_ephemeral_pubkeys_out);
 /**
-* brief: finalize_v1_output_proposal_set_v1 - finalize a set of output proposals
+* brief: finalize_v1_output_proposal_set_v1 - finalize a set of output proposals (new proposals are appended)
 *   - add a change output if necessary
 *   - add a dummy output if appropriate
 * param: total_input_amount -
