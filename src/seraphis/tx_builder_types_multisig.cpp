@@ -133,6 +133,19 @@ rct::key SpMultisigTxProposalV1::get_proposal_prefix_v1() const
     return tx_proposal.get_proposal_prefix(m_version_string);
 }
 //-------------------------------------------------------------------------------------------------------------------
+rct::key SpMultisigTxProposalV1::get_proposal_prefix_v1(
+    std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
+    std::vector<SpOutputProposalV1> opaque_payments,
+    TxExtra partial_memo)
+{
+    SpMultisigTxProposalV1 temp_proposal;
+    temp_proposal.m_explicit_payments = std::move(explicit_payments);
+    temp_proposal.m_opaque_payments = std::move(opaque_payments);
+    temp_proposal.m_partial_memo = std::move(partial_memo);
+
+    return temp_proposal.get_proposal_prefix_v1();
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool SpMultisigInputInitSetV1::try_get_nonces(const rct::key &masked_address,
     const std::size_t nonces_index,
     SpCompositionProofMultisigPubNonces &nonces_out) const

@@ -430,8 +430,12 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     proposal_out.m_aggregate_signer_set_filter = aggregate_signer_set_filter;
     proposal_out.m_version_string = std::move(version_string);
 
-    // get proposal prefix (it is safe to do this as soon as the outputs, memo, and version are set)
-    const rct::key proposal_prefix{proposal_out.get_proposal_prefix_v1()};
+    // get proposal prefix
+    const rct::key proposal_prefix{
+            SpMultisigTxProposalV1::get_proposal_prefix_v1(proposal_out.m_explicit_payments,
+                proposal_out.m_opaque_payments,
+                proposal_out.m_partial_memo)
+        };
 
     // prepare composition proofs for each input
     proposal_out.m_input_proof_proposals.clear();
