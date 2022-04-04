@@ -657,7 +657,7 @@ namespace multisig
       make_multisig_common_privkey(std::move(participant_base_common_privkeys), m_common_privkey);
 
       // set common pubkey
-      m_common_pubkey = rct::rct2pk(rct::scalarmultKey(generators.secondary, rct::sk2rct(m_common_privkey)));
+      m_common_pubkey = rct::rct2pk(rct::scalarmultKey(generators.m_secondary, rct::sk2rct(m_common_privkey)));
 
       // if N-of-N, then the base privkey will be used directly to make the account's share of the final key
       if (kex_rounds_required == 1)
@@ -668,7 +668,7 @@ namespace multisig
 
       // exclude all keys the local account recommends
       // - in the first round, only the local pubkey is recommended by the local signer
-      rct::key initial_pubkey{rct::scalarmultKey(generators.primary, rct::sk2rct(m_base_privkey))};
+      rct::key initial_pubkey{rct::scalarmultKey(generators.m_primary, rct::sk2rct(m_base_privkey))};
       exclude_pubkeys_out.emplace_back(rct::rct2pk(initial_pubkey));
     }
     else
@@ -722,10 +722,10 @@ namespace multisig
       preagg_keyshares.reserve(m_multisig_privkeys.size());
 
       for (const crypto::secret_key &multisig_privkey : m_multisig_privkeys)
-        preagg_keyshares.emplace_back(rct::rct2pk(rct::scalarmultKey(generators.primary, rct::sk2rct(multisig_privkey))));
+        preagg_keyshares.emplace_back(rct::rct2pk(rct::scalarmultKey(generators.m_primary, rct::sk2rct(multisig_privkey))));
 
       // compute final aggregate key, update local multisig privkeys with aggregation coefficients applied
-      m_multisig_pubkey = generate_multisig_aggregate_key(generators.primary, std::move(result_keys), m_multisig_privkeys);
+      m_multisig_pubkey = generate_multisig_aggregate_key(generators.m_primary, std::move(result_keys), m_multisig_privkeys);
 
       // prepare for aggregation-style signing
       m_multisig_keyshare_pubkeys.resize(m_multisig_privkeys.size());
@@ -735,7 +735,7 @@ namespace multisig
       {
         // 1) convert keyshares to pubkeys for convenience when assembling aggregate keys
         m_multisig_keyshare_pubkeys[keyshare_index] =
-          rct::rct2pk(rct::scalarmultKey(generators.primary, rct::sk2rct(m_multisig_privkeys[keyshare_index])));
+          rct::rct2pk(rct::scalarmultKey(generators.m_primary, rct::sk2rct(m_multisig_privkeys[keyshare_index])));
 
         // 2) record [post-aggregation pubkeys : origins] map for aggregation-style signing
         m_keyshare_to_origins_map[m_multisig_keyshare_pubkeys[keyshare_index]] =
@@ -776,10 +776,10 @@ namespace multisig
       for (const auto &derivation_and_origins : result_keys_to_origins_map)
       {
         // multisig_privkey = H(derivation)
-        // derived pubkey = multisig_key * generators.primary
+        // derived pubkey = multisig_key * generators.m_primary
         crypto::public_key_memsafe derived_pubkey;
         m_multisig_privkeys.push_back(
-            calculate_multisig_keypair_from_derivation(generators.primary, derivation_and_origins.first, derived_pubkey)
+            calculate_multisig_keypair_from_derivation(generators.m_primary, derivation_and_origins.first, derived_pubkey)
           );
 
         // save the account's kex key mappings for this round [derived pubkey : other signers who will have the same key]

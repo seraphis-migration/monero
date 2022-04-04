@@ -887,14 +887,14 @@ bool try_make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposa
 {
     try
     {
-        // all partial sigs must sign the same message
+        // all partial sigs must sign the expected message
         for (const SpCompositionProofMultisigPartial &partial_sig : input_proof_partial_sigs)
         {
             CHECK_AND_ASSERT_THROW_MES(partial_sig.message == expected_proposal_prefix,
                 "multisig make partial input: a partial signature's message does not match the expected proposal prefix.");
         }
 
-        // assemble proof
+        // assemble proof (will throw if partial sig assembly doesn't produce a valid proof)
         partial_input_out.m_image_proof.m_composition_proof = sp_composition_prove_multisig_final(input_proof_partial_sigs);
 
         // copy miscellaneous pieces
@@ -914,7 +914,7 @@ bool try_make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposa
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+bool try_make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const std::vector<crypto::public_key> &multisig_signers,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
@@ -930,7 +930,7 @@ void make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposa
         "multisig make partial inputs: failed to extract data from input proposals (maybe user doesn't own an input).");
 
     // collect masked addresses of input images
-    // map input proposals to their masked addresses for ease of use later
+    // and map input proposals to their masked addresses for ease of use later
     std::unordered_set<rct::key> expected_masked_addresses;
     std::unordered_map<rct::key, SpMultisigInputProposalV1> mapped_converted_input_proposals;
     rct::key temp_masked_address;
@@ -1007,6 +1007,11 @@ void make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposa
                 masked_addresses_with_partial_inputs.insert(masked_address_partial_sigs.first);
         }
     }
+
+    if (partial_inputs_out.size() != expected_masked_addresses.size())
+        return false;
+
+    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

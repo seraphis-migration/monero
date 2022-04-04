@@ -45,8 +45,8 @@ enum class account_generator_era : unsigned char
 
 struct account_generators
 {
-  rct::key primary;    //e.g. for spend key
-  rct::key secondary;  //e.g. for view key
+  rct::key m_primary;    //e.g. for spend key
+  rct::key m_secondary;  //e.g. for view key
 };
 
 inline const rct::key& get_primary_generator(const account_generator_era era)
