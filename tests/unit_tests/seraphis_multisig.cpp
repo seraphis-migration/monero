@@ -33,16 +33,62 @@
 #include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "seraphis/jamtis_core_utils.h"
+#include "seraphis/jamtis_destination.h"
+#include "seraphis/jamtis_payment_proposal.h"
+#include "seraphis/jamtis_support_types.h"
+#include "seraphis/mock_ledger_context.h"
 #include "seraphis/sp_composition_proof.h"
 #include "seraphis/sp_core_enote_utils.h"
 #include "seraphis/sp_crypto_utils.h"
+#include "seraphis/tx_builder_types.h"
+#include "seraphis/tx_builder_types_multisig.h"
+#include "seraphis/tx_builders_inputs.h"
+#include "seraphis/tx_builders_mixed.h"
+#include "seraphis/tx_builders_multisig.h"
+#include "seraphis/tx_builders_outputs.h"
+#include "seraphis/tx_component_types.h"
+#include "seraphis/tx_extra.h"
+#include "seraphis/tx_record_types.h"
+#include "seraphis/tx_record_utils.h"
+#include "seraphis/txtype_squashed_v1.h"
 
 #include "gtest/gtest.h"
 
 #include <memory>
 #include <vector>
 
+struct multisig_jamtis_keys
+{
+    crypto::secret_key k_vb;  //view-balance
+    crypto::secret_key k_fr;  //find-received
+    crypto::secret_key s_ga;  //generate-address
+    crypto::secret_key s_ct;  //cipher-tag
+    rct::key K_1_base;        //wallet spend base
+    rct::key K_fr;            //find-received pubkey
+};
 
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static crypto::secret_key make_secret_key()
+{
+    return rct::rct2sk(rct::skGen());
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void make_multisig_jamtis_keys(const multisig::multisig_account &account, multisig_jamtis_keys &keys_out)
+{
+    using namespace sp;
+    using namespace jamtis;
+
+    keys_out.k_vb = account.get_common_privkey();
+    make_jamtis_findreceived_key(keys_out.k_vb, keys_out.k_fr);
+    make_jamtis_generateaddress_secret(keys_out.k_vb, keys_out.s_ga);
+    make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
+    keys_out.K_1_base = rct::pk2rct(account.get_multisig_pubkey());
+    extend_seraphis_spendkey(keys_out.k_vb, keys_out.K_1_base);
+    rct::scalarmultBase(keys_out.K_fr, rct::sk2rct(keys_out.k_fr));
+}
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void make_multisig_accounts(const cryptonote::account_generator_era account_era,
@@ -62,7 +108,7 @@ static void make_multisig_accounts(const cryptonote::account_generator_era accou
   for (std::size_t account_index{0}; account_index < num_signers; ++account_index)
   {
     // create account [[ROUND 0]]
-    accounts_out.emplace_back(account_era, rct::rct2sk(rct::skGen()), rct::rct2sk(rct::skGen()));
+    accounts_out.emplace_back(account_era, make_secret_key(), make_secret_key());
 
     // collect signer
     signers.emplace_back(accounts_out.back().get_base_pubkey());
@@ -233,19 +279,331 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+// v1: SpTxSquashedV1
+//-------------------------------------------------------------------------------------------------------------------
+static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
+    const std::uint32_t num_signers,
+    const std::vector<std::uint32_t> &requested_signers,
+    const std::vector<rct::xmr_amount> &in_amounts,
+    const std::vector<rct::xmr_amount> &out_amounts_explicit,
+    const std::vector<rct::xmr_amount> &out_amounts_opaque,
+    const rct::xmr_amount &fee,
+    const sp::SpTxSquashedV1::SemanticRulesVersion semantic_rules_version)
+{
+    using namespace sp;
+    using namespace jamtis;
+
+    ASSERT_TRUE(num_signers > 0);
+    ASSERT_TRUE(requested_signers.size() >= threshold);
+    ASSERT_TRUE(requested_signers.size() <= num_signers);
+    for (const std::uint32_t requested_signer : requested_signers)
+        ASSERT_TRUE(requested_signer < num_signers);
+
+
+    /// 1) setup multisig accounts
+
+    // a) make accounts
+    std::vector<multisig::multisig_account> accounts;
+    ASSERT_NO_THROW(make_multisig_accounts(cryptonote::account_generator_era::seraphis, threshold, num_signers, accounts));
+    ASSERT_TRUE(accounts.size() == num_signers);
+
+    // b) get shared multisig wallet keys
+    multisig_jamtis_keys keys;
+    ASSERT_NO_THROW(make_multisig_jamtis_keys(accounts[0], keys));
+
+
+    /// 2) fund the multisig address
+
+    // a) make a user address to receive funds
+    const address_index_t j{crypto::rand_idx(MAX_ADDRESS_INDEX)};
+    JamtisDestinationV1 user_address;
+
+    ASSERT_NO_THROW(make_jamtis_destination_v1(keys.K_1_base,
+        keys.K_fr,
+        keys.s_ga,
+        j,
+        user_address));
+
+    // b) make plain enotes paying to the address
+    JamtisPaymentProposalV1 payment_proposal_temp;
+    SpOutputProposalV1 output_proposal_temp;
+
+    std::vector<SpEnoteV1> input_enotes;
+    std::vector<rct::key> input_enote_ephemeral_pubkeys;
+    input_enotes.reserve(in_amounts.size());
+    input_enote_ephemeral_pubkeys.reserve(in_amounts.size());
+
+    for (const rct::xmr_amount in_amount : in_amounts)
+    {
+        payment_proposal_temp = JamtisPaymentProposalV1{user_address, in_amount, make_secret_key(), TxExtra{}};
+        payment_proposal_temp.get_output_proposal_v1(output_proposal_temp);
+
+        input_enotes.emplace_back();
+        output_proposal_temp.get_enote_v1(input_enotes.back());
+        input_enote_ephemeral_pubkeys.emplace_back(output_proposal_temp.m_enote_ephemeral_pubkey);
+    }
+
+    // c) extract info from the enotes 'sent' to the multisig address
+    std::vector<SpEnoteRecordV1> input_enote_records;
+    input_enote_records.resize(input_enotes.size());
+
+    for (std::size_t input_index{0}; input_index < input_enotes.size(); ++input_index)
+    {
+        ASSERT_TRUE(try_get_enote_record_v1(input_enotes[input_index],
+            input_enote_ephemeral_pubkeys[input_index],
+            keys.K_1_base,
+            keys.k_vb,
+            input_enote_records[input_index]));
+
+        // double check information recovery
+        ASSERT_TRUE(input_enote_records[input_index].m_amount == in_amounts[input_index]);
+        ASSERT_TRUE(input_enote_records[input_index].m_address_index == j);
+        ASSERT_TRUE(input_enote_records[input_index].m_type == JamtisEnoteType::PLAIN);
+    }
+
+
+    /// 3) propose tx
+
+    // a) prepare input proposals (inputs to spend)
+    std::vector<SpMultisigInputProposalV1> full_input_proposals;
+    full_input_proposals.reserve(input_enote_records.size());
+
+    for (const SpEnoteRecordV1 &input_enote_record : input_enote_records)
+    {
+        full_input_proposals.emplace_back();
+        ASSERT_NO_THROW(make_v1_multisig_input_proposal_v1(input_enote_record,
+            make_secret_key(),
+            make_secret_key(),
+            full_input_proposals.back()));
+    }
+
+    // b) prepare outputs
+
+    // - explicit payments
+    std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments;
+    explicit_payments.reserve(out_amounts_explicit.size());
+
+    for (const rct::xmr_amount out_amount : out_amounts_explicit)
+    {
+        explicit_payments.emplace_back();
+        explicit_payments.back().gen(out_amount, 0);
+    }
+
+    // - opaque payments
+    std::vector<SpOutputProposalV1> opaque_payments;
+    opaque_payments.reserve(out_amounts_opaque.size());
+
+    for (const rct::xmr_amount out_amount : out_amounts_opaque)
+    {
+        opaque_payments.emplace_back();
+        opaque_payments.back().gen(out_amount, 0);
+    }
+
+    // - add change/dummy outputs
+    ASSERT_NO_THROW(finalize_multisig_output_proposals_v1(full_input_proposals,
+        fee,
+        user_address,
+        keys.K_1_base,
+        keys.k_vb,
+        explicit_payments,
+        opaque_payments));
+
+    // c) set signers who are requested to participate
+    std::vector<crypto::public_key> requested_signers_ids;
+    requested_signers_ids.reserve(requested_signers.size());
+
+    for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
+    {
+        if (std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end())
+            requested_signers_ids.emplace_back(accounts[signer_index].get_base_pubkey());
+    }
+
+    multisig::signer_set_filter aggregate_filter;
+    ASSERT_NO_THROW(multisig::multisig_signers_to_filter(requested_signers_ids,
+        accounts[0].get_signers(),
+        aggregate_filter));
+
+    // d) make multisig tx proposal
+    SpMultisigTxProposalV1 multisig_tx_proposal;
+    std::string version_string;
+    get_versioning_string(semantic_rules_version, version_string);
+
+    ASSERT_NO_THROW(make_v1_multisig_tx_proposal_v1(accounts[0].get_threshold(),
+        accounts[0].get_signers().size(),
+        std::move(explicit_payments),
+        std::move(opaque_payments),
+        TxExtra{},
+        version_string,
+        full_input_proposals,
+        aggregate_filter,
+        multisig_tx_proposal));
+
+    ASSERT_NO_THROW(check_v1_multisig_tx_proposal_semantics_v1(multisig_tx_proposal,
+        version_string,
+        accounts[0].get_threshold(),
+        accounts[0].get_signers().size(),
+        keys.K_1_base,
+        keys.k_vb));
+    ASSERT_NO_THROW(check_v1_multisig_tx_proposal_full_balance_v1(multisig_tx_proposal, keys.K_1_base, keys.k_vb, fee));
+
+
+    /// 4) get inits from all requested signers
+    std::vector<SpCompositionProofMultisigNonceRecord> signer_nonce_records;
+    std::vector<SpMultisigInputInitSetV1> input_inits;
+    input_inits.reserve(accounts.size());
+
+    for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
+    {
+        input_inits.emplace_back();
+        signer_nonce_records.emplace_back();
+
+        if (std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end())
+        {
+            ASSERT_NO_THROW(make_v1_multisig_input_init_set_v1(accounts[signer_index].get_base_pubkey(),
+                accounts[signer_index].get_threshold(),
+                accounts[signer_index].get_signers(),
+                multisig_tx_proposal,
+                signer_nonce_records.back(),
+                input_inits.back()));
+
+            ASSERT_NO_THROW(check_v1_multisig_input_init_set_semantics_v1(input_inits.back(),
+                accounts[signer_index].get_threshold(),
+                accounts[signer_index].get_signers()));
+        }
+        else
+        {
+            ASSERT_ANY_THROW(make_v1_multisig_input_init_set_v1(accounts[signer_index].get_base_pubkey(),
+                accounts[signer_index].get_threshold(),
+                accounts[signer_index].get_signers(),
+                multisig_tx_proposal,
+                signer_nonce_records.back(),
+                input_inits.back()));
+        }
+    }
+
+
+    /// 5) get partial signatures from all requested signers
+    std::vector<std::vector<SpMultisigInputPartialSigSetV1>> input_partial_sigs_per_signer;
+    input_partial_sigs_per_signer.resize(accounts.size());
+
+    for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
+    {
+        const bool is_requested_signer{
+                std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end()
+            };
+
+        ASSERT_TRUE(try_make_v1_multisig_input_partial_sig_sets_v1(accounts[signer_index],
+                multisig_tx_proposal,
+                input_inits[signer_index],
+                input_inits,  //don't need to remove the local init (will be filtered out internally)
+                signer_nonce_records[signer_index],
+                input_partial_sigs_per_signer[signer_index]) == is_requested_signer);
+
+        if (is_requested_signer)
+        {
+            for (const SpMultisigInputPartialSigSetV1 &partial_sigs : input_partial_sigs_per_signer[signer_index])
+            {
+                ASSERT_NO_THROW(check_v1_multisig_input_partial_sig_semantics_v1(partial_sigs,
+                    accounts[signer_index].get_signers()));
+            }
+        }
+    }
+
+
+    /// 6) each signer assembles partial signatures and completes txs
+
+    for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
+    {
+        const bool is_requested_signer{
+                std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end()
+            };
+
+        // a) get partial inputs
+        std::vector<SpPartialInputV1> partial_inputs;
+
+        ASSERT_TRUE(try_make_v1_partial_inputs_v1(multisig_tx_proposal,
+            accounts[signer_index].get_signers(),
+            keys.K_1_base,
+            keys.k_vb,
+            input_partial_sigs_per_signer[signer_index],
+            partial_inputs) == is_requested_signer);
+
+        // - non-requested signers should fail to make partial inputs, then be skipped
+        if (!is_requested_signer)
+            continue;
+
+        // b) build partial tx
+        SpTxProposalV1 tx_proposal;
+        multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
+
+        SpPartialTxV1 partial_tx;
+        ASSERT_NO_THROW(make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), fee, version_string, partial_tx));
+
+        // c) add enotes owned by multisig address to the ledger and prepare membership ref sets (one step)
+        // note: use ring size 2^2 = 4 for speed
+        MockLedgerContext ledger_context;
+
+        const std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
+                gen_mock_sp_membership_ref_sets_v1(partial_tx.m_input_enotes, 2, 2, ledger_context)
+            };
+
+        // d) make membership proofs
+        std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
+
+        ASSERT_NO_THROW(make_v1_membership_proofs_v1(membership_ref_sets,
+            partial_tx.m_image_address_masks,
+            partial_tx.m_image_commitment_masks,
+            alignable_membership_proofs));
+
+        // e) complete tx
+        SpTxSquashedV1 completed_tx;
+
+        ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(partial_tx,
+            std::move(alignable_membership_proofs),
+            semantic_rules_version,
+            completed_tx));
+
+        // f) verify tx
+        EXPECT_TRUE(validate_tx(completed_tx, ledger_context, false));
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_multisig, composition_proof_multisig)
 {
     // test various account combinations
-    EXPECT_TRUE(composition_proof_multisig_test(1, 2, rct::rct2sk(rct::skGen())));
-    EXPECT_TRUE(composition_proof_multisig_test(2, 2, rct::rct2sk(rct::skGen())));
-    EXPECT_TRUE(composition_proof_multisig_test(1, 3, rct::rct2sk(rct::skGen())));
-    EXPECT_TRUE(composition_proof_multisig_test(2, 3, rct::rct2sk(rct::skGen())));
-    EXPECT_TRUE(composition_proof_multisig_test(3, 3, rct::rct2sk(rct::skGen())));
-    EXPECT_TRUE(composition_proof_multisig_test(2, 4, rct::rct2sk(rct::skGen())));
+    EXPECT_TRUE(composition_proof_multisig_test(1, 2, make_secret_key()));
+    EXPECT_TRUE(composition_proof_multisig_test(2, 2, make_secret_key()));
+    EXPECT_TRUE(composition_proof_multisig_test(1, 3, make_secret_key()));
+    EXPECT_TRUE(composition_proof_multisig_test(2, 3, make_secret_key()));
+    EXPECT_TRUE(composition_proof_multisig_test(3, 3, make_secret_key()));
+    EXPECT_TRUE(composition_proof_multisig_test(2, 4, make_secret_key()));
 
     // test that setting x to zero works
     EXPECT_TRUE(composition_proof_multisig_test(2, 2, rct::rct2sk(rct::zero())));
     EXPECT_TRUE(composition_proof_multisig_test(2, 3, rct::rct2sk(rct::zero())));
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_multisig, txtype_squashed_v1)
+{
+    const sp::SpTxSquashedV1::SemanticRulesVersion semantic_rules_version{
+            sp::SpTxSquashedV1::SemanticRulesVersion::MOCK
+        };
+
+    // test M-of-N combos (and combinations of requested signers)
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 2, {0,1},   {2}, {1}, {0}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {0},     {2}, {1}, {0}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {1},     {2}, {1}, {0}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 3, {0,2},   {2}, {1}, {0}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(3, 3, {0,1,2}, {2}, {1}, {0}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {1,3},   {2}, {1}, {0}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {0,1,2,3}, {2}, {1}, {0}, 1, semantic_rules_version));
+
+    // test various combinations of inputs/outputs
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2},   {1},   {0},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3},   {1},   {0},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3},   {1},   {1},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4},   {1},   {1},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {5,5}, {1,1}, {1,1}, 1, semantic_rules_version));
 }
 //-------------------------------------------------------------------------------------------------------------------

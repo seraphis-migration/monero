@@ -118,7 +118,7 @@ void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_re
 void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
     const crypto::secret_key &image_address_mask,
     const crypto::secret_key &image_amount_mask,
-    SpAlignableMembershipProofV1 &talignable_membership_proof_out);
+    SpAlignableMembershipProofV1 &alignable_membership_proof_out);
 /**
 * brief: make_v1_membership_proofs_v1 - make a set of concise grootle membership proofs in the squashed enote model
 * param: membership_ref_sets -
@@ -131,10 +131,10 @@ void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> 
 void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const std::vector<crypto::secret_key> &image_address_masks,
     const std::vector<crypto::secret_key> &image_amount_masks,
-    std::vector<SpAlignableMembershipProofV1> &talignable_membership_proof_out);
+    std::vector<SpAlignableMembershipProofV1> &alignable_membership_proof_out);
 void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
     const std::vector<SpPartialInputV1> &partial_inputs,
-    std::vector<SpAlignableMembershipProofV1> &talignable_membership_proof_out);
+    std::vector<SpAlignableMembershipProofV1> &alignable_membership_proof_out);
 /**
 * brief: make_v1_partial_input_v1 - make a v1 partial input
 * param: input_proposal -

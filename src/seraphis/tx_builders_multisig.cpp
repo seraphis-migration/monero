@@ -48,6 +48,7 @@
 #include "tx_record_utils.h"
 
 //third party headers
+#include <boost/math/special_functions/binomial.hpp>
 #include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers

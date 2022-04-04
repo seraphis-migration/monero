@@ -249,9 +249,9 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 
     // check that amount commitments balance
     if (!validate_sp_amount_balance_equality_check_v1(input_images,
-        outputs,
-        transaction_fee,
-        balance_proof.m_remainder_blinding_factor))
+            outputs,
+            transaction_fee,
+            balance_proof.m_remainder_blinding_factor))
         return false;
 
     // check that commitments in range proofs line up with input image and output commitments
@@ -262,20 +262,16 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     {
         // the two stored copies of input image commitments must match
         if (input_images[input_commitment_index].m_core.m_masked_commitment !=
-            rct::rct2pk(rct::scalarmult8(range_proofs.V[input_commitment_index])))
-        {
+                rct::rct2pk(rct::scalarmult8(range_proofs.V[input_commitment_index])))
             return false;
-        }
     }
 
     for (std::size_t output_commitment_index{0}; output_commitment_index < outputs.size(); ++output_commitment_index)
     {
         // the two stored copies of output commitments must match
         if (outputs[output_commitment_index].m_core.m_amount_commitment !=
-            rct::rct2pk(rct::scalarmult8(range_proofs.V[input_images.size() + output_commitment_index])))
-        {
+                rct::rct2pk(rct::scalarmult8(range_proofs.V[input_images.size() + output_commitment_index])))
             return false;
-        }
     }
 
     // range proofs must be valid

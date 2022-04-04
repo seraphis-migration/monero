@@ -67,7 +67,7 @@ struct JamtisPaymentProposalV1 final
 
     /// enote ephemeral privkey: r
     crypto::secret_key m_enote_ephemeral_privkey;
-    
+
     /// memo elements to add to the tx memo
     TxExtra m_partial_memo;
 

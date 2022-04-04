@@ -129,8 +129,6 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
 {
     // doesn't include:
     // - ring member references (e.g. indices or explicit copies)
-    // - tx fees
-    // - memos
     // - miscellaneous serialization bytes
     std::size_t size{0};
 
@@ -155,6 +153,9 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
 
     // extra data in tx
     size += m_supplement.get_size_bytes();
+
+    // fees (TODO: fees are serialized as variants, so the size may be different)
+    size += sizeof(m_fee);
 
     return size;
 }
