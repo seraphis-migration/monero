@@ -82,8 +82,8 @@ static void hash_to_point(const hash &x, crypto::ec_point &res)
     hash h;
     ge_p2 temp_p2;
     ge_p1p1 temp_p1p1;
-    cn_fast_hash(reinterpret_cast<unsigned char*>(&x), sizeof(hash), h);
-    ge_fromfe_frombytes_vartime(&temp_p2, reinterpret_cast<unsigned char*>(&h));
+    cn_fast_hash(reinterpret_cast<const unsigned char*>(&x), sizeof(hash), h);
+    ge_fromfe_frombytes_vartime(&temp_p2, reinterpret_cast<const unsigned char*>(&h));
     ge_mul8(&temp_p1p1, &temp_p2);
     ge_p1p1_to_p3(&temp_p3, &temp_p1p1);
     ge_p3_tobytes(to_bytes(res), &temp_p3);
@@ -131,7 +131,7 @@ static void init_gens()
     ge_p2 temp_p2;
     ge_p1p1 temp_p1p1;
     hash H_temp_hash{cn_fast_hash(to_bytes(G), sizeof(ec_point))};
-    assert(ge_frombytes_vartime(&temp_p3, reinterpret_cast<unsigned char*>(&H_temp_hash)));  // this is known to pass for canonical value of G
+    assert(ge_frombytes_vartime(&temp_p3, reinterpret_cast<const unsigned char*>(&H_temp_hash)));  // this is known to pass for canonical value of G
     ge_p3_to_p2(&temp_p2, &temp_p3);
     ge_mul8(&temp_p1p1, &temp_p2);
     ge_p1p1_to_p3(&temp_p3, &temp_p1p1);
