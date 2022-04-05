@@ -30,7 +30,7 @@
 
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "seraphis/sp_crypto_utils.h"
+#include "crypto/generators.h"
 
 
 namespace cryptonote
@@ -49,22 +49,22 @@ struct account_generators
   rct::key m_secondary;  //e.g. for view key
 };
 
-inline const rct::key& get_primary_generator(const account_generator_era era)
+inline const rct::key get_primary_generator(const account_generator_era era)
 {
   if (era == account_generator_era::cryptonote)
-    return rct::G;
+    return rct::pk2rct(crypto::get_G_gen());
   else if (era == account_generator_era::seraphis)
-    return sp::get_U_gen();
+    return rct::pk2rct(crypto::get_U_gen());
   else
     return rct::Z;  //error
 }
 
-inline const rct::key& get_secondary_generator(const account_generator_era era)
+inline const rct::key get_secondary_generator(const account_generator_era era)
 {
   if (era == account_generator_era::cryptonote)
-    return rct::G;
+    return rct::pk2rct(crypto::get_G_gen());
   else if (era == account_generator_era::seraphis)
-    return sp::get_X_gen();
+    return rct::pk2rct(crypto::get_X_gen());
   else
     return rct::Z;  //error
 }

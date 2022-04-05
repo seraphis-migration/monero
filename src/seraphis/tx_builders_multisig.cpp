@@ -38,6 +38,7 @@
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
+#include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
 #include "tx_builder_types_multisig.h"
 #include "tx_builders_mixed.h"

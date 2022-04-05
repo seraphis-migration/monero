@@ -38,6 +38,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "crypto/generators.h"
 #include "concise_grootle.h"
 #include "cryptonote_config.h"
 #include "seraphis_config_temp.h"
@@ -118,6 +119,22 @@ static void init_sp_gens()
         const std::string X_salt(config::HASH_KEY_SERAPHIS_X);
         hash_to_p3(X_p3, rct::hash2rct(crypto::cn_fast_hash(X_salt.data(), X_salt.size())));
         ge_p3_tobytes(X.bytes, &X_p3);
+
+/*
+printf("U: ");
+for (const unsigned char byte : U.bytes)
+    printf("0x%x, ", byte);
+printf("\n");
+
+printf("X: ");
+for (const unsigned char byte : X.bytes)
+    printf("0x%x, ", byte);
+printf("\n");
+*/
+CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(rct::G) == crypto::get_G_gen(), "invalid G");
+CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(rct::H) == crypto::get_H_gen(), "invalid H");
+CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(U) == crypto::get_U_gen(), "invalid U");
+CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(X) == crypto::get_X_gen(), "invalid X");
 
     });
 }

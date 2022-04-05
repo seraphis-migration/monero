@@ -37,12 +37,12 @@ extern "C"
 namespace crypto
 {
 
-struct ec_point;
+struct public_key;
 
-const ec_point get_G_gen();
-const ec_point get_H_gen();
-const ec_point get_U_gen();
-const ec_point get_X_gen();
+const public_key get_G_gen();
+const public_key get_H_gen();
+const public_key get_U_gen();
+const public_key get_X_gen();
 const ge_p3 get_G_p3_gen();
 const ge_p3 get_H_p3_gen();
 const ge_p3 get_U_p3_gen();

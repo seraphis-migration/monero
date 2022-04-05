@@ -54,16 +54,17 @@ struct uint_point
 
 // generators
 //standard ed25519 generator G: {x, 4/5} (positive x when decompressing y = 4/5)
-static const ec_point G = { {0x58, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66} };
+static const uint_point G_uint = { {0x58, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66} };
+static public_key G;
 //pedersen commitment generator H: toPoint(cn_fast_hash(G))
 static const uint_point H_uint = { {0x8b, 0x65, 0x59, 0x70, 0x15, 0x37, 0x99, 0xaf, 0x2a, 0xea, 0xdc, 0x9f, 0xf1, 0xad, 0xd0, 0xea, 0x6c, 0x72, 0x51, 0xd5, 0x41, 0x54, 0xcf, 0xa9, 0x2c, 0x17, 0x3a, 0x0d, 0xd3, 0x9c, 0x1f, 0x94} };
-static ec_point H;
+static public_key H;
 //seraphis generator U: keccak_to_pt(keccak("seraphis_U"))
-static const uint_point U_uint = { {0x12, 0x65, 0x82, 0xdf, 0xc3, 0x57, 0xb1, 0x0e, 0xcb, 0x0c, 0xe0, 0xf1, 0x2c, 0x26, 0x35, 0x9f, 0x53, 0xc6, 0x4d, 0x49, 0x00, 0xb7, 0x69, 0x6c, 0x2c, 0x4b, 0x3f, 0x7d, 0xca, 0xb7, 0xf7, 0x30} };
-static ec_point U;
+static const uint_point U_uint = { {0x10, 0x94, 0x8b, 0x00, 0xd2, 0xde, 0x50, 0xb5, 0x76, 0x99, 0x8c, 0x11, 0xe8, 0x3c, 0x59, 0xa7, 0x96, 0x84, 0xd2, 0x5c, 0x9f, 0x8a, 0x0d, 0xc6, 0x86, 0x45, 0x70, 0xd7, 0x97, 0xb9, 0xc1, 0x6e} };
+static public_key U;
 //seraphis generator X: keccak_to_pt(keccak("seraphis_X"))
-static const uint_point X_uint = { {0x40, 0x17, 0xa1, 0x26, 0x18, 0x1c, 0x34, 0xb0, 0x77, 0x4d, 0x59, 0x05, 0x23, 0xa0, 0x83, 0x46, 0xbe, 0x4f, 0x42, 0x34, 0x8e, 0xdd, 0xd5, 0x0e, 0xb7, 0xa4, 0x41, 0xb5, 0x71, 0xb2, 0xb6, 0x13} };
-static ec_point X;
+static const uint_point X_uint = { {0xa4, 0xfb, 0x43, 0xca, 0x69, 0x5e, 0x12, 0x99, 0x88, 0x02, 0xa2, 0x0a, 0x15, 0x8f, 0x12, 0xea, 0x79, 0x47, 0x4f, 0xb9, 0x01, 0x21, 0x16, 0x95, 0x6a, 0x69, 0x76, 0x7c, 0x4d, 0x41, 0x11, 0x0f} };
+static public_key X;
 static ge_p3 G_p3;
 static ge_p3 H_p3;
 static ge_p3 U_p3;
@@ -89,27 +90,9 @@ static void hash_to_point(const hash &x, crypto::ec_point &res)
     ge_p3_tobytes(to_bytes(res), &temp_p3);
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Make generators, but only once
 //-------------------------------------------------------------------------------------------------------------------
-static void init_gens()
+static public_key reproduce_generator_G()
 {
-    std::call_once(init_gens_once_flag,
-        [&](){
-
-        // copy uint generator representations to standard 'ec_point' representations (char arrays)
-        memcpy(H.data, H_uint.bytes, 32);
-        memcpy(U.data, U_uint.bytes, 32);
-        memcpy(X.data, X_uint.bytes, 32);
-
-        // build ge_p3 representations of generators
-        ge_frombytes_vartime(&G_p3, to_bytes(G));
-        ge_frombytes_vartime(&H_p3, to_bytes(H));
-        ge_frombytes_vartime(&U_p3, to_bytes(U));
-        ge_frombytes_vartime(&X_p3, to_bytes(X));
-
-#if !defined(NDEBUG)
-{
-    // check that G is reproducible
     // G = {x, 4/5 mod q}
     fe four, five, inv_five, y;
     fe_0(four);
@@ -118,12 +101,15 @@ static void init_gens()
     five[0] = 5;
     fe_invert(inv_five, five);
     fe_mul(y, four, inv_five);
-    ec_point reproduced_G;
+    public_key reproduced_G;
     fe_tobytes(to_bytes(reproduced_G), y);
 
-    assert(reproduced_G == G);
-
-    // check that H is reproducible
+    return reproduced_G;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static public_key reproduce_generator_H()
+{
     // H = 8*to_point(keccak(G))
     // note: this does not use the point_from_bytes() function found in H_p(), instead directly interpreting the
     //       input bytes as a compressed point (this can fail, so should not be used generically)
@@ -131,55 +117,91 @@ static void init_gens()
     ge_p2 temp_p2;
     ge_p1p1 temp_p1p1;
     hash H_temp_hash{cn_fast_hash(to_bytes(G), sizeof(ec_point))};
-    assert(ge_frombytes_vartime(&temp_p3, reinterpret_cast<const unsigned char*>(&H_temp_hash)));  // this is known to pass for canonical value of G
+    assert(ge_frombytes_vartime(&temp_p3, reinterpret_cast<const unsigned char*>(&H_temp_hash)) == 0);  // this is known to pass for canonical value of G
     ge_p3_to_p2(&temp_p2, &temp_p3);
     ge_mul8(&temp_p1p1, &temp_p2);
     ge_p1p1_to_p3(&temp_p3, &temp_p1p1);
-    ec_point reproduced_H;
+    public_key reproduced_H;
     ge_p3_tobytes(to_bytes(reproduced_H), &temp_p3);
 
-    assert(reproduced_H == H);
-
-    // check that U is reproducible
+    return reproduced_H;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static public_key reproduce_generator_U()
+{
     // U = H_p(keccak("seraphis_U"))
     const std::string U_salt{config::HASH_KEY_SERAPHIS_U};
     hash U_temp_hash{cn_fast_hash(U_salt.data(), U_salt.size())};
+    public_key reproduced_U;
     hash_to_point(U_temp_hash, reproduced_U);
 
-    assert(reproduced_U == U);
-
-    // check that X is reproducible
+    return reproduced_U;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static public_key reproduce_generator_X()
+{
     // X = H_p(keccak("seraphis_X"))
     const std::string X_salt{config::HASH_KEY_SERAPHIS_X};
     hash X_temp_hash{cn_fast_hash(X_salt.data(), X_salt.size())};
+    public_key reproduced_X;
     hash_to_point(X_temp_hash, reproduced_X);
 
-    assert(reproduced_X == X);
+    return reproduced_X;
 }
-#endif //debug
+//-------------------------------------------------------------------------------------------------------------------
+// Make generators, but only once
+//-------------------------------------------------------------------------------------------------------------------
+static void init_gens()
+{
+    std::call_once(init_gens_once_flag,
+        [&](){
 
+        // copy uint generator representations to standard 'ec_point' representations (char arrays)
+        memcpy(G.data, G_uint.bytes, 32);
+        memcpy(H.data, H_uint.bytes, 32);
+        memcpy(U.data, U_uint.bytes, 32);
+        memcpy(X.data, X_uint.bytes, 32);
+
+        // build ge_p3 representations of generators
+        const int G_deserialize = ge_frombytes_vartime(&G_p3, to_bytes(G));
+        const int H_deserialize = ge_frombytes_vartime(&H_p3, to_bytes(H));
+        const int U_deserialize = ge_frombytes_vartime(&U_p3, to_bytes(U));
+        const int X_deserialize = ge_frombytes_vartime(&X_p3, to_bytes(X));
+
+        assert(G_deserialize == 0);
+        assert(H_deserialize == 0);
+        assert(U_deserialize == 0);
+        assert(X_deserialize == 0);
+
+        // in debug mode, check that generators are reproducible
+        assert(reproduce_generator_G() == G);
+        assert(reproduce_generator_H() == H);
+        assert(reproduce_generator_U() == U);
+        assert(reproduce_generator_X() == X);
     });
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ec_point get_G_gen()
+const public_key get_G_gen()
 {
     init_gens();
     return G;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ec_point get_H_gen()
+const public_key get_H_gen()
 {
     init_gens();
     return H;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ec_point get_U_gen()
+const public_key get_U_gen()
 {
     init_gens();
     return U;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ec_point get_X_gen()
+const public_key get_X_gen()
 {
     init_gens();
     return X;
