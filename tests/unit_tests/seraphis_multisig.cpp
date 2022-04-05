@@ -451,6 +451,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     std::vector<SpCompositionProofMultisigNonceRecord> signer_nonce_records;
     std::vector<SpMultisigInputInitSetV1> input_inits;
     input_inits.reserve(accounts.size());
+    signer_nonce_records.reserve(accounts.size());
 
     for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
     {
@@ -483,8 +484,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
 
     /// 5) get partial signatures from all requested signers
-    std::vector<std::vector<SpMultisigInputPartialSigSetV1>> input_partial_sigs_per_signer;
-    input_partial_sigs_per_signer.resize(accounts.size());
+    std::unordered_map<crypto::public_key, std::vector<SpMultisigInputPartialSigSetV1>> input_partial_sigs_per_signer;
 
     for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
     {
@@ -495,9 +495,10 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
                 input_inits[signer_index],
                 input_inits,  //don't need to remove the local init (will be filtered out internally)
                 signer_nonce_records[signer_index],
-                input_partial_sigs_per_signer[signer_index])));
+                input_partial_sigs_per_signer[accounts[signer_index].get_base_pubkey()])));
 
-            for (const SpMultisigInputPartialSigSetV1 &partial_sigs : input_partial_sigs_per_signer[signer_index])
+            for (const SpMultisigInputPartialSigSetV1 &partial_sigs :
+                    input_partial_sigs_per_signer[accounts[signer_index].get_base_pubkey()])
             {
                 ASSERT_NO_THROW(check_v1_multisig_input_partial_sig_semantics_v1(partial_sigs,
                     accounts[signer_index].get_signers()));
@@ -510,39 +511,27 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
                 input_inits[signer_index],
                 input_inits,  //don't need to remove the local init (will be filtered out internally)
                 signer_nonce_records[signer_index],
-                input_partial_sigs_per_signer[signer_index]));
+                input_partial_sigs_per_signer[accounts[signer_index].get_base_pubkey()]));
         }
     }
 
 
     /// 6) each signer assembles partial signatures and completes txs
+    /// note: even signers who didn't participate in making partial sigs can complete txs here
 
     for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
     {
         // a) get partial inputs
         std::vector<SpPartialInputV1> partial_inputs;
 
-        if (std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end())
-        {
-            ASSERT_NO_THROW(ASSERT_TRUE(try_make_v1_partial_inputs_v1(multisig_tx_proposal,
-                accounts[signer_index].get_signers(),
-                keys.K_1_base,
-                keys.k_vb,
-                input_partial_sigs_per_signer[signer_index],
-                partial_inputs)));
-        }
-        else
-        {
-            ASSERT_ANY_THROW(try_make_v1_partial_inputs_v1(multisig_tx_proposal,
-                accounts[signer_index].get_signers(),
-                keys.K_1_base,
-                keys.k_vb,
-                input_partial_sigs_per_signer[signer_index],
-                partial_inputs));
-
-            // - non-requested signers should fail to make partial inputs, then be skipped
-            continue;
-        }
+        ASSERT_NO_THROW(
+                ASSERT_TRUE(try_make_v1_partial_inputs_v1(multisig_tx_proposal,
+                    accounts[signer_index].get_signers(),
+                    keys.K_1_base,
+                    keys.k_vb,
+                    input_partial_sigs_per_signer,
+                    partial_inputs))
+            );
 
         // b) build partial tx
         SpTxProposalV1 tx_proposal;

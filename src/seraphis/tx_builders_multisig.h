@@ -173,7 +173,7 @@ bool try_make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_pro
     const std::vector<crypto::public_key> &multisig_signers,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    std::vector<SpMultisigInputPartialSigSetV1> input_partial_sigs,
+    std::unordered_map<crypto::public_key, std::vector<SpMultisigInputPartialSigSetV1>> input_partial_sigs_per_signer,
     std::vector<SpPartialInputV1> &partial_inputs_out);
 
 } //namespace sp

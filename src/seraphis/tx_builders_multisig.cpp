@@ -486,7 +486,7 @@ void check_v1_multisig_input_init_set_semantics_v1(const SpMultisigInputInitSetV
     CHECK_AND_ASSERT_THROW_MES(multisig::signer_is_in_filter(input_init_set.m_signer_id,
             multisig_signers,
             input_init_set.m_aggregate_signer_set_filter),
-        "multisig input initializer: signer is not eligible unexpectedly.");
+        "multisig input initializer: signer is not eligible.");
 
     // signer set filter must be valid (at least 'threshold' signers allowed, format is valid)
     CHECK_AND_ASSERT_THROW_MES(multisig::validate_aggregate_multisig_signer_set_filter(threshold,
@@ -929,7 +929,7 @@ bool try_make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_pro
     const std::vector<crypto::public_key> &multisig_signers,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    std::vector<SpMultisigInputPartialSigSetV1> input_partial_sigs,
+    std::unordered_map<crypto::public_key, std::vector<SpMultisigInputPartialSigSetV1>> input_partial_sigs_per_signer,
     std::vector<SpPartialInputV1> &partial_inputs_out)
 {
     // convert to full input proposals so key images are available
@@ -962,34 +962,41 @@ bool try_make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_pro
         std::unordered_map<rct::key,                 //masked address
             std::vector<SpCompositionProofMultisigPartial>>> collected_sigs_per_key_per_filter;
 
-    for (SpMultisigInputPartialSigSetV1 &input_partial_sig : input_partial_sigs)
+    for (auto &input_partial_sigs_for_signer : input_partial_sigs_per_signer)
     {
-        // skip sig sets with unknown proposal prefixes
-        if (!(input_partial_sig.m_proposal_prefix == expected_proposal_prefix))
-            continue;
-
-        // skip sig sets that are invalid
-        try { check_v1_multisig_input_partial_sig_semantics_v1(input_partial_sig, multisig_signers); }
-        catch (...) { continue; }
-
-        // skip sig sets that look like duplicates (same signer group and signer)
-        // - do this after checking sig set validity to avoid inserting invalid filters into the collected signers map
-        if (collected_signers_per_filter[input_partial_sig.m_signer_set_filter].find(input_partial_sig.m_signer_id) !=
-                collected_signers_per_filter[input_partial_sig.m_signer_set_filter].end())
-            continue;
-
-        // record that this signer/filter combo has been used
-        collected_signers_per_filter[input_partial_sig.m_signer_set_filter].insert(input_partial_sig.m_signer_id);
-
-        // record the partial sigs
-        for (SpCompositionProofMultisigPartial &partial_sig : input_partial_sig.m_partial_signatures)
+        for (SpMultisigInputPartialSigSetV1 &input_partial_sig : input_partial_sigs_for_signer.second)
         {
-            // skip partial sigs with unknown masked addresses
-            if (expected_masked_addresses.find(partial_sig.K) == expected_masked_addresses.end())
+            // skip sig sets with unknown proposal prefixes
+            if (!(input_partial_sig.m_proposal_prefix == expected_proposal_prefix))
                 continue;
 
-            collected_sigs_per_key_per_filter[input_partial_sig.m_signer_set_filter][partial_sig.K].emplace_back(
-                std::move(partial_sig));
+            // skip sig sets that are invalid
+            try { check_v1_multisig_input_partial_sig_semantics_v1(input_partial_sig, multisig_signers); }
+            catch (...) { continue; }
+
+            // skip sig sets if their signer ids don't match the input signer ids
+            if (!(input_partial_sig.m_signer_id == input_partial_sigs_for_signer.first))
+                continue;
+
+            // skip sig sets that look like duplicates (same signer group and signer)
+            // - do this after checking sig set validity to avoid inserting invalid filters into the collected signers map
+            if (collected_signers_per_filter[input_partial_sig.m_signer_set_filter].find(input_partial_sig.m_signer_id) !=
+                    collected_signers_per_filter[input_partial_sig.m_signer_set_filter].end())
+                continue;
+
+            // record that this signer/filter combo has been used
+            collected_signers_per_filter[input_partial_sig.m_signer_set_filter].insert(input_partial_sig.m_signer_id);
+
+            // record the partial sigs
+            for (SpCompositionProofMultisigPartial &partial_sig : input_partial_sig.m_partial_signatures)
+            {
+                // skip partial sigs with unknown masked addresses
+                if (expected_masked_addresses.find(partial_sig.K) == expected_masked_addresses.end())
+                    continue;
+
+                collected_sigs_per_key_per_filter[input_partial_sig.m_signer_set_filter][partial_sig.K].emplace_back(
+                    std::move(partial_sig));
+            }
         }
     }
 
