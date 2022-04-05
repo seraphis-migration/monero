@@ -671,7 +671,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
         "multisig input partial sigs: the local signer's input initializer doesn't match the multisig tx proposal.");
 
     // 2) weed out invalid other input init sets
-    (void) std::remove_if(other_input_init_sets.begin(), other_input_init_sets.end(),
+    auto removed_end = std::remove_if(other_input_init_sets.begin(), other_input_init_sets.end(),
             [&](const SpMultisigInputInitSetV1 &other_input_init_set) -> bool
             {
                 return !validate_v1_multisig_input_init_set_for_partial_sig_set_v1(
@@ -683,6 +683,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
                     input_masked_addresses);
             }
         );
+    other_input_init_sets.erase(removed_end, other_input_init_sets.end());
 
     // 3) collect all input init sets
     std::vector<SpMultisigInputInitSetV1> all_input_init_sets{std::move(other_input_init_sets)};
@@ -695,12 +696,13 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
                 return set1.m_signer_id < set2.m_signer_id;
             }
         );
-    (void) std::unique(all_input_init_sets.begin(), all_input_init_sets.end(),
+    auto unique_end = std::unique(all_input_init_sets.begin(), all_input_init_sets.end(),
             [](const SpMultisigInputInitSetV1 &set1, const SpMultisigInputInitSetV1 &set2) -> bool
             {
                 return set1.m_signer_id == set2.m_signer_id;
             }
         );
+    all_input_init_sets.erase(unique_end, all_input_init_sets.end());
 
 
     /// prepare for signing
