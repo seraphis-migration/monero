@@ -66,6 +66,7 @@ target_link_libraries(seraphis
     common
     device
     epee
+    multisig
     ringct
   PRIVATE
     ${EXTRA_LIBRARIES})

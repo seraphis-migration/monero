@@ -50,13 +50,6 @@ extern "C"
 //forward declarations
 
 
-// type conversions for easier calls to sc_add(), sc_sub(), hash functions
-static inline unsigned char* to_bytes(crypto::ec_scalar &scalar) { return &reinterpret_cast<unsigned char &>(scalar); }
-static inline const unsigned char* to_bytes(const crypto::ec_scalar &scalar) { return &reinterpret_cast<const unsigned char &>(scalar); }
-static inline unsigned char* to_bytes(crypto::ec_point &point) { return &reinterpret_cast<unsigned char &>(point); }
-static inline const unsigned char* to_bytes(const crypto::ec_point &point) { return &reinterpret_cast<const unsigned char &>(point); }
-
-
 namespace sp
 {
 

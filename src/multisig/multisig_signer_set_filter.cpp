@@ -183,7 +183,7 @@ namespace multisig
   {
     const std::uint32_t num_signers_requested{get_num_flags_set(aggregate_filter)};
 
-    return (num_signers_requested < threshold) &&
+    return (num_signers_requested >= threshold) &&
       validate_multisig_signer_set_filter(num_signers_requested, num_signers, aggregate_filter);
   }
   //----------------------------------------------------------------------------------------------------------------------

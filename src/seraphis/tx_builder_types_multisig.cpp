@@ -136,12 +136,14 @@ rct::key SpMultisigTxProposalV1::get_proposal_prefix_v1() const
 rct::key SpMultisigTxProposalV1::get_proposal_prefix_v1(
     std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
     std::vector<SpOutputProposalV1> opaque_payments,
-    TxExtra partial_memo)
+    TxExtra partial_memo,
+    std::string version_string)
 {
     SpMultisigTxProposalV1 temp_proposal;
     temp_proposal.m_explicit_payments = std::move(explicit_payments);
     temp_proposal.m_opaque_payments = std::move(opaque_payments);
     temp_proposal.m_partial_memo = std::move(partial_memo);
+    temp_proposal.m_version_string = std::move(version_string);
 
     return temp_proposal.get_proposal_prefix_v1();
 }

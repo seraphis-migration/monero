@@ -152,7 +152,8 @@ struct SpMultisigTxProposalV1 final
     /// - use this when the proposal prefix is needed but a complete multisig tx proposal isn't available
     static rct::key get_proposal_prefix_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
         std::vector<SpOutputProposalV1> opaque_payments,
-        TxExtra partial_memo);
+        TxExtra partial_memo,
+        std::string version_string);
 };
 
 ////

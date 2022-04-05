@@ -150,6 +150,7 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
 
 //temp
 // weak preconditions: ignores invalid init sets
+// - will throw if local signer is not in the aggregate signer filter
 // - will only succeed if a partial sig set can be made for each of the inputs found in the multisig tx proposal
 void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigSetV1 &input_partial_sig_set,
     const std::vector<crypto::public_key> &multisig_signers);
@@ -162,6 +163,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
 
 //temp
 // weak preconditions: ignores invalid partial sig sets
+// - will throw if local signer is not in the aggregate signer filter
 // - will only succeed if a partial input can be made for each of the inputs found in the multisig tx proposal
 bool try_make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposal,
     const rct::key &expected_proposal_prefix,

@@ -339,6 +339,12 @@ namespace crypto {
   inline bool operator>(const key_image &p1, const key_image &p2) { return p2 < p1; }
 }
 
+// type conversions for easier calls to sc_add(), sc_sub(), hash functions
+inline unsigned char* to_bytes(crypto::ec_scalar &scalar) { return &reinterpret_cast<unsigned char &>(scalar); }
+inline const unsigned char* to_bytes(const crypto::ec_scalar &scalar) { return &reinterpret_cast<const unsigned char &>(scalar); }
+inline unsigned char* to_bytes(crypto::ec_point &point) { return &reinterpret_cast<unsigned char &>(point); }
+inline const unsigned char* to_bytes(const crypto::ec_point &point) { return &reinterpret_cast<const unsigned char &>(point); }
+
 CRYPTO_MAKE_HASHABLE(public_key)
 CRYPTO_MAKE_HASHABLE_CONSTANT_TIME(secret_key)
 CRYPTO_MAKE_HASHABLE_CONSTANT_TIME(public_key_memsafe)

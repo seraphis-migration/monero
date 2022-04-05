@@ -104,7 +104,7 @@ static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxP
         multisig_tx_proposal.m_input_proof_proposals.size(),
         "multisig tx proposal: input proposals don't line up with input proposal proofs.");
 
-    SpEnote enote_core_temp;
+    rct::key image_address_with_squash_prefix;
     std::vector<crypto::key_image> key_images;
     key_images.reserve(converted_input_proposals.size());
 
@@ -114,13 +114,15 @@ static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxP
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].message == proposal_prefix,
             "multisig tx proposal: input proof proposal does not match the tx proposal (different proposal prefix).");
 
-        // input proof proposal keys and key images all line up 1:1 and match with input proposals
-        converted_input_proposals[input_index].get_enote_core(enote_core_temp);
+        // input proof proposal keys line up 1:1 and match with input proposals
+        converted_input_proposals[input_index].m_core.get_masked_address(image_address_with_squash_prefix);
+        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].K ==
+                image_address_with_squash_prefix,
+            "multisig tx proposal: input proof proposal does not match input proposal (different proof keys).");
+
+        // input proof proposal key images line up 1:1 and match with input proposals
         key_images.emplace_back();
         converted_input_proposals[input_index].get_key_image(key_images.back());
-        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].K ==
-                enote_core_temp.m_onetime_address,
-            "multisig tx proposal: input proof proposal does not match input proposal (different onetime addresses).");
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].KI ==
                 key_images.back(),
             "multisig tx proposal: input proof proposal does not match input proposal (different key images).");
@@ -162,8 +164,12 @@ static bool validate_v1_multisig_input_init_set_for_partial_sig_set_v1(const SpM
         return false;
 
     // signer is in aggregate filter
-    if (!multisig::signer_is_in_filter(input_init_set.m_signer_id, multisig_signers, expected_aggregate_signer_set_filter))
-        return false;
+    try
+    {
+        if (!multisig::signer_is_in_filter(input_init_set.m_signer_id, multisig_signers, expected_aggregate_signer_set_filter))
+            return false;
+    }
+    catch (...) { return false; }
 
     // masked addresses in init set line up 1:1 with expected masked addresses
     if (input_init_set.m_input_inits.size() != expected_masked_addresses.size())
@@ -435,7 +441,8 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     const rct::key proposal_prefix{
             SpMultisigTxProposalV1::get_proposal_prefix_v1(proposal_out.m_explicit_payments,
                 proposal_out.m_opaque_payments,
-                proposal_out.m_partial_memo)
+                proposal_out.m_partial_memo,
+                proposal_out.m_version_string)
         };
 
     // prepare composition proofs for each input
@@ -688,7 +695,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
             }
         );
     (void) std::unique(all_input_init_sets.begin(), all_input_init_sets.end(),
-            [&](const SpMultisigInputInitSetV1 &set1, const SpMultisigInputInitSetV1 &set2) -> bool
+            [](const SpMultisigInputInitSetV1 &set1, const SpMultisigInputInitSetV1 &set2) -> bool
             {
                 return set1.m_signer_id == set2.m_signer_id;
             }
@@ -705,8 +712,8 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     std::vector<crypto::public_key> available_signers;
     available_signers.reserve(all_input_init_sets.size());
 
-    for (const SpMultisigInputInitSetV1 &other_input_init_set : all_input_init_sets)
-        available_signers.emplace_back(other_input_init_set.m_signer_id);
+    for (const SpMultisigInputInitSetV1 &input_init_set : all_input_init_sets)
+        available_signers.emplace_back(input_init_set.m_signer_id);
 
     // give up if not enough signers
     if (available_signers.size() < threshold)

@@ -488,24 +488,29 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
     for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
     {
-        const bool is_requested_signer{
-                std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end()
-            };
-
-        ASSERT_TRUE(try_make_v1_multisig_input_partial_sig_sets_v1(accounts[signer_index],
+        if (std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end())
+        {
+            ASSERT_NO_THROW(ASSERT_TRUE(try_make_v1_multisig_input_partial_sig_sets_v1(accounts[signer_index],
                 multisig_tx_proposal,
                 input_inits[signer_index],
                 input_inits,  //don't need to remove the local init (will be filtered out internally)
                 signer_nonce_records[signer_index],
-                input_partial_sigs_per_signer[signer_index]) == is_requested_signer);
+                input_partial_sigs_per_signer[signer_index])));
 
-        if (is_requested_signer)
-        {
             for (const SpMultisigInputPartialSigSetV1 &partial_sigs : input_partial_sigs_per_signer[signer_index])
             {
                 ASSERT_NO_THROW(check_v1_multisig_input_partial_sig_semantics_v1(partial_sigs,
                     accounts[signer_index].get_signers()));
             }
+        }
+        else
+        {
+            ASSERT_ANY_THROW(try_make_v1_multisig_input_partial_sig_sets_v1(accounts[signer_index],
+                multisig_tx_proposal,
+                input_inits[signer_index],
+                input_inits,  //don't need to remove the local init (will be filtered out internally)
+                signer_nonce_records[signer_index],
+                input_partial_sigs_per_signer[signer_index]));
         }
     }
 
@@ -514,23 +519,30 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
     for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
     {
-        const bool is_requested_signer{
-                std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end()
-            };
-
         // a) get partial inputs
         std::vector<SpPartialInputV1> partial_inputs;
 
-        ASSERT_TRUE(try_make_v1_partial_inputs_v1(multisig_tx_proposal,
-            accounts[signer_index].get_signers(),
-            keys.K_1_base,
-            keys.k_vb,
-            input_partial_sigs_per_signer[signer_index],
-            partial_inputs) == is_requested_signer);
+        if (std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end())
+        {
+            ASSERT_NO_THROW(ASSERT_TRUE(try_make_v1_partial_inputs_v1(multisig_tx_proposal,
+                accounts[signer_index].get_signers(),
+                keys.K_1_base,
+                keys.k_vb,
+                input_partial_sigs_per_signer[signer_index],
+                partial_inputs)));
+        }
+        else
+        {
+            ASSERT_ANY_THROW(try_make_v1_partial_inputs_v1(multisig_tx_proposal,
+                accounts[signer_index].get_signers(),
+                keys.K_1_base,
+                keys.k_vb,
+                input_partial_sigs_per_signer[signer_index],
+                partial_inputs));
 
-        // - non-requested signers should fail to make partial inputs, then be skipped
-        if (!is_requested_signer)
+            // - non-requested signers should fail to make partial inputs, then be skipped
             continue;
+        }
 
         // b) build partial tx
         SpTxProposalV1 tx_proposal;
@@ -564,7 +576,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
             completed_tx));
 
         // f) verify tx
-        EXPECT_TRUE(validate_tx(completed_tx, ledger_context, false));
+        EXPECT_NO_THROW(EXPECT_TRUE(validate_tx(completed_tx, ledger_context, false)));
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
