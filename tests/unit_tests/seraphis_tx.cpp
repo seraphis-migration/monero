@@ -165,7 +165,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         temp.input_amounts.push_back(1);
         temp.output_amounts.push_back(1);
         temp.ref_set_decomp_n = 2;
-        temp.ref_set_decomp_m = 3;
+        temp.ref_set_decomp_m = 2;
         temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
@@ -179,7 +179,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         temp.output_amounts.push_back(1);
         temp.transaction_fee = 1;
         temp.ref_set_decomp_n = 2;
-        temp.ref_set_decomp_m = 3;
+        temp.ref_set_decomp_m = 2;
         temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
@@ -193,7 +193,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         temp.output_amounts.push_back(1);
         temp.output_amounts.push_back(1);
         temp.ref_set_decomp_n = 2;
-        temp.ref_set_decomp_m = 3;
+        temp.ref_set_decomp_m = 2;
         temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
@@ -207,7 +207,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         temp.input_amounts.push_back(1);
         temp.output_amounts.push_back(2);
         temp.ref_set_decomp_n = 2;
-        temp.ref_set_decomp_m = 3;
+        temp.ref_set_decomp_m = 2;
         temp.test_double_spend = test_double_spend;
 
         gen_data.push_back(temp);
@@ -218,7 +218,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         SpTxGenData temp;
         temp.expected_result = TestType::ExpectTrue;
         temp.ref_set_decomp_n = 2;
-        temp.ref_set_decomp_m = 3;
+        temp.ref_set_decomp_m = 2;
         for (std::size_t i{0}; i < 16; ++i)
         {
             temp.input_amounts.push_back(1);
@@ -266,7 +266,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         SpTxGenData temp;
         temp.expected_result = TestType::ExpectTrue;
         temp.ref_set_decomp_n = 2;
-        temp.ref_set_decomp_m = 3;
+        temp.ref_set_decomp_m = 2;
         for (std::size_t i{0}; i < 16; ++i)
         {
             temp.input_amounts.push_back(0);
@@ -285,7 +285,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         temp.expected_result = TestType::ExpectAnyThrow;
         temp.output_amounts.push_back(0);
         temp.ref_set_decomp_n = 2;
-        temp.ref_set_decomp_m = 3;
+        temp.ref_set_decomp_m = 2;
 
         gen_data.push_back(temp);
     }
@@ -296,7 +296,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         temp.expected_result = TestType::ExpectAnyThrow;
         temp.input_amounts.push_back(0);
         temp.ref_set_decomp_n = 2;
-        temp.ref_set_decomp_m = 3;
+        temp.ref_set_decomp_m = 2;
 
         gen_data.push_back(temp);
     }
@@ -319,7 +319,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         temp.input_amounts.push_back(2);
         temp.output_amounts.push_back(1);
         temp.ref_set_decomp_n = 2;
-        temp.ref_set_decomp_m = 3;
+        temp.ref_set_decomp_m = 2;
 
         gen_data.push_back(temp);
     }
@@ -341,7 +341,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_batching()
         gen.output_amounts.push_back(1);
         gen.transaction_fee = 1;
         gen.ref_set_decomp_n = 2;
-        gen.ref_set_decomp_m = 3;
+        gen.ref_set_decomp_m = 2;
     }
 
     return gen_data;

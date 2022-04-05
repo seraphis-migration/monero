@@ -846,7 +846,7 @@ TEST(seraphis, txtype_squashed_v1)
     for (std::size_t tx_index{0}; tx_index < num_txs; ++tx_index)
     {
         txs.emplace_back();
-        make_sp_txtype_squashed_v1(2, 3, 3, in_amounts, out_amounts, rct::xmr_amount{num_ins_outs},
+        make_sp_txtype_squashed_v1(2, 2, 3, in_amounts, out_amounts, rct::xmr_amount{num_ins_outs},
             sp::SpTxSquashedV1::SemanticRulesVersion::MOCK, ledger_context, txs.back());
         tx_ptrs.push_back(&(txs.back()));
     }
