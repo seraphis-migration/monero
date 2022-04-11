@@ -70,7 +70,7 @@ struct equals_from_less final
 */
 std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const std::size_t ref_set_decomp_m);
 /**
-* brief: make_bpp_rangeproofs - make BP+ range proofs
+* brief: make_bpp_rangeproofs - make a BP+ proof that aggregates several range proofs
 * param: amounts -
 * param: amount_commitment_blinding_factors -
 * outparam: range_proofs_out - aggregate set of amount commitments with range proofs

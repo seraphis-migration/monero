@@ -55,7 +55,7 @@ namespace sp
 * brief: align_v1_membership_proofs_v1 - rearrange membership proofs so they line up with a set of input images
 *   sort order: key images ascending with byte-wise comparisons
 * param: input_images -
-* inparam: membership_proofs_sortable -
+* param: membership_proofs_sortable -
 * outparam: membership_proofs_out -
 */
 void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_images,

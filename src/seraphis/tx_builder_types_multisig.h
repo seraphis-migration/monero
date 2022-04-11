@@ -159,9 +159,9 @@ struct SpMultisigTxProposalV1 final
 ////
 // SpMultisigInputInitV1
 // - initialize seraphis composition proofs for a set of enote images
-// - each enote image:
-//   - has proof nonce pairs for multiple sets of multisig signers (represented by an aggregate filter)
-//   - only signer sets that include 'signer_id' have initializer nonces
+// - each enote image has proof nonces for every set of multisig signers that includes the signer
+//   - the vectors of proof nonces map 1:1 with the signer sets that include the local signer that can be extracted
+//     from the aggregate filter
 ///
 struct SpMultisigInputInitSetV1 final
 {
@@ -197,7 +197,7 @@ struct SpMultisigInputPartialSigSetV1 final
     /// set of multisig signers these partial signatures correspond to
     multisig::signer_set_filter m_signer_set_filter;
 
-    // partial signatures for the masked addresses in a set of enote images
+    // partial composition proof signatures for the masked addresses in a set of enote images
     std::vector<SpCompositionProofMultisigPartial> m_partial_signatures;
 };
 

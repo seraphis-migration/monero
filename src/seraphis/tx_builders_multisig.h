@@ -63,15 +63,37 @@
 namespace sp
 {
 
-//temp
+/**
+* brief: make_v1_multisig_public_input_proposal_v1 - make a public input proposal for multisig (can be sent to other people)
+* param: enote -
+* param: enote_ephemeral_pubkey -
+* param: address_mask -
+* param: commitment_mask -
+* outparam: proposal_out -
+*/
 void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpMultisigPublicInputProposalV1 &proposal_out);
-
-//temp
+/**
+* brief: check_v1_multisig_input_proposal_semantics_v1 - check semantics of a multisig public input proposal
+*   - throws if a check fails
+*   - check: can reproduce enote amount commitment
+* param: input_proposal -
+*/
 void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposalV1 &input_proposal);
+/**
+* brief: make_v1_multisig_input_proposal_v1 - make an input proposal for multisig (for internal use only)
+* param: enote -
+* param: enote_ephemeral_pubkey -
+* param: enote_view_privkey -
+* param: input_amount -
+* param: input_amount_blinding_factor -
+* param: address_mask -
+* param: commitment_mask -
+* outparam: proposal_out -
+*/
 void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::secret_key &enote_view_privkey,
@@ -84,6 +106,14 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpMultisigInputProposalV1 &proposal_out);
+/**
+* brief: try_get_v1_multisig_input_proposal_v1 - try to convert a public multisig input proposal to a full input proposal
+* param: public_input_proposal -
+* param: wallet_spend_pubkey -
+* param: k_view_balance -
+* outparam: proposal_out -
+* return: true if an input proposal was obtained
+*/
 bool try_get_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1 &public_input_proposal,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
@@ -92,9 +122,17 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<SpMultisigInputProposalV1> &converted_input_proposals_out);
-
-//temp
-// if your multisig tx proposal will have a full amount balance with tx fee
+/**
+* brief: finalize_multisig_output_proposals_v1 - finalize output set for a multisig tx proposal (add change/dummy outputs)
+*   - precondition: multisig tx proposal will contain a full balance (not trying to partially fund an output set)
+* param: input_proposals -
+* param: transaction_fee -
+* param: change_destination -
+* param: wallet_spend_pubkey -
+* param: k_view_balance -
+* param: explicit_payments -
+* inoutparam: output_proposals_inout -
+*/
 void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &input_proposals,
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
@@ -102,20 +140,49 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
     const crypto::secret_key &k_view_balance,
     const std::vector<jamtis::JamtisPaymentProposalV1> &explicit_payments,
     std::vector<SpOutputProposalV1> &output_proposals_inout);
-
-//temp
-// unvalidated preconditions:
-// - input/output counts match the desired tx semantic rules version
+/**
+* brief: check_v1_multisig_tx_proposal_full_balance_v1 - check that a multisig tx proposal has a full balance
+*   - throws if a check fails
+*   - check: sum(inputs) != sum(outputs) + fee
+* param: multisig_tx_proposal -
+* param: wallet_spend_pubkey -
+* param: k_view_balance -
+* param: desired_fee -
+*/
 void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const rct::xmr_amount desired_fee);
+/**
+* brief: check_v1_multisig_tx_proposal_semantics_v1 - check semantics of a multisig tx proposal
+*   - throws if a check fails
+*   - not checked: input/output counts satisfy the desired tx semantic rules version
+*                  (input count can be lower if only partially funding a tx)
+* param: multisig_tx_proposal -
+* param: expected_version_string -
+* param: threshold -
+* param: num_signers -
+* param: wallet_spend_pubkey -
+* param: k_view_balance -
+*/
 void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const std::string &expected_version_string,
     const std::uint32_t threshold,
     const std::uint32_t num_signers,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance);
+/**
+* brief: make_v1_multisig_tx_proposal_v1 - make a multisig tx proposal
+* param: threshold -
+* param: num_signers -
+* param: explicit_payments -
+* param: opaque_payments -
+* param: partial_memo -
+* param: version_string -
+* param: full_input_proposals -
+* param: aggregate_signer_set_filter -
+* outparam: proposal_out -
+*/
 void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     const std::uint32_t num_signers,
     std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
@@ -125,14 +192,29 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpMultisigTxProposalV1 &proposal_out);
-
-//temp
-// unvalidated preconditions:
-// - input count matches the desired tx semantic rules version
-// - inputs have unique key images (can use check_v1_multisig_tx_proposal_semantics_v1() to ensure this)
+/**
+* brief: check_v1_multisig_input_init_set_semantics_v1 - check semantics of a multisig input initializer set
+*   - throws if a check fails
+*   - not checked: input count satisfied desired tx semantic rules version (can be lower if only partially funding a tx)
+*   - inputs have unique key images (can use check_v1_multisig_tx_proposal_semantics_v1() to ensure this)
+* param: input_init_set -
+* param: threshold -
+* param: multisig_signers -
+*/
 void check_v1_multisig_input_init_set_semantics_v1(const SpMultisigInputInitSetV1 &input_init_set,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers);
+/**
+* brief: make_v1_multisig_input_init_set_v1 - make a multisig input initializer set
+* param: signer_id -
+* param: threshold -
+* param: multisig_signers -
+* param: proposal_prefix -
+* param: masked_addresses -
+* param: aggregate_signer_set_filter -
+* inoutparam: nonce_record_inout -
+* outparam: input_init_set_out -
+*/
 void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers,
@@ -147,24 +229,46 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const SpMultisigTxProposalV1 &multisig_tx_proposal,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputInitSetV1 &input_init_set_out);
-
-//temp
-// weak preconditions: ignores invalid init sets
-// - will throw if local signer is not in the aggregate signer filter
-// - will only succeed if a partial sig set can be made for each of the inputs found in the multisig tx proposal
+/**
+* brief: check_v1_multisig_input_partial_sig_semantics_v1 - check semantics of a multisig input partial signature
+*   - throws if a check fails
+* param: input_partial_sig_set -
+* param: multisig_signers -
+*/
 void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputPartialSigSetV1 &input_partial_sig_set,
     const std::vector<crypto::public_key> &multisig_signers);
+/**
+* brief: try_make_v1_multisig_input_partial_sig_sets_v1 - try to make multisig partial signatures for tx inputs
+*   - weak preconditions: ignores invalid initializers from non-local signers
+*   - will throw if local signer is not in the aggregate signer filter (or has an invalid initializer)
+*   - will only succeed if a partial sig set can be made for each of the inputs found in the multisig tx proposal
+* param: signer_account -
+* param: multisig_tx_proposal -
+* param: local_input_init_set -
+* param: other_input_init_sets -
+* inoutparam: nonce_record_inout -
+* outparam: input_partial_sig_sets_out -
+* return: true if at least one set of partial signatures was created (one set will contain a partial sig for each input)
+*/
 bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_account &signer_account,
     const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const SpMultisigInputInitSetV1 &local_input_init_set,
     std::vector<SpMultisigInputInitSetV1> other_input_init_sets,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sig_sets_out);
-
-//temp
-// weak preconditions: ignores invalid partial sig sets
-// - will throw if local signer is not in the aggregate signer filter
-// - will only succeed if a partial input can be made for each of the inputs found in the multisig tx proposal
+/**
+* brief: try_make_v1_partial_inputs_v1 - try to make partial inputs from a collection of multisig partial signatures
+*   - weak preconditions: ignores invalid partial signature sets
+*   - will throw if the local signer cannot extract full multisig input proposals from the multisig tx proposal
+*   - will only succeed if a partial input can be made for each of the inputs found in the multisig tx proposal
+* param: multisig_tx_proposal -
+* param: multisig_signers -
+* param: wallet_spend_pubkey -
+* param: k_view_balance -
+* param: input_partial_sigs_per_signer -
+* outparam: partial_inputs_out -
+* return: true if partial_inputs_out contains a partial input corresponding to each input in the multisig tx proposal
+*/
 bool try_make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposal,
     const rct::key &expected_proposal_prefix,
     const std::vector<SpCompositionProofMultisigPartial> &input_proof_partial_sigs,
