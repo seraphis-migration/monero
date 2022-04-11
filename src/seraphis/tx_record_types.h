@@ -80,6 +80,8 @@ struct SpIntermediateEnoteRecordV1 final
     SpEnoteV1 m_enote;
     /// the enote's ephemeral pubkey
     rct::key m_enote_ephemeral_pubkey;
+    /// q': nominal shared secret
+    rct::key m_nominal_sender_receiver_secret;
     /// a: amount
     rct::xmr_amount m_amount;
     /// x: amount blinding factor

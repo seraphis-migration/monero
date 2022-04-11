@@ -116,6 +116,47 @@ static void make_fake_sp_masked_address(crypto::secret_key &mask,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void check_is_owned_with_intermediate_record(const sp::SpOutputProposalV1 &test_proposal,
+    const jamtis_keys &keys,
+    const sp::jamtis::address_index_t j_expected,
+    const rct::xmr_amount amount_expected)
+{
+    // convert to enote
+    sp::SpEnoteV1 enote;
+    test_proposal.get_enote_v1(enote);
+
+    // try to extract intermediate information from the enote
+    // - only succeeds if enote is owned and is a plain jamtis enote
+    sp::SpIntermediateEnoteRecordV1 intermediate_enote_record;
+    EXPECT_TRUE(sp::try_get_intermediate_enote_record_v1(enote,
+        test_proposal.m_enote_ephemeral_pubkey,
+        keys.K_1_base,
+        keys.k_fr,
+        keys.s_ga,
+        intermediate_enote_record));
+
+    // check misc fields
+    EXPECT_TRUE(intermediate_enote_record.m_amount == amount_expected);
+    EXPECT_TRUE(intermediate_enote_record.m_address_index == j_expected);
+
+    // get full enote record from intermediate record
+    sp::SpEnoteRecordV1 enote_record;
+    sp::get_enote_record_v1_plain(intermediate_enote_record, keys.K_1_base, keys.k_vb, keys.s_ga, enote_record);
+
+    // check misc fields
+    EXPECT_TRUE(enote_record.m_type == sp::jamtis::JamtisEnoteType::PLAIN);
+    EXPECT_TRUE(enote_record.m_amount == amount_expected);
+    EXPECT_TRUE(enote_record.m_address_index == j_expected);
+
+    // check key image
+    rct::key spendkey_base{keys.K_1_base};
+    sp::reduce_seraphis_spendkey(keys.k_vb, spendkey_base);
+    crypto::key_image reproduced_key_image;
+    sp::make_seraphis_key_image(enote_record.m_enote_view_privkey, rct::rct2pk(spendkey_base), reproduced_key_image);
+    EXPECT_TRUE(enote_record.m_key_image == reproduced_key_image);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void check_is_owned(const sp::SpOutputProposalV1 &test_proposal,
     const jamtis_keys &keys,
     const sp::jamtis::address_index_t j_expected,
@@ -134,15 +175,21 @@ static void check_is_owned(const sp::SpOutputProposalV1 &test_proposal,
         keys.k_vb,
         enote_record));
 
+    // check misc fields
     EXPECT_TRUE(enote_record.m_type == type_expected);
     EXPECT_TRUE(enote_record.m_amount == amount_expected);
     EXPECT_TRUE(enote_record.m_address_index == j_expected);
 
+    // check key image
     rct::key spendkey_base{keys.K_1_base};
     sp::reduce_seraphis_spendkey(keys.k_vb, spendkey_base);
     crypto::key_image reproduced_key_image;
     sp::make_seraphis_key_image(enote_record.m_enote_view_privkey, rct::rct2pk(spendkey_base), reproduced_key_image);
     EXPECT_TRUE(enote_record.m_key_image == reproduced_key_image);
+
+    // for plain enotes, double-check ownership with an intermediate record
+    if (enote_record.m_type == sp::jamtis::JamtisEnoteType::PLAIN)
+        check_is_owned_with_intermediate_record(test_proposal, keys, j_expected, amount_expected);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

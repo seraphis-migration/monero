@@ -57,23 +57,38 @@ namespace sp
 bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::key_derivation &sender_receiver_DH_derivation,
-    SpBasicEnoteRecordV1 &intermediate_record_out);
+    SpBasicEnoteRecordV1 &basic_record_out);
 bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::secret_key &k_find_received,
     hw::device &hwdev,
-    SpBasicEnoteRecordV1 &intermediate_record_out);
-
-//todo: intermediate record
+    SpBasicEnoteRecordV1 &basic_record_out);
 
 //temp
-bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &intermediate_record,
+bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &s_generate_address,
+    const crypto::secret_key &s_cipher_tag,
+    SpIntermediateEnoteRecordV1 &record_out);
+bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &s_generate_address,
+    SpIntermediateEnoteRecordV1 &record_out);
+bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_find_received,
+    const crypto::secret_key &s_generate_address,
+    SpIntermediateEnoteRecordV1 &record_out);
+
+//temp
+bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &s_generate_address,
     const crypto::secret_key &s_cipher_tag,
     SpEnoteRecordV1 &record_out);
-bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &intermediate_record,
+bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out);
@@ -81,6 +96,12 @@ bool try_get_enote_record_v1_plain(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
+    SpEnoteRecordV1 &record_out);
+// precondition: data stored in the intermediate record is correct/valid for this user
+void get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_record,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &s_generate_address,
     SpEnoteRecordV1 &record_out);
 
 bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
