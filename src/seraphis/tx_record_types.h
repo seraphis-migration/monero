@@ -51,10 +51,11 @@ namespace sp
 {
 
 ////
-// SpIntermediateEnoteRecordV1
-// - info extracted from a v1 enote using a jamtis find-received key (jamtis 'plain' enote type only)
+// SpBasicEnoteRecordV1  (jamtis 'plain' enote type only)
+// - info extracted from a v1 enote using a jamtis find-received key
+// - does not have: a, x, j, k_a, KI
 ///
-struct SpIntermediateEnoteRecordV1 final
+struct SpBasicEnoteRecordV1 final
 {
     /// original enote
     SpEnoteV1 m_enote;
@@ -66,6 +67,25 @@ struct SpIntermediateEnoteRecordV1 final
     rct::key m_nominal_spend_key;
     /// t'_addr: nominal address tag
     jamtis::address_tag_t m_nominal_address_tag;
+};
+
+////
+// SpIntermediateEnoteRecordV1  (jamtis 'plain' enote type only)
+// - info extracted from a v1 enote using a jamtis find-received key and generate-address secret
+// - does not have: k_a, KI
+///
+struct SpIntermediateEnoteRecordV1 final
+{
+    /// original enote
+    SpEnoteV1 m_enote;
+    /// the enote's ephemeral pubkey
+    rct::key m_enote_ephemeral_pubkey;
+    /// a: amount
+    rct::xmr_amount m_amount;
+    /// x: amount blinding factor
+    crypto::secret_key m_amount_blinding_factor;
+    /// j: jamtis account index
+    jamtis::address_index_t m_address_index;
 };
 
 ////

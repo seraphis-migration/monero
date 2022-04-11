@@ -126,18 +126,18 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_o
         tx_proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::key SpMultisigTxProposalV1::get_proposal_prefix_v1() const
+void SpMultisigTxProposalV1::get_proposal_prefix_v1(rct::key &proposal_prefix_out) const
 {
     SpTxProposalV1 tx_proposal;
     this->get_v1_tx_proposal_v1(tx_proposal);
-    return tx_proposal.get_proposal_prefix(m_version_string);
+    tx_proposal.get_proposal_prefix(m_version_string, proposal_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::key SpMultisigTxProposalV1::get_proposal_prefix_v1(
-    std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
+void SpMultisigTxProposalV1::get_proposal_prefix_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
     std::vector<SpOutputProposalV1> opaque_payments,
     TxExtra partial_memo,
-    std::string version_string)
+    std::string version_string,
+    rct::key &proposal_prefix_out)
 {
     SpMultisigTxProposalV1 temp_proposal;
     temp_proposal.m_explicit_payments = std::move(explicit_payments);
@@ -145,7 +145,7 @@ rct::key SpMultisigTxProposalV1::get_proposal_prefix_v1(
     temp_proposal.m_partial_memo = std::move(partial_memo);
     temp_proposal.m_version_string = std::move(version_string);
 
-    return temp_proposal.get_proposal_prefix_v1();
+    temp_proposal.get_proposal_prefix_v1(proposal_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpMultisigInputInitSetV1::try_get_nonces(const rct::key &masked_address,

@@ -161,7 +161,7 @@ struct SpTxProposalV1 final
     std::vector<crypto::secret_key> m_output_amount_commitment_blinding_factors;
 
     /// message to be signed by input spend proofs
-    rct::key get_proposal_prefix(const std::string &version_string) const;
+    void get_proposal_prefix(const std::string &version_string, rct::key &proposal_prefix_out) const;
 };
 
 ////

@@ -403,7 +403,8 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     // convert to a plain tx proposal to check the following
     // - unique onetime addresses
     // - if only 2 outputs, should be 1 unique enote ephemeral pubkey, otherwise 1:1 with outputs and all unique
-    const rct::key proposal_prefix{multisig_tx_proposal.get_proposal_prefix_v1()};
+    rct::key proposal_prefix;
+    multisig_tx_proposal.get_proposal_prefix_v1(proposal_prefix);
 
     // convert the public input proposals
     std::vector<SpMultisigInputProposalV1> converted_input_proposals;
@@ -439,12 +440,12 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     proposal_out.m_version_string = std::move(version_string);
 
     // get proposal prefix
-    const rct::key proposal_prefix{
-            SpMultisigTxProposalV1::get_proposal_prefix_v1(proposal_out.m_explicit_payments,
-                proposal_out.m_opaque_payments,
-                proposal_out.m_partial_memo,
-                proposal_out.m_version_string)
-        };
+    rct::key proposal_prefix;
+    SpMultisigTxProposalV1::get_proposal_prefix_v1(proposal_out.m_explicit_payments,
+        proposal_out.m_opaque_payments,
+        proposal_out.m_partial_memo,
+        proposal_out.m_version_string,
+        proposal_prefix);
 
     // prepare composition proofs for each input
     proposal_out.m_input_proof_proposals.clear();
@@ -587,7 +588,8 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
         "multisig input initializer: no inputs to initialize.");
 
     // make proposal prefix
-    const rct::key proposal_prefix{multisig_tx_proposal.get_proposal_prefix_v1()};
+    rct::key proposal_prefix;
+    multisig_tx_proposal.get_proposal_prefix_v1(proposal_prefix);
 
     // prepare masked addresses
     rct::keyV masked_addresses;
@@ -644,7 +646,8 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     extend_seraphis_spendkey(k_view_balance, wallet_spend_pubkey);
 
     // misc. from multisig tx proposal
-    const rct::key proposal_prefix{multisig_tx_proposal.get_proposal_prefix_v1()};
+    rct::key proposal_prefix;
+    multisig_tx_proposal.get_proposal_prefix_v1(proposal_prefix);
     rct::keyV input_masked_addresses;
     get_masked_addresses(multisig_tx_proposal.m_input_proposals, input_masked_addresses);
 
@@ -954,7 +957,8 @@ bool try_make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_pro
     }
 
     // get expected proposal prefix
-    const rct::key expected_proposal_prefix{multisig_tx_proposal.get_proposal_prefix_v1()};
+    rct::key expected_proposal_prefix;
+    multisig_tx_proposal.get_proposal_prefix_v1(expected_proposal_prefix);
 
     // filter the partial signatures into maps
     std::unordered_map<multisig::signer_set_filter, std::unordered_set<crypto::public_key>> collected_signers_per_filter;

@@ -95,10 +95,10 @@ static void make_seraphis_key_image_helper(const rct::key &wallet_spend_pubkey,
 }
 //-------------------------------------------------------------------------------------------------------------------    
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
+bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::key_derivation &sender_receiver_DH_derivation,
-    SpIntermediateEnoteRecordV1 &intermediate_record_out)
+    SpBasicEnoteRecordV1 &basic_record_out)
 {
     // get intermediate record
 
@@ -106,26 +106,26 @@ bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
     if (!jamtis::try_get_jamtis_nominal_spend_key_plain(sender_receiver_DH_derivation,
             enote.m_core.m_onetime_address,
             enote.m_view_tag,
-            intermediate_record_out.m_nominal_sender_receiver_secret,
-            intermediate_record_out.m_nominal_spend_key))
+            basic_record_out.m_nominal_sender_receiver_secret,
+            basic_record_out.m_nominal_spend_key))
         return false;
 
     // t'_addr
-    intermediate_record_out.m_nominal_address_tag =
-        jamtis::decrypt_address_tag(intermediate_record_out.m_nominal_sender_receiver_secret, enote.m_addr_tag_enc);
+    basic_record_out.m_nominal_address_tag =
+        jamtis::decrypt_address_tag(basic_record_out.m_nominal_sender_receiver_secret, enote.m_addr_tag_enc);
 
     // copy enote
-    intermediate_record_out.m_enote = enote;
-    intermediate_record_out.m_enote_ephemeral_pubkey = enote_ephemeral_pubkey;
+    basic_record_out.m_enote = enote;
+    basic_record_out.m_enote_ephemeral_pubkey = enote_ephemeral_pubkey;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
+bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::secret_key &k_find_received,
     hw::device &hwdev,
-    SpIntermediateEnoteRecordV1 &intermediate_record_out)
+    SpBasicEnoteRecordV1 &basic_record_out)
 {
     // compute DH derivation then get intermediate record
 
@@ -133,10 +133,10 @@ bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
     crypto::key_derivation derivation;
     hwdev.generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey), k_find_received, derivation);
 
-    return try_get_intermediate_enote_record_v1(enote, enote_ephemeral_pubkey, derivation, intermediate_record_out);
+    return try_get_basic_enote_record_v1(enote, enote_ephemeral_pubkey, derivation, basic_record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_record,
+bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &s_generate_address,
@@ -148,7 +148,7 @@ bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermedia
     // j
     jamtis::address_tag_MAC_t enote_tag_mac;
     record_out.m_address_index =
-        jamtis::decipher_address_index(rct::sk2rct(s_cipher_tag), intermediate_record.m_nominal_address_tag, enote_tag_mac);
+        jamtis::decipher_address_index(rct::sk2rct(s_cipher_tag), basic_record.m_nominal_address_tag, enote_tag_mac);
 
     // check if deciphering j succeeded
     if (enote_tag_mac != 0)
@@ -158,7 +158,7 @@ bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermedia
     if (!jamtis::test_jamtis_nominal_spend_key(wallet_spend_pubkey,
             s_generate_address,
             record_out.m_address_index,
-            intermediate_record.m_nominal_spend_key))
+            basic_record.m_nominal_spend_key))
         return false;
 
     // make amount commitment baked key
@@ -167,14 +167,14 @@ bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermedia
 
     crypto::key_derivation amount_baked_key;
     jamtis::make_jamtis_amount_baked_key_plain_recipient(address_privkey,
-        intermediate_record.m_enote_ephemeral_pubkey,
+        basic_record.m_enote_ephemeral_pubkey,
         amount_baked_key);
 
     // try to recover the amount
-    if (!jamtis::try_get_jamtis_amount_plain(intermediate_record.m_nominal_sender_receiver_secret,
+    if (!jamtis::try_get_jamtis_amount_plain(basic_record.m_nominal_sender_receiver_secret,
             amount_baked_key,
-            intermediate_record.m_enote.m_core.m_amount_commitment,
-            intermediate_record.m_enote.m_encoded_amount,
+            basic_record.m_enote.m_core.m_amount_commitment,
+            basic_record.m_enote.m_encoded_amount,
             record_out.m_amount,
             record_out.m_amount_blinding_factor))
         return false;
@@ -183,7 +183,7 @@ bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermedia
     make_enote_view_privkey_helper(k_view_balance,
         s_generate_address,
         record_out.m_address_index,
-        intermediate_record.m_nominal_sender_receiver_secret,
+        basic_record.m_nominal_sender_receiver_secret,
         record_out.m_enote_view_privkey);
 
     // make key image: k_m/k_a U
@@ -193,14 +193,14 @@ bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermedia
         record_out.m_key_image);
 
     // copy enote and set type
-    record_out.m_enote = intermediate_record.m_enote;
-    record_out.m_enote_ephemeral_pubkey = intermediate_record.m_enote_ephemeral_pubkey;
+    record_out.m_enote = basic_record.m_enote;
+    record_out.m_enote_ephemeral_pubkey = basic_record.m_enote_ephemeral_pubkey;
     record_out.m_type = jamtis::JamtisEnoteType::PLAIN;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_record,
+bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out)
@@ -211,7 +211,7 @@ bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermedia
     jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
     jamtis::make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
 
-    return try_get_enote_record_v1_plain(intermediate_record,
+    return try_get_enote_record_v1_plain(basic_record,
         wallet_spend_pubkey,
         k_view_balance,
         s_generate_address,
@@ -229,15 +229,15 @@ bool try_get_enote_record_v1_plain(const SpEnoteV1 &enote,
     crypto::secret_key k_find_received;
     jamtis::make_jamtis_findreceived_key(k_view_balance, k_find_received);
 
-    SpIntermediateEnoteRecordV1 intermediate_record;
-    if (!try_get_intermediate_enote_record_v1(enote,
+    SpBasicEnoteRecordV1 basic_record;
+    if (!try_get_basic_enote_record_v1(enote,
             enote_ephemeral_pubkey,
             k_find_received,
             hw::get_device("default"),
-            intermediate_record))
+            basic_record))
         return false;
 
-    return try_get_enote_record_v1_plain(intermediate_record, wallet_spend_pubkey, k_view_balance, record_out);
+    return try_get_enote_record_v1_plain(basic_record, wallet_spend_pubkey, k_view_balance, record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,

@@ -237,7 +237,8 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     // tx proposal
     SpTxProposalV1 tx_proposal;
     make_v1_tx_proposal_v1(std::move(output_proposals), std::move(additional_memo_elements), tx_proposal);
-    rct::key proposal_prefix{tx_proposal.get_proposal_prefix(version_string)};
+    rct::key proposal_prefix;
+    tx_proposal.get_proposal_prefix(version_string, proposal_prefix);
 
     // partial inputs
     std::vector<SpPartialInputV1> partial_inputs;

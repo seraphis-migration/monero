@@ -71,7 +71,7 @@ struct ExtraFieldElement final
             return m_value < other_element.m_value;
     }
 
-    /// convert to bytes: varint(type) || varint(length) || value
+    /// convert to bytes and append to the input variable: varint(type) || varint(length) || value
     void append_bytes(std::vector<unsigned char> &bytes_inout) const;
 
     /// generate a random extra field element

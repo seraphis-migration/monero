@@ -186,7 +186,8 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &proposal,
     /// prepare
 
     // inputs and proposal must be compatible
-    rct::key proposal_prefix{proposal.get_proposal_prefix(version_string)};
+    rct::key proposal_prefix;
+    proposal.get_proposal_prefix(version_string, proposal_prefix);
 
     for (const auto &partial_input : partial_inputs)
     {

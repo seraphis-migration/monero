@@ -146,14 +146,15 @@ struct SpMultisigTxProposalV1 final
     void get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_out) const;
 
     /// get the tx proposal prefix that will be signed by input composition proofs
-    rct::key get_proposal_prefix_v1() const;
+    void get_proposal_prefix_v1(rct::key &proposal_prefix_out) const;
 
     /// statically get the tx proposal prefix that will be signed by input composition proofs
     /// - use this when the proposal prefix is needed but a complete multisig tx proposal isn't available
-    static rct::key get_proposal_prefix_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
+    static void get_proposal_prefix_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
         std::vector<SpOutputProposalV1> opaque_payments,
         TxExtra partial_memo,
-        std::string version_string);
+        std::string version_string,
+        rct::key &proposal_prefix_out);
 };
 
 ////
