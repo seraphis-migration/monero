@@ -846,7 +846,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
                     // local signer's partial sig for this input
                     input_partial_sig_sets_out.back().m_partial_signatures.emplace_back();
 
-                    if (!try_get_sp_composition_multisig_partial_sig(
+                    if (!try_make_sp_composition_multisig_partial_sig(
                             multisig_tx_proposal.m_input_proof_proposals[input_index],
                             multisig_tx_proposal.m_input_proposals[input_index].m_address_mask,  //x
                             enote_view_privkey_with_squash_prefix,                               //y

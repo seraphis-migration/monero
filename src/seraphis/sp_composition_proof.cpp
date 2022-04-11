@@ -613,7 +613,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     return partial_sig;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_sp_composition_multisig_partial_sig(
+bool try_make_sp_composition_multisig_partial_sig(
     const SpCompositionProofMultisigProposal &proposal,
     const crypto::secret_key &x,
     const crypto::secret_key &y,

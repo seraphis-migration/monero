@@ -92,7 +92,7 @@ enum class TxStructureVersionSp : unsigned char
 };
 
 /// get the tx version string: era | format | semantic rules
-inline void get_versioning_string_tx_base(const unsigned char tx_era_version,
+inline void make_versioning_string_tx_base(const unsigned char tx_era_version,
     const unsigned char tx_structure_version,
     const unsigned char tx_semantic_rules_version,
     std::string &version_string_out)
@@ -107,18 +107,18 @@ inline void get_versioning_string_tx_base(const unsigned char tx_era_version,
 }
 
 /// get the tx version string for seraphis txs: TxEraSp | format | semantic rules
-inline void get_versioning_string_seraphis_base(const unsigned char tx_structure_version,
+inline void make_versioning_string_seraphis_base(const unsigned char tx_structure_version,
     const unsigned char tx_semantic_rules_version,
     std::string &version_string_out)
 {
-    get_versioning_string_tx_base(TxEraSp, tx_structure_version, tx_semantic_rules_version, version_string_out);
+    make_versioning_string_tx_base(TxEraSp, tx_structure_version, tx_semantic_rules_version, version_string_out);
 }
 
 /// get the tx version string for a specific seraphis tx type
 template <typename SpTxType>
-void get_versioning_string(const unsigned char tx_semantic_rules_version, std::string &version_string_out)
+void make_versioning_string(const unsigned char tx_semantic_rules_version, std::string &version_string_out)
 {
-    get_versioning_string_seraphis_base(get_structure_version<SpTxType>(), tx_semantic_rules_version, version_string_out);
+    make_versioning_string_seraphis_base(get_structure_version<SpTxType>(), tx_semantic_rules_version, version_string_out);
 }
 
 

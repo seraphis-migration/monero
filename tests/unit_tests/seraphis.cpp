@@ -207,7 +207,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     // versioning for proofs
     std::string version_string;
     version_string.reserve(3);
-    get_versioning_string(semantic_rules_version, version_string);
+    make_versioning_string(semantic_rules_version, version_string);
 
     // tx components
     std::vector<SpEnoteImageV1> input_images;
@@ -223,6 +223,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
     std::vector<crypto::secret_key> image_address_masks;
     std::vector<crypto::secret_key> image_amount_masks;
+    rct::key image_proofs_message;
     std::vector<rct::xmr_amount> input_amounts;
     std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
 
@@ -245,7 +246,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
         image_address_masks[input_index] = input_proposals[input_index].m_core.m_address_mask;
         image_amount_masks[input_index] = input_proposals[input_index].m_core.m_commitment_mask;
     }
-    rct::key image_proofs_message{get_tx_image_proof_message_v1(version_string, outputs, tx_supplement)};
+    make_tx_image_proof_message_v1(version_string, outputs, tx_supplement, image_proofs_message);
     make_v1_image_proofs_v1(input_proposals,
         image_proofs_message,
         tx_image_proofs);

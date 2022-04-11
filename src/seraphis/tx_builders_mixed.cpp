@@ -79,12 +79,12 @@ static auto convert_skv_to_rctv(const std::vector<crypto::secret_key> &skv, rct:
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-rct::key get_tx_image_proof_message_v1(const std::string &version_string,
+void make_tx_image_proof_message_v1(const std::string &version_string,
     const std::vector<SpEnoteV1> &output_enotes,
-    const SpTxSupplementV1 &tx_supplement)
+    const SpTxSupplementV1 &tx_supplement,
+    rct::key &proof_message_out)
 {
     // H(crypto project name, version string, output enotes, enote ephemeral pubkeys, memos)
-    rct::key hash_result;
     std::string hash;
     hash.reserve(sizeof(CRYPTONOTE_NAME) +
         version_string.size() +
@@ -103,9 +103,7 @@ rct::key get_tx_image_proof_message_v1(const std::string &version_string,
     }
     hash.append(reinterpret_cast<const char*>(tx_supplement.m_tx_extra.data()), tx_supplement.m_tx_extra.size());
 
-    rct::hash_to_scalar(hash_result, hash.data(), hash.size());
-
-    return hash_result;
+    rct::hash_to_scalar(proof_message_out, hash.data(), hash.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_balance_proof_v1(const std::vector<rct::xmr_amount> &input_amounts,

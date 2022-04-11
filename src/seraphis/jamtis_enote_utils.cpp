@@ -149,8 +149,9 @@ void make_jamtis_enote_ephemeral_pubkey(const crypto::secret_key &enote_privkey,
     rct::scalarmultKey(enote_ephemeral_pubkey_out, DH_base, rct::sk2rct(enote_privkey));
 }
 //-------------------------------------------------------------------------------------------------------------------
-view_tag_t make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const rct::key &onetime_address)
+void make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const rct::key &onetime_address,
+    view_tag_t &view_tag_out)
 {
     static_assert(sizeof(view_tag_t) == 1, "");
 
@@ -160,16 +161,14 @@ view_tag_t make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH
     epee::wipeable_string data;
     get_doublekey_hash_data(to_bytes(sender_receiver_DH_derivation), onetime_address.bytes, data);
 
-    view_tag_t view_tag;
-    jamtis_hash1(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), &view_tag);
-
-    return view_tag;
+    jamtis_hash1(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), &view_tag_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-view_tag_t make_jamtis_view_tag(const crypto::secret_key &privkey,
+void make_jamtis_view_tag(const crypto::secret_key &privkey,
     const rct::key &DH_key,
     hw::device &hwdev,
-    const rct::key &onetime_address)
+    const rct::key &onetime_address,
+    view_tag_t &view_tag_out)
 {
     // K_d = 8 * privkey * DH_key
     //TODO: consider using curve25519/x25519 variable-scalar-mult to get the derivation instead (faster?)
@@ -177,7 +176,7 @@ view_tag_t make_jamtis_view_tag(const crypto::secret_key &privkey,
     auto a_wiper = make_derivation_with_wiper(privkey, DH_key, hwdev, derivation);
 
     // view_tag = H_1(K_d, Ko)
-    return make_jamtis_view_tag(derivation, onetime_address);
+    make_jamtis_view_tag(derivation, onetime_address, view_tag_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
@@ -327,12 +326,14 @@ bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender
     rct::key &nominal_spend_key_out)
 {
     // recompute view tag and check that it matches; short-circuit on failure
-    if (make_jamtis_view_tag(sender_receiver_DH_derivation, onetime_address) != view_tag)
+    view_tag_t recomputed_view_tag;
+    make_jamtis_view_tag(sender_receiver_DH_derivation, onetime_address, recomputed_view_tag);
+
+    if (recomputed_view_tag != view_tag)
         return false;
 
     // q (normal derivation path)
-    make_jamtis_sender_receiver_secret_plain(sender_receiver_DH_derivation,
-        sender_receiver_secret_out);
+    make_jamtis_sender_receiver_secret_plain(sender_receiver_DH_derivation, sender_receiver_secret_out);
 
     // K'_1 = Ko - H_n(q) X
     make_jamtis_nominal_spend_key(sender_receiver_secret_out, onetime_address, nominal_spend_key_out);
@@ -349,13 +350,14 @@ bool try_get_jamtis_nominal_spend_key_selfsend(const crypto::key_derivation &sen
     rct::key &nominal_spend_key_out)
 {
     // recompute view tag and check that it matches; short-circuit on failure
-    if (make_jamtis_view_tag(sender_receiver_DH_derivation, onetime_address) != view_tag)
+    view_tag_t recomputed_view_tag;
+    make_jamtis_view_tag(sender_receiver_DH_derivation, onetime_address, recomputed_view_tag);
+
+    if (recomputed_view_tag != view_tag)
         return false;
 
     // q (self-send derivation path)
-    make_jamtis_sender_receiver_secret_selfsend(k_view_balance,
-        enote_ephemeral_pubkey,
-        sender_receiver_secret_out);
+    make_jamtis_sender_receiver_secret_selfsend(k_view_balance, enote_ephemeral_pubkey, sender_receiver_secret_out);
 
     // K'_1 = Ko - H_n(q) X
     make_jamtis_nominal_spend_key(sender_receiver_secret_out, onetime_address, nominal_spend_key_out);

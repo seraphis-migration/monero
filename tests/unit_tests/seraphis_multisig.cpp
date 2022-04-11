@@ -248,7 +248,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
                     continue;
 
                 partial_sigs.emplace_back();
-                EXPECT_TRUE(try_get_sp_composition_multisig_partial_sig(
+                EXPECT_TRUE(try_make_sp_composition_multisig_partial_sig(
                     proposal,
                     x,
                     accounts[signer_index].get_common_privkey(),
@@ -426,7 +426,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     // d) make multisig tx proposal
     SpMultisigTxProposalV1 multisig_tx_proposal;
     std::string version_string;
-    get_versioning_string(semantic_rules_version, version_string);
+    make_versioning_string(semantic_rules_version, version_string);
 
     ASSERT_NO_THROW(make_v1_multisig_tx_proposal_v1(accounts[0].get_threshold(),
         accounts[0].get_signers().size(),

@@ -83,8 +83,10 @@ void SpOutputProposalV1::gen(const rct::xmr_amount amount, const std::size_t num
 rct::key SpTxProposalV1::get_proposal_prefix(const std::string &version_string) const
 {
     CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to get proposal prefix for a tx proposal with no outputs!");
+    rct::key temp_proposal_prefix;
+    make_tx_image_proof_message_v1(version_string, m_outputs, m_tx_supplement, temp_proposal_prefix);
 
-    return get_tx_image_proof_message_v1(version_string, m_outputs, m_tx_supplement);
+    return temp_proposal_prefix;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

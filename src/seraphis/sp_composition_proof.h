@@ -325,7 +325,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     const crypto::secret_key &local_nonce_1_priv,
     const crypto::secret_key &local_nonce_2_priv);
 /**
-* brief: try_get_sp_composition_multisig_partial_sig - make a partial signature using a nonce record (nonce safety guarantee)
+* brief: try_make_sp_composition_multisig_partial_sig - make a partial signature using a nonce record (nonce safety guarantee)
 *        proof
 *   - caller must validate 'proposal'
 *       - is the key image well-made?
@@ -337,7 +337,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 * outparam: partial_sig_out - the partial signature
 * return: true if creating the partial signature succeeded
 */
-bool try_get_sp_composition_multisig_partial_sig(
+bool try_make_sp_composition_multisig_partial_sig(
     const SpCompositionProofMultisigProposal &proposal,
     const crypto::secret_key &x,
     const crypto::secret_key &y,

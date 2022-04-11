@@ -328,7 +328,8 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
             input_images[proof_index]->m_masked_commitment);
 
         // proof message
-        messages.emplace_back(get_tx_membership_proof_message_v1(membership_proofs[proof_index]->m_ledger_enote_indices));
+        messages.emplace_back();
+        make_tx_membership_proof_message_v1(membership_proofs[proof_index]->m_ledger_enote_indices, messages.back());
     }
 
     // get verification data

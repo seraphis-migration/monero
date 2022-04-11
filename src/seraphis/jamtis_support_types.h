@@ -71,7 +71,6 @@ struct address_tag_t final
     address_tag_t operator^(const address_tag_t &other_tag) const
     {
         address_tag_t temp;
-
         for (std::size_t i{0}; i < sizeof(address_tag_t); ++i)
             temp.bytes[i] = bytes[i] ^ other_tag.bytes[i];
 
@@ -122,9 +121,12 @@ inline bool is_known_self_send_MAC(const address_tag_MAC_t mac)
 
 inline JamtisEnoteType self_send_MAC_to_type(const JamtisSelfSendMAC mac)
 {
-    if (mac == JamtisSelfSendMAC::CHANGE) return JamtisEnoteType::CHANGE;
-    else if (mac == JamtisSelfSendMAC::SELF_SPEND) return JamtisEnoteType::SELF_SPEND;
-    else return JamtisEnoteType::UNKNOWN;
+    switch (mac)
+    {
+        case (JamtisSelfSendMAC::CHANGE)     : return JamtisEnoteType::CHANGE;
+        case (JamtisSelfSendMAC::SELF_SPEND) : return JamtisEnoteType::SELF_SPEND;
+        default                              : return JamtisEnoteType::UNKNOWN;
+    };
 }
 
 /// jamtis view tags

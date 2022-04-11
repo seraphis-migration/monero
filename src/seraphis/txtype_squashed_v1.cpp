@@ -232,7 +232,7 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     // versioning for proofs
     std::string version_string;
     version_string.reserve(3);
-    get_versioning_string(semantic_rules_version, version_string);
+    make_versioning_string(semantic_rules_version, version_string);
 
     // tx proposal
     SpTxProposalV1 tx_proposal;
@@ -352,9 +352,10 @@ bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
     // ownership proof (and proof that key images are well-formed)
     std::string version_string;
     version_string.reserve(3);
-    get_versioning_string(tx.m_tx_semantic_rules_version, version_string);
+    make_versioning_string(tx.m_tx_semantic_rules_version, version_string);
 
-    rct::key image_proofs_message{get_tx_image_proof_message_v1(version_string, tx.m_outputs, tx.m_supplement)};
+    rct::key image_proofs_message;
+    make_tx_image_proof_message_v1(version_string, tx.m_outputs, tx.m_supplement, image_proofs_message);
 
     if (!validate_sp_composition_proofs_v1(tx.m_image_proofs,
         tx.m_input_images,

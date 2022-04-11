@@ -51,16 +51,17 @@ namespace sp
 {
 
 /**
-* brief: get_tx_image_proof_message_v1 - message for tx image proofs
+* brief: make_tx_image_proof_message_v1 - message for tx image proofs
 *   - H(crypto project name, version string, output enotes, enote ephemeral pubkeys, memos)
 * param: version_string -
 * param: output_enotes -
 * param: tx_supplement -
-* return: message to insert in a tx image proof
+* outparam: proof_message_out - message to insert in a tx image proof
 */
-rct::key get_tx_image_proof_message_v1(const std::string &version_string,
+void make_tx_image_proof_message_v1(const std::string &version_string,
     const std::vector<SpEnoteV1> &output_enotes,
-    const SpTxSupplementV1 &tx_supplement);
+    const SpTxSupplementV1 &tx_supplement,
+    rct::key &proof_message_out);
 /**
 * brief: make_v1_balance_proof_v1 - make v1 tx balance proof (BP+ for range proofs; balance check is sum-to-zero)
 *   - range proofs: for input image amount commitments and output commitments (squashed enote model)

@@ -85,7 +85,7 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
         );
 
     // view tag: view_tag = H_1(K_d, Ko)
-    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address);
+    make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
 
     // enote amount baked key: 8 r G
     crypto::key_derivation amount_baked_key;
@@ -167,7 +167,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
         );
 
     // view tag: view_tag = H_1(K_d, Ko)
-    output_proposal_out.m_view_tag = make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address);
+    make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
 
     // amount blinding factor: y = H_n(q)  //note: no baked key
     make_jamtis_amount_blinding_factor_selfsend(q,

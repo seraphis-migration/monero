@@ -94,9 +94,8 @@ void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_imag
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::key get_tx_membership_proof_message_v1(const std::vector<std::size_t> &enote_ledger_indices)
+void make_tx_membership_proof_message_v1(const std::vector<std::size_t> &enote_ledger_indices, rct::key &message_out)
 {
-    rct::key hash_result;
     std::string hash;
     hash.reserve(sizeof(CRYPTONOTE_NAME) + enote_ledger_indices.size()*((sizeof(std::size_t) * 8 + 6) / 7));
     // project name
@@ -113,9 +112,7 @@ rct::key get_tx_membership_proof_message_v1(const std::vector<std::size_t> &enot
         hash.append(converted_index, end - converted_index);
     }
 
-    rct::hash_to_scalar(hash_result, hash.data(), hash.size());
-
-    return hash_result;
+    rct::hash_to_scalar(message_out, hash.data(), hash.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 void prepare_input_commitment_factors_for_balance_proof_v1(
@@ -266,7 +263,8 @@ void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_re
     sc_mul(to_bytes(image_masks[0]), to_bytes(image_masks[0]), MINUS_ONE.bytes);  // -(t_k + t_c)
 
     // proof message
-    rct::key message{get_tx_membership_proof_message_v1(membership_ref_set.m_ledger_enote_indices)};
+    rct::key message;
+    make_tx_membership_proof_message_v1(membership_ref_set.m_ledger_enote_indices, message);
 
 
     /// make concise grootle proof
