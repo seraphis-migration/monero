@@ -32,6 +32,7 @@
 #include "concise_grootle.h"
 
 //local headers
+#include "common/varint.h"
 #include "crypto/crypto.h"
 extern "C"
 {
@@ -202,9 +203,11 @@ static void transcript_init(rct::key &transcript_out)
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Base aggregation coefficient for concise structure
-// mu = H_n(H("domain-sep"), message, {{M}}, {C_offsets}, A, B)
+// mu = H_n(H("domain-sep"), message, n, m, {{M}}, {C_offsets}, A, B)
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_base_aggregation_coefficient(const rct::key &message,
+    const std::size_t n,
+    const std::size_t m,
     const rct::keyM &M,
     const rct::keyV &C_offsets,
     const rct::key &A,
@@ -219,9 +222,24 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
 
     // collect challenge string
     std::string hash;
-    hash.reserve(((M.size() + 1)*C_offsets.size() + 4)*sizeof(rct::key));
+    hash.reserve(2*4 + ((M.size() + 1)*C_offsets.size() + 4)*sizeof(rct::key));
     hash = std::string(reinterpret_cast<const char*>(challenge.bytes), sizeof(challenge));
     hash.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
+    {
+        unsigned char v_variable[(sizeof(std::size_t) * 8 + 6) / 7];
+        unsigned char *v_variable_end = v_variable;
+
+        // n
+        tools::write_varint(v_variable_end, n);
+        assert(v_variable_end <= v_variable + sizeof(v_variable));
+        hash.append(reinterpret_cast<const char*>(v_variable), v_variable_end - v_variable);
+
+        // m
+        v_variable_end = v_variable;
+        tools::write_varint(v_variable_end, m);
+        assert(v_variable_end <= v_variable + sizeof(v_variable));
+        hash.append(reinterpret_cast<const char*>(v_variable), v_variable_end - v_variable);
+    }
     for (const rct::keyV &tuple : M)
     {
         for (const rct::key &key : tuple)
@@ -415,7 +433,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
 
     // mu: base aggregation coefficient
     const rct::key mu{
-            compute_base_aggregation_coefficient(message, M, C_offsets, proof.A, proof.B)
+            compute_base_aggregation_coefficient(message, n, m, M, C_offsets, proof.A, proof.B)
         };
 
     // mu^alpha: powers of the aggregation coefficient
@@ -618,6 +636,8 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
         // Transcript challenges
         const rct::key mu{
                 compute_base_aggregation_coefficient(messages[proof_i],
+                    n,
+                    m,
                     proof_M,
                     proof_offsets[proof_i],
                     proof.A,
