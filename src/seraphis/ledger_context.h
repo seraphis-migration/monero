@@ -86,13 +86,13 @@ public:
 };
 
 template<typename TxType>
-bool try_add_tx_to_ledger(LedgerContext &ledger_context, const TxType &tx_to_add);
+bool try_add_tx_to_ledger(const TxType &tx_to_add, LedgerContext &ledger_context_inout);
 
 template<>
-inline bool try_add_tx_to_ledger<SpTxSquashedV1>(LedgerContext &ledger_context,
-    const SpTxSquashedV1 &tx_to_add)
+inline bool try_add_tx_to_ledger<SpTxSquashedV1>(const SpTxSquashedV1 &tx_to_add,
+    LedgerContext &ledger_context_inout)
 {
-    return ledger_context.try_add_transaction_sp_squashed_v1(tx_to_add);
+    return ledger_context_inout.try_add_transaction_sp_squashed_v1(tx_to_add);
 }
 
 } //namespace sp

@@ -88,7 +88,7 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
             if (gen.test_double_spend)
             {
                 // add key images once validated
-                EXPECT_TRUE(sp::try_add_tx_to_ledger<SpTxType>(ledger_context, tx));
+                EXPECT_TRUE(sp::try_add_tx_to_ledger<SpTxType>(tx, ledger_context));
 
                 // re-validate tx
                 // - should fail now that key images were added to the ledger
