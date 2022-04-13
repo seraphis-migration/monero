@@ -52,6 +52,8 @@ extern "C"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_misc_utils.h"
+#include "tx_record_types.h"
+#include "tx_record_utils.h"
 
 //third party headers
 
@@ -163,6 +165,67 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
         // input amount: a
         input_amounts_out.emplace_back(partial_inputs[input_index].m_input_amount);
     }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_input_proposal(const crypto::secret_key &enote_view_privkey,
+    const crypto::secret_key &spendbase_privkey,
+    const crypto::secret_key &input_amount_blinding_factor,
+    const rct::xmr_amount &input_amount,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    SpInputProposal &proposal_out)
+{
+    // make an input proposal
+
+    proposal_out.m_enote_view_privkey     = enote_view_privkey;
+    proposal_out.m_spendbase_privkey      = spendbase_privkey;
+    proposal_out.m_amount_blinding_factor = input_amount_blinding_factor;
+    proposal_out.m_amount                 = input_amount;
+    proposal_out.m_address_mask           = address_mask;
+    proposal_out.m_commitment_mask        = commitment_mask;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
+    const crypto::secret_key &spendbase_privkey,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    SpInputProposalV1 &proposal_out)
+{
+    // make input proposal from enote record
+    make_input_proposal(enote_record.m_enote_view_privkey,
+        spendbase_privkey,
+        enote_record.m_amount_blinding_factor,
+        enote_record.m_amount,
+        address_mask,
+        commitment_mask,
+        proposal_out.m_core);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
+    const crypto::secret_key &spendbase_privkey,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    SpInputProposalV1 &proposal_out)
+{
+    // try to extract info from enote then make an input proposal
+    SpEnoteRecordV1 enote_record;
+    if (!try_get_enote_record_v1(enote,
+            enote_ephemeral_pubkey,
+            wallet_spend_pubkey,
+            k_view_balance,
+            enote_record))
+        return false;
+
+    make_v1_input_proposal_v1(enote_record,
+        spendbase_privkey,
+        address_mask,
+        commitment_mask,
+        proposal_out);
+
+    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_image_proof_v1(const SpInputProposal &input_proposal,

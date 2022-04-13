@@ -230,8 +230,8 @@ void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposal
 void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::secret_key &enote_view_privkey,
-    const rct::xmr_amount &input_amount,
     const crypto::secret_key &input_amount_blinding_factor,
+    const rct::xmr_amount &input_amount,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpMultisigInputProposalV1 &proposal_out)
@@ -247,8 +247,8 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
 
     // add components
     proposal_out.m_enote_view_privkey = enote_view_privkey;
-    proposal_out.m_input_amount = input_amount;
     proposal_out.m_input_amount_blinding_factor = input_amount_blinding_factor;
+    proposal_out.m_input_amount = input_amount;
 
     // make sure it is well-formed
     check_v1_multisig_input_proposal_semantics_v1(proposal_out);
@@ -263,8 +263,8 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
     make_v1_multisig_input_proposal_v1(enote_record.m_enote,
         enote_record.m_enote_ephemeral_pubkey,
         enote_record.m_enote_view_privkey,
-        enote_record.m_amount,
         enote_record.m_amount_blinding_factor,
+        enote_record.m_amount,
         address_mask,
         commitment_mask,
         proposal_out);

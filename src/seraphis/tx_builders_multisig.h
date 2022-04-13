@@ -88,8 +88,8 @@ void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposal
 * param: enote -
 * param: enote_ephemeral_pubkey -
 * param: enote_view_privkey -
-* param: input_amount -
 * param: input_amount_blinding_factor -
+* param: input_amount -
 * param: address_mask -
 * param: commitment_mask -
 * outparam: proposal_out -
@@ -97,8 +97,8 @@ void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposal
 void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::secret_key &enote_view_privkey,
-    const rct::xmr_amount &input_amount,
     const crypto::secret_key &input_amount_blinding_factor,
+    const rct::xmr_amount &input_amount,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpMultisigInputProposalV1 &proposal_out);

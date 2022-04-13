@@ -66,7 +66,7 @@ struct multisig_binonce_factors
     /// overload operator< for sorting: compare nonce_1 then nonce_2
     bool operator<(const multisig_binonce_factors &other) const
     {
-        int nonce_1_comparison{memcmp(nonce_1.bytes, &other.nonce_1.bytes, sizeof(rct::key))};
+        const int nonce_1_comparison{memcmp(nonce_1.bytes, &other.nonce_1.bytes, sizeof(rct::key))};
     
         if (nonce_1_comparison < 0)
             return true;
@@ -508,11 +508,11 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     std::vector<multisig_binonce_factors> signer_nonces_pub_mul8;
     signer_nonces_pub_mul8.reserve(num_signers);
 
-    for (std::size_t e{0}; e < num_signers; ++e)
+    for (const SpCompositionProofMultisigPubNonces &signer_pub_nonce_pair : signer_pub_nonces)
     {
         signer_nonces_pub_mul8.emplace_back();
-        signer_nonces_pub_mul8.back().nonce_1 = rct::scalarmult8(signer_pub_nonces[e].signature_nonce_1_KI_pub);
-        signer_nonces_pub_mul8.back().nonce_2 = rct::scalarmult8(signer_pub_nonces[e].signature_nonce_2_KI_pub);
+        signer_nonces_pub_mul8.back().nonce_1 = rct::scalarmult8(signer_pub_nonce_pair.signature_nonce_1_KI_pub);
+        signer_nonces_pub_mul8.back().nonce_2 = rct::scalarmult8(signer_pub_nonce_pair.signature_nonce_2_KI_pub);
 
         CHECK_AND_ASSERT_THROW_MES(!(signer_nonces_pub_mul8.back().nonce_1 == rct::identity()),
             "Bad signer nonce (alpha_1 identity)!");

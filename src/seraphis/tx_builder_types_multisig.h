@@ -94,10 +94,10 @@ struct SpMultisigInputProposalV1 final
 
     /// k_{a, sender} + k_{a, recipient}
     crypto::secret_key m_enote_view_privkey;
-    /// a: input amount
-    rct::xmr_amount m_input_amount;
     /// x: input amount commitment's blinding factor
     crypto::secret_key m_input_amount_blinding_factor;
+    /// a: input amount
+    rct::xmr_amount m_input_amount;
 
     /**
     * brief: get_key_image - get this input's key image

@@ -39,6 +39,7 @@
 #include "sp_core_types.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
+#include "tx_record_types.h"
 
 //third party headers
 
@@ -86,6 +87,55 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<SpPartialInputV1> &partial_inputs,
     std::vector<rct::xmr_amount> &input_amounts_out,
     std::vector<crypto::secret_key> &blinding_factors_out);
+/**
+* brief: make_input_proposal - make the core of an input proposal
+* param: enote_view_privkey -
+* param: spendbase_privkey -
+* param: input_amount_blinding_factor -
+* param: input_amount -
+* param: address_mask -
+* param: commitment_mask -
+* outparam: proposal_out -
+*/
+void make_input_proposal(const crypto::secret_key &enote_view_privkey,
+    const crypto::secret_key &spendbase_privkey,
+    const crypto::secret_key &input_amount_blinding_factor,
+    const rct::xmr_amount &input_amount,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    SpInputProposal &proposal_out);
+/**
+* brief: make_v1_input_proposal_v1 - make an input proposal
+* param: enote_record -
+* param: spendbase_privkey -
+* param: address_mask -
+* param: commitment_mask -
+* outparam: proposal_out -
+*/
+void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
+    const crypto::secret_key &spendbase_privkey,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    SpInputProposalV1 &proposal_out);
+/**
+* brief: try_make_v1_input_proposal_v1 - try to make an input proposal from an enote
+* param: enote -
+* param: enote_ephemeral_pubkey -
+* param: spendbase_privkey -
+* param: wallet_spend_pubkey -
+* param: k_view_balance -
+* param: address_mask -
+* param: commitment_mask -
+* outparam: proposal_out -
+*/
+bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
+    const crypto::secret_key &spendbase_privkey,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    SpInputProposalV1 &proposal_out);
 /**
 * brief: make_v1_image_proof_v1 - make a seraphis composition proof in the squashed enote model
 * param: input_proposal -
