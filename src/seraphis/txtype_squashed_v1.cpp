@@ -160,6 +160,18 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
     return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
+std::size_t SpTxSquashedV1::get_weight() const
+{
+    // tx weight = tx size + balance proof clawback
+    std::size_t weight{this->get_size_bytes()};
+
+    // subtract balance proof size and add its weight
+    weight -= m_balance_proof.get_size_bytes();
+    weight += m_balance_proof.get_weight();
+
+    return weight;
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     std::vector<SpEnoteV1> outputs,
     SpBalanceProofV1 balance_proof,

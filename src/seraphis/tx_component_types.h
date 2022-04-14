@@ -151,6 +151,7 @@ struct SpBalanceProofV1 final
     rct::key m_remainder_blinding_factor;
 
     std::size_t get_size_bytes(const bool include_commitments = false) const;
+    std::size_t get_weight(const bool include_commitments = false) const;
 };
 
 ////

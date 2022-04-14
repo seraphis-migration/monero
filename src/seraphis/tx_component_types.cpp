@@ -35,6 +35,7 @@
 #include "crypto/crypto.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
+#include "tx_misc_utils.h"
 
 //third party headers
 
@@ -99,6 +100,21 @@ std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=f
     size += 32;
 
     return size;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t SpBalanceProofV1::get_weight(const bool include_commitments /*=false*/) const
+{
+    std::size_t weight{0};
+
+    // BP+ proof
+    if (include_commitments)
+        weight += 32 * m_bpp_proof.V.size();
+    weight += bpp_weight(m_bpp_proof);
+
+    // remainder blinding factor
+    weight += 32;
+
+    return weight;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSupplementV1::get_size_bytes() const

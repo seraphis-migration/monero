@@ -84,8 +84,10 @@ struct SpTxSquashedV1 final
     /// semantic rules version
     SemanticRulesVersion m_tx_semantic_rules_version;
 
-    /// get size of tx
+    /// get size of the tx
     std::size_t get_size_bytes() const;
+    /// get weight of the tx (for managing fees)
+    std::size_t get_weight() const;
 };
 
 /**

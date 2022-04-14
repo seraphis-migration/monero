@@ -45,7 +45,7 @@ extern "C"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
-#include "tx_misc_utils.h"
+#include "tx_misc_utils.h"  //for equals_from_less (todo: remove this dependency?)
 
 //third party headers
 

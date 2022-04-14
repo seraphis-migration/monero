@@ -79,6 +79,25 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
     rct::BulletproofPlus &range_proofs_out);
 /**
+* brief: bpp_weight - get the 'weight' of a BP+ proof
+*   - Verifying a BP+ is linear in the number of aggregated range proofs, but the proof size is logarithmic,
+*     so the cost of verifying a BP+ isn't proportional to the proof size. To get that proportionality, we 'claw back'
+*     some of the 'aggregated' proof's size.
+*   - An aggregate BP+ has 'step-wise' verification costs. It contains 'dummy range proofs' so that the number of
+*     actual aggregated proofs equals the next power of 2 >= the number of range proofs desired.
+*   - To 'price in' the additional verification costs from batching range proofs, we add a 'clawback' to the proof size,
+*     which gives us the proof 'weight'. The clawback is the additional proof size if all the range proofs and dummy
+*     range proofs were split into 2-aggregate BP+ proofs (with a 20% discount as 'reward' for using an aggregate proof).
+* 
+*   weight = size(proof) + clawback
+*   clawback = 0.8 * [(num range proofs + num dummy range proofs)*size(BP+ proof with 2 range proofs) - size(proof)]
+* 
+*   note: weight does not include the commitments that are range proofed
+* param: proof -
+* return: the proof's weight
+*/
+std::size_t bpp_weight(const rct::BulletproofPlus &proof);
+/**
 * brief: balance_check_equality - balance check between two commitment sets using an equality test
 *   - i.e. sum(inputs) ?= sum(outputs)
 * param: commitment_set1 -

@@ -89,6 +89,31 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     range_proofs_out = rct::bulletproof_plus_PROVE(amounts, amount_commitment_blinding_factors);
 }
 //-------------------------------------------------------------------------------------------------------------------
+std::size_t bpp_weight(const rct::BulletproofPlus &proof)
+{
+    // BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)
+    // BP+ size (2 range proofs): 32 * 20
+    // weight = size(proof) + 0.8 * (32*20*(num range proofs + num dummy range proofs)/2) - size(proof))
+    // note: weight does not include the commitments that are range proofed ('V' in the proof structure)
+
+    if (proof.L.size() <= 6 ||
+        proof.R.size() <= 6 ||
+        proof.L.size() != proof.R.size())
+        return 0;
+
+    // two aggregate range proofs: BP+ size
+    const std::size_t size_two_agg_proof{32 * 20};
+
+    // (number of range proofs + dummy range proofs) / 2
+    const std::size_t num_two_agg_groups{proof.L.size() - 6};
+
+    // proof size
+    const std::size_t proof_size{32 * (proof.L.size() + proof.R.size() + 6)};
+
+    // return the weight
+    return (2 * proof_size + 8 * size_two_agg_proof * num_two_agg_groups) / 10;
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool balance_check_in_out_amnts(const std::vector<rct::xmr_amount> &input_amounts,
     const std::vector<rct::xmr_amount> &output_amounts,
     const rct::xmr_amount transaction_fee)
