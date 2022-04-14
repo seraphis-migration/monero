@@ -107,9 +107,7 @@ std::size_t SpBalanceProofV1::get_weight(const bool include_commitments /*=false
     std::size_t weight{0};
 
     // BP+ proof
-    if (include_commitments)
-        weight += 32 * m_bpp_proof.V.size();
-    weight += bpp_weight(m_bpp_proof);
+    weight += bpp_weight(m_bpp_proof, include_commitments);
 
     // remainder blinding factor
     weight += 32;

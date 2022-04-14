@@ -91,12 +91,11 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
 * 
 *   weight = size(proof) + clawback
 *   clawback = 0.8 * [(num range proofs + num dummy range proofs)*size(BP+ proof with 2 range proofs) - size(proof)]
-* 
-*   note: weight does not include the commitments that are range proofed
 * param: proof -
+* param: include_commitments -
 * return: the proof's weight
 */
-std::size_t bpp_weight(const rct::BulletproofPlus &proof);
+std::size_t bpp_weight(const rct::BulletproofPlus &proof, const bool include_commitments);
 /**
 * brief: balance_check_equality - balance check between two commitment sets using an equality test
 *   - i.e. sum(inputs) ?= sum(outputs)
