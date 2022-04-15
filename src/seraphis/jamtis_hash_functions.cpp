@@ -77,8 +77,8 @@ static void jamtis_hash_base(const std::string &domain_separator,
     const std::size_t out_length)
 {
     epee::wipeable_string hash_data;
-
     jamtis_hash_data(domain_separator, input, input_length, hash_data);
+
     blake2b(hash_out, out_length, hash_data.data(), hash_data.size(), derivation_key, derivation_key ? 32 : 0);
 }
 //-------------------------------------------------------------------------------------------------------------------

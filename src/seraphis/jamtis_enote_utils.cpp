@@ -341,30 +341,6 @@ bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_jamtis_nominal_spend_key_selfsend(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const rct::key &onetime_address,
-    const view_tag_t view_tag,
-    const crypto::secret_key &k_view_balance,
-    const rct::key &enote_ephemeral_pubkey,
-    rct::key &sender_receiver_secret_out,
-    rct::key &nominal_spend_key_out)
-{
-    // recompute view tag and check that it matches; short-circuit on failure
-    view_tag_t recomputed_view_tag;
-    make_jamtis_view_tag(sender_receiver_DH_derivation, onetime_address, recomputed_view_tag);
-
-    if (recomputed_view_tag != view_tag)
-        return false;
-
-    // q (self-send derivation path)
-    make_jamtis_sender_receiver_secret_selfsend(k_view_balance, enote_ephemeral_pubkey, sender_receiver_secret_out);
-
-    // K'_1 = Ko - H_n(q) X
-    make_jamtis_nominal_spend_key(sender_receiver_secret_out, onetime_address, nominal_spend_key_out);
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
 bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
     const crypto::key_derivation &baked_key,
     const rct::key &amount_commitment,

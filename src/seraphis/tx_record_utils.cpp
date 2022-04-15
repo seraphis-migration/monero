@@ -95,7 +95,7 @@ static void make_seraphis_key_image_helper(const rct::key &wallet_spend_pubkey,
 }
 //-------------------------------------------------------------------------------------------------------------------    
 //-------------------------------------------------------------------------------------------------------------------
-static bool try_get_intermediate_enote_record_info_helper_v1(const SpBasicEnoteRecordV1 &basic_record,
+static bool try_get_intermediate_enote_record_info_v1_helper(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
     const crypto::secret_key &s_cipher_tag,
@@ -143,7 +143,7 @@ static bool try_get_intermediate_enote_record_info_helper_v1(const SpBasicEnoteR
 }
 //-------------------------------------------------------------------------------------------------------------------    
 //-------------------------------------------------------------------------------------------------------------------
-static void get_final_enote_record_info_helper_v1(const rct::key &sender_receiver_secret,
+static void get_final_enote_record_info_v1_helper(const rct::key &sender_receiver_secret,
     const jamtis::address_index_t j,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
@@ -161,10 +161,7 @@ static void get_final_enote_record_info_helper_v1(const rct::key &sender_receive
         enote_view_privkey_out);
 
     // make key image: k_m/k_a U
-    make_seraphis_key_image_helper(wallet_spend_pubkey,
-        k_view_balance,
-        enote_view_privkey_out,
-        key_image_out);
+    make_seraphis_key_image_helper(wallet_spend_pubkey, k_view_balance, enote_view_privkey_out, key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------    
 //-------------------------------------------------------------------------------------------------------------------
@@ -218,7 +215,7 @@ bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_reco
     // get intermediate enote record
 
     // use helper to get info
-    if (!try_get_intermediate_enote_record_info_helper_v1(basic_record,
+    if (!try_get_intermediate_enote_record_info_v1_helper(basic_record,
             wallet_spend_pubkey,
             s_generate_address,
             s_cipher_tag,
@@ -280,7 +277,7 @@ bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     // get enote record
 
     // use helper to get intermediate info (address index, amount, amount blinding factor)
-    if (!try_get_intermediate_enote_record_info_helper_v1(basic_record,
+    if (!try_get_intermediate_enote_record_info_v1_helper(basic_record,
             wallet_spend_pubkey,
             s_generate_address,
             s_cipher_tag,
@@ -290,7 +287,7 @@ bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
         return false;
 
     // use helper to get final info (enote view privkey, key image)
-    get_final_enote_record_info_helper_v1(basic_record.m_nominal_sender_receiver_secret,
+    get_final_enote_record_info_v1_helper(basic_record.m_nominal_sender_receiver_secret,
         record_out.m_address_index,
         wallet_spend_pubkey,
         k_view_balance,
@@ -355,7 +352,7 @@ void get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_r
     // get final info then copy remaining pieces from an intermediate record
 
     // use helper to get final info (enote view privkey, key image)
-    get_final_enote_record_info_helper_v1(intermediate_record.m_nominal_sender_receiver_secret,
+    get_final_enote_record_info_v1_helper(intermediate_record.m_nominal_sender_receiver_secret,
         intermediate_record.m_address_index,
         wallet_spend_pubkey,
         k_view_balance,
@@ -377,28 +374,14 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &s_generate_address,
-    const crypto::secret_key &k_find_received,
     SpEnoteRecordV1 &record_out)
 {
-    // sender-receiver DH derivation
-    crypto::key_derivation derivation;
-    hw::get_device("default").generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey), k_find_received, derivation);
-
-    // sender-receiver secret, nominal spend key
-    rct::key sender_receiver_secret;
-    rct::key nominal_recipient_spendkey;
-
-    if(!jamtis::try_get_jamtis_nominal_spend_key_selfsend(derivation,
-            enote.m_core.m_onetime_address,
-            enote.m_view_tag,
-            k_view_balance,
-            enote_ephemeral_pubkey,
-            sender_receiver_secret,
-            nominal_recipient_spendkey))
-        return false;
+    // sender-receiver secret
+    rct::key q;
+    jamtis::make_jamtis_sender_receiver_secret_selfsend(k_view_balance, enote_ephemeral_pubkey, q);
 
     // decrypt encrypted address tag
-    jamtis::address_tag_t decrypted_addr_tag{decrypt_address_tag(sender_receiver_secret, enote.m_addr_tag_enc)};
+    jamtis::address_tag_t decrypted_addr_tag{decrypt_address_tag(q, enote.m_addr_tag_enc)};
 
     // convert raw address tag to address index
     jamtis::address_tag_MAC_t enote_tag_mac;
@@ -408,6 +391,10 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     if (!jamtis::is_known_self_send_MAC(enote_tag_mac))
         return false;
 
+    // nominal spend key
+    rct::key nominal_recipient_spendkey;
+    jamtis::make_jamtis_nominal_spend_key(q, enote.m_core.m_onetime_address, nominal_recipient_spendkey);
+
     // check nominal spend key
     if (!jamtis::test_jamtis_nominal_spend_key(wallet_spend_pubkey,
             s_generate_address,
@@ -416,7 +403,7 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
         return false;
 
     // try to recover the amount
-    if (!jamtis::try_get_jamtis_amount_selfsend(sender_receiver_secret,
+    if (!jamtis::try_get_jamtis_amount_selfsend(q,
             enote.m_core.m_amount_commitment,
             enote.m_encoded_amount,
             record_out.m_amount,
@@ -427,7 +414,7 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     make_enote_view_privkey_helper(k_view_balance,
         s_generate_address,
         record_out.m_address_index,
-        sender_receiver_secret,
+        q,
         record_out.m_enote_view_privkey);
 
     // make key image: k_m/k_a U
@@ -452,16 +439,13 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
 {
     // make generate-address secret then get enote record
     crypto::secret_key s_generate_address;
-    crypto::secret_key k_find_received;
     jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
-    jamtis::make_jamtis_findreceived_key(k_view_balance, k_find_received);
 
     return try_get_enote_record_v1_selfsend(enote,
         enote_ephemeral_pubkey,
         wallet_spend_pubkey,
         k_view_balance,
         s_generate_address,
-        k_find_received,
         record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -471,8 +455,10 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out)
 {
-    return try_get_enote_record_v1_plain(enote, enote_ephemeral_pubkey, wallet_spend_pubkey, k_view_balance, record_out) ||
-        try_get_enote_record_v1_selfsend(enote, enote_ephemeral_pubkey, wallet_spend_pubkey, k_view_balance, record_out);
+    // note: check for selfsend first since it is more efficient
+    //       (assumes selfsends and plain enotes appear in similar quantities)
+    return try_get_enote_record_v1_selfsend(enote, enote_ephemeral_pubkey, wallet_spend_pubkey, k_view_balance, record_out) ||
+        try_get_enote_record_v1_plain(enote, enote_ephemeral_pubkey, wallet_spend_pubkey, k_view_balance, record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_contextual_enote_record_v1(const SpEnoteRecordV1 &core_record,

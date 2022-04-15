@@ -241,25 +241,6 @@ bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender
     rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out);
 /**
-* brief: try_get_jamtis_nominal_spend_key_selfsend - test view tag; if it passes, compute and return the nominal spend key
-*    and sender-receiver secret (for a self-send enote)
-* param: sender_receiver_DH_derivation - 8 * privkey * DH_key
-* param: onetime_address - Ko
-* param: view_tag - view_tag
-* param: k_view_balance - k_vb
-* param: enote_ephemeral_pubkey - K_e
-* outparam: sender_receiver_secret_out - q
-* outparam: nominal_spend_key_out - K'_1 = Ko - H(q) X
-* return: true if successfully recomputed the view tag
-*/
-bool try_get_jamtis_nominal_spend_key_selfsend(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const rct::key &onetime_address,
-    const view_tag_t view_tag,
-    const crypto::secret_key &k_view_balance,
-    const rct::key &enote_ephemeral_pubkey,
-    rct::key &sender_receiver_secret_out,
-    rct::key &nominal_spend_key_out);
-/**
 * brief: try_get_jamtis_amount_plain - test recreating the amount commitment; if it is recreate-able, return the amount
 *    (for a normal enote)
 * param: sender_receiver_secret - q

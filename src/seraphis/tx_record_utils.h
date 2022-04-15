@@ -140,7 +140,6 @@ void get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_r
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
 * param: s_generate_address -
-* param: k_find_received -
 * outparam: record_out -
 * return: true if an extraction succeeded
 */
@@ -149,7 +148,6 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &s_generate_address,
-    const crypto::secret_key &k_find_received,
     SpEnoteRecordV1 &record_out);
 bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
