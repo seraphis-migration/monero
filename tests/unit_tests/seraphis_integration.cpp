@@ -191,6 +191,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
     ASSERT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount_A,
         transaction_fee,
         user_address_A,
+        user_address_A,
         keys_user_A.K_1_base,
         keys_user_A.k_vb,
         output_proposals));

@@ -128,6 +128,7 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
 * param: input_proposals -
 * param: transaction_fee -
 * param: change_destination -
+* param: dummy_destination -
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
 * param: explicit_payments -
@@ -136,6 +137,7 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
 void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &input_proposals,
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
+    const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::vector<jamtis::JamtisPaymentProposalV1> &explicit_payments,

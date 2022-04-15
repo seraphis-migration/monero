@@ -87,9 +87,22 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
 * brief: finalize_v1_output_proposal_set_v1 - finalize a set of output proposals (new proposals are appended)
 *   - add a change output if necessary
 *   - add a dummy output if appropriate
+*   - All output sets will contain at least 1 self-send, either from the original set passed in, a change, or a dummy.
+*     - Only very rare txs should acquire an extra output due to this invariant. Most txs will contain a change output
+*       or have a 'natural' dummy output (a dummy that would be there anyway, so it can be made a self-send trivially).
+*     - A self-send dummy will only be made if there are no other self-sends; otherwise dummies will be purely random.
+*     - The goal of this is for all txs made from output sets produced by this function to be identifiable by view
+*       tag checks. If the local signer is scanning for enotes, then they only need key images from txs that are flagged
+*       by a view tag check in order to identify all of their enotes spent in txs that use output sets from this function.
+*       This optimizes third-party view-tag scanning services, which only need to transmit key images from txs with view
+*       tag matches to the local client. Only txs that don't use this function to define the output set _might_ cause
+*       failures to identify spent enotes in that workflow. At the time of writing this, it is assumed that only
+*       collaboratively-funded txs will cause that failure mode, since collaborative txs should not contain any
+*       self-send outputs.
 * param: total_input_amount -
 * param: transaction_fee -
 * param: change_destination -
+* param: dummy_destination -
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
 * inoutparam: output_proposals_inout -
@@ -97,6 +110,7 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
 void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &total_input_amount,
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
+    const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<SpOutputProposalV1> &output_proposals_inout);

@@ -316,6 +316,7 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
 void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
+    const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::vector<jamtis::JamtisPaymentProposalV1> &explicit_payments,
@@ -346,6 +347,7 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
     finalize_v1_output_proposal_set_v1(total_input_amount,
         transaction_fee,
         change_destination,
+        dummy_destination,
         wallet_spend_pubkey,
         k_view_balance,
         output_proposals_temp);

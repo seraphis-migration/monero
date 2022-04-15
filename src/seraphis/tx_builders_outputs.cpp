@@ -185,6 +185,7 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
 void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &total_input_amount,
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
+    const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<SpOutputProposalV1> &output_proposals_inout)
@@ -203,8 +204,10 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
 
     // finalize the output proposal set: add zero or more of the following
     // - normal dummy output
+    // - normal self-send dummy output
     // - normal change output
     // - special dummy output
+    // - special self-send dummy output
     // - special change output
     if (output_proposals_inout.size() == 0)
     {
@@ -217,14 +220,42 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     {
         if (change_amount == 0)
         {
-            // txs need at least 2 outputs
+            if (jamtis::is_self_send_output_proposal(output_proposals_inout[0], wallet_spend_pubkey, k_view_balance))
+            {
+                // txs need at least 2 outputs; we already have a self-send, so make a random special dummy output
 
-            // add a special dummy output
-            // - 0 amount
-            // - make sure the final proposal set will have 1 unique enote ephemeral pubkey
-            output_proposals_inout.emplace_back();
-            output_proposals_inout.back().gen(0, 0);
-            output_proposals_inout.back().m_enote_ephemeral_pubkey = output_proposals_inout[0].m_enote_ephemeral_pubkey;
+                // add a special dummy output
+                // - 0 amount
+                // - make sure the final proposal set will have 1 unique enote ephemeral pubkey
+                output_proposals_inout.emplace_back();
+                output_proposals_inout.back().gen(0, 0);
+                output_proposals_inout.back().m_enote_ephemeral_pubkey = output_proposals_inout[0].m_enote_ephemeral_pubkey;
+            }
+            else //(no self-send)
+            {
+                // txs need at least 2 outputs, with at least 1 self-send enote type
+
+                // add a special self-send dummy output
+                // - 0 amount
+                // - make sure the final proposal set will have 1 unique enote ephemeral pubkey
+                crypto::secret_key findreceived_key;
+                jamtis::make_jamtis_findreceived_key(k_view_balance, findreceived_key);
+                const rct::key special_dummy_addr_K2{
+                        rct::scalarmultKey(output_proposals_inout[0].m_enote_ephemeral_pubkey, rct::sk2rct(findreceived_key))
+                    };  //k_fr * K_e_other
+
+                jamtis::JamtisPaymentProposalSelfSendV1 special_dummy;
+                special_dummy.m_destination = dummy_destination;
+                special_dummy.m_destination.m_addr_K2 = special_dummy_addr_K2;  //k_fr * K_e_other
+                special_dummy.m_destination.m_addr_K3 = output_proposals_inout[0].m_enote_ephemeral_pubkey;  //K_e_other
+                special_dummy.m_amount = 0;
+                special_dummy.m_type = jamtis::JamtisSelfSendMAC::DUMMY;
+                special_dummy.m_enote_ephemeral_privkey = rct::rct2sk(rct::identity());  //r = 1 (not needed)
+                special_dummy.m_viewbalance_privkey = k_view_balance;
+
+                output_proposals_inout.emplace_back();
+                special_dummy.get_output_proposal_v1(output_proposals_inout.back());
+            }
         }
         else if /*change_amount > 0 &&*/
             (!jamtis::is_self_send_output_proposal(output_proposals_inout[0], wallet_spend_pubkey, k_view_balance))
@@ -283,10 +314,32 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
             // 2-out txs need 1 shared enote ephemeral pubkey; add a dummy output here since the outputs have different
             //   enote ephemeral pubkeys
 
-            // add a normal dummy output
-            // - 0 amount
-            output_proposals_inout.emplace_back();
-            output_proposals_inout.back().gen(0, 0);
+            if (jamtis::is_self_send_output_proposal(output_proposals_inout[0], wallet_spend_pubkey, k_view_balance) ||
+                jamtis::is_self_send_output_proposal(output_proposals_inout[1], wallet_spend_pubkey, k_view_balance))
+            {
+                // if we have at least 1 self-send already, we can just make a normal dummy output
+
+                // add a normal dummy output
+                // - 0 amount
+                output_proposals_inout.emplace_back();
+                output_proposals_inout.back().gen(0, 0);
+            }
+            else //(no self-sends)
+            {
+                // if there are no self-sends, then we need to add a dummy self-send
+
+                // add a normal self-send dummy output
+                // - 0 amount
+                jamtis::JamtisPaymentProposalSelfSendV1 normal_dummy;
+                normal_dummy.m_destination = dummy_destination;
+                normal_dummy.m_amount = 0;
+                normal_dummy.m_type = jamtis::JamtisSelfSendMAC::DUMMY;
+                normal_dummy.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+                normal_dummy.m_viewbalance_privkey = k_view_balance;
+
+                output_proposals_inout.emplace_back();
+                normal_dummy.get_output_proposal_v1(output_proposals_inout.back());
+            }
         }
         else //(change_amount > 0)
         {
@@ -317,9 +370,17 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
                     "an enote ephemeral pubkey, but this can reduce user privacy. If you want to send money to yourself, "
                     "make independent self-spend types, or avoid calling this function (not recommended).");
             }
-            else //(at most 1 output proposal is a self-send)
+            else if (jamtis::is_self_send_output_proposal(output_proposals_inout[0], wallet_spend_pubkey, k_view_balance) ||
+                jamtis::is_self_send_output_proposal(output_proposals_inout[1], wallet_spend_pubkey, k_view_balance))
             {
                 // do nothing: the proposal set is already 'final'
+            }
+            else //(no self-sends)
+            {
+                CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: there are 2 normal outputs that share "
+                    "an enote ephemeral pubkey, but every normally-constructed tx needs at least one self-send output (since "
+                    "the 2 outputs share an enote ephemeral pubkey, we can't add a dummy self-send). If you want to make a "
+                    "2-output tx with no self-sends, then avoid calling this function (not recommended without good reason).");
             }
         }
         else //(change_amount > 0)
@@ -337,7 +398,38 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
 
         if (change_amount == 0)
         {
-            // do nothing: the proposal set is already 'final'
+            // see if there is a self-send proposal
+            bool has_self_send{false};
+
+            for (const SpOutputProposalV1 &output_proposal : output_proposals_inout)
+            {
+                if (jamtis::is_self_send_output_proposal(output_proposal, wallet_spend_pubkey, k_view_balance))
+                {
+                    has_self_send = true;
+                    break;
+                }
+            }
+
+            if (has_self_send)
+            {
+                // do nothing: the proposal set is already 'final'
+            }
+            else //(no self-sends)
+            {
+                // every tx made by this function needs a self-send output, so make a dummy self-send here
+
+                // add a normal self-send dummy output
+                // - 0 amount
+                jamtis::JamtisPaymentProposalSelfSendV1 normal_dummy;
+                normal_dummy.m_destination = dummy_destination;
+                normal_dummy.m_amount = 0;
+                normal_dummy.m_type = jamtis::JamtisSelfSendMAC::DUMMY;
+                normal_dummy.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+                normal_dummy.m_viewbalance_privkey = k_view_balance;
+
+                output_proposals_inout.emplace_back();
+                normal_dummy.get_output_proposal_v1(output_proposals_inout.back());
+            }
         }
         else //(change_amount > 0)
         {
