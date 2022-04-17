@@ -721,6 +721,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     out_proposals[1].m_enote_ephemeral_pubkey = out_proposals[0].m_enote_ephemeral_pubkey;
     EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, dummy_dest, keys.K_1_base, keys.k_vb, out_proposals));
     EXPECT_TRUE(out_proposals.size() == 2);
+    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     // 1 self-send output & 1 normal output (shared ephemeral pubkey), >0 change: error
     in_amount = 3 + fee;
