@@ -125,7 +125,11 @@ static SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1(
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t SpTxSquashedV1::get_size_bytes() const
+std::size_t SpTxSquashedV1::get_size_bytes(const std::size_t num_inputs,
+    const std::size_t num_outputs,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    const TxExtra &tx_extra)
 {
     // doesn't include:
     // - ring member references (e.g. indices or explicit copies)
@@ -133,43 +137,83 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
     std::size_t size{0};
 
     // input images
-    size += m_input_images.size() * SpEnoteImageV1::get_size_bytes();
+    size += num_inputs * SpEnoteImageV1::get_size_bytes();
 
     // outputs
-    size += m_outputs.size() * SpEnoteV1::get_size_bytes();
+    size += num_outputs * SpEnoteV1::get_size_bytes();
 
     // balance proof
-    size += m_balance_proof.get_size_bytes();
-
-    // membership proofs
-    // - assumes all have the same size
-    if (m_membership_proofs.size())
-        size += m_membership_proofs.size() * m_membership_proofs[0].get_size_bytes();
+    size += SpBalanceProofV1::get_size_bytes(num_inputs, num_outputs);
 
     // ownership/key-image-legitimacy proof for all inputs
-    // - assumes all have the same size
-    if (m_image_proofs.size())
-        size += m_image_proofs.size() * m_image_proofs[0].get_size_bytes();
+    size += num_inputs * SpImageProofV1::get_size_bytes();
+
+    // membership proofs
+    size += num_inputs * SpMembershipProofV1::get_size_bytes(ref_set_decomp_n, ref_set_decomp_m);
 
     // extra data in tx
-    size += m_supplement.get_size_bytes();
+    size += SpTxSupplementV1::get_size_bytes(num_outputs, tx_extra);
 
-    // fees (TODO: fees are serialized as variants, so the size may be different)
+    // fees
     size += sizeof(m_fee);
 
     return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t SpTxSquashedV1::get_weight() const
+std::size_t SpTxSquashedV1::get_size_bytes() const
+{
+    const std::size_t ref_set_decomp_n{
+            m_membership_proofs.size()
+            ? m_membership_proofs[0].m_ref_set_decomp_n
+            : 0
+        };
+    const std::size_t ref_set_decomp_m{
+            m_membership_proofs.size()
+            ? m_membership_proofs[0].m_ref_set_decomp_m
+            : 0
+        };
+
+    return SpTxSquashedV1::get_size_bytes(m_input_images.size(),
+        m_outputs.size(),
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        m_supplement.m_tx_extra);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t SpTxSquashedV1::get_weight(const std::size_t num_inputs,
+    const std::size_t num_outputs,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    const TxExtra &tx_extra)
 {
     // tx weight = tx size + balance proof clawback
-    std::size_t weight{this->get_size_bytes()};
+    std::size_t weight{SpTxSquashedV1::get_size_bytes(num_inputs, num_outputs, ref_set_decomp_n, ref_set_decomp_m, tx_extra)};
 
     // subtract balance proof size and add its weight
-    weight -= m_balance_proof.get_size_bytes();
-    weight += m_balance_proof.get_weight();
+    weight -= SpBalanceProofV1::get_size_bytes(num_inputs, num_outputs);
+    weight += SpBalanceProofV1::get_weight(num_inputs, num_outputs);
 
     return weight;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t SpTxSquashedV1::get_weight() const
+{
+    const std::size_t ref_set_decomp_n{
+            m_membership_proofs.size()
+            ? m_membership_proofs[0].m_ref_set_decomp_n
+            : 0
+        };
+    const std::size_t ref_set_decomp_m{
+            m_membership_proofs.size()
+            ? m_membership_proofs[0].m_ref_set_decomp_m
+            : 0
+        };
+
+    return SpTxSquashedV1::get_weight(m_input_images.size(),
+        m_outputs.size(),
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        m_supplement.m_tx_extra);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,

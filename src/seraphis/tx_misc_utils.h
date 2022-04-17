@@ -70,6 +70,18 @@ struct equals_from_less final
 */
 std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const std::size_t ref_set_decomp_m);
 /**
+* brief: round_up_to_power_of_2 - next power of 2 >= the input number
+* param: num -
+* return: the next power of 2 >= the input num
+*/
+std::size_t round_up_to_power_of_2(const std::size_t num);
+/**
+* brief: highest_bit_position - equivalent to floor(log2(num))
+* param: num -
+* return: floor(log2(num))
+*/
+std::size_t highest_bit_position(const std::size_t num);
+/**
 * brief: make_bpp_rangeproofs - make a BP+ proof that aggregates several range proofs
 * param: amounts -
 * param: amount_commitment_blinding_factors -
@@ -78,6 +90,14 @@ std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const s
 void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
     rct::BulletproofPlus &range_proofs_out);
+/**
+* brief: bpp_size_bytes - get the size of a BP+ proof in bytes
+*   - BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)
+* param: num_range_proofs -
+* param: include_commitments -
+* return: the BP+ proof's size in bytes
+*/
+std::size_t bpp_size_bytes(const std::size_t num_range_proofs, const bool include_commitments);
 /**
 * brief: bpp_weight - get the 'weight' of a BP+ proof
 *   - Verifying a BP+ is linear in the number of aggregated range proofs, but the proof size is logarithmic,
@@ -91,11 +111,11 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
 * 
 *   weight = size(proof) + clawback
 *   clawback = 0.8 * [(num range proofs + num dummy range proofs)*size(BP+ proof with 2 range proofs) - size(proof)]
-* param: proof -
+* param: num_range_proofs -
 * param: include_commitments -
-* return: the proof's weight
+* return: the BP+ proof's weight
 */
-std::size_t bpp_weight(const rct::BulletproofPlus &proof, const bool include_commitments);
+std::size_t bpp_weight(const std::size_t num_range_proofs, const bool include_commitments);
 /**
 * brief: balance_check_equality - balance check between two commitment sets using an equality test
 *   - i.e. sum(inputs) ?= sum(outputs)

@@ -70,6 +70,29 @@ std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const s
     return ref_set_size;
 }
 //-------------------------------------------------------------------------------------------------------------------
+std::size_t round_up_to_power_of_2(const std::size_t num)
+{
+    // next power of 2 >= num
+    std::size_t result{1};
+    while (result < num)
+        result <<= 1;
+
+    return result;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t highest_bit_position(std::size_t num)
+{
+    // floor(log2(num))
+    std::size_t bit_position{static_cast<std::size_t>(-1)};
+    while (num > 0)
+    {
+        ++bit_position;
+        num >>= 1;
+    }
+
+    return bit_position;
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2)
 {
     // balance check method chosen from perf test: tests/performance_tests/balance_check.h
@@ -89,31 +112,38 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     range_proofs_out = rct::bulletproof_plus_PROVE(amounts, amount_commitment_blinding_factors);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t bpp_weight(const rct::BulletproofPlus &proof, const bool include_commitments)
+std::size_t bpp_size_bytes(const std::size_t num_range_proofs, const bool include_commitments)
+{
+    // BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)
+    std::size_t proof_size{32 * (2 * highest_bit_position(round_up_to_power_of_2(64 * num_range_proofs)) + 6)};
+
+    // size of commitments that are range proofed (if requested)
+    if (include_commitments)
+        proof_size += 32 * num_range_proofs;
+
+    return proof_size;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t bpp_weight(const std::size_t num_range_proofs, const bool include_commitments)
 {
     // BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)
     // BP+ size (2 range proofs): 32 * 20
     // weight = size(proof) + 0.8 * (32*20*(num range proofs + num dummy range proofs)/2) - size(proof))
     // note: the weight can optionally include the commitments that are range proofed
 
-    if (proof.L.size() <= 6 ||
-        proof.R.size() <= 6 ||
-        proof.L.size() != proof.R.size())
-        return 0;
-
     // two aggregate range proofs: BP+ size
     const std::size_t size_two_agg_proof{32 * 20};
 
     // (number of range proofs + dummy range proofs) / 2
-    const std::size_t num_two_agg_groups{proof.L.size() - 6};
+    const std::size_t num_two_agg_groups{round_up_to_power_of_2(num_range_proofs) / 2};
 
     // proof size
-    const std::size_t proof_size{32 * (proof.L.size() + proof.R.size() + 6)};
+    const std::size_t proof_size{bpp_size_bytes(num_range_proofs, false)};  //don't include commitments here
 
     // size of commitments that are range proofed (if requested)
     const std::size_t commitments_size{
             include_commitments
-            ? 32 * proof.V.size()
+            ? 32 * num_range_proofs
             : 0
         };
 

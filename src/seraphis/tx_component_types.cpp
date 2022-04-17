@@ -75,26 +75,26 @@ void SpEnoteV1::gen()
     crypto::rand(sizeof(jamtis::encrypted_address_tag_t), m_addr_tag_enc.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t SpMembershipProofV1::get_size_bytes() const
+std::size_t SpMembershipProofV1::get_size_bytes(const std::size_t n, const std::size_t m)
 {
-    std::size_t num_elements = m_concise_grootle_proof.X.size();  // X
-
-    if (m_concise_grootle_proof.f.size() > 0)
-        num_elements += num_elements * m_concise_grootle_proof.f[0].size();  // f
-
-    num_elements += 4;  // A, B, zA, z
-
-    return 32 * num_elements;
+    //todo: include of reference set
+    return sp::ConciseGrootleProof::get_size_bytes(n, m);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=false*/) const
+std::size_t SpMembershipProofV1::get_size_bytes() const
+{
+    //todo: include reference set
+    return SpMembershipProofV1::get_size_bytes(m_ref_set_decomp_n, m_ref_set_decomp_m);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t SpBalanceProofV1::get_size_bytes(const std::size_t num_inputs,
+    const std::size_t num_outputs,
+    const bool include_commitments /*=false*/)
 {
     std::size_t size{0};
 
     // BP+ proof
-    if (include_commitments)
-        size += 32 * m_bpp_proof.V.size();
-    size += 32 * (6 + m_bpp_proof.L.size() + m_bpp_proof.R.size());;
+    size += bpp_size_bytes(num_inputs + num_outputs, include_commitments);
 
     // remainder blinding factor
     size += 32;
@@ -102,17 +102,45 @@ std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=f
     return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t SpBalanceProofV1::get_weight(const bool include_commitments /*=false*/) const
+std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=false*/) const
+{
+    return SpBalanceProofV1::get_size_bytes(m_bpp_proof.V.size(), 0, include_commitments);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t SpBalanceProofV1::get_weight(const std::size_t num_inputs,
+    const std::size_t num_outputs,
+    const bool include_commitments /*=false*/)
 {
     std::size_t weight{0};
 
     // BP+ proof
-    weight += bpp_weight(m_bpp_proof, include_commitments);
+    weight += bpp_weight(num_inputs + num_outputs, include_commitments);
 
     // remainder blinding factor
     weight += 32;
 
     return weight;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t SpBalanceProofV1::get_weight(const bool include_commitments /*=false*/) const
+{
+    return SpBalanceProofV1::get_weight(m_bpp_proof.V.size(), 0, include_commitments);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t SpTxSupplementV1::get_size_bytes(const std::size_t num_outputs, const TxExtra &tx_extra)
+{
+    std::size_t size{0};
+
+    // enote ephemeral pubkeys (need to refactor if assumption about output count : enote ephemeral pubkey mapping changes)
+    if (num_outputs == 2)
+        size += 32;
+    else
+        size += 32 * num_outputs;
+
+    // tx extra
+    size += tx_extra.size();
+
+    return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSupplementV1::get_size_bytes() const

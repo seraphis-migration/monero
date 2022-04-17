@@ -124,6 +124,8 @@ struct SpCompositionProof final
     // key image KI: not stored with proof
     // main proof key K: not stored with proof
     // message m: not stored with proof
+
+    static std::size_t get_size_bytes() { return 32*5; }
 };
 
 ////

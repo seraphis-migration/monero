@@ -285,6 +285,20 @@ static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
     return challenge;
 }
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t ConciseGrootleProof::get_size_bytes(const std::size_t n, const std::size_t m)
+{
+    return 32 * (m + m*(n-1) + 4);  // X + f + {A, B, zA, z}
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t ConciseGrootleProof::get_size_bytes()
+{
+    const std::size_t n{f.size() ? f[0].size() : 0};
+    const std::size_t m{X.size()};
+
+    return ConciseGrootleProof::get_size_bytes(n, m);
+}
+//-------------------------------------------------------------------------------------------------------------------
 ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
     const std::size_t l,        // secret index into {{M}}
     const rct::keyV &C_offsets,  // offsets for commitment to zero at index l

@@ -576,6 +576,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     // get output types to add
     OutputProposalSetExtraTypesContextV1 additional_outputs_context;
     std::vector<OutputProposalSetExtraTypesV1> additional_outputs;
+
     get_additional_output_types_for_output_set_v1(wallet_spend_pubkey,
         k_view_balance,
         output_proposals_inout,

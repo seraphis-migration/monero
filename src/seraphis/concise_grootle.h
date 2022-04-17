@@ -84,6 +84,9 @@ struct ConciseGrootleProof
     rct::keyM f;
     rct::keyV X;
     rct::key zA, z;
+
+    static std::size_t get_size_bytes(const std::size_t n, const std::size_t m);
+    std::size_t get_size_bytes();
 };
 
 

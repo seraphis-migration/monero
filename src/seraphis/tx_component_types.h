@@ -122,6 +122,7 @@ struct SpMembershipProofV1 final
     std::size_t m_ref_set_decomp_n;
     std::size_t m_ref_set_decomp_m;
 
+    static std::size_t get_size_bytes(const std::size_t n, const std::size_t m);
     std::size_t get_size_bytes() const;
 };
 
@@ -135,7 +136,7 @@ struct SpImageProofV1 final
     /// a seraphis composition proof
     sp::SpCompositionProof m_composition_proof;
 
-    static std::size_t get_size_bytes() { return 32*5; }
+    static std::size_t get_size_bytes() { return sp::SpCompositionProof::get_size_bytes(); }
 };
 
 ////
@@ -150,7 +151,13 @@ struct SpBalanceProofV1 final
     /// the remainder blinding factor
     rct::key m_remainder_blinding_factor;
 
+    static std::size_t get_size_bytes(const std::size_t num_inputs,
+        const std::size_t num_outputs,
+        const bool include_commitments = false);
     std::size_t get_size_bytes(const bool include_commitments = false) const;
+    static std::size_t get_weight(const std::size_t num_inputs,
+        const std::size_t num_outputs,
+        const bool include_commitments = false);
     std::size_t get_weight(const bool include_commitments = false) const;
 };
 
@@ -167,6 +174,7 @@ struct SpTxSupplementV1 final
     /// tx memo
     TxExtra m_tx_extra;
 
+    static std::size_t get_size_bytes(const std::size_t num_outputs, const TxExtra &tx_extra);
     std::size_t get_size_bytes() const;
 };
 
