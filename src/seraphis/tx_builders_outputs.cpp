@@ -59,29 +59,6 @@
 
 namespace sp
 {
-
-struct OutputProposalSetExtraTypesContextV1
-{
-    // an enote ephemeral pubkey to be shared by all outputs in a tx
-    rct::key m_shared_enote_ephemeral_pubkey;
-};
-
-enum class OutputProposalSetExtraTypesV1
-{
-    // a plain dummy output (random recipient, random enote ephemeral pubkey)
-    NORMAL_DUMMY,
-    // a self-send dummy output (specified recipient, normal enote ephemeral pubkey)
-    NORMAL_SELF_SEND_DUMMY,
-    // a normal change output (specified recipient, normal enote ephemeral pubkey)
-    NORMAL_CHANGE,
-    // a special dummy output (random recipient, shared enote ephemeral pubkey)
-    SPECIAL_DUMMY,
-    // a special self-send dummy output (specified recipient, shared enote ephemeral pubkey)
-    SPECIAL_SELF_SEND_DUMMY,
-    // a special change output (specified recipient, shared enote ephemeral pubkey)
-    SPECIAL_CHANGE
-};
-
 //-------------------------------------------------------------------------------------------------------------------
 // check that all enote ephemeral pubkeys in an output proposal set are unique
 //-------------------------------------------------------------------------------------------------------------------
@@ -102,7 +79,157 @@ static bool ephemeral_pubkeys_are_unique_v1(const std::vector<SpOutputProposalV1
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_pubkey,
+static void make_additional_output_normal_self_send_v1(const jamtis::JamtisSelfSendMAC self_send_MAC,
+    const jamtis::JamtisDestinationV1 &destination,
+    const crypto::secret_key &k_view_balance,
+    const rct::xmr_amount amount,
+    SpOutputProposalV1 &output_proposal_out)
+{
+    // build payment proposal for a 'normal' self-send
+    jamtis::JamtisPaymentProposalSelfSendV1 payment_proposal;
+    payment_proposal.m_destination = destination;
+    payment_proposal.m_amount = amount;
+    payment_proposal.m_type = self_send_MAC;
+    payment_proposal.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+    payment_proposal.m_viewbalance_privkey = k_view_balance;
+
+    // get output proposal
+    payment_proposal.get_output_proposal_v1(output_proposal_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void make_additional_output_special_self_send_v1(const jamtis::JamtisSelfSendMAC self_send_MAC,
+    const rct::key &enote_ephemeral_pubkey,
+    const jamtis::JamtisDestinationV1 &destination,
+    const crypto::secret_key &k_view_balance,
+    const rct::xmr_amount amount,
+    SpOutputProposalV1 &output_proposal_out)
+{
+    // build payment proposal for a 'special' self-send that uses a shared enote ephemeral pubkey
+    crypto::secret_key findreceived_key;
+    jamtis::make_jamtis_findreceived_key(k_view_balance, findreceived_key);
+    const rct::key special_addr_K2{
+            rct::scalarmultKey(enote_ephemeral_pubkey, rct::sk2rct(findreceived_key))
+        };  //k_fr * K_e_other
+
+    jamtis::JamtisPaymentProposalSelfSendV1 payment_proposal;
+    payment_proposal.m_destination = destination;
+    payment_proposal.m_destination.m_addr_K2 = special_addr_K2;  //k_fr * K_e_other
+    payment_proposal.m_destination.m_addr_K3 = enote_ephemeral_pubkey;  //K_e_other
+    payment_proposal.m_amount = amount;
+    payment_proposal.m_type = self_send_MAC;
+    payment_proposal.m_enote_ephemeral_privkey = rct::rct2sk(rct::identity());  //r = 1 (not needed)
+    payment_proposal.m_viewbalance_privkey = k_view_balance;
+
+    // get output proposal
+    payment_proposal.get_output_proposal_v1(output_proposal_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+void check_v1_output_proposal_set_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals)
+{
+    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() >= 1, "Semantics check output proposals v1: insufficient outputs.");
+
+    // if 2 proposals, must be a shared enote ephemeral pubkey
+    if (output_proposals.size() == 2)
+    {
+        CHECK_AND_ASSERT_THROW_MES(output_proposals[0].m_enote_ephemeral_pubkey == 
+                output_proposals[1].m_enote_ephemeral_pubkey,
+            "Semantics check output proposals v1: there are 2 outputs but they don't share an enote ephemeral pubkey.");
+    }
+
+    // if >2 proposals, all enote ephemeral pubkeys should be unique
+    if (output_proposals.size() > 2)
+    {
+        for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
+        {
+            CHECK_AND_ASSERT_THROW_MES(ephemeral_pubkeys_are_unique_v1(output_proposals),
+                "Semantics check output proposals v1: there are >2 outputs but their enote ephemeral pubkeys aren't all "
+                "unique.");
+        }
+    }
+
+    // proposals should be sorted
+    CHECK_AND_ASSERT_THROW_MES(std::is_sorted(output_proposals.begin(), output_proposals.end()),
+        "Semantics check output proposals v1: outputs aren't sorted.");
+
+    // proposals should be unique (can use adjacent_find when sorted)
+    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(output_proposals.begin(), output_proposals.end(), equals_from_less{})
+            == output_proposals.end(),
+        "Semantics check output proposals v1: output onetime addresses are not all unique.");
+
+    // proposal onetime addresses should be canonical (sanity check so our tx outputs don't have duplicate key images)
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
+    {
+        CHECK_AND_ASSERT_THROW_MES(output_proposal.m_core.onetime_address_is_canonical(),
+            "Semantics check output proposals v1: an output onetime address is not in the prime subgroup.");
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs)
+{
+    // there may be either 1 or 3+ enote pubkeys
+    if (num_outputs == 2)
+    {
+        CHECK_AND_ASSERT_THROW_MES(tx_supplement.m_output_enote_ephemeral_pubkeys.size() == 1,
+            "Semantics check tx supplement v1: there must be 1 enote pubkey if there are 2 outputs.");
+    }
+    else if (num_outputs >= 3)
+    {
+        CHECK_AND_ASSERT_THROW_MES(tx_supplement.m_output_enote_ephemeral_pubkeys.size() == num_outputs,
+            "Semantics check tx supplement v1: there must be one enote pubkey for each output when there are 3+ outputs.");
+    }
+
+    // if 3+ enote pubkeys, all should be unique
+    if (tx_supplement.m_output_enote_ephemeral_pubkeys.size() >= 3)
+    {
+        for (auto enote_pubkey_it = tx_supplement.m_output_enote_ephemeral_pubkeys.begin();
+            enote_pubkey_it != tx_supplement.m_output_enote_ephemeral_pubkeys.end();
+            ++enote_pubkey_it)
+        {
+            CHECK_AND_ASSERT_THROW_MES(std::find(tx_supplement.m_output_enote_ephemeral_pubkeys.begin(), enote_pubkey_it,
+                    *enote_pubkey_it) == enote_pubkey_it,
+                "Semantics check tx supplement v1: enote pubkeys must be unique.");
+        }
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
+    std::vector<SpEnoteV1> &outputs_out,
+    std::vector<rct::xmr_amount> &output_amounts_out,
+    std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
+    std::vector<rct::key> &output_enote_ephemeral_pubkeys_out)
+{
+    outputs_out.clear();
+    outputs_out.reserve(output_proposals.size());
+    output_amounts_out.clear();
+    output_amounts_out.reserve(output_proposals.size());
+    output_amount_commitment_blinding_factors_out.clear();
+    output_amount_commitment_blinding_factors_out.reserve(output_proposals.size());
+    output_enote_ephemeral_pubkeys_out.clear();
+    output_enote_ephemeral_pubkeys_out.reserve(output_proposals.size());
+
+    for (const SpOutputProposalV1 &proposal : output_proposals)
+    {
+        // convert to enote
+        outputs_out.emplace_back();
+        proposal.get_enote_v1(outputs_out.back());
+
+        // prepare for range proofs
+        output_amounts_out.emplace_back(proposal.m_core.m_amount);
+        output_amount_commitment_blinding_factors_out.emplace_back(proposal.m_core.m_amount_blinding_factor);
+
+        // copy non-duplicate enote pubkeys to tx supplement
+        if (std::find(output_enote_ephemeral_pubkeys_out.begin(),
+            output_enote_ephemeral_pubkeys_out.end(),
+            proposal.m_enote_ephemeral_pubkey) == output_enote_ephemeral_pubkeys_out.end())
+        {
+            output_enote_ephemeral_pubkeys_out.emplace_back(proposal.m_enote_ephemeral_pubkey);
+        }
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::vector<SpOutputProposalV1> &output_proposals,
     const rct::xmr_amount change_amount,
@@ -327,55 +454,7 @@ static void get_additional_output_types_for_output_set_v1(const rct::key &wallet
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void make_additional_output_normal_self_send_v1(const jamtis::JamtisSelfSendMAC self_send_MAC,
-    const jamtis::JamtisDestinationV1 &destination,
-    const crypto::secret_key &k_view_balance,
-    const rct::xmr_amount amount,
-    SpOutputProposalV1 &output_proposal_out)
-{
-    // build payment proposal for a 'normal' self-send
-    jamtis::JamtisPaymentProposalSelfSendV1 payment_proposal;
-    payment_proposal.m_destination = destination;
-    payment_proposal.m_amount = amount;
-    payment_proposal.m_type = self_send_MAC;
-    payment_proposal.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
-    payment_proposal.m_viewbalance_privkey = k_view_balance;
-
-    // get output proposal
-    payment_proposal.get_output_proposal_v1(output_proposal_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void make_additional_output_special_self_send_v1(const jamtis::JamtisSelfSendMAC self_send_MAC,
-    const rct::key &enote_ephemeral_pubkey,
-    const jamtis::JamtisDestinationV1 &destination,
-    const crypto::secret_key &k_view_balance,
-    const rct::xmr_amount amount,
-    SpOutputProposalV1 &output_proposal_out)
-{
-    // build payment proposal for a 'special' self-send that uses a shared enote ephemeral pubkey
-    crypto::secret_key findreceived_key;
-    jamtis::make_jamtis_findreceived_key(k_view_balance, findreceived_key);
-    const rct::key special_addr_K2{
-            rct::scalarmultKey(enote_ephemeral_pubkey, rct::sk2rct(findreceived_key))
-        };  //k_fr * K_e_other
-
-    jamtis::JamtisPaymentProposalSelfSendV1 payment_proposal;
-    payment_proposal.m_destination = destination;
-    payment_proposal.m_destination.m_addr_K2 = special_addr_K2;  //k_fr * K_e_other
-    payment_proposal.m_destination.m_addr_K3 = enote_ephemeral_pubkey;  //K_e_other
-    payment_proposal.m_amount = amount;
-    payment_proposal.m_type = self_send_MAC;
-    payment_proposal.m_enote_ephemeral_privkey = rct::rct2sk(rct::identity());  //r = 1 (not needed)
-    payment_proposal.m_viewbalance_privkey = k_view_balance;
-
-    // get output proposal
-    payment_proposal.get_output_proposal_v1(output_proposal_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void make_additional_output_v1(const OutputProposalSetExtraTypesV1 additional_output_type,
+void make_additional_output_v1(const OutputProposalSetExtraTypesV1 additional_output_type,
     const OutputProposalSetExtraTypesContextV1 &additional_outputs_context,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
@@ -446,110 +525,6 @@ static void make_additional_output_v1(const OutputProposalSetExtraTypesV1 additi
     else
     {
         CHECK_AND_ASSERT_THROW_MES(false, "Unknown output proposal set extra type.");
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-void check_v1_output_proposal_set_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals)
-{
-    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() >= 1, "Semantics check output proposals v1: insufficient outputs.");
-
-    // if 2 proposals, must be a shared enote ephemeral pubkey
-    if (output_proposals.size() == 2)
-    {
-        CHECK_AND_ASSERT_THROW_MES(output_proposals[0].m_enote_ephemeral_pubkey == 
-                output_proposals[1].m_enote_ephemeral_pubkey,
-            "Semantics check output proposals v1: there are 2 outputs but they don't share an enote ephemeral pubkey.");
-    }
-
-    // if >2 proposals, all enote ephemeral pubkeys should be unique
-    if (output_proposals.size() > 2)
-    {
-        for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
-        {
-            CHECK_AND_ASSERT_THROW_MES(ephemeral_pubkeys_are_unique_v1(output_proposals),
-                "Semantics check output proposals v1: there are >2 outputs but their enote ephemeral pubkeys aren't all "
-                "unique.");
-        }
-    }
-
-    // proposals should be sorted
-    CHECK_AND_ASSERT_THROW_MES(std::is_sorted(output_proposals.begin(), output_proposals.end()),
-        "Semantics check output proposals v1: outputs aren't sorted.");
-
-    // proposals should be unique (can use adjacent_find when sorted)
-    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(output_proposals.begin(), output_proposals.end(), equals_from_less{})
-            == output_proposals.end(),
-        "Semantics check output proposals v1: output onetime addresses are not all unique.");
-
-    // proposal onetime addresses should be canonical (sanity check so our tx outputs don't have duplicate key images)
-    for (const SpOutputProposalV1 &output_proposal : output_proposals)
-    {
-        CHECK_AND_ASSERT_THROW_MES(output_proposal.m_core.onetime_address_is_canonical(),
-            "Semantics check output proposals v1: an output onetime address is not in the prime subgroup.");
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
-void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs)
-{
-    // there may be either 1 or 3+ enote pubkeys
-    if (num_outputs == 2)
-    {
-        CHECK_AND_ASSERT_THROW_MES(tx_supplement.m_output_enote_ephemeral_pubkeys.size() == 1,
-            "Semantics check tx supplement v1: there must be 1 enote pubkey if there are 2 outputs.");
-    }
-    else if (num_outputs >= 3)
-    {
-        CHECK_AND_ASSERT_THROW_MES(tx_supplement.m_output_enote_ephemeral_pubkeys.size() == num_outputs,
-            "Semantics check tx supplement v1: there must be one enote pubkey for each output when there are 3+ outputs.");
-    }
-
-    // if 3+ enote pubkeys, all should be unique
-    if (tx_supplement.m_output_enote_ephemeral_pubkeys.size() >= 3)
-    {
-        for (auto enote_pubkey_it = tx_supplement.m_output_enote_ephemeral_pubkeys.begin();
-            enote_pubkey_it != tx_supplement.m_output_enote_ephemeral_pubkeys.end();
-            ++enote_pubkey_it)
-        {
-            CHECK_AND_ASSERT_THROW_MES(std::find(tx_supplement.m_output_enote_ephemeral_pubkeys.begin(), enote_pubkey_it,
-                    *enote_pubkey_it) == enote_pubkey_it,
-                "Semantics check tx supplement v1: enote pubkeys must be unique.");
-        }
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
-    std::vector<SpEnoteV1> &outputs_out,
-    std::vector<rct::xmr_amount> &output_amounts_out,
-    std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
-    std::vector<rct::key> &output_enote_ephemeral_pubkeys_out)
-{
-    outputs_out.clear();
-    outputs_out.reserve(output_proposals.size());
-    output_amounts_out.clear();
-    output_amounts_out.reserve(output_proposals.size());
-    output_amount_commitment_blinding_factors_out.clear();
-    output_amount_commitment_blinding_factors_out.reserve(output_proposals.size());
-    output_enote_ephemeral_pubkeys_out.clear();
-    output_enote_ephemeral_pubkeys_out.reserve(output_proposals.size());
-
-    for (const SpOutputProposalV1 &proposal : output_proposals)
-    {
-        // convert to enote
-        outputs_out.emplace_back();
-        proposal.get_enote_v1(outputs_out.back());
-
-        // prepare for range proofs
-        output_amounts_out.emplace_back(proposal.m_core.m_amount);
-        output_amount_commitment_blinding_factors_out.emplace_back(proposal.m_core.m_amount_blinding_factor);
-
-        // copy non-duplicate enote pubkeys to tx supplement
-        if (std::find(output_enote_ephemeral_pubkeys_out.begin(),
-            output_enote_ephemeral_pubkeys_out.end(),
-            proposal.m_enote_ephemeral_pubkey) == output_enote_ephemeral_pubkeys_out.end())
-        {
-            output_enote_ephemeral_pubkeys_out.emplace_back(proposal.m_enote_ephemeral_pubkey);
-        }
     }
 }
 //-------------------------------------------------------------------------------------------------------------------

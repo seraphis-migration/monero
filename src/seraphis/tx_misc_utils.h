@@ -71,12 +71,14 @@ struct equals_from_less final
 std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const std::size_t ref_set_decomp_m);
 /**
 * brief: round_up_to_power_of_2 - next power of 2 >= the input number
+*   TODO: move to better file?
 * param: num -
 * return: the next power of 2 >= the input num
 */
 std::size_t round_up_to_power_of_2(const std::size_t num);
 /**
 * brief: highest_bit_position - equivalent to floor(log2(num))
+*   TODO: move to better file?
 * param: num -
 * return: floor(log2(num))
 */
