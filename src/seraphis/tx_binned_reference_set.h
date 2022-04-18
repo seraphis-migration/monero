@@ -1,0 +1,100 @@
+// Copyright (c) 2021, The Monero Project
+//
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without modification, are
+// permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this list of
+//    conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice, this list
+//    of conditions and the following disclaimer in the documentation and/or other
+//    materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its contributors may be
+//    used to endorse or promote products derived from this software without specific
+//    prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+// THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+// THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+// NOT FOR PRODUCTION
+
+// A reference set using deterministic bins
+
+#pragma once
+
+//local headers
+
+//third party headers
+
+//standard headers
+#include <vector>
+
+//forward declarations
+
+
+namespace sp
+{
+
+using ref_set_bin_dimension_v1_t = std::uint16_t;  //warning: changing this is not backward compatible! (struct sizes will change)
+
+////
+// SpBinnedReferenceSetConfigV1
+///
+struct SpBinnedReferenceSetConfigV1 final
+{
+    /// bin width (defines the range of elements that a bin covers in the parent set)
+    ref_set_bin_dimension_v1_t m_bin_width;
+    /// number of elements referenced by a bin
+    ref_set_bin_dimension_v1_t m_num_bin_members;
+};
+
+////
+// SpReferenceBinV1
+// - bin: a selection of elements from a range of elements in a larger set
+// - bin locus: the center of the bin range, as an index into that larger set
+// - rotation factor: rotates deterministically-generated bin members within the bin, so that a pre-selected
+//                    member of the larger set becomes a member of the bin
+///
+struct SpReferenceBinV1 final
+{
+    /// bin locus (index into original set)
+    std::uint64_t m_bin_locus;
+    /// rotation factor
+    ref_set_bin_dimension_v1_t m_rotation_factor;
+
+    static std::size_t get_size_bytes() { return sizeof(m_bin_locus) + sizeof(m_rotation_factor); }
+};
+
+////
+// SpBinnedReferenceSetV1
+// - reference set: a set of elements that are in a larger set
+// - binned: the reference set is split into 'bins'
+///
+struct SpBinnedReferenceSetV1 final
+{
+    /// bin generator seed (shared by all bins)
+    ref_set_bin_dimension_v1_t m_bin_generator_seed;
+    /// bin configuration details (shared by all bins)
+    SpBinnedReferenceSetConfigV1 m_bin_config;
+    /// bins
+    std::vector<SpReferenceBinV1> m_bins;
+
+    /// size of the binned reference set (does not include the config)
+    static std::size_t get_size_bytes(const std::size_t num_bins)
+    {
+        return sizeof(m_bin_generator_seed) + num_bins * SpReferenceBinV1::get_size_bytes();
+    }
+    std::size_t get_size_bytes() const { return SpBinnedReferenceSetV1::get_size_bytes(m_bins.size()); }
+};
+
+} //namespace sp
