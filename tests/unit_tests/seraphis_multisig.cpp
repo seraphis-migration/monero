@@ -517,57 +517,54 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     }
 
 
-    /// 6) each signer assembles partial signatures and completes txs
+    /// 6) any signer (or even a non-signer) can assemble partial signatures and complete txs
     /// note: even signers who didn't participate in making partial sigs can complete txs here
 
-    for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
-    {
-        // a) get partial inputs
-        std::vector<SpPartialInputV1> partial_inputs;
+    // a) get partial inputs
+    std::vector<SpPartialInputV1> partial_inputs;
 
-        ASSERT_NO_THROW(
-                ASSERT_TRUE(try_make_v1_partial_inputs_v1(multisig_tx_proposal,
-                    accounts[signer_index].get_signers(),
-                    keys.K_1_base,
-                    keys.k_vb,
-                    input_partial_sigs_per_signer,
-                    partial_inputs))
-            );
+    ASSERT_NO_THROW(
+            ASSERT_TRUE(try_make_v1_partial_inputs_v1(multisig_tx_proposal,
+                accounts[0].get_signers(),
+                keys.K_1_base,
+                keys.k_vb,
+                input_partial_sigs_per_signer,
+                partial_inputs))
+        );
 
-        // b) build partial tx
-        SpTxProposalV1 tx_proposal;
-        multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
+    // b) build partial tx
+    SpTxProposalV1 tx_proposal;
+    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
 
-        SpPartialTxV1 partial_tx;
-        ASSERT_NO_THROW(make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), fee, version_string, partial_tx));
+    SpPartialTxV1 partial_tx;
+    ASSERT_NO_THROW(make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), fee, version_string, partial_tx));
 
-        // c) add enotes owned by multisig address to the ledger and prepare membership ref sets (one step)
-        // note: use ring size 2^2 = 4 for speed
-        MockLedgerContext ledger_context;
+    // c) add enotes owned by multisig address to the ledger and prepare membership ref sets (one step)
+    // note: use ring size 2^2 = 4 for speed
+    MockLedgerContext ledger_context;
 
-        const std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
-                gen_mock_sp_membership_ref_sets_v1(partial_tx.m_input_enotes, 2, 2, ledger_context)
-            };
+    const std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
+            gen_mock_sp_membership_ref_sets_v1(partial_tx.m_input_enotes, 2, 2, ledger_context)
+        };
 
-        // d) make membership proofs
-        std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
+    // d) make membership proofs
+    std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
 
-        ASSERT_NO_THROW(make_v1_membership_proofs_v1(membership_ref_sets,
-            partial_tx.m_image_address_masks,
-            partial_tx.m_image_commitment_masks,
-            alignable_membership_proofs));
+    ASSERT_NO_THROW(make_v1_membership_proofs_v1(membership_ref_sets,
+        partial_tx.m_image_address_masks,
+        partial_tx.m_image_commitment_masks,
+        alignable_membership_proofs));
 
-        // e) complete tx
-        SpTxSquashedV1 completed_tx;
+    // e) complete tx
+    SpTxSquashedV1 completed_tx;
 
-        ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(partial_tx,
-            std::move(alignable_membership_proofs),
-            semantic_rules_version,
-            completed_tx));
+    ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(partial_tx,
+        std::move(alignable_membership_proofs),
+        semantic_rules_version,
+        completed_tx));
 
-        // f) verify tx
-        EXPECT_NO_THROW(EXPECT_TRUE(validate_tx(completed_tx, ledger_context, false)));
-    }
+    // f) verify tx
+    EXPECT_NO_THROW(EXPECT_TRUE(validate_tx(completed_tx, ledger_context, false)));
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

@@ -37,6 +37,7 @@
 //third party headers
 
 //standard headers
+#include <cstdint>
 #include <vector>
 
 //forward declarations
