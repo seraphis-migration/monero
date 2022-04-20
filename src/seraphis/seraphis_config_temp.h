@@ -36,9 +36,10 @@
 namespace config
 {
   // note: version number should line up with intended grootle n^m decomposition
-  const constexpr std::uint64_t SP_REF_SET_BIN_WIDTH_V1 = 256;
+  const constexpr std::uint64_t SP_REF_SET_BIN_RADIUS_V1 = 127;
   const constexpr std::uint64_t SP_REF_SET_NUM_BIN_MEMBERS_V1 = 8;
 
   const constexpr char HASH_KEY_GROOTLE_Hi_A[] = "grootle_Hi_A";
   const constexpr char HASH_KEY_GROOTLE_Hi_B[] = "grootle_Hi_B";
+  const constexpr char HASH_KEY_BINNED_REF_SET_MEMBER[] = "binned_ref_set_member";
 }

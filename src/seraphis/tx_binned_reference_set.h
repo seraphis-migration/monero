@@ -53,8 +53,8 @@ using ref_set_bin_dimension_v1_t = std::uint16_t;  //warning: changing this is n
 ///
 struct SpBinnedReferenceSetConfigV1 final
 {
-    /// bin width (defines the range of elements that a bin covers in the parent set)
-    ref_set_bin_dimension_v1_t m_bin_width;
+    /// bin radius (defines the range of elements that a bin covers in the parent set)
+    ref_set_bin_dimension_v1_t m_bin_radius;
     /// number of elements referenced by a bin
     ref_set_bin_dimension_v1_t m_num_bin_members;
 };
@@ -72,6 +72,17 @@ struct SpReferenceBinV1 final
     std::uint64_t m_bin_locus;
     /// rotation factor
     ref_set_bin_dimension_v1_t m_rotation_factor;
+
+    /// less-than operator for sorting
+    bool operator<(const SpReferenceBinV1 &other_bin)
+    {
+        if (m_bin_locus < other_bin.m_bin_locus)
+            return true;
+        else if (m_bin_locus > other_bin.m_bin_locus)
+            return false;
+        else
+            return m_rotation_factor < other_bin.m_rotation_factor;
+    }
 
     static std::size_t get_size_bytes() { return sizeof(m_bin_locus) + sizeof(m_rotation_factor); }
 };
@@ -97,5 +108,83 @@ struct SpBinnedReferenceSetV1 final
     }
     std::size_t get_size_bytes() const { return SpBinnedReferenceSetV1::get_size_bytes(m_bins.size()); }
 };
+
+////
+// SpBinLociGenerator
+// - interface for generating bin loci for a binned reference set
+// - requires that the original element set can be modeled as a range of indices
+///
+class SpBinLociGenerator
+{
+public:
+//constructors: default
+//destructor
+    virtual ~SpBinLociGenerator() = default;
+
+//getters
+    virtual const SpBinnedReferenceSetConfigV1& get_bin_config() const = 0;
+    virtual std::uint64_t get_distribution_min_index() const = 0;
+    virtual std::uint64_t get_distribution_max_index() const = 0;
+
+//member functions
+    virtual bool try_generate_bin_loci(const std::uint64_t reference_set_size,
+        const std::uint64_t real_reference_index,
+        std::vector<std::uint64_t> &bin_loci_out,
+        std::uint64_t &bin_index_with_real_out) const = 0;
+};
+
+////
+// SpBinLociGeneratorRand
+// - implementation of SpBinLociGenerator
+// - selects bin loci uniformly from the original element set (modeled as a range of indices)
+///
+class SpBinLociGeneratorRand final : public SpBinLociGenerator
+{
+public:
+//constructors
+    /// default constructor
+    SpBinLociGeneratorRand() = default;
+
+    /// normal constructor
+    SpBinLociGeneratorRand(const SpBinnedReferenceSetConfigV1 &bin_config,
+        const std::uint64_t distribution_min_index,
+        const std::uint64_t distribution_max_index);
+
+//destructor: default
+
+//getters
+    const SpBinnedReferenceSetConfigV1& get_bin_config() const override { return m_bin_config; }
+    std::uint64_t get_distribution_min_index() const override { return m_distribution_min_index; }
+    std::uint64_t get_distribution_max_index() const override { return m_distribution_max_index; }
+
+//member functions
+    bool try_generate_bin_loci(const std::uint64_t reference_set_size,
+        const std::uint64_t real_reference_index,
+        std::vector<std::uint64_t> &bin_loci_out,
+        std::uint64_t &bin_index_with_real_out) const override;
+
+//member variables
+private:
+    SpBinnedReferenceSetConfigV1 m_bin_config;
+    std::uint64_t m_distribution_min_index;
+    std::uint64_t m_distribution_max_index;
+};
+
+//todo
+void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config,
+    const std::uint64_t distribution_min_index,
+    const std::uint64_t distribution_max_index,
+    const std::uint64_t real_reference_index,
+    const std::vector<std::uint64_t> &bin_loci,
+    const std::uint64_t bin_index_with_real,  //index into bin_loci
+    SpBinnedReferenceSetV1 &binned_reference_set_out);
+void make_binned_reference_set_v1(const SpBinLociGenerator &loci_generator,
+    const std::uint64_t reference_set_size,
+    const std::uint64_t real_reference_index,
+    SpBinnedReferenceSetV1 &binned_reference_set_out);
+
+//todo
+bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedReferenceSetV1 &binned_reference_set,
+    std::vector<std::uint64_t> &reference_indices_out);
 
 } //namespace sp

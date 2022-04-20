@@ -81,7 +81,7 @@ static void make_enote_view_privkey_helper(const crypto::secret_key &k_view_bala
     // H_n(q) + k^j_x + k_vb
     sc_add(to_bytes(enote_view_privkey_out), to_bytes(sender_extension), to_bytes(enote_view_privkey_out));
 }
-//-------------------------------------------------------------------------------------------------------------------    
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void make_seraphis_key_image_helper(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
@@ -93,7 +93,7 @@ static void make_seraphis_key_image_helper(const rct::key &wallet_spend_pubkey,
     reduce_seraphis_spendkey(k_view_balance, wallet_spend_pubkey_base);  //k_m U
     make_seraphis_key_image(enote_view_privkey, rct::rct2pk(wallet_spend_pubkey_base), key_image_out);  //k_m/k_a U
 }
-//-------------------------------------------------------------------------------------------------------------------    
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static bool try_get_intermediate_enote_record_info_v1_helper(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
@@ -141,7 +141,7 @@ static bool try_get_intermediate_enote_record_info_v1_helper(const SpBasicEnoteR
 
     return true;
 }
-//-------------------------------------------------------------------------------------------------------------------    
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void get_final_enote_record_info_v1_helper(const rct::key &sender_receiver_secret,
     const jamtis::address_index_t j,
@@ -163,7 +163,7 @@ static void get_final_enote_record_info_v1_helper(const rct::key &sender_receive
     // make key image: k_m/k_a U
     make_seraphis_key_image_helper(wallet_spend_pubkey, k_view_balance, enote_view_privkey_out, key_image_out);
 }
-//-------------------------------------------------------------------------------------------------------------------    
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
