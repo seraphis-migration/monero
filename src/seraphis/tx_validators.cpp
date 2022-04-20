@@ -130,7 +130,7 @@ bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCoun
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_semantics_ref_set_size_v1(const SemanticConfigRefSetSizeV1 &config,
+bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetSizeV1 &config,
     const std::vector<SpMembershipProofV1> &membership_proofs)
 {
     // sanity check

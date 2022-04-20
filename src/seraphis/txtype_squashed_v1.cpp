@@ -320,39 +320,31 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
 {
     // validate component counts (num inputs/outputs/etc.)
     if (!validate_sp_semantics_component_counts_v1(
-        semantic_config_component_counts_v1(tx.m_tx_semantic_rules_version),
-        tx.m_input_images.size(),
-        tx.m_membership_proofs.size(),
-        tx.m_image_proofs.size(),
-        tx.m_outputs.size(),
-        tx.m_supplement.m_output_enote_ephemeral_pubkeys.size(),
-        tx.m_balance_proof.m_bpp_proof.V.size()))
-    {
+            semantic_config_component_counts_v1(tx.m_tx_semantic_rules_version),
+            tx.m_input_images.size(),
+            tx.m_membership_proofs.size(),
+            tx.m_image_proofs.size(),
+            tx.m_outputs.size(),
+            tx.m_supplement.m_output_enote_ephemeral_pubkeys.size(),
+            tx.m_balance_proof.m_bpp_proof.V.size()))
         return false;
-    }
 
     // validate input proof reference set sizes
-    if (!validate_sp_semantics_ref_set_size_v1(
-        semantic_config_ref_set_size_v1(tx.m_tx_semantic_rules_version),
-        tx.m_membership_proofs))
-    {
+    if (!validate_sp_semantics_reference_sets_v1(
+            semantic_config_ref_set_size_v1(tx.m_tx_semantic_rules_version),
+            tx.m_membership_proofs))
         return false;
-    }
 
     // validate linking tag semantics
     if (!validate_sp_semantics_input_images_v1(tx.m_input_images))
-    {
         return false;
-    }
 
     // validate input images, membershio proof ref sets, outputs, and memo elements are sorted (and memo can be deserialized)
     if (!validate_sp_semantics_sorting_v1(tx.m_membership_proofs,
-        tx.m_input_images,
-        tx.m_outputs,
-        tx.m_supplement.m_tx_extra))
-    {
+            tx.m_input_images,
+            tx.m_outputs,
+            tx.m_supplement.m_tx_extra))
         return false;
-    }
 
     return true;
 }
@@ -362,9 +354,7 @@ bool validate_tx_linking_tags<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const Le
 {
     // unspentness proof (key images not in ledger)
     if (!validate_sp_linking_tags_v1(tx.m_input_images, ledger_context))
-    {
         return false;
-    }
 
     return true;
 }
@@ -374,9 +364,7 @@ bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const 
 {
     // balance proof
     if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, tx.m_fee, tx.m_balance_proof, defer_batchable))
-    {
         return false;
-    }
 
     return true;
 }
@@ -401,9 +389,7 @@ bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
             input_image_ptrs.push_back(&(input_image.m_core));
 
         if (!validate_sp_membership_proofs_v1(membership_proof_ptrs, input_image_ptrs, ledger_context))
-        {
             return false;
-        }
     }
 
     // ownership proof (and proof that key images are well-formed)
@@ -415,11 +401,9 @@ bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
     make_tx_image_proof_message_v1(version_string, tx.m_outputs, tx.m_supplement, image_proofs_message);
 
     if (!validate_sp_composition_proofs_v1(tx.m_image_proofs,
-        tx.m_input_images,
-        image_proofs_message))
-    {
+            tx.m_input_images,
+            image_proofs_message))
         return false;
-    }
 
     return true;
 }
@@ -458,12 +442,10 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
 
     // membership proofs
     if (!try_get_sp_membership_proofs_v1_validation_data(membership_proof_ptrs,
-        input_image_ptrs,
-        ledger_context,
-        validation_data[0]))
-    {
+            input_image_ptrs,
+            ledger_context,
+            validation_data[0]))
         return false;
-    }
 
     // range proofs
     if (!rct::try_get_bulletproof_plus_verification_data(range_proof_ptrs, validation_data[1]))
@@ -513,6 +495,7 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
     // make additional mock memo elements
     std::vector<ExtraFieldElement> additional_memo_elements;
     additional_memo_elements.resize(params.num_random_memo_elements);
+
     for (ExtraFieldElement &element : additional_memo_elements)
         element.gen();
 

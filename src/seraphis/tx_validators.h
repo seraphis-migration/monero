@@ -93,7 +93,7 @@ bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCoun
     const std::size_t num_enote_pubkeys,
     const std::size_t num_range_proofs);
 /**
-* brief: validate_sp_semantics_ref_set_size_v1 - check membership proofs have consistent reference set sizes
+* brief: validate_sp_semantics_reference_sets_v1 - check membership proofs have consistent and valid reference sets
 *   - decomp_n_min <= decomp_n <= decom_n_max
 *   - decomp_m_min <= decomp_m <= decom_m_max
 *   - num(refd enotes) == ref set size
@@ -101,7 +101,7 @@ bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCoun
 * param: membership_proofs -
 * return: true/false on validation result
 */
-bool validate_sp_semantics_ref_set_size_v1(const SemanticConfigRefSetSizeV1 &config,
+bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetSizeV1 &config,
     const std::vector<SpMembershipProofV1> &membership_proofs);
 /**
 * brief: validate_sp_semantics_input_images_v1 - check key images are well-formed
