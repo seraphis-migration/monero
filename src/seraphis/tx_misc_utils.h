@@ -68,26 +68,7 @@ struct equals_from_less final
 * 
 * note: use this instead of std::pow() for better control over error states
 */
-constexpr std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const std::size_t ref_set_decomp_m)
-{
-    // ref set size = n^m
-    std::size_t ref_set_size{ref_set_decomp_n};
-
-    if (ref_set_decomp_n == 0 || ref_set_decomp_m == 0)
-        ref_set_size = 1;
-    else
-    {
-        for (std::size_t mul{1}; mul < ref_set_decomp_m; ++mul)
-        {
-            if (ref_set_size*ref_set_decomp_n < ref_set_size)  //overflow
-                return -1;
-            else
-                ref_set_size *= ref_set_decomp_n;
-        }
-    }
-
-    return ref_set_size;
-}
+std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_n, const std::size_t ref_set_decomp_m);
 /**
 * brief: round_up_to_power_of_2 - next power of 2 >= the input number
 *   TODO: move to better file?

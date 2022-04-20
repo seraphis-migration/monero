@@ -33,6 +33,7 @@
 #pragma once
 
 //local headers
+#include "ringct/rctTypes.h"
 
 //third party headers
 
@@ -95,7 +96,7 @@ struct SpReferenceBinV1 final
 struct SpBinnedReferenceSetV1 final
 {
     /// bin generator seed (shared by all bins)
-    ref_set_bin_dimension_v1_t m_bin_generator_seed;
+    rct::key m_bin_generator_seed;
     /// bin configuration details (shared by all bins)
     SpBinnedReferenceSetConfigV1 m_bin_config;
     /// bins

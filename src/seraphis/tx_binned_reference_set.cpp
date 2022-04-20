@@ -52,16 +52,14 @@ namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-constexpr std::uint64_t compute_bin_width(const std::uint64_t bin_radius)
+static std::uint64_t compute_bin_width(const std::uint64_t bin_radius)
 {
     return 2*bin_radius + 1;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-//// validate reference set configurations (must update with each new config version)
-///TODO: is this actually necessary? delete or maybe move to different file?
 template <typename BinDim>
-constexpr bool check_bin_config(const std::uint64_t reference_set_size,
+static bool check_bin_config(const std::uint64_t reference_set_size,
     const std::uint64_t bin_radius,
     const std::uint64_t num_bin_members)
 {
@@ -78,12 +76,6 @@ constexpr bool check_bin_config(const std::uint64_t reference_set_size,
     // reference set can't be perfectly divided into bins
     return num_bin_members*(reference_set_size/num_bin_members) == reference_set_size;
 }
-
-/// reference set V1: size defined by grootle decomposition -> referenced with bins of a specified size
-static_assert(check_bin_config<ref_set_bin_dimension_v1_t>(
-    ref_set_size_from_decomp(config::SP_GROOTLE_N_V1, config::SP_GROOTLE_M_V1),
-    config::SP_REF_SET_BIN_RADIUS_V1,
-    config::SP_REF_SET_NUM_BIN_MEMBERS_V1), "");
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static std::uint64_t clamp(const std::uint64_t a, const std::uint64_t min, const std::uint64_t max)
@@ -153,15 +145,13 @@ static std::uint64_t mod_sub(const std::uint64_t a, const std::uint64_t b, const
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_config,
-    const ref_set_bin_dimension_v1_t bin_generator_seed,
+    const rct::key &bin_generator_seed,
     const std::uint64_t bin_index_in_set,
     std::vector<std::uint64_t> &members_of_bin_out)
 {
     // checks and initialization
     const std::uint64_t bin_width{compute_bin_width(bin_config.m_bin_radius)};
 
-    CHECK_AND_ASSERT_THROW_MES(bin_generator_seed < bin_width,
-        "making normalized bin members: the bin generator seed is larger than the bin width.");
     CHECK_AND_ASSERT_THROW_MES(bin_config.m_num_bin_members > 0,
         "making normalized bin members: zero bin members were requested (at least one expected).");
 
@@ -193,14 +183,10 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
     std::string data;
     data.reserve(domain_separator.size() + sizeof(bin_generator_seed) + sizeof(bin_index_in_set));
     data = domain_separator;
+    data.append(reinterpret_cast<const char*>(bin_generator_seed.bytes), sizeof(bin_generator_seed));
     {
         unsigned char v_variable[(sizeof(std::size_t) * 8 + 6) / 7];
         unsigned char *v_variable_end = v_variable;
-
-        // bin generator seed
-        tools::write_varint(v_variable_end, bin_generator_seed);
-        assert(v_variable_end <= v_variable + sizeof(v_variable));
-        data.append(reinterpret_cast<const char*>(v_variable), v_variable_end - v_variable);
 
         // bin index
         v_variable_end = v_variable;
@@ -216,10 +202,10 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
 
     for (std::uint64_t &bin_member : members_of_bin_out)
     {
-        // update the generator for this bin member (find a generator that can be clipped to within the allowed max)
+        // update the generator for this bin member (find a generator that is within the allowed max)
         do
         {
-            member_generator = crypto::cn_fast_hash(member_generator.data, sizeof(member_generator));
+            crypto::cn_fast_hash(member_generator.data, sizeof(member_generator), member_generator);
             memcpy(&generator_clip, member_generator.data, sizeof(generator_clip));
             generator_clip = SWAP64LE(generator_clip);
         } while (generator_clip > clip_allowed_max);
@@ -381,8 +367,7 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
 
 
     /// make the bin member generator seed
-    binned_reference_set_out.m_bin_generator_seed =
-        static_cast<ref_set_bin_dimension_v1_t>(crypto::rand_idx<std::uint64_t>(bin_width));
+    crypto::rand(32, binned_reference_set_out.m_bin_generator_seed.bytes);
 
 
     /// make bins
