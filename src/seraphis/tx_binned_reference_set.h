@@ -128,6 +128,10 @@ public:
 //getters
     virtual std::uint64_t get_distribution_min_index() const = 0;
     virtual std::uint64_t get_distribution_max_index() const = 0;
+    virtual std::uint64_t get_distribution_width() const final
+    {
+        return get_distribution_max_index() - get_distribution_min_index() + 1;
+    }
 
 //member functions
     /// [min, max] --(func)-> [0, 2^64 - 1]
@@ -166,8 +170,8 @@ public:
 
 //member variables
 private:
-    std::uint64_t m_distribution_min_index;
-    std::uint64_t m_distribution_max_index;
+    std::uint64_t m_distribution_min_index{1};  //use an invalid range by default so default objects will throw errors
+    std::uint64_t m_distribution_max_index{0};
 };
 
 //todo
@@ -180,8 +184,6 @@ void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
 
 //todo
 void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config,
-    const std::uint64_t distribution_min_index,
-    const std::uint64_t distribution_max_index,
     const std::uint64_t real_reference_index,
     const std::vector<std::uint64_t> &bin_loci,
     const std::uint64_t bin_index_with_real,  //index into bin_loci

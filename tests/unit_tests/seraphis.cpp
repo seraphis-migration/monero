@@ -49,6 +49,7 @@ extern "C"
 #include "seraphis/sp_core_types.h"
 #include "seraphis/sp_crypto_utils.h"
 #include "seraphis/tx_base.h"
+#include "seraphis/tx_binned_reference_set.h"
 #include "seraphis/tx_builder_types.h"
 #include "seraphis/tx_builders_inputs.h"
 #include "seraphis/tx_builders_mixed.h"
@@ -869,6 +870,49 @@ TEST(seraphis, tx_extra)
     tx_extra.pop_back();
     extra_field_elements.clear();
     EXPECT_FALSE(sp::try_get_extra_field_elements(tx_extra, extra_field_elements));
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis, binned_reference_set)
+{
+    const std::uint64_t distribution_min_index{20};
+    const std::uint64_t distribution_max_index{40};
+    const sp::SpRefSetIndexMapperFlat flat_index_mapper{distribution_min_index, distribution_max_index};
+    const sp::SpBinnedReferenceSetConfigV1 bin_config{.m_bin_radius = 2, .m_num_bin_members = 4};
+    const std::uint64_t reference_set_size{
+            bin_config.m_num_bin_members *
+                ((distribution_max_index - distribution_min_index) / bin_config.m_num_bin_members)
+        };
+    const std::uint64_t real_reference_index{distribution_min_index + reference_set_size/2};
+
+    for (std::size_t i{0}; i < 2000; ++i)
+    {
+        // make a reference set
+        sp::SpBinnedReferenceSetV1 binned_reference_set;
+        EXPECT_NO_THROW(sp::make_binned_reference_set_v1(flat_index_mapper,
+            bin_config,
+            reference_set_size,
+            real_reference_index,
+            binned_reference_set));
+
+        // extract the references
+        std::vector<std::uint64_t> reference_indices;
+        EXPECT_NO_THROW(
+                EXPECT_TRUE(try_get_reference_indices_from_binned_reference_set_v1(binned_reference_set, reference_indices))
+            );
+
+        // check the references
+        EXPECT_TRUE(reference_indices.size() == reference_set_size);
+        bool found_real{false};
+        for (const std::uint64_t reference_index : reference_indices)
+        {
+            EXPECT_TRUE(reference_index >= distribution_min_index);
+            EXPECT_TRUE(reference_index <= distribution_max_index);
+
+            if (reference_index == real_reference_index)
+                found_real = true;
+        }
+        EXPECT_TRUE(found_real);
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, txtype_squashed_v1)

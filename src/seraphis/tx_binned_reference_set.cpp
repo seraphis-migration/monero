@@ -507,7 +507,7 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
 
     // 4) compute rotation factor
     bins[bin_index_with_real].m_rotation_factor = static_cast<ref_set_bin_dimension_v1_t>(
-        mod_sub(members_of_real_bin[designated_real_bin_member], normalized_real_reference, bin_width));
+        mod_sub(normalized_real_reference, members_of_real_bin[designated_real_bin_member], bin_width));
 
 
     /// set remaining output pieces
@@ -541,12 +541,12 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
 {
     // initialization
     const std::uint64_t bin_width{compute_bin_width(binned_reference_set.m_bin_config.m_bin_radius)};
-    const std::uint64_t num_bin_members{
+    const std::uint64_t reference_set_size{
             binned_reference_set.m_bins.size() * binned_reference_set.m_bin_config.m_num_bin_members
         };
 
     // sanity check the bin config
-    if (!check_bin_config<ref_set_bin_dimension_v1_t>(num_bin_members, binned_reference_set.m_bin_config))
+    if (!check_bin_config<ref_set_bin_dimension_v1_t>(reference_set_size, binned_reference_set.m_bin_config))
         return false;
 
     // validate bins
@@ -565,14 +565,12 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
 
     // add all the bin members
     reference_indices_out.clear();
-    reference_indices_out.reserve(num_bin_members);
+    reference_indices_out.reserve(reference_set_size);
 
     std::vector<std::uint64_t> bin_members;
 
     for (std::size_t bin_index{0}; bin_index < binned_reference_set.m_bins.size(); ++bin_index)
     {
-        bin_members.clear();
-
         // 1) make normalized bin members
         make_normalized_bin_members(binned_reference_set.m_bin_config,
             binned_reference_set.m_bin_generator_seed,
@@ -583,7 +581,9 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
         rotate_elements(bin_width, binned_reference_set.m_bins[bin_index].m_rotation_factor, bin_members);
 
         // 3) de-normalize the bin members
-        denormalize_elements(binned_reference_set.m_bins[bin_index].m_bin_locus, bin_members);
+        denormalize_elements(
+            binned_reference_set.m_bins[bin_index].m_bin_locus - binned_reference_set.m_bin_config.m_bin_radius,
+            bin_members);
 
         // 4) save the bin members
         reference_indices_out.insert(reference_indices_out.end(), bin_members.begin(), bin_members.end());
