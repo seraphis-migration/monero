@@ -649,7 +649,7 @@ bool try_make_sp_composition_multisig_partial_sig(
 
     // clear the used nonces
     CHECK_AND_ASSERT_THROW_MES(nonce_record_inout.try_remove_record(proposal.message, proposal.K, filter),
-        "Failed to clear nonces from nonce record (aborting partial signature)!");
+        "Sp composition proof: failed to clear nonces from nonce record (aborting partial signature)!");
 
     // set the output partial sig AFTER used nonces are cleared, in case of exception
     partial_sig_out = std::move(partial_sig_temp);

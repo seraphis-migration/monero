@@ -40,6 +40,7 @@
 #include "tx_misc_utils.h"
 
 //third party headers
+#include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
 #include <algorithm>
@@ -148,6 +149,35 @@ static std::uint64_t mod_sub(const std::uint64_t a, const std::uint64_t b, const
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static std::uint64_t project_between_ranges(const std::uint64_t a,
+    const std::uint64_t a_min,
+    const std::uint64_t a_max,
+    const std::uint64_t b_min,
+    const std::uint64_t b_max)
+{
+    // sanity checks
+    CHECK_AND_ASSERT_THROW_MES(a >= a_min &&
+            a     <= a_max &&
+            a_min <= a_max &&
+            b_min <= b_max,
+        "projecting between ranges: invalid inputs.");
+
+    // (a - a_min)/(a_max - a_min + 1) = (b - b_min)/(b_max - b_min + 1)
+    // b = (a - a_min)*(b_max - b_min + 1)/(a_max - a_min + 1) + b_min
+    using boost::multiprecision::uint128_t;
+
+    // numerator: (a - a_min)*(b_max - b_min + 1)
+    uint128_t result{a - a_min};
+    result *= (uint128_t{b_max} - b_min + 1);
+
+    // denominator: (a_max - a_min + 1)
+    result /= (uint128_t{a_max} - a_min + 1);
+
+    // + b_min
+    return static_cast<std::uint64_t>(result) + b_min;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_config,
     const rct::key &bin_generator_seed,
     const std::uint64_t bin_index_in_set,
@@ -239,47 +269,52 @@ static void denormalize_elements(const std::uint64_t normalization_factor, std::
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-SpRefSetIndexMapperFlat::SpRefSetIndexMapperFlat(const SpBinnedReferenceSetConfigV1 &bin_config,
-    const std::uint64_t distribution_min_index,
+SpRefSetIndexMapperFlat::SpRefSetIndexMapperFlat(const std::uint64_t distribution_min_index,
     const std::uint64_t distribution_max_index) :
-        m_bin_config{bin_config},
         m_distribution_min_index{distribution_min_index},
         m_distribution_max_index{distribution_max_index}
 {
     // checks
-    CHECK_AND_ASSERT_THROW_MES(m_distribution_max_index > m_distribution_min_index,
+    CHECK_AND_ASSERT_THROW_MES(m_distribution_max_index >= m_distribution_min_index,
         "ref set index mapper (flat): invalid element range.");
-    CHECK_AND_ASSERT_THROW_MES(m_distribution_max_index - m_distribution_min_index >=
-            compute_bin_width(m_bin_config.m_bin_radius),
-        "ref set index mapper (flat): insufficient elements for one bin.");
-    CHECK_AND_ASSERT_THROW_MES(compute_bin_width(m_bin_config.m_bin_radius) >= m_bin_config.m_num_bin_members,
-        "ref set index mapper (flat): bin radius not large enough to fit bin members.");
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t SpRefSetIndexMapperFlat::element_index_to_uniform_index(const std::uint64_t element_index) const
 {
     // [min, max] --(projection)-> [0, 2^64 - 1]
-    std::uint64_t uniform_index;
+    CHECK_AND_ASSERT_THROW_MES(element_index >= m_distribution_min_index,
+        "ref set index manager (flat): element index below distribution range.");
+    CHECK_AND_ASSERT_THROW_MES(element_index <= m_distribution_max_index,
+        "ref set index manager (flat): element index above distribution range.");
 
-    return uniform_index;
+    // (element_index - min)/(max - min + 1) = (uniform_index - 0)/([2^64 - 1] - 0 + 1)
+    return project_between_ranges(element_index,
+        m_distribution_min_index,
+        m_distribution_max_index,
+        0,
+        std::numeric_limits<std::uint64_t>::max());
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t SpRefSetIndexMapperFlat::uniform_index_to_element_index(const std::uint64_t uniform_index) const
 {
     // [min, max] <-(projection)-- [0, 2^64 - 1]
-    std::uint64_t element_index;
 
-    return element_index;
+    // (uniform_index - 0)/([2^64 - 1] - 0 + 1) = (element_index - min)/(max - min + 1)
+    return project_between_ranges(uniform_index,
+        0,
+        std::numeric_limits<std::uint64_t>::max(),
+        m_distribution_min_index,
+        m_distribution_max_index);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
     std::vector<std::uint64_t> &bin_loci_out,
     std::uint64_t &bin_index_with_real_out)
 {
     /// checks and initialization
-    const SpBinnedReferenceSetConfigV1 &bin_config{index_mapper.get_bin_config()};
     const std::uint64_t distribution_min_index{index_mapper.get_distribution_min_index()};
     const std::uint64_t distribution_max_index{index_mapper.get_distribution_max_index()};
 
@@ -481,6 +516,7 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
     SpBinnedReferenceSetV1 &binned_reference_set_out)
@@ -490,10 +526,10 @@ void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
     // generate bin loci
     std::vector<std::uint64_t> bin_loci;
     std::uint64_t bin_index_with_real;
-    generate_bin_loci(index_mapper, reference_set_size, real_reference_index, bin_loci, bin_index_with_real);
+    generate_bin_loci(index_mapper, bin_config, reference_set_size, real_reference_index, bin_loci, bin_index_with_real);
 
     // make the reference set
-    make_binned_reference_set_v1(index_mapper.get_bin_config(),
+    make_binned_reference_set_v1(bin_config,
         real_reference_index,
         bin_loci,
         bin_index_with_real,

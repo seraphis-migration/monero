@@ -126,7 +126,6 @@ public:
     virtual ~SpRefSetIndexMapper() = default;
 
 //getters
-    virtual const SpBinnedReferenceSetConfigV1& get_bin_config() const = 0;
     virtual std::uint64_t get_distribution_min_index() const = 0;
     virtual std::uint64_t get_distribution_max_index() const = 0;
 
@@ -150,14 +149,12 @@ public:
     SpRefSetIndexMapperFlat() = default;
 
     /// normal constructor
-    SpRefSetIndexMapperFlat(const SpBinnedReferenceSetConfigV1 &bin_config,
-        const std::uint64_t distribution_min_index,
+    SpRefSetIndexMapperFlat(const std::uint64_t distribution_min_index,
         const std::uint64_t distribution_max_index);
 
 //destructor: default
 
 //getters
-    const SpBinnedReferenceSetConfigV1& get_bin_config() const override { return m_bin_config; }
     std::uint64_t get_distribution_min_index() const override { return m_distribution_min_index; }
     std::uint64_t get_distribution_max_index() const override { return m_distribution_max_index; }
 
@@ -169,13 +166,13 @@ public:
 
 //member variables
 private:
-    SpBinnedReferenceSetConfigV1 m_bin_config;
     std::uint64_t m_distribution_min_index;
     std::uint64_t m_distribution_max_index;
 };
 
 //todo
 void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
     std::vector<std::uint64_t> &bin_loci_out,
@@ -190,6 +187,7 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
     const std::uint64_t bin_index_with_real,  //index into bin_loci
     SpBinnedReferenceSetV1 &binned_reference_set_out);
 void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
     SpBinnedReferenceSetV1 &binned_reference_set_out);
