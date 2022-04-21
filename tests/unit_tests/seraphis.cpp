@@ -875,13 +875,10 @@ TEST(seraphis, tx_extra)
 TEST(seraphis, binned_reference_set)
 {
     const std::uint64_t distribution_min_index{20};
-    const std::uint64_t distribution_max_index{40};
+    const std::uint64_t distribution_max_index{40000};
     const sp::SpRefSetIndexMapperFlat flat_index_mapper{distribution_min_index, distribution_max_index};
-    const sp::SpBinnedReferenceSetConfigV1 bin_config{.m_bin_radius = 2, .m_num_bin_members = 4};
-    const std::uint64_t reference_set_size{
-            bin_config.m_num_bin_members *
-                ((distribution_max_index - distribution_min_index) / bin_config.m_num_bin_members)
-        };
+    const sp::SpBinnedReferenceSetConfigV1 bin_config{.m_bin_radius = 127, .m_num_bin_members = 8};
+    const std::uint64_t reference_set_size{128};
     const std::uint64_t real_reference_index{distribution_min_index + reference_set_size/2};
 
     for (std::size_t i{0}; i < 2000; ++i)

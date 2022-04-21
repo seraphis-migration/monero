@@ -177,6 +177,7 @@ static std::uint64_t project_between_ranges(const std::uint64_t a,
     return static_cast<std::uint64_t>(result) + b_min;
 }
 //-------------------------------------------------------------------------------------------------------------------
+// deterministically generate unique members of a bin
 //-------------------------------------------------------------------------------------------------------------------
 static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_config,
     const rct::key &bin_generator_seed,
@@ -230,23 +231,30 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
     }
     crypto::hash member_generator{crypto::cn_fast_hash(data.data(), data.size())};
 
-    // make each bin member (as indices within the bin)
+    // make each bin member (as unique indices within the bin)
     std::uint64_t generator_clip;
+    std::uint64_t member_candidate;
     members_of_bin_out.clear();
     members_of_bin_out.reserve(bin_config.m_num_bin_members);
 
     for (std::size_t bin_member_index{0}; bin_member_index < bin_config.m_num_bin_members; ++bin_member_index)
     {
-        // update the generator for this bin member (find a generator that is within the allowed max)
+        // look for a unique bin member to add
         do
         {
-            crypto::cn_fast_hash(member_generator.data, sizeof(member_generator), member_generator);
-            memcpy(&generator_clip, member_generator.data, sizeof(generator_clip));
-            generator_clip = SWAP64LE(generator_clip);
-        } while (generator_clip > clip_allowed_max);
+            // update the generator (find a generator that is within the allowed max)
+            do
+            {
+                crypto::cn_fast_hash(member_generator.data, sizeof(member_generator), member_generator);
+                memcpy(&generator_clip, member_generator.data, sizeof(generator_clip));
+                generator_clip = SWAP64LE(generator_clip);
+            } while (generator_clip > clip_allowed_max);
 
-        // add the bin member: slice_8_bytes(generator) mod bin_width
-        members_of_bin_out.emplace_back(mod(generator_clip, bin_width));
+            // compute the bin member: slice_8_bytes(generator) mod bin_width
+            member_candidate = mod(generator_clip, bin_width);
+        } while (std::find(members_of_bin_out.begin(), members_of_bin_out.end(), member_candidate) != members_of_bin_out.end());
+
+        members_of_bin_out.emplace_back(member_candidate);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
