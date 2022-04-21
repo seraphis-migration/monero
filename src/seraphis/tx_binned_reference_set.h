@@ -111,16 +111,19 @@ struct SpBinnedReferenceSetV1 final
 };
 
 ////
-// SpBinLociGenerator
-// - interface for generating bin loci for a binned reference set
-// - requires that the original element set can be modeled as a range of indices
+// SpRefSetIndexMapper
+// - interface for mapping reference set indices between a custom distribution (e.g. uniform over [a, b], a gamma distribution,
+//   etc.) and a uniform space (the range [0, 2^64 - 1])
+// - the original element set (from which the reference set will be selected) exists as a range of indices ([min, max]),
+//   so the mapping function exists as a filter between element-space and uniform space
+// - mapping: [min, max] <-(func)-> [0, 2^64 - 1]
 ///
-class SpBinLociGenerator
+class SpRefSetIndexMapper
 {
 public:
 //constructors: default
 //destructor
-    virtual ~SpBinLociGenerator() = default;
+    virtual ~SpRefSetIndexMapper() = default;
 
 //getters
     virtual const SpBinnedReferenceSetConfigV1& get_bin_config() const = 0;
@@ -128,26 +131,26 @@ public:
     virtual std::uint64_t get_distribution_max_index() const = 0;
 
 //member functions
-    virtual bool try_generate_bin_loci(const std::uint64_t reference_set_size,
-        const std::uint64_t real_reference_index,
-        std::vector<std::uint64_t> &bin_loci_out,
-        std::uint64_t &bin_index_with_real_out) const = 0;
+    /// [min, max] --(func)-> [0, 2^64 - 1]
+    virtual std::uint64_t element_index_to_uniform_index(const std::uint64_t element_index) const = 0;
+    /// [min, max] <-(func)-- [0, 2^64 - 1]
+    virtual std::uint64_t uniform_index_to_element_index(const std::uint64_t uniform_index) const = 0;
 };
 
 ////
-// SpBinLociGeneratorRand
-// - implementation of SpBinLociGenerator
-// - selects bin loci uniformly from the original element set (modeled as a range of indices)
+// SpRefSetIndexMapperFlat
+// - implementation of SpRefSetIndexMapper
+// - linear mapping function (i.e. project the element range onto the uniform space)
 ///
-class SpBinLociGeneratorRand final : public SpBinLociGenerator
+class SpRefSetIndexMapperFlat final : public SpRefSetIndexMapper
 {
 public:
 //constructors
     /// default constructor
-    SpBinLociGeneratorRand() = default;
+    SpRefSetIndexMapperFlat() = default;
 
     /// normal constructor
-    SpBinLociGeneratorRand(const SpBinnedReferenceSetConfigV1 &bin_config,
+    SpRefSetIndexMapperFlat(const SpBinnedReferenceSetConfigV1 &bin_config,
         const std::uint64_t distribution_min_index,
         const std::uint64_t distribution_max_index);
 
@@ -159,10 +162,10 @@ public:
     std::uint64_t get_distribution_max_index() const override { return m_distribution_max_index; }
 
 //member functions
-    bool try_generate_bin_loci(const std::uint64_t reference_set_size,
-        const std::uint64_t real_reference_index,
-        std::vector<std::uint64_t> &bin_loci_out,
-        std::uint64_t &bin_index_with_real_out) const override;
+    /// [min, max] --(projection)-> [0, 2^64 - 1]
+    std::uint64_t element_index_to_uniform_index(const std::uint64_t element_index) const override;
+    /// [min, max] <-(projection)-- [0, 2^64 - 1]
+    std::uint64_t uniform_index_to_element_index(const std::uint64_t uniform_index) const override;
 
 //member variables
 private:
@@ -172,6 +175,13 @@ private:
 };
 
 //todo
+void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
+    const std::uint64_t reference_set_size,
+    const std::uint64_t real_reference_index,
+    std::vector<std::uint64_t> &bin_loci_out,
+    std::uint64_t &bin_index_with_real_out);
+
+//todo
 void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config,
     const std::uint64_t distribution_min_index,
     const std::uint64_t distribution_max_index,
@@ -179,7 +189,7 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
     const std::vector<std::uint64_t> &bin_loci,
     const std::uint64_t bin_index_with_real,  //index into bin_loci
     SpBinnedReferenceSetV1 &binned_reference_set_out);
-void make_binned_reference_set_v1(const SpBinLociGenerator &loci_generator,
+void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
     const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
     SpBinnedReferenceSetV1 &binned_reference_set_out);

@@ -42,6 +42,7 @@
 //third party headers
 
 //standard headers
+#include <algorithm>
 #include <limits>
 #include <vector>
 
@@ -63,12 +64,12 @@ static bool check_bin_config(const std::uint64_t reference_set_size,
     const SpBinnedReferenceSetConfigV1 &bin_config)
 {
     // bin width outside bin dimension
-    if (bin_config.m_bin_radius > std::numeric_limits<BinDim>::max()/2 - 1)
+    if (bin_config.m_bin_radius > (std::numeric_limits<BinDim>::max() - 1)/2)
         return false;
     // too many bin members
     if (bin_config.m_num_bin_members > std::numeric_limits<BinDim>::max())
         return false;
-    // can't fit bin members in bin
+    // can't fit bin members in bin (note: bin can't contain more than std::uint64_t::max members)
     if (bin_config.m_num_bin_members > compute_bin_width(bin_config.m_bin_radius))
         return false;
     // no bin members
@@ -82,6 +83,7 @@ static bool check_bin_config(const std::uint64_t reference_set_size,
 //-------------------------------------------------------------------------------------------------------------------
 static std::uint64_t clamp(const std::uint64_t a, const std::uint64_t min, const std::uint64_t max)
 {
+    // clamp 'a' to range [min, max]
     if (a < min)
         return min;
     else if (a > max)
@@ -112,12 +114,12 @@ static std::uint64_t saturating_add(const std::uint64_t a, const std::uint64_t b
         : max;
 }
 //-------------------------------------------------------------------------------------------------------------------
+// special case: n = 0 means n = std::uint64_t::max + 1
 //-------------------------------------------------------------------------------------------------------------------
 static std::uint64_t mod(const std::uint64_t a, const std::uint64_t n)
 {
     // a mod n
-    CHECK_AND_ASSERT_THROW_MES(n > 0, "Modulo 0 is illegal.");
-    return a % n;
+    return n > 0 ? a % n : a;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -237,7 +239,7 @@ static void denormalize_elements(const std::uint64_t normalization_factor, std::
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-SpBinLociGeneratorRand::SpBinLociGeneratorRand(const SpBinnedReferenceSetConfigV1 &bin_config,
+SpRefSetIndexMapperFlat::SpRefSetIndexMapperFlat(const SpBinnedReferenceSetConfigV1 &bin_config,
     const std::uint64_t distribution_min_index,
     const std::uint64_t distribution_max_index) :
         m_bin_config{bin_config},
@@ -246,69 +248,119 @@ SpBinLociGeneratorRand::SpBinLociGeneratorRand(const SpBinnedReferenceSetConfigV
 {
     // checks
     CHECK_AND_ASSERT_THROW_MES(m_distribution_max_index > m_distribution_min_index,
-        "bin loci generator rand: invalid element range.");
+        "ref set index mapper (flat): invalid element range.");
     CHECK_AND_ASSERT_THROW_MES(m_distribution_max_index - m_distribution_min_index >=
             compute_bin_width(m_bin_config.m_bin_radius),
-        "bin loci generator rand: insufficient elements for one bin.");
+        "ref set index mapper (flat): insufficient elements for one bin.");
     CHECK_AND_ASSERT_THROW_MES(compute_bin_width(m_bin_config.m_bin_radius) >= m_bin_config.m_num_bin_members,
-        "bin loci generator rand: bin radius not large enough to fit bin members.");
+        "ref set index mapper (flat): bin radius not large enough to fit bin members.");
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool SpBinLociGeneratorRand::try_generate_bin_loci(const std::uint64_t reference_set_size,
+std::uint64_t SpRefSetIndexMapperFlat::element_index_to_uniform_index(const std::uint64_t element_index) const
+{
+    // [min, max] --(projection)-> [0, 2^64 - 1]
+    std::uint64_t uniform_index;
+
+    return uniform_index;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t SpRefSetIndexMapperFlat::uniform_index_to_element_index(const std::uint64_t uniform_index) const
+{
+    // [min, max] <-(projection)-- [0, 2^64 - 1]
+    std::uint64_t element_index;
+
+    return element_index;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
+    const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
     std::vector<std::uint64_t> &bin_loci_out,
-    std::uint64_t &bin_index_with_real_out) const
+    std::uint64_t &bin_index_with_real_out)
 {
     /// checks and initialization
-    if (reference_set_size   < 1                        ||
-        real_reference_index < m_distribution_min_index ||
-        real_reference_index > m_distribution_max_index ||
-        !check_bin_config<ref_set_bin_dimension_v1_t>(reference_set_size, m_bin_config))
-        return false;
+    const SpBinnedReferenceSetConfigV1 &bin_config{index_mapper.get_bin_config()};
+    const std::uint64_t distribution_min_index{index_mapper.get_distribution_min_index()};
+    const std::uint64_t distribution_max_index{index_mapper.get_distribution_max_index()};
 
-    const std::uint64_t num_bins{reference_set_size/m_bin_config.m_num_bin_members};
-    const std::uint64_t distribution_width{m_distribution_max_index - m_distribution_min_index + 1};
+    CHECK_AND_ASSERT_THROW_MES(real_reference_index >= distribution_min_index &&
+            real_reference_index <= distribution_max_index,
+        "generating bin loci: real element reference is not within the element distribution.");
+    CHECK_AND_ASSERT_THROW_MES(reference_set_size >= 1 &&
+            distribution_min_index <= distribution_max_index &&
+            distribution_max_index - distribution_min_index >= compute_bin_width(bin_config.m_bin_radius) &&
+            check_bin_config<ref_set_bin_dimension_v1_t>(reference_set_size, bin_config),
+        "generating bin loci: invalid input parameters.");
+
+    const std::uint64_t num_bins{reference_set_size/bin_config.m_num_bin_members};
+    const std::uint64_t distribution_width{distribution_max_index - distribution_min_index + 1};
 
 
     /// pick a locus for the real reference's bin
 
-    // 1) define range where the locus may reside (clamp bounds to distribution range)
+    // 1) define range where the locus may reside (clamp bounds to element distribution range)
     const std::uint64_t real_locus_min{
-            saturating_sub(real_reference_index, m_bin_config.m_bin_radius, m_distribution_min_index)
+            saturating_sub(real_reference_index, bin_config.m_bin_radius, distribution_min_index)
         };
     const std::uint64_t real_locus_max{
-            saturating_add(real_reference_index, m_bin_config.m_bin_radius, m_distribution_max_index)
+            saturating_add(real_reference_index, bin_config.m_bin_radius, distribution_max_index)
         };
 
-    // 2) generate the bin locus (normalized within the distribution)
-    const std::uint64_t real_locus{
-            crypto::rand_idx<std::uint64_t>(real_locus_max - real_locus_min + 1) + (real_locus_min - m_distribution_min_index)
-        };
+    // 2) generate the bin locus within the element distribution
+    const std::uint64_t real_locus{crypto::rand_range<std::uint64_t>(real_locus_min, real_locus_max)};
+
+    // 3) translate the real locus to uniform space (uniform distribution across [0, 2^64 - 1])
+    const std::uint64_t real_locus_flattened{index_mapper.element_index_to_uniform_index(real_locus)};
 
 
-    /// randomly generate a set of bin loci (normalized within the distribution)
-    // note: this step is the core piece of this loci generator (a different generator should use a different method of
-    //       selecting loci)
-    //todo: maybe refactor everything so that just the mapping between normalized bin loci space and distribution space
-    //      is customize-able
-
+    /// randomly generate a set of bin loci in uniform space
     std::vector<std::uint64_t> bin_loci;
     bin_loci.resize(num_bins);
 
     for (std::uint64_t &bin_locus : bin_loci)
-        bin_locus = crypto::rand_idx<std::uint64_t>(distribution_width);
+        bin_locus = crypto::rand_range<std::uint64_t>(0, std::numeric_limits<std::uint64_t>::max());
 
 
-    /// rotate the randomly generated bins so a random bin lines up with the real bin locus
+    /// rotate the randomly generated bins so a random bin lines up with the real bin locus (in uniform space)
 
     // 1) randomly select one of the bins
-    const std::uint64_t designated_real_bin{crypto::rand_idx<std::uint64_t>(num_bins)};
+    const std::uint64_t designated_real_bin{crypto::rand_range<std::uint64_t>(0, num_bins - 1)};
 
     // 2) compute rotation factor
-    const std::uint64_t bin_loci_rotation_factor{mod_sub(real_locus, bin_loci[designated_real_bin], distribution_width)};
+    const std::uint64_t bin_loci_rotation_factor{mod_sub(real_locus_flattened, bin_loci[designated_real_bin], 0)};
 
     // 3) rotate all the bin loci
-    rotate_elements(distribution_width, bin_loci_rotation_factor, bin_loci);
+    rotate_elements(0, bin_loci_rotation_factor, bin_loci);
+
+
+    /// get bin loci into the element distribution space
+
+    // 1) map the bin loci into the distribution space
+    for (std::uint64_t &bin_locus : bin_loci)
+        bin_locus = index_mapper.uniform_index_to_element_index(bin_locus);
+
+    // 2) find the bin locus closest to the real locus (the index mapper might have precision loss)
+    std::uint64_t locus_closest_to_real{0};
+    std::uint64_t locus_gap{distribution_width - 1};  //all gaps will be <= the range of locus values
+    std::uint64_t smallest_gap;
+
+    for (std::size_t bin_loci_index{0}; bin_loci_index < bin_loci.size(); ++bin_loci_index)
+    {
+        // test for gaps above and below the locus
+        smallest_gap = std::min(
+                mod_sub(real_locus, bin_loci[bin_loci_index], distribution_width),  //gap below
+                mod_sub(bin_loci[bin_loci_index], real_locus, distribution_width)   //gap above
+            );
+
+        if (smallest_gap < locus_gap)
+        {
+            locus_gap = smallest_gap;
+            locus_closest_to_real = bin_loci_index;
+        }
+    }
+
+    // 3) reset the bin locus closest to the real locus
+    bin_loci[locus_closest_to_real] = real_locus;
 
 
     /// prepare outputs
@@ -316,15 +368,21 @@ bool SpBinLociGeneratorRand::try_generate_bin_loci(const std::uint64_t reference
     // 1) sort bin loci
     std::sort(bin_loci.begin(), bin_loci.end());
 
-    // 2) shift bin loci so their entire widths are within the distribution
+    // 2) shift bin loci so their entire widths are within the element distribution
     for (std::uint64_t &bin_locus : bin_loci)
-        bin_locus = clamp(bin_locus, m_bin_config.m_bin_radius, distribution_width - m_bin_config.m_bin_radius - 1);
+    {
+        bin_locus = clamp(bin_locus,
+            distribution_min_index + bin_config.m_bin_radius,
+            distribution_max_index - bin_config.m_bin_radius);
+    }
 
     const std::uint64_t real_locus_shifted{
-            clamp(real_locus, m_bin_config.m_bin_radius, distribution_width - m_bin_config.m_bin_radius - 1)
+            clamp(real_locus,
+                distribution_min_index + bin_config.m_bin_radius,
+                distribution_max_index - bin_config.m_bin_radius)
         };
 
-    // 3) find the real reference's locus (if multiple loci equal the real locus, pick one randomly)
+    // 3) select the real reference's locus (if multiple loci equal the real locus, pick one randomly)
     std::uint64_t last_locus_equal_to_real{0};
     std::uint64_t num_loci_equal_to_real{0};
 
@@ -340,13 +398,8 @@ bool SpBinLociGeneratorRand::try_generate_bin_loci(const std::uint64_t reference
     bin_index_with_real_out =
         crypto::rand_range<std::uint64_t>(last_locus_equal_to_real - num_loci_equal_to_real + 1, last_locus_equal_to_real);
 
-    // 4) de-normalize loci
-    denormalize_elements(m_distribution_min_index, bin_loci);
-
-    // 5) set bin loci output
+    // 4) set bin loci output
     bin_loci_out = std::move(bin_loci);
-
-    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config,
@@ -394,7 +447,7 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
     {
         bins[bin_index].m_bin_locus = bin_loci[bin_index];
         bins[bin_index].m_rotation_factor =
-            static_cast<ref_set_bin_dimension_v1_t>(crypto::rand_idx<std::uint64_t>(bin_width));
+            static_cast<ref_set_bin_dimension_v1_t>(crypto::rand_range<std::uint64_t>(0, bin_width - 1));
     }
 
 
@@ -410,7 +463,7 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
         "binned reference set: getting normalized bin members failed (bug).");
 
     // 2) select a random bin member to land on the real reference
-    const std::uint64_t designated_real_bin_member{crypto::rand_idx<std::uint64_t>(bin_config.m_num_bin_members)};
+    const std::uint64_t designated_real_bin_member{crypto::rand_range<std::uint64_t>(0, bin_config.m_num_bin_members - 1)};
 
     // 3) normalize the real reference within its bin (subtract the bottom of the bin)
     const std::uint64_t normalized_real_reference{
@@ -427,7 +480,7 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
     binned_reference_set_out.m_bins = std::move(bins);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_binned_reference_set_v1(const SpBinLociGenerator &loci_generator,
+void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
     const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
     SpBinnedReferenceSetV1 &binned_reference_set_out)
@@ -437,14 +490,10 @@ void make_binned_reference_set_v1(const SpBinLociGenerator &loci_generator,
     // generate bin loci
     std::vector<std::uint64_t> bin_loci;
     std::uint64_t bin_index_with_real;
-    CHECK_AND_ASSERT_THROW_MES(loci_generator.try_generate_bin_loci(reference_set_size,
-            real_reference_index,
-            bin_loci,
-            bin_index_with_real),
-        "binned reference set: unable to generate bin loci.");
+    generate_bin_loci(index_mapper, reference_set_size, real_reference_index, bin_loci, bin_index_with_real);
 
     // make the reference set
-    make_binned_reference_set_v1(loci_generator.get_bin_config(),
+    make_binned_reference_set_v1(index_mapper.get_bin_config(),
         real_reference_index,
         bin_loci,
         bin_index_with_real,
