@@ -194,6 +194,57 @@ static void check_is_owned(const sp::SpOutputProposalV1 &test_proposal,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static bool test_binned_reference_set(const std::uint64_t distribution_min_index,
+    const std::uint64_t distribution_max_index,
+    const sp::ref_set_bin_dimension_v1_t bin_radius,
+    const sp::ref_set_bin_dimension_v1_t num_bin_members,
+    const std::uint64_t reference_set_size,
+    const std::uint64_t real_reference_index)
+{
+    const sp::SpRefSetIndexMapperFlat flat_index_mapper{distribution_min_index, distribution_max_index};
+    const sp::SpBinnedReferenceSetConfigV1 bin_config{
+            .m_bin_radius = bin_radius,
+            .m_num_bin_members = num_bin_members
+        };
+
+    for (std::size_t i{0}; i < 50; ++i)
+    {
+        // make a reference set
+        sp::SpBinnedReferenceSetV1 binned_reference_set;
+        sp::make_binned_reference_set_v1(flat_index_mapper,
+            bin_config,
+            reference_set_size,
+            real_reference_index,
+            binned_reference_set);
+
+        // extract the references
+        std::vector<std::uint64_t> reference_indices;
+        if(!try_get_reference_indices_from_binned_reference_set_v1(binned_reference_set, reference_indices))
+            return false;
+
+        // check the references
+        if (reference_indices.size() != reference_set_size)
+            return false;
+
+        bool found_real{false};
+        for (const std::uint64_t reference_index : reference_indices)
+        {
+            if (reference_index < distribution_min_index)
+                return false;
+            if (reference_index > distribution_max_index)
+                return false;
+
+            if (reference_index == real_reference_index)
+                found_real = true;
+        }
+        if (!found_real)
+            return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     const std::size_t num_random_memo_elements,
@@ -874,42 +925,33 @@ TEST(seraphis, tx_extra)
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, binned_reference_set)
 {
-    const std::uint64_t distribution_min_index{20};
-    const std::uint64_t distribution_max_index{40000};
-    const sp::SpRefSetIndexMapperFlat flat_index_mapper{distribution_min_index, distribution_max_index};
-    const sp::SpBinnedReferenceSetConfigV1 bin_config{.m_bin_radius = 127, .m_num_bin_members = 8};
-    const std::uint64_t reference_set_size{128};
-    const std::uint64_t real_reference_index{distribution_min_index + reference_set_size/2};
-
-    for (std::size_t i{0}; i < 2000; ++i)
-    {
-        // make a reference set
-        sp::SpBinnedReferenceSetV1 binned_reference_set;
-        EXPECT_NO_THROW(sp::make_binned_reference_set_v1(flat_index_mapper,
-            bin_config,
-            reference_set_size,
-            real_reference_index,
-            binned_reference_set));
-
-        // extract the references
-        std::vector<std::uint64_t> reference_indices;
-        EXPECT_NO_THROW(
-                EXPECT_TRUE(try_get_reference_indices_from_binned_reference_set_v1(binned_reference_set, reference_indices))
-            );
-
-        // check the references
-        EXPECT_TRUE(reference_indices.size() == reference_set_size);
-        bool found_real{false};
-        for (const std::uint64_t reference_index : reference_indices)
-        {
-            EXPECT_TRUE(reference_index >= distribution_min_index);
-            EXPECT_TRUE(reference_index <= distribution_max_index);
-
-            if (reference_index == real_reference_index)
-                found_real = true;
-        }
-        EXPECT_TRUE(found_real);
-    }
+    EXPECT_ANY_THROW(test_binned_reference_set(0, 0, 0, 0, 0, 0));  //invalid reference set size and bin num members
+    EXPECT_ANY_THROW(test_binned_reference_set(1, 0, 0, 1, 1, 0));  //invalid range
+    EXPECT_ANY_THROW(test_binned_reference_set(0, 0, 1, 1, 1, 0));  //invalid bin radius
+    EXPECT_ANY_THROW(test_binned_reference_set(0, 0, 0, 2, 1, 0));  //invalid bin num members
+    EXPECT_ANY_THROW(test_binned_reference_set(0, 0, 0, 1, 1, 1));  //invalid real reference location
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 0, 0, 1, 1, 0)));  //1 bin member in 1 bin in [0, 0]
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 0, 0, 1, 2, 0)));  //1 bin member in 2 bins in [0, 0]
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 0, 0, 1, 3, 0)));  //1 bin member in 3 bins in [0, 0]
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 1, 0, 1, 1, 0)));  //1 bin member in 1 bins in [0, 1]
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 1, 0, 1, 2, 0)));  //1 bin member in 2 bins in [0, 1]
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 2, 1, 2, 2, 0)));  //2 bin members in 1 bin in [0, 2]
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 2, 1, 2, 4, 0)));  //2 bin members in 2 bins in [0, 2]
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 2, 1, 2, 4, 1)));  //2 bin members in 2 bins in [0, 2]
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 2, 1, 2, 4, 1)));  //2 bin members in 2 bins in [0, 2]
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0,
+        static_cast<std::uint64_t>(-1),
+        100,
+        10,
+        50,
+        static_cast<std::uint64_t>(-1))));  //max range, real at top
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0,
+        static_cast<std::uint64_t>(-1),
+        100,
+        10,
+        50,
+        0)));  //max range, real at bottom
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 40000, 127, 8, 128, 40000/2)));  //realistic example
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, txtype_squashed_v1)

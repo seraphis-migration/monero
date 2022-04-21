@@ -331,7 +331,7 @@ void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
         "generating bin loci: real element reference is not within the element distribution.");
     CHECK_AND_ASSERT_THROW_MES(reference_set_size >= 1 &&
             distribution_min_index <= distribution_max_index &&
-            distribution_max_index - distribution_min_index >= compute_bin_width(bin_config.m_bin_radius) &&
+            distribution_max_index - distribution_min_index >= compute_bin_width(bin_config.m_bin_radius) - 1 &&
             check_bin_config<ref_set_bin_dimension_v1_t>(reference_set_size, bin_config),
         "generating bin loci: invalid input parameters.");
 
