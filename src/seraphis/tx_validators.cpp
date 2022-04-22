@@ -40,6 +40,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
 #include "sp_crypto_utils.h"
+#include "tx_binned_reference_set.h"
 #include "tx_builders_inputs.h"
 #include "tx_component_types.h"
 #include "tx_extra.h"
@@ -130,7 +131,7 @@ bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCoun
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetSizeV1 &config,
+bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetV1 &config,
     const std::vector<SpMembershipProofV1> &membership_proofs)
 {
     // sanity check
@@ -152,10 +153,19 @@ bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetSizeV1 &c
     // check membership proofs
     for (const auto &proof : membership_proofs)
     {
+        // check binned reference set configuration
+        if (proof.m_binned_reference_set.m_bin_config.m_bin_radius < config.m_bin_radius_min ||
+            proof.m_binned_reference_set.m_bin_config.m_bin_radius > config.m_bin_radius_max)
+            return false;
+
+        if (proof.m_binned_reference_set.m_bin_config.m_num_bin_members < config.m_num_bin_members_min ||
+            proof.m_binned_reference_set.m_bin_config.m_num_bin_members > config.m_num_bin_members_max)
+            return false;
+
         // proof ref set decomposition (n^m) should match number of referenced enotes
         std::size_t ref_set_size{ref_set_size_from_decomp(proof.m_ref_set_decomp_n, proof.m_ref_set_decomp_m)};
 
-        if (ref_set_size != proof.m_ledger_enote_indices.size())
+        if (ref_set_size != proof.m_binned_reference_set.reference_set_size())
             return false;
 
         // all proofs should have same ref set decomp (and implicitly: same ref set size)
@@ -193,11 +203,11 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
     const std::vector<SpEnoteV1> &outputs,
     const TxExtra &tx_extra)
 {
-    // membership proof referenced enote indices should be sorted (ascending)
-    // note: duplicate references are allowed
+    // membership proof binned reference set bins should be sorted (ascending)
+    // note: duplicate bin locations are allowed
     for (const auto &proof : membership_proofs)
     {
-        if (!std::is_sorted(proof.m_ledger_enote_indices.begin(), proof.m_ledger_enote_indices.end()))
+        if (!std::is_sorted(proof.m_binned_reference_set.m_bins.begin(), proof.m_binned_reference_set.m_bins.end()))
             return false;
     }
 
@@ -309,6 +319,9 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
     offsets.resize(num_proofs, rct::keyV(1));
     messages.reserve(num_proofs);
 
+    rct::key generator_seed_reproduced;
+    std::vector<std::uint64_t> reference_indices;
+
     for (std::size_t proof_index{0}; proof_index < num_proofs; ++proof_index)
     {
         // sanity check
@@ -316,11 +329,21 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
             !input_images[proof_index])
             return false;
 
-        proofs.emplace_back(&(membership_proofs[proof_index]->m_concise_grootle_proof));
+        // the binned reference set's generator seed should be reproducible
+        make_binned_ref_set_generator_seed_v1(input_images[proof_index]->m_masked_address,
+            input_images[proof_index]->m_masked_commitment,
+            generator_seed_reproduced);
+
+        if (!(generator_seed_reproduced == membership_proofs[proof_index]->m_binned_reference_set.m_bin_generator_seed))
+            return false;
+
+        // extract the references
+        if(!try_get_reference_indices_from_binned_reference_set_v1(membership_proofs[proof_index]->m_binned_reference_set,
+                reference_indices))
+            return false;
 
         // get proof keys from enotes stored in the ledger
-        ledger_context.get_reference_set_proof_elements_v1(membership_proofs[proof_index]->m_ledger_enote_indices,
-            membership_proof_keys[proof_index]);
+        ledger_context.get_reference_set_proof_elements_v1(reference_indices, membership_proof_keys[proof_index]);
 
         // offset (input image masked keys squashed: Q' = Ko' + C')
         rct::addKeys(offsets[proof_index][0],
@@ -329,7 +352,10 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
 
         // proof message
         messages.emplace_back();
-        make_tx_membership_proof_message_v1(membership_proofs[proof_index]->m_ledger_enote_indices, messages.back());
+        make_tx_membership_proof_message_v1(membership_proofs[proof_index]->m_binned_reference_set, messages.back());
+
+        // save the proof
+        proofs.emplace_back(&(membership_proofs[proof_index]->m_concise_grootle_proof));
     }
 
     // get verification data

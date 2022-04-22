@@ -41,5 +41,6 @@ namespace config
 
   const constexpr char HASH_KEY_GROOTLE_Hi_A[] = "grootle_Hi_A";
   const constexpr char HASH_KEY_GROOTLE_Hi_B[] = "grootle_Hi_B";
+  const constexpr char HASH_KEY_BINNED_REF_SET_GENERATOR_SEED[] = "binned_ref_set_generator_seed";
   const constexpr char HASH_KEY_BINNED_REF_SET_MEMBER[] = "binned_ref_set_member";
 }

@@ -148,6 +148,7 @@ static std::uint64_t mod_sub(const std::uint64_t a, const std::uint64_t b, const
     return mod_add(a, mod_negate(b, n), n);
 }
 //-------------------------------------------------------------------------------------------------------------------
+// project element 'a' from range [a_min, a_max] into range [b_min, b_max]
 //-------------------------------------------------------------------------------------------------------------------
 static std::uint64_t project_between_ranges(const std::uint64_t a,
     const std::uint64_t a_min,
@@ -181,6 +182,7 @@ static std::uint64_t project_between_ranges(const std::uint64_t a,
 //-------------------------------------------------------------------------------------------------------------------
 static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_config,
     const rct::key &bin_generator_seed,
+    const std::uint64_t bin_locus,
     const std::uint64_t bin_index_in_set,
     std::vector<std::uint64_t> &members_of_bin_out)
 {
@@ -189,6 +191,18 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
 
     CHECK_AND_ASSERT_THROW_MES(bin_config.m_num_bin_members > 0,
         "making normalized bin members: zero bin members were requested (at least one expected).");
+
+    // make this bin's member generator
+    // g = H("..", bin_generator_seed, bin_locus, bin_index_in_set)
+    static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_MEMBER};
+
+    std::string data;
+    data.reserve(domain_separator.size() + sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set));
+    data = domain_separator;
+    data.append(reinterpret_cast<const char*>(bin_generator_seed.bytes), sizeof(bin_generator_seed));
+    append_int_to_string(bin_locus, data);
+    append_int_to_string(bin_index_in_set, data);
+    crypto::hash member_generator{crypto::cn_fast_hash(data.data(), data.size())};
 
     // set clip allowed max to be a large multiple of the bin width (minus 1 since we are zero-basis),
     //   to avoid bias in the bin members
@@ -210,26 +224,6 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
             std::numeric_limits<std::uint64_t>::max() -
                 mod(mod(std::numeric_limits<std::uint64_t>::max(), bin_width) + 1, bin_width)
         };
-
-    // make this bin's member generator
-    // g = H("..", bin_generator_seed, bin_index_in_set)
-    static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_MEMBER};
-
-    std::string data;
-    data.reserve(domain_separator.size() + sizeof(bin_generator_seed) + sizeof(bin_index_in_set));
-    data = domain_separator;
-    data.append(reinterpret_cast<const char*>(bin_generator_seed.bytes), sizeof(bin_generator_seed));
-    {
-        unsigned char v_variable[(sizeof(std::size_t) * 8 + 6) / 7];
-        unsigned char *v_variable_end = v_variable;
-
-        // bin index
-        v_variable_end = v_variable;
-        tools::write_varint(v_variable_end, bin_index_in_set);
-        assert(v_variable_end <= v_variable + sizeof(v_variable));
-        data.append(reinterpret_cast<const char*>(v_variable), v_variable_end - v_variable);
-    }
-    crypto::hash member_generator{crypto::cn_fast_hash(data.data(), data.size())};
 
     // make each bin member (as unique indices within the bin)
     std::uint64_t generator_clip;
@@ -276,6 +270,36 @@ static void denormalize_elements(const std::uint64_t normalization_factor, std::
         element += normalization_factor;
 }
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+void SpBinnedReferenceSetConfigV1::append_to_string(std::string &str_inout) const
+{
+    // str || bin radius || number of bin members
+    append_int_to_string(m_bin_radius, str_inout);
+    append_int_to_string(m_num_bin_members, str_inout);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpReferenceBinV1::append_to_string(std::string &str_inout) const
+{
+    // str || bin locus || bin rotation factor
+    append_int_to_string(m_bin_locus, str_inout);
+    append_int_to_string(m_rotation_factor, str_inout);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpBinnedReferenceSetV1::append_to_string(std::string &str_inout) const
+{
+    // str || bin config || bin generator seed || {bins}
+    str_inout.reserve(str_inout.size() + this->get_size_bytes(true) + SpBinnedReferenceSetConfigV1::get_size_bytes());
+
+    // bin config
+    m_bin_config.append_to_string(str_inout);
+
+    // bin generator seed
+    str_inout.append(reinterpret_cast<const char*>(m_bin_generator_seed.bytes), sizeof(m_bin_generator_seed));
+
+    // bins
+    for (const SpReferenceBinV1 &bin : m_bins)
+        bin.append_to_string(str_inout);
+}
 //-------------------------------------------------------------------------------------------------------------------
 SpRefSetIndexMapperFlat::SpRefSetIndexMapperFlat(const std::uint64_t distribution_min_index,
     const std::uint64_t distribution_max_index) :
@@ -329,11 +353,15 @@ void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
     CHECK_AND_ASSERT_THROW_MES(real_reference_index >= distribution_min_index &&
             real_reference_index <= distribution_max_index,
         "generating bin loci: real element reference is not within the element distribution.");
-    CHECK_AND_ASSERT_THROW_MES(reference_set_size >= 1 &&
-            distribution_min_index <= distribution_max_index &&
-            distribution_max_index - distribution_min_index >= compute_bin_width(bin_config.m_bin_radius) - 1 &&
-            check_bin_config<ref_set_bin_dimension_v1_t>(reference_set_size, bin_config),
-        "generating bin loci: invalid input parameters.");
+    CHECK_AND_ASSERT_THROW_MES(reference_set_size >= 1,
+        "generating bin loci: reference set size too small (needs to be >= 1).");
+    CHECK_AND_ASSERT_THROW_MES(distribution_min_index <= distribution_max_index,
+        "generating bin loci: invalid distribution range.");
+    CHECK_AND_ASSERT_THROW_MES(distribution_max_index - distribution_min_index >= 
+            compute_bin_width(bin_config.m_bin_radius) - 1,
+        "generating bin loci: bin width is too large for the distribution range.");
+    CHECK_AND_ASSERT_THROW_MES(check_bin_config<ref_set_bin_dimension_v1_t>(reference_set_size, bin_config),
+        "generating bin loci: invalid config.");
 
     const std::uint64_t num_bins{reference_set_size/bin_config.m_num_bin_members};
     const std::uint64_t distribution_width{distribution_max_index - distribution_min_index + 1};
@@ -446,6 +474,7 @@ void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config,
+    const rct::key &generator_seed,
     const std::uint64_t real_reference_index,
     const std::vector<std::uint64_t> &bin_loci,
     const std::uint64_t bin_index_with_real,  //index into bin_loci
@@ -470,16 +499,12 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
             "binned reference set: the top of a proposed bin extends above uint64::max().");        
     }
 
-    CHECK_AND_ASSERT_THROW_MES(bin_index_with_real <= bin_loci.size(),
+    CHECK_AND_ASSERT_THROW_MES(bin_index_with_real < bin_loci.size(),
         "binned reference set: real element's bin isn't in the bins proposed.");
     CHECK_AND_ASSERT_THROW_MES(real_reference_index >= bin_loci[bin_index_with_real] - bin_config.m_bin_radius,
         "binned reference set: real element is below its proposed bin.");
     CHECK_AND_ASSERT_THROW_MES(real_reference_index <= bin_loci[bin_index_with_real] + bin_config.m_bin_radius,
         "binned reference set: real element is above its proposed bin.");
-
-
-    /// make the bin member generator seed
-    crypto::rand(32, binned_reference_set_out.m_bin_generator_seed.bytes);
 
 
     /// make bins
@@ -496,10 +521,11 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
 
     /// set real reference's bin rotation factor
 
-    // 1) generate the bin members' indices into the element set (normalized and not rotated)
+    // 1) generate the bin members' element set indices (normalized and not rotated)
     std::vector<std::uint64_t> members_of_real_bin;
     make_normalized_bin_members(bin_config,
-        binned_reference_set_out.m_bin_generator_seed,
+        generator_seed,
+        bin_loci[bin_index_with_real],
         bin_index_with_real,
         members_of_real_bin);
     CHECK_AND_ASSERT_THROW_MES(members_of_real_bin.size() == bin_config.m_num_bin_members,
@@ -518,13 +544,15 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
         mod_sub(normalized_real_reference, members_of_real_bin[designated_real_bin_member], bin_width));
 
 
-    /// set remaining output pieces
+    /// set output reference set
     binned_reference_set_out.m_bin_config = bin_config;
+    binned_reference_set_out.m_bin_generator_seed = generator_seed;
     binned_reference_set_out.m_bins = std::move(bins);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
     const SpBinnedReferenceSetConfigV1 &bin_config,
+    const rct::key &generator_seed,
     const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
     SpBinnedReferenceSetV1 &binned_reference_set_out)
@@ -538,6 +566,7 @@ void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
 
     // make the reference set
     make_binned_reference_set_v1(bin_config,
+        generator_seed,
         real_reference_index,
         bin_loci,
         bin_index_with_real,
@@ -582,6 +611,7 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
         // 1) make normalized bin members
         make_normalized_bin_members(binned_reference_set.m_bin_config,
             binned_reference_set.m_bin_generator_seed,
+            binned_reference_set.m_bins[bin_index].m_bin_locus,
             bin_index,
             bin_members);
 

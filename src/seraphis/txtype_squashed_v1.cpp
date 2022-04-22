@@ -42,6 +42,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
 #include "sp_crypto_utils.h"
+#include "tx_binned_reference_set.h"
 #include "tx_builder_types.h"
 #include "tx_builders_inputs.h"
 #include "tx_builders_mixed.h"
@@ -96,18 +97,22 @@ static SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(
 //-------------------------------------------------------------------------------------------------------------------
 // semantic validation config: reference set size
 //-------------------------------------------------------------------------------------------------------------------
-static SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1(
+static SemanticConfigRefSetV1 semantic_config_ref_sets_v1(
     const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version)
 {
-    SemanticConfigRefSetSizeV1 config{};
+    SemanticConfigRefSetV1 config{};
 
     if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
     {
-        // note: if n*m exceeds GROOTLE_MAX_MN, there will be an exception thrown
+        // note: if n*m exceeds GROOTLE_MAX_MN, an exception will be thrown
         config.m_decom_n_min = 0;
         config.m_decom_n_max = 100000;
         config.m_decom_m_min = 0;
         config.m_decom_m_max = 100000;
+        config.m_bin_radius_min = 0;
+        config.m_bin_radius_max = 30000;
+        config.m_num_bin_members_min = 0;
+        config.m_num_bin_members_max = 60000;
     }
     else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
     {
@@ -115,6 +120,10 @@ static SemanticConfigRefSetSizeV1 semantic_config_ref_set_size_v1(
         config.m_decom_n_max = config::SP_GROOTLE_N_V1;
         config.m_decom_m_min = config::SP_GROOTLE_M_V1;
         config.m_decom_m_max = config::SP_GROOTLE_M_V1;
+        config.m_bin_radius_min = config::SP_REF_SET_BIN_RADIUS_V1;
+        config.m_bin_radius_max = config::SP_REF_SET_BIN_RADIUS_V1;
+        config.m_num_bin_members_min = config::SP_REF_SET_NUM_BIN_MEMBERS_V1;
+        config.m_num_bin_members_max = config::SP_REF_SET_NUM_BIN_MEMBERS_V1;
     }
     else  //unknown semantic rules version
     {
@@ -129,6 +138,7 @@ std::size_t SpTxSquashedV1::get_size_bytes(const std::size_t num_inputs,
     const std::size_t num_outputs,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
+    const std::size_t num_bin_members,
     const TxExtra &tx_extra)
 {
     // doesn't include:
@@ -149,7 +159,7 @@ std::size_t SpTxSquashedV1::get_size_bytes(const std::size_t num_inputs,
     size += num_inputs * SpImageProofV1::get_size_bytes();
 
     // membership proofs
-    size += num_inputs * SpMembershipProofV1::get_size_bytes(ref_set_decomp_n, ref_set_decomp_m);
+    size += num_inputs * SpMembershipProofV1::get_size_bytes(ref_set_decomp_n, ref_set_decomp_m, num_bin_members);
 
     // extra data in tx
     size += SpTxSupplementV1::get_size_bytes(num_outputs, tx_extra);
@@ -172,11 +182,17 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
             ? m_membership_proofs[0].m_ref_set_decomp_m
             : 0
         };
+    const std::size_t num_bin_members{
+            m_membership_proofs.size()
+            ? m_membership_proofs[0].m_binned_reference_set.m_bin_config.m_num_bin_members
+            : 0u
+        };
 
     return SpTxSquashedV1::get_size_bytes(m_input_images.size(),
         m_outputs.size(),
         ref_set_decomp_n,
         ref_set_decomp_m,
+        num_bin_members,
         m_supplement.m_tx_extra);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -184,10 +200,18 @@ std::size_t SpTxSquashedV1::get_weight(const std::size_t num_inputs,
     const std::size_t num_outputs,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
+    const std::size_t num_bin_members,
     const TxExtra &tx_extra)
 {
     // tx weight = tx size + balance proof clawback
-    std::size_t weight{SpTxSquashedV1::get_size_bytes(num_inputs, num_outputs, ref_set_decomp_n, ref_set_decomp_m, tx_extra)};
+    std::size_t weight{
+            SpTxSquashedV1::get_size_bytes(num_inputs,
+                num_outputs,
+                ref_set_decomp_n,
+                ref_set_decomp_m,
+                num_bin_members,
+                tx_extra)
+        };
 
     // subtract balance proof size and add its weight
     weight -= SpBalanceProofV1::get_size_bytes(num_inputs, num_outputs);
@@ -208,11 +232,17 @@ std::size_t SpTxSquashedV1::get_weight() const
             ? m_membership_proofs[0].m_ref_set_decomp_m
             : 0
         };
+    const std::size_t num_bin_members{
+            m_membership_proofs.size()
+            ? m_membership_proofs[0].m_binned_reference_set.m_bin_config.m_num_bin_members
+            : 0u
+        };
 
     return SpTxSquashedV1::get_weight(m_input_images.size(),
         m_outputs.size(),
         ref_set_decomp_n,
         ref_set_decomp_m,
+        num_bin_members,
         m_supplement.m_tx_extra);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -331,7 +361,7 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
 
     // validate input proof reference set sizes
     if (!validate_sp_semantics_reference_sets_v1(
-            semantic_config_ref_set_size_v1(tx.m_tx_semantic_rules_version),
+            semantic_config_ref_sets_v1(tx.m_tx_semantic_rules_version),
             tx.m_membership_proofs))
         return false;
 

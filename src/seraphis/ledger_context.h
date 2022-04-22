@@ -68,14 +68,14 @@ public:
     * param: indices -
     * outparam: enotes_out - 
     */
-    virtual void get_reference_set_v1(const std::vector<std::size_t> &indices,
+    virtual void get_reference_set_v1(const std::vector<std::uint64_t> &indices,
         std::vector<SpEnoteV1> &enotes_out) const = 0;
     /**
     * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the ledger
     * param: indices -
     * outparam: proof_elements_out - {{squashed enote}}
     */
-    virtual void get_reference_set_proof_elements_v1(const std::vector<std::size_t> &indices,
+    virtual void get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
         rct::keyM &proof_elements_out) const = 0;
     /**
     * brief: try_add_transaction_sp_squashed_v1 - try to add a SpTxSquashedV1 transaction to the ledger

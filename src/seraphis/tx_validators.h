@@ -59,13 +59,17 @@ struct SemanticConfigComponentCountsV1 final
     std::size_t m_max_outputs;
 };
 
-/// semantic validation config: reference set size
-struct SemanticConfigRefSetSizeV1 final
+/// semantic validation config: reference sets
+struct SemanticConfigRefSetV1 final
 {
     std::size_t m_decom_n_min;
     std::size_t m_decom_n_max;
     std::size_t m_decom_m_min;
     std::size_t m_decom_m_max;
+    std::size_t m_bin_radius_min;
+    std::size_t m_bin_radius_max;
+    std::size_t m_num_bin_members_min;
+    std::size_t m_num_bin_members_max;
 };
 
 /**
@@ -96,12 +100,14 @@ bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCoun
 * brief: validate_sp_semantics_reference_sets_v1 - check membership proofs have consistent and valid reference sets
 *   - decomp_n_min <= decomp_n <= decom_n_max
 *   - decomp_m_min <= decomp_m <= decom_m_max
-*   - num(refd enotes) == ref set size
+*   - bin_radius_min <= bin_radius <= bin_radius_max
+*   - num_bin_members_min <= num_bin_members <= num_bin_members_max
+*   - ref set size from decomposition == ref set size from binned reference set
 * param: config
 * param: membership_proofs -
 * return: true/false on validation result
 */
-bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetSizeV1 &config,
+bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetV1 &config,
     const std::vector<SpMembershipProofV1> &membership_proofs);
 /**
 * brief: validate_sp_semantics_input_images_v1 - check key images are well-formed
@@ -113,7 +119,7 @@ bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetSizeV1 &c
 bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &input_images);
 /**
 * brief: validate_sp_semantics_sorting_v1 - check tx components are properly sorted
-*   - membership proof referenced enote indices are sorted (ascending)
+*   - membership proof binned reference set bins are sorted (ascending)
 *   - input images sorted by key image with byte-wise comparisons (ascending)
 *   - input key images are all unique
 *   - output enotes sorted by onetime addresses with byte-wise comparisons (ascending)

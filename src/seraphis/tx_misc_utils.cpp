@@ -93,6 +93,18 @@ std::size_t highest_bit_position(std::size_t num)
     return bit_position;
 }
 //-------------------------------------------------------------------------------------------------------------------
+void append_int_to_string(const std::size_t value, std::string &str_inout)
+{
+    unsigned char v_variable[(sizeof(std::size_t) * 8 + 6) / 7];
+    unsigned char *v_variable_end = v_variable;
+
+    // bin locus
+    v_variable_end = v_variable;
+    tools::write_varint(v_variable_end, value);
+    assert(v_variable_end <= v_variable + sizeof(v_variable));
+    str_inout.append(reinterpret_cast<const char*>(v_variable), v_variable_end - v_variable);
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2)
 {
     // balance check method chosen from perf test: tests/performance_tests/balance_check.h

@@ -84,6 +84,13 @@ std::size_t round_up_to_power_of_2(const std::size_t num);
 */
 std::size_t highest_bit_position(const std::size_t num);
 /**
+* brief: append_int_to_string - convert an int to a varint and append it to a string
+*   TODO: move to better file?
+* param: value -
+* inoutparam: str_inout -
+*/
+void append_int_to_string(const std::size_t value, std::string &str_inout);
+/**
 * brief: make_bpp_rangeproofs - make a BP+ proof that aggregates several range proofs
 * param: amounts -
 * param: amount_commitment_blinding_factors -

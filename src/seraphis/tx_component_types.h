@@ -39,6 +39,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
 #include "sp_core_types.h"
+#include "tx_binned_reference_set.h"
 #include "tx_extra.h"
 
 //third party headers
@@ -116,13 +117,14 @@ struct SpMembershipProofV1 final
 {
     /// a concise grootle proof
     sp::ConciseGrootleProof m_concise_grootle_proof;
-    /// ledger indices of enotes referenced by the proof
-    std::vector<std::size_t> m_ledger_enote_indices;
+    /// binned representation of ledger indices of enotes referenced by the proof
+    SpBinnedReferenceSetV1 m_binned_reference_set;
     /// ref set size = n^m
     std::size_t m_ref_set_decomp_n;
     std::size_t m_ref_set_decomp_m;
 
-    static std::size_t get_size_bytes(const std::size_t n, const std::size_t m);
+    /// size of the membership proof (does not include the ref set decomp)
+    static std::size_t get_size_bytes(const std::size_t n, const std::size_t m, const std::size_t num_bin_members);
     std::size_t get_size_bytes() const;
 };
 

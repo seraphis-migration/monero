@@ -49,6 +49,7 @@ extern "C"
 #include "sp_composition_proof.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
+#include "tx_binned_reference_set.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_misc_utils.h"
@@ -68,6 +69,23 @@ extern "C"
 
 namespace sp
 {
+//-------------------------------------------------------------------------------------------------------------------
+void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
+    const rct::key &masked_commitment,
+    rct::key &generator_seed_out)
+{
+    static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_GENERATOR_SEED};
+
+    // H("domain-sep", Ko', C')
+    std::string hash;
+    hash.reserve(domain_separator.size() + 2*sizeof(rct::key));
+    hash = domain_separator;
+    hash.append(reinterpret_cast<const char*>(masked_address.bytes), sizeof(rct::key));
+    hash.append(reinterpret_cast<const char*>(masked_commitment.bytes), sizeof(rct::key));
+
+    // hash to the result
+    rct::cn_fast_hash(generator_seed_out, hash.data(), hash.size());
+}
 //-------------------------------------------------------------------------------------------------------------------
 void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_images,
     std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs,
@@ -96,25 +114,21 @@ void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_imag
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_tx_membership_proof_message_v1(const std::vector<std::size_t> &enote_ledger_indices, rct::key &message_out)
+void make_tx_membership_proof_message_v1(const SpBinnedReferenceSetV1 &binned_reference_set, rct::key &message_out)
 {
-    std::string hash;
-    hash.reserve(sizeof(CRYPTONOTE_NAME) + enote_ledger_indices.size()*((sizeof(std::size_t) * 8 + 6) / 7));
-    // project name
-    hash = CRYPTONOTE_NAME;
-    // all referenced enote ledger indices
-    char converted_index[(sizeof(std::size_t) * 8 + 6) / 7];
-    char *end;
-    for (const std::size_t index : enote_ledger_indices)
-    {
-        // TODO: append real ledger references
-        end = converted_index;
-        tools::write_varint(end, index);
-        assert(end <= converted_index + sizeof(converted_index));
-        hash.append(converted_index, end - converted_index);
-    }
+    static const std::string domain_separator{CRYPTONOTE_NAME};
 
-    rct::hash_to_scalar(message_out, hash.data(), hash.size());
+    // m = H('project name', {binned reference set})
+    std::string hash;
+    hash.reserve(domain_separator.size() +
+        binned_reference_set.get_size_bytes(true) +
+        SpBinnedReferenceSetConfigV1::get_size_bytes());
+    // project name
+    hash = domain_separator;
+    // binned reference set
+    binned_reference_set.append_to_string(hash);
+
+    rct::cn_fast_hash(message_out, hash.data(), hash.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 void prepare_input_commitment_factors_for_balance_proof_v1(
@@ -327,7 +341,7 @@ void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_re
 
     // proof message
     rct::key message;
-    make_tx_membership_proof_message_v1(membership_ref_set.m_ledger_enote_indices, message);
+    make_tx_membership_proof_message_v1(membership_ref_set.m_binned_reference_set, message);
 
 
     /// make concise grootle proof
@@ -341,7 +355,7 @@ void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_re
 
 
     /// copy miscellaneous components
-    membership_proof_out.m_ledger_enote_indices = membership_ref_set.m_ledger_enote_indices;
+    membership_proof_out.m_binned_reference_set = membership_ref_set.m_binned_reference_set;
     membership_proof_out.m_ref_set_decomp_n = membership_ref_set.m_ref_set_decomp_n;
     membership_proof_out.m_ref_set_decomp_m = membership_ref_set.m_ref_set_decomp_m;
 }

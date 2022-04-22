@@ -37,6 +37,7 @@
 #include "mock_ledger_context.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
+#include "tx_binned_reference_set.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_record_types.h"
@@ -53,6 +54,16 @@ namespace sp
 {
 
 /**
+* brief: make_binned_ref_set_generator_seed_v1 - compute a generator seed for making a binned reference set
+*   s = H("domain-sep", Ko', C')
+* param: masked_address -
+* param: masked_commitment -
+* outparam: generator_seed_out -
+*/
+void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
+    const rct::key &masked_commitment,
+    rct::key &generator_seed_out);
+/**
 * brief: align_v1_membership_proofs_v1 - rearrange membership proofs so they line up with a set of input images
 *   sort order: key images ascending with byte-wise comparisons
 * param: input_images -
@@ -64,12 +75,11 @@ void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_imag
     std::vector<SpMembershipProofV1> &membership_proofs_out);
 /**
 * brief: make_tx_membership_proof_message_v1 - message for membership proofs
-*   - H(crypto project name, enote ledger references)
-* TODO: use a real reference system instead of plain indices
-* param: - enote_ledger_indices -
+*   - H(crypto project name, {binned reference set})
+* param: - binned_reference_set -
 * outparam: message_out - the message to sign in a membership proof
 */
-void make_tx_membership_proof_message_v1(const std::vector<std::size_t> &enote_ledger_indices, rct::key &message_out);
+void make_tx_membership_proof_message_v1(const SpBinnedReferenceSetV1 &binned_reference_set, rct::key &message_out);
 /**
 * brief: prepare_input_commitment_factors_for_balance_proof_v1 - collect input amounts and input image amount
 *   commitment blinding factors

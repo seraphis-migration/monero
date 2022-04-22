@@ -45,6 +45,7 @@ extern "C"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
+#include "tx_misc_utils.h"
 
 //third party headers
 
@@ -225,21 +226,8 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     hash.reserve(2*4 + ((M.size() + 1)*C_offsets.size() + 4)*sizeof(rct::key));
     hash = std::string(reinterpret_cast<const char*>(challenge.bytes), sizeof(challenge));
     hash.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    {
-        unsigned char v_variable[(sizeof(std::size_t) * 8 + 6) / 7];
-        unsigned char *v_variable_end = v_variable;
-
-        // n
-        tools::write_varint(v_variable_end, n);
-        assert(v_variable_end <= v_variable + sizeof(v_variable));
-        hash.append(reinterpret_cast<const char*>(v_variable), v_variable_end - v_variable);
-
-        // m
-        v_variable_end = v_variable;
-        tools::write_varint(v_variable_end, m);
-        assert(v_variable_end <= v_variable + sizeof(v_variable));
-        hash.append(reinterpret_cast<const char*>(v_variable), v_variable_end - v_variable);
-    }
+    append_int_to_string(n, hash);
+    append_int_to_string(m, hash);
     for (const rct::keyV &tuple : M)
     {
         for (const rct::key &key : tuple)

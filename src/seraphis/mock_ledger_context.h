@@ -73,14 +73,14 @@ public:
     * param: indices -
     * outparam: enotes_out - 
     */
-    void get_reference_set_v1(const std::vector<std::size_t> &indices,
+    void get_reference_set_v1(const std::vector<std::uint64_t> &indices,
         std::vector<SpEnoteV1> &enotes_out) const override;
     /**
     * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the ledger
     * param: indices -
     * outparam: proof_elements_out - {{squashed enote}}
     */
-    void get_reference_set_proof_elements_v1(const std::vector<std::size_t> &indices,
+    void get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
         rct::keyM &proof_elements_out) const override;
     /**
     * brief: try_add_transaction_sp_squashed_v1 - try to add a SpTxSquashedV1 transaction to the ledger
@@ -99,13 +99,13 @@ public:
     * param: enote -
     * return: index in the ledger of the enote just added
     */
-    std::size_t add_enote_v1(const SpEnoteV1 &enote);
+    std::uint64_t add_enote_v1(const SpEnoteV1 &enote);
 
 private:
     /// implementations of the above, without internally locking the ledger mutex (all expected to be no-fail)
     bool linking_tag_exists_v1_impl(const crypto::key_image &linking_tag) const;
     void add_linking_tag_v1_impl(const crypto::key_image &linking_tag);
-    std::size_t add_enote_v1_impl(const SpEnoteV1 &enote);
+    std::uint64_t add_enote_v1_impl(const SpEnoteV1 &enote);
 
     /// Ledger mutex (mutable for use in const member functions)
     mutable std::mutex m_ledger_mutex;
@@ -113,9 +113,9 @@ private:
     /// Seraphis linking tags
     std::unordered_set<crypto::key_image> m_sp_linking_tags;
     /// Seraphis v1 enotes
-    std::unordered_map<std::size_t, SpEnoteV1> m_sp_enotes;
+    std::unordered_map<std::uint64_t, SpEnoteV1> m_sp_enotes;
     /// Seraphis squashed enotes
-    std::unordered_map<std::size_t, rct::key> m_sp_squashed_enotes;
+    std::unordered_map<std::uint64_t, rct::key> m_sp_squashed_enotes;
 };
 
 } //namespace sp

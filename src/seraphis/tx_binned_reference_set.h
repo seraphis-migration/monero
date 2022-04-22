@@ -58,6 +58,11 @@ struct SpBinnedReferenceSetConfigV1 final
     ref_set_bin_dimension_v1_t m_bin_radius;
     /// number of elements referenced by a bin
     ref_set_bin_dimension_v1_t m_num_bin_members;
+
+    /// convert to a string and append to existing string (for proof transcripts)
+    void append_to_string(std::string &str_inout) const;
+
+    static std::size_t get_size_bytes() { return sizeof(m_bin_radius) + sizeof(m_num_bin_members); }
 };
 
 ////
@@ -85,6 +90,9 @@ struct SpReferenceBinV1 final
             return m_rotation_factor < other_bin.m_rotation_factor;
     }
 
+    /// convert to a string and append to existing string (for proof transcripts)
+    void append_to_string(std::string &str_inout) const;
+
     static std::size_t get_size_bytes() { return sizeof(m_bin_locus) + sizeof(m_rotation_factor); }
 };
 
@@ -95,19 +103,28 @@ struct SpReferenceBinV1 final
 ///
 struct SpBinnedReferenceSetV1 final
 {
-    /// bin generator seed (shared by all bins)
-    rct::key m_bin_generator_seed;
     /// bin configuration details (shared by all bins)
     SpBinnedReferenceSetConfigV1 m_bin_config;
+    /// bin generator seed (shared by all bins)
+    rct::key m_bin_generator_seed;
     /// bins
     std::vector<SpReferenceBinV1> m_bins;
 
+    /// compute the reference set size
+    std::uint64_t reference_set_size() const { return m_bin_config.m_num_bin_members * m_bins.size(); }
+
+    /// convert to a string and append to existing string (for proof transcripts)
+    void append_to_string(std::string &str_inout) const;
+
     /// size of the binned reference set (does not include the config)
-    static std::size_t get_size_bytes(const std::size_t num_bins)
+    static std::size_t get_size_bytes(const std::size_t num_bins, const bool include_seed = false)
     {
-        return sizeof(m_bin_generator_seed) + num_bins * SpReferenceBinV1::get_size_bytes();
+        return num_bins * SpReferenceBinV1::get_size_bytes() + (include_seed ? sizeof(m_bin_generator_seed) : 0);
     }
-    std::size_t get_size_bytes() const { return SpBinnedReferenceSetV1::get_size_bytes(m_bins.size()); }
+    std::size_t get_size_bytes(const bool include_seed = false) const
+    {
+        return SpBinnedReferenceSetV1::get_size_bytes(m_bins.size(), include_seed);
+    }
 };
 
 ////
@@ -128,10 +145,6 @@ public:
 //getters
     virtual std::uint64_t get_distribution_min_index() const = 0;
     virtual std::uint64_t get_distribution_max_index() const = 0;
-    virtual std::uint64_t get_distribution_width() const final
-    {
-        return get_distribution_max_index() - get_distribution_min_index() + 1;
-    }
 
 //member functions
     /// [min, max] --(func)-> [0, 2^64 - 1]
@@ -183,13 +196,17 @@ void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
     std::uint64_t &bin_index_with_real_out);
 
 //todo
+//todo: consider making reference sets deterministic from some input secret so repeat reference sets for the same element
+//      can produce the same real bin (given the same generator seed, secret, and index mapper)
 void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config,
+    const rct::key &generator_seed,
     const std::uint64_t real_reference_index,
     const std::vector<std::uint64_t> &bin_loci,
     const std::uint64_t bin_index_with_real,  //index into bin_loci
     SpBinnedReferenceSetV1 &binned_reference_set_out);
 void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
     const SpBinnedReferenceSetConfigV1 &bin_config,
+    const rct::key &generator_seed,
     const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
     SpBinnedReferenceSetV1 &binned_reference_set_out);

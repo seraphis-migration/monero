@@ -35,6 +35,7 @@
 #include "crypto/crypto.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
+#include "tx_binned_reference_set.h"
 #include "tx_misc_utils.h"
 
 //third party headers
@@ -75,16 +76,18 @@ void SpEnoteV1::gen()
     crypto::rand(sizeof(jamtis::encrypted_address_tag_t), m_addr_tag_enc.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t SpMembershipProofV1::get_size_bytes(const std::size_t n, const std::size_t m)
+std::size_t SpMembershipProofV1::get_size_bytes(const std::size_t n, const std::size_t m, const std::size_t num_bin_members)
 {
     //todo: include of reference set
-    return sp::ConciseGrootleProof::get_size_bytes(n, m);
+    return sp::ConciseGrootleProof::get_size_bytes(n, m) + SpBinnedReferenceSetV1::get_size_bytes(num_bin_members);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpMembershipProofV1::get_size_bytes() const
 {
     //todo: include reference set
-    return SpMembershipProofV1::get_size_bytes(m_ref_set_decomp_n, m_ref_set_decomp_m);
+    return SpMembershipProofV1::get_size_bytes(m_ref_set_decomp_n,
+        m_ref_set_decomp_m,
+        m_binned_reference_set.m_bin_config.m_num_bin_members);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBalanceProofV1::get_size_bytes(const std::size_t num_inputs,
