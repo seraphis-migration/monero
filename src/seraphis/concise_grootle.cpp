@@ -89,14 +89,14 @@ static void init_gens()
 
         // Build Hi generators
         // H_i = keccak_to_pt("grootle Hi", i)
-        const std::string Hi_A_salt(config::HASH_KEY_GROOTLE_Hi_A);
+        const std::string Hi_A_salt{config::HASH_KEY_GROOTLE_Hi_A};
         for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
         {
             std::string hash = Hi_A_salt + tools::get_varint_data(i);
             hash_to_p3(Hi_A_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
         }
 
-        const std::string Hi_B_salt(config::HASH_KEY_GROOTLE_Hi_B);
+        const std::string Hi_B_salt{config::HASH_KEY_GROOTLE_Hi_B};
         for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
         {
             std::string hash = Hi_B_salt + tools::get_varint_data(i);
@@ -160,10 +160,10 @@ static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
     const rct::keyM &M_priv_B,  //matrix B
     std::vector<rct::MultiexpData> &data_out)
 {
-    const std::size_t m = M_priv_A.size();
+    const std::size_t m{M_priv_A.size()};
     CHECK_AND_ASSERT_THROW_MES(m > 0, "Bad matrix size!");
     CHECK_AND_ASSERT_THROW_MES(m == M_priv_B.size(), "Matrix size mismatch!");
-    const std::size_t n = M_priv_A[0].size();
+    const std::size_t n{M_priv_A[0].size()};
     CHECK_AND_ASSERT_THROW_MES(n == M_priv_B[0].size(), "Matrix size mismatch!");
     CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "Bad matrix commitment parameters!");
 
@@ -199,7 +199,7 @@ static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
 //-------------------------------------------------------------------------------------------------------------------
 static void transcript_init(rct::key &transcript_out)
 {
-    std::string salt(config::HASH_KEY_CONCISE_GROOTLE_TRANSCRIPT);
+    static const std::string salt{config::HASH_KEY_CONCISE_GROOTLE_TRANSCRIPT};
     rct::cn_fast_hash(transcript_out, salt.data(), salt.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -246,7 +246,6 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
 
     // challenge
     rct::hash_to_scalar(challenge, hash.data(), hash.size());
-
     CHECK_AND_ASSERT_THROW_MES(!(challenge == ZERO), "Transcript challenge must be nonzero!");
 
     return challenge;
@@ -260,7 +259,7 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
 {
-    rct::key challenge;
+    // hash data
     std::string hash;
     hash.reserve((X.size() + 1)*sizeof(rct::key));
     hash = std::string(reinterpret_cast<const char*>(message.bytes), sizeof(message));
@@ -269,8 +268,10 @@ static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
         hash.append(reinterpret_cast<const char*>(x.bytes), sizeof(x));
     }
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
-    rct::hash_to_scalar(challenge, hash.data(), hash.size());
 
+    // challenge
+    rct::key challenge;
+    rct::hash_to_scalar(challenge, hash.data(), hash.size());
     CHECK_AND_ASSERT_THROW_MES(!(challenge == ZERO), "Transcript challenge must be nonzero!");
 
     return challenge;
@@ -338,8 +339,8 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     std::vector<rct::MultiexpData> data;
 
     // Matrix masks
-    rct::key rA = rct::skGen();
-    rct::key rB = rct::skGen();
+    rct::key rA{rct::skGen()};
+    rct::key rB{rct::skGen()};
 
     // A: commit to zero-sum values: {a, -a^2}
     rct::keyM a = rct::keyMInit(n, m);
@@ -436,12 +437,10 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     }
 
     // mu: base aggregation coefficient
-    const rct::key mu{
-            compute_base_aggregation_coefficient(message, n, m, M, C_offsets, proof.A, proof.B)
-        };
+    const rct::key mu{compute_base_aggregation_coefficient(message, n, m, M, C_offsets, proof.A, proof.B)};
 
     // mu^alpha: powers of the aggregation coefficient
-    rct::keyV mu_pow = powers_of_scalar(mu, num_keys);
+    const rct::keyV mu_pow{powers_of_scalar(mu, num_keys)};
 
     // {X}: 'encodings' of [p] (i.e. of the real signing index 'l' in the referenced tuple set)
     proof.X = rct::keyV(m);
@@ -483,7 +482,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     const rct::key xi{compute_challenge(mu, proof.X)};
 
     // xi^j: challenge powers
-    rct::keyV xi_pow = powers_of_scalar(xi, m + 1);
+    const rct::keyV xi_pow{powers_of_scalar(xi, m + 1)};
 
 
     /// concise grootle proof final components/responses
@@ -553,8 +552,10 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
 
     CHECK_AND_ASSERT_THROW_MES(M.size() == N_proofs, "Public key vector is wrong size!");
     for (const rct::keyM &proof_M : M)
+    {
         for (const rct::keyV &column : proof_M)
             CHECK_AND_ASSERT_THROW_MES(column.size() == N, "Public key vector is wrong size!");
+    }
 
     // inputs line up with proofs
     CHECK_AND_ASSERT_THROW_MES(proof_offsets.size() == N_proofs, "Commitment offsets don't match with input proofs!");
@@ -634,8 +635,8 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
         // random weights
         // - to allow verifiying batches of proofs, must weight each proof's components randomly so an adversary doesn't
         //   gain an advantage if >1 of their proofs are being validated in a batch
-        rct::key w1{rct::skGen()};  // decomp:        w1*[ A + xi*B == dual_matrix_commit(zA, f, f*(xi - f)) ]
-        rct::key w2{rct::skGen()};  // main stuff:    w2*[ ... - zG == 0 ]
+        const rct::key w1{rct::skGen()};  // decomp:        w1*[ A + xi*B == dual_matrix_commit(zA, f, f*(xi - f)) ]
+        const rct::key w2{rct::skGen()};  // main stuff:    w2*[ ... - zG == 0 ]
 
         // Transcript challenges
         const rct::key mu{
@@ -650,10 +651,10 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
         const rct::key xi{compute_challenge(mu, proof.X)};
 
         // Aggregation coefficient powers
-        rct::keyV mu_pow = powers_of_scalar(mu, num_keys);
+        const rct::keyV mu_pow{powers_of_scalar(mu, num_keys)};
 
         // Challenge powers (negated)
-        rct::keyV minus_xi_pow = powers_of_scalar(xi, m, true);
+        const rct::keyV minus_xi_pow{powers_of_scalar(xi, m, true)};
 
         // Recover proof elements
         ge_p3 A_p3;

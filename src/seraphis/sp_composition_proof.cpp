@@ -83,7 +83,7 @@ struct multisig_binonce_factors
 //-------------------------------------------------------------------------------------------------------------------
 static void transcript_init(rct::key &transcript)
 {
-    std::string salt(config::HASH_KEY_SP_COMPOSITION_PROOF_TRANSCRIPT);
+    static const std::string salt{config::HASH_KEY_SP_COMPOSITION_PROOF_TRANSCRIPT};
     rct::cn_fast_hash(transcript, salt.data(), salt.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -114,7 +114,6 @@ static rct::key compute_challenge_message(const rct::key &message,
 
     // challenge_message
     rct::cn_fast_hash(challenge_message, hash.data(), hash.size());
-
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge_message.bytes), "Transcript challenge_message must be nonzero!");
 
     return challenge_message;
@@ -128,7 +127,6 @@ static rct::key compute_challenge(const rct::key &message,
     const rct::key &K_t2_proofkey,
     const rct::key &KI_proofkey)
 {
-    rct::key challenge;
     std::string hash;
     hash.reserve(4 * sizeof(rct::key));
     hash = std::string(reinterpret_cast<const char*>(message.bytes), sizeof(message));
@@ -136,8 +134,9 @@ static rct::key compute_challenge(const rct::key &message,
     hash.append(reinterpret_cast<const char*>(K_t2_proofkey.bytes), sizeof(K_t2_proofkey));
     hash.append(reinterpret_cast<const char*>(KI_proofkey.bytes), sizeof(KI_proofkey));
     CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
-    rct::hash_to_scalar(challenge, hash.data(), hash.size());
 
+    rct::key challenge;
+    rct::hash_to_scalar(challenge, hash.data(), hash.size());
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
 
     return challenge;
@@ -175,7 +174,7 @@ static void compute_responses(const rct::key &challenge,
 }
 //-------------------------------------------------------------------------------------------------------------------
 // Element 'K_t1' for a proof
-//   - multiplied by (1/8) for storage (and use in byte-aware contexts)
+//   - multiplied by (1/8) for storage (and for use in byte-aware contexts)
 // K_t1 = (1/y) * K
 // return: (1/8)*K_t1
 //-------------------------------------------------------------------------------------------------------------------
@@ -194,8 +193,6 @@ static void compute_K_t1_for_proof(const crypto::secret_key &y,
 static rct::key multisig_binonce_merge_factor(const rct::key &message,
     const std::vector<multisig_binonce_factors> &nonces)
 {
-    rct::key merge_factor;
-
     // build hash
     std::string hash;
     hash.reserve(sizeof(config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR) +
@@ -208,7 +205,9 @@ static rct::key multisig_binonce_merge_factor(const rct::key &message,
         hash.append(reinterpret_cast<const char*>(nonce_pair.nonce_2.bytes), sizeof(rct::key));
     }
 
+    rct::key merge_factor;
     rct::hash_to_scalar(merge_factor, hash.data(), hash.size());
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(merge_factor.bytes), "Binonce merge factor must be nonzero!");
 
     return merge_factor;
 }
@@ -273,7 +272,7 @@ SpCompositionProof sp_composition_prove(const rct::key &message,
 
 
     /// compute proof challenge
-    rct::key m = compute_challenge_message(message, K, KI, proof.K_t1);
+    const rct::key m{compute_challenge_message(message, K, KI, proof.K_t1)};
     proof.c = compute_challenge(m, alpha_t1_pub, alpha_t2_pub, alpha_ki_pub);
 
 
@@ -308,7 +307,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 
 
     /// challenge message
-    rct::key m = compute_challenge_message(message, K, KI, proof.K_t1);
+    const rct::key m{compute_challenge_message(message, K, KI, proof.K_t1)};
 
 
     /// challenge pieces
@@ -330,8 +329,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     CHECK_AND_ASSERT_THROW_MES(!(ge_p3_is_point_at_infinity_vartime(&K_t1_p3)), "Invalid proof element K_t1!");
 
     // get KI
-    CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&KI_p3, rct::ki2rct(KI).bytes) == 0,
-        "ge_frombytes_vartime failed!");
+    CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&KI_p3, rct::ki2rct(KI).bytes) == 0, "ge_frombytes_vartime failed!");
 
     // K_t2 = K_t1 - X - KI
     ge_p3_to_cached(&temp_cache, &get_X_p3_gen());
@@ -357,7 +355,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 
 
     /// compute nominal challenge
-    rct::key challenge_nom{compute_challenge(m, part_t1, part_t2, part_ki)};
+    const rct::key challenge_nom{compute_challenge(m, part_t1, part_t2, part_ki)};
 
 
     /// validate proof
@@ -548,9 +546,9 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
 
     /// challenge message and binonce merge factor
-    rct::key m{compute_challenge_message(partial_sig.message, partial_sig.K, partial_sig.KI, partial_sig.K_t1)};
+    const rct::key m{compute_challenge_message(partial_sig.message, partial_sig.K, partial_sig.KI, partial_sig.K_t1)};
 
-    rct::key binonce_merge_factor{multisig_binonce_merge_factor(m, signer_nonces_pub_mul8)};
+    const rct::key binonce_merge_factor{multisig_binonce_merge_factor(m, signer_nonces_pub_mul8)};
 
 
     /// signature openers
