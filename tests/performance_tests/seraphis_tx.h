@@ -264,8 +264,12 @@ public:
                 tx_params.ref_set_decomp_m = params.m;
                 tx_params.bin_config =
                     sp::SpBinnedReferenceSetConfigV1{
-                        .m_bin_radius = static_cast<sp::ref_set_bin_dimension_v1_t>(params.n),
-                        .m_num_bin_members = static_cast<sp::ref_set_bin_dimension_v1_t>(params.m > 0 ? params.n : 1)
+                        .m_bin_radius = static_cast<sp::ref_set_bin_dimension_v1_t>(
+                                sp::ref_set_size_from_decomp(params.n, params.m) / 2
+                            ),
+                        .m_num_bin_members = static_cast<sp::ref_set_bin_dimension_v1_t>(
+                                sp::ref_set_size_from_decomp(params.n, params.m / 2)
+                            )
                     };  //bin config must be compatible with n^m
 
                 // make tx
