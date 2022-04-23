@@ -182,9 +182,9 @@ static void compute_K_t1_for_proof(const crypto::secret_key &y,
     const rct::key &K,
     rct::key &K_t1_out)
 {
-    K_t1_out = invert(rct::sk2rct(y));  // borrow the variable
-    sc_mul(K_t1_out.bytes, K_t1_out.bytes, rct::INV_EIGHT.bytes);
-    rct::scalarmultKey(K_t1_out, K, K_t1_out);
+    rct::key inv_y{invert(rct::sk2rct(y))};
+    sc_mul(inv_y.bytes, inv_y.bytes, rct::INV_EIGHT.bytes);
+    rct::scalarmultKey(K_t1_out, K, inv_y);
 }
 //-------------------------------------------------------------------------------------------------------------------
 // MuSig2--style bi-nonce signing merge factor
@@ -489,12 +489,20 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
     CHECK_AND_ASSERT_THROW_MES(!(proposal.K == rct::identity()), "Bad proof key (K identity)!");
     CHECK_AND_ASSERT_THROW_MES(!(rct::ki2rct(proposal.KI) == rct::identity()), "Bad proof key (KI identity)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(proposal.signature_nonce_K_t1)),
+        "Bad private key (proposal nonce K_t1 zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(proposal.signature_nonce_K_t1)) == 0,
+        "Bad private key (proposal nonce K_t1)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(proposal.signature_nonce_K_t2)),
+        "Bad private key (proposal nonce K_t2 zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(proposal.signature_nonce_K_t2)) == 0,
+        "Bad private key (proposal nonce K_t2)!");
 
     // x == 0 is allowed
     CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(x)) == 0, "Bad private key (x)!");
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(y)), "Bad private key (y zero)!");
     CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(y)) == 0, "Bad private key (y)!");
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(z_e)), "Bad private key (z zero)!");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(z_e)), "Bad private key (z_e zero)!");
     CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(z_e)) == 0, "Bad private key (z)!");
 
     CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(local_nonce_1_priv)) == 0, "Bad private key (local_nonce_1_priv)!");

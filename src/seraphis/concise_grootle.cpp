@@ -584,13 +584,14 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
             CHECK_AND_ASSERT_THROW_MES(proof.f[j].size() == n - 1, "Bad proof matrix size (f internal)!");
             for (std::size_t i = 0; i < n - 1; ++i)
             {
+                CHECK_AND_ASSERT_THROW_MES(!(proof.f[j][i] == ZERO), "Proof matrix element should not be zero (f internal)!");
                 CHECK_AND_ASSERT_THROW_MES(sc_check(proof.f[j][i].bytes) == 0, "Bad scalar element in proof (f internal)!");
             }
         }
-        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.zA.bytes) == 0, "Bad scalar element in proof (zA)!");
         CHECK_AND_ASSERT_THROW_MES(!(proof.zA == ZERO), "Proof scalar element should not be zero (zA)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.z.bytes) == 0, "Bad scalar element in proof (z)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.zA.bytes) == 0, "Bad scalar element in proof (zA)!");
         CHECK_AND_ASSERT_THROW_MES(!(proof.z == ZERO), "Proof scalar element should not be zero (z)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.z.bytes) == 0, "Bad scalar element in proof (z)!");
     }
 
     // prepare context
@@ -637,6 +638,8 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
         //   gain an advantage if >1 of their proofs are being validated in a batch
         const rct::key w1{rct::skGen()};  // decomp:        w1*[ A + xi*B == dual_matrix_commit(zA, f, f*(xi - f)) ]
         const rct::key w2{rct::skGen()};  // main stuff:    w2*[ ... - zG == 0 ]
+        CHECK_AND_ASSERT_THROW_MES(!(w1 == ZERO), "Invalid verifier weight (w1 must be non-zero) (bug).");
+        CHECK_AND_ASSERT_THROW_MES(!(w2 == ZERO), "Invalid verifier weight (w2 must be non-zero) (bug).");
 
         // Transcript challenges
         const rct::key mu{
@@ -680,7 +683,6 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
             {
                 // note: indexing between f-matrix and proof.f is off by 1 because
                 //       'f[j][0] = xi - sum(f_{j,i})' is only implied by the proof, not recorded in it
-                CHECK_AND_ASSERT_THROW_MES(!(proof.f[j][i - 1] == ZERO), "Proof matrix element should not be zero!");
                 f[j][i] = proof.f[j][i - 1];
                 sc_sub(f[j][0].bytes, f[j][0].bytes, f[j][i].bytes);
             }

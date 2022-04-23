@@ -139,7 +139,10 @@ TEST(seraphis_integration, txtype_squashed_v1)
     const rct::xmr_amount in_amount_A{10};
 
     const JamtisPaymentProposalV1 payment_proposal_A{
-            JamtisPaymentProposalV1{user_address_A, in_amount_A, make_secret_key(), TxExtra{}}
+            .m_destination = user_address_A,
+            .m_amount = in_amount_A,
+            .m_enote_ephemeral_privkey = make_secret_key(),
+            .m_partial_memo = TxExtra{}
         };
     SpOutputProposalV1 output_proposal_A;
     payment_proposal_A.get_output_proposal_v1(output_proposal_A);
@@ -178,7 +181,10 @@ TEST(seraphis_integration, txtype_squashed_v1)
     const rct::xmr_amount out_amount_B{5};
 
     const JamtisPaymentProposalV1 payment_proposal_B{
-            JamtisPaymentProposalV1{user_address_A, out_amount_B, make_secret_key(), TxExtra{}}
+            .m_destination = user_address_B,
+            .m_amount = out_amount_B,
+            .m_enote_ephemeral_privkey = make_secret_key(),
+            .m_partial_memo = TxExtra{}
         };
     SpOutputProposalV1 output_proposal_B;
     payment_proposal_B.get_output_proposal_v1(output_proposal_B);

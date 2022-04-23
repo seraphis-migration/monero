@@ -64,6 +64,13 @@ namespace sp
 {
 
 /**
+* brief: check_v1_multisig_public_input_proposal_semantics_v1 - check semantics of a multisig public input proposal
+*   - throws if a check fails
+*   - check: enote masks are non-zero canonical scalars
+* param: input_proposal -
+*/
+void check_v1_multisig_public_input_proposal_semantics_v1(const SpMultisigPublicInputProposalV1 &public_input_proposal);
+/**
 * brief: make_v1_multisig_public_input_proposal_v1 - make a public input proposal for multisig (can be sent to other people)
 * param: enote -
 * param: enote_ephemeral_pubkey -
@@ -77,7 +84,7 @@ void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     const crypto::secret_key &commitment_mask,
     SpMultisigPublicInputProposalV1 &proposal_out);
 /**
-* brief: check_v1_multisig_input_proposal_semantics_v1 - check semantics of a multisig public input proposal
+* brief: check_v1_multisig_input_proposal_semantics_v1 - check semantics of a multisig input proposal
 *   - throws if a check fails
 *   - check: can reproduce enote amount commitment
 * param: input_proposal -

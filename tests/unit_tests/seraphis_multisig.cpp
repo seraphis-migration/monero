@@ -336,7 +336,12 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
     for (const rct::xmr_amount in_amount : in_amounts)
     {
-        payment_proposal_temp = JamtisPaymentProposalV1{user_address, in_amount, make_secret_key(), TxExtra{}};
+        payment_proposal_temp = JamtisPaymentProposalV1{
+                .m_destination = user_address,
+                .m_amount = in_amount,
+                .m_enote_ephemeral_privkey = make_secret_key(),
+                .m_partial_memo = TxExtra{}
+            };
         payment_proposal_temp.get_output_proposal_v1(output_proposal_temp);
 
         input_enotes.emplace_back();

@@ -59,6 +59,12 @@ namespace jamtis
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const
 {
+    // sanity checks
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(m_enote_ephemeral_privkey)),
+        "jamtis payment proposal: invalid enote ephemeral privkey (zero).");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(m_enote_ephemeral_privkey)) == 0,
+        "jamtis payment proposal: invalid enote ephemeral privkey (not canonical).");
+
     // enote ephemeral pubkey: K_e = r K_3
     make_jamtis_enote_ephemeral_pubkey(m_enote_ephemeral_privkey,
             m_destination.m_addr_K3,
@@ -117,6 +123,18 @@ void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount, const std::size_
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const
 {
+    // sanity checks
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(m_enote_ephemeral_privkey)),
+        "jamtis payment proposal self-send: invalid enote ephemeral privkey (zero).");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(m_enote_ephemeral_privkey)) == 0,
+        "jamtis payment proposal self-send: invalid enote ephemeral privkey (not canonical).");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(m_viewbalance_privkey)),
+        "jamtis payment proposal self-send: invalid view-balance privkey (zero).");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(m_viewbalance_privkey)) == 0,
+        "jamtis payment proposal self-send: invalid view-balance privkey (not canonical).");
+    CHECK_AND_ASSERT_THROW_MES(is_known_self_send_MAC(static_cast<address_tag_MAC_t>(m_type)),
+        "jamtis payment proposal self-send: unknown self-send MAC.");
+
     // enote ephemeral pubkey: K_e = r K_3
     make_jamtis_enote_ephemeral_pubkey(m_enote_ephemeral_privkey,
             m_destination.m_addr_K3,

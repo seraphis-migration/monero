@@ -211,6 +211,11 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
 
     for (const SpOutputProposalV1 &proposal : output_proposals)
     {
+        // sanity check
+        // note: a blinding factor of 0 is allowed (but not recommended)
+        CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(proposal.m_core.m_amount_blinding_factor)) == 0,
+            "making v1 outputs: invalid amount blinding factor (non-canonical).");
+
         // convert to enote
         outputs_out.emplace_back();
         proposal.get_enote_v1(outputs_out.back());

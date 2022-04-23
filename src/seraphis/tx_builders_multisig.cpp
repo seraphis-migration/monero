@@ -111,6 +111,9 @@ static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxP
 
     for (std::size_t input_index{0}; input_index < converted_input_proposals.size(); ++input_index)
     {
+        // converted proposals should be well-formed
+        check_v1_multisig_input_proposal_semantics_v1(converted_input_proposals[input_index]);
+
         // input proof proposal messages all equal proposal prefix of core tx proposal
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].message == proposal_prefix,
             "multisig tx proposal: input proof proposal does not match the tx proposal (different proposal prefix).");
@@ -204,6 +207,18 @@ static void get_masked_addresses(const std::vector<SpMultisigPublicInputProposal
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+void check_v1_multisig_public_input_proposal_semantics_v1(const SpMultisigPublicInputProposalV1 &public_input_proposal)
+{
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(public_input_proposal.m_address_mask)),
+        "multisig public input proposal: bad address mask (zero).");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(public_input_proposal.m_address_mask)) == 0,
+        "multisig public input proposal: bad address mask (not canonical).");
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(public_input_proposal.m_commitment_mask)),
+        "multisig public input proposal: bad address mask (zero).");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(public_input_proposal.m_commitment_mask)) == 0,
+        "multisig public input proposal: bad address mask (not canonical).");
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::secret_key &address_mask,
@@ -215,6 +230,9 @@ void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     proposal_out.m_enote_ephemeral_pubkey = enote_ephemeral_pubkey;
     proposal_out.m_address_mask = address_mask;
     proposal_out.m_commitment_mask = commitment_mask;
+
+    // make sure it is well-formed
+    check_v1_multisig_public_input_proposal_semantics_v1(proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposalV1 &input_proposal)
@@ -408,6 +426,10 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     rct::key proposal_prefix;
     multisig_tx_proposal.get_proposal_prefix_v1(proposal_prefix);
 
+    // check the public input proposal semantics
+    for (const SpMultisigPublicInputProposalV1 &public_input_proposal : multisig_tx_proposal.m_input_proposals)
+        check_v1_multisig_public_input_proposal_semantics_v1(public_input_proposal);
+
     // convert the public input proposals
     std::vector<SpMultisigInputProposalV1> converted_input_proposals;
     CHECK_AND_ASSERT_THROW_MES(try_get_v1_multisig_input_proposals_v1(multisig_tx_proposal.m_input_proposals,
@@ -574,7 +596,7 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
         }
     }
 
-    // check that the input initializer is well formed
+    // check that the input initializer is well-formed
     check_v1_multisig_input_init_set_semantics_v1(input_init_set_out, threshold, multisig_signers);
 }
 //-------------------------------------------------------------------------------------------------------------------
