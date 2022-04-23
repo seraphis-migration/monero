@@ -213,9 +213,14 @@ static bool test_binned_reference_set(const std::uint64_t distribution_min_index
         sp::SpBinnedReferenceSetV1 binned_reference_set;
         sp::make_binned_reference_set_v1(flat_index_mapper,
             bin_config,
+            rct::pkGen(),
             reference_set_size,
             real_reference_index,
             binned_reference_set);
+
+        // bins should be sorted
+        if (!std::is_sorted(binned_reference_set.m_bins.begin(), binned_reference_set.m_bins.end()))
+            return false;
 
         // extract the references
         std::vector<std::uint64_t> reference_indices;
@@ -247,6 +252,7 @@ static bool test_binned_reference_set(const std::uint64_t distribution_min_index
 //-------------------------------------------------------------------------------------------------------------------
 static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
+    const sp::SpBinnedReferenceSetConfigV1 &bin_config,
     const std::size_t num_random_memo_elements,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
@@ -281,19 +287,11 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     std::sort(output_proposals.begin(), output_proposals.end());
 
     // make mock membership proof ref sets
-    std::vector<SpEnote> input_enotes;
-    input_enotes.reserve(input_proposals.size());
-
-    for (const auto &input_proposal : input_proposals)
-    {
-        input_enotes.emplace_back();
-        input_proposal.m_core.get_enote_core(input_enotes.back());
-    }
-
-    std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
-            gen_mock_sp_membership_ref_sets_v1(input_enotes,
+    std::vector<SpMembershipProofPrepV1> membership_proof_preps{
+            gen_mock_sp_membership_proof_preps_v1(input_proposals,
                 ref_set_decomp_n,
                 ref_set_decomp_m,
+                bin_config,
                 ledger_context_inout)
         };
 
@@ -359,10 +357,8 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
         input_image_amount_commitment_blinding_factors,
         output_amount_commitment_blinding_factors,
         balance_proof);
-    make_v1_membership_proofs_v1(membership_ref_sets,
-        image_address_masks,
-        image_amount_masks,
-        tx_alignable_membership_proofs);  //alignable membership proofs could theoretically be inputs as well
+    make_v1_membership_proofs_v1(std::move(membership_proof_preps),
+        tx_alignable_membership_proofs);  //alignable membership proofs could theoretically be user inputs as well
     align_v1_membership_proofs_v1(input_images, std::move(tx_alignable_membership_proofs), tx_membership_proofs);
 
     make_seraphis_tx_squashed_v1(std::move(input_images), std::move(outputs),
@@ -981,8 +977,16 @@ TEST(seraphis, txtype_squashed_v1)
     for (std::size_t tx_index{0}; tx_index < num_txs; ++tx_index)
     {
         txs.emplace_back();
-        make_sp_txtype_squashed_v1(2, 2, 3, in_amounts, out_amounts, rct::xmr_amount{num_ins_outs},
-            sp::SpTxSquashedV1::SemanticRulesVersion::MOCK, ledger_context, txs.back());
+        make_sp_txtype_squashed_v1(2,
+            2,
+            sp::SpBinnedReferenceSetConfigV1{.m_bin_radius = 1, .m_num_bin_members = 2},
+            3,
+            in_amounts,
+            out_amounts,
+            rct::xmr_amount{num_ins_outs},
+            sp::SpTxSquashedV1::SemanticRulesVersion::MOCK,
+            ledger_context,
+            txs.back());
         tx_ptrs.push_back(&(txs.back()));
     }
 

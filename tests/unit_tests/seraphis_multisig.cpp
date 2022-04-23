@@ -41,6 +41,7 @@
 #include "seraphis/sp_composition_proof.h"
 #include "seraphis/sp_core_enote_utils.h"
 #include "seraphis/sp_crypto_utils.h"
+#include "seraphis/tx_binned_reference_set.h"
 #include "seraphis/tx_builder_types.h"
 #include "seraphis/tx_builder_types_multisig.h"
 #include "seraphis/tx_builders_inputs.h"
@@ -543,16 +544,20 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     // note: use ring size 2^2 = 4 for speed
     MockLedgerContext ledger_context;
 
-    const std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
-            gen_mock_sp_membership_ref_sets_v1(partial_tx.m_input_enotes, 2, 2, ledger_context)
+    std::vector<SpMembershipProofPrepV1> membership_proof_preps{
+            gen_mock_sp_membership_proof_preps_v1(partial_tx.m_input_enotes,
+                partial_tx.m_address_masks,
+                partial_tx.m_commitment_masks,
+                2,
+                2,
+                SpBinnedReferenceSetConfigV1{.m_bin_radius = 1, .m_num_bin_members = 2},
+                ledger_context)
         };
 
     // d) make membership proofs
     std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
 
-    ASSERT_NO_THROW(make_v1_membership_proofs_v1(membership_ref_sets,
-        partial_tx.m_image_address_masks,
-        partial_tx.m_image_commitment_masks,
+    ASSERT_NO_THROW(make_v1_membership_proofs_v1(std::move(membership_proof_preps),
         alignable_membership_proofs));
 
     // e) complete tx

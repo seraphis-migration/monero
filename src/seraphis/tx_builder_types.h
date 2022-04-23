@@ -114,20 +114,24 @@ struct SpOutputProposalV1 final
 };
 
 ////
-// SpMembershipReferenceSetV1 - Records info about a membership reference set, for producing a membership proof
+// SpMembershipProofPrepV1
+// - data for producing a membership proof
 ///
-struct SpMembershipReferenceSetV1 final
+struct SpMembershipProofPrepV1 final
 {
     /// ref set size = n^m
     std::size_t m_ref_set_decomp_n;
     std::size_t m_ref_set_decomp_m;
-    /// locations in the ledger of the referenced enotes; only enotes in the ledger can have a membership proof
-    ///TODO: deterministic references instead of indices
-    std::vector<std::size_t> m_ledger_enote_indices;
-    /// the referenced enotes
-    std::vector<SpEnote> m_referenced_enotes;
-    /// the index in the referenced enotes vector of the enote who will be proven a member of the ref set (via its image)
-    std::size_t m_real_spend_index_in_set;
+    /// binned representation of ledger indices of enotes referenced by the proof
+    /// - only enotes in the ledger can have a membership proof
+    SpBinnedReferenceSetV1 m_binned_reference_set;
+    /// the referenced enotes (squashed representation)
+    std::vector<rct::key> m_referenced_enotes_squashed;
+    /// the real enote being referenced (plain enote representation)
+    SpEnote m_real_reference_enote;
+    /// image masks for the real reference
+    crypto::secret_key m_address_mask;
+    crypto::secret_key m_commitment_mask;
 };
 
 ////
@@ -178,8 +182,8 @@ struct SpPartialInputV1 final
     /// input image's proof (demonstrates ownership of the underlying enote, and that the key image is correct)
     SpImageProofV1 m_image_proof;
     /// image masks
-    crypto::secret_key m_image_address_mask;
-    crypto::secret_key m_image_commitment_mask;
+    crypto::secret_key m_address_mask;
+    crypto::secret_key m_commitment_mask;
 
     /// proposal prefix (represents the set of destinations and memos; signed by this partial input's image proof)
     rct::key m_proposal_prefix;
@@ -221,8 +225,8 @@ struct SpPartialTxV1 final
     /// input enotes
     std::vector<SpEnote> m_input_enotes;
     /// image masks for creating input membership proofs
-    std::vector<crypto::secret_key> m_image_address_masks;
-    std::vector<crypto::secret_key> m_image_commitment_masks;
+    std::vector<crypto::secret_key> m_address_masks;
+    std::vector<crypto::secret_key> m_commitment_masks;
 };
 
 // need these for validating externally-sourced objects (e.g. deserialized, custom construction, etc.)
@@ -231,9 +235,9 @@ void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposa
 //todo
 void check_v1_output_proposal_semantics_v1(const SpOutputProposalV1 &output_proposal);
 //todo
-void check_v1_membership_reference_set_semantics_v1(const SpMembershipReferenceSetV1 &reference_set);
+void check_v1_membership_proof_prep_semantics_v1(const SpMembershipProofPrepV1 &reference_set);
 //todo
-void check_v1_alignable_membership_proof_semantics_v1(const SpMembershipReferenceSetV1 &reference_set);
+void check_v1_alignable_membership_proof_semantics_v1(const SpAlignableMembershipProofV1 &reference_set);
 //todo
 void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal);
 //todo

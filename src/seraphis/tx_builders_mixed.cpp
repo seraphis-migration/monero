@@ -223,16 +223,16 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &proposal,
     partial_tx_out.m_input_images.reserve(partial_inputs.size());
     partial_tx_out.m_image_proofs.reserve(partial_inputs.size());
     partial_tx_out.m_input_enotes.reserve(partial_inputs.size());
-    partial_tx_out.m_image_address_masks.reserve(partial_inputs.size());
-    partial_tx_out.m_image_commitment_masks.reserve(partial_inputs.size());
+    partial_tx_out.m_address_masks.reserve(partial_inputs.size());
+    partial_tx_out.m_commitment_masks.reserve(partial_inputs.size());
 
     for (auto &partial_input : partial_inputs)
     {
         partial_tx_out.m_input_images.emplace_back(partial_input.m_input_image);
         partial_tx_out.m_image_proofs.emplace_back(std::move(partial_input.m_image_proof));
         partial_tx_out.m_input_enotes.emplace_back(partial_input.m_input_enote_core);
-        partial_tx_out.m_image_address_masks.emplace_back(partial_input.m_image_address_mask);
-        partial_tx_out.m_image_commitment_masks.emplace_back(partial_input.m_image_commitment_mask);
+        partial_tx_out.m_address_masks.emplace_back(partial_input.m_address_mask);
+        partial_tx_out.m_commitment_masks.emplace_back(partial_input.m_commitment_mask);
     }
 
     // gather tx output parts

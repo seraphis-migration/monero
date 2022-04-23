@@ -96,7 +96,7 @@ bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
 
         // Build key vectors
         std::vector<keyM> M;                         // ref sets for each proof
-        M.resize(N_proofs, keyM(N, keyV(num_keys)));
+        M.resize(N_proofs, keyM(num_keys, keyV(N)));
         std::vector<std::vector<crypto::secret_key>> proof_privkeys;// privkey tuple per-proof (at secret indices in M)
         proof_privkeys.resize(N_proofs, std::vector<crypto::secret_key>(num_keys));
         keyV proof_messages = keyV(N_proofs); // message per-proof
@@ -107,23 +107,23 @@ bool test_grootle_proof(const std::size_t n,  // size base: N = n^m
         key temp;
         for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
         {
-            for (std::size_t k = 0; k < N; k++)
+            for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
-                for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+                for (std::size_t k = 0; k < N; k++)
                 {
-                    skpkGen(temp, M[proof_i][k][alpha]);
+                    skpkGen(temp, M[proof_i][alpha][k]);
                 }
             }
         }
 
         // Signing keys, proof_messages, and commitment offsets
         key privkey, offset_privkey;
-        for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
+        for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
         {
-            for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+            for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
             {
                 // set real-signer index = proof index (kludge)
-                skpkGen(privkey, M[proof_i][proof_i][alpha]);  //m_{l, alpha} * G
+                skpkGen(privkey, M[proof_i][alpha][proof_i]);  //m_{l, alpha} * G
                 proof_messages[proof_i] = skGen();
 
                 // set the first 'num_ident_offsets' commitment offsets equal to identity

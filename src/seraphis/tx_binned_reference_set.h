@@ -59,6 +59,14 @@ struct SpBinnedReferenceSetConfigV1 final
     /// number of elements referenced by a bin
     ref_set_bin_dimension_v1_t m_num_bin_members;
 
+    /// equals operator for equality checks
+    bool operator==(const SpBinnedReferenceSetConfigV1 &other_config) const
+    {
+        return m_bin_radius == other_config.m_bin_radius &&
+            m_num_bin_members == other_config.m_num_bin_members;
+    }
+    bool operator!=(const SpBinnedReferenceSetConfigV1 &other_config) const { return !(*this == other_config); }
+
     /// convert to a string and append to existing string (for proof transcripts)
     void append_to_string(std::string &str_inout) const;
 
@@ -80,14 +88,11 @@ struct SpReferenceBinV1 final
     ref_set_bin_dimension_v1_t m_rotation_factor;
 
     /// less-than operator for sorting
-    bool operator<(const SpReferenceBinV1 &other_bin)
+    /// - only use bin locus for sorting, since the rotation factor is not always independent of ordering (the real
+    //    reference's bin's rotation factor depends on the generator seed hashed with the bin index)
+    bool operator<(const SpReferenceBinV1 &other_bin) const
     {
-        if (m_bin_locus < other_bin.m_bin_locus)
-            return true;
-        else if (m_bin_locus > other_bin.m_bin_locus)
-            return false;
-        else
-            return m_rotation_factor < other_bin.m_rotation_factor;
+        return m_bin_locus < other_bin.m_bin_locus;
     }
 
     /// convert to a string and append to existing string (for proof transcripts)
@@ -186,6 +191,9 @@ private:
     std::uint64_t m_distribution_min_index{1};  //use an invalid range by default so default objects will throw errors
     std::uint64_t m_distribution_max_index{0};
 };
+
+//todo
+bool check_bin_config_v1(const std::uint64_t reference_set_size, const SpBinnedReferenceSetConfigV1 &bin_config);
 
 //todo
 void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,

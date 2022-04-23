@@ -93,7 +93,7 @@ std::size_t highest_bit_position(std::size_t num)
     return bit_position;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_int_to_string(const std::size_t value, std::string &str_inout)
+void append_uint_to_string(const std::size_t value, std::string &str_inout)
 {
     unsigned char v_variable[(sizeof(std::size_t) * 8 + 6) / 7];
     unsigned char *v_variable_end = v_variable;

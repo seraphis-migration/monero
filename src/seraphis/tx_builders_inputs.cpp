@@ -74,6 +74,7 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
     const rct::key &masked_commitment,
     rct::key &generator_seed_out)
 {
+    // make binned reference set generator seed
     static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_GENERATOR_SEED};
 
     // H("domain-sep", Ko', C')
@@ -85,6 +86,27 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
 
     // hash to the result
     rct::cn_fast_hash(generator_seed_out, hash.data(), hash.size());
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_binned_ref_set_generator_seed_v1(const rct::key &onetime_address,
+    const rct::key &amount_commitment,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    rct::key &generator_seed_out)
+{
+    // make binned reference set generator seed from pieces
+
+    // masked address
+    rct::key masked_address;
+    make_seraphis_squashed_address_key(onetime_address, amount_commitment, masked_address);  //H(Ko,C) Ko
+    mask_key(address_mask, masked_address, masked_address);  //K' = t_k G + H(Ko,C) Ko
+
+    // masked commitment
+    rct::key masked_commitment;
+    mask_key(commitment_mask, amount_commitment, masked_commitment);  //C' = t_c G + C
+
+    // finish making the seed
+    make_binned_ref_set_generator_seed_v1(masked_address, masked_commitment, generator_seed_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_images,
@@ -119,16 +141,16 @@ void make_tx_membership_proof_message_v1(const SpBinnedReferenceSetV1 &binned_re
     static const std::string domain_separator{CRYPTONOTE_NAME};
 
     // m = H('project name', {binned reference set})
-    std::string hash;
-    hash.reserve(domain_separator.size() +
+    std::string data;
+    data.reserve(domain_separator.size() +
         binned_reference_set.get_size_bytes(true) +
         SpBinnedReferenceSetConfigV1::get_size_bytes());
     // project name
-    hash = domain_separator;
+    data = domain_separator;
     // binned reference set
-    binned_reference_set.append_to_string(hash);
+    binned_reference_set.append_to_string(data);
 
-    rct::cn_fast_hash(message_out, hash.data(), hash.size());
+    rct::cn_fast_hash(message_out, data.data(), data.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 void prepare_input_commitment_factors_for_balance_proof_v1(
@@ -173,7 +195,7 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     {
         // input image amount commitment blinding factor: t_c + x
         sc_add(to_bytes(blinding_factors_out[input_index]),
-            to_bytes(partial_inputs[input_index].m_image_commitment_mask),  // t_c
+            to_bytes(partial_inputs[input_index].m_commitment_mask),  // t_c
             to_bytes(partial_inputs[input_index].m_input_amount_blinding_factor));  // x
 
         // input amount: a
@@ -290,166 +312,160 @@ void make_v1_image_proofs_v1(const std::vector<SpInputProposalV1> &input_proposa
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
-    const crypto::secret_key &image_address_mask,
-    const crypto::secret_key &image_amount_mask,
+void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    SpBinnedReferenceSetV1 binned_reference_set,
+    std::vector<rct::key> referenced_enotes_squashed,
+    const SpEnote &real_reference_enote,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
     SpMembershipProofV1 &membership_proof_out)
 {
     // make membership proof
 
-    /// initial checks
-    std::size_t ref_set_size{
-            ref_set_size_from_decomp(membership_ref_set.m_ref_set_decomp_n, membership_ref_set.m_ref_set_decomp_m)
-        };
+    /// checks and initialization
 
-    CHECK_AND_ASSERT_THROW_MES(membership_ref_set.m_referenced_enotes.size() == ref_set_size,
-        "Ref set size doesn't match number of referenced enotes");
-    CHECK_AND_ASSERT_THROW_MES(membership_ref_set.m_ledger_enote_indices.size() == ref_set_size,
-        "Ref set size doesn't match number of referenced enotes' ledger indices");
+    // misc
+    const std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};
+
+    CHECK_AND_ASSERT_THROW_MES(referenced_enotes_squashed.size() == ref_set_size,
+        "make membership proof: ref set size doesn't match number of referenced enotes.");
+    CHECK_AND_ASSERT_THROW_MES(binned_reference_set.reference_set_size() == ref_set_size,
+        "make membership proof: ref set size doesn't number of references in the binned reference set.");
+
+    // make the real reference's squashed representation for later
+    rct::key transformed_address;
+    make_seraphis_squashed_address_key(real_reference_enote.m_onetime_address,
+        real_reference_enote.m_amount_commitment,
+        transformed_address);  //H(Ko,C) Ko
+
+    rct::key real_Q;
+    rct::addKeys(real_Q, transformed_address, real_reference_enote.m_amount_commitment);  //Hn(Ko, C) Ko + C
+
+    // check binned reference set generator
+    rct::key masked_address;
+    mask_key(address_mask, transformed_address, masked_address);  //K' = t_k G + H(Ko,C) Ko
+
+    rct::key masked_commitment;
+    mask_key(commitment_mask, real_reference_enote.m_amount_commitment, masked_commitment);  //C' = t_c G + C
+
+    rct::key generator_seed_reproduced;
+    make_binned_ref_set_generator_seed_v1(masked_address, masked_commitment, generator_seed_reproduced);
+
+    CHECK_AND_ASSERT_THROW_MES(generator_seed_reproduced == binned_reference_set.m_bin_generator_seed,
+        "make membership proof: unable to reproduce binned reference set generator seed.");
 
 
     /// prepare to make proof
 
-    // public keys referenced by proof
-    rct::keyM reference_keys;
-    reference_keys.resize(ref_set_size, rct::keyV(1));
+    // find the real referenced enote
+    std::size_t real_spend_index_in_set{};  //l
+    bool found_real{false};
 
     for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
     {
-        // Q_i
-        // computing this for every enote for every proof is expensive; TODO: copy Q_i from the node record
-        make_seraphis_squashed_enote_Q(membership_ref_set.m_referenced_enotes[ref_index].m_onetime_address,
-            membership_ref_set.m_referenced_enotes[ref_index].m_amount_commitment,
-            reference_keys[ref_index][0]);
+        if (!found_real &&
+            real_Q == referenced_enotes_squashed[ref_index])  //Q[l]
+        {
+            real_spend_index_in_set = ref_index;
+            found_real = true;
+        }
     }
+    CHECK_AND_ASSERT_THROW_MES(found_real,
+        "make membership proof: could not find enote for membership proof in reference set.");
+
+    // public keys referenced by proof (Q_i)
+    rct::keyM reference_keys;
+    reference_keys.emplace_back(std::move(referenced_enotes_squashed));
 
     // proof offsets (only one in the squashed enote model)
     rct::keyV image_offsets;
-    image_offsets.resize(1);
+    image_offsets.push_back(rct::addKeys(masked_address, masked_commitment));  //Q' = K' + C'
 
-    // Q'
-    crypto::secret_key squashed_enote_mask;
-    sc_add(to_bytes(squashed_enote_mask), to_bytes(image_address_mask), to_bytes(image_amount_mask));  // t_k + t_c
-    mask_key(squashed_enote_mask,
-        reference_keys[membership_ref_set.m_real_spend_index_in_set][0],
-        image_offsets[0]);  // Q'
-
-    // secret key of (Q[l] - Q')
+    // secret key of: Q[l] - Q' = -(t_k + t_c) G
     std::vector<crypto::secret_key> image_masks;
-    image_masks.emplace_back(squashed_enote_mask);  // t_k + t_c
+    image_masks.emplace_back();
+    sc_add(to_bytes(image_masks[0]), to_bytes(address_mask), to_bytes(commitment_mask));  // t_k + t_c
     sc_mul(to_bytes(image_masks[0]), to_bytes(image_masks[0]), MINUS_ONE.bytes);  // -(t_k + t_c)
 
     // proof message
     rct::key message;
-    make_tx_membership_proof_message_v1(membership_ref_set.m_binned_reference_set, message);
+    make_tx_membership_proof_message_v1(binned_reference_set, message);
 
 
     /// make concise grootle proof
     membership_proof_out.m_concise_grootle_proof = concise_grootle_prove(reference_keys,
-        membership_ref_set.m_real_spend_index_in_set,
+        real_spend_index_in_set,
         image_offsets,
         image_masks,
-        membership_ref_set.m_ref_set_decomp_n,
-        membership_ref_set.m_ref_set_decomp_m,
+        ref_set_decomp_n,
+        ref_set_decomp_m,
         message);
 
 
     /// copy miscellaneous components
-    membership_proof_out.m_binned_reference_set = membership_ref_set.m_binned_reference_set;
-    membership_proof_out.m_ref_set_decomp_n = membership_ref_set.m_ref_set_decomp_n;
-    membership_proof_out.m_ref_set_decomp_m = membership_ref_set.m_ref_set_decomp_m;
+    membership_proof_out.m_binned_reference_set = std::move(binned_reference_set);
+    membership_proof_out.m_ref_set_decomp_n     = ref_set_decomp_n;
+    membership_proof_out.m_ref_set_decomp_m     = ref_set_decomp_m;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
-    const crypto::secret_key &image_address_mask,
-    const crypto::secret_key &image_amount_mask,
+void make_v1_membership_proof_v1(SpMembershipProofPrepV1 membership_proof_prep, SpMembershipProofV1 &membership_proof_out)
+{
+    make_v1_membership_proof_v1(membership_proof_prep.m_ref_set_decomp_n,
+        membership_proof_prep.m_ref_set_decomp_m,
+        std::move(membership_proof_prep.m_binned_reference_set),
+        std::move(membership_proof_prep.m_referenced_enotes_squashed),
+        membership_proof_prep.m_real_reference_enote,
+        membership_proof_prep.m_address_mask,
+        membership_proof_prep.m_commitment_mask,
+        membership_proof_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_membership_proof_v1(SpMembershipProofPrepV1 membership_proof_prep,
     SpAlignableMembershipProofV1 &alignable_membership_proof_out)
 {
     // make alignable membership proof
 
     // save the masked address to later match the membership proof with its input image
     make_seraphis_squashed_address_key(
-        membership_ref_set.m_referenced_enotes[membership_ref_set.m_real_spend_index_in_set].m_onetime_address,
-        membership_ref_set.m_referenced_enotes[membership_ref_set.m_real_spend_index_in_set].m_amount_commitment,
+        membership_proof_prep.m_real_reference_enote.m_onetime_address,
+        membership_proof_prep.m_real_reference_enote.m_amount_commitment,
         alignable_membership_proof_out.m_masked_address);  //H(Ko,C) Ko
 
-    mask_key(image_address_mask,
+    mask_key(membership_proof_prep.m_address_mask,
         alignable_membership_proof_out.m_masked_address,
         alignable_membership_proof_out.m_masked_address);  //t_k G + H(Ko,C) Ko
 
     // make the membership proof
-    make_v1_membership_proof_v1(membership_ref_set,
-        image_address_mask,
-        image_amount_mask,
-        alignable_membership_proof_out.m_membership_proof);
+    make_v1_membership_proof_v1(std::move(membership_proof_prep), alignable_membership_proof_out.m_membership_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-    const SpPartialTxV1 &partial_tx,
+void make_v1_membership_proofs_v1(std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     std::vector<SpMembershipProofV1> &membership_proofs_out)
 {
     // make multiple membership proofs
-
-    // note: ref sets are assumed to be pre-sorted, so alignable membership proofs are not needed
-    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_tx.m_image_address_masks.size(),
-        "Input components size mismatch");
-    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_tx.m_image_commitment_masks.size(),
-        "Input components size mismatch");
-
+    // note: proof preps are assumed to be pre-sorted, so alignable membership proofs are not needed
     membership_proofs_out.clear();
-    membership_proofs_out.resize(membership_ref_sets.size());
+    membership_proofs_out.reserve(membership_proof_preps.size());
 
-    for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
+    for (SpMembershipProofPrepV1 &proof_prep : membership_proof_preps)
     {
-        make_v1_membership_proof_v1(membership_ref_sets[input_index],
-            partial_tx.m_image_address_masks[input_index],
-            partial_tx.m_image_commitment_masks[input_index],
-            membership_proofs_out[input_index]);
+        membership_proofs_out.emplace_back();
+        make_v1_membership_proof_v1(std::move(proof_prep), membership_proofs_out.back());
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-    const std::vector<crypto::secret_key> &image_address_masks,
-    const std::vector<crypto::secret_key> &image_amount_masks,
+void make_v1_membership_proofs_v1(std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     std::vector<SpAlignableMembershipProofV1> &alignable_membership_proofs_out)
 {
     // make multiple alignable membership proofs
-    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_address_masks.size(), "Input components size mismatch");
-    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == image_amount_masks.size(), "Input components size mismatch");
-
     alignable_membership_proofs_out.clear();
-    alignable_membership_proofs_out.resize(membership_ref_sets.size());
+    alignable_membership_proofs_out.reserve(membership_proof_preps.size());
 
-    for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
+    for (SpMembershipProofPrepV1 &proof_prep : membership_proof_preps)
     {
-        make_v1_membership_proof_v1(membership_ref_sets[input_index],
-            image_address_masks[input_index],
-            image_amount_masks[input_index],
-            alignable_membership_proofs_out[input_index]);
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-    const std::vector<SpPartialInputV1> &partial_inputs,
-    std::vector<SpAlignableMembershipProofV1> &alignable_membership_proofs_out)
-{
-    // make multiple alignable membership proofs with partial inputs
-    CHECK_AND_ASSERT_THROW_MES(membership_ref_sets.size() == partial_inputs.size(), "Input components size mismatch");
-
-    alignable_membership_proofs_out.clear();
-    alignable_membership_proofs_out.resize(membership_ref_sets.size());
-
-    for (std::size_t input_index{0}; input_index < membership_ref_sets.size(); ++input_index)
-    {
-        CHECK_AND_ASSERT_THROW_MES(membership_ref_sets[input_index].
-                m_referenced_enotes[membership_ref_sets[input_index].m_real_spend_index_in_set].m_onetime_address ==
-            partial_inputs[input_index].m_input_enote_core.m_onetime_address, 
-            "Membership ref set real spend doesn't match partial input's enote.");
-
-        make_v1_membership_proof_v1(membership_ref_sets[input_index],
-            partial_inputs[input_index].m_image_address_mask,
-            partial_inputs[input_index].m_image_commitment_mask,
-            alignable_membership_proofs_out[input_index]);
+        alignable_membership_proofs_out.emplace_back();
+        make_v1_membership_proof_v1(std::move(proof_prep), alignable_membership_proofs_out.back());
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -461,8 +477,8 @@ void make_v1_partial_input_v1(const SpInputProposalV1 &input_proposal,
     input_proposal.get_enote_image_v1(partial_input_out.m_input_image);
 
     // copy misc. proposal info
-    partial_input_out.m_image_address_mask           = input_proposal.m_core.m_address_mask;
-    partial_input_out.m_image_commitment_mask        = input_proposal.m_core.m_commitment_mask;
+    partial_input_out.m_address_mask           = input_proposal.m_core.m_address_mask;
+    partial_input_out.m_commitment_mask        = input_proposal.m_core.m_commitment_mask;
     partial_input_out.m_proposal_prefix              = proposal_prefix;
     partial_input_out.m_input_amount                 = input_proposal.m_core.m_amount;
     partial_input_out.m_input_amount_blinding_factor = input_proposal.m_core.m_amount_blinding_factor;
@@ -478,7 +494,7 @@ void make_v1_partial_inputs_v1(const std::vector<SpInputProposalV1> &input_propo
     const rct::key &proposal_prefix,
     std::vector<SpPartialInputV1> &partial_inputs_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Can't make partial tx inputs without any input proposals");
+    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Can't make partial tx inputs without any input proposals.");
 
     partial_inputs_out.clear();
     partial_inputs_out.reserve(input_proposals.size());
@@ -506,84 +522,154 @@ std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<
     return input_proposals;
 }
 //-------------------------------------------------------------------------------------------------------------------
-SpMembershipReferenceSetV1 gen_mock_sp_membership_ref_set_v1(
-    const SpEnote &input_enote,
+SpMembershipProofPrepV1 gen_mock_sp_membership_proof_prep_v1(
+    const SpEnote &real_reference_enote,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     MockLedgerContext &ledger_context_inout)
 {
-    SpMembershipReferenceSetV1 reference_set;
+    // generate a mock membership proof prep
 
-    std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};  // n^m
+    /// checks and initialization
+    const std::size_t ref_set_size{ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m)};  // n^m
 
-    reference_set.m_ref_set_decomp_n = ref_set_decomp_n;
-    reference_set.m_ref_set_decomp_m = ref_set_decomp_m;
-    reference_set.m_real_spend_index_in_set = crypto::rand_idx(ref_set_size);  // pi
+    CHECK_AND_ASSERT_THROW_MES(check_bin_config_v1(ref_set_size, bin_config),
+        "gen mock membership proof prep: invalid binned reference set config.");
 
-    reference_set.m_ledger_enote_indices.resize(ref_set_size);
-    reference_set.m_referenced_enotes.resize(ref_set_size);
 
-    for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
+    /// add fake enotes to the ledger (2x the ref set size), with the real one at a random location
+    const std::size_t num_enotes_to_add{ref_set_size * 2};
+    const std::size_t add_real_at_pos{crypto::rand_idx(num_enotes_to_add)};
+    std::uint64_t real_reference_index_in_ledger{};
+    SpEnoteV1 dummy_enote;
+
+    for (std::size_t enote_to_add{0}; enote_to_add < num_enotes_to_add; ++enote_to_add)
     {
-        // add real input at pi
-        if (ref_index == reference_set.m_real_spend_index_in_set)
+        if (enote_to_add == add_real_at_pos)
         {
-            reference_set.m_referenced_enotes[ref_index] = input_enote;
+            SpEnoteV1 real_reference_enote_clumsy;
+            real_reference_enote_clumsy.m_core = real_reference_enote;
+            real_reference_index_in_ledger = ledger_context_inout.add_enote_v1(real_reference_enote_clumsy);
         }
-        // add dummy enote
         else
         {
-            reference_set.m_referenced_enotes[ref_index].gen();
+            dummy_enote.gen();
+            ledger_context_inout.add_enote_v1(dummy_enote);
         }
-
-        // insert referenced enote into mock ledger (also, record squashed enote)
-        // note: in a real context, you would instead 'get' the enote's index from the ledger, and error if not found
-        SpEnoteV1 temp_enote;
-        temp_enote.m_core = reference_set.m_referenced_enotes[ref_index];
-
-        reference_set.m_ledger_enote_indices[ref_index] = ledger_context_inout.add_enote_v1(temp_enote);
     }
 
-    return reference_set;
+
+    /// make binned reference set
+    SpMembershipProofPrepV1 proof_prep;
+
+    // 1) flat index mapper for mock-up
+    const SpRefSetIndexMapperFlat flat_index_mapper{
+            ledger_context_inout.min_enote_index(),
+            ledger_context_inout.max_enote_index()
+        };
+
+    // 2) generator seed
+    rct::key generator_seed;
+    make_binned_ref_set_generator_seed_v1(real_reference_enote.m_onetime_address,
+        real_reference_enote.m_amount_commitment,
+        address_mask,
+        commitment_mask,
+        generator_seed);
+
+    // 3) binned reference set
+    make_binned_reference_set_v1(flat_index_mapper,
+        bin_config,
+        generator_seed,
+        ref_set_size,
+        real_reference_index_in_ledger,
+        proof_prep.m_binned_reference_set);
+
+
+    /// copy all referenced enotes from the ledger (in squashed enote representation)
+    std::vector<std::uint64_t> reference_indices;
+    CHECK_AND_ASSERT_THROW_MES(try_get_reference_indices_from_binned_reference_set_v1(proof_prep.m_binned_reference_set,
+            reference_indices),
+        "gen mock membership proof prep: could not extract reference indices from binned representation (bug).");
+
+    ledger_context_inout.get_reference_set_proof_elements_v1(reference_indices, proof_prep.m_referenced_enotes_squashed);
+
+
+    /// copy misc pieces
+    proof_prep.m_ref_set_decomp_n = ref_set_decomp_n;
+    proof_prep.m_ref_set_decomp_m = ref_set_decomp_m;
+    proof_prep.m_real_reference_enote = real_reference_enote;
+    proof_prep.m_address_mask = address_mask;
+    proof_prep.m_commitment_mask = commitment_mask;
+
+    return proof_prep;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
-    const std::vector<SpEnote> &input_enotes,
+std::vector<SpMembershipProofPrepV1> gen_mock_sp_membership_proof_preps_v1(
+    const std::vector<SpEnote> &real_referenced_enotes,
+    const std::vector<crypto::secret_key> &address_masks,
+    const std::vector<crypto::secret_key> &commitment_masks,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     MockLedgerContext &ledger_context_inout)
 {
     // make mock membership ref sets from input enotes
-    std::vector<SpMembershipReferenceSetV1> reference_sets;
-    reference_sets.reserve(input_enotes.size());
+    CHECK_AND_ASSERT_THROW_MES(real_referenced_enotes.size() == address_masks.size(),
+        "gen mock membership proof preps: input enotes don't line up with address masks.");
+    CHECK_AND_ASSERT_THROW_MES(real_referenced_enotes.size() == commitment_masks.size(),
+        "gen mock membership proof preps: input enotes don't line up with commitment masks.");
 
-    for (const SpEnote &input_enote : input_enotes)
+    std::vector<SpMembershipProofPrepV1> proof_preps;
+    proof_preps.reserve(real_referenced_enotes.size());
+
+    for (std::size_t input_index{0}; input_index < real_referenced_enotes.size(); ++input_index)
     {
-        reference_sets.emplace_back(
-                gen_mock_sp_membership_ref_set_v1(input_enote, ref_set_decomp_n, ref_set_decomp_m, ledger_context_inout)
+        proof_preps.emplace_back(
+                gen_mock_sp_membership_proof_prep_v1(real_referenced_enotes[input_index],
+                    address_masks[input_index],
+                    commitment_masks[input_index],
+                    ref_set_decomp_n,
+                    ref_set_decomp_m,
+                    bin_config,
+                    ledger_context_inout)
             );
     }
 
-    return reference_sets;
+    return proof_preps;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
+std::vector<SpMembershipProofPrepV1> gen_mock_sp_membership_proof_preps_v1(
     const std::vector<SpInputProposalV1> &input_proposals,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     MockLedgerContext &ledger_context_inout)
 {
     // make mock membership ref sets from input proposals
     std::vector<SpEnote> input_enotes;
+    std::vector<crypto::secret_key> address_masks;
+    std::vector<crypto::secret_key> commitment_masks;
     input_enotes.reserve(input_proposals.size());
 
     for (const SpInputProposalV1 &input_proposal : input_proposals)
     {
         input_enotes.emplace_back();
         input_proposal.m_core.get_enote_core(input_enotes.back());
+
+        address_masks.emplace_back(input_proposal.m_core.m_address_mask);
+        commitment_masks.emplace_back(input_proposal.m_core.m_commitment_mask);
     }
 
-    return gen_mock_sp_membership_ref_sets_v1(input_enotes, ref_set_decomp_n, ref_set_decomp_m, ledger_context_inout);
+    return gen_mock_sp_membership_proof_preps_v1(input_enotes,
+        address_masks,
+        commitment_masks,
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

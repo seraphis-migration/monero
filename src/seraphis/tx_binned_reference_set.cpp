@@ -60,28 +60,6 @@ static std::uint64_t compute_bin_width(const std::uint64_t bin_radius)
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-template <typename BinDim>
-static bool check_bin_config(const std::uint64_t reference_set_size,
-    const SpBinnedReferenceSetConfigV1 &bin_config)
-{
-    // bin width outside bin dimension
-    if (bin_config.m_bin_radius > (std::numeric_limits<BinDim>::max() - 1)/2)
-        return false;
-    // too many bin members
-    if (bin_config.m_num_bin_members > std::numeric_limits<BinDim>::max())
-        return false;
-    // can't fit bin members in bin (note: bin can't contain more than std::uint64_t::max members)
-    if (bin_config.m_num_bin_members > compute_bin_width(bin_config.m_bin_radius))
-        return false;
-    // no bin members
-    if (bin_config.m_num_bin_members < 1)
-        return false;
-
-    // reference set can't be perfectly divided into bins
-    return bin_config.m_num_bin_members * (reference_set_size / bin_config.m_num_bin_members) == reference_set_size;
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 static std::uint64_t clamp(const std::uint64_t a, const std::uint64_t min, const std::uint64_t max)
 {
     // clamp 'a' to range [min, max]
@@ -200,8 +178,8 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
     data.reserve(domain_separator.size() + sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set));
     data = domain_separator;
     data.append(reinterpret_cast<const char*>(bin_generator_seed.bytes), sizeof(bin_generator_seed));
-    append_int_to_string(bin_locus, data);
-    append_int_to_string(bin_index_in_set, data);
+    append_uint_to_string(bin_locus, data);
+    append_uint_to_string(bin_index_in_set, data);
     crypto::hash member_generator{crypto::cn_fast_hash(data.data(), data.size())};
 
     // set clip allowed max to be a large multiple of the bin width (minus 1 since we are zero-basis),
@@ -274,15 +252,15 @@ static void denormalize_elements(const std::uint64_t normalization_factor, std::
 void SpBinnedReferenceSetConfigV1::append_to_string(std::string &str_inout) const
 {
     // str || bin radius || number of bin members
-    append_int_to_string(m_bin_radius, str_inout);
-    append_int_to_string(m_num_bin_members, str_inout);
+    append_uint_to_string(m_bin_radius, str_inout);
+    append_uint_to_string(m_num_bin_members, str_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpReferenceBinV1::append_to_string(std::string &str_inout) const
 {
     // str || bin locus || bin rotation factor
-    append_int_to_string(m_bin_locus, str_inout);
-    append_int_to_string(m_rotation_factor, str_inout);
+    append_uint_to_string(m_bin_locus, str_inout);
+    append_uint_to_string(m_rotation_factor, str_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpBinnedReferenceSetV1::append_to_string(std::string &str_inout) const
@@ -339,6 +317,25 @@ std::uint64_t SpRefSetIndexMapperFlat::uniform_index_to_element_index(const std:
         m_distribution_max_index);
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool check_bin_config_v1(const std::uint64_t reference_set_size, const SpBinnedReferenceSetConfigV1 &bin_config)
+{
+    // bin width outside bin dimension
+    if (bin_config.m_bin_radius > (std::numeric_limits<ref_set_bin_dimension_v1_t>::max() - 1)/2)
+        return false;
+    // too many bin members
+    if (bin_config.m_num_bin_members > std::numeric_limits<ref_set_bin_dimension_v1_t>::max())
+        return false;
+    // can't fit bin members in bin (note: bin can't contain more than std::uint64_t::max members)
+    if (bin_config.m_num_bin_members > compute_bin_width(bin_config.m_bin_radius))
+        return false;
+    // no bin members
+    if (bin_config.m_num_bin_members < 1)
+        return false;
+
+    // reference set can't be perfectly divided into bins
+    return bin_config.m_num_bin_members * (reference_set_size / bin_config.m_num_bin_members) == reference_set_size;
+}
+//-------------------------------------------------------------------------------------------------------------------
 void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
     const SpBinnedReferenceSetConfigV1 &bin_config,
     const std::uint64_t reference_set_size,
@@ -360,8 +357,7 @@ void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
     CHECK_AND_ASSERT_THROW_MES(distribution_max_index - distribution_min_index >= 
             compute_bin_width(bin_config.m_bin_radius) - 1,
         "generating bin loci: bin width is too large for the distribution range.");
-    CHECK_AND_ASSERT_THROW_MES(check_bin_config<ref_set_bin_dimension_v1_t>(reference_set_size, bin_config),
-        "generating bin loci: invalid config.");
+    CHECK_AND_ASSERT_THROW_MES(check_bin_config_v1(reference_set_size, bin_config), "generating bin loci: invalid config.");
 
     const std::uint64_t num_bins{reference_set_size/bin_config.m_num_bin_members};
     const std::uint64_t distribution_width{distribution_max_index - distribution_min_index + 1};
@@ -485,8 +481,7 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
     /// checks and initialization
     const std::uint64_t bin_width{compute_bin_width(bin_config.m_bin_radius)};
 
-    CHECK_AND_ASSERT_THROW_MES(check_bin_config<ref_set_bin_dimension_v1_t>(bin_config.m_num_bin_members * bin_loci.size(),
-            bin_config),
+    CHECK_AND_ASSERT_THROW_MES(check_bin_config_v1(bin_config.m_num_bin_members * bin_loci.size(), bin_config),
         "binned reference set: invalid bin config.");
 
     CHECK_AND_ASSERT_THROW_MES(std::is_sorted(bin_loci.begin(), bin_loci.end()),
@@ -544,6 +539,10 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
         mod_sub(normalized_real_reference, members_of_real_bin[designated_real_bin_member], bin_width));
 
 
+    /// make sure the bins are sorted (defense against implementation changes that break sorting)
+    std::sort(bins.begin(), bins.end());
+
+
     /// set output reference set
     binned_reference_set_out.m_bin_config = bin_config;
     binned_reference_set_out.m_bin_generator_seed = generator_seed;
@@ -583,7 +582,7 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
         };
 
     // sanity check the bin config
-    if (!check_bin_config<ref_set_bin_dimension_v1_t>(reference_set_size, binned_reference_set.m_bin_config))
+    if (!check_bin_config_v1(reference_set_size, binned_reference_set.m_bin_config))
         return false;
 
     // validate bins

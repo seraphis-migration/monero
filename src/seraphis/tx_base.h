@@ -184,15 +184,6 @@ bool validate_txs(const std::vector<const SpTxSquashedV1*> &txs, const LedgerCon
 
 //// mock-ups
 
-////
-// SpTxParamPack - parameter pack (for unit tests/mockups/etc.)
-///
-struct SpTxParamPack
-{
-    std::size_t ref_set_decomp_n{0};
-    std::size_t ref_set_decomp_m{0};
-    std::size_t num_random_memo_elements{0};
-};
 /**
 * brief: make_mock_tx - make a mock transaction
 * type: SpTxType - 
@@ -204,7 +195,7 @@ struct SpTxParamPack
 * inoutparam: ledger_context_inout -
 * outparam: tx_out -
 */
-template <typename SpTxType, typename SpTxParamsT = SpTxParamPack>
+template <typename SpTxType, typename SpTxParamsT>
 void make_mock_tx(const SpTxParamsT &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,

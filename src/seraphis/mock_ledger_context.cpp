@@ -58,41 +58,30 @@ bool MockLedgerContext::linking_tag_exists_v1(const crypto::key_image &linking_t
     return linking_tag_exists_v1_impl(linking_tag);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::get_reference_set_v1(const std::vector<std::uint64_t> &indices,
-    std::vector<SpEnoteV1> &enotes_out) const
-{
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
-
-    std::vector<SpEnoteV1> enotes_temp;
-    enotes_temp.reserve(indices.size());
-
-    for (const std::uint64_t index : indices)
-    {
-        CHECK_AND_ASSERT_THROW_MES(index < m_sp_enotes.size(), "Tried to get enote that doesn't exist.");
-        enotes_temp.push_back(m_sp_enotes.at(index));
-    }
-
-    enotes_out = std::move(enotes_temp);
-}
-//-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
-    rct::keyM &proof_elements_out) const
+    rct::keyV &proof_elements_out) const
 {
     std::lock_guard<std::mutex> lock{m_ledger_mutex};
 
     // gets squashed enotes
-    rct::keyM referenced_enotes_squashed;
-    referenced_enotes_squashed.reserve(indices.size());
+    proof_elements_out.clear();
+    proof_elements_out.reserve(indices.size());
 
     for (const std::uint64_t index : indices)
     {
         CHECK_AND_ASSERT_THROW_MES(index < m_sp_squashed_enotes.size(), "Tried to get squashed enote that doesn't exist.");
-        referenced_enotes_squashed.emplace_back(
-                rct::keyV{m_sp_squashed_enotes.at(index)}
-            );
+        proof_elements_out.emplace_back(m_sp_squashed_enotes.at(index));
     }
-
-    proof_elements_out = std::move(referenced_enotes_squashed);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t MockLedgerContext::min_enote_index() const
+{
+    return 0;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t MockLedgerContext::max_enote_index() const
+{
+    return m_sp_enotes.size() - 1;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::try_add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add)
@@ -151,15 +140,17 @@ void MockLedgerContext::add_linking_tag_v1_impl(const crypto::key_image &linking
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t MockLedgerContext::add_enote_v1_impl(const SpEnoteV1 &enote)
 {
+    const std::size_t current_max_enote_index{max_enote_index()};  //defaults to std::uint64_t::max if no enotes
+
     // add the enote
-    m_sp_enotes[m_sp_enotes.size()] = enote;
+    m_sp_enotes[current_max_enote_index + 1] = enote;
 
     // add the squashed enote
     make_seraphis_squashed_enote_Q(enote.m_core.m_onetime_address,
         enote.m_core.m_amount_commitment,
-        m_sp_squashed_enotes[m_sp_enotes.size() - 1]);
+        m_sp_squashed_enotes[current_max_enote_index + 1]);
 
-    return m_sp_enotes.size() - 1;
+    return max_enote_index();
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

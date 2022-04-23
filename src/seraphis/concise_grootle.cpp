@@ -214,8 +214,11 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     const rct::key &A,
     const rct::key &B)
 {
-    for (const rct::keyV &tuple : M)
-        CHECK_AND_ASSERT_THROW_MES(tuple.size() == C_offsets.size(), "Transcript challenge inputs have incorrect size!");
+    CHECK_AND_ASSERT_THROW_MES(M.size() == C_offsets.size(), "Transcript challenge inputs have incorrect size!");
+
+    const std::size_t N = std::pow(n, m);
+    for (const rct::keyV &column : M)
+        CHECK_AND_ASSERT_THROW_MES(column.size() == N, "Transcript challenge inputs have incorrect size!");
 
     // initialize transcript message
     rct::key challenge;
@@ -226,11 +229,11 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     hash.reserve(2*4 + ((M.size() + 1)*C_offsets.size() + 4)*sizeof(rct::key));
     hash = std::string(reinterpret_cast<const char*>(challenge.bytes), sizeof(challenge));
     hash.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    append_int_to_string(n, hash);
-    append_int_to_string(m, hash);
-    for (const rct::keyV &tuple : M)
+    append_uint_to_string(n, hash);
+    append_uint_to_string(m, hash);
+    for (const rct::keyV &column : M)
     {
-        for (const rct::key &key : tuple)
+        for (const rct::key &key : column)
             hash.append(reinterpret_cast<const char*>(key.bytes), sizeof(key));
     }
     for (const rct::key &offset : C_offsets)
@@ -303,24 +306,23 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     // ref set size
     const std::size_t N = std::pow(n, m);
 
-    CHECK_AND_ASSERT_THROW_MES(M.size() == N, "Ref set vector is wrong size!");
+    for (const rct::keyV &column : M)
+        CHECK_AND_ASSERT_THROW_MES(column.size() == N, "Commitment column is wrong size!");
 
     // number of parallel commitments to zero
     const std::size_t num_keys = C_offsets.size();
 
     CHECK_AND_ASSERT_THROW_MES(privkeys.size() == num_keys, "Private key vector is wrong size!");
-
-    for (const rct::keyV &tuple : M)
-        CHECK_AND_ASSERT_THROW_MES(tuple.size() == num_keys, "Commitment tuple is wrong size!");
+    CHECK_AND_ASSERT_THROW_MES(M.size() == num_keys, "Ref set tuple is wrong size!");
 
     // commitment to zero signing keys
-    CHECK_AND_ASSERT_THROW_MES(l < M.size(), "Signing index out of bounds!");
+    CHECK_AND_ASSERT_THROW_MES(l < N, "Signing index out of bounds!");
 
     for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
     {
         // verify: commitment to zero C_zero = M - C_offset = k*G
         rct::key C_zero_temp;
-        rct::subKeys(C_zero_temp, M[l][alpha], C_offsets[alpha]);
+        rct::subKeys(C_zero_temp, M[alpha][l], C_offsets[alpha]);
         CHECK_AND_ASSERT_THROW_MES(rct::scalarmultBase(rct::sk2rct(privkeys[alpha])) == C_zero_temp, "Bad commitment key!");
     }
 
@@ -456,7 +458,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
             for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
                 sc_mul(c_zero_nominal_prefix_temp.bytes, mu_pow[alpha].bytes, p[k][j].bytes);  // p[k][j] * mu^alpha
-                rct::subKeys(C_zero_nominal_temp, M[k][alpha], C_offsets[alpha]);  // M[k][alpha] - C_offset[alpha]
+                rct::subKeys(C_zero_nominal_temp, M[alpha][k], C_offsets[alpha]);  // M[k][alpha] - C_offset[alpha]
                 data_X.push_back({c_zero_nominal_prefix_temp, C_zero_nominal_temp});
             }
         }
@@ -551,7 +553,8 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
 
     CHECK_AND_ASSERT_THROW_MES(M.size() == N_proofs, "Public key vector is wrong size!");
     for (const rct::keyM &proof_M : M)
-        CHECK_AND_ASSERT_THROW_MES(proof_M.size() == N, "Public key vector is wrong size!");
+        for (const rct::keyV &column : proof_M)
+            CHECK_AND_ASSERT_THROW_MES(column.size() == N, "Public key vector is wrong size!");
 
     // inputs line up with proofs
     CHECK_AND_ASSERT_THROW_MES(proof_offsets.size() == N_proofs, "Commitment offsets don't match with input proofs!");
@@ -564,8 +567,7 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
         CHECK_AND_ASSERT_THROW_MES(C_offsets.size() == num_keys, "Incorrect number of commitment offsets!");
 
     for (const rct::keyM &proof_M : M)
-        for (const rct::keyV &tuple : proof_M)
-            CHECK_AND_ASSERT_THROW_MES(tuple.size() == num_keys, "Incorrect number of input keys!");
+        CHECK_AND_ASSERT_THROW_MES(proof_M.size() == num_keys, "Incorrect number of input keys!");
 
 
     /// Per-proof checks
@@ -749,7 +751,7 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
             for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
             {
                 sc_mul(temp.bytes, t_k.bytes, mu_pow[alpha].bytes);  // w2*t_k*mu^alpha
-                data.emplace_back(temp, proof_M[k][alpha]);
+                data.emplace_back(temp, proof_M[alpha][k]);
             }
         }
 

@@ -63,6 +63,11 @@ namespace sp
 void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
     const rct::key &masked_commitment,
     rct::key &generator_seed_out);
+void make_binned_ref_set_generator_seed_v1(const rct::key &onetime_address,
+    const rct::key &amount_commitment,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    rct::key &generator_seed_out);
 /**
 * brief: align_v1_membership_proofs_v1 - rearrange membership proofs so they line up with a set of input images
 *   sort order: key images ascending with byte-wise comparisons
@@ -166,34 +171,36 @@ void make_v1_image_proofs_v1(const std::vector<SpInputProposalV1> &input_proposa
     std::vector<SpImageProofV1> &image_proofs_out);
 /**
 * brief: make_v1_membership_proof_v1 - make a concise grootle membership proof in the squashed enote model
-* param: membership_ref_set -
+* param: ref_set_decomp_n -
+* param: ref_set_decomp_m -
+* param: binned_reference_set -
+* param: referenced_enotes_squashed -
+* param: real_spend_index_in_set -
+* param: real_reference_enote -
 * param: image_address_mask -
-* param: image_amount_mask -
+* param: image_commitment_mask -
 * outparam: membership_proof_out -
 */
-void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
+void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    SpBinnedReferenceSetV1 binned_reference_set,
+    std::vector<rct::key> referenced_enotes_squashed,
+    const std::size_t real_spend_index_in_set,
+    const SpEnote &real_reference_enote,
     const crypto::secret_key &image_address_mask,
-    const crypto::secret_key &image_amount_mask,
+    const crypto::secret_key &image_commitment_mask,
     SpMembershipProofV1 &membership_proof_out);
-void make_v1_membership_proof_v1(const SpMembershipReferenceSetV1 &membership_ref_set,
-    const crypto::secret_key &image_address_mask,
-    const crypto::secret_key &image_amount_mask,
+void make_v1_membership_proof_v1(SpMembershipProofPrepV1 membership_proof_prep, SpMembershipProofV1 &membership_proof_out);
+void make_v1_membership_proof_v1(SpMembershipProofPrepV1 membership_proof_prep,
     SpAlignableMembershipProofV1 &alignable_membership_proof_out);
 /**
 * brief: make_v1_membership_proofs_v1 - make a set of concise grootle membership proofs in the squashed enote model
-* param: membership_ref_sets -
-* param: partial_tx -
+* param: membership_proof_preps -
 * outparam: membership_proofs_out -
 */
-void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-    const SpPartialTxV1 &partial_tx,
+void make_v1_membership_proofs_v1(std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     std::vector<SpMembershipProofV1> &membership_proofs_out);
-void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-    const std::vector<crypto::secret_key> &image_address_masks,
-    const std::vector<crypto::secret_key> &image_amount_masks,
-    std::vector<SpAlignableMembershipProofV1> &alignable_membership_proof_out);
-void make_v1_membership_proofs_v1(const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
-    const std::vector<SpPartialInputV1> &partial_inputs,
+void make_v1_membership_proofs_v1(std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     std::vector<SpAlignableMembershipProofV1> &alignable_membership_proof_out);
 /**
 * brief: make_v1_partial_input_v1 - make a v1 partial input
@@ -220,7 +227,7 @@ void make_v1_partial_inputs_v1(const std::vector<SpInputProposalV1> &input_propo
 */
 std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts);
 /**
-* brief: gen_mock_sp_membership_ref_set_v1 - create a random reference set for an enote, with real spend at a random index,
+* brief: gen_mock_sp_membership_proof_prep_v1 - create a random reference set for an enote, with real spend at a random index,
 *   and update mock ledger to include all members of the reference set (including squashed enotes)
 * param: input_enote -
 * param: ref_set_decomp_n -
@@ -228,20 +235,27 @@ std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<
 * inoutparam: ledger_context_inout -
 * return: a reference set that can be used to make a membership proof
 */
-SpMembershipReferenceSetV1 gen_mock_sp_membership_ref_set_v1(
-    const SpEnote &input_enote,
+SpMembershipProofPrepV1 gen_mock_sp_membership_proof_prep_v1(
+    const SpEnote &real_reference_enote,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     MockLedgerContext &ledger_context_inout);
-std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
-    const std::vector<SpEnote> &input_enotes,
+std::vector<SpMembershipProofPrepV1> gen_mock_sp_membership_proof_preps_v1(
+    const std::vector<SpEnote> &real_referenced_enotes,
+    const std::vector<crypto::secret_key> &address_masks,
+    const std::vector<crypto::secret_key> &commitment_masks,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     MockLedgerContext &ledger_context_inout);
-std::vector<SpMembershipReferenceSetV1> gen_mock_sp_membership_ref_sets_v1(
+std::vector<SpMembershipProofPrepV1> gen_mock_sp_membership_proof_preps_v1(
     const std::vector<SpInputProposalV1> &input_proposals,
     const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     MockLedgerContext &ledger_context_inout);
 
 } //namespace sp

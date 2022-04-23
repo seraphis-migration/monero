@@ -139,8 +139,8 @@ bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetV1 &confi
         return false;
 
     // check ref set decomp
-    std::size_t ref_set_decomp_n{membership_proofs[0].m_ref_set_decomp_n};
-    std::size_t ref_set_decomp_m{membership_proofs[0].m_ref_set_decomp_m};
+    const std::size_t ref_set_decomp_n{membership_proofs[0].m_ref_set_decomp_n};
+    const std::size_t ref_set_decomp_m{membership_proofs[0].m_ref_set_decomp_m};
 
     if (ref_set_decomp_n < config.m_decom_n_min ||
         ref_set_decomp_n > config.m_decom_n_max)
@@ -150,20 +150,22 @@ bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetV1 &confi
         ref_set_decomp_m > config.m_decom_m_max)
         return false;
 
+    // check binned reference set configuration
+    const SpBinnedReferenceSetConfigV1 bin_config{membership_proofs[0].m_binned_reference_set.m_bin_config};
+
+    if (bin_config.m_bin_radius < config.m_bin_radius_min ||
+        bin_config.m_bin_radius > config.m_bin_radius_max)
+        return false;
+
+    if (bin_config.m_num_bin_members < config.m_num_bin_members_min ||
+        bin_config.m_num_bin_members > config.m_num_bin_members_max)
+        return false;
+
     // check membership proofs
     for (const auto &proof : membership_proofs)
     {
-        // check binned reference set configuration
-        if (proof.m_binned_reference_set.m_bin_config.m_bin_radius < config.m_bin_radius_min ||
-            proof.m_binned_reference_set.m_bin_config.m_bin_radius > config.m_bin_radius_max)
-            return false;
-
-        if (proof.m_binned_reference_set.m_bin_config.m_num_bin_members < config.m_num_bin_members_min ||
-            proof.m_binned_reference_set.m_bin_config.m_num_bin_members > config.m_num_bin_members_max)
-            return false;
-
         // proof ref set decomposition (n^m) should match number of referenced enotes
-        std::size_t ref_set_size{ref_set_size_from_decomp(proof.m_ref_set_decomp_n, proof.m_ref_set_decomp_m)};
+        const std::size_t ref_set_size{ref_set_size_from_decomp(proof.m_ref_set_decomp_n, proof.m_ref_set_decomp_m)};
 
         if (ref_set_size != proof.m_binned_reference_set.reference_set_size())
             return false;
@@ -172,6 +174,10 @@ bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetV1 &confi
         if (proof.m_ref_set_decomp_n != ref_set_decomp_n)
             return false;
         if (proof.m_ref_set_decomp_m != ref_set_decomp_m)
+            return false;
+
+        // all proofs should have the same bin config
+        if (proof.m_binned_reference_set.m_bin_config != bin_config)
             return false;
     }
 
@@ -343,7 +349,8 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
             return false;
 
         // get proof keys from enotes stored in the ledger
-        ledger_context.get_reference_set_proof_elements_v1(reference_indices, membership_proof_keys[proof_index]);
+        membership_proof_keys[proof_index].emplace_back();
+        ledger_context.get_reference_set_proof_elements_v1(reference_indices, membership_proof_keys[proof_index][0]);
 
         // offset (input image masked keys squashed: Q' = Ko' + C')
         rct::addKeys(offsets[proof_index][0],

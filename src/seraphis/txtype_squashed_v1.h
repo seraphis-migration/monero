@@ -129,7 +129,7 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
 void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
     std::vector<SpOutputProposalV1> output_proposals,
     const rct::xmr_amount transaction_fee,
-    const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     std::vector<ExtraFieldElement> additional_memo_elements,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);
@@ -173,6 +173,16 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
 
 //// mock-ups
 
+////
+// SpTxParamPackV1 - parameter pack (for unit tests/mockups/etc.)
+///
+struct SpTxParamPackV1
+{
+    std::size_t ref_set_decomp_n{0};
+    std::size_t ref_set_decomp_m{0};
+    std::size_t num_random_memo_elements{0};
+    SpBinnedReferenceSetConfigV1 bin_config{0, 0};
+};
 /**
 * brief: make_mock_tx - make an SpTxSquashedV1 transaction
 * param: params -
@@ -182,7 +192,7 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
 * outparam: tx_out -
 */
 template <>
-void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
+void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
     const rct::xmr_amount transaction_fee,

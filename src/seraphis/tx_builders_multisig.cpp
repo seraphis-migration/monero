@@ -915,8 +915,8 @@ bool try_make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposa
 
         // copy miscellaneous pieces
         input_proposal.get_enote_image(partial_input_out.m_input_image.m_core);
-        partial_input_out.m_image_address_mask = input_proposal.m_core.m_address_mask;
-        partial_input_out.m_image_commitment_mask = input_proposal.m_core.m_commitment_mask;
+        partial_input_out.m_address_mask = input_proposal.m_core.m_address_mask;
+        partial_input_out.m_commitment_mask = input_proposal.m_core.m_commitment_mask;
         partial_input_out.m_proposal_prefix = expected_proposal_prefix;
         input_proposal.get_enote_core(partial_input_out.m_input_enote_core);
         partial_input_out.m_input_amount = input_proposal.m_input_amount;

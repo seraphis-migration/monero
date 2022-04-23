@@ -96,7 +96,7 @@ struct ConciseGrootleProof
 
 /**
 * brief: concise_grootle_prove - create a concise grootle proof
-* param: M - [vec<tuple of commitments>]
+* param: M - [tuple<vec of commitments>]  (commitments are columnar)
 * param: l - secret index into {{M}}
 * param: C_offsets - offsets for commitment to zero at index l
 * param: privkeys - privkeys of commitments to zero in 'M[l] - C_offsets'
@@ -115,7 +115,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
 /**
 * brief: concise_grootle_verify - verify a batch of concise grootle proofs
 * param: proofs - batch of proofs to verify
-* param: M - (per-proof) vec<[vec<tuple of commitments>]>
+* param: M - (per-proof) vec<[tuple<vec of commitments>]>  (commitments are columnar per proof)
 * param: proof_offsets - (per-proof) offsets for commitments to zero at unknown indices in each proof
 * param: n - decomp input set: n^m
 * param: m - ...

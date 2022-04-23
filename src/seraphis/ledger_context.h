@@ -64,25 +64,37 @@ public:
     */
     virtual bool linking_tag_exists_v1(const crypto::key_image &linking_tag) const = 0;
     /**
-    * brief: get_reference_set_v1 - gets Seraphis enotes stored in the ledger
-    * param: indices -
-    * outparam: enotes_out - 
-    */
-    virtual void get_reference_set_v1(const std::vector<std::uint64_t> &indices,
-        std::vector<SpEnoteV1> &enotes_out) const = 0;
-    /**
     * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the ledger
     * param: indices -
-    * outparam: proof_elements_out - {{squashed enote}}
+    * outparam: proof_elements_out - {squashed enote}
     */
     virtual void get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
-        rct::keyM &proof_elements_out) const = 0;
+        rct::keyV &proof_elements_out) const = 0;
+    /**
+    * brief: min_enote_index - lowest index of an enote in the ledger
+    *   TODO: version this somehow?
+    * param: tx_to_add -
+    * return: lowest enote index (defaults to 0 if no enotes)
+    */
+    virtual std::uint64_t min_enote_index() const = 0;
+    /**
+    * brief: max_enote_index - highest index of an enote in the ledger
+    *   TODO: version this somehow?
+    * return: highest enote index (defaults to std::uint64_t::max if no enotes)
+    */
+    virtual std::uint64_t max_enote_index() const = 0;
     /**
     * brief: try_add_transaction_sp_squashed_v1 - try to add a SpTxSquashedV1 transaction to the ledger
     * param: tx_to_add -
-    * bool: true if adding tx succeeded
+    * return: true if adding tx succeeded
     */
     virtual bool try_add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add) = 0;
+    /**
+    * brief: num_enotes - number of enotes in the ledger
+    *   TODO: version this somehow?
+    * return: number of enotes in the ledger
+    */
+    std::uint64_t num_enotes() const { return max_enote_index() - min_enote_index() + 1; }
 };
 
 template<typename TxType>

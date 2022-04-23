@@ -32,6 +32,7 @@
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis/mock_ledger_context.h"
+#include "seraphis/tx_binned_reference_set.h"
 #include "seraphis/tx_misc_utils.h"
 #include "seraphis/txtype_squashed_v1.h"
 
@@ -257,10 +258,15 @@ public:
                     input_amounts.back() += amount_chunk*(params.out_count - params.in_count);
 
                 // mock params
-                sp::SpTxParamPack tx_params;
+                sp::SpTxParamPackV1 tx_params;
 
                 tx_params.ref_set_decomp_n = params.n;
                 tx_params.ref_set_decomp_m = params.m;
+                tx_params.bin_config =
+                    sp::SpBinnedReferenceSetConfigV1{
+                        .m_bin_radius = static_cast<sp::ref_set_bin_dimension_v1_t>(params.n),
+                        .m_num_bin_members = static_cast<sp::ref_set_bin_dimension_v1_t>(params.m > 0 ? params.n : 1)
+                    };  //bin config must be compatible with n^m
 
                 // make tx
                 m_txs.emplace_back();

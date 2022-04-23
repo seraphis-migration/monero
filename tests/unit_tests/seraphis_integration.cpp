@@ -49,6 +49,7 @@ extern "C"
 #include "seraphis/sp_core_types.h"
 #include "seraphis/sp_crypto_utils.h"
 #include "seraphis/tx_base.h"
+#include "seraphis/tx_binned_reference_set.h"
 #include "seraphis/tx_builder_types.h"
 #include "seraphis/tx_builders_inputs.h"
 #include "seraphis/tx_builders_mixed.h"
@@ -207,19 +208,23 @@ TEST(seraphis_integration, txtype_squashed_v1)
         input_proposals.back()));
 
     // e) prepare a reference set for the input's membership proof
-    std::vector<SpMembershipReferenceSetV1> membership_ref_sets;
+    std::vector<SpMembershipProofPrepV1> membership_proof_preps;
 
-    ASSERT_NO_THROW(membership_ref_sets.emplace_back(
-            gen_mock_sp_membership_ref_set_v1(input_enote_A.m_core, 2, 2, ledger_context)
-        ));
+    ASSERT_NO_THROW(membership_proof_preps =
+            gen_mock_sp_membership_proof_preps_v1(input_proposals,
+                2,
+                2,
+                SpBinnedReferenceSetConfigV1{.m_bin_radius = 1, .m_num_bin_members = 2},
+                ledger_context)
+        );
 
     // f) make the transaction
     SpTxSquashedV1 completed_tx;
 
     ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(input_proposals,
-        output_proposals,
+        std::move(output_proposals),
         transaction_fee,
-        membership_ref_sets,
+        std::move(membership_proof_preps),
         std::vector<ExtraFieldElement>{},
         SpTxSquashedV1::SemanticRulesVersion::MOCK,
         completed_tx));

@@ -305,7 +305,7 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
 void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
     std::vector<SpOutputProposalV1> output_proposals,
     const rct::xmr_amount transaction_fee,
-    const std::vector<SpMembershipReferenceSetV1> &membership_ref_sets,
+    std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     std::vector<ExtraFieldElement> additional_memo_elements,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
@@ -330,13 +330,13 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     std::vector<SpPartialInputV1> partial_inputs;
     make_v1_partial_inputs_v1(input_proposals, proposal_prefix, partial_inputs);
 
-    // membership proofs (assumes the caller lined up input proposals with membership ref sets)
-    std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
-    make_v1_membership_proofs_v1(membership_ref_sets, partial_inputs, alignable_membership_proofs);
-
     // partial tx
     SpPartialTxV1 partial_tx;
     make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), transaction_fee, version_string, partial_tx);
+
+    // membership proofs (assumes the caller prepared to make a membership proof for each input)
+    std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
+    make_v1_membership_proofs_v1(std::move(membership_proof_preps), alignable_membership_proofs);
 
     // finish tx
     make_seraphis_tx_squashed_v1(std::move(partial_tx),
@@ -489,7 +489,7 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
+void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
     const rct::xmr_amount transaction_fee,
@@ -515,10 +515,11 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
         output_proposals[1].m_enote_ephemeral_pubkey = output_proposals[0].m_enote_ephemeral_pubkey;
 
     // make mock membership proof ref sets
-    std::vector<SpMembershipReferenceSetV1> membership_ref_sets{
-            gen_mock_sp_membership_ref_sets_v1(input_proposals,
+    std::vector<SpMembershipProofPrepV1> membership_proof_preps{
+            gen_mock_sp_membership_proof_preps_v1(input_proposals,
                 params.ref_set_decomp_n,
                 params.ref_set_decomp_m,
+                params.bin_config,
                 ledger_context_inout)
         };
 
@@ -530,8 +531,9 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPack &params,
         element.gen();
 
     // make tx
-    make_seraphis_tx_squashed_v1(input_proposals, output_proposals, transaction_fee, membership_ref_sets,
-        std::move(additional_memo_elements), SpTxSquashedV1::SemanticRulesVersion::MOCK, tx_out);
+    make_seraphis_tx_squashed_v1(input_proposals, std::move(output_proposals), transaction_fee,
+        std::move(membership_proof_preps), std::move(additional_memo_elements), SpTxSquashedV1::SemanticRulesVersion::MOCK,
+        tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp
