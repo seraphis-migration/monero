@@ -66,6 +66,11 @@ static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpEno
     const rct::xmr_amount transaction_fee,
     const rct::key &remainder_blinding_factor)
 {
+    // the blinding factor should be a canonical scalar
+    if (sc_check(remainder_blinding_factor.bytes) != 0)
+        return false;
+
+    // balance check
     rct::keyV input_image_amount_commitments;
     rct::keyV output_commitments;
     input_image_amount_commitments.reserve(input_images.size());
