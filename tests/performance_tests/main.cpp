@@ -263,7 +263,24 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.3: SpTxSquashedV1 {outputs, batch size 1}
+  // TEST 5.3: SpTxSquashedV1 {decomp 2-series, batch size 25}
+  incrementer = {
+      {25}, //batch sizes
+      {2}, //in counts
+      {2}, //out counts
+      {2}, //decomp n
+      {12} //decomp m limits
+    };
+  while (incrementer.next(p_seraphis_tx))
+  {
+    if (p_seraphis_tx.n >= 2 && p_seraphis_tx.m >= 2)
+      TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
+  }
+  // test done, save results
+  if (p.core_params.td.get())
+    p.core_params.td->save(false);
+
+  // TEST 5.4: SpTxSquashedV1 {outputs, batch size 1}
   incrementer = {
       {1}, //batch sizes
       {1, 2, 4, 7, 12, 16}, //in counts
@@ -281,7 +298,7 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.4: SpTxSquashedV1 {16in/out, batch sizes 7, 15}
+  // TEST 5.5: SpTxSquashedV1 {16in/out, batch sizes 7, 15}
   incrementer = {
       {7, 15}, //batch sizes
       {16}, //in counts
@@ -299,7 +316,7 @@ int main(int argc, char** argv)
   if (p.core_params.td.get())
     p.core_params.td->save(false);
 
-  // TEST 5.5: SpTxSquashedV1 {outputs, batch size 25}
+  // TEST 5.6: SpTxSquashedV1 {outputs, batch size 25}
   incrementer = {
       {25}, //batch sizes
       {1, 2, 4, 7, 12, 16}, //in counts
