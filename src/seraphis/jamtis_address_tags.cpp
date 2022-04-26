@@ -105,7 +105,7 @@ static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct
 address_tag_t address_index_to_tag(const address_index_t j,
     const address_tag_MAC_t mac)
 {
-    address_index_t j_canonical{address_index_to_canonical(j)};
+    const address_index_t j_canonical{address_index_to_canonical(j)};
 
     // addr_tag = j_canonical || MAC
     address_tag_t addr_tag;

@@ -204,8 +204,8 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
         };
 
     // make each bin member (as unique indices within the bin)
-    std::uint64_t generator_clip;
-    std::uint64_t member_candidate;
+    std::uint64_t generator_clip{};
+    std::uint64_t member_candidate{};
     members_of_bin_out.clear();
     members_of_bin_out.reserve(bin_config.m_num_bin_members);
 
@@ -538,9 +538,8 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
     bins[bin_index_with_real].m_rotation_factor = static_cast<ref_set_bin_dimension_v1_t>(
         mod_sub(normalized_real_reference, members_of_real_bin[designated_real_bin_member], bin_width));
 
-
-    /// make sure the bins are sorted (defense against implementation changes that break sorting)
-    std::sort(bins.begin(), bins.end());
+    // WARNING: Do not unstably sort the bin members after this point! Bin members are partially determined by bin index,
+    //          so the real element will only line up with its intended bin member if order is preserved.
 
 
     /// set output reference set

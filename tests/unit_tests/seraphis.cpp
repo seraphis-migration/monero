@@ -218,21 +218,31 @@ static bool test_binned_reference_set(const std::uint64_t distribution_min_index
             real_reference_index,
             binned_reference_set);
 
+        // bin config should persist
+        if (binned_reference_set.m_bin_config != bin_config)
+            return false;
+
         // bins should be sorted
         if (!std::is_sorted(binned_reference_set.m_bins.begin(), binned_reference_set.m_bins.end()))
             return false;
 
-        // extract the references
-        std::vector<std::uint64_t> reference_indices;
-        if(!try_get_reference_indices_from_binned_reference_set_v1(binned_reference_set, reference_indices))
+        // extract the references twice (should get the same results)
+        std::vector<std::uint64_t> reference_indices_1;
+        std::vector<std::uint64_t> reference_indices_2;
+        if(!try_get_reference_indices_from_binned_reference_set_v1(binned_reference_set, reference_indices_1))
+            return false;
+        if(!try_get_reference_indices_from_binned_reference_set_v1(binned_reference_set, reference_indices_2))
+            return false;
+
+        if (reference_indices_1 != reference_indices_2)
             return false;
 
         // check the references
-        if (reference_indices.size() != reference_set_size)
+        if (reference_indices_1.size() != reference_set_size)
             return false;
 
         bool found_real{false};
-        for (const std::uint64_t reference_index : reference_indices)
+        for (const std::uint64_t reference_index : reference_indices_1)
         {
             if (reference_index < distribution_min_index)
                 return false;
@@ -948,6 +958,9 @@ TEST(seraphis, binned_reference_set)
         50,
         0)));  //max range, real at bottom
     EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 40000, 127, 8, 128, 40000/2)));  //realistic example
+
+    // intermittently fails if bins are unstably sorted after defining the real element's bin's rotation factor
+    EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 100, 40, 4, 100, 0)));
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, txtype_squashed_v1)
