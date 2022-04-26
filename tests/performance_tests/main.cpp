@@ -217,12 +217,32 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 16x 16, 16x 32
 */
 
-
   /// mock tx performance tests
   SpTxPerfIncrementer incrementer;
   ParamsShuttleSpTx p_seraphis_tx;
   p_seraphis_tx.core_params = p.core_params;
-
+/*
+  /// Looking for membership proof membership error
+  for (std::size_t i{0}; i < 100; ++i)
+  {
+    incrementer = {
+        {1}, //batch sizes
+        {2}, //in counts
+        {2}, //out counts
+        {2}, //decomp n
+        {11} //decomp m limits
+      };
+    while (incrementer.next(p_seraphis_tx))
+    {
+      // only decomp 2^7
+      if (p_seraphis_tx.n == 2 && p_seraphis_tx.m == 11)
+      {
+std::cerr << "TEST #" << i;
+        TEST_PERFORMANCE1(filter, p_seraphis_tx, test_seraphis_tx, sp::SpTxSquashedV1);
+      }
+    }
+  }
+*/
 
   //// TEST SET 3
 

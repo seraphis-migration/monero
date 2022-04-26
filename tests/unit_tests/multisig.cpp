@@ -651,7 +651,9 @@ TEST(multisig, multisig_conversion_msg)
     EXPECT_EQ(recovery_test_msg.get_new_keyshares(), expected_new_keyshares);
     EXPECT_EQ(recovery_test_msg.get_old_keyshares(), expected_old_keyshares);
     if (old_era == new_era)
+    {
       EXPECT_EQ(recovery_test_msg.get_new_keyshares(), recovery_test_msg.get_old_keyshares());
+    }
   };
 
   // test all version combinations

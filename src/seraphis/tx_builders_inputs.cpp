@@ -364,11 +364,11 @@ void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
 
     for (std::size_t ref_index{0}; ref_index < ref_set_size; ++ref_index)
     {
-        if (!found_real &&
-            real_Q == referenced_enotes_squashed[ref_index])  //Q[l]
+        if (real_Q == referenced_enotes_squashed[ref_index])  //Q[l]
         {
             real_spend_index_in_set = ref_index;
             found_real = true;
+            break;
         }
     }
     CHECK_AND_ASSERT_THROW_MES(found_real,
