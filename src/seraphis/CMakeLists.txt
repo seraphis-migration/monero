@@ -42,6 +42,7 @@ set(seraphis_sources
   sp_crypto_utils.cpp
   tx_base.cpp
   tx_binned_reference_set.cpp
+  tx_binned_reference_set_utils.cpp
   tx_builder_types.cpp
   tx_builder_types_multisig.cpp
   tx_builders_inputs.cpp
@@ -52,6 +53,7 @@ set(seraphis_sources
   tx_extra.cpp
   tx_misc_utils.cpp
   tx_record_utils.cpp
+  tx_ref_set_index_mapper_flat.cpp
   tx_validators.cpp
   txtype_squashed_v1.cpp)
 

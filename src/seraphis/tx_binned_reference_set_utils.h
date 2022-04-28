@@ -28,51 +28,54 @@
 
 // NOT FOR PRODUCTION
 
-//paired header
-#include "tx_binned_reference_set.h"
+#pragma once
 
 //local headers
-#include "tx_misc_utils.h"
+#include "ringct/rctTypes.h"
 
 //third party headers
+#include "tx_binned_reference_set.h"
+#include "tx_ref_set_index_mapper.h"
 
 //standard headers
-#include <string>
+#include <cstdint>
+#include <vector>
 
-#undef MONERO_DEFAULT_LOG_CATEGORY
-#define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
+//forward declarations
+
 
 namespace sp
 {
-//-------------------------------------------------------------------------------------------------------------------
-void SpBinnedReferenceSetConfigV1::append_to_string(std::string &str_inout) const
-{
-    // str || bin radius || number of bin members
-    append_uint_to_string(m_bin_radius, str_inout);
-    append_uint_to_string(m_num_bin_members, str_inout);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpReferenceBinV1::append_to_string(std::string &str_inout) const
-{
-    // str || bin locus || bin rotation factor
-    append_uint_to_string(m_bin_locus, str_inout);
-    append_uint_to_string(m_rotation_factor, str_inout);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpBinnedReferenceSetV1::append_to_string(std::string &str_inout) const
-{
-    // str || bin config || bin generator seed || {bins}
-    str_inout.reserve(str_inout.size() + this->get_size_bytes(true) + SpBinnedReferenceSetConfigV1::get_size_bytes());
 
-    // bin config
-    m_bin_config.append_to_string(str_inout);
+//todo
+bool check_bin_config_v1(const std::uint64_t reference_set_size, const SpBinnedReferenceSetConfigV1 &bin_config);
 
-    // bin generator seed
-    str_inout.append(reinterpret_cast<const char*>(m_bin_generator_seed.bytes), sizeof(m_bin_generator_seed));
+//todo
+void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
+    const std::uint64_t reference_set_size,
+    const std::uint64_t real_reference_index,
+    std::vector<std::uint64_t> &bin_loci_out,
+    std::uint64_t &bin_index_with_real_out);
 
-    // bins
-    for (const SpReferenceBinV1 &bin : m_bins)
-        bin.append_to_string(str_inout);
-}
-//-------------------------------------------------------------------------------------------------------------------
+//todo
+//todo: consider making reference sets deterministic from some input secret so repeat reference sets for the same element
+//      can produce the same real bin (given the same generator seed, secret, and index mapper)
+void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config,
+    const rct::key &generator_seed,
+    const std::uint64_t real_reference_index,
+    const std::vector<std::uint64_t> &bin_loci,
+    const std::uint64_t bin_index_with_real,  //index into bin_loci
+    SpBinnedReferenceSetV1 &binned_reference_set_out);
+void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
+    const rct::key &generator_seed,
+    const std::uint64_t reference_set_size,
+    const std::uint64_t real_reference_index,
+    SpBinnedReferenceSetV1 &binned_reference_set_out);
+
+//todo
+bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedReferenceSetV1 &binned_reference_set,
+    std::vector<std::uint64_t> &reference_indices_out);
+
 } //namespace sp

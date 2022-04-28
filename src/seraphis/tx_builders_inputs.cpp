@@ -50,11 +50,13 @@ extern "C"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_binned_reference_set.h"
+#include "tx_binned_reference_set_utils.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_misc_utils.h"
 #include "tx_record_types.h"
 #include "tx_record_utils.h"
+#include "tx_ref_set_index_mapper_flat.h"
 
 //third party headers
 

@@ -28,51 +28,46 @@
 
 // NOT FOR PRODUCTION
 
-//paired header
-#include "tx_binned_reference_set.h"
+#pragma once
 
 //local headers
-#include "tx_misc_utils.h"
 
 //third party headers
 
 //standard headers
-#include <string>
+#include <cstdint>
+#include <vector>
 
-#undef MONERO_DEFAULT_LOG_CATEGORY
-#define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
+//forward declarations
+
 
 namespace sp
 {
-//-------------------------------------------------------------------------------------------------------------------
-void SpBinnedReferenceSetConfigV1::append_to_string(std::string &str_inout) const
-{
-    // str || bin radius || number of bin members
-    append_uint_to_string(m_bin_radius, str_inout);
-    append_uint_to_string(m_num_bin_members, str_inout);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpReferenceBinV1::append_to_string(std::string &str_inout) const
-{
-    // str || bin locus || bin rotation factor
-    append_uint_to_string(m_bin_locus, str_inout);
-    append_uint_to_string(m_rotation_factor, str_inout);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpBinnedReferenceSetV1::append_to_string(std::string &str_inout) const
-{
-    // str || bin config || bin generator seed || {bins}
-    str_inout.reserve(str_inout.size() + this->get_size_bytes(true) + SpBinnedReferenceSetConfigV1::get_size_bytes());
 
-    // bin config
-    m_bin_config.append_to_string(str_inout);
+////
+// SpRefSetIndexMapper
+// - interface for mapping reference set indices between a custom distribution (e.g. uniform over [a, b], a gamma distribution,
+//   etc.) and a uniform space (the range [0, 2^64 - 1])
+// - the original element set (from which the reference set will be selected) exists as a range of indices ([min, max]),
+//   so the mapping function exists as a filter between element-space and uniform space
+// - mapping: [min, max] <-(func)-> [0, 2^64 - 1]
+///
+class SpRefSetIndexMapper
+{
+public:
+//constructors: default
+//destructor
+    virtual ~SpRefSetIndexMapper() = default;
 
-    // bin generator seed
-    str_inout.append(reinterpret_cast<const char*>(m_bin_generator_seed.bytes), sizeof(m_bin_generator_seed));
+//getters
+    virtual std::uint64_t get_distribution_min_index() const = 0;
+    virtual std::uint64_t get_distribution_max_index() const = 0;
 
-    // bins
-    for (const SpReferenceBinV1 &bin : m_bins)
-        bin.append_to_string(str_inout);
-}
-//-------------------------------------------------------------------------------------------------------------------
+//member functions
+    /// [min, max] --(func)-> [0, 2^64 - 1]
+    virtual std::uint64_t element_index_to_uniform_index(const std::uint64_t element_index) const = 0;
+    /// [min, max] <-(func)-- [0, 2^64 - 1]
+    virtual std::uint64_t uniform_index_to_element_index(const std::uint64_t uniform_index) const = 0;
+};
+
 } //namespace sp
