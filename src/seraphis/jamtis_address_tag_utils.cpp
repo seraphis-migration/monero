@@ -135,6 +135,39 @@ static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+void jamtis_address_tag_cipher_context::set_key(const rct::key &cipher_key)
+{
+    Blowfish_Init(&m_blowfish_context, cipher_key.bytes, sizeof(rct::key));
+}
+//-------------------------------------------------------------------------------------------------------------------
+address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j, const address_tag_MAC_t mac) const
+{
+    // concatenate index and MAC
+    address_tag_t addr_tag{address_index_to_tag(j, mac)};
+
+    // wrap the concatenated packet into a Blowfish-compatible format
+    static_assert(sizeof(address_tag_t) == 8, "");
+    Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
+
+    // encrypt the packet
+    Blowfish_Encrypt(&m_blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
+
+    return addr_tag;
+}
+//-------------------------------------------------------------------------------------------------------------------
+address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_tag, address_tag_MAC_t &mac_out) const
+{
+    // wrap the tag into a Blowfish-compatible format
+    static_assert(sizeof(address_tag_t) == 8, "");
+    Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
+
+    // decrypt the tag
+    Blowfish_Decrypt(&m_blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
+
+    // convert to {j, MAC}
+    return address_tag_to_index(addr_tag, mac_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 address_tag_t address_index_to_tag(const address_index_t j,
     const address_tag_MAC_t mac)
 {
@@ -166,24 +199,24 @@ address_index_t address_tag_to_index(const address_tag_t addr_tag,
 //-------------------------------------------------------------------------------------------------------------------
 void prepare_address_tag_cipher(const rct::key &cipher_key, jamtis_address_tag_cipher_context &cipher_context_out)
 {
-    Blowfish_Init(&cipher_context_out.m_blowfish_context, cipher_key.bytes, sizeof(rct::key));
+    /*
+    oaes_set_option(cipher_context_out.m_aes_context);
+
+
+    OAES_API OAES_RET oaes_set_option( OAES_CTX * ctx,
+            OAES_OPTION option, const void * value );
+
+    OAES_RET oaes_key_import( OAES_CTX * ctx,
+        const uint8_t * data, size_t data_len )
+    */
+    cipher_context_out.set_key(cipher_key);
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_tag_t cipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
     const address_index_t j,
     const address_tag_MAC_t mac)
 {
-    // concatenate index and MAC
-    address_tag_t addr_tag{address_index_to_tag(j, mac)};
-
-    // wrap the concatenated packet into a Blowfish-compatible format
-    static_assert(sizeof(address_tag_t) == 8, "");
-    Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
-
-    // encrypt the packet
-    Blowfish_Encrypt(&cipher_context.m_blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
-
-    return addr_tag;
+    return cipher_context.cipher(j, mac);
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_tag_t cipher_address_index(const rct::key &cipher_key,
@@ -202,15 +235,7 @@ address_index_t decipher_address_index_with_context(const jamtis_address_tag_cip
     address_tag_t addr_tag,
     address_tag_MAC_t &mac_out)
 {
-    // wrap the tag into a Blowfish-compatible format
-    static_assert(sizeof(address_tag_t) == 8, "");
-    Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
-
-    // decrypt the tag
-    Blowfish_Decrypt(&cipher_context.m_blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
-
-    // convert to {j, MAC}
-    return address_tag_to_index(addr_tag, mac_out);
+    return cipher_context.decipher(addr_tag, mac_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_index_t decipher_address_index(const rct::key &cipher_key,

@@ -36,6 +36,7 @@
 //local headers
 extern "C"
 {
+#include "crypto/oaes_lib.h"
 #include "crypto/blowfish.h"
 }
 #include "jamtis_support_types.h"
@@ -55,13 +56,33 @@ namespace jamtis
 
 struct jamtis_address_tag_cipher_context
 {
-    BLOWFISH_CTX m_blowfish_context;
+public:
+//constructors
+    /// normal constructor
+    jamtis_address_tag_cipher_context()
+    {
+        //m_aes_context = reinterpret_cast<oaes_ctx*>(oaes_alloc());
+    }
 
+    /// disable copy/move (this is a scoped manager)
+    jamtis_address_tag_cipher_context& operator=(jamtis_address_tag_cipher_context&&) = delete;
+
+//destructor
     ~jamtis_address_tag_cipher_context()
     {
-        // cleanup on destruction
+        //oaes_free(reinterpret_cast<void**>(&m_aes_context));
         memwipe(&m_blowfish_context, sizeof(BLOWFISH_CTX));
     }
+
+//member functions
+    void set_key(const rct::key &cipher_key);
+    address_tag_t cipher(const address_index_t j, const address_tag_MAC_t mac) const;
+    address_index_t decipher(address_tag_t addr_tag, address_tag_MAC_t &mac_out) const;
+
+//member variables
+private:
+    //oaes_ctx *m_aes_context;
+    BLOWFISH_CTX m_blowfish_context;
 };
 
 /// convert {j, mac} to/from an address tag byte-representation
