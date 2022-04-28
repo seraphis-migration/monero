@@ -32,6 +32,7 @@
 #include "jamtis_address_tags.h"
 
 //local headers
+#include "crypto/crypto.h"
 #include "cryptonote_config.h"
 #include "seraphis_config_temp.h"
 extern "C"
@@ -69,21 +70,53 @@ struct Blowfish_LR_wrapper
 };
 
 //-------------------------------------------------------------------------------------------------------------------
+// little-endian swaps
+//-------------------------------------------------------------------------------------------------------------------
+static unsigned char swap_le(const unsigned char x)
+{
+    return x;
+}
+static std::uint16_t swap_le(const std::uint16_t x)
+{
+    return SWAP16LE(x);
+}
+static std::uint32_t swap_le(const std::uint32_t x)
+{
+    return SWAP32LE(x);
+}
+static std::uint64_t swap_le(const std::uint64_t x)
+{
+    return SWAP64LE(x);
+}
+//-------------------------------------------------------------------------------------------------------------------
 // j_canonical = little_endian(j)
 //-------------------------------------------------------------------------------------------------------------------
 static address_index_t address_index_to_canonical(address_index_t j)
 {
-    static_assert(sizeof(address_index_t) == 8, "");
-    return SWAP64LE(j);
+    return swap_le(j);
 }
 //-------------------------------------------------------------------------------------------------------------------
 // j = system_endian(j_canonical)
 //-------------------------------------------------------------------------------------------------------------------
 static address_index_t address_index_from_canonical(address_index_t j_canonical)
 {
-    static_assert(sizeof(address_index_t) == 8, "");
     // on big-endian systems, this makes the result big-endian (since it always starts as little-endian)
-    return SWAP64LE(j_canonical);
+    return swap_le(j_canonical);
+}
+//-------------------------------------------------------------------------------------------------------------------
+// mac_canonical = little_endian(mac)
+//-------------------------------------------------------------------------------------------------------------------
+static address_tag_MAC_t mac_to_canonical(address_tag_MAC_t mac)
+{
+    return swap_le(mac);
+}
+//-------------------------------------------------------------------------------------------------------------------
+// mac = system_endian(mac_canonical)
+//-------------------------------------------------------------------------------------------------------------------
+static address_tag_MAC_t mac_from_canonical(address_tag_MAC_t mac_canonical)
+{
+    // on big-endian systems, this makes the result big-endian (since it always starts as little-endian)
+    return swap_le(mac_canonical);
 }
 //-------------------------------------------------------------------------------------------------------------------
 // encryption_secret = H_8(encryption_key)
@@ -106,11 +139,12 @@ address_tag_t address_index_to_tag(const address_index_t j,
     const address_tag_MAC_t mac)
 {
     const address_index_t j_canonical{address_index_to_canonical(j)};
+    const address_tag_MAC_t mac_canonical{mac_to_canonical(mac)};
 
     // addr_tag = j_canonical || MAC
     address_tag_t addr_tag;
     memcpy(addr_tag.bytes, &j_canonical, ADDRESS_INDEX_BYTES);  //canonical j is little-endian
-    memcpy(addr_tag.bytes + ADDRESS_INDEX_BYTES, &mac, ADDRESS_TAG_MAC_BYTES);
+    memcpy(addr_tag.bytes + ADDRESS_INDEX_BYTES, &mac_canonical, ADDRESS_TAG_MAC_BYTES);
 
     return addr_tag;
 }
@@ -123,11 +157,19 @@ address_index_t address_tag_to_index(const address_tag_t addr_tag,
     memcpy(&j_canonical, addr_tag.bytes, ADDRESS_INDEX_BYTES);
     memcpy(&mac_out, addr_tag.bytes + ADDRESS_INDEX_BYTES, ADDRESS_TAG_MAC_BYTES);
 
+    // mac - system_endian(mac_canonical)
+    mac_out = mac_from_canonical(mac_out);
+
     // j = system_endian(j_canonical)
     return address_index_from_canonical(j_canonical);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_t cipher_address_index_with_context(const BLOWFISH_CTX &blowfish_context,
+void prepare_address_tag_cipher(const rct::key &cipher_key, jamtis_address_tag_cipher_context &cipher_context_out)
+{
+    Blowfish_Init(&cipher_context_out.m_blowfish_context, cipher_key.bytes, sizeof(rct::key));
+}
+//-------------------------------------------------------------------------------------------------------------------
+address_tag_t cipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
     const address_index_t j,
     const address_tag_MAC_t mac)
 {
@@ -139,7 +181,7 @@ address_tag_t cipher_address_index_with_context(const BLOWFISH_CTX &blowfish_con
     Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
 
     // encrypt the packet
-    Blowfish_Encrypt(&blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
+    Blowfish_Encrypt(&cipher_context.m_blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
 
     return addr_tag;
 }
@@ -149,15 +191,14 @@ address_tag_t cipher_address_index(const rct::key &cipher_key,
     const address_tag_MAC_t mac)
 {
     // prepare to encrypt the index and MAC
-    BLOWFISH_CTX blowfish_context;
-    auto bfc_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&blowfish_context, sizeof(BLOWFISH_CTX)); });
-    Blowfish_Init(&blowfish_context, cipher_key.bytes, sizeof(rct::key));
+    jamtis_address_tag_cipher_context cipher_context;
+    prepare_address_tag_cipher(cipher_key, cipher_context);
 
     // encrypt it
-    return cipher_address_index_with_context(blowfish_context, j, mac);
+    return cipher_address_index_with_context(cipher_context, j, mac);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_index_t decipher_address_index_with_context(const BLOWFISH_CTX &blowfish_context,
+address_index_t decipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
     address_tag_t addr_tag,
     address_tag_MAC_t &mac_out)
 {
@@ -166,7 +207,7 @@ address_index_t decipher_address_index_with_context(const BLOWFISH_CTX &blowfish
     Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
 
     // decrypt the tag
-    Blowfish_Decrypt(&blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
+    Blowfish_Decrypt(&cipher_context.m_blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
 
     // convert to {j, MAC}
     return address_tag_to_index(addr_tag, mac_out);
@@ -177,12 +218,11 @@ address_index_t decipher_address_index(const rct::key &cipher_key,
     address_tag_MAC_t &mac_out)
 {
     // prepare to decrypt the tag
-    BLOWFISH_CTX blowfish_context;
-    auto bfc_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&blowfish_context, sizeof(BLOWFISH_CTX)); });
-    Blowfish_Init(&blowfish_context, cipher_key.bytes, sizeof(rct::key));
+    jamtis_address_tag_cipher_context cipher_context;
+    prepare_address_tag_cipher(cipher_key, cipher_context);
 
     // decrypt it
-    return decipher_address_index_with_context(blowfish_context, addr_tag, mac_out);
+    return decipher_address_index_with_context(cipher_context, addr_tag, mac_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key,
@@ -197,6 +237,11 @@ address_tag_t decrypt_address_tag(const rct::key &encryption_key,
 {
     // addr_tag = addr_tag_enc XOR_8 encryption_secret
     return addr_tag_enc ^ get_encrypted_address_tag_secret(encryption_key);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void gen_address_tag(address_tag_t &addr_tag_inout)
+{
+    crypto::rand(sizeof(address_tag_t), reinterpret_cast<unsigned char*>(&addr_tag_inout));
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

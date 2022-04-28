@@ -119,6 +119,15 @@ int main(int argc, char** argv)
   timer.start();
 
 
+  // test client-side scanning in a seraphis remote-scanning workflow
+  ParamsShuttleScannerClient p_client_scan;
+  p_client_scan.core_params = p.core_params;
+  p_client_scan.mode = ScannerClientModes::ALL_FAKE;
+  TEST_PERFORMANCE0(filter, p_client_scan, test_remote_scanner_client_scan_sp);
+  p_client_scan.mode = ScannerClientModes::ONE_FAKE_TAG_MATCH;
+  TEST_PERFORMANCE0(filter, p_client_scan, test_remote_scanner_client_scan_sp);
+  p_client_scan.mode = ScannerClientModes::ONE_OWNED;
+  TEST_PERFORMANCE0(filter, p_client_scan, test_remote_scanner_client_scan_sp);
 
   // test blowfish performance for single blocks
   TEST_PERFORMANCE0(filter, p, test_blowfish_address_id);

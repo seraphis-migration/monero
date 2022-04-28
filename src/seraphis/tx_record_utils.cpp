@@ -98,7 +98,7 @@ static void make_seraphis_key_image_helper(const rct::key &wallet_spend_pubkey,
 static bool try_get_intermediate_enote_record_info_v1_helper(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
-    const crypto::secret_key &s_cipher_tag,
+    const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     jamtis::address_index_t &address_index_out,
     rct::xmr_amount &amount_out,
     crypto::secret_key &amount_blinding_factor_out)
@@ -107,8 +107,9 @@ static bool try_get_intermediate_enote_record_info_v1_helper(const SpBasicEnoteR
 
     // j
     jamtis::address_tag_MAC_t enote_tag_mac;
-    address_index_out =
-        jamtis::decipher_address_index(rct::sk2rct(s_cipher_tag), basic_record.m_nominal_address_tag, enote_tag_mac);
+    address_index_out = jamtis::decipher_address_index_with_context(cipher_context,
+        basic_record.m_nominal_address_tag,
+        enote_tag_mac);
 
     // check if deciphering j succeeded
     if (enote_tag_mac != 0)
@@ -209,7 +210,7 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
 bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
-    const crypto::secret_key &s_cipher_tag,
+    const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     SpIntermediateEnoteRecordV1 &record_out)
 {
     // get intermediate enote record
@@ -218,7 +219,7 @@ bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_reco
     if (!try_get_intermediate_enote_record_info_v1_helper(basic_record,
             wallet_spend_pubkey,
             s_generate_address,
-            s_cipher_tag,
+            cipher_context,
             record_out.m_address_index,
             record_out.m_amount,
             record_out.m_amount_blinding_factor))
@@ -237,14 +238,17 @@ bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_reco
     const crypto::secret_key &s_generate_address,
     SpIntermediateEnoteRecordV1 &record_out)
 {
-    // make cipher-tag secret then get intermediate enote record
+    // make blowfish context then get intermediate enote record
     crypto::secret_key s_cipher_tag;
     jamtis::make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
+
+    jamtis::jamtis_address_tag_cipher_context cipher_context;
+    prepare_address_tag_cipher(rct::sk2rct(s_cipher_tag), cipher_context);
 
     return try_get_intermediate_enote_record_v1(basic_record,
         wallet_spend_pubkey,
         s_generate_address,
-        s_cipher_tag,
+        cipher_context,
         record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -271,7 +275,7 @@ bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &s_generate_address,
-    const crypto::secret_key &s_cipher_tag,
+    const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     SpEnoteRecordV1 &record_out)
 {
     // get enote record
@@ -280,7 +284,7 @@ bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     if (!try_get_intermediate_enote_record_info_v1_helper(basic_record,
             wallet_spend_pubkey,
             s_generate_address,
-            s_cipher_tag,
+            cipher_context,
             record_out.m_address_index,
             record_out.m_amount,
             record_out.m_amount_blinding_factor))
@@ -314,11 +318,14 @@ bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
     jamtis::make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
 
+    jamtis::jamtis_address_tag_cipher_context cipher_context;
+    prepare_address_tag_cipher(rct::sk2rct(s_cipher_tag), cipher_context);
+
     return try_get_enote_record_v1_plain(basic_record,
         wallet_spend_pubkey,
         k_view_balance,
         s_generate_address,
-        s_cipher_tag,
+        cipher_context,
         record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------

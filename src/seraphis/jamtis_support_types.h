@@ -46,13 +46,13 @@ namespace sp
 namespace jamtis
 {
 
-/// index (system-endian; only 56 bits are used): j
+/// index (system-endian; only a portion of the bits are used): j
 using address_index_t = std::uint64_t;
 constexpr std::size_t ADDRESS_INDEX_BYTES{7};
-constexpr address_index_t MAX_ADDRESS_INDEX{(address_index_t{1} << 8*ADDRESS_INDEX_BYTES) - 1};  //2^56 - 1
+constexpr address_index_t MAX_ADDRESS_INDEX{(address_index_t{1} << 8*ADDRESS_INDEX_BYTES) - 1};
 
 /// MAC for address tags (system-endian): addr_tag_MAC
-constexpr std::size_t ADDRESS_TAG_MAC_BYTES{1};  //if > 1, then endianness must be preserved
+constexpr std::size_t ADDRESS_TAG_MAC_BYTES{1};
 using address_tag_MAC_t = unsigned char;
 
 /// index ciphered with view-balance key: addr_tag = enc[k_vb](little_endian(j) || little_endian(addr_tag_MAC))

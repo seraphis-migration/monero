@@ -37,14 +37,24 @@ extern "C"
 #include "device/device.hpp"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "seraphis/jamtis_address_tags.h"
+#include "seraphis/jamtis_core_utils.h"
 #include "seraphis/jamtis_destination.h"
 #include "seraphis/jamtis_enote_utils.h"
 #include "seraphis/jamtis_payment_proposal.h"
+#include "seraphis/jamtis_support_types.h"
 #include "seraphis/sp_core_enote_utils.h"
+#include "seraphis/sp_crypto_utils.h"
 #include "seraphis/tx_builder_types.h"
 #include "seraphis/tx_component_types.h"
+#include "seraphis/tx_misc_utils.h"
+#include "seraphis/tx_record_types.h"
+#include "seraphis/tx_record_utils.h"
 #include "performance_tests.h"
 
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
 /// cryptonote view key scanning
 class test_view_scan_cn
@@ -87,6 +97,9 @@ private:
     crypto::public_key m_onetime_address;
 };
 
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
 ////
 // cryptonote view key scanning using optimized crypto library
@@ -134,12 +147,40 @@ private:
     crypto::public_key m_onetime_address;
 };
 
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
 /// seraphis view key scanning
 struct ParamsShuttleViewScan final : public ParamsShuttle
 {
     bool test_view_tag_check{false};
 };
+
+struct jamtis_keys
+{
+    crypto::secret_key k_m;   //master
+    crypto::secret_key k_vb;  //view-balance
+    crypto::secret_key k_fr;  //find-received
+    crypto::secret_key s_ga;  //generate-address
+    crypto::secret_key s_ct;  //cipher-tag
+    rct::key K_1_base;        //wallet spend base
+    rct::key K_fr;            //find-received pubkey
+};
+
+inline void make_jamtis_keys(jamtis_keys &keys_out)
+{
+    using namespace sp;
+    using namespace jamtis;
+
+    keys_out.k_m = rct::rct2sk(rct::skGen());
+    keys_out.k_vb = rct::rct2sk(rct::skGen());
+    sp::jamtis::make_jamtis_findreceived_key(keys_out.k_vb, keys_out.k_fr);
+    sp::jamtis::make_jamtis_generateaddress_secret(keys_out.k_vb, keys_out.s_ga);
+    sp::jamtis::make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
+    sp::make_seraphis_spendkey(keys_out.k_vb, keys_out.k_m, keys_out.K_1_base);
+    rct::scalarmultBase(keys_out.K_fr, rct::sk2rct(keys_out.k_fr));
+}
 
 class test_view_scan_sp
 {
@@ -150,29 +191,27 @@ public:
     {
         m_test_view_tag_check = params.test_view_tag_check;
 
-        // user wallet keys (incomplete set)
-        rct::key wallet_spend_pubkey{rct::pkGen()};
-        crypto::secret_key s_generate_address{rct::rct2sk(rct::skGen())};
-        m_recipient_findreceived_key = rct::rct2sk(rct::skGen());
-        rct::key findreceived_pubkey{rct::scalarmultBase(rct::sk2rct(m_recipient_findreceived_key))};
+        // user wallet keys
+        make_jamtis_keys(m_keys);
 
         // user address
         sp::jamtis::JamtisDestinationV1 user_address;
+        sp::jamtis::address_index_t j{0}; //address 0
 
-        sp::jamtis::make_jamtis_destination_v1(wallet_spend_pubkey,
-            findreceived_pubkey,
-            s_generate_address,
-            0, //address 0
+        sp::jamtis::make_jamtis_destination_v1(m_keys.K_1_base,
+            m_keys.K_fr,
+            m_keys.s_ga,
+            j,
             user_address);
 
         m_recipient_spend_key = user_address.m_addr_K1;
 
         // make enote paying to address
         crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
-        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, 0, enote_privkey};
+        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, j, enote_privkey};
         sp::SpOutputProposalV1 output_proposal;
         payment_proposal.get_output_proposal_v1(output_proposal);
-        m_enote_pubkey = output_proposal.m_enote_ephemeral_pubkey;
+        m_enote_ephemeral_pubkey = output_proposal.m_enote_ephemeral_pubkey;
         output_proposal.get_enote_v1(m_enote);
 
         // invalidate view tag to test the performance of short-circuiting on failed view tags
@@ -184,43 +223,33 @@ public:
 
     bool test()
     {
-        rct::key sender_receiver_secret_dummy;
-        crypto::key_derivation derivation;
-
-        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_pubkey),
-            m_recipient_findreceived_key,
-            derivation);
-
-        rct::key nominal_recipient_spendkey;
-
-        if (!sp::jamtis::try_get_jamtis_nominal_spend_key_plain(derivation,
-            m_enote.m_core.m_onetime_address,
-            m_enote.m_view_tag,
-            sender_receiver_secret_dummy,  //outparam not used
-            nominal_recipient_spendkey))
-        {
+        sp::SpBasicEnoteRecordV1 basic_enote_record;
+        if (!sp::try_get_basic_enote_record_v1(m_enote,
+                m_enote_ephemeral_pubkey,
+                m_keys.k_fr,
+                m_hwdev,
+                basic_enote_record))
             return m_test_view_tag_check;  // this branch is only valid if trying to trigger view tag check
-        }
 
-        memwipe(&sender_receiver_secret_dummy, sizeof(rct::key));
-        memwipe(&derivation, sizeof(derivation));
-
-        return nominal_recipient_spendkey == m_recipient_spend_key;
+        return basic_enote_record.m_nominal_spend_key == m_recipient_spend_key;
     }
 
 private:
+    hw::device &m_hwdev{hw::get_device("default")};
+    jamtis_keys m_keys;
     rct::key m_recipient_spend_key;
-    crypto::secret_key m_recipient_findreceived_key;
 
     sp::SpEnoteV1 m_enote;
-    rct::key m_enote_pubkey;
+    rct::key m_enote_ephemeral_pubkey;
 
     bool m_test_view_tag_check;
 };
 
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
-
-void domain_separate_derivation_hash_siphash(const std::string &domain_separator,
+inline void domain_separate_derivation_hash_siphash(const std::string &domain_separator,
     const crypto::key_derivation &derivation,
     rct::key &hash_result_out)
 {
@@ -240,7 +269,7 @@ void domain_separate_derivation_hash_siphash(const std::string &domain_separator
     memwipe(siphash_key, 16);
 }
 
-unsigned char make_seraphis_view_tag_siphash(const crypto::key_derivation &sender_receiver_DH_derivation)
+inline unsigned char make_seraphis_view_tag_siphash(const crypto::key_derivation &sender_receiver_DH_derivation)
 {
     static std::string salt{config::HASH_KEY_JAMTIS_VIEW_TAG};
 
@@ -254,7 +283,7 @@ unsigned char make_seraphis_view_tag_siphash(const crypto::key_derivation &sende
     return static_cast<unsigned char>(view_tag_scalar.bytes[0]);
 }
 
-unsigned char make_seraphis_view_tag_siphash(const crypto::secret_key &privkey,
+inline unsigned char make_seraphis_view_tag_siphash(const crypto::secret_key &privkey,
     const rct::key &DH_key,
     hw::device &hwdev)
 {
@@ -270,7 +299,7 @@ unsigned char make_seraphis_view_tag_siphash(const crypto::secret_key &privkey,
     return view_tag;
 }
 
-bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_derivation &sender_receiver_DH_derivation,
+inline bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_derivation &sender_receiver_DH_derivation,
     const rct::key &onetime_address,
     const unsigned char view_tag,
     rct::key &sender_receiver_secret_out,
@@ -328,7 +357,7 @@ public:
         sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, 0, enote_privkey};
         sp::SpOutputProposalV1 output_proposal;
         payment_proposal.get_output_proposal_v1(output_proposal);
-        m_enote_pubkey = output_proposal.m_enote_ephemeral_pubkey;
+        m_enote_ephemeral_pubkey = output_proposal.m_enote_ephemeral_pubkey;
         output_proposal.get_enote_v1(m_enote);
 
         // kludge: use siphash to make view tag
@@ -346,7 +375,7 @@ public:
         rct::key sender_receiver_secret_dummy;
         crypto::key_derivation derivation;
 
-        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_pubkey), m_recipient_findreceived_key, derivation);
+        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_ephemeral_pubkey), m_recipient_findreceived_key, derivation);
 
         rct::key nominal_recipient_spendkey;
 
@@ -370,12 +399,12 @@ private:
     crypto::secret_key m_recipient_findreceived_key;
 
     sp::SpEnoteV1 m_enote;
-    rct::key m_enote_pubkey;
+    rct::key m_enote_ephemeral_pubkey;
 };
 
-
-
-
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
 ////
 // Plain perf test of hash functions eligible for making view tags
@@ -383,10 +412,15 @@ private:
 // - siphash
 // - blake2b
 ///
+
 struct ParamsShuttleViewHash final : public ParamsShuttle
 {
     std::string domain_separator;
 };
+
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
 
 class test_view_scan_hash_siphash
@@ -438,6 +472,9 @@ private:
     std::string m_domain_separator;
 };
 
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
 class test_view_scan_hash_halfsiphash
 {
@@ -492,6 +529,10 @@ private:
     std::string m_domain_separator;
 };
 
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+
 class test_view_scan_hash_cnhash
 {
 public:
@@ -543,6 +584,9 @@ private:
     std::string m_domain_separator;
 };
 
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
 
 class test_view_scan_hash_b2bhash
 {
@@ -594,3 +638,149 @@ private:
     crypto::key_derivation m_derivation;
     std::string m_domain_separator;
 };
+
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+
+// performance of the client of a remote scanning service
+// - takes a 'basic' enote record and tries to get a 'full record' out of it
+enum class ScannerClientModes
+{
+    ALL_FAKE,
+    ONE_FAKE_TAG_MATCH,
+    ONE_OWNED
+};
+
+struct ParamsShuttleScannerClient final : public ParamsShuttle
+{
+    ScannerClientModes mode;
+};
+
+class test_remote_scanner_client_scan_sp
+{
+public:
+    static const size_t num_records = sp::ref_set_size_from_decomp(2, sp::jamtis::ADDRESS_TAG_MAC_BYTES * 8);
+    static const size_t loop_count = 256000 / num_records + 20;
+
+    bool init(const ParamsShuttleScannerClient &params)
+    {
+        m_mode = params.mode;
+
+        // make enote basic records for 1/(num bits in address tag mac) success rate
+        m_basic_records.reserve(num_records);
+
+        // user wallet keys
+        make_jamtis_keys(m_keys);
+
+        // user address
+        sp::jamtis::JamtisDestinationV1 user_address;
+        m_real_address_index = sp::jamtis::address_index_t{0}; //address 0
+
+        sp::jamtis::make_jamtis_destination_v1(m_keys.K_1_base,
+            m_keys.K_fr,
+            m_keys.s_ga,
+            m_real_address_index,
+            user_address);
+
+        // prepare cipher context for the test
+        prepare_address_tag_cipher(rct::sk2rct(m_keys.s_ct), m_cipher_context);
+
+        // make enote paying to address
+        crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
+        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, m_real_address_index, enote_privkey};
+        sp::SpOutputProposalV1 output_proposal;
+        payment_proposal.get_output_proposal_v1(output_proposal);
+        sp::SpEnoteV1 real_enote;
+        output_proposal.get_enote_v1(real_enote);
+
+        // convert to basic enote record (just use a bunch of copies of this)
+        sp::SpBasicEnoteRecordV1 basic_record;
+        if (!sp::try_get_basic_enote_record_v1(real_enote,
+                output_proposal.m_enote_ephemeral_pubkey,
+                m_keys.k_fr,
+                hw::get_device("default"),
+                basic_record))
+            return false;
+
+        // make a pile of basic records
+        // - only the last basic record should succeed
+        sp::SpEnoteRecordV1 enote_record_dummy;
+
+        for (std::size_t record_index{0}; record_index < num_records; ++record_index)
+        {
+            m_basic_records.emplace_back(basic_record);
+
+            // ONE_OWNED: don't do anything else if we are on the last record
+            if (m_mode == ScannerClientModes::ONE_OWNED &&
+                record_index == num_records - 1)
+                continue;
+
+            // ONE_FAKE_TAG_MATCH: mangle the nominal spendkey if we are the last record (don't modify the address tag)
+            if (m_mode == ScannerClientModes::ONE_FAKE_TAG_MATCH &&
+                record_index == num_records - 1)
+            {
+                m_basic_records.back().m_nominal_spend_key = rct::pkGen();
+                continue;
+            }
+
+            // mangle the address tag
+            // - re-do the fake ones if they succeed by accident
+            sp::jamtis::address_tag_MAC_t enote_tag_mac;
+            do
+            {
+                sp::jamtis::gen_address_tag(m_basic_records.back().m_nominal_address_tag);
+
+                // j
+                (void) sp::jamtis::decipher_address_index_with_context(m_cipher_context,
+                    m_basic_records.back().m_nominal_address_tag,
+                    enote_tag_mac);
+            } while(enote_tag_mac == 0);
+        }
+
+        return true;
+    }
+
+    bool test()
+    {
+        sp::SpEnoteRecordV1 enote_record;
+
+        for (std::size_t record_index{0}; record_index <  m_basic_records.size(); ++record_index)
+        {
+            const bool result{
+                    try_get_enote_record_v1_plain(m_basic_records[record_index],
+                        m_keys.K_1_base,
+                        m_keys.k_vb,
+                        m_keys.s_ga,
+                        m_cipher_context,
+                        enote_record)
+                };
+
+            // only the last record of mode ONE_OWNED should succeed
+            if (result &&
+                m_mode == ScannerClientModes::ONE_OWNED &&
+                record_index == m_basic_records.size() - 1)
+            {
+                return enote_record.m_address_index == m_real_address_index;  //should have succeeded
+            }
+            else if (result)
+                return false;
+        }
+
+        return true;
+    }
+
+private:
+    ScannerClientModes m_mode;
+
+    jamtis_keys m_keys;
+    sp::jamtis::jamtis_address_tag_cipher_context m_cipher_context;
+
+    sp::jamtis::address_index_t m_real_address_index;
+
+    std::vector<sp::SpBasicEnoteRecordV1> m_basic_records;
+};
+
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------

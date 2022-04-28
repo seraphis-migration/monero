@@ -35,6 +35,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "device/device.hpp"
+#include "jamtis_address_tags.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
@@ -75,14 +76,14 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
 * param: basic_record -
 * param: wallet_spend_pubkey -
 * param: s_generate_address -
-* param: s_cipher_tag -
+* param: cipher_context -
 * outparam: record_out -
 * return: true if an extraction succeeded
 */
 bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
-    const crypto::secret_key &s_cipher_tag,
+    const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     SpIntermediateEnoteRecordV1 &record_out);
 bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
@@ -100,7 +101,7 @@ bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
 * param: s_generate_address -
-* param: s_cipher_tag -
+* param: cipher_context -
 * outparam: record_out -
 * return: true if an extraction succeeded
 */
@@ -108,7 +109,7 @@ bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &s_generate_address,
-    const crypto::secret_key &s_cipher_tag,
+    const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     SpEnoteRecordV1 &record_out);
 bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,

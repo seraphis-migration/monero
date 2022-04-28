@@ -53,22 +53,36 @@ namespace sp
 namespace jamtis
 {
 
+struct jamtis_address_tag_cipher_context
+{
+    BLOWFISH_CTX m_blowfish_context;
+
+    ~jamtis_address_tag_cipher_context()
+    {
+        // cleanup on destruction
+        memwipe(&m_blowfish_context, sizeof(BLOWFISH_CTX));
+    }
+};
+
 /// convert {j, mac} to/from an address tag byte-representation
 address_tag_t address_index_to_tag(const address_index_t j,
     const address_tag_MAC_t mac);
 address_index_t address_tag_to_index(const address_tag_t addr_tag,
     address_tag_MAC_t &mac_out);
 
-/// blowfish[k](j || addr_tag_MAC) -> addr_tag
-address_tag_t cipher_address_index_with_context(const BLOWFISH_CTX &blowfish_context,
+/// cipher init with cipher key
+void prepare_address_tag_cipher(const rct::key &cipher_key, jamtis_address_tag_cipher_context &cipher_context_out);
+
+/// cipher[k](j || addr_tag_MAC) -> addr_tag
+address_tag_t cipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
     const address_index_t j,
     const address_tag_MAC_t mac);
 address_tag_t cipher_address_index(const rct::key &cipher_key,
     const address_index_t j,
     const address_tag_MAC_t mac);
 
-/// blowfish_decrypt[k](addr_tag) -> {j, addr_tag_MAC}
-address_index_t decipher_address_index_with_context(const BLOWFISH_CTX &blowfish_context,
+/// cipher_decrypt[k](addr_tag) -> {j, addr_tag_MAC}
+address_index_t decipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
     address_tag_t addr_tag,
     address_tag_MAC_t &mac_out);
 address_index_t decipher_address_index(const rct::key &cipher_key,
@@ -82,6 +96,9 @@ encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key,
 /// addr_tag = addr_tag_enc XOR addr_tag_enc_secret
 address_tag_t decrypt_address_tag(const rct::key &encryption_key,
     const encrypted_address_tag_t addr_tag_enc);
+
+/// generate a random tag
+void gen_address_tag(address_tag_t &addr_tag_inout);
 
 } //namespace jamtis
 } //namespace sp
