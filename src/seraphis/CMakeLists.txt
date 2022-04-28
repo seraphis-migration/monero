@@ -28,7 +28,7 @@
 
 set(seraphis_sources
   concise_grootle.cpp
-  jamtis_address_tags.cpp
+  jamtis_address_tag_utils.cpp
   jamtis_address_utils.cpp
   jamtis_core_utils.cpp
   jamtis_destination.cpp

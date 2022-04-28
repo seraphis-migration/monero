@@ -39,7 +39,7 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "device/device.hpp"
-#include "jamtis_address_tags.h"
+#include "jamtis_address_tag_utils.h"
 #include "jamtis_address_utils.h"
 #include "jamtis_core_utils.h"
 #include "jamtis_enote_utils.h"

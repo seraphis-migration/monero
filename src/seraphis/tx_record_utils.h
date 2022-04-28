@@ -35,7 +35,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "device/device.hpp"
-#include "jamtis_address_tags.h"
+#include "jamtis_address_tag_utils.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"

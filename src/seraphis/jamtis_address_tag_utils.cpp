@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "jamtis_address_tags.h"
+#include "jamtis_address_tag_utils.h"
 
 //local headers
 #include "crypto/crypto.h"

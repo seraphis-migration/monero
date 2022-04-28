@@ -33,7 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "jamtis_address_tags.h"
+#include "jamtis_address_tag_utils.h"
 #include "jamtis_address_utils.h"
 #include "jamtis_core_utils.h"
 #include "jamtis_support_types.h"
