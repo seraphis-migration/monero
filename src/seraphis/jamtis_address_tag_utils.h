@@ -59,9 +59,20 @@ struct jamtis_address_tag_cipher_context
 public:
 //constructors
     /// normal constructor
-    jamtis_address_tag_cipher_context()
+    jamtis_address_tag_cipher_context(const rct::key &cipher_key)
     {
         //m_aes_context = reinterpret_cast<oaes_ctx*>(oaes_alloc());
+        /*
+        oaes_set_option(cipher_context_out.m_aes_context);
+
+
+        OAES_API OAES_RET oaes_set_option( OAES_CTX * ctx,
+                OAES_OPTION option, const void * value );
+
+        OAES_RET oaes_key_import( OAES_CTX * ctx,
+            const uint8_t * data, size_t data_len )
+        */
+        Blowfish_Init(&m_blowfish_context, cipher_key.bytes, sizeof(rct::key));
     }
 
     /// disable copy/move (this is a scoped manager)
@@ -75,7 +86,6 @@ public:
     }
 
 //member functions
-    void set_key(const rct::key &cipher_key);
     address_tag_t cipher(const address_index_t j, const address_tag_MAC_t mac) const;
     address_index_t decipher(address_tag_t addr_tag, address_tag_MAC_t &mac_out) const;
 
@@ -90,9 +100,6 @@ address_tag_t address_index_to_tag(const address_index_t j,
     const address_tag_MAC_t mac);
 address_index_t address_tag_to_index(const address_tag_t addr_tag,
     address_tag_MAC_t &mac_out);
-
-/// cipher init with cipher key
-void prepare_address_tag_cipher(const rct::key &cipher_key, jamtis_address_tag_cipher_context &cipher_context_out);
 
 /// cipher[k](j || addr_tag_MAC) -> addr_tag
 address_tag_t cipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,

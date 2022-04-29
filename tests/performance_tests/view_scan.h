@@ -684,7 +684,7 @@ public:
             user_address);
 
         // prepare cipher context for the test
-        prepare_address_tag_cipher(rct::sk2rct(m_keys.s_ct), m_cipher_context);
+        m_cipher_context = std::make_shared<sp::jamtis::jamtis_address_tag_cipher_context>(rct::sk2rct(m_keys.s_ct));
 
         // make enote paying to address
         crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
@@ -732,7 +732,7 @@ public:
                 sp::jamtis::gen_address_tag(m_basic_records.back().m_nominal_address_tag);
 
                 // j
-                (void) sp::jamtis::decipher_address_index_with_context(m_cipher_context,
+                (void) sp::jamtis::decipher_address_index_with_context(*m_cipher_context,
                     m_basic_records.back().m_nominal_address_tag,
                     enote_tag_mac);
             } while(enote_tag_mac == 0);
@@ -743,6 +743,10 @@ public:
 
     bool test()
     {
+        // sanity check
+        if (!m_cipher_context)
+            return false;
+
         sp::SpEnoteRecordV1 enote_record;
 
         for (std::size_t record_index{0}; record_index <  m_basic_records.size(); ++record_index)
@@ -752,7 +756,7 @@ public:
                         m_keys.K_1_base,
                         m_keys.k_vb,
                         m_keys.s_ga,
-                        m_cipher_context,
+                        *m_cipher_context,
                         enote_record)
                 };
 
@@ -774,7 +778,7 @@ private:
     ScannerClientModes m_mode;
 
     jamtis_keys m_keys;
-    sp::jamtis::jamtis_address_tag_cipher_context m_cipher_context;
+    std::shared_ptr<sp::jamtis::jamtis_address_tag_cipher_context> m_cipher_context;
 
     sp::jamtis::address_index_t m_real_address_index;
 

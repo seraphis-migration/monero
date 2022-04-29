@@ -135,11 +135,6 @@ static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-void jamtis_address_tag_cipher_context::set_key(const rct::key &cipher_key)
-{
-    Blowfish_Init(&m_blowfish_context, cipher_key.bytes, sizeof(rct::key));
-}
-//-------------------------------------------------------------------------------------------------------------------
 address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j, const address_tag_MAC_t mac) const
 {
     // concatenate index and MAC
@@ -197,21 +192,6 @@ address_index_t address_tag_to_index(const address_tag_t addr_tag,
     return address_index_from_canonical(j_canonical);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void prepare_address_tag_cipher(const rct::key &cipher_key, jamtis_address_tag_cipher_context &cipher_context_out)
-{
-    /*
-    oaes_set_option(cipher_context_out.m_aes_context);
-
-
-    OAES_API OAES_RET oaes_set_option( OAES_CTX * ctx,
-            OAES_OPTION option, const void * value );
-
-    OAES_RET oaes_key_import( OAES_CTX * ctx,
-        const uint8_t * data, size_t data_len )
-    */
-    cipher_context_out.set_key(cipher_key);
-}
-//-------------------------------------------------------------------------------------------------------------------
 address_tag_t cipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
     const address_index_t j,
     const address_tag_MAC_t mac)
@@ -224,8 +204,7 @@ address_tag_t cipher_address_index(const rct::key &cipher_key,
     const address_tag_MAC_t mac)
 {
     // prepare to encrypt the index and MAC
-    jamtis_address_tag_cipher_context cipher_context;
-    prepare_address_tag_cipher(cipher_key, cipher_context);
+    const jamtis_address_tag_cipher_context cipher_context{cipher_key};
 
     // encrypt it
     return cipher_address_index_with_context(cipher_context, j, mac);
@@ -243,8 +222,7 @@ address_index_t decipher_address_index(const rct::key &cipher_key,
     address_tag_MAC_t &mac_out)
 {
     // prepare to decrypt the tag
-    jamtis_address_tag_cipher_context cipher_context;
-    prepare_address_tag_cipher(cipher_key, cipher_context);
+    const jamtis_address_tag_cipher_context cipher_context{cipher_key};
 
     // decrypt it
     return decipher_address_index_with_context(cipher_context, addr_tag, mac_out);

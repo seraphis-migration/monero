@@ -242,8 +242,7 @@ bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_reco
     crypto::secret_key s_cipher_tag;
     jamtis::make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
 
-    jamtis::jamtis_address_tag_cipher_context cipher_context;
-    prepare_address_tag_cipher(rct::sk2rct(s_cipher_tag), cipher_context);
+    const jamtis::jamtis_address_tag_cipher_context cipher_context{rct::sk2rct(s_cipher_tag)};
 
     return try_get_intermediate_enote_record_v1(basic_record,
         wallet_spend_pubkey,
@@ -318,8 +317,7 @@ bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
     jamtis::make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
 
-    jamtis::jamtis_address_tag_cipher_context cipher_context;
-    prepare_address_tag_cipher(rct::sk2rct(s_cipher_tag), cipher_context);
+    const jamtis::jamtis_address_tag_cipher_context cipher_context{rct::sk2rct(s_cipher_tag)};
 
     return try_get_enote_record_v1_plain(basic_record,
         wallet_spend_pubkey,
