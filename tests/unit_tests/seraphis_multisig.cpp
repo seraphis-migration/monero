@@ -316,7 +316,8 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     /// 2) fund the multisig address
 
     // a) make a user address to receive funds
-    const address_index_t j{crypto::rand_idx(MAX_ADDRESS_INDEX)};
+    address_index_t j;
+    j.gen();
     JamtisDestinationV1 user_address;
 
     ASSERT_NO_THROW(make_jamtis_destination_v1(keys.K_1_base,

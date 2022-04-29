@@ -36,7 +36,7 @@
 //local headers
 extern "C"
 {
-#include "crypto/oaes_lib.h"
+//#include "crypto/oaes_lib.h"
 #include "crypto/blowfish.h"
 }
 #include "jamtis_support_types.h"
@@ -54,6 +54,7 @@ namespace sp
 namespace jamtis
 {
 
+/// cipher context for making address tags
 struct jamtis_address_tag_cipher_context
 {
 public:
@@ -61,16 +62,11 @@ public:
     /// normal constructor
     jamtis_address_tag_cipher_context(const rct::key &cipher_key)
     {
-        //m_aes_context = reinterpret_cast<oaes_ctx*>(oaes_alloc());
         /*
-        oaes_set_option(cipher_context_out.m_aes_context);
-
-
-        OAES_API OAES_RET oaes_set_option( OAES_CTX * ctx,
-                OAES_OPTION option, const void * value );
-
-        OAES_RET oaes_key_import( OAES_CTX * ctx,
-            const uint8_t * data, size_t data_len )
+        // use ECB mode for address tags (only one main block + MAC)
+        m_aes_context = reinterpret_cast<oaes_ctx*>(oaes_alloc());
+        oaes_set_option(m_aes_context, OAES_OPTION_ECB, std::nullptr);
+        oaes_key_import_data(m_aes_context, cipher_key.data, sizeof(rct::key));
         */
         Blowfish_Init(&m_blowfish_context, cipher_key.bytes, sizeof(rct::key));
     }

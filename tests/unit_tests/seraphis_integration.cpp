@@ -126,7 +126,8 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
     /// 1] send money to user A
     // a) make an address for user A to receive funds
-    const address_index_t j_A{crypto::rand_idx(MAX_ADDRESS_INDEX)};
+    address_index_t j_A;
+    j_A.gen();
     JamtisDestinationV1 user_address_A;
 
     ASSERT_NO_THROW(make_jamtis_destination_v1(keys_user_A.K_1_base,
@@ -168,7 +169,8 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
     /// 2] user A makes tx sending money to user B   //todo: use wallet to make tx
     // a) make an address for user B to receive funds
-    const address_index_t j_B{crypto::rand_idx(MAX_ADDRESS_INDEX)};
+    address_index_t j_B;
+    j_B.gen();
     JamtisDestinationV1 user_address_B;
 
     ASSERT_NO_THROW(make_jamtis_destination_v1(keys_user_B.K_1_base,

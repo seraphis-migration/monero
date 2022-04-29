@@ -208,7 +208,7 @@ public:
 
         // make enote paying to address
         crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
-        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, j, enote_privkey};
+        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, rct::xmr_amount{0}, enote_privkey};
         sp::SpOutputProposalV1 output_proposal;
         payment_proposal.get_output_proposal_v1(output_proposal);
         m_enote_ephemeral_pubkey = output_proposal.m_enote_ephemeral_pubkey;
@@ -688,7 +688,7 @@ public:
 
         // make enote paying to address
         crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
-        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, m_real_address_index, enote_privkey};
+        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, rct::xmr_amount{0}, enote_privkey};
         sp::SpOutputProposalV1 output_proposal;
         payment_proposal.get_output_proposal_v1(output_proposal);
         sp::SpEnoteV1 real_enote;

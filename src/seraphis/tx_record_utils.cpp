@@ -431,7 +431,7 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     // copy enote and set type
     record_out.m_enote = enote;
     record_out.m_enote_ephemeral_pubkey = enote_ephemeral_pubkey;
-    record_out.m_type = jamtis::self_send_MAC_to_type(static_cast<jamtis::JamtisSelfSendMAC>(enote_tag_mac));
+    record_out.m_type = jamtis::self_send_MAC_to_type(enote_tag_mac);
 
     return true;
 }

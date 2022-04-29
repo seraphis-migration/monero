@@ -46,36 +46,50 @@ namespace sp
 namespace jamtis
 {
 
-/// index (system-endian; only a portion of the bits are used): j
-using address_index_t = std::uint64_t;
+/// index (little-endian): j
 constexpr std::size_t ADDRESS_INDEX_BYTES{7};
-constexpr address_index_t MAX_ADDRESS_INDEX{(address_index_t{1} << 8*ADDRESS_INDEX_BYTES) - 1};
+struct address_index_t
+{
+    unsigned char bytes[ADDRESS_INDEX_BYTES];
 
-/// MAC for address tags (system-endian): addr_tag_MAC
+    address_index_t();
+    address_index_t(std::uint64_t index);
+
+    void gen();
+
+    /// max address index
+    static address_index_t max();
+
+    /// comparison operators
+    bool operator==(const address_index_t &other_index) const;
+    bool operator!=(const address_index_t &other_index) const { return !(*this == other_index); }
+};
+
+/// MAC for address tags (little-endian): addr_tag_MAC
 constexpr std::size_t ADDRESS_TAG_MAC_BYTES{1};
-using address_tag_MAC_t = unsigned char;
+struct address_tag_MAC_t
+{
+    unsigned char bytes[ADDRESS_TAG_MAC_BYTES];
 
-/// index ciphered with view-balance key: addr_tag = enc[k_vb](little_endian(j) || little_endian(addr_tag_MAC))
+    address_tag_MAC_t();
+    address_tag_MAC_t(unsigned char mac);
+
+    /// comparison operators
+    bool operator==(const address_tag_MAC_t &other_mac) const;
+    bool operator!=(const address_tag_MAC_t &other_mac) const { return !(*this == other_mac); }
+};
+
+/// index ciphered with a cipher key: addr_tag = enc[cipher_key](little_endian(j) || little_endian(addr_tag_MAC))
 struct address_tag_t final
 {
     unsigned char bytes[ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES];
 
     /// comparison operators
-    bool operator==(const address_tag_t &other_tag) const
-    {
-        return memcmp(bytes, other_tag.bytes, sizeof(address_tag_t)) == 0;
-    }
+    bool operator==(const address_tag_t &other_tag) const;
     bool operator!=(const address_tag_t &other_tag) const { return !(*this == other_tag); }
 
     /// operator^ for encrypting tags
-    address_tag_t operator^(const address_tag_t &other_tag) const
-    {
-        address_tag_t temp;
-        for (std::size_t i{0}; i < sizeof(address_tag_t); ++i)
-            temp.bytes[i] = bytes[i] ^ other_tag.bytes[i];
-
-        return temp;
-    }
+    address_tag_t operator^(const address_tag_t &other_tag) const;
 };
 
 /// address tag XORd with a user-defined secret: addr_tag_enc = addr_tag XOR addr_tag_enc_secret
@@ -83,56 +97,39 @@ using encrypted_address_tag_t = address_tag_t;
 
 /// sizes are consistent
 static_assert(
-    sizeof(address_index_t)   >= ADDRESS_INDEX_BYTES                          &&
-    sizeof(address_tag_MAC_t) >= ADDRESS_TAG_MAC_BYTES                        &&
+    sizeof(address_index_t)   == ADDRESS_INDEX_BYTES                          &&
+    sizeof(address_tag_MAC_t) == ADDRESS_TAG_MAC_BYTES                        &&
     sizeof(address_tag_t)     == ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES  &&
     sizeof(address_tag_t)     == sizeof(encrypted_address_tag_t),
     ""
 );
 
 /// jamtis enote types
-enum class JamtisEnoteType : unsigned int
+enum class JamtisEnoteType : unsigned char
 {
     UNKNOWN = 0,
     PLAIN = 1,
     DUMMY = 2,
     CHANGE = 3,
-    SELF_SPEND = 4,
+    SELF_SPEND = 4
 };
 
 /// jamtis self-send MACs, used to define enote-construction procedure for self-sends
-enum class JamtisSelfSendMAC : address_tag_MAC_t
+enum JamtisSelfSendMAC : unsigned char
 {
     DUMMY = 0,
     CHANGE = 1,
-    SELF_SPEND = 2,
+    SELF_SPEND = 2
 };
 
-inline bool operator==(const JamtisSelfSendMAC a, const address_tag_MAC_t b)
-{
-    return static_cast<address_tag_MAC_t>(a) == b;
-}
+bool operator==(JamtisSelfSendMAC a, const address_tag_MAC_t b);
 inline bool operator==(const address_tag_MAC_t a, const JamtisSelfSendMAC b) { return b == a; }
 inline bool operator!=(const JamtisSelfSendMAC a, const address_tag_MAC_t b) { return !(a == b); }
 inline bool operator!=(const address_tag_MAC_t a, const JamtisSelfSendMAC b) { return !(a == b); }
 
-inline bool is_known_self_send_MAC(const address_tag_MAC_t mac)
-{
-    return mac == JamtisSelfSendMAC::DUMMY ||
-        mac == JamtisSelfSendMAC::CHANGE ||
-        mac == JamtisSelfSendMAC::SELF_SPEND;
-}
-
-inline JamtisEnoteType self_send_MAC_to_type(const JamtisSelfSendMAC mac)
-{
-    switch (mac)
-    {
-        case (JamtisSelfSendMAC::DUMMY)      : return JamtisEnoteType::DUMMY;
-        case (JamtisSelfSendMAC::CHANGE)     : return JamtisEnoteType::CHANGE;
-        case (JamtisSelfSendMAC::SELF_SPEND) : return JamtisEnoteType::SELF_SPEND;
-        default                              : return JamtisEnoteType::UNKNOWN;
-    };
-}
+bool is_known_self_send_MAC(const address_tag_MAC_t mac);
+JamtisEnoteType self_send_MAC_to_type(const JamtisSelfSendMAC mac);
+JamtisEnoteType self_send_MAC_to_type(const address_tag_MAC_t mac);
 
 /// jamtis view tags
 using view_tag_t = unsigned char;

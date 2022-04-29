@@ -37,9 +37,9 @@
 #include "seraphis_config_temp.h"
 extern "C"
 {
-#include "crypto/blowfish.h"
+#include "crypto/oaes_lib.h"
+//#include "crypto/blowfish.h"
 }
-#include "int-util.h"
 #include "jamtis_hash_functions.h"
 #include "jamtis_support_types.h"
 #include "memwipe.h"
@@ -70,75 +70,59 @@ struct Blowfish_LR_wrapper
 };
 
 //-------------------------------------------------------------------------------------------------------------------
-// little-endian swaps
-//-------------------------------------------------------------------------------------------------------------------
-static unsigned char swap_le(const unsigned char x)
-{
-    return x;
-}
-static std::uint16_t swap_le(const std::uint16_t x)
-{
-    return SWAP16LE(x);
-}
-static std::uint32_t swap_le(const std::uint32_t x)
-{
-    return SWAP32LE(x);
-}
-static std::uint64_t swap_le(const std::uint64_t x)
-{
-    return SWAP64LE(x);
-}
-//-------------------------------------------------------------------------------------------------------------------
-// j_canonical = little_endian(j)
-//-------------------------------------------------------------------------------------------------------------------
-static address_index_t address_index_to_canonical(address_index_t j)
-{
-    return swap_le(j);
-}
-//-------------------------------------------------------------------------------------------------------------------
-// j = system_endian(j_canonical)
-//-------------------------------------------------------------------------------------------------------------------
-static address_index_t address_index_from_canonical(address_index_t j_canonical)
-{
-    // on big-endian systems, this makes the result big-endian (since it always starts as little-endian)
-    return swap_le(j_canonical);
-}
-//-------------------------------------------------------------------------------------------------------------------
-// mac_canonical = little_endian(mac)
-//-------------------------------------------------------------------------------------------------------------------
-static address_tag_MAC_t mac_to_canonical(address_tag_MAC_t mac)
-{
-    return swap_le(mac);
-}
-//-------------------------------------------------------------------------------------------------------------------
-// mac = system_endian(mac_canonical)
-//-------------------------------------------------------------------------------------------------------------------
-static address_tag_MAC_t mac_from_canonical(address_tag_MAC_t mac_canonical)
-{
-    // on big-endian systems, this makes the result big-endian (since it always starts as little-endian)
-    return swap_le(mac_canonical);
-}
-//-------------------------------------------------------------------------------------------------------------------
-// encryption_secret = H_8(encryption_key)
+// encryption_secret = truncate_to_addr_tag_size(H_32(encryption_key))
 //-------------------------------------------------------------------------------------------------------------------
 static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct::key &encryption_key)
 {
-    static_assert(sizeof(encrypted_address_tag_secret_t) == 8, "");
+    static_assert(sizeof(encrypted_address_tag_secret_t) <= 32, "");
 
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG};
 
-    // encryption_secret = H_8(encryption_key)
+    // temp_encryption_secret = H_32(encryption_key)
+    rct::key temp_encryption_secret;
+    jamtis_hash32(domain_separator, encryption_key.bytes, sizeof(rct::key), temp_encryption_secret.bytes);
+
+    // truncate to desired size of the secret
     encrypted_address_tag_secret_t encryption_secret;
-    jamtis_hash8(domain_separator, encryption_key.bytes, sizeof(rct::key), encryption_secret.bytes);
+    memcpy(encryption_secret.bytes, temp_encryption_secret.bytes, sizeof(encrypted_address_tag_secret_t));
 
     return encryption_secret;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+// pseudo-CBC encryption
+// - given a plaintext that isn't a multiple of the cipher block size, use an 'overlapping' chained block cipher
+// - example
+//     block size: 4 bits
+//     plaintext: 1111111
+//     blocks:    [111[1]111]  (the 4th bit overlaps)
+//     cipher block 1:      [010[0]111]  (first 4 bits ciphered)
+//     xor non-overlapping: [010[0]101]  (last 3 bits xord with first three)
+//     cipher block 2:      [010[1]110]  (last 4 bits ciphered)
+//-------------------------------------------------------------------------------------------------------------------
 address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j, const address_tag_MAC_t mac) const
 {
     // concatenate index and MAC
     address_tag_t addr_tag{address_index_to_tag(j, mac)};
+
+    /*
+    // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
+    static_assert(sizeof(address_index_t) <= 16 && sizeof(address_tag_t) >= 16 && sizeof(address_tag_t) <= 32, "");
+
+    // AES encrypt the first block
+    oaes_encrypt(m_aes_context, addr_tag.bytes, 16, addr_tag.bytes, 16);
+
+    // XOR the non-overlapping pieces
+    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - 16};
+
+    for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+    {
+        addr_tag.bytes[offset_index + 16] ^= addr_tag.bytes[offset_index];
+    }
+
+    // AES encrypt the second block (pseudo-CBC mode)
+    oaes_encrypt(m_aes_context, addr_tag.bytes + nonoverlapping_width, 16, addr_tag.bytes + nonoverlapping_width, 16);
+    */
 
     // wrap the concatenated packet into a Blowfish-compatible format
     static_assert(sizeof(address_tag_t) == 8, "");
@@ -152,6 +136,25 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j,
 //-------------------------------------------------------------------------------------------------------------------
 address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_tag, address_tag_MAC_t &mac_out) const
 {
+    /*
+    // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
+    static_assert(sizeof(address_index_t) <= 16 && sizeof(address_tag_t) >= 16 && sizeof(address_tag_t) <= 32, "");
+
+    // AES decrypt the second block
+    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - 16};
+
+    oaes_decrypt(m_aes_context, addr_tag.bytes + nonoverlapping_width, 16, addr_tag.bytes + nonoverlapping_width, 16);
+
+    // XOR the non-overlapping pieces
+    for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+    {
+        addr_tag.bytes[offset_index + 16] ^= addr_tag.bytes[offset_index];
+    }
+
+    // AES decrypt the first block
+    oaes_decrypt(m_aes_context, addr_tag.bytes, 16, addr_tag.bytes, 16);
+    */
+
     // wrap the tag into a Blowfish-compatible format
     static_assert(sizeof(address_tag_t) == 8, "");
     Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
@@ -166,13 +169,10 @@ address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_t
 address_tag_t address_index_to_tag(const address_index_t j,
     const address_tag_MAC_t mac)
 {
-    const address_index_t j_canonical{address_index_to_canonical(j)};
-    const address_tag_MAC_t mac_canonical{mac_to_canonical(mac)};
-
-    // addr_tag = j_canonical || MAC
-    address_tag_t addr_tag;
-    memcpy(addr_tag.bytes, &j_canonical, ADDRESS_INDEX_BYTES);  //canonical j is little-endian
-    memcpy(addr_tag.bytes + ADDRESS_INDEX_BYTES, &mac_canonical, ADDRESS_TAG_MAC_BYTES);
+    // addr_tag = j || MAC
+    address_tag_t addr_tag{};
+    memcpy(addr_tag.bytes, &j, ADDRESS_INDEX_BYTES);
+    memcpy(addr_tag.bytes + ADDRESS_INDEX_BYTES, &mac, ADDRESS_TAG_MAC_BYTES);
 
     return addr_tag;
 }
@@ -180,16 +180,12 @@ address_tag_t address_index_to_tag(const address_index_t j,
 address_index_t address_tag_to_index(const address_tag_t addr_tag,
     address_tag_MAC_t &mac_out)
 {
-    // addr_tag -> {j_canonical, MAC}
-    address_index_t j_canonical{0};
-    memcpy(&j_canonical, addr_tag.bytes, ADDRESS_INDEX_BYTES);
+    // addr_tag -> {j, MAC}
+    address_index_t j{};
+    memcpy(&j, addr_tag.bytes, ADDRESS_INDEX_BYTES);
     memcpy(&mac_out, addr_tag.bytes + ADDRESS_INDEX_BYTES, ADDRESS_TAG_MAC_BYTES);
 
-    // mac - system_endian(mac_canonical)
-    mac_out = mac_from_canonical(mac_out);
-
-    // j = system_endian(j_canonical)
-    return address_index_from_canonical(j_canonical);
+    return j;
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_tag_t cipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
@@ -231,14 +227,16 @@ address_index_t decipher_address_index(const rct::key &cipher_key,
 encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key,
     const address_tag_t addr_tag)
 {
-    // addr_tag_enc = addr_tag XOR_8 encryption_secret
+    static_assert(sizeof(address_tag_t), "");
+
+    // addr_tag_enc = addr_tag XOR encryption_secret
     return addr_tag ^ get_encrypted_address_tag_secret(encryption_key);
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_tag_t decrypt_address_tag(const rct::key &encryption_key,
     const encrypted_address_tag_t addr_tag_enc)
 {
-    // addr_tag = addr_tag_enc XOR_8 encryption_secret
+    // addr_tag = addr_tag_enc XOR encryption_secret
     return addr_tag_enc ^ get_encrypted_address_tag_secret(encryption_key);
 }
 //-------------------------------------------------------------------------------------------------------------------
