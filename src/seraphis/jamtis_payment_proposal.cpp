@@ -153,9 +153,8 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     crypto::secret_key ciphertag_secret;
     make_jamtis_generateaddress_secret(m_viewbalance_privkey, generateaddress_secret);
     make_jamtis_ciphertag_secret(generateaddress_secret, ciphertag_secret);
-    address_tag_MAC_t j_mac;
-    address_index_t j{decipher_address_index(rct::sk2rct(ciphertag_secret), m_destination.m_addr_tag, j_mac)};
-    CHECK_AND_ASSERT_THROW_MES(j_mac == address_tag_MAC_t{0},
+    address_index_t j;
+    CHECK_AND_ASSERT_THROW_MES(try_decipher_address_index(rct::sk2rct(ciphertag_secret), m_destination.m_addr_tag, j),
         "Failed to create a self-send-type output proposal: could not decipher the destination's address tag.");
 
     // 2. make a raw address tag (not ciphered) from {j || selfspend_type} (with the type as mac)

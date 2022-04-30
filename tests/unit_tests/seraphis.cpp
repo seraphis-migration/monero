@@ -395,11 +395,12 @@ static bool test_info_recovery_addressindex(const sp::jamtis::address_index_t j)
     // cipher and decipher the index
     crypto::secret_key cipher_key;
     make_secret_key(cipher_key);
-    address_tag_t ciphered_tag{cipher_address_index(rct::sk2rct(cipher_key), j, 0)};
+    address_tag_t ciphered_tag{cipher_address_index(rct::sk2rct(cipher_key), j)};
     address_tag_MAC_t decipher_mac;
-    if (decipher_address_index(rct::sk2rct(cipher_key), ciphered_tag, decipher_mac) != j)
+    address_index_t decipher_j;
+    if (!try_decipher_address_index(rct::sk2rct(cipher_key), ciphered_tag, decipher_j))
         return false;
-    if (decipher_mac != 0)
+    if (decipher_j != j)
         return false;
 
     // encrypt and decrypt an address tag

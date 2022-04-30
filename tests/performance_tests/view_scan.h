@@ -726,16 +726,13 @@ public:
 
             // mangle the address tag
             // - re-do the fake ones if they succeed by accident
-            sp::jamtis::address_tag_MAC_t enote_tag_mac;
+            sp::jamtis::address_index_t j_temp;
             do
             {
                 sp::jamtis::gen_address_tag(m_basic_records.back().m_nominal_address_tag);
-
-                // j
-                (void) sp::jamtis::decipher_address_index_with_context(*m_cipher_context,
-                    m_basic_records.back().m_nominal_address_tag,
-                    enote_tag_mac);
-            } while(enote_tag_mac == 0);
+            } while(sp::jamtis::try_decipher_address_index_with_context(*m_cipher_context,
+                m_basic_records.back().m_nominal_address_tag,
+                j_temp));
         }
 
         return true;

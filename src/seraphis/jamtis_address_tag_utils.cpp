@@ -138,10 +138,10 @@ jamtis_address_tag_cipher_context::~jamtis_address_tag_cipher_context()
 //     xor non-overlapping: [010[0]101]  (last 3 bits xord with first three)
 //     cipher block 2:      [010[1]110]  (last 4 bits ciphered)
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t &j, const address_tag_MAC_t &mac) const
+address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t &j) const
 {
     // concatenate index and MAC
-    address_tag_t addr_tag{address_index_to_tag(j, mac)};
+    address_tag_t addr_tag{address_index_to_tag(j, address_tag_MAC_t{0})};
 
     ///*  //Twofish
     // expect address index to fit in one Twofish block (16 bytes), and for there to be no more than 2 Twofish blocks
@@ -232,13 +232,21 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t &j
     return addr_tag;
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_tag, address_tag_MAC_t &mac_out) const
+bool jamtis_address_tag_cipher_context::try_decipher(address_tag_t addr_tag, address_index_t &j_out) const
 {
     ///*  //Twofish
-    // expect address index to fit in one Twofish block (16 bytes), and for there to be no more than 2 Twofish blocks
-    static_assert(sizeof(address_index_t) <= TWOFISH_BLOCK_SIZE &&
-            sizeof(address_tag_t) >= TWOFISH_BLOCK_SIZE &&
-            sizeof(address_tag_t) <= 2 * TWOFISH_BLOCK_SIZE,
+    // expect one of the following
+    // A) address tag is exactly one block
+    // B) address tag fits in 2 blocks and index equals one block
+    static_assert(
+            (
+                sizeof(address_tag_t) == TWOFISH_BLOCK_SIZE
+            ) ||
+            (
+                sizeof(address_index_t) == TWOFISH_BLOCK_SIZE &&
+                sizeof(address_tag_t) > TWOFISH_BLOCK_SIZE &&
+                sizeof(address_tag_t) <= 2 * TWOFISH_BLOCK_SIZE
+            ),
         "");
 
     // decrypt the second block
@@ -247,16 +255,25 @@ address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_t
     unsigned char temp_cipher[TWOFISH_BLOCK_SIZE];
     memcpy(temp_cipher, addr_tag.bytes + nonoverlapping_width, TWOFISH_BLOCK_SIZE);
     Twofish_decrypt_block(&m_twofish_key, temp_cipher, temp_cipher);
-    memcpy(addr_tag.bytes + nonoverlapping_width, temp_cipher, TWOFISH_BLOCK_SIZE);
+    memcpy(addr_tag.bytes + nonoverlapping_width, temp_cipher, TWOFISH_BLOCK_SIZE);    
 
+    // XOR the non-overlapping pieces
+    for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+    {
+        addr_tag.bytes[offset_index + TWOFISH_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
+    }
+
+    // extract the mac
+    address_tag_MAC_t mac_temp;
+    address_tag_to_index(addr_tag, mac_temp);
+
+    // check the mac
+    if (mac_temp != address_tag_MAC_t{0})
+        return false;
+
+    // decrypt the remaining bytes (if there are any)
     if (nonoverlapping_width > 0)
     {
-        // XOR the non-overlapping pieces
-        for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
-        {
-            addr_tag.bytes[offset_index + TWOFISH_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
-        }
-
         // decrypt the first block
         memcpy(temp_cipher, addr_tag.bytes, TWOFISH_BLOCK_SIZE);
         Twofish_decrypt_block(&m_twofish_key, temp_cipher, temp_cipher);
@@ -323,8 +340,10 @@ address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_t
     Blowfish_Decrypt(&m_blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
     */
 
-    // convert to {j, MAC}
-    return address_tag_to_index(addr_tag, mac_out);
+    // extract the index j
+    j_out = address_tag_to_index(addr_tag, mac_temp);
+
+    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_tag_t address_index_to_tag(const address_index_t &j, const address_tag_MAC_t &mac)
@@ -348,37 +367,34 @@ address_index_t address_tag_to_index(const address_tag_t &addr_tag, address_tag_
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_tag_t cipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
-    const address_index_t &j,
-    const address_tag_MAC_t &mac)
+    const address_index_t &j)
 {
-    return cipher_context.cipher(j, mac);
+    return cipher_context.cipher(j);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_t cipher_address_index(const rct::key &cipher_key, const address_index_t &j, const address_tag_MAC_t &mac)
+address_tag_t cipher_address_index(const rct::key &cipher_key, const address_index_t &j)
 {
     // prepare to encrypt the index and MAC
     const jamtis_address_tag_cipher_context cipher_context{cipher_key};
 
     // encrypt it
-    return cipher_address_index_with_context(cipher_context, j, mac);
+    return cipher_address_index_with_context(cipher_context, j);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_index_t decipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
-    address_tag_t addr_tag,
-    address_tag_MAC_t &mac_out)
-{
-    return cipher_context.decipher(addr_tag, mac_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-address_index_t decipher_address_index(const rct::key &cipher_key,
+bool try_decipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
     const address_tag_t &addr_tag,
-    address_tag_MAC_t &mac_out)
+    address_index_t &j_out)
+{
+    return cipher_context.try_decipher(addr_tag, j_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_decipher_address_index(const rct::key &cipher_key, const address_tag_t &addr_tag, address_index_t &j_out)
 {
     // prepare to decrypt the tag
     const jamtis_address_tag_cipher_context cipher_context{cipher_key};
 
     // decrypt it
-    return decipher_address_index_with_context(cipher_context, addr_tag, mac_out);
+    return try_decipher_address_index_with_context(cipher_context, addr_tag, j_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key, const address_tag_t &addr_tag)
