@@ -165,12 +165,11 @@ JamtisEnoteType self_send_MAC_to_type(const JamtisSelfSendMAC mac)
 //-------------------------------------------------------------------------------------------------------------------
 JamtisEnoteType self_send_MAC_to_type(const address_tag_MAC_t mac)
 {
-    static_assert(sizeof(JamtisSelfSendMAC) <= sizeof(address_tag_MAC_t), "");
-    JamtisSelfSendMAC mac_converted;
-    memcpy(&mac_converted, mac.bytes, sizeof(JamtisSelfSendMAC));
-    mac_converted = static_cast<JamtisSelfSendMAC>(swap_le(mac_converted));
+    static_assert(1 <= sizeof(address_tag_MAC_t), "");
+    unsigned char mac_converted;
+    memcpy(&mac_converted, mac.bytes, 1);
 
-    return self_send_MAC_to_type(mac_converted);
+    return self_send_MAC_to_type(static_cast<JamtisSelfSendMAC>(mac_converted));
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis
