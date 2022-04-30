@@ -71,7 +71,7 @@ public:
     ~jamtis_address_tag_cipher_context();
 
 //member functions
-    address_tag_t cipher(const address_index_t j, const address_tag_MAC_t mac) const;
+    address_tag_t cipher(const address_index_t &j, const address_tag_MAC_t &mac) const;
     address_index_t decipher(address_tag_t addr_tag, address_tag_MAC_t &mac_out) const;
 
 //member variables
@@ -86,34 +86,28 @@ private:
 };
 
 /// convert {j, mac} to/from an address tag byte-representation
-address_tag_t address_index_to_tag(const address_index_t j,
-    const address_tag_MAC_t mac);
-address_index_t address_tag_to_index(const address_tag_t addr_tag,
-    address_tag_MAC_t &mac_out);
+address_tag_t address_index_to_tag(const address_index_t &j, const address_tag_MAC_t &mac);
+address_index_t address_tag_to_index(const address_tag_t &addr_tag, address_tag_MAC_t &mac_out);
 
 /// cipher[k](j || addr_tag_MAC) -> addr_tag
 address_tag_t cipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
-    const address_index_t j,
-    const address_tag_MAC_t mac);
-address_tag_t cipher_address_index(const rct::key &cipher_key,
-    const address_index_t j,
-    const address_tag_MAC_t mac);
+    const address_index_t &j,
+    const address_tag_MAC_t &mac);
+address_tag_t cipher_address_index(const rct::key &cipher_key, const address_index_t &j, const address_tag_MAC_t &mac);
 
 /// cipher_decrypt[k](addr_tag) -> {j, addr_tag_MAC}
 address_index_t decipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
     address_tag_t addr_tag,
     address_tag_MAC_t &mac_out);
 address_index_t decipher_address_index(const rct::key &cipher_key,
-    const address_tag_t addr_tag,
+    const address_tag_t &addr_tag,
     address_tag_MAC_t &mac_out);
 
 /// addr_tag_enc = addr_tag XOR addr_tag_enc_secret
-encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key,
-    const address_tag_t addr_tag);
+encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key, const address_tag_t &addr_tag);
 
 /// addr_tag = addr_tag_enc XOR addr_tag_enc_secret
-address_tag_t decrypt_address_tag(const rct::key &encryption_key,
-    const encrypted_address_tag_t addr_tag_enc);
+address_tag_t decrypt_address_tag(const rct::key &encryption_key, const encrypted_address_tag_t &addr_tag_enc);
 
 /// generate a random tag
 void gen_address_tag(address_tag_t &addr_tag_inout);
