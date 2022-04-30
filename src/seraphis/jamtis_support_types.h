@@ -47,13 +47,14 @@ namespace jamtis
 {
 
 /// index (little-endian): j
-constexpr std::size_t ADDRESS_INDEX_BYTES{7};
+constexpr std::size_t ADDRESS_INDEX_BYTES{16};
 struct address_index_t
 {
     unsigned char bytes[ADDRESS_INDEX_BYTES];
 
     address_index_t();
-    address_index_t(std::uint64_t index);
+    address_index_t(std::uint64_t half1, std::uint64_t half2);
+    address_index_t(std::uint64_t half1) : address_index_t{half1, 0} {}
 
     void gen();
 

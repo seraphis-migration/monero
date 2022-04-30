@@ -73,16 +73,16 @@ address_index_t::address_index_t()
     std::memset(this->bytes, 0, ADDRESS_INDEX_BYTES);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_index_t::address_index_t(std::uint64_t index)
+address_index_t::address_index_t(std::uint64_t half1, std::uint64_t half2)
 {
-    static_assert(sizeof(index) >= sizeof(address_index_t), "");
-    CHECK_AND_ASSERT_THROW_MES(index <= (std::uint64_t{1} << 8 * ADDRESS_INDEX_BYTES) - 1,
-        "Jamtis address index out of range.");
+    static_assert(sizeof(half1) + sizeof(half2) <= sizeof(address_index_t), "");
 
-    // copy the index over (as little endian bytes)
+    // copy each half of the index over (as little endian bytes)
     std::memset(this->bytes, 0, ADDRESS_INDEX_BYTES);
-    index = swap_le(index);
-    memcpy(this->bytes, &index, ADDRESS_INDEX_BYTES);
+    half1 = swap_le(half1);
+    half2 = swap_le(half2);
+    memcpy(this->bytes, &half1, sizeof(half1));
+    memcpy(this->bytes + sizeof(half1), &half2, sizeof(half2));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void address_index_t::gen()
@@ -109,7 +109,7 @@ address_tag_MAC_t::address_tag_MAC_t()
 //-------------------------------------------------------------------------------------------------------------------
 address_tag_MAC_t::address_tag_MAC_t(unsigned char mac)
 {
-    static_assert(ADDRESS_TAG_MAC_BYTES >= sizeof(mac), "");
+    static_assert(sizeof(mac) <= ADDRESS_TAG_MAC_BYTES, "");
 
     // copy the mac over (as little endian bytes)
     std::memset(this->bytes, 0, ADDRESS_TAG_MAC_BYTES);

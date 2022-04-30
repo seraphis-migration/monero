@@ -69,6 +69,9 @@ struct Blowfish_LR_wrapper
     std::uint32_t* R_addr() { return reinterpret_cast<std::uint32_t*>(bytes_ref + 4); }
 };
 
+/// AES block size
+constexpr std::size_t AES_BLOCK_SIZE{16};
+
 //-------------------------------------------------------------------------------------------------------------------
 // encryption_secret = truncate_to_addr_tag_size(H_32(encryption_key))
 //-------------------------------------------------------------------------------------------------------------------
@@ -105,62 +108,72 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j,
     // concatenate index and MAC
     address_tag_t addr_tag{address_index_to_tag(j, mac)};
 
-    /*
+    ///*
     // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
-    static_assert(sizeof(address_index_t) <= 16 && sizeof(address_tag_t) >= 16 && sizeof(address_tag_t) <= 32, "");
+    static_assert(sizeof(address_index_t) <= AES_BLOCK_SIZE &&
+            sizeof(address_tag_t) >= AES_BLOCK_SIZE &&
+            sizeof(address_tag_t) <= 2 * AES_BLOCK_SIZE,
+        "");
 
     // AES encrypt the first block
-    oaes_encrypt(m_aes_context, addr_tag.bytes, 16, addr_tag.bytes, 16);
+    oaes_encrypt_block(m_aes_context, addr_tag.bytes, &AES_BLOCK_SIZE);
 
     // XOR the non-overlapping pieces
-    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - 16};
+    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - AES_BLOCK_SIZE};
 
     for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
     {
-        addr_tag.bytes[offset_index + 16] ^= addr_tag.bytes[offset_index];
+        addr_tag.bytes[offset_index + AES_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
     }
 
     // AES encrypt the second block (pseudo-CBC mode)
-    oaes_encrypt(m_aes_context, addr_tag.bytes + nonoverlapping_width, 16, addr_tag.bytes + nonoverlapping_width, 16);
-    */
+    oaes_encrypt_block(m_aes_context, addr_tag.bytes + nonoverlapping_width, &AES_BLOCK_SIZE);
+    //*/
 
+    /*
     // wrap the concatenated packet into a Blowfish-compatible format
     static_assert(sizeof(address_tag_t) == 8, "");
     Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
 
     // encrypt the packet
     Blowfish_Encrypt(&m_blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
+    */
 
     return addr_tag;
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_tag, address_tag_MAC_t &mac_out) const
 {
-    /*
+    ///*
     // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
-    static_assert(sizeof(address_index_t) <= 16 && sizeof(address_tag_t) >= 16 && sizeof(address_tag_t) <= 32, "");
+    static_assert(sizeof(address_index_t) <= AES_BLOCK_SIZE &&
+            sizeof(address_tag_t) >= AES_BLOCK_SIZE &&
+            sizeof(address_tag_t) <= 2 * AES_BLOCK_SIZE,
+        "");
 
     // AES decrypt the second block
-    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - 16};
+    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - AES_BLOCK_SIZE};
 
-    oaes_decrypt(m_aes_context, addr_tag.bytes + nonoverlapping_width, 16, addr_tag.bytes + nonoverlapping_width, 16);
+    oaes_decrypt_block(m_aes_context, addr_tag.bytes + nonoverlapping_width, AES_BLOCK_SIZE);
 
     // XOR the non-overlapping pieces
     for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
     {
-        addr_tag.bytes[offset_index + 16] ^= addr_tag.bytes[offset_index];
+        addr_tag.bytes[offset_index + AES_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
     }
 
     // AES decrypt the first block
-    oaes_decrypt(m_aes_context, addr_tag.bytes, 16, addr_tag.bytes, 16);
-    */
+    oaes_decrypt_block(m_aes_context, addr_tag.bytes, AES_BLOCK_SIZE);
+    //*/
 
+    /*
     // wrap the tag into a Blowfish-compatible format
     static_assert(sizeof(address_tag_t) == 8, "");
     Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
 
     // decrypt the tag
     Blowfish_Decrypt(&m_blowfish_context, addr_tag_formatted.L_addr(), addr_tag_formatted.R_addr());
+    */
 
     // convert to {j, MAC}
     return address_tag_to_index(addr_tag, mac_out);
