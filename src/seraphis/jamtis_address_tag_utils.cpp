@@ -39,7 +39,8 @@ extern "C"
 {
 //#include "crypto/blowfish.h"
 //#include "crypto/oaes_lib.h"
-#include "crypto/tiny_aes.h"
+//#include "crypto/tiny_aes.h"
+#include "crypto/twofish.h"
 }
 #include "jamtis_hash_functions.h"
 #include "jamtis_support_types.h"
@@ -70,8 +71,10 @@ struct Blowfish_LR_wrapper
     std::uint32_t* R_addr() { return reinterpret_cast<std::uint32_t*>(bytes_ref + 4); }
 };
 
-/// AES block size
+/// block sizes
+constexpr std::size_t BLOWFISH_BLOCK_SIZE{8};
 constexpr std::size_t AES_BLOCK_SIZE{16};
+constexpr std::size_t TWOFISH_BLOCK_SIZE{16};
 
 //-------------------------------------------------------------------------------------------------------------------
 // encryption_secret = truncate_to_addr_tag_size(H_32(encryption_key))
@@ -94,6 +97,38 @@ static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+jamtis_address_tag_cipher_context::jamtis_address_tag_cipher_context(const rct::key &cipher_key)
+{
+    ///*  //Twofish
+    Twofish_initialise();
+    Twofish_prepare_key(cipher_key.bytes, 32, &(m_twofish_key));
+
+    //*/
+
+    /*  //Tiny AES
+    AES_init_ctx(&m_aes_context, cipher_key.bytes);
+    */
+
+    /*  //Open AES
+    // note: we are using the raw AES block cipher/decipher API, so setting the AES mode is not needed
+    m_aes_context = reinterpret_cast<oaes_ctx*>(oaes_alloc());
+    oaes_key_import_data(m_aes_context, cipher_key.bytes, sizeof(rct::key));
+    */
+
+    //Blowfish_Init(&m_blowfish_context, cipher_key.bytes, sizeof(rct::key));
+}
+//-------------------------------------------------------------------------------------------------------------------
+jamtis_address_tag_cipher_context::~jamtis_address_tag_cipher_context()
+{
+    memwipe(&m_twofish_key, sizeof(Twofish_key));  //Twofish
+
+    //memwipe(&m_aes_context, sizeof(AES_ctx));  //Tiny AES
+
+    //oaes_free(reinterpret_cast<void**>(&m_aes_context));  //Open AES
+
+    //memwipe(&m_blowfish_context, sizeof(BLOWFISH_CTX));  //Blowfish
+}
+//-------------------------------------------------------------------------------------------------------------------
 // pseudo-CBC encryption
 // - given a plaintext that isn't a multiple of the cipher block size, use an 'overlapping' chained block cipher
 // - example
@@ -109,7 +144,36 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j,
     // concatenate index and MAC
     address_tag_t addr_tag{address_index_to_tag(j, mac)};
 
-    ///*  //Tiny AES
+    ///*  //Twofish
+    // expect address index to fit in one Twofish block (16 bytes), and for there to be no more than 2 Twofish blocks
+    static_assert(sizeof(address_index_t) <= TWOFISH_BLOCK_SIZE &&
+            sizeof(address_tag_t) >= TWOFISH_BLOCK_SIZE &&
+            sizeof(address_tag_t) <= 2 * TWOFISH_BLOCK_SIZE,
+        "");
+
+    // encrypt the first block
+    unsigned char temp_cipher[16];
+    memcpy(temp_cipher, addr_tag.bytes, 16);
+    Twofish_encrypt_block(&m_twofish_key, temp_cipher, temp_cipher);
+    memcpy(addr_tag.bytes, temp_cipher, 16);
+
+    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - TWOFISH_BLOCK_SIZE};
+    if (nonoverlapping_width > 0)
+    {
+        // XOR the non-overlapping pieces
+        for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+        {
+            addr_tag.bytes[offset_index + TWOFISH_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
+        }
+
+        // encrypt the second block (pseudo-CBC mode)
+        memcpy(temp_cipher, addr_tag.bytes + nonoverlapping_width, 16);
+        Twofish_encrypt_block(&m_twofish_key, temp_cipher, temp_cipher);
+        memcpy(addr_tag.bytes + nonoverlapping_width, temp_cipher, 16);
+    }
+    //*/
+
+    /*  //Tiny AES
     // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
     static_assert(sizeof(address_index_t) <= AES_BLOCK_SIZE &&
             sizeof(address_tag_t) >= AES_BLOCK_SIZE &&
@@ -131,7 +195,7 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j,
         // AES encrypt the second block (pseudo-CBC mode)
         AES_ECB_encrypt(&m_aes_context, addr_tag.bytes + nonoverlapping_width);
     }
-    //*/
+    */
 
     /*  //Open AES
     // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
@@ -159,7 +223,7 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j,
 
     /*  //Blowfish
     // wrap the concatenated packet into a Blowfish-compatible format
-    static_assert(sizeof(address_tag_t) == 8, "");
+    static_assert(sizeof(address_tag_t) == BLOWFISH_BLOCK_SIZE, "");
     Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
 
     // encrypt the packet
@@ -171,7 +235,37 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j,
 //-------------------------------------------------------------------------------------------------------------------
 address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_tag, address_tag_MAC_t &mac_out) const
 {
-    ///*  //Tiny AES
+    ///*  //Twofish
+    // expect address index to fit in one Twofish block (16 bytes), and for there to be no more than 2 Twofish blocks
+    static_assert(sizeof(address_index_t) <= TWOFISH_BLOCK_SIZE &&
+            sizeof(address_tag_t) >= TWOFISH_BLOCK_SIZE &&
+            sizeof(address_tag_t) <= 2 * TWOFISH_BLOCK_SIZE,
+        "");
+
+    // decrypt the second block
+    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - TWOFISH_BLOCK_SIZE};
+
+    unsigned char temp_cipher[16];
+    memcpy(temp_cipher, addr_tag.bytes + nonoverlapping_width, 16);
+    Twofish_decrypt_block(&m_twofish_key, temp_cipher, temp_cipher);
+    memcpy(addr_tag.bytes + nonoverlapping_width, temp_cipher, 16);
+
+    if (nonoverlapping_width > 0)
+    {
+        // XOR the non-overlapping pieces
+        for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+        {
+            addr_tag.bytes[offset_index + TWOFISH_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
+        }
+
+        // decrypt the first block
+        memcpy(temp_cipher, addr_tag.bytes, 16);
+        Twofish_decrypt_block(&m_twofish_key, temp_cipher, temp_cipher);
+        memcpy(addr_tag.bytes, temp_cipher, 16);
+    }
+    //*/
+
+    /*  //Tiny AES
     // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
     static_assert(sizeof(address_index_t) <= AES_BLOCK_SIZE &&
             sizeof(address_tag_t) >= AES_BLOCK_SIZE &&
@@ -194,7 +288,7 @@ address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_t
         // AES decrypt the first block
         AES_ECB_decrypt(&m_aes_context, addr_tag.bytes);
     }
-    //*/
+    */
 
     /*  //Open AES
     // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks

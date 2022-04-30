@@ -73,8 +73,8 @@ NOTE:   String length must be evenly divisible by 16byte (str_len % 16 == 0)
 // The number of columns comprising a state in AES. This is a constant in AES. Value=4
 #define Nb 4
 
-#define Nk 8        // The number of 32 bit words in a key.
-#define Nr 14       // The number of rounds in AES Cipher.
+#define Nk 4        // The number of 32 bit words in a key.
+#define Nr 10       // The number of rounds in AES Cipher.
 
 
 
@@ -208,6 +208,7 @@ static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key)
       tempa[0] = tempa[0] ^ Rcon[i/Nk];
     }
 
+/*
     if (i % Nk == 4)  //for 256-bit keys specifically
     {
       // Function Subword()
@@ -218,6 +219,7 @@ static void KeyExpansion(uint8_t* RoundKey, const uint8_t* Key)
         tempa[3] = getSBoxValue(tempa[3]);
       }
     }
+*/
 
     j = i * 4; k=(i - Nk) * 4;
     RoundKey[j + 0] = RoundKey[k + 0] ^ tempa[0];

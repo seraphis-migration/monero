@@ -53,7 +53,8 @@ set(crypto_sources
   rx-slow-hash.c
   CryptonightR_JIT.c
   tiny_aes.c
-  tree-hash.c)
+  tree-hash.c
+  twofish.c)
 
 if(ARCH_ID STREQUAL "i386" OR ARCH_ID STREQUAL "x86_64" OR ARCH_ID STREQUAL "x86-64" OR ARCH_ID STREQUAL "amd64")
 list(APPEND crypto_sources CryptonightR_template.S)

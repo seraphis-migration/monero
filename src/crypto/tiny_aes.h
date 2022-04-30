@@ -35,8 +35,8 @@ origin: https://github.com/kokke/tiny-AES-c
 
 #define AES_BLOCKLEN 16 // Block length in bytes - AES is 128b block only
 
-#define AES_KEYLEN 32   // Key length in bytes
-#define AES_keyExpSize 240
+#define AES_KEYLEN 16   // Key length in bytes
+#define AES_keyExpSize 176
 
 struct AES_ctx
 {

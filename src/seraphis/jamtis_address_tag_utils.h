@@ -38,7 +38,8 @@ extern "C"
 {
 //#include "crypto/blowfish.h"
 //#include "crypto/oaes_lib.h"
-#include "crypto/tiny_aes.h"
+//#include "crypto/tiny_aes.h"
+#include "crypto/twofish.h"
 }
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
@@ -61,33 +62,13 @@ struct jamtis_address_tag_cipher_context
 public:
 //constructors
     /// normal constructor
-    jamtis_address_tag_cipher_context(const rct::key &cipher_key)
-    {
-        ///*  //Tiny AES
-        AES_init_ctx(&m_aes_context, cipher_key.bytes);
-        //*/
-
-        /*  //Open AES
-        // note: we are using the raw AES block cipher/decipher API, so setting the AES mode is not needed
-        m_aes_context = reinterpret_cast<oaes_ctx*>(oaes_alloc());
-        oaes_key_import_data(m_aes_context, cipher_key.bytes, sizeof(rct::key));
-        */
-
-        //Blowfish_Init(&m_blowfish_context, cipher_key.bytes, sizeof(rct::key));
-    }
+    jamtis_address_tag_cipher_context(const rct::key &cipher_key);
 
     /// disable copy/move (this is a scoped manager)
     jamtis_address_tag_cipher_context& operator=(jamtis_address_tag_cipher_context&&) = delete;
 
 //destructor
-    ~jamtis_address_tag_cipher_context()
-    {
-        //tiny aes: nothing to do
-
-        //oaes_free(reinterpret_cast<void**>(&m_aes_context));
-
-        //memwipe(&m_blowfish_context, sizeof(BLOWFISH_CTX));
-    }
+    ~jamtis_address_tag_cipher_context();
 
 //member functions
     address_tag_t cipher(const address_index_t j, const address_tag_MAC_t mac) const;
@@ -95,7 +76,9 @@ public:
 
 //member variables
 private:
-    AES_ctx m_aes_context;
+    Twofish_key m_twofish_key;
+
+    //AES_ctx m_aes_context;
 
     //oaes_ctx *m_aes_context;
 
