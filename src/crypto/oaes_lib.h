@@ -192,6 +192,14 @@ OAES_API OAES_RET oaes_key_import( OAES_CTX * ctx,
 OAES_API OAES_RET oaes_key_import_data( OAES_CTX * ctx,
 		const uint8_t * data, size_t data_len );
 
+// encrypt one block
+OAES_RET oaes_encrypt_block(
+    OAES_CTX * ctx, uint8_t * c, size_t c_len );
+
+// decrypt one block
+OAES_RET oaes_decrypt_block(
+    OAES_CTX * ctx, uint8_t * c, size_t c_len );
+
 // set c == NULL to get the required c_len
 OAES_API OAES_RET oaes_encrypt( OAES_CTX * ctx,
 		const uint8_t * m, size_t m_len, uint8_t * c, size_t * c_len );

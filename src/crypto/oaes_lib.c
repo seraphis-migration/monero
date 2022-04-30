@@ -1022,7 +1022,7 @@ OAES_RET oaes_set_option( OAES_CTX * ctx,
 	return OAES_RET_SUCCESS;
 }
 
-static OAES_RET oaes_encrypt_block(
+OAES_RET oaes_encrypt_block(
 		OAES_CTX * ctx, uint8_t * c, size_t c_len )
 {
 	size_t _i, _j;
@@ -1139,7 +1139,7 @@ static OAES_RET oaes_encrypt_block(
 	return OAES_RET_SUCCESS;
 }
 
-static OAES_RET oaes_decrypt_block(
+OAES_RET oaes_decrypt_block(
 		OAES_CTX * ctx, uint8_t * c, size_t c_len )
 {
 	size_t _i, _j;
