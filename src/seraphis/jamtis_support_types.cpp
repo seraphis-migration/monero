@@ -75,14 +75,16 @@ address_index_t::address_index_t()
 //-------------------------------------------------------------------------------------------------------------------
 address_index_t::address_index_t(std::uint64_t half1, std::uint64_t half2)
 {
-    static_assert(sizeof(half1) + sizeof(half2) <= sizeof(address_index_t), "");
+    static_assert(sizeof(half1) + sizeof(half2) >= sizeof(address_index_t) &&
+            sizeof(half1) <= sizeof(address_index_t),
+        "");
 
     // copy each half of the index over (as little endian bytes)
     std::memset(this->bytes, 0, ADDRESS_INDEX_BYTES);
     half1 = swap_le(half1);
     half2 = swap_le(half2);
     memcpy(this->bytes, &half1, sizeof(half1));
-    memcpy(this->bytes + sizeof(half1), &half2, sizeof(half2));
+    memcpy(this->bytes + sizeof(half1), &half2, ADDRESS_INDEX_BYTES - sizeof(half2));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void address_index_t::gen()

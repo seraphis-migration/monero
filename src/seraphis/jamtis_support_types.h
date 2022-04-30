@@ -47,7 +47,7 @@ namespace jamtis
 {
 
 /// index (little-endian): j
-constexpr std::size_t ADDRESS_INDEX_BYTES{16};
+constexpr std::size_t ADDRESS_INDEX_BYTES{15};
 struct address_index_t
 {
     unsigned char bytes[ADDRESS_INDEX_BYTES];

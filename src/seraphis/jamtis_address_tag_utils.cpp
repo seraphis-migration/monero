@@ -37,8 +37,9 @@
 #include "seraphis_config_temp.h"
 extern "C"
 {
-#include "crypto/oaes_lib.h"
 //#include "crypto/blowfish.h"
+//#include "crypto/oaes_lib.h"
+#include "crypto/tiny_aes.h"
 }
 #include "jamtis_hash_functions.h"
 #include "jamtis_support_types.h"
@@ -108,7 +109,7 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j,
     // concatenate index and MAC
     address_tag_t addr_tag{address_index_to_tag(j, mac)};
 
-    ///*
+    ///*  //Tiny AES
     // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
     static_assert(sizeof(address_index_t) <= AES_BLOCK_SIZE &&
             sizeof(address_tag_t) >= AES_BLOCK_SIZE &&
@@ -116,21 +117,47 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j,
         "");
 
     // AES encrypt the first block
-    oaes_encrypt_block(m_aes_context, addr_tag.bytes, &AES_BLOCK_SIZE);
+    AES_ECB_encrypt(&m_aes_context, addr_tag.bytes);
 
-    // XOR the non-overlapping pieces
     const std::size_t nonoverlapping_width{sizeof(address_tag_t) - AES_BLOCK_SIZE};
-
-    for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+    if (nonoverlapping_width > 0)
     {
-        addr_tag.bytes[offset_index + AES_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
-    }
+        // XOR the non-overlapping pieces
+        for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+        {
+            addr_tag.bytes[offset_index + AES_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
+        }
 
-    // AES encrypt the second block (pseudo-CBC mode)
-    oaes_encrypt_block(m_aes_context, addr_tag.bytes + nonoverlapping_width, &AES_BLOCK_SIZE);
+        // AES encrypt the second block (pseudo-CBC mode)
+        AES_ECB_encrypt(&m_aes_context, addr_tag.bytes + nonoverlapping_width);
+    }
     //*/
 
-    /*
+    /*  //Open AES
+    // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
+    static_assert(sizeof(address_index_t) <= AES_BLOCK_SIZE &&
+            sizeof(address_tag_t) >= AES_BLOCK_SIZE &&
+            sizeof(address_tag_t) <= 2 * AES_BLOCK_SIZE,
+        "");
+
+    // AES encrypt the first block
+    oaes_encrypt_block(m_aes_context, addr_tag.bytes, AES_BLOCK_SIZE);
+
+    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - AES_BLOCK_SIZE};
+    if (nonoverlapping_width > 0)
+    {
+        // XOR the non-overlapping pieces
+        for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+        {
+            addr_tag.bytes[offset_index + AES_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
+        }
+
+        // AES encrypt the second block (pseudo-CBC mode)
+        oaes_encrypt_block(m_aes_context, addr_tag.bytes + nonoverlapping_width, AES_BLOCK_SIZE);
+    }
+    */
+
+    /*  //Blowfish
     // wrap the concatenated packet into a Blowfish-compatible format
     static_assert(sizeof(address_tag_t) == 8, "");
     Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
@@ -144,7 +171,32 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t j,
 //-------------------------------------------------------------------------------------------------------------------
 address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_tag, address_tag_MAC_t &mac_out) const
 {
-    ///*
+    ///*  //Tiny AES
+    // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
+    static_assert(sizeof(address_index_t) <= AES_BLOCK_SIZE &&
+            sizeof(address_tag_t) >= AES_BLOCK_SIZE &&
+            sizeof(address_tag_t) <= 2 * AES_BLOCK_SIZE,
+        "");
+
+    // AES decrypt the second block
+    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - AES_BLOCK_SIZE};
+
+    AES_ECB_decrypt(&m_aes_context, addr_tag.bytes + nonoverlapping_width);
+
+    if (nonoverlapping_width > 0)
+    {
+        // XOR the non-overlapping pieces
+        for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+        {
+            addr_tag.bytes[offset_index + AES_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
+        }
+
+        // AES decrypt the first block
+        AES_ECB_decrypt(&m_aes_context, addr_tag.bytes);
+    }
+    //*/
+
+    /*  //Open AES
     // expect address index to fit in one AES block (16 bytes), and for there to be no more than 2 AES blocks
     static_assert(sizeof(address_index_t) <= AES_BLOCK_SIZE &&
             sizeof(address_tag_t) >= AES_BLOCK_SIZE &&
@@ -156,17 +208,20 @@ address_index_t jamtis_address_tag_cipher_context::decipher(address_tag_t addr_t
 
     oaes_decrypt_block(m_aes_context, addr_tag.bytes + nonoverlapping_width, AES_BLOCK_SIZE);
 
-    // XOR the non-overlapping pieces
-    for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+    if (nonoverlapping_width > 0)
     {
-        addr_tag.bytes[offset_index + AES_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
+        // XOR the non-overlapping pieces
+        for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+        {
+            addr_tag.bytes[offset_index + AES_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
+        }
+
+        // AES decrypt the first block
+        oaes_decrypt_block(m_aes_context, addr_tag.bytes, AES_BLOCK_SIZE);
     }
+    */
 
-    // AES decrypt the first block
-    oaes_decrypt_block(m_aes_context, addr_tag.bytes, AES_BLOCK_SIZE);
-    //*/
-
-    /*
+    /*  //Blowfish
     // wrap the tag into a Blowfish-compatible format
     static_assert(sizeof(address_tag_t) == 8, "");
     Blowfish_LR_wrapper addr_tag_formatted{addr_tag.bytes};
