@@ -121,16 +121,17 @@ void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount, const std::size_
     make_tx_extra(std::move(memo_elements), m_partial_memo);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const
+void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secret_key &viewbalance_privkey,
+    SpOutputProposalV1 &output_proposal_out) const
 {
     // sanity checks
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(m_enote_ephemeral_privkey)),
         "jamtis payment proposal self-send: invalid enote ephemeral privkey (zero).");
     CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(m_enote_ephemeral_privkey)) == 0,
         "jamtis payment proposal self-send: invalid enote ephemeral privkey (not canonical).");
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(m_viewbalance_privkey)),
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(viewbalance_privkey)),
         "jamtis payment proposal self-send: invalid view-balance privkey (zero).");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(m_viewbalance_privkey)) == 0,
+    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(viewbalance_privkey)) == 0,
         "jamtis payment proposal self-send: invalid view-balance privkey (not canonical).");
     CHECK_AND_ASSERT_THROW_MES(is_known_self_send_MAC(static_cast<address_tag_MAC_t>(m_type)),
         "jamtis payment proposal self-send: unknown self-send MAC.");
@@ -144,14 +145,14 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(SpOutputProposalV1 
     // sender-receiver shared secret: q = H_32[k_vb](K_e)  //note: K_e not K_d
     rct::key q;
     auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
-    make_jamtis_sender_receiver_secret_selfsend(m_viewbalance_privkey, output_proposal_out.m_enote_ephemeral_pubkey, q);
+    make_jamtis_sender_receiver_secret_selfsend(viewbalance_privkey, output_proposal_out.m_enote_ephemeral_pubkey, q);
 
     // encrypt address index and mac: addr_tag_enc = addr_tag(j, mac) ^ H_8(q)
 
     // 1. extract the address index from the destination address's address tag
     crypto::secret_key generateaddress_secret;
     crypto::secret_key ciphertag_secret;
-    make_jamtis_generateaddress_secret(m_viewbalance_privkey, generateaddress_secret);
+    make_jamtis_generateaddress_secret(viewbalance_privkey, generateaddress_secret);
     make_jamtis_ciphertag_secret(generateaddress_secret, ciphertag_secret);
     address_index_t j;
     CHECK_AND_ASSERT_THROW_MES(try_decipher_address_index(rct::sk2rct(ciphertag_secret), m_destination.m_addr_tag, j),
@@ -195,7 +196,6 @@ void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount,
     m_amount = amount;
     m_type = type;
     m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
-    m_viewbalance_privkey = rct::rct2sk(rct::skGen());
 
     std::vector<ExtraFieldElement> memo_elements;
     memo_elements.resize(num_random_memo_elements);

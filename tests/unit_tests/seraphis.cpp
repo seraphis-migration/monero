@@ -624,10 +624,9 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     JamtisPaymentProposalSelfSendV1 payment_proposal_selfspend{user_address,
         amount,
         JamtisSelfSendMAC::SELF_SPEND,
-        enote_privkey,
-        keys.k_vb};
+        enote_privkey};
     SpOutputProposalV1 output_proposal;
-    payment_proposal_selfspend.get_output_proposal_v1(output_proposal);
+    payment_proposal_selfspend.get_output_proposal_v1(keys.k_vb, output_proposal);
 
     // check the enote
     check_is_owned(output_proposal, keys, j, amount, JamtisEnoteType::SELF_SPEND);
@@ -639,9 +638,8 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     JamtisPaymentProposalSelfSendV1 payment_proposal_change{user_address,
         amount,
         JamtisSelfSendMAC::CHANGE,
-        enote_privkey,
-        keys.k_vb};
-    payment_proposal_change.get_output_proposal_v1(output_proposal);
+        enote_privkey};
+    payment_proposal_change.get_output_proposal_v1(keys.k_vb, output_proposal);
 
     // check the enote
     check_is_owned(output_proposal, keys, j, amount, JamtisEnoteType::CHANGE);
@@ -678,14 +676,13 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     self_spend_payment_proposal.m_amount = 1;
     self_spend_payment_proposal.m_type = JamtisSelfSendMAC::SELF_SPEND;
     make_secret_key(self_spend_payment_proposal.m_enote_ephemeral_privkey);
-    self_spend_payment_proposal.m_viewbalance_privkey = keys.k_vb;
-    self_spend_payment_proposal.get_output_proposal_v1(self_spend_proposal_amnt_1);
+    self_spend_payment_proposal.get_output_proposal_v1(keys.k_vb, self_spend_proposal_amnt_1);
     check_is_owned(self_spend_proposal_amnt_1, keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     JamtisPaymentProposalSelfSendV1 self_spend_payment_proposal2{self_spend_payment_proposal};
     SpOutputProposalV1 self_spend_proposal2_amnt_1;
     make_secret_key(self_spend_payment_proposal2.m_enote_ephemeral_privkey);
-    self_spend_payment_proposal2.get_output_proposal_v1(self_spend_proposal2_amnt_1);
+    self_spend_payment_proposal2.get_output_proposal_v1(keys.k_vb, self_spend_proposal2_amnt_1);
     check_is_owned(self_spend_proposal2_amnt_1, keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     /// test cases

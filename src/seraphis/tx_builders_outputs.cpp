@@ -91,10 +91,9 @@ static void make_additional_output_normal_self_send_v1(const jamtis::JamtisSelfS
     payment_proposal.m_amount = amount;
     payment_proposal.m_type = self_send_MAC;
     payment_proposal.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
-    payment_proposal.m_viewbalance_privkey = k_view_balance;
 
     // get output proposal
-    payment_proposal.get_output_proposal_v1(output_proposal_out);
+    payment_proposal.get_output_proposal_v1(k_view_balance, output_proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -119,10 +118,9 @@ static void make_additional_output_special_self_send_v1(const jamtis::JamtisSelf
     payment_proposal.m_amount = amount;
     payment_proposal.m_type = self_send_MAC;
     payment_proposal.m_enote_ephemeral_privkey = rct::rct2sk(rct::identity());  //r = 1 (not needed)
-    payment_proposal.m_viewbalance_privkey = k_view_balance;
 
     // get output proposal
-    payment_proposal.get_output_proposal_v1(output_proposal_out);
+    payment_proposal.get_output_proposal_v1(k_view_balance, output_proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

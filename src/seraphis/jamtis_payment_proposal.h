@@ -101,17 +101,17 @@ struct JamtisPaymentProposalSelfSendV1 final
     JamtisSelfSendMAC m_type;
     /// enote ephemeral privkey: r
     crypto::secret_key m_enote_ephemeral_privkey;
-    /// view-balance privkey: k_vb
-    crypto::secret_key m_viewbalance_privkey;
 
     /// memo elements to add to the tx memo
     TxExtra m_partial_memo;
 
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
+    * param: viewbalance_privkey -
     * outparam: output_proposal_out -
     */
-    void get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const;
+    void get_output_proposal_v1(const crypto::secret_key &viewbalance_privkey,
+        SpOutputProposalV1 &output_proposal_out) const;
 
     /**
     * brief: gen - generate a random proposal
