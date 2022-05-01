@@ -730,7 +730,7 @@ public:
             do
             {
                 sp::jamtis::gen_address_tag(m_basic_records.back().m_nominal_address_tag);
-            } while(sp::jamtis::try_decipher_address_index_with_context(*m_cipher_context,
+            } while(sp::jamtis::try_decipher_address_index(*m_cipher_context,
                 m_basic_records.back().m_nominal_address_tag,
                 j_temp));
         }

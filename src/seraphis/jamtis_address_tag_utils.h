@@ -90,12 +90,11 @@ address_tag_t address_index_to_tag(const address_index_t &j, const address_tag_M
 address_index_t address_tag_to_index(const address_tag_t &addr_tag, address_tag_MAC_t &mac_out);
 
 /// cipher[k](j || addr_tag_MAC) -> addr_tag
-address_tag_t cipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
-    const address_index_t &j);
+address_tag_t cipher_address_index(const jamtis_address_tag_cipher_context &cipher_context, const address_index_t &j);
 address_tag_t cipher_address_index(const rct::key &cipher_key, const address_index_t &j);
 
 /// cipher_decrypt[k](addr_tag) -> {j, addr_tag_MAC}
-bool try_decipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
+bool try_decipher_address_index(const jamtis_address_tag_cipher_context &cipher_context,
     const address_tag_t &addr_tag,
     address_index_t &j_out);
 bool try_decipher_address_index(const rct::key &cipher_key, const address_tag_t &addr_tag, address_index_t &j_out);

@@ -106,9 +106,7 @@ static bool try_get_intermediate_enote_record_info_v1_helper(const SpBasicEnoteR
     // get intermediate info (address index, amount, amount blinding factor) for a plain jamtis enote
 
     // j (fails if mac is 0)
-    if (!jamtis::try_decipher_address_index_with_context(cipher_context,
-            basic_record.m_nominal_address_tag,
-            address_index_out))
+    if (!jamtis::try_decipher_address_index(cipher_context, basic_record.m_nominal_address_tag, address_index_out))
         return false;
 
     // check nominal spend key

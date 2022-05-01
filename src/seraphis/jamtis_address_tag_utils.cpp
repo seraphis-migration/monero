@@ -366,8 +366,7 @@ address_index_t address_tag_to_index(const address_tag_t &addr_tag, address_tag_
     return j;
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_t cipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
-    const address_index_t &j)
+address_tag_t cipher_address_index(const jamtis_address_tag_cipher_context &cipher_context, const address_index_t &j)
 {
     return cipher_context.cipher(j);
 }
@@ -378,10 +377,10 @@ address_tag_t cipher_address_index(const rct::key &cipher_key, const address_ind
     const jamtis_address_tag_cipher_context cipher_context{cipher_key};
 
     // encrypt it
-    return cipher_address_index_with_context(cipher_context, j);
+    return cipher_address_index(cipher_context, j);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_decipher_address_index_with_context(const jamtis_address_tag_cipher_context &cipher_context,
+bool try_decipher_address_index(const jamtis_address_tag_cipher_context &cipher_context,
     const address_tag_t &addr_tag,
     address_index_t &j_out)
 {
@@ -394,7 +393,7 @@ bool try_decipher_address_index(const rct::key &cipher_key, const address_tag_t 
     const jamtis_address_tag_cipher_context cipher_context{cipher_key};
 
     // decrypt it
-    return try_decipher_address_index_with_context(cipher_context, addr_tag, j_out);
+    return try_decipher_address_index(cipher_context, addr_tag, j_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key, const address_tag_t &addr_tag)
