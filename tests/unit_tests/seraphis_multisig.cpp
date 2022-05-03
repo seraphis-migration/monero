@@ -286,6 +286,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     const std::uint32_t num_signers,
     const std::vector<std::uint32_t> &requested_signers,
     const std::vector<rct::xmr_amount> &in_amounts,
+    const std::vector<rct::xmr_amount> &out_amounts_explicit_selfsend,
     const std::vector<rct::xmr_amount> &out_amounts_explicit,
     const std::vector<rct::xmr_amount> &out_amounts_opaque,
     const rct::xmr_amount &fee,
@@ -386,6 +387,32 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
     // b) prepare outputs
 
+    // - enote ephemeral privkey entropy and seed
+    crypto::secret_key enote_ephemeral_privkey_entropy;
+    crypto::rand(32, to_bytes(enote_ephemeral_privkey_entropy));
+
+    crypto::secret_key enote_ephemeral_privkey_seed;
+    ASSERT_NO_THROW(make_multisig_enote_ephemeral_privkey_seed_v1(enote_ephemeral_privkey_entropy,
+        full_input_proposals,
+        enote_ephemeral_privkey_seed));
+
+    // - explicit self-send payments
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> explicit_payments_selfsend;
+    explicit_payments_selfsend.reserve(out_amounts_explicit_selfsend.size());
+
+    for (const rct::xmr_amount out_amount : out_amounts_explicit_selfsend)
+    {
+        explicit_payments_selfsend.emplace_back(
+                JamtisPaymentProposalSelfSendV1{
+                    .m_destination = user_address,
+                    .m_amount = out_amount,
+                    .m_type = JamtisSelfSendMAC::SELF_SPEND,
+                    .m_enote_ephemeral_privkey = make_secret_key(),
+                    .m_partial_memo = TxExtra{}
+                }
+            );
+    }
+
     // - explicit payments
     std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments;
     explicit_payments.reserve(out_amounts_explicit.size());
@@ -413,6 +440,8 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         user_address,
         keys.K_1_base,
         keys.k_vb,
+        enote_ephemeral_privkey_seed,
+        std::move(explicit_payments_selfsend),
         explicit_payments,
         opaque_payments));
 
@@ -438,6 +467,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
     ASSERT_NO_THROW(make_v1_multisig_tx_proposal_v1(accounts[0].get_threshold(),
         accounts[0].get_signers().size(),
+        enote_ephemeral_privkey_entropy,
         std::move(explicit_payments),
         std::move(opaque_payments),
         TxExtra{},
@@ -602,19 +632,29 @@ TEST(seraphis_multisig, txtype_squashed_v1)
         };
 
     // test M-of-N combos (and combinations of requested signers)
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 2, {0,1},   {2}, {1}, {0}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {0},     {2}, {1}, {0}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {1},     {2}, {1}, {0}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 3, {0,2},   {2}, {1}, {0}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(3, 3, {0,1,2}, {2}, {1}, {0}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {1,3},   {2}, {1}, {0}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {0,1,2,3}, {2}, {1}, {0}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 2, {0,1},   {2}, {}, {1}, {}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {0},     {2}, {}, {1}, {}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {1},     {2}, {}, {1}, {}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 3, {0,2},   {2}, {}, {1}, {}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(3, 3, {0,1,2}, {2}, {}, {1}, {}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {1,3},   {2}, {}, {1}, {}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {0,1,2,3}, {2}, {}, {1}, {}, 1, semantic_rules_version));
 
     // test various combinations of inputs/outputs
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2},   {1},   {0},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3},   {1},   {0},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3},   {1},   {1},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4},   {1},   {1},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {5,5}, {1,1}, {1,1}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {1},   { },   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {1},   {0},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {1},   { },   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {1},   { },   { },   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   { },   {1},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {2},   { },   0, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {2},   {0},   0, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {2},   { },   0, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {1},   {0},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3}, { },   {1},   {0},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3}, {1},   {1},   {0},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {1},   {1},   {0},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {1},   {1},   {1},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {0},   {1},   {1},   1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {6,6}, {1,1}, {1,1}, {1,1}, 1, semantic_rules_version));
 }
 //-------------------------------------------------------------------------------------------------------------------

@@ -125,6 +125,8 @@ struct SpMultisigInputProposalV1 final
 ///
 struct SpMultisigTxProposalV1 final
 {
+    /// entropy for generating enote ephemeral privkeys of outputs (explicit payments and opaque self-sends)
+    crypto::secret_key m_enote_ephemeral_privkey_entropy;
     /// tx outputs with known addresses
     std::vector<jamtis::JamtisPaymentProposalV1> m_explicit_payments;
     /// tx outputs with unknown addresses (may include self-sends and dummy outputs)

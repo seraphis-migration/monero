@@ -33,10 +33,14 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "jamtis_address_utils.h"
+#include "jamtis_core_utils.h"
+#include "misc_language.h"
 #include "misc_log_ex.h"
 #include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "seraphis_config_temp.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
@@ -268,55 +272,217 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_multisig_enote_ephemeral_privkey_seed_v1(const crypto::secret_key &enote_ephemeral_privkey_entropy,
+    const std::vector<crypto::key_image> &multisig_input_key_images,
+    crypto::secret_key &enote_ephemeral_privkey_seed_out)
+{
+    // make an enote ephemeral privkey seed
+    static const std::string domain_separator{config::HASH_KEY_MULTISIG_TX_PRIVKEYS_SEED};
+
+    // seed = H("domain-sep", entropy, {KI})
+    std::string hash;
+    hash.reserve(domain_separator.size() + sizeof(rct::key)*(1 + multisig_input_key_images.size()));
+    hash = domain_separator;
+    hash.append(enote_ephemeral_privkey_entropy.data, sizeof(crypto::secret_key));  //entropy
+    for (const crypto::key_image &key_image : multisig_input_key_images)
+        hash.append(key_image.data, sizeof(crypto::key_image));  //{KI}
+
+    // hash to the result
+    crypto::cn_fast_hash(hash.data(), hash.size(), enote_ephemeral_privkey_seed_out.data);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_multisig_enote_ephemeral_privkey_seed_v1(const crypto::secret_key &enote_ephemeral_privkey_entropy,
+    const std::vector<SpMultisigInputProposalV1> &input_proposals,
+    crypto::secret_key &enote_ephemeral_privkey_seed_out)
+{
+    // get key images out of input proposals then make the enote ephemeral privkey seed
+    std::vector<crypto::key_image> multisig_input_key_images;
+    multisig_input_key_images.reserve(input_proposals.size());
+
+    for (const SpMultisigInputProposalV1 &input_proposal : input_proposals)
+    {
+        multisig_input_key_images.emplace_back();
+        input_proposal.get_key_image(multisig_input_key_images.back());
+    }
+
+    make_multisig_enote_ephemeral_privkey_seed_v1(enote_ephemeral_privkey_entropy,
+        multisig_input_key_images,
+        enote_ephemeral_privkey_seed_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_multisig_enote_ephemeral_privkeys_v1(const crypto::secret_key &enote_ephemeral_privkey_seed,
+    const std::size_t num_keys_requested,
+    std::vector<crypto::secret_key> &enote_ephemeral_privkeys_out)
+{
+    static const std::string domain_separator{config::HASH_KEY_MULTISIG_TX_PRIVKEYS};
+
+    // hash chain
+    // h1 = H_n(seed, H("domain-sep"))
+    // h2 = H_n(seed, h1)
+    // h3 = H_n(seed, h2)
+    // h4 = ...
+    rct::keyV hash_context;
+    auto hash_context_wiper = epee::misc_utils::create_scope_leave_handler([&]{
+            memwipe(hash_context.data(), hash_context.size());
+        });
+
+    hash_context.resize(2);
+
+    hash_context[0] = rct::sk2rct(enote_ephemeral_privkey_seed);  //seed
+    rct::cn_fast_hash(hash_context[1], domain_separator.data(), domain_separator.size());  //H("domain-sep")
+
+    enote_ephemeral_privkeys_out.clear();
+    enote_ephemeral_privkeys_out.resize(num_keys_requested);
+
+    for (crypto::secret_key &enote_ephemeral_privkey : enote_ephemeral_privkeys_out)
+    {
+        // advance the hash chain
+        hash_context[1] = rct::hash_to_scalar(hash_context);
+        // set this key
+        enote_ephemeral_privkey = rct::rct2sk(hash_context[1]);
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    const std::vector<jamtis::JamtisPaymentProposalV1> &explicit_payments,
+    const crypto::secret_key &enote_ephemeral_privkey_seed,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> explicit_payments_selfsend,
+    std::vector<jamtis::JamtisPaymentProposalV1> &explicit_payments_normal_inout,
     std::vector<SpOutputProposalV1> &opaque_payments_inout)
 {
-    // collect total input amount
+    /// prepare to finalize the output set
+
+    // 1. if there is only one opaque payment, and <= 1 explicit payments, add a normal dummy opaque payment prematurely
+    // - in multisig, we must avoid the case where an explicit payment in a 2-out tx shares an enote ephemeral privkey
+    //   with an opaque output proposal, which could allow the explicit payment to contain a onetime address that already
+    //   exists in the ledger (effectively burning funds)
+    if (opaque_payments_inout.size() == 1 &&
+        explicit_payments_normal_inout.size() + explicit_payments_selfsend.size() <= 1)
+    {
+        opaque_payments_inout.emplace_back();
+
+        // normal dummy
+        // - 0 amount
+        opaque_payments_inout.back().gen(0, 0);
+    }
+
+    // 2. prepare enough enote ephemeral privkeys for all explicit payments (finalize will add 2 at most)
+    std::vector<crypto::secret_key> enote_ephemeral_privkeys;
+    make_multisig_enote_ephemeral_privkeys_v1(enote_ephemeral_privkey_seed,
+        explicit_payments_normal_inout.size() + explicit_payments_selfsend.size() + 2,
+        enote_ephemeral_privkeys);
+
+    // - sanity check
+    CHECK_AND_ASSERT_THROW_MES(enote_ephemeral_privkeys.size() ==
+            explicit_payments_normal_inout.size() + explicit_payments_selfsend.size() + 2,
+        "finalize multisig output proposals: incorrect number of enote ephemeral privkeys (bug).");
+
+    std::size_t enote_ephemeral_privkey_index{0};
+
+    // 3. reset enote ephemeral privkeys of explicit payments
+    // note: the case where explicit proposals passed in have already set up the 2-output shared enote ephemeral pubkey
+    //       is NOT supported
+    for (jamtis::JamtisPaymentProposalV1 &normal_payment_proposal : explicit_payments_normal_inout)
+    {
+        normal_payment_proposal.m_enote_ephemeral_privkey = enote_ephemeral_privkeys[enote_ephemeral_privkey_index];
+        ++enote_ephemeral_privkey_index;
+    }
+
+    for (jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment_proposal : explicit_payments_selfsend)
+    {
+        selfsend_payment_proposal.m_enote_ephemeral_privkey = enote_ephemeral_privkeys[enote_ephemeral_privkey_index];
+        ++enote_ephemeral_privkey_index;
+    }
+
+    // 4. copy existing output proposals
+    std::vector<SpOutputProposalV1> output_proposals_temp;
+    output_proposals_temp.reserve(opaque_payments_inout.size() +
+        explicit_payments_normal_inout.size() +
+        explicit_payments_selfsend.size());
+    output_proposals_temp = opaque_payments_inout;
+
+    opaque_payments_inout.reserve(opaque_payments_inout.size() + explicit_payments_selfsend.size() + 2);
+
+    for (const jamtis::JamtisPaymentProposalV1 &normal_payment_proposal : explicit_payments_normal_inout)
+    {
+        output_proposals_temp.emplace_back();
+        normal_payment_proposal.get_output_proposal_v1(output_proposals_temp.back());
+    }
+
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment_proposal : explicit_payments_selfsend)
+    {
+        output_proposals_temp.emplace_back();
+        selfsend_payment_proposal.get_output_proposal_v1(k_view_balance, output_proposals_temp.back());
+
+        // insert to the output opaque set (for efficiency)
+        opaque_payments_inout.emplace_back(output_proposals_temp.back());
+    }
+
+    // 5. collect total input amount
     boost::multiprecision::uint128_t total_input_amount{0};
 
     for (const SpMultisigInputProposalV1 &input_proposal : full_input_proposals)
         total_input_amount += input_proposal.m_input_amount;
 
-    // copy existing output proposals
-    std::vector<SpOutputProposalV1> output_proposals_temp;
-    output_proposals_temp.reserve(opaque_payments_inout.size() + explicit_payments.size() + 2);  //finalize adds 2 at most
-    output_proposals_temp = opaque_payments_inout;
 
-    // add explicit payments to output proposal set
-    for (const jamtis::JamtisPaymentProposalV1 &jamtis_payment_proposal : explicit_payments)
-    {
-        output_proposals_temp.emplace_back();
-        jamtis_payment_proposal.get_output_proposal_v1(output_proposals_temp.back());
-    }
+    /// finalize the output proposal set
 
-    // save number of output proposals so we know how many get added
-    const std::size_t num_original_payments{output_proposals_temp.size()};
+    // 1. finalize
+    std::vector<SpOutputProposalV1> new_output_proposals;
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> new_selfsend_proposals;
 
-    // finalize the output proposal set
     finalize_v1_output_proposal_set_v1(total_input_amount,
         transaction_fee,
         change_destination,
         dummy_destination,
         wallet_spend_pubkey,
         k_view_balance,
-        output_proposals_temp);
+        output_proposals_temp,
+        new_output_proposals,
+        new_selfsend_proposals);
 
-    CHECK_AND_ASSERT_THROW_MES(output_proposals_temp.size() >= num_original_payments,
-        "finalize multisig output proposals: finalizing output proposals reduced number of proposals (bug).");
+    CHECK_AND_ASSERT_THROW_MES(new_output_proposals.size() + new_selfsend_proposals.size() <= 2,
+        "finalize multisig output proposals: finalizing output proposals added more than 2 proposals (bug).");
 
-    // add new output proposals to the original opaque output set
-    opaque_payments_inout.reserve(opaque_payments_inout.size() + output_proposals_temp.size() - num_original_payments);
+    // 2. reset the new selfsend proposals' enote ephemeral privkeys if there are any
+    if (new_selfsend_proposals.size() == 1 &&
+        output_proposals_temp.size() + new_output_proposals.size() == 1)
+    {
+        // special type: do nothing (it must be shared with an explicit normal payment that was passed in)
+    }
+    else
+    {
+        for (jamtis::JamtisPaymentProposalSelfSendV1 &new_selfsend_payment_proposal : new_selfsend_proposals)
+        {
+            new_selfsend_payment_proposal.m_enote_ephemeral_privkey =
+                enote_ephemeral_privkeys[enote_ephemeral_privkey_index];
+            ++enote_ephemeral_privkey_index;
+        }
 
-    for (std::size_t output_proposal_index{num_original_payments};
-            output_proposal_index < output_proposals_temp.size();
-            ++output_proposal_index)
-        opaque_payments_inout.emplace_back(output_proposals_temp[output_proposal_index]);
+        // sanity check
+        CHECK_AND_ASSERT_THROW_MES(enote_ephemeral_privkey_index + 1 <= enote_ephemeral_privkeys.size(),
+            "finalize multisig output proposals: enote ephemeral privkey index error (bug).");
+    }
+
+
+    /// set output variables
+
+    // 1. add new opaque output proposals to the original opaque output set
+    for (const SpOutputProposalV1 &new_normal_payment_proposal : new_output_proposals)
+        opaque_payments_inout.emplace_back(new_normal_payment_proposal);
+
+    // 2. insert pre-existing self-send proposals to the opaque set (we did this above)
+
+    // 3. insert new self-send output proposals to the opaque set
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &new_selfsend_payment_proposal : new_selfsend_proposals)
+    {
+        opaque_payments_inout.emplace_back();
+        new_selfsend_payment_proposal.get_output_proposal_v1(k_view_balance, opaque_payments_inout.back());
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
@@ -366,54 +532,6 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
         "multisig tx proposal: invalid aggregate signer set filter.");
 
 
-    /// output checks
-
-    // 1. convert to a plain tx proposal to validate outputs (should call full semantics check of tx proposal)
-    // note: for 2-out txs, that semantics check will ensure they share an enote ephemeral pubkey
-    SpTxProposalV1 tx_proposal;
-    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
-
-    // - get prefix from proposal
-    rct::key proposal_prefix;
-    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, proposal_prefix);
-
-    // 2. validate self-sends and explicit proposals' enote ephemeral privkeys
-    // goal: it should not be possible for a multisig tx proposer to burn funds (either of normal destinations or
-    //       of the multisig account) by re-using an enote ephemeral privkey between different txs
-    //       - non-self-send opaque outputs are an exception to this in order to permit some tx modularity, BUT to avoid
-    //         self-sends getting burnt it isn't permitted for self-sends to be in a 2-out tx with an opaque non-self-send
-    //         output (because outputs in 2-out txs share an enote ephemeral privkey, and non-self-send opaque outputs'
-    //         enote ephemeral privkeys are not validated)
-
-    // a. there must be at least one opaque self-send output
-    // - this implies if there is only one opaque output proposal, it isn't a non-self-send
-    std::size_t num_self_sends{0};
-
-    for (const SpOutputProposalV1 &output_proposal : multisig_tx_proposal.m_opaque_payments)
-    {
-        if (jamtis::is_self_send_output_proposal(output_proposal, wallet_spend_pubkey, k_view_balance))
-            ++num_self_sends;
-    }
-
-    CHECK_AND_ASSERT_THROW_MES(num_self_sends > 0, "multisig tx proposal: there are no self-send outputs.");
-
-    // b. there cannot be two self-send outputs and no other outputs (postcondition of the output set finalizer)
-    if (num_self_sends == 2)
-    {
-        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_opaque_payments.size() +
-                multisig_tx_proposal.m_explicit_payments.size() > 2,
-            "multisig tx proposal: there are two self-send outputs but no other outputs (not allowed).");
-    }
-
-    // c. self-send outputs' enote ephemeral privkeys should be reproducible
-    // note: if there are exactly two opaque proposals (one of which is a self-send), then reproducing the self-send
-    //       output's enote ephemeral privkey will mean the other output's enote ephemeral privkey was deterministic,
-    //       which means there is some wiggle-room around how opaque output proposals can be defined
-
-    // d. explicit outputs' enote ephemeral privkeys should be reproducible
-
-
-
     /// input/output checks
 
     // 1. check the public input proposal semantics
@@ -433,6 +551,136 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_explicit_payments.size() +
             multisig_tx_proposal.m_opaque_payments.size() > 0,
         "multisig tx proposal: no outputs.");
+
+
+    /// output checks
+
+    const std::size_t num_outputs{
+            multisig_tx_proposal.m_opaque_payments.size() + multisig_tx_proposal.m_explicit_payments.size()
+        };
+
+    // 1. convert to a plain tx proposal to validate outputs (should call full semantics check of tx proposal)
+    // note: for 2-out txs, that semantics check will ensure they share an enote ephemeral pubkey
+    SpTxProposalV1 tx_proposal;
+    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
+
+    // - get prefix from proposal
+    rct::key proposal_prefix;
+    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, proposal_prefix);
+
+    // 2. validate self-sends and enote ephemeral privkeys
+    // goal: it should not be possible for a multisig tx proposer to burn funds (either of normal destinations or
+    //       of the multisig account) by re-using an enote ephemeral privkey between different txs
+    //       - non-self-send opaque outputs are an exception to this in order to permit some tx modularity, BUT to avoid
+    //         self-sends getting burnt it isn't permitted for self-sends to be in a 2-out tx with an opaque non-self-send
+    //         output (because outputs in 2-out txs share an enote ephemeral privkey, and non-self-send opaque outputs'
+    //         enote ephemeral privkeys are not validated)
+
+    // a. make enote view privkeys
+    crypto::secret_key enote_ephemeral_privkey_seed;
+    make_multisig_enote_ephemeral_privkey_seed_v1(multisig_tx_proposal.m_enote_ephemeral_privkey_entropy,
+        converted_input_proposals,
+        enote_ephemeral_privkey_seed);
+
+    std::vector<crypto::secret_key> enote_ephemeral_privkeys;
+    make_multisig_enote_ephemeral_privkeys_v1(enote_ephemeral_privkey_seed,
+        num_outputs == 2 ? 1 : num_outputs,
+        enote_ephemeral_privkeys);
+
+    // - sanity check
+    CHECK_AND_ASSERT_THROW_MES(enote_ephemeral_privkeys.size() == (num_outputs == 2 ? 1 : num_outputs),
+        "multisig tx proposal: incorrect number of enote ephemeral privkeys (bug).");
+
+    std::size_t enote_ephemeral_privkey_index{0};
+
+    // b. explicit outputs' enote ephemeral privkeys should be reproducible
+    for (const jamtis::JamtisPaymentProposalV1 &explicit_payment : multisig_tx_proposal.m_explicit_payments)
+    {
+        CHECK_AND_ASSERT_THROW_MES(explicit_payment.m_enote_ephemeral_privkey ==
+                enote_ephemeral_privkeys[enote_ephemeral_privkey_index],
+            "multisig tx proposal: an explicit payment did not have a reproducible enote ephemeral privkey.");
+
+        // go to the next enote ephemeral privkey (if there is one)
+        if (enote_ephemeral_privkey_index + 1 < enote_ephemeral_privkeys.size())
+            ++enote_ephemeral_privkey_index;
+    }
+
+    // c. there must be at least one opaque self-send output
+    std::size_t num_self_sends{0};
+    SpEnoteRecordV1 temp_enote_record;
+    SpEnoteV1 temp_enote;
+    crypto::secret_key temp_address_privkey;
+    rct::key temp_reproduced_enote_ephemeral_pubkey;
+
+    crypto::secret_key s_generate_address;
+    jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
+
+    for (const SpOutputProposalV1 &output_proposal : multisig_tx_proposal.m_opaque_payments)
+    {
+        output_proposal.get_enote_v1(temp_enote);
+
+        if (try_get_enote_record_v1_selfsend(temp_enote,
+            output_proposal.m_enote_ephemeral_pubkey,
+            wallet_spend_pubkey,
+            k_view_balance,
+            s_generate_address,
+            temp_enote_record))
+        {
+            ++num_self_sends;
+
+            // - self-send outputs' enote ephemeral privkeys should be reproducible
+            // note: if there are exactly two opaque proposals, one of which is a self-send, then the second conditional
+            //       will fail (even if the enote ephemeral privkey is reproducible) because there is insufficient
+            //       information to validate that case
+            if (num_outputs == 2 && multisig_tx_proposal.m_explicit_payments.size() == 1)
+            {
+                // if our self-send is a 'special' type and there is one explicit payment, then the self-send will share
+                //   the explicit payment's enote ephemeral privkey; for sanity, we double-check here (even though the
+                //   tx_proposal semantics check should ensure our two outputs have the same enote ephemeral pubkey)
+                SpOutputProposalV1 temp_other_proposal;
+                multisig_tx_proposal.m_explicit_payments[0].get_output_proposal_v1(temp_other_proposal);
+
+                CHECK_AND_ASSERT_THROW_MES(temp_other_proposal.m_enote_ephemeral_pubkey ==
+                        output_proposal.m_enote_ephemeral_pubkey,
+                    "multisig tx proposal: a special self-send did not share its enote ephemeral pubkey with the "
+                    "explicit payment in its tx.");
+            }
+            else
+            {
+                // otherwise, this should be a normal self-send, so just reproduce the enote ephemeral pubkey
+
+                // address privkey of address that owns this output (k^j_a)
+                jamtis::make_jamtis_address_privkey(s_generate_address,
+                    temp_enote_record.m_address_index,
+                    temp_address_privkey);
+
+                // K_e = r * k^j_a * G
+                temp_reproduced_enote_ephemeral_pubkey =
+                    rct::scalarmultKey(
+                            rct::scalarmultBase(rct::sk2rct(temp_address_privkey)),
+                            rct::sk2rct(enote_ephemeral_privkeys[enote_ephemeral_privkey_index])
+                        );
+
+                // check that the enote ephemeral pubkey was reproduced
+                CHECK_AND_ASSERT_THROW_MES(temp_reproduced_enote_ephemeral_pubkey ==
+                        output_proposal.m_enote_ephemeral_pubkey,
+                    "multisig tx proposal: could not reproduce the enote ephemeral pubkey for a self-send.");
+
+                // go to the next enote ephemeral privkey (if there is one)
+                if (enote_ephemeral_privkey_index + 1 < enote_ephemeral_privkeys.size())
+                    ++enote_ephemeral_privkey_index;
+            }
+        }
+    }
+
+    CHECK_AND_ASSERT_THROW_MES(num_self_sends > 0, "multisig tx proposal: there are no self-send outputs.");
+
+    // d. there cannot be two self-send outputs and no other outputs (postcondition of the output set finalizer)
+    if (num_self_sends == 2)
+    {
+        CHECK_AND_ASSERT_THROW_MES(num_outputs > 2,
+            "multisig tx proposal: there are two self-send outputs but no other outputs (not allowed).");
+    }
 
 
     /// input checks
@@ -482,6 +730,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     const std::uint32_t num_signers,
+    const crypto::secret_key &enote_ephemeral_privkey_entropy,
     std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
     std::vector<SpOutputProposalV1> opaque_payments,
     TxExtra partial_memo,
@@ -491,6 +740,7 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     SpMultisigTxProposalV1 &proposal_out)
 {
     // add miscellaneous components
+    proposal_out.m_enote_ephemeral_privkey_entropy = enote_ephemeral_privkey_entropy;
     proposal_out.m_explicit_payments = std::move(explicit_payments);
     proposal_out.m_opaque_payments = std::move(opaque_payments);
     proposal_out.m_partial_memo = std::move(partial_memo);

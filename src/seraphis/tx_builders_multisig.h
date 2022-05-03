@@ -129,6 +129,17 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<SpMultisigInputProposalV1> &converted_input_proposals_out);
+//todo
+void make_multisig_enote_ephemeral_privkey_seed_v1(const crypto::secret_key &enote_ephemeral_privkey_entropy,
+    const std::vector<crypto::key_image> &multisig_input_key_images,
+    crypto::secret_key &enote_ephemeral_privkey_seed_out);
+void make_multisig_enote_ephemeral_privkey_seed_v1(const crypto::secret_key &enote_ephemeral_privkey_entropy,
+    const std::vector<SpMultisigInputProposalV1> &input_proposals,
+    crypto::secret_key &enote_ephemeral_privkey_seed_out);
+//todo
+void make_multisig_enote_ephemeral_privkeys_v1(const crypto::secret_key &enote_ephemeral_privkey_seed,
+    const std::size_t num_keys_requested,
+    std::vector<crypto::secret_key> &enote_ephemeral_privkeys_out);
 /**
 * brief: finalize_multisig_output_proposals_v1 - finalize output set for a multisig tx proposal (add change/dummy outputs)
 *   - precondition: multisig tx proposal will contain a full balance (not trying to partially fund an output set)
@@ -138,17 +149,21 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
 * param: dummy_destination -
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
-* param: explicit_payments -
+* param: enote_ephemeral_privkey_seed -
+* param: explicit_payments_selfsend -
+* inoutparam: explicit_payments_normal_inout -
 * inoutparam: output_proposals_inout -
 */
-void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &input_proposals,
+void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    const std::vector<jamtis::JamtisPaymentProposalV1> &explicit_payments,
-    std::vector<SpOutputProposalV1> &output_proposals_inout);
+    const crypto::secret_key &enote_ephemeral_privkey_seed,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> explicit_payments_selfsend,
+    std::vector<jamtis::JamtisPaymentProposalV1> &explicit_payments_normal_inout,
+    std::vector<SpOutputProposalV1> &opaque_payments_inout);
 /**
 * brief: check_v1_multisig_tx_proposal_full_balance_v1 - check that a multisig tx proposal has a full balance
 *   - throws if a check fails
@@ -184,6 +199,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 * brief: make_v1_multisig_tx_proposal_v1 - make a multisig tx proposal
 * param: threshold -
 * param: num_signers -
+* param: enote_ephemeral_privkey_entropy -
 * param: explicit_payments -
 * param: opaque_payments -
 * param: partial_memo -
@@ -194,6 +210,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 */
 void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     const std::uint32_t num_signers,
+    const crypto::secret_key &enote_ephemeral_privkey_entropy,
     std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
     std::vector<SpOutputProposalV1> opaque_payments,
     TxExtra partial_memo,
