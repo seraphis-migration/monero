@@ -120,12 +120,18 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_o
 
     // make the tx proposal
     make_v1_tx_proposal_v1(std::move(output_proposals), std::move(additional_memo_elements), tx_proposal_out);
+
+    // validate the tx proposal
+    check_v1_tx_proposal_semantics_v1(tx_proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultisigTxProposalV1::get_proposal_prefix_v1(rct::key &proposal_prefix_out) const
 {
+    // extract proposal
     SpTxProposalV1 tx_proposal;
     this->get_v1_tx_proposal_v1(tx_proposal);
+
+    // get prefix from proposal
     tx_proposal.get_proposal_prefix(m_version_string, proposal_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------

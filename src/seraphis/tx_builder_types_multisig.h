@@ -142,7 +142,7 @@ struct SpMultisigTxProposalV1 final
     /// encoding of intended tx version
     std::string m_version_string;
 
-    /// convert to plain tx proposal
+    /// convert to plain tx proposal (auto-checks the tx proposal semantics)
     void get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_out) const;
 
     /// get the tx proposal prefix that will be signed by input composition proofs

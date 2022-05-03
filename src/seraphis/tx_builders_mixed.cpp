@@ -207,7 +207,7 @@ void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
         "v1 partial tx semantics check (v1): test transaction was invalid using requested semantics rules version!");
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_partial_tx_v1(const SpTxProposalV1 &proposal,
+void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     std::vector<SpPartialInputV1> partial_inputs,
     const rct::xmr_amount transaction_fee,
     const std::string &version_string,
@@ -221,7 +221,7 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &proposal,
 
     // inputs and proposal must be compatible
     rct::key proposal_prefix;
-    proposal.get_proposal_prefix(version_string, proposal_prefix);
+    tx_proposal.get_proposal_prefix(version_string, proposal_prefix);
 
     for (const auto &partial_input : partial_inputs)
     {
@@ -244,10 +244,10 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &proposal,
 
     // make balance proof
     make_v1_balance_proof_v1(input_amounts,
-        proposal.m_output_amounts,
+        tx_proposal.m_output_amounts,
         transaction_fee,
         input_image_amount_commitment_blinding_factors,
-        proposal.m_output_amount_commitment_blinding_factors,
+        tx_proposal.m_output_amount_commitment_blinding_factors,
         partial_tx_out.m_balance_proof);
 
 
@@ -270,8 +270,8 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &proposal,
     }
 
     // gather tx output parts
-    partial_tx_out.m_outputs = proposal.m_outputs;
-    partial_tx_out.m_tx_supplement = proposal.m_tx_supplement;
+    partial_tx_out.m_outputs = tx_proposal.m_outputs;
+    partial_tx_out.m_tx_supplement = tx_proposal.m_tx_supplement;
     partial_tx_out.m_tx_fee = transaction_fee;
 }
 //-------------------------------------------------------------------------------------------------------------------

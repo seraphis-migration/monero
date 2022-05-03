@@ -65,9 +65,9 @@ struct SpEnote final
     }
 
     /**
-    * brief: gen_base - generate a Seraphis ENote (all random)
+    * brief: onetime_address_is_canonical - check if the onetime address is canonical (prime subgroup)
     */
-    void gen();
+    bool onetime_address_is_canonical() const;
 
     /**
     * brief: append_to_string - convert enote to a string and append to existing string (for proof transcripts)
@@ -76,6 +76,11 @@ struct SpEnote final
     void append_to_string(std::string &str_inout) const;
 
     static std::size_t get_size_bytes() { return 32*2; }
+
+    /**
+    * brief: gen_base - generate a Seraphis ENote (all random)
+    */
+    void gen();
 };
 
 ////
@@ -166,7 +171,9 @@ struct SpOutputProposal final
         return memcmp(&m_onetime_address, &other_proposal.m_onetime_address, sizeof(rct::key)) < 0;
     }
 
-    /// check if the onetime address is canonical
+    /**
+    * brief: onetime_address_is_canonical - check if the onetime address is canonical (prime subgroup)
+    */
     bool onetime_address_is_canonical() const;
 
     /**

@@ -84,67 +84,86 @@ static std::uint32_t n_choose_k(const std::uint32_t n, const std::uint32_t k)
     return static_cast<std::uint32_t>(std::round(fp_result));
 }
 //-------------------------------------------------------------------------------------------------------------------
-// finalize checking multisig tx proposal semantics
-// - doesn't validate onetime addresses and enote ephemeral pubkeys (these require the expensive get_v1_tx_proposal_v1())
+// check multisig tx proposal semantics (multisig signing config, inputs, and outputs)
 // - assumes 'converted_input_proposals' are converted versions of the public input proposals stored in the tx proposal
 //-------------------------------------------------------------------------------------------------------------------
 static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const std::uint32_t threshold,
     const std::uint32_t num_signers,
-    const std::vector<SpMultisigInputProposalV1> &converted_input_proposals,
-    const rct::key &proposal_prefix)
+    const std::vector<SpMultisigInputProposalV1> &converted_input_proposals)
 {
-    // should be at least 1 input and 1 output
+    /// multisig signing config checks
+
+    // 1. signer set filter must be valid (at least 'threshold' signers allowed, format is valid)
+    CHECK_AND_ASSERT_THROW_MES(multisig::validate_aggregate_multisig_signer_set_filter(threshold,
+            num_signers,
+            multisig_tx_proposal.m_aggregate_signer_set_filter),
+        "multisig tx proposal: invalid aggregate signer set filter.");
+
+
+    /// output checks
+
+    // 1. convert to a plain tx proposal to validate outputs (should call full semantics check of tx proposal)
+    SpTxProposalV1 tx_proposal;
+    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
+
+    // 2. get prefix from proposal
+    rct::key proposal_prefix;
+    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, proposal_prefix);
+
+
+    /// input/output checks
+
+    // 1. should be at least 1 input and 1 output
     CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() > 0, "multisig tx proposal: no inputs.");
     CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_explicit_payments.size() +
             multisig_tx_proposal.m_opaque_payments.size() > 0,
         "multisig tx proposal: no outputs.");
 
-    // input proposals line up 1:1 with input proof proposals, each input has a unique key image
+
+    /// input checks
+
+    // 1. input proposals line up 1:1 with input proof proposals, each input has a unique key image
     CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() ==
         multisig_tx_proposal.m_input_proof_proposals.size(),
         "multisig tx proposal: input proposals don't line up with input proposal proofs.");
 
+    // 2. assess each input proposal
     rct::key image_address_with_squash_prefix;
     std::vector<crypto::key_image> key_images;
     key_images.reserve(converted_input_proposals.size());
 
     for (std::size_t input_index{0}; input_index < converted_input_proposals.size(); ++input_index)
     {
-        // converted proposals should be well-formed
+        // a. converted proposals should be well-formed
         check_v1_multisig_input_proposal_semantics_v1(converted_input_proposals[input_index]);
 
-        // input proof proposal messages all equal proposal prefix of core tx proposal
+        // b. input proof proposal messages all equal proposal prefix of core tx proposal
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].message == proposal_prefix,
             "multisig tx proposal: input proof proposal does not match the tx proposal (different proposal prefix).");
 
-        // input proof proposal keys line up 1:1 and match with input proposals
+        // c. input proof proposal keys line up 1:1 and match with input proposals
         converted_input_proposals[input_index].m_core.get_masked_address(image_address_with_squash_prefix);
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].K ==
                 image_address_with_squash_prefix,
             "multisig tx proposal: input proof proposal does not match input proposal (different proof keys).");
 
-        // input proof proposal key images line up 1:1 and match with input proposals
+        // d. input proof proposal key images line up 1:1 and match with input proposals
         key_images.emplace_back();
         converted_input_proposals[input_index].get_key_image(key_images.back());
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].KI ==
                 key_images.back(),
             "multisig tx proposal: input proof proposal does not match input proposal (different key images).");
 
-        // check that the key image obtained is canonical
+        // e. check that the key image obtained is canonical
         CHECK_AND_ASSERT_THROW_MES(key_domain_is_prime_subgroup(rct::ki2rct(key_images.back())),
             "multisig tx proposal: an input's key image is not in the prime subgroup.");
     }
 
+    // 3. key images should be unique
     std::sort(key_images.begin(), key_images.end());
     CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(key_images.begin(), key_images.end()) == key_images.end(),
         "multisig tx proposal: inputs are not unique (found duplicate key image).");
-
-    // signer set filter must be valid (at least 'threshold' signers allowed, format is valid)
-    CHECK_AND_ASSERT_THROW_MES(multisig::validate_aggregate_multisig_signer_set_filter(threshold,
-            num_signers,
-            multisig_tx_proposal.m_aggregate_signer_set_filter),
-        "multisig tx proposal: invalid aggregate signer set filter.");
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -416,15 +435,9 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance)
 {
-    // proposal should contain expected tx version encoding
+    /// proposal should contain expected tx version encoding
     CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_version_string == expected_version_string,
         "multisig tx proposal: intended tx version encoding is invalid.");
-
-    // convert to a plain tx proposal to check the following (getting a proposal prefix should accomplish these checks)
-    // - unique onetime addresses
-    // - if only 2 outputs, should be 1 unique enote ephemeral pubkey, otherwise 1:1 with outputs and all unique
-    rct::key proposal_prefix;
-    multisig_tx_proposal.get_proposal_prefix_v1(proposal_prefix);
 
     // check the public input proposal semantics
     for (const SpMultisigPublicInputProposalV1 &public_input_proposal : multisig_tx_proposal.m_input_proposals)
@@ -438,12 +451,11 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
             converted_input_proposals),
         "multisig tx proposal: could not extract data from an input proposal (maybe input not owned by user).");
 
-    // finish the checks
+    // do all the remaining checks
     check_v1_multisig_tx_proposal_semantics_v1_final(multisig_tx_proposal,
         threshold,
         num_signers,
-        converted_input_proposals,
-        proposal_prefix);
+        converted_input_proposals);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
@@ -497,8 +509,7 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     check_v1_multisig_tx_proposal_semantics_v1_final(proposal_out,
         threshold,
         num_signers,
-        full_input_proposals,
-        proposal_prefix);
+        full_input_proposals);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_input_init_set_semantics_v1(const SpMultisigInputInitSetV1 &input_init_set,

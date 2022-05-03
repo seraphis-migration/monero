@@ -161,6 +161,8 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<SpOutputProposalV1> &output_proposals_inout);
+//todo
+void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal);
 /**
 * brief: make_v1_tx_proposal_v1 - make v1 tx proposal (set of outputs that can be incorporated in a full tx)
 * param: output_proposals -

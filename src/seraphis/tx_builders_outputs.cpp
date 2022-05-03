@@ -632,6 +632,44 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal)
+{
+    // outputs should be sorted
+    CHECK_AND_ASSERT_THROW_MES(std::is_sorted(tx_proposal.m_outputs.begin(), tx_proposal.m_outputs.end()),
+        "Semantics check tx proposal v1: outputs aren't sorted.");
+
+    // outputs should be unique (can use adjacent_find when sorted)
+    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(tx_proposal.m_outputs.begin(),
+            tx_proposal.m_outputs.end(),
+            equals_from_less{}) == tx_proposal.m_outputs.end(),
+        "Semantics check tx proposal v1: output onetime addresses are not all unique.");
+
+    // onetime addresses should be canonical (sanity check so our tx outputs don't have duplicate key images)
+    for (const SpEnoteV1 &output_enote : tx_proposal.m_outputs)
+    {
+        CHECK_AND_ASSERT_THROW_MES(output_enote.m_core.onetime_address_is_canonical(),
+            "Semantics check tx proposal v1: an output onetime address is not in the prime subgroup.");
+    }
+
+    // check that output amount commitments can be reproduced
+    CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_outputs.size() == tx_proposal.m_output_amounts.size(),
+        "Semantics check tx proposal v1: outputs don't line up with output amounts.");
+    CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_outputs.size() ==
+            tx_proposal.m_output_amount_commitment_blinding_factors.size(),
+        "Semantics check tx proposal v1: outputs don't line up with output amount commitment blinding factors.");
+
+    for (std::size_t output_index{0}; output_index < tx_proposal.m_outputs.size(); ++output_index)
+    {
+        CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_outputs[output_index].m_core.m_amount_commitment ==
+                rct::commit(tx_proposal.m_output_amounts[output_index],
+                    rct::sk2rct(tx_proposal.m_output_amount_commitment_blinding_factors[output_index])),
+            "Semantics check tx proposal v1: could not reproduce an output's amount commitment.");
+    }
+
+    // check tx supplement (especially enote ephemeral pubkeys)
+    check_v1_tx_supplement_semantics_v1(tx_proposal.m_tx_supplement, tx_proposal.m_outputs.size());
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
     SpTxProposalV1 &proposal_out)

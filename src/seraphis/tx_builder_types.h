@@ -239,8 +239,6 @@ void check_v1_membership_proof_prep_semantics_v1(const SpMembershipProofPrepV1 &
 //todo
 void check_v1_alignable_membership_proof_semantics_v1(const SpAlignableMembershipProofV1 &reference_set);
 //todo
-void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal);
-//todo
 void check_v1_partial_input_semantics_v1(const SpPartialInputV1 &partial_input);
 
 } //namespace sp

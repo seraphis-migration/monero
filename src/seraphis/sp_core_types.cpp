@@ -50,11 +50,9 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnote::gen()
+bool SpEnote::onetime_address_is_canonical() const
 {
-    // all random
-    m_onetime_address = rct::pkGen();
-    m_amount_commitment = rct::pkGen();
+    return key_domain_is_prime_subgroup(m_onetime_address);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpEnote::append_to_string(std::string &str_inout) const
@@ -64,6 +62,13 @@ void SpEnote::append_to_string(std::string &str_inout) const
 
     str_inout.append(reinterpret_cast<const char *>(m_onetime_address.bytes), sizeof(rct::key));
     str_inout.append(reinterpret_cast<const char *>(m_amount_commitment.bytes), sizeof(rct::key));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnote::gen()
+{
+    // all random
+    m_onetime_address = rct::pkGen();
+    m_amount_commitment = rct::pkGen();
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpInputProposal::operator<(const SpInputProposal &other_proposal) const

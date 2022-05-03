@@ -95,13 +95,13 @@ void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version);
 /**
 * brief: make_v1_partial_tx_v1 - make v1 partial transaction (everything ready for a full tx except membership proofs)
-* param: proposal -
+* param: tx_proposal -
 * param: partial_inputs -
 * param: transaction_fee -
 * param: version_string -
 * outparam: partial_tx_out -
 */
-void make_v1_partial_tx_v1(const SpTxProposalV1 &proposal,
+void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     std::vector<SpPartialInputV1> partial_inputs,
     const rct::xmr_amount transaction_fee,
     const std::string &version_string,
