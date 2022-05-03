@@ -319,8 +319,8 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
                 additional_outputs_out.emplace_back(OutputProposalSetExtraTypesV1::SPECIAL_SELF_SEND_DUMMY);
             }
         }
-        else if /*change_amount > 0 &&*/
-            (!jamtis::is_self_send_output_proposal(output_proposals[0], wallet_spend_pubkey, k_view_balance))
+        else if (/*change_amount > 0 &&*/
+            !jamtis::is_self_send_output_proposal(output_proposals[0], wallet_spend_pubkey, k_view_balance))
         {
             // if there is 1 normal output and non-zero change, then make a special change enote that shares
             //   the normal output's enote ephemeral pubkey
@@ -333,6 +333,9 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
         else //(change_amount > 0 && single output is self-send)
         {
             // 2-out txs may not have 2 self-send type enotes from the same wallet, so we can't have a special change here
+            // reason: the outputs in a 2-out tx with 2 self-sends would have the same sender-receiver shared secret,
+            //         which could cause problems (e.g. the outputs would have the same view tags, and could even have the
+            //         same onetime address if the destinations of the two outputs are the same)
 
             // add a normal dummy output
             // - 0 amount
@@ -695,7 +698,7 @@ void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
 
     make_tx_extra(std::move(additional_memo_elements), proposal_out.m_tx_supplement.m_tx_extra);
 
-    // sanity-check semantics
+    // sanity-check supplement semantics
     check_v1_tx_supplement_semantics_v1(proposal_out.m_tx_supplement, proposal_out.m_outputs.size());
 }
 //-------------------------------------------------------------------------------------------------------------------

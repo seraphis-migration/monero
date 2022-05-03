@@ -84,88 +84,6 @@ static std::uint32_t n_choose_k(const std::uint32_t n, const std::uint32_t k)
     return static_cast<std::uint32_t>(std::round(fp_result));
 }
 //-------------------------------------------------------------------------------------------------------------------
-// check multisig tx proposal semantics (multisig signing config, inputs, and outputs)
-// - assumes 'converted_input_proposals' are converted versions of the public input proposals stored in the tx proposal
-//-------------------------------------------------------------------------------------------------------------------
-static void check_v1_multisig_tx_proposal_semantics_v1_final(const SpMultisigTxProposalV1 &multisig_tx_proposal,
-    const std::uint32_t threshold,
-    const std::uint32_t num_signers,
-    const std::vector<SpMultisigInputProposalV1> &converted_input_proposals)
-{
-    /// multisig signing config checks
-
-    // 1. signer set filter must be valid (at least 'threshold' signers allowed, format is valid)
-    CHECK_AND_ASSERT_THROW_MES(multisig::validate_aggregate_multisig_signer_set_filter(threshold,
-            num_signers,
-            multisig_tx_proposal.m_aggregate_signer_set_filter),
-        "multisig tx proposal: invalid aggregate signer set filter.");
-
-
-    /// output checks
-
-    // 1. convert to a plain tx proposal to validate outputs (should call full semantics check of tx proposal)
-    SpTxProposalV1 tx_proposal;
-    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
-
-    // 2. get prefix from proposal
-    rct::key proposal_prefix;
-    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, proposal_prefix);
-
-
-    /// input/output checks
-
-    // 1. should be at least 1 input and 1 output
-    CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() > 0, "multisig tx proposal: no inputs.");
-    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_explicit_payments.size() +
-            multisig_tx_proposal.m_opaque_payments.size() > 0,
-        "multisig tx proposal: no outputs.");
-
-
-    /// input checks
-
-    // 1. input proposals line up 1:1 with input proof proposals, each input has a unique key image
-    CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() ==
-        multisig_tx_proposal.m_input_proof_proposals.size(),
-        "multisig tx proposal: input proposals don't line up with input proposal proofs.");
-
-    // 2. assess each input proposal
-    rct::key image_address_with_squash_prefix;
-    std::vector<crypto::key_image> key_images;
-    key_images.reserve(converted_input_proposals.size());
-
-    for (std::size_t input_index{0}; input_index < converted_input_proposals.size(); ++input_index)
-    {
-        // a. converted proposals should be well-formed
-        check_v1_multisig_input_proposal_semantics_v1(converted_input_proposals[input_index]);
-
-        // b. input proof proposal messages all equal proposal prefix of core tx proposal
-        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].message == proposal_prefix,
-            "multisig tx proposal: input proof proposal does not match the tx proposal (different proposal prefix).");
-
-        // c. input proof proposal keys line up 1:1 and match with input proposals
-        converted_input_proposals[input_index].m_core.get_masked_address(image_address_with_squash_prefix);
-        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].K ==
-                image_address_with_squash_prefix,
-            "multisig tx proposal: input proof proposal does not match input proposal (different proof keys).");
-
-        // d. input proof proposal key images line up 1:1 and match with input proposals
-        key_images.emplace_back();
-        converted_input_proposals[input_index].get_key_image(key_images.back());
-        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].KI ==
-                key_images.back(),
-            "multisig tx proposal: input proof proposal does not match input proposal (different key images).");
-
-        // e. check that the key image obtained is canonical
-        CHECK_AND_ASSERT_THROW_MES(key_domain_is_prime_subgroup(rct::ki2rct(key_images.back())),
-            "multisig tx proposal: an input's key image is not in the prime subgroup.");
-    }
-
-    // 3. key images should be unique
-    std::sort(key_images.begin(), key_images.end());
-    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(key_images.begin(), key_images.end()) == key_images.end(),
-        "multisig tx proposal: inputs are not unique (found duplicate key image).");
-}
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static bool validate_v1_multisig_input_init_set_for_partial_sig_set_v1(const SpMultisigInputInitSetV1 &input_init_set,
     const std::uint32_t threshold,
@@ -435,15 +353,74 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance)
 {
-    /// proposal should contain expected tx version encoding
+    /// multisig signing config checks
+
+    // 1. proposal should contain expected tx version encoding
     CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_version_string == expected_version_string,
         "multisig tx proposal: intended tx version encoding is invalid.");
 
-    // check the public input proposal semantics
+    // 2. signer set filter must be valid (at least 'threshold' signers allowed, format is valid)
+    CHECK_AND_ASSERT_THROW_MES(multisig::validate_aggregate_multisig_signer_set_filter(threshold,
+            num_signers,
+            multisig_tx_proposal.m_aggregate_signer_set_filter),
+        "multisig tx proposal: invalid aggregate signer set filter.");
+
+
+    /// output checks
+
+    // 1. convert to a plain tx proposal to validate outputs (should call full semantics check of tx proposal)
+    // note: for 2-out txs, that semantics check will ensure they share an enote ephemeral pubkey
+    SpTxProposalV1 tx_proposal;
+    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
+
+    // - get prefix from proposal
+    rct::key proposal_prefix;
+    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, proposal_prefix);
+
+    // 2. validate self-sends and explicit proposals' enote ephemeral privkeys
+    // goal: it should not be possible for a multisig tx proposer to burn funds (either of normal destinations or
+    //       of the multisig account) by re-using an enote ephemeral privkey between different txs
+    //       - non-self-send opaque outputs are an exception to this in order to permit some tx modularity, BUT to avoid
+    //         self-sends getting burnt it isn't permitted for self-sends to be in a 2-out tx with an opaque non-self-send
+    //         output (because outputs in 2-out txs share an enote ephemeral privkey, and non-self-send opaque outputs'
+    //         enote ephemeral privkeys are not validated)
+
+    // a. there must be at least one opaque self-send output
+    // - this implies if there is only one opaque output proposal, it isn't a non-self-send
+    std::size_t num_self_sends{0};
+
+    for (const SpOutputProposalV1 &output_proposal : multisig_tx_proposal.m_opaque_payments)
+    {
+        if (jamtis::is_self_send_output_proposal(output_proposal, wallet_spend_pubkey, k_view_balance))
+            ++num_self_sends;
+    }
+
+    CHECK_AND_ASSERT_THROW_MES(num_self_sends > 0, "multisig tx proposal: there are no self-send outputs.");
+
+    // b. there cannot be two self-send outputs and no other outputs (postcondition of the output set finalizer)
+    if (num_self_sends == 2)
+    {
+        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_opaque_payments.size() +
+                multisig_tx_proposal.m_explicit_payments.size() > 2,
+            "multisig tx proposal: there are two self-send outputs but no other outputs (not allowed).");
+    }
+
+    // c. self-send outputs' enote ephemeral privkeys should be reproducible
+    // note: if there are exactly two opaque proposals (one of which is a self-send), then reproducing the self-send
+    //       output's enote ephemeral privkey will mean the other output's enote ephemeral privkey was deterministic,
+    //       which means there is some wiggle-room around how opaque output proposals can be defined
+
+    // d. explicit outputs' enote ephemeral privkeys should be reproducible
+
+
+
+    /// input/output checks
+
+    // 1. check the public input proposal semantics
     for (const SpMultisigPublicInputProposalV1 &public_input_proposal : multisig_tx_proposal.m_input_proposals)
         check_v1_multisig_public_input_proposal_semantics_v1(public_input_proposal);
 
-    // convert the public input proposals
+    // 2. convert the public input proposals
     std::vector<SpMultisigInputProposalV1> converted_input_proposals;
     CHECK_AND_ASSERT_THROW_MES(try_get_v1_multisig_input_proposals_v1(multisig_tx_proposal.m_input_proposals,
             wallet_spend_pubkey,
@@ -451,11 +428,56 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
             converted_input_proposals),
         "multisig tx proposal: could not extract data from an input proposal (maybe input not owned by user).");
 
-    // do all the remaining checks
-    check_v1_multisig_tx_proposal_semantics_v1_final(multisig_tx_proposal,
-        threshold,
-        num_signers,
-        converted_input_proposals);
+    // 3. should be at least 1 input and 1 output
+    CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() > 0, "multisig tx proposal: no inputs.");
+    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_explicit_payments.size() +
+            multisig_tx_proposal.m_opaque_payments.size() > 0,
+        "multisig tx proposal: no outputs.");
+
+
+    /// input checks
+
+    // 1. input proposals line up 1:1 with input proof proposals, each input has a unique key image
+    CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() ==
+        multisig_tx_proposal.m_input_proof_proposals.size(),
+        "multisig tx proposal: input proposals don't line up with input proposal proofs.");
+
+    // 2. assess each input proposal
+    rct::key image_address_with_squash_prefix;
+    std::vector<crypto::key_image> key_images;
+    key_images.reserve(converted_input_proposals.size());
+
+    for (std::size_t input_index{0}; input_index < converted_input_proposals.size(); ++input_index)
+    {
+        // a. converted proposals should be well-formed
+        check_v1_multisig_input_proposal_semantics_v1(converted_input_proposals[input_index]);
+
+        // b. input proof proposal messages all equal proposal prefix of core tx proposal
+        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].message == proposal_prefix,
+            "multisig tx proposal: input proof proposal does not match the tx proposal (different proposal prefix).");
+
+        // c. input proof proposal keys line up 1:1 and match with input proposals
+        converted_input_proposals[input_index].m_core.get_masked_address(image_address_with_squash_prefix);
+        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].K ==
+                image_address_with_squash_prefix,
+            "multisig tx proposal: input proof proposal does not match input proposal (different proof keys).");
+
+        // d. input proof proposal key images line up 1:1 and match with input proposals
+        key_images.emplace_back();
+        converted_input_proposals[input_index].get_key_image(key_images.back());
+        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].KI ==
+                key_images.back(),
+            "multisig tx proposal: input proof proposal does not match input proposal (different key images).");
+
+        // e. check that the key image obtained is canonical
+        CHECK_AND_ASSERT_THROW_MES(key_domain_is_prime_subgroup(rct::ki2rct(key_images.back())),
+            "multisig tx proposal: an input's key image is not in the prime subgroup.");
+    }
+
+    // 3. key images should be unique
+    std::sort(key_images.begin(), key_images.end());
+    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(key_images.begin(), key_images.end()) == key_images.end(),
+        "multisig tx proposal: inputs are not unique (found duplicate key image).");
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
@@ -504,12 +526,6 @@ void make_v1_multisig_tx_proposal_v1(const std::uint32_t threshold,
     proposal_out.m_input_proposals.reserve(full_input_proposals.size());
     for (const SpMultisigInputProposalV1 &full_input_proposal : full_input_proposals)
         proposal_out.m_input_proposals.emplace_back(full_input_proposal.m_core);
-
-    // sanity check the proposal contents
-    check_v1_multisig_tx_proposal_semantics_v1_final(proposal_out,
-        threshold,
-        num_signers,
-        full_input_proposals);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_input_init_set_semantics_v1(const SpMultisigInputInitSetV1 &input_init_set,
