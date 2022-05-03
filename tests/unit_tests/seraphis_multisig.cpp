@@ -545,6 +545,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
     SpPartialTxV1 partial_tx;
     ASSERT_NO_THROW(make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), fee, version_string, partial_tx));
+    ASSERT_NO_THROW(check_v1_partial_tx_semantics_v1(partial_tx, semantic_rules_version));
 
     // c) add enotes owned by multisig address to the ledger and prepare membership ref sets (one step)
     // note: use ring size 2^2 = 4 for speed

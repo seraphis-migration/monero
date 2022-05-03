@@ -62,10 +62,10 @@ struct SemanticConfigComponentCountsV1 final
 /// semantic validation config: reference sets
 struct SemanticConfigRefSetV1 final
 {
-    std::size_t m_decom_n_min;
-    std::size_t m_decom_n_max;
-    std::size_t m_decom_m_min;
-    std::size_t m_decom_m_max;
+    std::size_t m_decomp_n_min;
+    std::size_t m_decomp_n_max;
+    std::size_t m_decomp_m_min;
+    std::size_t m_decomp_m_max;
     std::size_t m_bin_radius_min;
     std::size_t m_bin_radius_max;
     std::size_t m_num_bin_members_min;

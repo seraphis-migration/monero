@@ -35,8 +35,10 @@
 //local headers
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
+#include "seraphis/tx_base.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
+#include "txtype_squashed_v1.h"
 
 //third party headers
 
@@ -88,6 +90,9 @@ void make_v1_balance_proof_v1(const std::vector<rct::xmr_amount> &input_amounts,
 bool balance_check_in_out_amnts_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const std::vector<SpOutputProposalV1> &output_proposals,
     const rct::xmr_amount transaction_fee);
+//todo
+void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version);
 /**
 * brief: make_v1_partial_tx_v1 - make v1 partial transaction (everything ready for a full tx except membership proofs)
 * param: proposal -

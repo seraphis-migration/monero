@@ -65,75 +65,6 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-// semantic validation config: component counts
-//-------------------------------------------------------------------------------------------------------------------
-static SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(
-    const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version)
-{
-    SemanticConfigComponentCountsV1 config{};
-
-    //TODO: in the squashed model, inputs + outputs must be <= the BP+ pre-generated generator array size ('maxM')
-    if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
-    {
-        config.m_min_inputs = 1;
-        config.m_max_inputs = 100000;
-        config.m_min_outputs = 1;
-        config.m_max_outputs = 100000;
-    }
-    else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
-    {
-        config.m_min_inputs = 1;
-        config.m_max_inputs = config::SP_MAX_INPUTS_V1;
-        config.m_min_outputs = 2;
-        config.m_max_outputs = config::SP_MAX_OUTPUTS_V1;
-    }
-    else  //unknown semantic rules version
-    {
-        CHECK_AND_ASSERT_THROW_MES(false, "Tried to get semantic config for component counts with unknown rules version.");
-    }
-
-    return config;
-}
-//-------------------------------------------------------------------------------------------------------------------
-// semantic validation config: reference set size
-//-------------------------------------------------------------------------------------------------------------------
-static SemanticConfigRefSetV1 semantic_config_ref_sets_v1(
-    const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version)
-{
-    SemanticConfigRefSetV1 config{};
-
-    if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
-    {
-        // note: if n*m exceeds GROOTLE_MAX_MN, an exception will be thrown
-        config.m_decom_n_min = 0;
-        config.m_decom_n_max = 100000;
-        config.m_decom_m_min = 0;
-        config.m_decom_m_max = 100000;
-        config.m_bin_radius_min = 0;
-        config.m_bin_radius_max = 30000;
-        config.m_num_bin_members_min = 0;
-        config.m_num_bin_members_max = 60000;
-    }
-    else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
-    {
-        config.m_decom_n_min = config::SP_GROOTLE_N_V1;
-        config.m_decom_n_max = config::SP_GROOTLE_N_V1;
-        config.m_decom_m_min = config::SP_GROOTLE_M_V1;
-        config.m_decom_m_max = config::SP_GROOTLE_M_V1;
-        config.m_bin_radius_min = config::SP_REF_SET_BIN_RADIUS_V1;
-        config.m_bin_radius_max = config::SP_REF_SET_BIN_RADIUS_V1;
-        config.m_num_bin_members_min = config::SP_REF_SET_NUM_BIN_MEMBERS_V1;
-        config.m_num_bin_members_max = config::SP_REF_SET_NUM_BIN_MEMBERS_V1;
-    }
-    else  //unknown semantic rules version
-    {
-        CHECK_AND_ASSERT_THROW_MES(false, "Tried to get semantic config for ref set sizes with unknown rules version.");
-    }
-
-    return config;
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSquashedV1::get_size_bytes(const std::size_t num_inputs,
     const std::size_t num_outputs,
     const std::size_t ref_set_decomp_n,
@@ -343,6 +274,69 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
         std::move(alignable_membership_proofs),
         semantic_rules_version,
         tx_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(
+    const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version)
+{
+    SemanticConfigComponentCountsV1 config{};
+
+    //TODO: in the squashed model, inputs + outputs must be <= the BP+ pre-generated generator array size ('maxM')
+    if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
+    {
+        config.m_min_inputs = 1;
+        config.m_max_inputs = 100000;
+        config.m_min_outputs = 1;
+        config.m_max_outputs = 100000;
+    }
+    else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
+    {
+        config.m_min_inputs = 1;
+        config.m_max_inputs = config::SP_MAX_INPUTS_V1;
+        config.m_min_outputs = 2;
+        config.m_max_outputs = config::SP_MAX_OUTPUTS_V1;
+    }
+    else  //unknown semantic rules version
+    {
+        CHECK_AND_ASSERT_THROW_MES(false, "Tried to get semantic config for component counts with unknown rules version.");
+    }
+
+    return config;
+}
+//-------------------------------------------------------------------------------------------------------------------
+SemanticConfigRefSetV1 semantic_config_ref_sets_v1(const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version)
+{
+    SemanticConfigRefSetV1 config{};
+
+    if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::MOCK)
+    {
+        // note: if n*m exceeds GROOTLE_MAX_MN, an exception will be thrown
+        config.m_decomp_n_min = 2;
+        config.m_decomp_n_max = 100000;
+        config.m_decomp_m_min = 2;
+        config.m_decomp_m_max = 100000;
+        config.m_bin_radius_min = 0;
+        config.m_bin_radius_max = 30000;
+        config.m_num_bin_members_min = 1;
+        config.m_num_bin_members_max = 60000;
+    }
+    else if (tx_semantic_rules_version == SpTxSquashedV1::SemanticRulesVersion::ONE)
+    {
+        config.m_decomp_n_min = config::SP_GROOTLE_N_V1;
+        config.m_decomp_n_max = config::SP_GROOTLE_N_V1;
+        config.m_decomp_m_min = config::SP_GROOTLE_M_V1;
+        config.m_decomp_m_max = config::SP_GROOTLE_M_V1;
+        config.m_bin_radius_min = config::SP_REF_SET_BIN_RADIUS_V1;
+        config.m_bin_radius_max = config::SP_REF_SET_BIN_RADIUS_V1;
+        config.m_num_bin_members_min = config::SP_REF_SET_NUM_BIN_MEMBERS_V1;
+        config.m_num_bin_members_max = config::SP_REF_SET_NUM_BIN_MEMBERS_V1;
+    }
+    else  //unknown semantic rules version
+    {
+        CHECK_AND_ASSERT_THROW_MES(false, "Tried to get semantic config for ref set sizes with unknown rules version.");
+    }
+
+    return config;
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>

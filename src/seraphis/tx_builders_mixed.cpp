@@ -37,6 +37,7 @@
 #include "seraphis_config_temp.h"
 #include "misc_language.h"
 #include "misc_log_ex.h"
+#include "mock_ledger_context.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -45,6 +46,7 @@
 #include "tx_builders_inputs.h"
 #include "tx_component_types.h"
 #include "tx_misc_utils.h"
+#include "txtype_squashed_v1.h"
 
 //third party headers
 
@@ -171,6 +173,43 @@ bool balance_check_in_out_amnts_v1(const std::vector<SpInputProposalV1> &input_p
     }
 
     return balance_check_in_out_amnts(in_amounts, out_amounts, transaction_fee);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version)
+{
+    // prepare a mock ledger
+    MockLedgerContext mock_ledger;
+
+    // get parameters for making mock ref sets (use minimum parameters for efficiency when possible)
+    const SemanticConfigRefSetV1 ref_set_config{semantic_config_ref_sets_v1(semantic_rules_version)};
+    const SpBinnedReferenceSetConfigV1 bin_config{
+            .m_bin_radius = static_cast<ref_set_bin_dimension_v1_t>(ref_set_config.m_bin_radius_min),
+            .m_num_bin_members = static_cast<ref_set_bin_dimension_v1_t>(ref_set_config.m_num_bin_members_min),
+        };
+
+    // make mock membership proof ref sets
+    std::vector<SpMembershipProofPrepV1> membership_proof_preps{
+            gen_mock_sp_membership_proof_preps_v1(partial_tx.m_input_enotes,
+                partial_tx.m_address_masks,
+                partial_tx.m_commitment_masks,
+                ref_set_config.m_decomp_n_min,
+                ref_set_config.m_decomp_m_min,
+                bin_config,
+                mock_ledger)
+        };
+
+    // make the mock membership proofs
+    std::vector<SpMembershipProofV1> membership_proofs;
+    make_v1_membership_proofs_v1(std::move(membership_proof_preps), membership_proofs);
+
+    // make tx
+    SpTxSquashedV1 test_tx;
+    make_seraphis_tx_squashed_v1(partial_tx, std::move(membership_proofs), semantic_rules_version, test_tx);
+
+    // validate tx
+    CHECK_AND_ASSERT_THROW_MES(validate_tx(test_tx, mock_ledger, false),
+        "v1 partial tx semantics check (v1): test transaction was invalid using requested semantics rules version!");
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_partial_tx_v1(const SpTxProposalV1 &proposal,

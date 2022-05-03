@@ -41,6 +41,7 @@
 #include "tx_base.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
+#include "tx_validators.h"
 
 //third party headers
 
@@ -133,6 +134,12 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     std::vector<ExtraFieldElement> additional_memo_elements,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);
+
+//todo
+SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(
+    const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version);
+//todo
+SemanticConfigRefSetV1 semantic_config_ref_sets_v1(const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version);
 
 
 //// tx base concept implementations

@@ -147,12 +147,12 @@ bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetV1 &confi
     const std::size_t ref_set_decomp_n{membership_proofs[0].m_ref_set_decomp_n};
     const std::size_t ref_set_decomp_m{membership_proofs[0].m_ref_set_decomp_m};
 
-    if (ref_set_decomp_n < config.m_decom_n_min ||
-        ref_set_decomp_n > config.m_decom_n_max)
+    if (ref_set_decomp_n < config.m_decomp_n_min ||
+        ref_set_decomp_n > config.m_decomp_n_max)
         return false;
 
-    if (ref_set_decomp_m < config.m_decom_m_min ||
-        ref_set_decomp_m > config.m_decom_m_max)
+    if (ref_set_decomp_m < config.m_decomp_m_min ||
+        ref_set_decomp_m > config.m_decomp_m_max)
         return false;
 
     // check binned reference set configuration

@@ -242,7 +242,5 @@ void check_v1_alignable_membership_proof_semantics_v1(const SpAlignableMembershi
 void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal);
 //todo
 void check_v1_partial_input_semantics_v1(const SpPartialInputV1 &partial_input);
-//todo
-void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx);
 
 } //namespace sp
