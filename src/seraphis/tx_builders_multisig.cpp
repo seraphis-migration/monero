@@ -420,7 +420,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_version_string == expected_version_string,
         "multisig tx proposal: intended tx version encoding is invalid.");
 
-    // convert to a plain tx proposal to check the following
+    // convert to a plain tx proposal to check the following (getting a proposal prefix should accomplish these checks)
     // - unique onetime addresses
     // - if only 2 outputs, should be 1 unique enote ephemeral pubkey, otherwise 1:1 with outputs and all unique
     rct::key proposal_prefix;

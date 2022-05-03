@@ -250,18 +250,10 @@ bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
 {
     // try to extract info from enote then make an input proposal
     SpEnoteRecordV1 enote_record;
-    if (!try_get_enote_record_v1(enote,
-            enote_ephemeral_pubkey,
-            wallet_spend_pubkey,
-            k_view_balance,
-            enote_record))
+    if (!try_get_enote_record_v1(enote, enote_ephemeral_pubkey, wallet_spend_pubkey, k_view_balance, enote_record))
         return false;
 
-    make_v1_input_proposal_v1(enote_record,
-        spendbase_privkey,
-        address_mask,
-        commitment_mask,
-        proposal_out);
+    make_v1_input_proposal_v1(enote_record, spendbase_privkey, address_mask, commitment_mask, proposal_out);
 
     return true;
 }
@@ -487,9 +479,7 @@ void make_v1_partial_input_v1(const SpInputProposalV1 &input_proposal,
     input_proposal.m_core.get_enote_core(partial_input_out.m_input_enote_core);
 
     // construct image proof
-    make_v1_image_proof_v1(input_proposal.m_core,
-        partial_input_out.m_proposal_prefix,
-        partial_input_out.m_image_proof);
+    make_v1_image_proof_v1(input_proposal.m_core, partial_input_out.m_proposal_prefix, partial_input_out.m_image_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_partial_inputs_v1(const std::vector<SpInputProposalV1> &input_proposals,

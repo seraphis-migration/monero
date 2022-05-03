@@ -74,8 +74,7 @@ static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpEno
     rct::keyV input_image_amount_commitments;
     rct::keyV output_commitments;
     input_image_amount_commitments.reserve(input_images.size());
-    output_commitments.reserve(outputs.size() + 1 +
-        (remainder_blinding_factor == rct::zero() ? 0 : 1));
+    output_commitments.reserve(outputs.size() + 1 + (remainder_blinding_factor == rct::zero() ? 0 : 1));
 
     for (const auto &input_image : input_images)
         input_image_amount_commitments.emplace_back(input_image.m_core.m_masked_commitment);

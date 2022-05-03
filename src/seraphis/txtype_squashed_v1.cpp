@@ -206,16 +206,15 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
 {
     // finish tx from pieces
     make_seraphis_tx_squashed_v1(
-            std::move(partial_tx.m_input_images),
-            std::move(partial_tx.m_outputs),
-            std::move(partial_tx.m_balance_proof),
-            std::move(partial_tx.m_image_proofs),
-            std::move(membership_proofs),
-            std::move(partial_tx.m_tx_supplement),
-            partial_tx.m_tx_fee,
-            semantic_rules_version,
-            tx_out
-        );
+        std::move(partial_tx.m_input_images),
+        std::move(partial_tx.m_outputs),
+        std::move(partial_tx.m_balance_proof),
+        std::move(partial_tx.m_image_proofs),
+        std::move(membership_proofs),
+        std::move(partial_tx.m_tx_supplement),
+        partial_tx.m_tx_fee,
+        semantic_rules_version,
+        tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
@@ -424,9 +423,7 @@ bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
     rct::key image_proofs_message;
     make_tx_image_proof_message_v1(version_string, tx.m_outputs, tx.m_supplement, image_proofs_message);
 
-    if (!validate_sp_composition_proofs_v1(tx.m_image_proofs,
-            tx.m_input_images,
-            image_proofs_message))
+    if (!validate_sp_composition_proofs_v1(tx.m_image_proofs, tx.m_input_images, image_proofs_message))
         return false;
 
     return true;
@@ -497,7 +494,7 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
 
     // make mock inputs
     // enote, ks, view key stuff, amount, amount blinding factor
-    std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(in_amounts)};
+    const std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(in_amounts)};
 
     // make mock outputs
     std::vector<SpOutputProposalV1> output_proposals{
@@ -525,8 +522,12 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
         element.gen();
 
     // make tx
-    make_seraphis_tx_squashed_v1(input_proposals, std::move(output_proposals), transaction_fee,
-        std::move(membership_proof_preps), std::move(additional_memo_elements), SpTxSquashedV1::SemanticRulesVersion::MOCK,
+    make_seraphis_tx_squashed_v1(input_proposals,
+        std::move(output_proposals),
+        transaction_fee,
+        std::move(membership_proof_preps),
+        std::move(additional_memo_elements),
+        SpTxSquashedV1::SemanticRulesVersion::MOCK,
         tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------

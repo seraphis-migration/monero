@@ -139,9 +139,7 @@ void make_v1_balance_proof_v1(const std::vector<rct::xmr_amount> &input_amounts,
 
     rct::keyV amount_commitment_blinding_factors;
     auto vec_wiper = convert_skv_to_rctv(blinding_factors, amount_commitment_blinding_factors);
-    make_bpp_rangeproofs(amounts,
-        amount_commitment_blinding_factors,
-        range_proofs);
+    make_bpp_rangeproofs(amounts, amount_commitment_blinding_factors, range_proofs);
 
     balance_proof_out.m_bpp_proof = std::move(range_proofs);
 
@@ -164,13 +162,10 @@ bool balance_check_in_out_amnts_v1(const std::vector<SpInputProposalV1> &input_p
     out_amounts.reserve(output_proposals.size());
 
     for (const auto &input_proposal : input_proposals)
-    {
         in_amounts.emplace_back(input_proposal.m_core.m_amount);
-    }
+
     for (const auto &output_proposal : output_proposals)
-    {
         out_amounts.emplace_back(output_proposal.m_core.m_amount);
-    }
 
     return balance_check_in_out_amnts(in_amounts, out_amounts, transaction_fee);
 }

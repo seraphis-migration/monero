@@ -60,9 +60,7 @@ void SpMultisigPublicInputProposalV1::get_masked_address(rct::key &masked_addres
     make_seraphis_squashed_address_key(m_enote.m_core.m_onetime_address,
         m_enote.m_core.m_amount_commitment,
         masked_address_out);  //H(Ko,C) Ko
-    sp::mask_key(m_address_mask,
-        masked_address_out,
-        masked_address_out);  //t_k G + H(Ko,C) Ko
+    sp::mask_key(m_address_mask, masked_address_out, masked_address_out);  //t_k G + H(Ko,C) Ko
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultisigPublicInputProposalV1::get_squash_prefix(crypto::secret_key &squash_prefix_out) const
@@ -121,9 +119,7 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_o
         "multisig tx proposal: could not parse partial memo.");
 
     // make the tx proposal
-    make_v1_tx_proposal_v1(std::move(output_proposals),
-        std::move(additional_memo_elements),
-        tx_proposal_out);
+    make_v1_tx_proposal_v1(std::move(output_proposals), std::move(additional_memo_elements), tx_proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultisigTxProposalV1::get_proposal_prefix_v1(rct::key &proposal_prefix_out) const
