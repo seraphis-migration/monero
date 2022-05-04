@@ -56,6 +56,7 @@ extern "C"
 #include "seraphis/tx_builders_mixed.h"
 #include "seraphis/tx_builders_outputs.h"
 #include "seraphis/tx_component_types.h"
+#include "seraphis/tx_discretized_fees.h"
 #include "seraphis/tx_extra.h"
 #include "seraphis/tx_misc_utils.h"
 #include "seraphis/tx_record_types.h"
@@ -970,6 +971,44 @@ TEST(seraphis, binned_reference_set)
 
     // intermittently fails if bins are unstably sorted after defining the real element's bin's rotation factor
     EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 100, 40, 4, 100, 0)));
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis, discretized_fees)
+{
+    // test the fee discretizer
+    std::uint64_t test_fee_value, fee_value;
+    sp::DiscretizedFee discretized_fee;
+
+    // fee value 0
+    test_fee_value = 0;
+    EXPECT_TRUE(sp::try_discretize_fee_value(test_fee_value, discretized_fee));
+    EXPECT_TRUE(sp::try_get_fee_value(discretized_fee, fee_value));
+    EXPECT_TRUE(fee_value == test_fee_value);
+
+    // fee value 1
+    test_fee_value = 1;
+    EXPECT_TRUE(sp::try_discretize_fee_value(test_fee_value, discretized_fee));
+    EXPECT_TRUE(sp::try_get_fee_value(discretized_fee, fee_value));
+    EXPECT_TRUE(fee_value == test_fee_value);
+
+    // fee value multiple digits (should round up)
+    test_fee_value = 11;
+    EXPECT_TRUE(sp::try_discretize_fee_value(test_fee_value, discretized_fee));
+    EXPECT_TRUE(sp::try_get_fee_value(discretized_fee, fee_value));
+    EXPECT_TRUE(fee_value > test_fee_value);
+
+    test_fee_value = 19;
+    EXPECT_TRUE(sp::try_discretize_fee_value(test_fee_value, discretized_fee));
+    EXPECT_TRUE(sp::try_get_fee_value(discretized_fee, fee_value));
+    EXPECT_TRUE(fee_value > test_fee_value);
+
+    // fee value MAX (out of range of the highest discretized fee value)
+    test_fee_value = std::numeric_limits<std::uint64_t>::max();
+    EXPECT_FALSE(sp::try_discretize_fee_value(test_fee_value, discretized_fee));
+
+    // unknown fee level (this test may break if all values of the fee level type are used)
+    discretized_fee.m_fee_level = static_cast<sp::discretized_fee_level_t>(-1);
+    EXPECT_FALSE(sp::try_get_fee_value(discretized_fee, fee_value));
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, txtype_squashed_v1)

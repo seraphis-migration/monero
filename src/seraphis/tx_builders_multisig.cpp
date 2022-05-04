@@ -471,13 +471,13 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
 
     /// set output variables
 
-    // 1. add new opaque output proposals to the original opaque output set
+    // 1. insert pre-existing self-send proposals to the original opaque output set (we did this above)
+
+    // 2. add new opaque output proposals to the original opaque output set
     for (const SpOutputProposalV1 &new_normal_payment_proposal : new_output_proposals)
         opaque_payments_inout.emplace_back(new_normal_payment_proposal);
 
-    // 2. insert pre-existing self-send proposals to the opaque set (we did this above)
-
-    // 3. insert new self-send output proposals to the opaque set
+    // 3. insert new self-send output proposals to the original opaque output set
     for (const jamtis::JamtisPaymentProposalSelfSendV1 &new_selfsend_payment_proposal : new_selfsend_proposals)
     {
         opaque_payments_inout.emplace_back();
@@ -605,7 +605,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
             ++enote_ephemeral_privkey_index;
     }
 
-    // c. there must be at least one opaque self-send output
+    // c. there must be at least one opaque self-send output (all of which have reproducible enote ephemeral privkeys)
     std::size_t num_self_sends{0};
     SpEnoteRecordV1 temp_enote_record;
     SpEnoteV1 temp_enote;

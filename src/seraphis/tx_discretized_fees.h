@@ -1,21 +1,21 @@
-// Copyright (c) 2014-2020, The Monero Project
-// 
+// Copyright (c) 2021, The Monero Project
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without modification, are
 // permitted provided that the following conditions are met:
-// 
+//
 // 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
-// 
+//
 // 2. Redistributions in binary form must reproduce the above copyright notice, this list
 //    of conditions and the following disclaimer in the documentation and/or other
 //    materials provided with the distribution.
-// 
+//
 // 3. Neither the name of the copyright holder nor the names of its contributors may be
 //    used to endorse or promote products derived from this software without specific
 //    prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
 // EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
 // MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
@@ -25,25 +25,52 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
 
-//TODO: transfer this file to cryptonote_config.h (separate file for better compile-time during development)
+// NOT FOR PRODUCTION
 
 #pragma once
 
+//local headers
+
+//third party headers
+
+//standard headers
 #include <cstdint>
 
-namespace config
-{
-  // note: version number should line up with intended grootle n^m decomposition
-  const constexpr std::uint64_t SP_REF_SET_BIN_RADIUS_V1 = 127;
-  const constexpr std::uint64_t SP_REF_SET_NUM_BIN_MEMBERS_V1 = 8;
-  const constexpr std::uint64_t DISC_FEE_LEVEL_NUMERATOR_X100 = 150;  //fee level factor = 1.5
+//forward declarations
 
-  const constexpr char HASH_KEY_GROOTLE_Hi_A[] = "grootle_Hi_A";
-  const constexpr char HASH_KEY_GROOTLE_Hi_B[] = "grootle_Hi_B";
-  const constexpr char HASH_KEY_BINNED_REF_SET_GENERATOR_SEED[] = "binned_ref_set_generator_seed";
-  const constexpr char HASH_KEY_BINNED_REF_SET_MEMBER[] = "binned_ref_set_member";
-  const constexpr char HASH_KEY_MULTISIG_TX_PRIVKEYS_SEED[] = "multisig_tx_privkeys_seed";
-  const constexpr char HASH_KEY_MULTISIG_TX_PRIVKEYS[] = "multisig_tx_privkeys";
+
+namespace sp
+{
+
+using discretized_fee_level_t = unsigned char;
+
+struct DiscretizedFee
+{
+    discretized_fee_level_t m_fee_level;
+
+    bool operator==(const DiscretizedFee &other) const { return m_fee_level == other.m_fee_level; }
+    bool operator==(const discretized_fee_level_t other_fee_level) const { return m_fee_level == other_fee_level; }
+};
+
+inline bool operator==(const discretized_fee_level_t fee_level, const DiscretizedFee &discretized_fee)
+{
+    return discretized_fee == fee_level;
 }
+
+/**
+* brief: try_get_basic_enote_record_v1 - try to extract a basic enote record from an enote
+* param: enote -
+* param: enote_ephemeral_pubkey -
+* param: sender_receiver_DH_derivation -
+* outparam: basic_record_out -
+* return: true if an extraction succeeded
+*/
+void test_discretized_fees();
+
+//todo
+bool try_discretize_fee_value(const std::uint64_t raw_fee_value, DiscretizedFee &discretized_fee_out);
+//todo
+bool try_get_fee_value(const DiscretizedFee discretized_fee, std::uint64_t &fee_value_out);
+
+} //namespace sp
