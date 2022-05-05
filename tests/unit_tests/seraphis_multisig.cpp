@@ -434,6 +434,9 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         opaque_payments.back().gen(out_amount, 0);
     }
 
+    // - prepare the output set for finalization
+    prepare_multisig_output_proposals_v1(explicit_payments_selfsend.size() + explicit_payments.size(), opaque_payments);
+
     // - add change/dummy outputs
     ASSERT_NO_THROW(finalize_multisig_output_proposals_v1(full_input_proposals,
         fee,

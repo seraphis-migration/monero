@@ -344,6 +344,24 @@ void make_multisig_enote_ephemeral_privkeys_v1(const crypto::secret_key &enote_e
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void prepare_multisig_output_proposals_v1(const std::size_t num_explicit_payments,
+    std::vector<SpOutputProposalV1> &opaque_payments_inout)
+{
+    // if there is only one opaque payment and <= 1 explicit payments, add a normal dummy opaque payment prematurely
+    // - in multisig, we must avoid the case where an explicit payment in a 2-out tx shares an enote ephemeral privkey
+    //   with an opaque output proposal, which could allow the explicit payment to contain a onetime address that already
+    //   exists in the ledger (effectively burning funds)
+    if (opaque_payments_inout.size() == 1 &&
+        num_explicit_payments <= 1)
+    {
+        opaque_payments_inout.emplace_back();
+
+        // normal dummy
+        // - 0 amount
+        opaque_payments_inout.back().gen(0, 0);
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
     const DiscretizedFee &discretized_transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
@@ -357,18 +375,12 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
 {
     /// prepare to finalize the output set
 
-    // 1. if there is only one opaque payment, and <= 1 explicit payments, add a normal dummy opaque payment prematurely
-    // - in multisig, we must avoid the case where an explicit payment in a 2-out tx shares an enote ephemeral privkey
-    //   with an opaque output proposal, which could allow the explicit payment to contain a onetime address that already
-    //   exists in the ledger (effectively burning funds)
+    // 1. validate the relative amounts of opaque and explicit payments
     if (opaque_payments_inout.size() == 1 &&
         explicit_payments_normal_inout.size() + explicit_payments_selfsend.size() <= 1)
     {
-        opaque_payments_inout.emplace_back();
-
-        // normal dummy
-        // - 0 amount
-        opaque_payments_inout.back().gen(0, 0);
+        CHECK_AND_ASSERT_THROW_MES(false, "finalize multisig output proposals: cannot have only one opaque payment in "
+            "combination with <= 1 explicit payments.");
     }
 
     // 2. prepare enough enote ephemeral privkeys for all explicit payments (finalize will add 2 at most)

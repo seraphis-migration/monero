@@ -158,8 +158,15 @@ void make_multisig_enote_ephemeral_privkeys_v1(const crypto::secret_key &enote_e
     const std::size_t num_keys_requested,
     std::vector<crypto::secret_key> &enote_ephemeral_privkeys_out);
 /**
+* brief: prepare_multisig_output_proposals_v1 - add a dummy output if there is one opaque payment and <= 1 explicit payments
+* param: num_explicit_payments -
+* inoutparam: opaque_payments_inout -
+*/
+void prepare_multisig_output_proposals_v1(const std::size_t num_explicit_payments,
+    std::vector<SpOutputProposalV1> &opaque_payments_inout);
+/**
 * brief: finalize_multisig_output_proposals_v1 - finalize output set for a multisig tx proposal (add change/dummy outputs)
-*   - precondition: multisig tx proposal will contain a full balance (not trying to partially fund an output set)
+*   - precondition: multisig tx proposal contains a full balance (don't use this if trying to partially fund an output set)
 * param: input_proposals -
 * param: discretized_transaction_fee -
 * param: change_destination -
