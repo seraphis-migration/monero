@@ -28,7 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// implementation of the cryptonote tx_extra field for use in constructing/validating seraphis txs
+// Implementation of the cryptonote tx_extra field, with an enforced 'sorted TLV' format.
+
 
 #pragma once
 

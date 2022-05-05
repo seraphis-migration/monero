@@ -28,7 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// Seraphis transaction-reading utilities
+// Utilities for obtaining enote records.
+
 
 #pragma once
 

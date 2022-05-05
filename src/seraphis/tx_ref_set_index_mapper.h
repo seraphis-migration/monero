@@ -28,6 +28,9 @@
 
 // NOT FOR PRODUCTION
 
+// Interface for mapping reference set indices to and from a custom distribution.
+
+
 #pragma once
 
 //local headers

@@ -28,7 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// misc. utility functions for seraphis transactions
+// Miscellaneous utility functions for making Seraphis transactions.
+
 
 #pragma once
 

@@ -28,8 +28,6 @@
 
 // NOT FOR PRODUCTION
 
-// Seraphis tx-builder/component-builder implementations
-
 #pragma once
 
 //local headers

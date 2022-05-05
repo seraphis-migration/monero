@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// A 'payment proposal' is a proposal to make an enote sending funds to a Jamtis address
+// A 'payment proposal' is a proposal to make an enote sending funds to a Jamtis address.
 
 
 #pragma once

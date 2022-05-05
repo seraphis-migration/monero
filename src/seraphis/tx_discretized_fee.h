@@ -28,6 +28,9 @@
 
 // NOT FOR PRODUCTION
 
+// A discretized fee (i.e. a fee value represented by a discrete identifier).
+
+
 #pragma once
 
 //local headers
@@ -46,16 +49,25 @@ namespace sp
 
 using discretized_fee_level_t = unsigned char;
 
+////
+// DiscretizedFee
+// - a discretized fee represents a fee value selected from a limited set of valid fee values
+// - a raw fee value is 'discretized' when it is converted into one of those valid fee values (rounded up)
+///
 struct DiscretizedFee final
 {
     discretized_fee_level_t m_fee_level;
 
+    /// default constructor
     DiscretizedFee() = default;
-    DiscretizedFee(const rct::xmr_amount raw_fee_amount);
 
+    /// normal constructor: discretize a raw fee value
+    DiscretizedFee(const rct::xmr_amount raw_fee_value);
+
+    /// equality operators
     bool operator==(const DiscretizedFee &other) const { return m_fee_level == other.m_fee_level; }
     bool operator==(const discretized_fee_level_t other_fee_level) const { return m_fee_level == other_fee_level; }
-    bool operator==(const rct::xmr_amount raw_fee_amount) const;
+    bool operator==(const rct::xmr_amount raw_fee_value) const;
 
     static std::size_t get_size_bytes() { return sizeof(m_fee_level); }
 };

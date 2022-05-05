@@ -28,8 +28,9 @@
 
 // NOT FOR PRODUCTION
 
-// base tx interface
+// Base tx interface for Seraphis.
 // WARNING: this file MUST NOT acquire more includes (may open a hole for overload injection)
+
 
 #pragma once
 

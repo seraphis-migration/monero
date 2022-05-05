@@ -28,7 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// Seraphis base types
+// Seraphis core types.
+
 
 #pragma once
 

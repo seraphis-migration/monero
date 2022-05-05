@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Core implementation details for making and finding enotes with Jamtis address privkeys
+// Core implementation details for making and finding enotes with Jamtis address privkeys.
 
 
 #pragma once

@@ -28,7 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// Seraphis component types
+// Seraphis transaction component types.
+
 
 #pragma once
 

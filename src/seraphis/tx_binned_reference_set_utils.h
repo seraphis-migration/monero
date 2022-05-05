@@ -28,6 +28,9 @@
 
 // NOT FOR PRODUCTION
 
+// Utilities for interacting with binned reference sets.
+
+
 #pragma once
 
 //local headers

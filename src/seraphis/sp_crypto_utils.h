@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Miscellaneous crypto utils for Seraphis
+// Miscellaneous crypto utils for Seraphis.
 
 
 #pragma once

@@ -28,8 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Core types for making enotes with Jamtis addresses
-// - Jamtis is a specification for Seraphis-compatible addresses
+// Utilities for building Jamtis addresses.
 
 
 #pragma once

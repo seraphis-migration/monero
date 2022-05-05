@@ -30,6 +30,7 @@
 
 // Interface for interacting with a ledger when validating a tx.
 
+
 #pragma once
 
 //local headers

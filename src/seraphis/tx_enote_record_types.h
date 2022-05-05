@@ -28,7 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// Seraphis transaction-reading helper types
+// Records of Seraphis enotes owned by some wallet.
+
 
 #pragma once
 

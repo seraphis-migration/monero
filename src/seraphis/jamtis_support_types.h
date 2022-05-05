@@ -28,6 +28,9 @@
 
 // NOT FOR PRODUCTION
 
+// Supporting types for Jamtis (address index, address tag mac, address tag, etc.).
+
+
 #pragma once
 
 //local headers

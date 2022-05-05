@@ -28,7 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// Seraphis transaction-builder helper types
+// Seraphis transaction-builder helper types (multisig).
+
 
 #pragma once
 

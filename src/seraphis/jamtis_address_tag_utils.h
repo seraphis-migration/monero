@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Address tag handling for Jamtis addresses
+// Address tag handling for Jamtis addresses.
 
 
 #pragma once

@@ -28,6 +28,9 @@
 
 // NOT FOR PRODUCTION
 
+// Implementation of the reference set index mapper. Maps to and from a uniform distribution across [0, 2^64 - 1]
+
+
 #pragma once
 
 //local headers

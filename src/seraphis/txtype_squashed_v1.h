@@ -28,8 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// Seraphis implemented with concise Grootle membership proofs on squashed enotes and separate
-//     composition proofs for each input image
+// A Seraphis transaction implemented in the 'squashed enote' model.
+
 
 #pragma once
 
@@ -57,8 +57,14 @@ namespace sp
 {
 
 ////
-// Seraphis tx: based on concise grootle membership proofs on squashed enotes,
-//              with separate composition proofs for input images
+// Seraphis tx in the squashed enote model
+// - membership: concise grootle proofs (one per input)
+// - ownership: seraphis composition proofs (one per input)
+// - key image validity: seraphis composition proofs (one per input)
+// - range proofs: Bulletproof+ (aggregated range proofs for all input masked commitments and new output commitments)
+// - reference sets: binned reference sets
+// - fees: discretized
+// - memo field: sorted TLV format
 ///
 struct SpTxSquashedV1 final
 {

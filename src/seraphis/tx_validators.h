@@ -28,7 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// Seraphis tx validator implementations
+// Seraphis tx validator implementations.
+
 
 #pragma once
 

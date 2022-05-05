@@ -32,6 +32,7 @@
 // note: In a real ledger, new enotes and new linking tags from a tx must be committed in ONE atomic operation. Otherwise,
 //       the order of linking tags and enotes may be misaligned.
 
+
 #pragma once
 
 //local headers

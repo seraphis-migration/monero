@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// A Jamtis 'destination', i.e. an address that can receive funds
+// A Jamtis 'destination', i.e. an address that can receive funds.
 
 
 #pragma once

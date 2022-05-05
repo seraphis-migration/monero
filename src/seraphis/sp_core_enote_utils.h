@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Seraphis enote and enote image component builders
+// Seraphis core enote and enote image component builders.
 
 
 #pragma once

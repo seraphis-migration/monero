@@ -28,7 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// Seraphis tx-builder/component-builder implementations
+// Seraphis tx-builder/component-builder implementations (tx inputs).
+
 
 #pragma once
 

@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Hash functions for Jamtis addresses and making enotes with Jamtis addresses
+// Hash functions required by the Jamtis specification.
 
 
 #pragma once
