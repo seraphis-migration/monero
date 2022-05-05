@@ -94,6 +94,7 @@ static void generate_discretized_fee_context()
         std::uint64_t last_fee_value{static_cast<std::uint64_t>(-1)};
         std::uint64_t fee_value;
 
+        // powers of the fee level factor
         do
         {
             // value = round_1_sig_fig(factor ^ level)
@@ -109,11 +110,22 @@ static void generate_discretized_fee_context()
             last_fee_value = fee_value;
         } while (round_to_sig_figs(std::pow(fee_level_factor, ++current_level), 1) < std::numeric_limits<std::uint64_t>::max());
 
+        // special encoding: uint64::max
+        s_discretized_fee_map.emplace_back(
+                static_cast<discretized_fee_level_t>(current_level),
+                std::numeric_limits<std::uint64_t>::max()
+            );
+
+        // special encoding: 0
+        ++current_level;
         s_discretized_fee_map.emplace_back(static_cast<discretized_fee_level_t>(current_level), 0);
 
+        // special encoding: invalid
+        //all remaining levels (there should be at least one)
+
         // sanity check
-        CHECK_AND_ASSERT_THROW_MES(current_level <= std::numeric_limits<discretized_fee_level_t>::max(),
-            "Seraphis discretized fees: could not fit all fee levels in the fee level type.");
+        CHECK_AND_ASSERT_THROW_MES(current_level < std::numeric_limits<discretized_fee_level_t>::max(),
+            "Seraphis discretized fees: could not fit all required fee levels in the fee level type.");
 
     });
 }
@@ -121,11 +133,14 @@ static void generate_discretized_fee_context()
 //-------------------------------------------------------------------------------------------------------------------
 DiscretizedFee::DiscretizedFee(const rct::xmr_amount raw_fee_value)
 {
-    // try to find the closest discretized fee that is >= the specified fee value
+    // find the closest discretized fee that is >= the specified fee value
     generate_discretized_fee_context();
 
+    // start with the highest fee level (should be invalid)
+    m_fee_level = std::numeric_limits<discretized_fee_level_t>::max();
+
+    // start with the max discretized fee value, then reduce it as we get closer to the final solution
     std::uint64_t closest_discretized_fee_value{static_cast<std::uint64_t>(-1)};
-    bool result_found{false};
 
     for (const auto &discretized_fee_setting : s_discretized_fee_map)
     {
@@ -134,15 +149,10 @@ DiscretizedFee::DiscretizedFee(const rct::xmr_amount raw_fee_value)
 
         if (discretized_fee_setting.second <= closest_discretized_fee_value)
         {
-            this->m_fee_level = discretized_fee_setting.first;
+            m_fee_level = discretized_fee_setting.first;
             closest_discretized_fee_value = discretized_fee_setting.second;
-            result_found = true;
         }
     }
-
-    // check if a valid fee was found (if the fee value was > the highest discretized fee value, this will fail)
-    CHECK_AND_ASSERT_THROW_MES(result_found, "constructing a discretized fee failed: invalid fee amount (" <<
-        raw_fee_value << ").");
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool DiscretizedFee::operator==(const rct::xmr_amount raw_fee_value) const
@@ -159,15 +169,7 @@ bool operator==(const discretized_fee_level_t fee_level, const DiscretizedFee &d
     return discretized_fee == fee_level;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_discretize_fee_value(const std::uint64_t raw_fee_value, DiscretizedFee &discretized_fee_out)
-{
-    try { discretized_fee_out = DiscretizedFee{raw_fee_value}; }
-    catch (...) { return false; }
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool try_get_fee_value(const DiscretizedFee discretized_fee, std::uint64_t &fee_value_out)
+bool try_get_fee_value(const DiscretizedFee &discretized_fee, std::uint64_t &fee_value_out)
 {
     // try to find this discretized fee in the map and return its fee value
     generate_discretized_fee_context();

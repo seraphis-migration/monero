@@ -51,7 +51,7 @@ struct DiscretizedFee
     discretized_fee_level_t m_fee_level;
 
     DiscretizedFee() = default;
-    DiscretizedFee(const rct::xmr_amount raw_fee_amount);  //throwing constructor
+    DiscretizedFee(const rct::xmr_amount raw_fee_amount);
 
     bool operator==(const DiscretizedFee &other) const { return m_fee_level == other.m_fee_level; }
     bool operator==(const discretized_fee_level_t other_fee_level) const { return m_fee_level == other_fee_level; }
@@ -73,8 +73,6 @@ bool operator==(const discretized_fee_level_t fee_level, const DiscretizedFee &d
 void test_discretized_fees();
 
 //todo
-bool try_discretize_fee_value(const std::uint64_t raw_fee_value, DiscretizedFee &discretized_fee_out);
-//todo
-bool try_get_fee_value(const DiscretizedFee discretized_fee, std::uint64_t &fee_value_out);
+bool try_get_fee_value(const DiscretizedFee &discretized_fee, std::uint64_t &fee_value_out);
 
 } //namespace sp
