@@ -136,10 +136,18 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out);
 
-//todo
+/**
+* brief: semantic_config_component_counts_v1 - component count configuration for a given semantics rule version
+* param: tx_semantic_rules_version -
+* return: allowed component counts for the given semantics rules version
+*/
 SemanticConfigComponentCountsV1 semantic_config_component_counts_v1(
     const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version);
-//todo
+/**
+* brief: semantic_config_ref_sets_v1 - reference set configuration for a given semantics rule version
+* param: tx_semantic_rules_version -
+* return: allowed reference set configuration for the given semantics rules version
+*/
 SemanticConfigRefSetV1 semantic_config_ref_sets_v1(const SpTxSquashedV1::SemanticRulesVersion tx_semantic_rules_version);
 
 

@@ -48,7 +48,7 @@ namespace jamtis
 
 /// index (little-endian): j
 constexpr std::size_t ADDRESS_INDEX_BYTES{16};
-struct address_index_t
+struct address_index_t final
 {
     unsigned char bytes[ADDRESS_INDEX_BYTES];
 
@@ -68,7 +68,7 @@ struct address_index_t
 
 /// MAC for address tags (little-endian): addr_tag_MAC
 constexpr std::size_t ADDRESS_TAG_MAC_BYTES{2};
-struct address_tag_MAC_t
+struct address_tag_MAC_t final
 {
     unsigned char bytes[ADDRESS_TAG_MAC_BYTES];
 

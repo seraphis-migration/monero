@@ -47,34 +47,36 @@
 namespace sp
 {
 
-//todo
+/**
+* brief: check_bin_config_v1 - check that a reference set bin configuration is valid
+* param: reference_set_size -
+* param: bin_config -
+* return: true if the config is valid
+*/
 bool check_bin_config_v1(const std::uint64_t reference_set_size, const SpBinnedReferenceSetConfigV1 &bin_config);
-
-//todo
-void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
-    const SpBinnedReferenceSetConfigV1 &bin_config,
-    const std::uint64_t reference_set_size,
-    const std::uint64_t real_reference_index,
-    std::vector<std::uint64_t> &bin_loci_out,
-    std::uint64_t &bin_index_with_real_out);
-
-//todo
-//todo: consider making reference sets deterministic from some input secret so repeat reference sets for the same element
-//      can produce the same real bin (given the same generator seed, secret, and index mapper)
-void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config,
-    const rct::key &generator_seed,
-    const std::uint64_t real_reference_index,
-    const std::vector<std::uint64_t> &bin_loci,
-    const std::uint64_t bin_index_with_real,  //index into bin_loci
-    SpBinnedReferenceSetV1 &binned_reference_set_out);
+/**
+* brief: make_binned_reference_set_v1 - make a binned reference set (a reference set represented using bins, where one
+*    reference element is pre-defined but should be hidden within the generated reference set)
+* param: index_mapper -
+* param: bin_config -
+* param: generator_seed -
+* param: reference_set_size -
+* param: real_reference_index -
+* outparam: binned_reference_set_out -
+*/
 void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
     const SpBinnedReferenceSetConfigV1 &bin_config,
     const rct::key &generator_seed,
     const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
     SpBinnedReferenceSetV1 &binned_reference_set_out);
-
-//todo
+/**
+* brief: try_get_reference_indices_from_binned_reference_set_v1 - try to converted a binned reference set into a list of
+*    indices (i.e. the underlying reference set)
+* param: binned_reference_set -
+* outparam: reference_indices_out -
+* return: true if extracting the reference indices succeeded
+*/
 bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedReferenceSetV1 &binned_reference_set,
     std::vector<std::uint64_t> &reference_indices_out);
 

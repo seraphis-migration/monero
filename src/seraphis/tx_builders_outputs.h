@@ -77,20 +77,22 @@ enum class OutputProposalSetExtraTypesV1
 
 /**
 * brief: check_v1_output_proposal_set_semantics_v1 - check semantics of a set of output proposals
+*   - throws if a check fails
 *   - if 2 proposals, should be 1 unique enote ephemeral pubkey
 *   - if >2 proposals, should be 1 unique enote ephemeral pubkey per output
 *   - proposals should be sorted
-*   - proposals should have unique onetime addresses
-* param - output_proposals -
+*   - proposals should have unique and canonical onetime addresses
+* param: output_proposals -
 */
 void check_v1_output_proposal_set_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals);
 /**
 * brief: check_v1_tx_supplement_semantics_v1 - check semantics of a tx supplement
+*   - throws if a check fails
 *   - if num_outputs == 2, should be 1 enote ephemeral pubkey
 *   - if num_outputs > 2, should be 'num_outputs' enote ephemeral pubkeys
 *   - all enote ephemeral pubkeys should be unique
-* param - tx_supplement -
-* param - num_outputs -
+* param: tx_supplement -
+* param: num_outputs -
 */
 void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs);
 /**
@@ -161,7 +163,15 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<SpOutputProposalV1> &output_proposals_inout);
-//todo
+/**
+* brief: check_v1_tx_proposal_semantics_v1 - check semantics of a tx proposal
+*   - throws if a check fails
+*   - outputs should be sorted
+*   - outputs should have unique and canonical onetime addresses
+*   - amount commitments are consistent with masks/amounts recorded in the proposal
+*   - the tx supplement should have valid semantics
+* param: tx_proposal -
+*/
 void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal);
 /**
 * brief: make_v1_tx_proposal_v1 - make v1 tx proposal (set of outputs that can be incorporated in a full tx)

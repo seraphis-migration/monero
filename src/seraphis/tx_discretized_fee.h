@@ -46,7 +46,7 @@ namespace sp
 
 using discretized_fee_level_t = unsigned char;
 
-struct DiscretizedFee
+struct DiscretizedFee final
 {
     discretized_fee_level_t m_fee_level;
 
@@ -63,16 +63,11 @@ struct DiscretizedFee
 bool operator==(const discretized_fee_level_t fee_level, const DiscretizedFee &discretized_fee);
 
 /**
-* brief: try_get_basic_enote_record_v1 - try to extract a basic enote record from an enote
-* param: enote -
-* param: enote_ephemeral_pubkey -
-* param: sender_receiver_DH_derivation -
-* outparam: basic_record_out -
+* brief: try_get_fee_value - try to extract a raw fee value from a discretized fee
+* param: discretized_fee -
+* outparam: fee_value_out -
 * return: true if an extraction succeeded
 */
-void test_discretized_fees();
-
-//todo
 bool try_get_fee_value(const DiscretizedFee &discretized_fee, std::uint64_t &fee_value_out);
 
 } //namespace sp

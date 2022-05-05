@@ -221,27 +221,9 @@ static void denormalize_elements(const std::uint64_t normalization_factor, std::
         element += normalization_factor;
 }
 //-------------------------------------------------------------------------------------------------------------------
+// make bin loci for a reference set (one of which will be the locus for the bin with the real reference)
 //-------------------------------------------------------------------------------------------------------------------
-bool check_bin_config_v1(const std::uint64_t reference_set_size, const SpBinnedReferenceSetConfigV1 &bin_config)
-{
-    // bin width outside bin dimension
-    if (bin_config.m_bin_radius > (std::numeric_limits<ref_set_bin_dimension_v1_t>::max() - 1)/2)
-        return false;
-    // too many bin members
-    if (bin_config.m_num_bin_members > std::numeric_limits<ref_set_bin_dimension_v1_t>::max())
-        return false;
-    // can't fit bin members in bin (note: bin can't contain more than std::uint64_t::max members)
-    if (bin_config.m_num_bin_members > compute_bin_width(bin_config.m_bin_radius))
-        return false;
-    // no bin members
-    if (bin_config.m_num_bin_members < 1)
-        return false;
-
-    // reference set can't be perfectly divided into bins
-    return bin_config.m_num_bin_members * (reference_set_size / bin_config.m_num_bin_members) == reference_set_size;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
+static void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
     const SpBinnedReferenceSetConfigV1 &bin_config,
     const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
@@ -374,14 +356,40 @@ void generate_bin_loci(const SpRefSetIndexMapper &index_mapper,
     bin_loci_out = std::move(bin_loci);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config,
+//-------------------------------------------------------------------------------------------------------------------
+bool check_bin_config_v1(const std::uint64_t reference_set_size, const SpBinnedReferenceSetConfigV1 &bin_config)
+{
+    // bin width outside bin dimension
+    if (bin_config.m_bin_radius > (std::numeric_limits<ref_set_bin_dimension_v1_t>::max() - 1)/2)
+        return false;
+    // too many bin members
+    if (bin_config.m_num_bin_members > std::numeric_limits<ref_set_bin_dimension_v1_t>::max())
+        return false;
+    // can't fit bin members in bin (note: bin can't contain more than std::uint64_t::max members)
+    if (bin_config.m_num_bin_members > compute_bin_width(bin_config.m_bin_radius))
+        return false;
+    // no bin members
+    if (bin_config.m_num_bin_members < 1)
+        return false;
+
+    // reference set can't be perfectly divided into bins
+    return bin_config.m_num_bin_members * (reference_set_size / bin_config.m_num_bin_members) == reference_set_size;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
     const rct::key &generator_seed,
+    const std::uint64_t reference_set_size,
     const std::uint64_t real_reference_index,
-    const std::vector<std::uint64_t> &bin_loci,
-    const std::uint64_t bin_index_with_real,  //index into bin_loci
     SpBinnedReferenceSetV1 &binned_reference_set_out)
 {
     // make binned reference set
+
+    /// generate bin loci
+    std::vector<std::uint64_t> bin_loci;
+    std::uint64_t bin_index_with_real;
+    generate_bin_loci(index_mapper, bin_config, reference_set_size, real_reference_index, bin_loci, bin_index_with_real);
+
 
     /// checks and initialization
     const std::uint64_t bin_width{compute_bin_width(bin_config.m_bin_radius)};
@@ -451,29 +459,6 @@ void make_binned_reference_set_v1(const SpBinnedReferenceSetConfigV1 &bin_config
     binned_reference_set_out.m_bin_config = bin_config;
     binned_reference_set_out.m_bin_generator_seed = generator_seed;
     binned_reference_set_out.m_bins = std::move(bins);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
-    const SpBinnedReferenceSetConfigV1 &bin_config,
-    const rct::key &generator_seed,
-    const std::uint64_t reference_set_size,
-    const std::uint64_t real_reference_index,
-    SpBinnedReferenceSetV1 &binned_reference_set_out)
-{
-    // make binned reference set with loci generator
-
-    // generate bin loci
-    std::vector<std::uint64_t> bin_loci;
-    std::uint64_t bin_index_with_real;
-    generate_bin_loci(index_mapper, bin_config, reference_set_size, real_reference_index, bin_loci, bin_index_with_real);
-
-    // make the reference set
-    make_binned_reference_set_v1(bin_config,
-        generator_seed,
-        real_reference_index,
-        bin_loci,
-        bin_index_with_real,
-        binned_reference_set_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedReferenceSetV1 &binned_reference_set,

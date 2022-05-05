@@ -130,14 +130,30 @@ bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicIn
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<SpMultisigInputProposalV1> &converted_input_proposals_out);
-//todo
+/**
+* brief: make_multisig_enote_ephemeral_privkey_seed_v1 - make the seed for generating enote ephemeral privkeys
+*   seed = H("domain-sep", entropy, {KI})
+* param: enote_ephemeral_privkey_entropy -
+* param: multisig_input_key_images -
+* outparam: enote_ephemeral_privkey_seed_out -
+*/
 void make_multisig_enote_ephemeral_privkey_seed_v1(const crypto::secret_key &enote_ephemeral_privkey_entropy,
     const std::vector<crypto::key_image> &multisig_input_key_images,
     crypto::secret_key &enote_ephemeral_privkey_seed_out);
 void make_multisig_enote_ephemeral_privkey_seed_v1(const crypto::secret_key &enote_ephemeral_privkey_entropy,
     const std::vector<SpMultisigInputProposalV1> &input_proposals,
     crypto::secret_key &enote_ephemeral_privkey_seed_out);
-//todo
+/**
+* brief: make_multisig_enote_ephemeral_privkeys_v1 - make enote ephemeral privkeys for multisig outputs via a hash chain
+*   hash chain
+*   h1 = H_n(seed, H("domain-sep"))
+*   h2 = H_n(seed, h1)
+*   h3 = H_n(seed, h2)
+*   h4 = ...
+* param: enote_ephemeral_privkey_seed -
+* param: num_keys_requested -
+* outparam: enote_ephemeral_privkeys_out -
+*/
 void make_multisig_enote_ephemeral_privkeys_v1(const crypto::secret_key &enote_ephemeral_privkey_seed,
     const std::size_t num_keys_requested,
     std::vector<crypto::secret_key> &enote_ephemeral_privkeys_out);
