@@ -116,7 +116,7 @@ struct SpEnoteRecordV1 final
 
 ////
 // SpContextualEnoteRecordV1
-// - info extracted from a v1 enote, with additional info related to the tx where it was found
+// - info extracted from a v1 enote, with additional info related to where it was found
 ///
 struct SpContextualEnoteRecordV1 final
 {
@@ -128,6 +128,8 @@ struct SpContextualEnoteRecordV1 final
     rct::key m_transaction_id;
     /// block height of transaction (0 if height is unknown)
     std::uint64_t m_transaction_height;
+    /// ledger index of the enote (-1 if index is unknown)
+    std::uint64_t m_ledger_index;
 };
 
 } //namespace sp

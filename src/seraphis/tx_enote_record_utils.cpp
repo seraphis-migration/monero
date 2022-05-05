@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "tx_record_utils.h"
+#include "tx_enote_record_utils.h"
 
 //local headers
 #include "crypto/crypto.h"
@@ -48,7 +48,7 @@ extern "C"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_component_types.h"
-#include "tx_record_types.h"
+#include "tx_enote_record_types.h"
 
 //third party headers
 
@@ -464,12 +464,14 @@ void make_contextual_enote_record_v1(const SpEnoteRecordV1 &core_record,
     TxExtra memo,
     const rct::key &transaction_id,
     const std::uint64_t transaction_height,
+    const std::uint64_t ledger_index,
     SpContextualEnoteRecordV1 &contextual_record_out)
 {
     contextual_record_out.m_core = core_record;
     contextual_record_out.m_memo = std::move(memo);
     contextual_record_out.m_transaction_id = transaction_id;
     contextual_record_out.m_transaction_height = transaction_height;
+    contextual_record_out.m_ledger_index = ledger_index;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

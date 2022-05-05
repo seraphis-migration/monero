@@ -41,7 +41,7 @@
 #include "sp_core_types.h"
 #include "tx_component_types.h"
 #include "tx_extra.h"
-#include "tx_record_types.h"
+#include "tx_enote_record_types.h"
 
 //third party headers
 
@@ -175,12 +175,14 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
 * param: memo -
 * param: transaction_id -
 * param: transaction_height -
+* param: ledger_index -
 * outparam: contextual_record_out -
 */
 void make_contextual_enote_record_v1(const SpEnoteRecordV1 &core_record,
     TxExtra memo,
     const rct::key &transaction_id,
     const std::uint64_t transaction_height,
+    const std::uint64_t ledger_index,
     SpContextualEnoteRecordV1 &contextual_record_out);
 
 } //namespace sp

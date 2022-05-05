@@ -52,9 +52,9 @@ set(seraphis_sources
   tx_builders_outputs.cpp
   tx_component_types.cpp
   tx_discretized_fee.cpp
+  tx_enote_record_utils.cpp
   tx_extra.cpp
   tx_misc_utils.cpp
-  tx_record_utils.cpp
   tx_ref_set_index_mapper_flat.cpp
   tx_validators.cpp
   txtype_squashed_v1.cpp)

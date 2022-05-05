@@ -50,8 +50,8 @@
 #include "tx_component_types.h"
 #include "tx_discretized_fee.h"
 #include "tx_misc_utils.h"
-#include "tx_record_types.h"
-#include "tx_record_utils.h"
+#include "tx_enote_record_types.h"
+#include "tx_enote_record_utils.h"
 
 //third party headers
 #include <boost/math/special_functions/binomial.hpp>

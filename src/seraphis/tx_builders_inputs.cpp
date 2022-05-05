@@ -54,8 +54,8 @@ extern "C"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_misc_utils.h"
-#include "tx_record_types.h"
-#include "tx_record_utils.h"
+#include "tx_enote_record_types.h"
+#include "tx_enote_record_utils.h"
 #include "tx_ref_set_index_mapper_flat.h"
 
 //third party headers

@@ -129,6 +129,24 @@ static std::uint64_t mod_sub(const std::uint64_t a, const std::uint64_t b, const
     return mod_add(a, mod_negate(b, n), n);
 }
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void rotate_elements(const std::uint64_t range_limit,
+    const std::uint64_t rotation_factor,
+    std::vector<std::uint64_t> &elements_inout)
+{
+    // rotate a group of elements by a rotation factor
+    for (std::uint64_t &element : elements_inout)
+        element = mod_add(element, rotation_factor, range_limit);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void denormalize_elements(const std::uint64_t normalization_factor, std::vector<std::uint64_t> &elements_inout)
+{
+    // de-normalize elements
+    for (std::uint64_t &element : elements_inout)
+        element += normalization_factor;
+}
+//-------------------------------------------------------------------------------------------------------------------
 // deterministically generate unique members of a bin
 //-------------------------------------------------------------------------------------------------------------------
 static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_config,
@@ -201,24 +219,6 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
 
         members_of_bin_out.emplace_back(member_candidate);
     }
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void rotate_elements(const std::uint64_t range_limit,
-    const std::uint64_t rotation_factor,
-    std::vector<std::uint64_t> &elements_inout)
-{
-    // rotate a group of elements by a rotation factor
-    for (std::uint64_t &element : elements_inout)
-        element = mod_add(element, rotation_factor, range_limit);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void denormalize_elements(const std::uint64_t normalization_factor, std::vector<std::uint64_t> &elements_inout)
-{
-    // de-normalize elements
-    for (std::uint64_t &element : elements_inout)
-        element += normalization_factor;
 }
 //-------------------------------------------------------------------------------------------------------------------
 // make bin loci for a reference set (one of which will be the locus for the bin with the real reference)

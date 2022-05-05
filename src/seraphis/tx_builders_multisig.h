@@ -51,7 +51,7 @@
 #include "tx_component_types.h"
 #include "tx_discretized_fee.h"
 #include "tx_extra.h"
-#include "tx_record_types.h"
+#include "tx_enote_record_types.h"
 
 //third party headers
 
