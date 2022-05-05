@@ -37,6 +37,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
 #include "tx_component_types.h"
+#include "tx_discretized_fee.h"
 #include "tx_extra.h"
 
 //third party headers
@@ -204,8 +205,6 @@ struct SpPartialInputV1 final
 
 ////
 // SpPartialTxV1: everything needed for a tx except input membership proofs
-//
-// TODO: from multisig - multisigproposal.txproposal, multisig inputs + extra inputs, balance proof
 ///
 struct SpPartialTxV1 final
 {
@@ -219,8 +218,8 @@ struct SpPartialTxV1 final
     std::vector<SpImageProofV1> m_image_proofs;
     /// supplemental data for tx
     SpTxSupplementV1 m_tx_supplement;
-    /// fee
-    rct::xmr_amount m_tx_fee;
+    /// tx fee (discretized representation)
+    DiscretizedFee m_tx_fee;
 
     /// input enotes
     std::vector<SpEnote> m_input_enotes;

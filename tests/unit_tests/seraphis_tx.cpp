@@ -55,7 +55,7 @@ struct SpTxGenData
     sp::SpBinnedReferenceSetConfigV1 bin_config{0, 0};
     std::vector<rct::xmr_amount> input_amounts;
     std::vector<rct::xmr_amount> output_amounts;
-    rct::xmr_amount transaction_fee{0};
+    sp::DiscretizedFee discretized_transaction_fee{0};
     TestType expected_result{TestType::ExpectTrue};
     bool test_double_spend{false};
 };
@@ -81,7 +81,7 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
             sp::make_mock_tx<SpTxType>(tx_params,
                 gen.input_amounts,
                 gen.output_amounts,
-                gen.transaction_fee,
+                gen.discretized_transaction_fee,
                 ledger_context,
                 tx);
 
@@ -134,7 +134,7 @@ static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
             sp::make_mock_tx<SpTxType>(tx_params,
                 gen.input_amounts,
                 gen.output_amounts,
-                gen.transaction_fee,
+                gen.discretized_transaction_fee,
                 ledger_context,
                 txs_to_verify.back());
             txs_to_verify_ptrs.push_back(&(txs_to_verify.back()));
@@ -182,7 +182,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_misc(const bool test_double
         temp.expected_result = TestType::ExpectTrue;
         temp.input_amounts.push_back(2);
         temp.output_amounts.push_back(1);
-        temp.transaction_fee = 1;
+        temp.discretized_transaction_fee = sp::DiscretizedFee{1};
         temp.ref_set_decomp_n = 2;
         temp.ref_set_decomp_m = 2;
         temp.bin_config = sp::SpBinnedReferenceSetConfigV1{.m_bin_radius = 0, .m_num_bin_members = 1};
@@ -355,7 +355,7 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_batching()
         gen.input_amounts.push_back(1);
         gen.output_amounts.push_back(2);
         gen.output_amounts.push_back(1);
-        gen.transaction_fee = 1;
+        gen.discretized_transaction_fee = sp::DiscretizedFee{1};
         gen.ref_set_decomp_n = 2;
         gen.ref_set_decomp_m = 2;
         gen.bin_config = sp::SpBinnedReferenceSetConfigV1{.m_bin_radius = 0, .m_num_bin_members = 1};

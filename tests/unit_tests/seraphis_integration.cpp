@@ -55,6 +55,7 @@ extern "C"
 #include "seraphis/tx_builders_mixed.h"
 #include "seraphis/tx_builders_outputs.h"
 #include "seraphis/tx_component_types.h"
+#include "seraphis/tx_discretized_fee.h"
 #include "seraphis/tx_extra.h"
 #include "seraphis/tx_misc_utils.h"
 #include "seraphis/tx_record_types.h"
@@ -192,13 +193,16 @@ TEST(seraphis_integration, txtype_squashed_v1)
     payment_proposal_B.get_output_proposal_v1(output_proposal_B);
 
     // c) finalize output proposals
-    const rct::xmr_amount transaction_fee{1};   //todo: use fee oracle mockup
+    const rct::xmr_amount real_transaction_fee{1};
+    DiscretizedFee discretized_transaction_fee;  //todo: use fee oracle mockup
+    ASSERT_NO_THROW(discretized_transaction_fee = DiscretizedFee{real_transaction_fee});
+    ASSERT_TRUE(discretized_transaction_fee == real_transaction_fee);  //a tx fee of 1 should discretize perfectly
 
     std::vector<SpOutputProposalV1> output_proposals;
     output_proposals.emplace_back(output_proposal_B);
 
     ASSERT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount_A,
-        transaction_fee,
+        real_transaction_fee,
         user_address_A,
         user_address_A,
         keys_user_A.K_1_base,
@@ -231,7 +235,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
     ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(input_proposals,
         std::move(output_proposals),
-        transaction_fee,
+        discretized_transaction_fee,
         std::move(membership_proof_preps),
         std::vector<ExtraFieldElement>{},
         SpTxSquashedV1::SemanticRulesVersion::MOCK,

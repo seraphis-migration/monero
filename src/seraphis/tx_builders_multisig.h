@@ -49,6 +49,7 @@
 #include "tx_builder_types.h"
 #include "tx_builder_types_multisig.h"
 #include "tx_component_types.h"
+#include "tx_discretized_fee.h"
 #include "tx_extra.h"
 #include "tx_record_types.h"
 
@@ -144,7 +145,7 @@ void make_multisig_enote_ephemeral_privkeys_v1(const crypto::secret_key &enote_e
 * brief: finalize_multisig_output_proposals_v1 - finalize output set for a multisig tx proposal (add change/dummy outputs)
 *   - precondition: multisig tx proposal will contain a full balance (not trying to partially fund an output set)
 * param: input_proposals -
-* param: transaction_fee -
+* param: discretized_transaction_fee -
 * param: change_destination -
 * param: dummy_destination -
 * param: wallet_spend_pubkey -
@@ -155,7 +156,7 @@ void make_multisig_enote_ephemeral_privkeys_v1(const crypto::secret_key &enote_e
 * inoutparam: output_proposals_inout -
 */
 void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
-    const rct::xmr_amount transaction_fee,
+    const DiscretizedFee &discretized_transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &wallet_spend_pubkey,
@@ -177,6 +178,10 @@ void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const rct::xmr_amount desired_fee);
+void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const DiscretizedFee &discretized_desired_fee);
 /**
 * brief: check_v1_multisig_tx_proposal_semantics_v1 - check semantics of a multisig tx proposal
 *   - throws if a check fails

@@ -48,6 +48,7 @@ namespace sp
     class LedgerContext;
     class MockLedgerContext;
     struct SpTxSquashedV1;
+    struct DiscretizedFee;
 }
 
 
@@ -191,7 +192,7 @@ bool validate_txs(const std::vector<const SpTxSquashedV1*> &txs, const LedgerCon
 * param: params -
 * param: in_amounts -
 * param: out_amounts -
-* param: transaction_fee -
+* param: discretized_transaction_fee -
 * inoutparam: ledger_context_inout -
 * outparam: tx_out -
 */
@@ -199,7 +200,7 @@ template <typename SpTxType, typename SpTxParamsT>
 void make_mock_tx(const SpTxParamsT &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    const rct::xmr_amount transaction_fee,
+    const DiscretizedFee &discretized_transaction_fee,
     MockLedgerContext &ledger_context_inout,
     SpTxType &tx_out);
 

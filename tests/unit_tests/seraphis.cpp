@@ -56,7 +56,7 @@ extern "C"
 #include "seraphis/tx_builders_mixed.h"
 #include "seraphis/tx_builders_outputs.h"
 #include "seraphis/tx_component_types.h"
-#include "seraphis/tx_discretized_fees.h"
+#include "seraphis/tx_discretized_fee.h"
 #include "seraphis/tx_extra.h"
 #include "seraphis/tx_misc_utils.h"
 #include "seraphis/tx_record_types.h"
@@ -269,7 +269,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     const std::size_t num_random_memo_elements,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    const rct::xmr_amount transaction_fee,
+    const sp::DiscretizedFee &discretized_transaction_fee,
     const sp::SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     sp::MockLedgerContext &ledger_context_inout,
     sp::SpTxSquashedV1 &tx_out)
@@ -277,10 +277,14 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     /// build a tx from base components
     using namespace sp;
 
-    CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "Tried to make tx without any inputs.");
-    CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "Tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts, transaction_fee),
-        "Tried to make tx with unbalanced amounts.");
+    rct::xmr_amount raw_transaction_fee;
+    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(discretized_transaction_fee, raw_transaction_fee),
+        "SpTxSquashedV1: tried to raw make tx with invalid discretized fee.");
+
+    CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "SpTxSquashedV1: tried to raw make tx without any inputs.");
+    CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "SpTxSquashedV1: tried to raw make tx without any outputs.");
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts, raw_transaction_fee),
+        "SpTxSquashedV1: tried to raw make tx with unbalanced amounts.");
 
     // make mock inputs
     // enote, ks, view key stuff, amount, amount blinding factor
@@ -366,7 +370,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
         input_image_amount_commitment_blinding_factors);
     make_v1_balance_proof_v1(input_amounts, //note: must range proof input image commitments in squashed enote model
         output_amounts,
-        transaction_fee,
+        raw_transaction_fee,
         input_image_amount_commitment_blinding_factors,
         output_amount_commitment_blinding_factors,
         balance_proof);
@@ -376,7 +380,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
 
     make_seraphis_tx_squashed_v1(std::move(input_images), std::move(outputs),
         std::move(balance_proof), std::move(tx_image_proofs), std::move(tx_membership_proofs),
-        std::move(tx_supplement), transaction_fee, semantic_rules_version, tx_out);
+        std::move(tx_supplement), discretized_transaction_fee, semantic_rules_version, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -979,13 +983,13 @@ TEST(seraphis, discretized_fees)
     std::uint64_t test_fee_value, fee_value;
     sp::DiscretizedFee discretized_fee;
 
-    // fee value 0
+    // fee value 0 (should perfectly discretize)
     test_fee_value = 0;
     EXPECT_TRUE(sp::try_discretize_fee_value(test_fee_value, discretized_fee));
     EXPECT_TRUE(sp::try_get_fee_value(discretized_fee, fee_value));
     EXPECT_TRUE(fee_value == test_fee_value);
 
-    // fee value 1
+    // fee value 1 (should perfectly discretize)
     test_fee_value = 1;
     EXPECT_TRUE(sp::try_discretize_fee_value(test_fee_value, discretized_fee));
     EXPECT_TRUE(sp::try_get_fee_value(discretized_fee, fee_value));
@@ -1014,11 +1018,33 @@ TEST(seraphis, discretized_fees)
 TEST(seraphis, txtype_squashed_v1)
 {
     // demo making SpTxTypeSquasedV1 with raw tx builder API
-    std::size_t num_txs{3};
-    std::size_t num_ins_outs{11};
+    const std::size_t num_txs{3};
+    const std::size_t num_ins_outs{11};
 
     // fake ledger context for this test
     sp::MockLedgerContext ledger_context{};
+
+    // prepare input/output amounts
+    std::vector<rct::xmr_amount> in_amounts;
+    std::vector<rct::xmr_amount> out_amounts;
+
+    for (int i{0}; i < num_ins_outs; ++i)
+    {
+        in_amounts.push_back(3);  //initial tx_fee = num_ins_outs
+        out_amounts.push_back(2);
+    }
+
+    // set fee
+    sp::DiscretizedFee discretized_transaction_fee;
+    EXPECT_NO_THROW(discretized_transaction_fee = sp::DiscretizedFee{num_ins_outs});
+    rct::xmr_amount real_transaction_fee;
+    EXPECT_TRUE(try_get_fee_value(discretized_transaction_fee, real_transaction_fee));
+
+    // add an input to cover any extra fee added during discretization
+    const rct::xmr_amount extra_fee_amount{real_transaction_fee - num_ins_outs};
+
+    if (extra_fee_amount > 0)
+        in_amounts.push_back(extra_fee_amount);
 
     // make txs
     std::vector<sp::SpTxSquashedV1> txs;
@@ -1026,25 +1052,19 @@ TEST(seraphis, txtype_squashed_v1)
     txs.reserve(num_txs);
     tx_ptrs.reserve(num_txs);
 
-    std::vector<rct::xmr_amount> in_amounts;
-    std::vector<rct::xmr_amount> out_amounts;
-
-    for (int i{0}; i < num_ins_outs; ++i)
-    {
-        in_amounts.push_back(3);  //tx_fee = num_ins_outs
-        out_amounts.push_back(2);
-    }
-
     for (std::size_t tx_index{0}; tx_index < num_txs; ++tx_index)
     {
         txs.emplace_back();
         make_sp_txtype_squashed_v1(2,
             2,
-            sp::SpBinnedReferenceSetConfigV1{.m_bin_radius = 1, .m_num_bin_members = 2},
+            sp::SpBinnedReferenceSetConfigV1{
+                .m_bin_radius = 1,
+                .m_num_bin_members = 2
+            },
             3,
             in_amounts,
             out_amounts,
-            rct::xmr_amount{num_ins_outs},
+            discretized_transaction_fee,
             sp::SpTxSquashedV1::SemanticRulesVersion::MOCK,
             ledger_context,
             txs.back());

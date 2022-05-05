@@ -31,6 +31,7 @@
 #pragma once
 
 //local headers
+#include "ringct/rctTypes.h"
 
 //third party headers
 
@@ -49,14 +50,17 @@ struct DiscretizedFee
 {
     discretized_fee_level_t m_fee_level;
 
+    DiscretizedFee() = default;
+    DiscretizedFee(const rct::xmr_amount raw_fee_amount);  //throwing constructor
+
     bool operator==(const DiscretizedFee &other) const { return m_fee_level == other.m_fee_level; }
     bool operator==(const discretized_fee_level_t other_fee_level) const { return m_fee_level == other_fee_level; }
+    bool operator==(const rct::xmr_amount raw_fee_amount) const;
+
+    static std::size_t get_size_bytes() { return sizeof(m_fee_level); }
 };
 
-inline bool operator==(const discretized_fee_level_t fee_level, const DiscretizedFee &discretized_fee)
-{
-    return discretized_fee == fee_level;
-}
+bool operator==(const discretized_fee_level_t fee_level, const DiscretizedFee &discretized_fee);
 
 /**
 * brief: try_get_basic_enote_record_v1 - try to extract a basic enote record from an enote

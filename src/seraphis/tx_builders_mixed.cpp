@@ -154,7 +154,7 @@ void make_v1_balance_proof_v1(const std::vector<rct::xmr_amount> &input_amounts,
 //-------------------------------------------------------------------------------------------------------------------
 bool balance_check_in_out_amnts_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const std::vector<SpOutputProposalV1> &output_proposals,
-    const rct::xmr_amount transaction_fee)
+    const DiscretizedFee &discretized_transaction_fee)
 {
     std::vector<rct::xmr_amount> in_amounts;
     std::vector<rct::xmr_amount> out_amounts;
@@ -167,7 +167,11 @@ bool balance_check_in_out_amnts_v1(const std::vector<SpInputProposalV1> &input_p
     for (const auto &output_proposal : output_proposals)
         out_amounts.emplace_back(output_proposal.m_core.m_amount);
 
-    return balance_check_in_out_amnts(in_amounts, out_amounts, transaction_fee);
+    rct::xmr_amount raw_transaction_fee;
+    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(discretized_transaction_fee, raw_transaction_fee),
+        "balance check in out amnts v1: unable to extract transaction fee from discretized fee representation.");
+
+    return balance_check_in_out_amnts(in_amounts, out_amounts, raw_transaction_fee);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
@@ -209,7 +213,7 @@ void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     std::vector<SpPartialInputV1> partial_inputs,
-    const rct::xmr_amount transaction_fee,
+    const DiscretizedFee &discretized_transaction_fee,
     const std::string &version_string,
     SpPartialTxV1 &partial_tx_out)
 {
@@ -242,10 +246,15 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
         input_amounts,
         input_image_amount_commitment_blinding_factors);
 
+    // extract the fee
+    rct::xmr_amount raw_transaction_fee;
+    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(discretized_transaction_fee, raw_transaction_fee),
+        "making partial tx: could not extract a fee value from the discretized fee.");
+
     // make balance proof
     make_v1_balance_proof_v1(input_amounts,
         tx_proposal.m_output_amounts,
-        transaction_fee,
+        raw_transaction_fee,
         input_image_amount_commitment_blinding_factors,
         tx_proposal.m_output_amount_commitment_blinding_factors,
         partial_tx_out.m_balance_proof);
@@ -272,7 +281,7 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     // gather tx output parts
     partial_tx_out.m_outputs = tx_proposal.m_outputs;
     partial_tx_out.m_tx_supplement = tx_proposal.m_tx_supplement;
-    partial_tx_out.m_tx_fee = transaction_fee;
+    partial_tx_out.m_tx_fee = discretized_transaction_fee;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

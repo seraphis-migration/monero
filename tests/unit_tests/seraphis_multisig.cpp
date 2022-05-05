@@ -49,6 +49,7 @@
 #include "seraphis/tx_builders_multisig.h"
 #include "seraphis/tx_builders_outputs.h"
 #include "seraphis/tx_component_types.h"
+#include "seraphis/tx_discretized_fee.h"
 #include "seraphis/tx_extra.h"
 #include "seraphis/tx_record_types.h"
 #include "seraphis/tx_record_utils.h"
@@ -289,7 +290,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     const std::vector<rct::xmr_amount> &out_amounts_explicit_selfsend,
     const std::vector<rct::xmr_amount> &out_amounts_explicit,
     const std::vector<rct::xmr_amount> &out_amounts_opaque,
-    const rct::xmr_amount &fee,
+    const sp::DiscretizedFee &fee,
     const sp::SpTxSquashedV1::SemanticRulesVersion semantic_rules_version)
 {
     using namespace sp;
@@ -631,30 +632,36 @@ TEST(seraphis_multisig, txtype_squashed_v1)
             sp::SpTxSquashedV1::SemanticRulesVersion::MOCK
         };
 
+    // prepare fees to use (these should discretize perfectly)
+    const sp::DiscretizedFee fee_zero{0};
+    const sp::DiscretizedFee fee_one{1};
+    EXPECT_TRUE(fee_zero == rct::xmr_amount{0});
+    EXPECT_TRUE(fee_one == rct::xmr_amount{1});
+
     // test M-of-N combos (and combinations of requested signers)
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 2, {0,1},   {2}, {}, {1}, {}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {0},     {2}, {}, {1}, {}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {1},     {2}, {}, {1}, {}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 3, {0,2},   {2}, {}, {1}, {}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(3, 3, {0,1,2}, {2}, {}, {1}, {}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {1,3},   {2}, {}, {1}, {}, 1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {0,1,2,3}, {2}, {}, {1}, {}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 2, {0,1},   {2}, {}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {0},     {2}, {}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {1},     {2}, {}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 3, {0,2},   {2}, {}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(3, 3, {0,1,2}, {2}, {}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {1,3},   {2}, {}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {0,1,2,3}, {2}, {}, {1}, {}, fee_one, semantic_rules_version));
 
     // test various combinations of inputs/outputs
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {1},   { },   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {1},   {0},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {1},   { },   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {1},   { },   { },   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   { },   {1},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {2},   { },   0, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {2},   {0},   0, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {2},   { },   0, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {1},   {0},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3}, { },   {1},   {0},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3}, {1},   {1},   {0},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {1},   {1},   {0},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {1},   {1},   {1},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {0},   {1},   {1},   1, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {6,6}, {1,1}, {1,1}, {1,1}, 1, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {1},   { },   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {1},   {0},   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {1},   { },   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {1},   { },   { },   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   { },   {1},   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {2},   { },   fee_zero, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {2},   {0},   fee_zero, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {2},   { },   fee_zero, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {1},   {0},   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3}, { },   {1},   {0},   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3}, {1},   {1},   {0},   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {1},   {1},   {0},   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {1},   {1},   {1},   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {0},   {1},   {1},   fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {6,6}, {1,1}, {1,1}, {1,1}, fee_one, semantic_rules_version));
 }
 //-------------------------------------------------------------------------------------------------------------------

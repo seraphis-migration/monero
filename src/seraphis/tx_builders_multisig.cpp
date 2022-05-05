@@ -48,6 +48,7 @@
 #include "tx_builders_mixed.h"
 #include "tx_builders_outputs.h"
 #include "tx_component_types.h"
+#include "tx_discretized_fee.h"
 #include "tx_misc_utils.h"
 #include "tx_record_types.h"
 #include "tx_record_utils.h"
@@ -344,7 +345,7 @@ void make_multisig_enote_ephemeral_privkeys_v1(const crypto::secret_key &enote_e
 }
 //-------------------------------------------------------------------------------------------------------------------
 void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
-    const rct::xmr_amount transaction_fee,
+    const DiscretizedFee &discretized_transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &wallet_spend_pubkey,
@@ -428,6 +429,11 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
     for (const SpMultisigInputProposalV1 &input_proposal : full_input_proposals)
         total_input_amount += input_proposal.m_input_amount;
 
+    // 6. extract raw transaction fee
+    rct::xmr_amount raw_transaction_fee;
+    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(discretized_transaction_fee, raw_transaction_fee),
+        "finalize multisig output proposals: could not get tx fee from discretized fee.");
+
 
     /// finalize the output proposal set
 
@@ -436,7 +442,7 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> new_selfsend_proposals;
 
     finalize_v1_output_proposal_set_v1(total_input_amount,
-        transaction_fee,
+        raw_transaction_fee,
         change_destination,
         dummy_destination,
         wallet_spend_pubkey,
@@ -490,6 +496,8 @@ void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 
     const crypto::secret_key &k_view_balance,
     const rct::xmr_amount desired_fee)
 {
+    // check that a multisig tx proposal covers the full input amount of a tx
+
     // get input amounts
     std::vector<rct::xmr_amount> in_amounts;
     in_amounts.reserve(multisig_tx_proposal.m_input_proposals.size());
@@ -508,8 +516,25 @@ void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 
     SpTxProposalV1 tx_proposal;
     multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
 
+    // check: sum(input amnts) == sum(output amnts) + fee
     CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, tx_proposal.m_output_amounts, desired_fee),
         "multisig tx proposal: input/output amounts did not balance with desired fee.");
+}
+//-------------------------------------------------------------------------------------------------------------------
+void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const DiscretizedFee &discretized_desired_fee)
+{
+    // extract the feel value from a discretized fee then check the multisig tx proposal full balance
+    rct::xmr_amount raw_transaction_fee;
+    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(discretized_desired_fee, raw_transaction_fee),
+        "multisig tx proposal balance check: could not extract fee value from discretized fee.");
+
+    check_v1_multisig_tx_proposal_full_balance_v1(multisig_tx_proposal,
+        wallet_spend_pubkey,
+        k_view_balance,
+        raw_transaction_fee);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,

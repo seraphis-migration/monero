@@ -35,6 +35,8 @@
 //local headers
 #include "ringct/rctTypes.h"
 #include "tx_component_types.h"
+#include "tx_discretized_fee.h"
+#include "tx_extra.h"
 
 //third party headers
 
@@ -136,6 +138,12 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
     const std::vector<SpEnoteV1> &outputs,
     const TxExtra &tx_extra);
 /**
+* brief: validate_sp_semantics_fee_v1 - check that a discretized fee is a valid fee representation
+* param: discretized_transaction_fee
+* return: true/false on validation result
+*/
+bool validate_sp_semantics_fee_v1(const DiscretizedFee &discretized_transaction_fee);
+/**
 * brief: validate_sp_linking_tags_v1 - check tx does not double spend
 *   - no key image duplicates in ledger
 * TODO: checking duplicates in tx pool could be embedded in the ledger context implementation
@@ -154,14 +162,14 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
 *   - check sum(input image masked commitments) == sum(output commitments) + fee*H + remainder*G
 * param: input_images -
 * param: outputs -
-* param: transaction_fee -
+* param: discretized_transaction_fee -
 * param: balance_proof -
 * param: defer_batchable -
 * return: true/false on validation result
 */
 bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
-    const rct::xmr_amount transaction_fee,
+    const DiscretizedFee &discretized_transaction_fee,
     const SpBalanceProofV1 &balance_proof,
     const bool defer_batchable);
 /**

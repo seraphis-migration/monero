@@ -43,6 +43,7 @@
 #include "tx_binned_reference_set_utils.h"
 #include "tx_builders_inputs.h"
 #include "tx_component_types.h"
+#include "tx_discretized_fee.h"
 #include "tx_extra.h"
 #include "tx_misc_utils.h"
 
@@ -243,6 +244,13 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool validate_sp_semantics_fee_v1(const DiscretizedFee &discretized_transaction_fee)
+{
+    rct::xmr_amount raw_transaction_fee;
+
+    return try_get_fee_value(discretized_transaction_fee, raw_transaction_fee);
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images, const LedgerContext &ledger_context)
 {
     // check no duplicates in ledger context
@@ -257,7 +265,7 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
-    const rct::xmr_amount transaction_fee,
+    const DiscretizedFee &discretized_transaction_fee,
     const SpBalanceProofV1 &balance_proof,
     const bool defer_batchable)
 {
@@ -267,10 +275,15 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     if (range_proofs.V.size() == 0)
         return false;
 
+    // try to extract the fee
+    rct::xmr_amount raw_transaction_fee;
+    if (!try_get_fee_value(discretized_transaction_fee, raw_transaction_fee))
+        return false;
+
     // check that amount commitments balance
     if (!validate_sp_amount_balance_equality_check_v1(input_images,
             outputs,
-            transaction_fee,
+            raw_transaction_fee,
             balance_proof.m_remainder_blinding_factor))
         return false;
 

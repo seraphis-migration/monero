@@ -48,6 +48,7 @@
 #include "tx_builders_mixed.h"
 #include "tx_builders_outputs.h"
 #include "tx_component_types.h"
+#include "tx_discretized_fee.h"
 #include "tx_misc_utils.h"
 #include "tx_validators.h"
 
@@ -95,8 +96,8 @@ std::size_t SpTxSquashedV1::get_size_bytes(const std::size_t num_inputs,
     // extra data in tx
     size += SpTxSupplementV1::get_size_bytes(num_outputs, tx_extra);
 
-    // fees
-    size += sizeof(m_fee);
+    // tx fee
+    size += DiscretizedFee::get_size_bytes();
 
     return size;
 }
@@ -183,7 +184,7 @@ void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     std::vector<SpImageProofV1> image_proofs,
     std::vector<SpMembershipProofV1> membership_proofs,
     SpTxSupplementV1 tx_supplement,
-    const rct::xmr_amount transaction_fee,
+    const DiscretizedFee &discretized_transaction_fee,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
 {
@@ -193,7 +194,7 @@ void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     tx_out.m_image_proofs = std::move(image_proofs);
     tx_out.m_membership_proofs = std::move(membership_proofs);
     tx_out.m_supplement = std::move(tx_supplement);
-    tx_out.m_fee = transaction_fee;
+    tx_out.m_fee = discretized_transaction_fee;
     tx_out.m_tx_semantic_rules_version = semantic_rules_version;
 
     CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(tx_out), "Failed to assemble an SpTxSquashedV1.");
@@ -234,16 +235,18 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
     std::vector<SpOutputProposalV1> output_proposals,
-    const rct::xmr_amount transaction_fee,
+    const DiscretizedFee &discretized_transaction_fee,
     std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     std::vector<ExtraFieldElement> additional_memo_elements,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Tried to make tx without any inputs.");
-    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() > 0, "Tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_v1(input_proposals, output_proposals, transaction_fee),
-        "Tried to make tx with unbalanced amounts.");
+    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "SpTxTypeSquashedV1: tried to make tx without any inputs.");
+    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() > 0, "SpTxTypeSquashedV1: tried to make tx without any outputs.");
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_v1(input_proposals,
+            output_proposals,
+            discretized_transaction_fee),
+        "SpTxTypeSquashedV1: tried to make tx with unbalanced amounts.");
 
     // versioning for proofs
     std::string version_string;
@@ -262,7 +265,7 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
 
     // partial tx
     SpPartialTxV1 partial_tx;
-    make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), transaction_fee, version_string, partial_tx);
+    make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), discretized_transaction_fee, version_string, partial_tx);
 
     // membership proofs (assumes the caller prepared to make a membership proof for each input)
     std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
@@ -367,6 +370,10 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
             tx.m_input_images,
             tx.m_outputs,
             tx.m_supplement.m_tx_extra))
+        return false;
+
+    // validate the tx fee is well-formed
+    if (!validate_sp_semantics_fee_v1(tx.m_fee))
         return false;
 
     return true;
@@ -483,14 +490,12 @@ template <>
 void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    const rct::xmr_amount transaction_fee,
+    const DiscretizedFee &discretized_transaction_fee,
     MockLedgerContext &ledger_context_inout,
     SpTxSquashedV1 &tx_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "Tried to make tx without any inputs.");
-    CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "Tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts, transaction_fee),
-        "Tried to make tx with unbalanced amounts.");
+    CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "SpTxSquashedV1: tried to make mock tx without any inputs.");
+    CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "SpTxSquashedV1: tried to make mock tx without any outputs.");
 
     // make mock inputs
     // enote, ks, view key stuff, amount, amount blinding factor
@@ -500,6 +505,12 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
     std::vector<SpOutputProposalV1> output_proposals{
             gen_mock_sp_output_proposals_v1(out_amounts, params.num_random_memo_elements)
         };
+
+    // expect amounts to balance
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_v1(input_proposals,
+            output_proposals,
+            discretized_transaction_fee),
+        "SpTxSquashedV1: tried to make mock tx with unbalanced amounts.");
 
     // for 2-out tx, the enote ephemeral pubkey is shared by both outputs
     if (output_proposals.size() == 2)
@@ -524,7 +535,7 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
     // make tx
     make_seraphis_tx_squashed_v1(input_proposals,
         std::move(output_proposals),
-        transaction_fee,
+        discretized_transaction_fee,
         std::move(membership_proof_preps),
         std::move(additional_memo_elements),
         SpTxSquashedV1::SemanticRulesVersion::MOCK,

@@ -29,9 +29,10 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "tx_discretized_fees.h"
+#include "tx_discretized_fee.h"
 
 //local headers
+#include "misc_log_ex.h"
 #include "seraphis_config_temp.h"
 
 //third party headers
@@ -111,19 +112,18 @@ static void generate_discretized_fee_context()
         s_discretized_fee_map.emplace_back(static_cast<discretized_fee_level_t>(current_level), 0);
 
         // sanity check
-        if (current_level > std::numeric_limits<discretized_fee_level_t>::max())
-            throw std::runtime_error("Seraphis discretized fees: could not fit all fee levels in the fee level type.");
+        CHECK_AND_ASSERT_THROW_MES(current_level <= std::numeric_limits<discretized_fee_level_t>::max(),
+            "Seraphis discretized fees: could not fit all fee levels in the fee level type.");
 
     });
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-bool try_discretize_fee_value(const std::uint64_t raw_fee_value, DiscretizedFee &discretized_fee_out)
+DiscretizedFee::DiscretizedFee(const rct::xmr_amount raw_fee_value)
 {
     // try to find the closest discretized fee that is >= the specified fee value
     generate_discretized_fee_context();
 
-    DiscretizedFee temp_discretized_fee;
     std::uint64_t closest_discretized_fee_value{static_cast<std::uint64_t>(-1)};
     bool result_found{false};
 
@@ -134,17 +134,36 @@ bool try_discretize_fee_value(const std::uint64_t raw_fee_value, DiscretizedFee 
 
         if (discretized_fee_setting.second <= closest_discretized_fee_value)
         {
-            temp_discretized_fee.m_fee_level = discretized_fee_setting.first;
+            this->m_fee_level = discretized_fee_setting.first;
             closest_discretized_fee_value = discretized_fee_setting.second;
             result_found = true;
         }
     }
 
     // check if a valid fee was found (if the fee value was > the highest discretized fee value, this will fail)
-    if (!result_found)
-        return false;
+    CHECK_AND_ASSERT_THROW_MES(result_found, "constructing a discretized fee failed: invalid fee amount (" <<
+        raw_fee_value << ").");
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool DiscretizedFee::operator==(const rct::xmr_amount raw_fee_value) const
+{
+    rct::xmr_amount this_fee_value;
+    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(*this, this_fee_value), "discretized fee equality check with "
+        "a raw fee failed: the discretized fee is invalid.");
 
-    discretized_fee_out = temp_discretized_fee;
+    return this_fee_value == raw_fee_value;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool operator==(const discretized_fee_level_t fee_level, const DiscretizedFee &discretized_fee)
+{
+    return discretized_fee == fee_level;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_discretize_fee_value(const std::uint64_t raw_fee_value, DiscretizedFee &discretized_fee_out)
+{
+    try { discretized_fee_out = DiscretizedFee{raw_fee_value}; }
+    catch (...) { return false; }
+
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
