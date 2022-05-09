@@ -666,7 +666,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
             ++num_self_sends;
 
             // - self-send outputs' enote ephemeral privkeys should be reproducible
-            // note: if there are exactly two opaque proposals, one of which is a self-send, then the second conditional
+            // note: if there are exactly two opaque proposals, one of which is a self-send, then the second branch
             //       will fail (even if the enote ephemeral privkey is reproducible) because there is insufficient
             //       information to validate that case
             if (num_outputs == 2 && multisig_tx_proposal.m_explicit_payments.size() == 1)
@@ -694,8 +694,8 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
                 // K_e = r * k^j_a * G
                 temp_reproduced_enote_ephemeral_pubkey =
                     rct::scalarmultKey(
-                            rct::scalarmultBase(rct::sk2rct(temp_address_privkey)),
-                            rct::sk2rct(enote_ephemeral_privkeys[enote_ephemeral_privkey_index])
+                            rct::scalarmultBase(rct::sk2rct(temp_address_privkey)),  //k^j_a * G
+                            rct::sk2rct(enote_ephemeral_privkeys[enote_ephemeral_privkey_index])  //r
                         );
 
                 // check that the enote ephemeral pubkey was reproduced

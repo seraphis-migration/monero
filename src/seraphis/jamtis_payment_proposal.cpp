@@ -44,6 +44,9 @@
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
+#include "tx_enote_record_types.h"
+#include "tx_enote_record_utils.h"
+#include "tx_extra.h"
 
 //third party headers
 
@@ -204,53 +207,22 @@ void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount,
     make_tx_extra(std::move(memo_elements), m_partial_memo);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool is_self_send_output_proposal(const SpOutputProposalV1 &proposal,
+bool is_self_send_output_proposal(const SpOutputProposalV1 &output_proposal,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance)
 {
-    // nominal sender-receiver secret (self-send derivation path)
-    rct::key q_nominal;
-    auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q_nominal, sizeof(q_nominal)); });
-    make_jamtis_sender_receiver_secret_selfsend(k_view_balance, proposal.m_enote_ephemeral_pubkey, q_nominal);
+    // extract enote from output proposal
+    SpEnoteV1 temp_enote;
+    output_proposal.get_enote_v1(temp_enote);
 
-    // get the nominal raw address tag
-    address_tag_t nominal_raw_address_tag{decrypt_address_tag(q_nominal, proposal.m_addr_tag_enc)};
+    // try to get an enote record from the enote (via selfsend path)
+    SpEnoteRecordV1 temp_enote_record;
 
-    // check if the mac is a self-send type
-    address_tag_MAC_t nominal_mac;
-    address_index_t nominal_address_index{address_tag_to_index(nominal_raw_address_tag, nominal_mac)};
-
-    if (!is_known_self_send_MAC(nominal_mac))
-        return false;
-
-    // find-received key
-    crypto::secret_key findreceived_key;
-    make_jamtis_findreceived_key(k_view_balance, findreceived_key);
-
-    // sender-receiver derivation
-    crypto::key_derivation K_d;
-    crypto::generate_key_derivation(rct::rct2pk(proposal.m_enote_ephemeral_pubkey), findreceived_key, K_d);
-
-    // recompute view tag and check that it matches
-    view_tag_t recomputed_view_tag;
-    make_jamtis_view_tag(K_d, proposal.m_core.m_onetime_address, recomputed_view_tag);
-
-    if (recomputed_view_tag != proposal.m_view_tag)
-        return false;
-
-    // nominal spendkey
-    rct::key nominal_spendkey;
-    make_jamtis_nominal_spend_key(q_nominal, proposal.m_core.m_onetime_address, nominal_spendkey);
-
-    // generate-address secret
-    crypto::secret_key generateaddress_secret;
-    make_jamtis_generateaddress_secret(k_view_balance, generateaddress_secret);
-
-    // check if the nominal spend key is owned by this wallet
-    return test_jamtis_nominal_spend_key(wallet_spend_pubkey,
-        generateaddress_secret,
-        nominal_address_index,
-        nominal_spendkey);
+    return try_get_enote_record_v1_selfsend(temp_enote,
+        output_proposal.m_enote_ephemeral_pubkey,
+        wallet_spend_pubkey,
+        k_view_balance,
+        temp_enote_record);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis
