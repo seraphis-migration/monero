@@ -38,7 +38,8 @@ namespace config
   // note: version number should line up with intended grootle n^m decomposition
   const constexpr std::uint64_t SP_REF_SET_BIN_RADIUS_V1 = 127;
   const constexpr std::uint64_t SP_REF_SET_NUM_BIN_MEMBERS_V1 = 8;
-  const constexpr std::uint64_t DISC_FEE_LEVEL_NUMERATOR_X100 = 150;  //fee level factor = 1.5
+  const constexpr std::uint64_t DISCRETIZED_FEE_LEVEL_NUMERATOR_X100 = 150;  //fee level factor = 1.5
+  const constexpr std::uint64_t DISCRETIZED_FEE_SIG_FIGS = 1;
 
   const constexpr char HASH_KEY_GROOTLE_Hi_A[] = "grootle_Hi_A";
   const constexpr char HASH_KEY_GROOTLE_Hi_B[] = "grootle_Hi_B";

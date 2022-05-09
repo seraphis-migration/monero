@@ -47,9 +47,9 @@ extern "C"
 #include "seraphis/sp_crypto_utils.h"
 #include "seraphis/tx_builder_types.h"
 #include "seraphis/tx_component_types.h"
+#include "seraphis/tx_enote_record_types.h"
+#include "seraphis/tx_enote_record_utils.h"
 #include "seraphis/tx_misc_utils.h"
-#include "seraphis/tx_record_types.h"
-#include "seraphis/tx_record_utils.h"
 #include "performance_tests.h"
 
 //---------------------------------------------------------------------------------------------------------------------

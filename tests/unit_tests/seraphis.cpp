@@ -44,6 +44,7 @@ extern "C"
 #include "seraphis/jamtis_support_types.h"
 #include "seraphis/ledger_context.h"
 #include "seraphis/mock_ledger_context.h"
+#include "seraphis/seraphis_config_temp.h"
 #include "seraphis/sp_composition_proof.h"
 #include "seraphis/sp_core_enote_utils.h"
 #include "seraphis/sp_core_types.h"
@@ -997,14 +998,13 @@ TEST(seraphis, discretized_fees)
     EXPECT_TRUE(fee_value == test_fee_value);
     EXPECT_TRUE(discretized_fee == test_fee_value);
 
-    // fee value multiple digits (should round up)
-    test_fee_value = 11;
-    discretized_fee = sp::DiscretizedFee{test_fee_value};
-    EXPECT_TRUE(sp::try_get_fee_value(discretized_fee, fee_value));
-    EXPECT_TRUE(fee_value > test_fee_value);
-    EXPECT_FALSE(discretized_fee == test_fee_value);
-
-    test_fee_value = 19;
+    // fee value more digits than sig figs (should round up)
+    test_fee_value = 1;
+    for (std::size_t sig_fig{0}; sig_fig < config::DISCRETIZED_FEE_SIG_FIGS; ++sig_fig)
+    {
+        test_fee_value *= 10;
+        test_fee_value += 1;
+    }
     discretized_fee = sp::DiscretizedFee{test_fee_value};
     EXPECT_TRUE(sp::try_get_fee_value(discretized_fee, fee_value));
     EXPECT_TRUE(fee_value > test_fee_value);

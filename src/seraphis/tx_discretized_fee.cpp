@@ -89,7 +89,7 @@ static void generate_discretized_fee_context()
     std::call_once(init_fee_context_once_flag,
         [&](){
 
-        const long double fee_level_factor{config::DISC_FEE_LEVEL_NUMERATOR_X100 / 100.0};
+        const long double fee_level_factor{config::DISCRETIZED_FEE_LEVEL_NUMERATOR_X100 / 100.0};
         std::size_t current_level{0};
         std::uint64_t last_fee_value{static_cast<std::uint64_t>(-1)};
         std::uint64_t fee_value;
@@ -98,7 +98,9 @@ static void generate_discretized_fee_context()
         do
         {
             // value = round_1_sig_fig(factor ^ level)
-            fee_value = static_cast<std::uint64_t>(round_to_sig_figs(std::pow(fee_level_factor, current_level), 1));
+            fee_value = static_cast<std::uint64_t>(
+                    round_to_sig_figs(std::pow(fee_level_factor, current_level), config::DISCRETIZED_FEE_SIG_FIGS)
+                );
 
             // skip if we already have this value
             if (fee_value == last_fee_value)
@@ -108,7 +110,8 @@ static void generate_discretized_fee_context()
             s_discretized_fee_map.emplace_back(static_cast<discretized_fee_level_t>(current_level), fee_value);
 
             last_fee_value = fee_value;
-        } while (round_to_sig_figs(std::pow(fee_level_factor, ++current_level), 1) < std::numeric_limits<std::uint64_t>::max());
+        } while (round_to_sig_figs(std::pow(fee_level_factor, ++current_level), config::DISCRETIZED_FEE_SIG_FIGS) <
+            std::numeric_limits<std::uint64_t>::max());
 
         // special encoding: uint64::max
         s_discretized_fee_map.emplace_back(

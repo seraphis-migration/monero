@@ -64,11 +64,12 @@ public:
     /// normal constructor
     jamtis_address_tag_cipher_context(const rct::key &cipher_key);
 
-    /// disable copy/move (this is a scoped manager)
-    jamtis_address_tag_cipher_context& operator=(jamtis_address_tag_cipher_context&&) = delete;
-
 //destructor
     ~jamtis_address_tag_cipher_context();
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager)
+    jamtis_address_tag_cipher_context& operator=(jamtis_address_tag_cipher_context&&) = delete;
 
 //member functions
     address_tag_t cipher(const address_index_t &j) const;

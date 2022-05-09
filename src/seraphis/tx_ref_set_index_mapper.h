@@ -62,6 +62,10 @@ public:
 //destructor
     virtual ~SpRefSetIndexMapper() = default;
 
+//overloaded operators
+    /// disable copy/move (this is a pure virtual base class)
+    SpRefSetIndexMapper& operator=(SpRefSetIndexMapper&&) = delete;
+
 //getters
     virtual std::uint64_t get_distribution_min_index() const = 0;
     virtual std::uint64_t get_distribution_max_index() const = 0;
