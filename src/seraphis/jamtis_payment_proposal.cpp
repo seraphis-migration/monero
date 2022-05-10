@@ -99,7 +99,7 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
     make_jamtis_amount_baked_key_plain_sender(m_enote_ephemeral_privkey, amount_baked_key);
 
     // amount blinding factor: y = H_n(q, 8 r G)
-    make_jamtis_amount_blinding_factor_plain(q, amount_baked_key, output_proposal_out.get_amount_blinding_factor());
+    make_jamtis_amount_blinding_factor_plain(q, amount_baked_key, output_proposal_out.m_core.m_amount_blinding_factor);
 
     // amount: a
     output_proposal_out.m_core.m_amount = m_amount;
@@ -179,7 +179,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
     make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
 
     // amount blinding factor: y = H_n(q)  //note: no baked key
-    make_jamtis_amount_blinding_factor_selfsend(q, output_proposal_out.get_amount_blinding_factor());
+    make_jamtis_amount_blinding_factor_selfsend(q, output_proposal_out.m_core.m_amount_blinding_factor);
 
     // amount: a
     output_proposal_out.m_core.m_amount = m_amount;

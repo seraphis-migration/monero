@@ -102,10 +102,11 @@ static boost::multiprecision::uint128_t compute_total_amount(
 //-------------------------------------------------------------------------------------------------------------------
 static void sort_contextual_enote_records_descending(std::list<SpContextualEnoteRecordV1> &contextual_enote_records_inout)
 {
-    std::sort(contextual_enote_records_inout.rbegin(), contextual_enote_records_inout.rend(),
-            [](const auto &record1, const auto &record2) -> bool
+    // sort: largest amount first, smallest amount last
+    contextual_enote_records_inout.sort(
+            [](const SpContextualEnoteRecordV1 &record1, const SpContextualEnoteRecordV1 &record2) -> bool
             {
-                return record1.get_amount() < record2.get_amount();
+                return record1.get_amount() > record2.get_amount();
             }
         );
 }
