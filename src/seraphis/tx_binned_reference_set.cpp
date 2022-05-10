@@ -54,14 +54,13 @@ void SpBinnedReferenceSetConfigV1::append_to_string(std::string &str_inout) cons
 //-------------------------------------------------------------------------------------------------------------------
 void SpReferenceBinV1::append_to_string(std::string &str_inout) const
 {
-    // str || bin locus || bin rotation factor
+    // str || bin locus
     append_uint_to_string(m_bin_locus, str_inout);
-    append_uint_to_string(m_rotation_factor, str_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpBinnedReferenceSetV1::append_to_string(std::string &str_inout) const
 {
-    // str || bin config || bin generator seed || {bins}
+    // str || bin config || bin generator seed || bin rotation factor || {bins}
     str_inout.reserve(str_inout.size() + this->get_size_bytes(true) + SpBinnedReferenceSetConfigV1::get_size_bytes());
 
     // bin config
@@ -70,9 +69,24 @@ void SpBinnedReferenceSetV1::append_to_string(std::string &str_inout) const
     // bin generator seed
     str_inout.append(reinterpret_cast<const char*>(m_bin_generator_seed.bytes), sizeof(m_bin_generator_seed));
 
+    // bin rotation factor
+    append_uint_to_string(m_bin_rotation_factor, str_inout);
+
     // bins
     for (const SpReferenceBinV1 &bin : m_bins)
         bin.append_to_string(str_inout);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t SpBinnedReferenceSetV1::get_size_bytes(const std::size_t num_bins, const bool include_seed /*= false*/)
+{
+    return num_bins * SpReferenceBinV1::get_size_bytes() +
+        sizeof(ref_set_bin_dimension_v1_t) +
+        (include_seed ? sizeof(m_bin_generator_seed) : 0);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t SpBinnedReferenceSetV1::get_size_bytes(const bool include_seed /*= false*/) const
+{
+    return SpBinnedReferenceSetV1::get_size_bytes(m_bins.size(), include_seed);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

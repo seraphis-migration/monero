@@ -78,19 +78,13 @@ struct SpBinnedReferenceSetConfigV1 final
 // SpReferenceBinV1
 // - bin: a selection of elements from a range of elements in a larger set
 // - bin locus: the center of the bin range, as an index into that larger set
-// - rotation factor: rotates deterministically-generated bin members within the bin, so that a pre-selected
-//                    member of the larger set becomes a member of the bin
 ///
 struct SpReferenceBinV1 final
 {
     /// bin locus (index into original set)
     std::uint64_t m_bin_locus;
-    /// rotation factor
-    ref_set_bin_dimension_v1_t m_rotation_factor;
 
     /// less-than operator for sorting
-    /// - only use bin locus for sorting, since the rotation factor is not always independent of ordering (the real
-    //    reference's bin's rotation factor depends on the generator seed hashed with the bin index)
     bool operator<(const SpReferenceBinV1 &other_bin) const
     {
         return m_bin_locus < other_bin.m_bin_locus;
@@ -99,13 +93,15 @@ struct SpReferenceBinV1 final
     /// convert to a string and append to existing string (for proof transcripts)
     void append_to_string(std::string &str_inout) const;
 
-    static std::size_t get_size_bytes() { return sizeof(m_bin_locus) + sizeof(m_rotation_factor); }
+    static std::size_t get_size_bytes() { return sizeof(m_bin_locus); }
 };
 
 ////
 // SpBinnedReferenceSetV1
 // - reference set: a set of elements that are in a larger set
 // - binned: the reference set is split into 'bins'
+// - rotation factor: rotates deterministically-generated bin members within each bin, so that a pre-selected
+//                    member of the larger set becomes a member of one of the bins
 ///
 struct SpBinnedReferenceSetV1 final
 {
@@ -113,6 +109,8 @@ struct SpBinnedReferenceSetV1 final
     SpBinnedReferenceSetConfigV1 m_bin_config;
     /// bin generator seed (shared by all bins)
     rct::key m_bin_generator_seed;
+    /// rotation factor (shared by all bins)
+    ref_set_bin_dimension_v1_t m_bin_rotation_factor;
     /// bins
     std::vector<SpReferenceBinV1> m_bins;
 
@@ -123,14 +121,8 @@ struct SpBinnedReferenceSetV1 final
     void append_to_string(std::string &str_inout) const;
 
     /// size of the binned reference set (does not include the config)
-    static std::size_t get_size_bytes(const std::size_t num_bins, const bool include_seed = false)
-    {
-        return num_bins * SpReferenceBinV1::get_size_bytes() + (include_seed ? sizeof(m_bin_generator_seed) : 0);
-    }
-    std::size_t get_size_bytes(const bool include_seed = false) const
-    {
-        return SpBinnedReferenceSetV1::get_size_bytes(m_bins.size(), include_seed);
-    }
+    static std::size_t get_size_bytes(const std::size_t num_bins, const bool include_seed = false);
+    std::size_t get_size_bytes(const bool include_seed = false) const;
 };
 
 } //namespace sp

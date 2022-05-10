@@ -420,11 +420,7 @@ void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
     bins.resize(bin_loci.size());
 
     for (std::size_t bin_index{0}; bin_index < bin_loci.size(); ++bin_index)
-    {
         bins[bin_index].m_bin_locus = bin_loci[bin_index];
-        bins[bin_index].m_rotation_factor =
-            static_cast<ref_set_bin_dimension_v1_t>(crypto::rand_range<std::uint64_t>(0, bin_width - 1));
-    }
 
 
     /// set real reference's bin rotation factor
@@ -448,14 +444,11 @@ void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
         };
 
     // 4) compute rotation factor
-    bins[bin_index_with_real].m_rotation_factor = static_cast<ref_set_bin_dimension_v1_t>(
+    binned_reference_set_out.m_bin_rotation_factor = static_cast<ref_set_bin_dimension_v1_t>(
         mod_sub(normalized_real_reference, members_of_real_bin[designated_real_bin_member], bin_width));
 
-    // WARNING: Do not unstably sort the bin members after this point! Bin members are partially determined by bin index,
-    //          so the real element will only line up with its intended bin member if order is preserved.
 
-
-    /// set output reference set
+    /// set remaining pieces of the output reference set
     binned_reference_set_out.m_bin_config = bin_config;
     binned_reference_set_out.m_bin_generator_seed = generator_seed;
     binned_reference_set_out.m_bins = std::move(bins);
@@ -474,6 +467,10 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
     if (!check_bin_config_v1(reference_set_size, binned_reference_set.m_bin_config))
         return false;
 
+    // rotation factor must be within the bins (normalized)
+    if (binned_reference_set.m_bin_rotation_factor >= bin_width)
+        return false;
+
     // validate bins
     for (const SpReferenceBinV1 &bin : binned_reference_set.m_bins)
     {
@@ -481,10 +478,6 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
         if (bin.m_bin_locus < binned_reference_set.m_bin_config.m_bin_radius)
             return false;
         if (bin.m_bin_locus > std::numeric_limits<std::uint64_t>::max() - binned_reference_set.m_bin_config.m_bin_radius)
-            return false;
-
-        // rotation factor must be within the bin (normalized)
-        if (bin.m_rotation_factor >= bin_width)
             return false;
     }
 
@@ -504,7 +497,7 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
             bin_members);
 
         // 2) rotate the bin members by the rotation factor
-        rotate_elements(bin_width, binned_reference_set.m_bins[bin_index].m_rotation_factor, bin_members);
+        rotate_elements(bin_width, binned_reference_set.m_bin_rotation_factor, bin_members);
 
         // 3) de-normalize the bin members
         denormalize_elements(
