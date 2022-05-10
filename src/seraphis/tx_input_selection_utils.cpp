@@ -75,6 +75,19 @@ static std::size_t compute_num_additional_outputs(const rct::key &wallet_spend_p
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+rct::xmr_amount get_fee_from_parameters(const rct::xmr_amount fee_per_tx_weight,
+    const SpTxSquashedV1::WeightParams &tx_weight_parameters)
+{
+    const DiscretizedFee fee_discretized{fee_per_tx_weight * SpTxSquashedV1::get_weight(tx_weight_parameters)};
+
+    rct::xmr_amount fee_value;
+    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(fee_discretized, fee_value),
+        "selecting an input set: could not extract discretized fee (bug).");
+
+    return fee_value;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static boost::multiprecision::uint128_t compute_total_amount(
     const std::list<SpContextualEnoteRecordV1> &contextual_enote_records)
 {
@@ -98,7 +111,66 @@ static void sort_contextual_enote_records(std::list<SpContextualEnoteRecordV1> &
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static bool try_update_added_inputs_v1(const boost::multiprecision::uint128_t output_amount,
+static bool try_update_added_inputs_replace_excluded_v1(std::list<SpContextualEnoteRecordV1> &added_inputs_inout,
+    std::list<SpContextualEnoteRecordV1> &excluded_inputs_inout)
+{
+    // make sure all the inputs are sorted
+    sort_contextual_enote_records(added_inputs_inout);
+    sort_contextual_enote_records(excluded_inputs_inout);
+
+    // try to use the highest excluded input to replace the lowest amount in the added inputs
+    if (excluded_inputs_inout.size() > 0 &&
+        excluded_inputs_inout.back().get_amount() > added_inputs_inout.front().get_amount())
+    {
+        auto exclude_last = excluded_inputs_inout.rbegin();
+        added_inputs_inout.pop_front();
+        added_inputs_inout.splice(added_inputs_inout.begin(), excluded_inputs_inout, exclude_last);
+
+        return true;
+    }
+
+    return false;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool try_update_added_inputs_add_excluded_v1(const std::size_t max_inputs_allowed,
+    SpTxSquashedV1::WeightParams &tx_weight_parameters_inout,
+    std::list<SpContextualEnoteRecordV1> &added_inputs_inout,
+    std::list<SpContextualEnoteRecordV1> &excluded_inputs_inout)
+{
+    // expect the inputs to not be full here
+    if (added_inputs_inout.size() >= max_inputs_allowed)
+        return false;
+
+    // current tx fee
+    tx_weight_parameters_inout.m_num_inputs = added_inputs_inout.size();
+    const rct::xmr_amount current_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_parameters_inout)};
+
+    // next tx fee (from adding one input)
+    ++tx_weight_parameters_inout.m_num_inputs;
+    const rct::xmr_amount next_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_parameters_inout)};
+
+    // make sure the excluded inputs are sorted
+    sort_contextual_enote_records(excluded_inputs_inout);
+
+    // try to use the highest excluded input to cover and exceed the differential fee from adding it
+    CHECK_AND_ASSERT_THROW_MES(next_fee >= current_fee,
+        "updating an input set (add excluded): next fee is less than current fee (bug).");
+
+    if (excluded_inputs_inout.size() > 0 &&
+        excluded_inputs_inout.back().get_amount() > next_fee - current_fee)
+    {
+        auto exclude_last = excluded_inputs_inout.rbegin();
+        added_inputs_inout.splice(added_inputs_inout.begin(), excluded_inputs_inout, exclude_last);
+
+        return true;
+    }
+
+    return false;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool try_update_added_inputs_selection_v1(const boost::multiprecision::uint128_t output_amount,
     const rct::xmr_amount fee_per_tx_weight,
     const std::size_t max_inputs_allowed,
     const InputSelectorV1 &input_selector,
@@ -106,149 +178,111 @@ static bool try_update_added_inputs_v1(const boost::multiprecision::uint128_t ou
     std::list<SpContextualEnoteRecordV1> &added_inputs_inout,
     std::list<SpContextualEnoteRecordV1> &excluded_inputs_inout)
 {
-    // make sure the inputs are sorted
+    // make sure the added inputs are sorted
     sort_contextual_enote_records(added_inputs_inout);
-    sort_contextual_enote_records(excluded_inputs_inout);
 
     // current tx fee
     tx_weight_parameters_inout.m_num_inputs = added_inputs_inout.size();
+    const rct::xmr_amount current_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_parameters_inout)};
 
-    const DiscretizedFee current_fee_discretized{
-            fee_per_tx_weight * SpTxSquashedV1::get_weight(tx_weight_parameters_inout)
-        };
+    // prepare for finding a new input
+    rct::xmr_amount selection_amount;
+    rct::xmr_amount comparison_amount;
 
-    rct::xmr_amount current_fee;
-    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(current_fee_discretized, current_fee),
-        "updating an input set: could not extract discretized fee for current case (bug).");
-
-    SpContextualEnoteRecordV1 requested_input;
-
-    // inputs are not full
     if (added_inputs_inout.size() < max_inputs_allowed)
     {
-        // next tx fee (from adding one input)
+        // if inputs aren't full, then we will be trying to add a new input to the added inputs list
         ++tx_weight_parameters_inout.m_num_inputs;
+        const rct::xmr_amount next_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_parameters_inout)};
 
-        const DiscretizedFee next_fee_discretized{
-                fee_per_tx_weight * SpTxSquashedV1::get_weight(tx_weight_parameters_inout)
-            };
-
-        rct::xmr_amount next_fee;
-        CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(next_fee_discretized, next_fee),
-            "updating an input set: could not extract discretized fee for next input case (bug).");
-
-        // try to use the highest excluded input to cover and exceed the differential fee from adding it
         CHECK_AND_ASSERT_THROW_MES(next_fee >= current_fee,
-            "updating an input set: next fee is less than current fee (bug).");
+            "updating an input set (selection): next fee is less than current fee (bug).");
 
-        if (excluded_inputs_inout.size() > 0 &&
-            excluded_inputs_inout.back().get_amount() > next_fee - current_fee)
-        {
-            auto exclude_last = excluded_inputs_inout.rbegin();
-            added_inputs_inout.splice(added_inputs_inout.begin(), excluded_inputs_inout, exclude_last);
-
-            return true;
-        }
-
-        // try to request a new input from the selector 
-        while (input_selector.try_select_input_v1(output_amount + next_fee,
-            added_inputs_inout,
-            excluded_inputs_inout,
-            requested_input))
-        {
-            // if requested input can cover its differential fee, add it to the inputs list
-            if (requested_input.get_amount() > next_fee - current_fee)
-            {
-                added_inputs_inout.emplace_front(std::move(requested_input));
-
-                return true;
-            }
-            // otherwise, add it to the excluded list
-            else
-            {
-                excluded_inputs_inout.emplace_front(requested_input);  //don't move - requested_input may be used again
-            }
-        }
-
-        // if no more inputs to select, fall back to trying to add a range of excluded inputs
-        if (excluded_inputs_inout.size() > 0)
-        {
-            sort_contextual_enote_records(excluded_inputs_inout);
-
-            boost::multiprecision::uint128_t range_sum{0};
-            std::size_t range_size{0};
-            for (auto exclude_it = excluded_inputs_inout.rbegin(); exclude_it != excluded_inputs_inout.rend(); ++exclude_it)
-            {
-                range_sum += exclude_it->get_amount();
-                ++range_size;
-
-                // we have failed if our range exceeds the input limit
-                if (added_inputs_inout.size() + range_size > max_inputs_allowed)
-                    return false;
-
-                // total fee including this range of inputs
-                tx_weight_parameters_inout.m_num_inputs = added_inputs_inout.size() + range_size;
-
-                const DiscretizedFee range_fee_discretized{
-                        fee_per_tx_weight * SpTxSquashedV1::get_weight(tx_weight_parameters_inout)
-                    };
-
-                rct::xmr_amount range_fee;
-                CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(range_fee_discretized, range_fee),
-                    "updating an input set: could not extract discretized fee for range input case (bug).");
-
-                // if range of excluded inputs can cover the differential fee from those inputs, insert them
-                CHECK_AND_ASSERT_THROW_MES(range_fee >= current_fee,
-                    "updating an input set: range fee is less than current fee (bug).");
-
-                if (range_sum > range_fee - current_fee)
-                {
-                    added_inputs_inout.splice(added_inputs_inout.begin(),
-                        excluded_inputs_inout,
-                        exclude_it,
-                        excluded_inputs_inout.end());
-
-                    return true;
-                }
-            }
-        }
+        selection_amount = output_amount + next_fee;
+        comparison_amount = next_fee - current_fee;
     }
-    // inputs are full
     else
     {
-        CHECK_AND_ASSERT_THROW_MES(max_inputs_allowed > 0 && added_inputs_inout.size() > 0,
-            "updating an input set: unexpectedly there are no inputs in max inputs case (max ins should be > 0).");
+        // if inputs are full, then we will be trying to replace the lowest amount input
+        selection_amount = output_amount + current_fee;
+        comparison_amount = added_inputs_inout.front().get_amount();
+    }
 
-        // try to use the highest excluded input to replace the lowest amount in the added inputs
-        if (excluded_inputs_inout.size() > 0 &&
-            excluded_inputs_inout.back().get_amount() > added_inputs_inout.front().get_amount())
+    // try to get a new input from the selector
+    SpContextualEnoteRecordV1 requested_input;
+
+    while (input_selector.try_select_input_v1(selection_amount, added_inputs_inout, excluded_inputs_inout, requested_input))
+    {
+        // if requested input can cover the comparison amount, add it to the inputs list
+        if (requested_input.get_amount() > comparison_amount)
         {
-            auto exclude_last = excluded_inputs_inout.rbegin();
-            added_inputs_inout.pop_front();
-            added_inputs_inout.splice(added_inputs_inout.begin(), excluded_inputs_inout, exclude_last);
+            if (added_inputs_inout.size() >= max_inputs_allowed)
+            {
+                // for the 'inputs is full' case, we replace the lowest amount input
+                added_inputs_inout.pop_front();
+            }
+
+            added_inputs_inout.emplace_front(std::move(requested_input));
 
             return true;
         }
-
-        // try to request a new input from the selector to replace the lowest amount in the added inputs
-        while (input_selector.try_select_input_v1(output_amount + current_fee,
-            added_inputs_inout,
-            excluded_inputs_inout,
-            requested_input))
+        // otherwise, add it to the excluded list
+        else
         {
-            // if requested input can cover the lowest added amount, replace it in the inputs list
-            if (requested_input.get_amount() > added_inputs_inout.front.get_amount())
-            {
-                added_inputs_inout.pop_front();
-                added_inputs_inout.emplace_front(std::move(requested_input));
+            excluded_inputs_inout.emplace_front(requested_input);  //don't move - requested_input may be used again
+        }
+    }
 
-                return true;
-            }
-            // otherwise, add it to the excluded list
-            else
-            {
-                excluded_inputs_inout.emplace_front(requested_input);  //don't move - requested_input may be used again
-            }
+    return false;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool try_update_added_inputs_range_v1(const rct::xmr_amount fee_per_tx_weight,
+    const std::size_t max_inputs_allowed,
+    SpTxSquashedV1::WeightParams &tx_weight_parameters_inout,
+    std::list<SpContextualEnoteRecordV1> &added_inputs_inout,
+    std::list<SpContextualEnoteRecordV1> &excluded_inputs_inout)
+{
+    // expect the added inputs list is not full
+    if (added_inputs_inout.size() >= max_inputs_allowed)
+        return false;
+
+    // current tx fee
+    tx_weight_parameters_inout.m_num_inputs = added_inputs_inout.size();
+    const rct::xmr_amount current_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_parameters_inout)};
+
+    // make sure the excluded inputs are sorted
+    sort_contextual_enote_records(excluded_inputs_inout);
+
+    // try to add a range of excluded inputs
+    boost::multiprecision::uint128_t range_sum{0};
+    std::size_t range_size{0};
+
+    for (auto exclude_it = excluded_inputs_inout.rbegin(); exclude_it != excluded_inputs_inout.rend(); ++exclude_it)
+    {
+        range_sum += exclude_it->get_amount();
+        ++range_size;
+
+        // we have failed if our range exceeds the input limit
+        if (added_inputs_inout.size() + range_size > max_inputs_allowed)
+            return false;
+
+        // total fee including this range of inputs
+        tx_weight_parameters_inout.m_num_inputs = added_inputs_inout.size() + range_size;
+        const rct::xmr_amount range_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_parameters_inout)};
+
+        // if range of excluded inputs can cover the differential fee from those inputs, insert them
+        CHECK_AND_ASSERT_THROW_MES(range_fee >= current_fee,
+            "updating an input set (range): range fee is less than current fee (bug).");
+
+        if (range_sum > range_fee - current_fee)
+        {
+            added_inputs_inout.splice(added_inputs_inout.begin(),
+                excluded_inputs_inout,
+                exclude_it,
+                excluded_inputs_inout.end());
+
+            return true;
         }
     }
 
@@ -269,31 +303,57 @@ static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_a
     std::list<SpContextualEnoteRecordV1> added_inputs;
     std::list<SpContextualEnoteRecordV1> excluded_inputs;
 
-    while (try_update_added_inputs_v1(output_amount,
-        fee_per_tx_weight,
-        input_selector,
-        tx_weight_parameters,
-        added_inputs,
-        excluded_inputs))
+    while (true)
     {
+        // 1. check if we have a solution
         CHECK_AND_ASSERT_THROW_MES(added_inputs.size() <= max_inputs_allowed,
             "selecting an input set: there are more inputs than the number allowed (bug).");
 
-        // compute current fee
+        // a. compute current fee
         tx_weight_parameters.m_num_inputs = added_inputs.size();
 
         const DiscretizedFee fee_discretized{fee_per_tx_weight * SpTxSquashedV1::get_weight(tx_weight_parameters)};
 
         rct::xmr_amount fee;
         CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(fee_discretized, fee),
-            "selecting an input set: could not extract discretized fee for zero inputs case (bug).");
+            "selecting an input set: could not extract discretized fee (bug).");
 
-        // check if we have covered the required amount
+        // b. check if we have covered the required amount
         if (compute_total_amount(added_inputs) >= output_amount + fee)
         {
             contextual_enote_records_out = std::move(added_inputs);
             return true;
         }
+
+        // 2. try to replace an added input with a better excluded input
+        if (try_update_added_inputs_replace_excluded_v1(added_inputs, excluded_inputs))
+            continue;
+
+        // 3. try to add the best excluded input to the added inputs set
+        if (try_update_added_inputs_add_excluded_v1(fee_per_tx_weight,
+                tx_weight_parameters,
+                added_inputs,
+                excluded_inputs))
+            continue;
+
+        // 4. try to get a new input that can get us closer to a solution
+        if (try_update_added_inputs_selection_v1(output_amount,
+                fee_per_tx_weight,
+                input_selector,
+                tx_weight_parameters,
+                added_inputs,
+                excluded_inputs))
+            continue;
+
+        // 5. try to use a range of excluded inputs to get us closer to a solution
+        if (try_update_added_inputs_range_v1(fee_per_tx_weight,
+                tx_weight_parameters,
+                added_inputs,
+                excluded_inputs))
+            continue;
+
+        // 6. no attempts to update the added inputs worked, so we have failed
+        return false;
     }
 
     return false;
@@ -319,11 +379,7 @@ bool try_get_input_set_v1(const boost::multiprecision::uint128_t output_amount,
     const InputSelectorV1 &input_selector,
     std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out)
 {
-    /// try to get an input set
-    contextual_enote_records_out.clear();
-
     // 1. select inputs to cover requested output amount (assume 0 change)
-
     // a. get number of additional outputs assuming zero change amount
     const std::size_t num_additional_outputs_no_change{
             compute_num_additional_outputs(wallet_spend_pubkey, k_view_balance, output_proposals, 0)
@@ -332,6 +388,8 @@ bool try_get_input_set_v1(const boost::multiprecision::uint128_t output_amount,
     tx_weight_parameters.m_num_outputs = output_proposals.size() + num_additional_outputs_no_change;
 
     // b. select inputs
+    contextual_enote_records_out.clear();
+
     if (!try_select_inputs_v1(output_amount,
             fee_per_tx_weight,
             tx_weight_parameters,
@@ -342,31 +400,20 @@ bool try_get_input_set_v1(const boost::multiprecision::uint128_t output_amount,
 
     // 2. compute fee for selected inputs
     tx_weight_parameters.m_num_inputs = contextual_enote_records_out.size();
-
-    const DiscretizedFee zero_change_fee_discretized{fee_per_tx_weight * SpTxSquashedV1::get_weight(tx_weight_parameters)};
-
-    rct::xmr_amount zero_change_fee;
-    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(zero_change_fee_discretized, zero_change_fee),
-        "getting an input set: could not extract discretized fee for zero change case (bug).");
+    const rct::xmr_amount zero_change_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_parameters_inout)};
 
     // 3. return if we are done (zero change is covered by input amounts) (very rare case)
     if (compute_total_amount(contextual_enote_records_out) == output_amount + zero_change_fee)
         return true;
 
     // 4. if non-zero change with computed fee, assume change must be non-zero (typical case)
-
     // a. update fee assuming non-zero change
     const std::size_t num_additional_outputs_with_change{
             compute_num_additional_outputs(wallet_spend_pubkey, k_view_balance, output_proposals, 1)
         };
 
     tx_weight_parameters.m_num_outputs = output_proposals.size() + num_additional_outputs_with_change;
-
-    DiscretizedFee nonzero_change_fee_discretized{fee_per_tx_weight * SpTxSquashedV1::get_weight(tx_weight_parameters)};
-
-    rct::xmr_amount nonzero_change_fee;
-    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(nonzero_change_fee_discretized, nonzero_change_fee),
-        "getting an input set: could not extract discretized fee for nonzero change case (bug).");
+    rct::xmr_amount nonzero_change_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_parameters_inout)};
 
     CHECK_AND_ASSERT_THROW_MES(zero_change_fee <= nonzero_change_fee,
         "getting an input set: adding a change output reduced the tx fee (bug).");
@@ -374,6 +421,8 @@ bool try_get_input_set_v1(const boost::multiprecision::uint128_t output_amount,
     // b. if previously selected inputs are insufficient for non-zero change, select inputs again (very rare case)
     if (compute_total_amount(contextual_enote_records_out) <= output_amount + nonzero_change_fee)
     {
+        contextual_enote_records_out.clear();
+
         if (!try_select_inputs_v1(output_amount + 1,  //+1 to force a non-zero change
                 fee_per_tx_weight,
                 tx_weight_parameters,
@@ -383,12 +432,7 @@ bool try_get_input_set_v1(const boost::multiprecision::uint128_t output_amount,
             return false;
 
         tx_weight_parameters.m_num_inputs = contextual_enote_records_out.size();
-        nonzero_change_fee_discretized = DiscretizedFee{
-                fee_per_tx_weight * SpTxSquashedV1::get_weight(tx_weight_parameters)
-            };
-
-        CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(nonzero_change_fee_discretized, nonzero_change_fee),
-            "getting an input set: could not extract discretized fee for nonzero change + updated inputs case (bug).");
+        nonzero_change_fee = get_fee_from_parameters(fee_per_tx_weight, tx_weight_parameters_inout);
     }
 
     // c. we are done (non-zero change is covered by input amounts)
