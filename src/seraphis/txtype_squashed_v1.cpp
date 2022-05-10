@@ -102,6 +102,16 @@ std::size_t SpTxSquashedV1::get_size_bytes(const std::size_t num_inputs,
     return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
+std::size_t SpTxSquashedV1::get_size_bytes(const SpTxSquashedV1::WeightParams &params)
+{
+    return SpTxSquashedV1::get_size_bytes(params.m_num_inputs,
+        params.m_num_outputs,
+        params.m_ref_set_decomp_m,
+        params.m_ref_set_decomp_n,
+        params.m_num_bin_members,
+        params.m_tx_extra);
+}
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSquashedV1::get_size_bytes() const
 {
     const std::size_t ref_set_decomp_n{
@@ -150,6 +160,16 @@ std::size_t SpTxSquashedV1::get_weight(const std::size_t num_inputs,
     weight += SpBalanceProofV1::get_weight(num_inputs, num_outputs);
 
     return weight;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t SpTxSquashedV1::get_weight(const SpTxSquashedV1::WeightParams &params)
+{
+    return SpTxSquashedV1::get_weight(params.m_num_inputs,
+        params.m_num_outputs,
+        params.m_ref_set_decomp_m,
+        params.m_ref_set_decomp_n,
+        params.m_num_bin_members,
+        params.m_tx_extra);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSquashedV1::get_weight() const

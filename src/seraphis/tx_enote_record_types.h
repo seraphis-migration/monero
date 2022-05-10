@@ -131,6 +131,9 @@ struct SpContextualEnoteRecordV1 final
     std::uint64_t m_transaction_height;
     /// ledger index of the enote (-1 if index is unknown)
     std::uint64_t m_ledger_index;
+
+    /// get this enote's amount
+    rct::xmr_amount get_amount() const { return m_core.m_amount; }
 };
 
 } //namespace sp
