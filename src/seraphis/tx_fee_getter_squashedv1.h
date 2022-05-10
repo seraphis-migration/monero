@@ -28,17 +28,20 @@
 
 // NOT FOR PRODUCTION
 
-// Get a tx weight (interface).
+// Get an SpTxSquashedV1 weight.
 
 
 #pragma once
 
 //local headers
+#include "ringct/rctTypes.h"
+#include "tx_extra.h"
+#include "tx_fee_getter.h"
+#include "txtype_squashed_v1.h"
 
 //third party headers
 
 //standard headers
-#include <cstddef>
 
 //forward declarations
 
@@ -46,23 +49,38 @@
 namespace sp
 {
 
-class TxWeightGetter
+class TxFeeGetterSquashedV1 final : public TxFeeGetter
 {
 public:
-//constructors: default
-//destructor
-    virtual ~TxWeightGetter() = default;
+//constructors
+    TxFeeGetterSquashedV1() = default;
 
-//overloaded operators
-    /// disable copy/move (this is a pure virtual base class)
-    TxWeightGetter& operator=(TxWeightGetter&&) = delete;
+    TxFeeGetterSquashedV1(const std::size_t num_inputs,
+        const std::size_t num_outputs,
+        const std::size_t ref_set_decomp_m,
+        const std::size_t ref_set_decomp_n,
+        const std::size_t num_bin_members,
+        const TxExtra &tx_extra);
 
-//getters
-    virtual std::size_t get_weight() const = 0;
+//destructor: default
 
 //setters
-    virtual void set_num_inputs(const std::size_t num_inputs) = 0;
-    virtual void set_num_outputs(const std::size_t num_outputs) = 0;
+    void set_num_inputs(const std::size_t num_inputs) override { m_num_inputs = num_inputs; }
+    void set_num_outputs(const std::size_t num_outputs) override { m_num_outputs = num_outputs; }
+
+//getters
+    static rct::xmr_amount get_fee(const std::size_t fee_per_weight, const std::size_t weight);
+    static rct::xmr_amount get_fee(const std::size_t fee_per_weight, const SpTxSquashedV1 &tx);
+    rct::xmr_amount get_fee(const std::size_t fee_per_weight) const override;
+
+private:
+//member variables
+    std::size_t m_num_inputs;
+    std::size_t m_num_outputs;
+    std::size_t m_ref_set_decomp_m;
+    std::size_t m_ref_set_decomp_n;
+    std::size_t m_num_bin_members;
+    TxExtra m_tx_extra;
 };
 
 } //namespace sp

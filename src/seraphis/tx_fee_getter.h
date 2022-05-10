@@ -28,19 +28,18 @@
 
 // NOT FOR PRODUCTION
 
-// Get an SpTxSquashedV1 weight.
+// Get a tx's fee given a fee/weight ratio (interface).
 
 
 #pragma once
 
 //local headers
-#include "tx_extra.h"
-#include "tx_weight_getter.h"
-#include "txtype_squashed_v1.h"
+#include "ringct/rctTypes.h"
 
 //third party headers
 
 //standard headers
+#include <cstddef>
 
 //forward declarations
 
@@ -48,51 +47,23 @@
 namespace sp
 {
 
-class TxWeightGetterSquashedV1 final : public TxWeightGetter
+class TxFeeGetter
 {
 public:
-//constructors
-    TxWeightGetterSquashedV1() = default;
+//constructors: default
+//destructor
+    virtual ~TxFeeGetter() = default;
 
-    TxWeightGetterSquashedV1(const std::size_t num_inputs,
-        const std::size_t num_outputs,
-        const std::size_t ref_set_decomp_m,
-        const std::size_t ref_set_decomp_n,
-        const std::size_t num_bin_members,
-        const TxExtra &tx_extra) :
-            m_num_inputs{num_inputs},
-            m_num_outputs{num_outputs},
-            m_ref_set_decomp_m{ref_set_decomp_m},
-            m_ref_set_decomp_n{ref_set_decomp_n},
-            m_num_bin_members{num_bin_members},
-            m_tx_extra{tx_extra}
-    {}
-
-//destructor: default
+//overloaded operators
+    /// disable copy/move (this is a pure virtual base class)
+    TxFeeGetter& operator=(TxFeeGetter&&) = delete;
 
 //getters
-    std::size_t get_weight() const override
-    {
-        return SpTxSquashedV1::get_weight(m_num_inputs,
-            m_num_outputs,
-            m_ref_set_decomp_m,
-            m_ref_set_decomp_n,
-            m_num_bin_members,
-            m_tx_extra);
-    }
+    virtual rct::xmr_amount get_fee(const std::size_t fee_per_weight) const = 0;
 
 //setters
-    void set_num_inputs(const std::size_t num_inputs) override { m_num_inputs = num_inputs; }
-    void set_num_outputs(const std::size_t num_outputs) override { m_num_outputs = num_outputs; }
-
-private:
-//member variables
-    std::size_t m_num_inputs;
-    std::size_t m_num_outputs;
-    std::size_t m_ref_set_decomp_m;
-    std::size_t m_ref_set_decomp_n;
-    std::size_t m_num_bin_members;
-    TxExtra m_tx_extra;
+    virtual void set_num_inputs(const std::size_t num_inputs) = 0;
+    virtual void set_num_outputs(const std::size_t num_outputs) = 0;
 };
 
 } //namespace sp

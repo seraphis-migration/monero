@@ -37,9 +37,8 @@
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
 #include "tx_builders_outputs.h"
-#include "tx_discretized_fee.h"
 #include "tx_enote_record_types.h"
-#include "tx_weight_getter.h"
+#include "tx_fee_getter.h"
 
 //third party headers
 #include "boost/multiprecision/cpp_int.hpp"
@@ -72,19 +71,6 @@ static std::size_t compute_num_additional_outputs(const rct::key &wallet_spend_p
         additional_outputs_from_change);
 
     return additional_outputs_from_change.size();
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-rct::xmr_amount get_fee_from_parameters(const rct::xmr_amount fee_per_tx_weight,
-    const TxWeightGetter &tx_weight_getter)
-{
-    const DiscretizedFee fee_discretized{fee_per_tx_weight * tx_weight_getter.get_weight()};
-
-    rct::xmr_amount fee_value;
-    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(fee_discretized, fee_value),
-        "selecting an input set: could not extract discretized fee (bug).");
-
-    return fee_value;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -135,7 +121,7 @@ static bool try_update_added_inputs_replace_excluded_v1(std::list<SpContextualEn
 //-------------------------------------------------------------------------------------------------------------------
 static bool try_update_added_inputs_add_excluded_v1(const rct::xmr_amount fee_per_tx_weight,
     const std::size_t max_inputs_allowed,
-    TxWeightGetter &tx_weight_getter_inout,
+    TxFeeGetter &tx_fee_getter_inout,
     std::list<SpContextualEnoteRecordV1> &added_inputs_inout,
     std::list<SpContextualEnoteRecordV1> &excluded_inputs_inout)
 {
@@ -144,12 +130,12 @@ static bool try_update_added_inputs_add_excluded_v1(const rct::xmr_amount fee_pe
         return false;
 
     // current tx fee
-    tx_weight_getter_inout.set_num_inputs(added_inputs_inout.size());
-    const rct::xmr_amount current_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_getter_inout)};
+    tx_fee_getter_inout.set_num_inputs(added_inputs_inout.size());
+    const rct::xmr_amount current_fee{tx_fee_getter_inout.get_fee(fee_per_tx_weight)};
 
     // next tx fee (from adding one input)
-    tx_weight_getter_inout.set_num_inputs(added_inputs_inout.size() + 1);
-    const rct::xmr_amount next_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_getter_inout)};
+    tx_fee_getter_inout.set_num_inputs(added_inputs_inout.size() + 1);
+    const rct::xmr_amount next_fee{tx_fee_getter_inout.get_fee(fee_per_tx_weight)};
 
     // make sure the excluded inputs are sorted
     sort_contextual_enote_records_descending(excluded_inputs_inout);
@@ -174,7 +160,7 @@ static bool try_update_added_inputs_selection_v1(const boost::multiprecision::ui
     const rct::xmr_amount fee_per_tx_weight,
     const std::size_t max_inputs_allowed,
     const InputSelectorV1 &input_selector,
-    TxWeightGetter &tx_weight_getter_inout,
+    TxFeeGetter &tx_fee_getter_inout,
     std::list<SpContextualEnoteRecordV1> &added_inputs_inout,
     std::list<SpContextualEnoteRecordV1> &excluded_inputs_inout)
 {
@@ -182,8 +168,8 @@ static bool try_update_added_inputs_selection_v1(const boost::multiprecision::ui
     sort_contextual_enote_records_descending(added_inputs_inout);
 
     // current tx fee
-    tx_weight_getter_inout.set_num_inputs(added_inputs_inout.size());
-    const rct::xmr_amount current_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_getter_inout)};
+    tx_fee_getter_inout.set_num_inputs(added_inputs_inout.size());
+    const rct::xmr_amount current_fee{tx_fee_getter_inout.get_fee(fee_per_tx_weight)};
 
     // prepare for finding a new input
     boost::multiprecision::uint128_t selection_amount;
@@ -192,8 +178,8 @@ static bool try_update_added_inputs_selection_v1(const boost::multiprecision::ui
     if (added_inputs_inout.size() < max_inputs_allowed)
     {
         // if inputs aren't full, then we will be trying to add a new input to the added inputs list
-        tx_weight_getter_inout.set_num_inputs(added_inputs_inout.size() + 1);
-        const rct::xmr_amount next_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_getter_inout)};
+        tx_fee_getter_inout.set_num_inputs(added_inputs_inout.size() + 1);
+        const rct::xmr_amount next_fee{tx_fee_getter_inout.get_fee(fee_per_tx_weight)};
 
         CHECK_AND_ASSERT_THROW_MES(next_fee >= current_fee,
             "updating an input set (selection): next fee is less than current fee (bug).");
@@ -239,7 +225,7 @@ static bool try_update_added_inputs_selection_v1(const boost::multiprecision::ui
 //-------------------------------------------------------------------------------------------------------------------
 static bool try_update_added_inputs_range_v1(const rct::xmr_amount fee_per_tx_weight,
     const std::size_t max_inputs_allowed,
-    TxWeightGetter &tx_weight_getter_inout,
+    TxFeeGetter &tx_fee_getter_inout,
     std::list<SpContextualEnoteRecordV1> &added_inputs_inout,
     std::list<SpContextualEnoteRecordV1> &excluded_inputs_inout)
 {
@@ -248,8 +234,8 @@ static bool try_update_added_inputs_range_v1(const rct::xmr_amount fee_per_tx_we
         return false;
 
     // current tx fee
-    tx_weight_getter_inout.set_num_inputs(added_inputs_inout.size());
-    const rct::xmr_amount current_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_getter_inout)};
+    tx_fee_getter_inout.set_num_inputs(added_inputs_inout.size());
+    const rct::xmr_amount current_fee{tx_fee_getter_inout.get_fee(fee_per_tx_weight)};
 
     // make sure the excluded inputs are sorted
     sort_contextual_enote_records_descending(excluded_inputs_inout);
@@ -268,8 +254,8 @@ static bool try_update_added_inputs_range_v1(const rct::xmr_amount fee_per_tx_we
             return false;
 
         // total fee including this range of inputs
-        tx_weight_getter_inout.set_num_inputs(added_inputs_inout.size() + range_size);
-        const rct::xmr_amount range_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_getter_inout)};
+        tx_fee_getter_inout.set_num_inputs(added_inputs_inout.size() + range_size);
+        const rct::xmr_amount range_fee{tx_fee_getter_inout.get_fee(fee_per_tx_weight)};
 
         // if range of excluded inputs can cover the differential fee from those inputs, insert them
         CHECK_AND_ASSERT_THROW_MES(range_fee >= current_fee,
@@ -292,9 +278,9 @@ static bool try_update_added_inputs_range_v1(const rct::xmr_amount fee_per_tx_we
 //-------------------------------------------------------------------------------------------------------------------
 static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_amount,
     const rct::xmr_amount fee_per_tx_weight,
-    TxWeightGetter &tx_weight_getter_inout,
     const std::size_t max_inputs_allowed,
     const InputSelectorV1 &input_selector,
+    TxFeeGetter &tx_fee_getter_inout,
     std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out)
 {
     CHECK_AND_ASSERT_THROW_MES(max_inputs_allowed > 0, "selecting an input set: zero inputs were allowed.");
@@ -310,8 +296,8 @@ static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_a
             "selecting an input set: there are more inputs than the number allowed (bug).");
 
         // a. compute current fee
-        tx_weight_getter_inout.set_num_inputs(added_inputs.size());
-        const rct::xmr_amount fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_getter_inout)};
+        tx_fee_getter_inout.set_num_inputs(added_inputs.size());
+        const rct::xmr_amount fee{tx_fee_getter_inout.get_fee(fee_per_tx_weight)};
 
         // b. check if we have covered the required amount
         if (compute_total_amount(added_inputs) >= output_amount + fee)
@@ -327,7 +313,7 @@ static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_a
         // 3. try to add the best excluded input to the added inputs set
         if (try_update_added_inputs_add_excluded_v1(fee_per_tx_weight,
                 max_inputs_allowed,
-                tx_weight_getter_inout,
+                tx_fee_getter_inout,
                 added_inputs,
                 excluded_inputs))
             continue;
@@ -337,7 +323,7 @@ static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_a
                 fee_per_tx_weight,
                 max_inputs_allowed,
                 input_selector,
-                tx_weight_getter_inout,
+                tx_fee_getter_inout,
                 added_inputs,
                 excluded_inputs))
             continue;
@@ -345,7 +331,7 @@ static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_a
         // 5. try to use a range of excluded inputs to get us closer to a solution
         if (try_update_added_inputs_range_v1(fee_per_tx_weight,
                 max_inputs_allowed,
-                tx_weight_getter_inout,
+                tx_fee_getter_inout,
                 added_inputs,
                 excluded_inputs))
             continue;
@@ -373,7 +359,7 @@ bool try_get_input_set_v1(const std::vector<SpOutputProposalV1> &output_proposal
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const InputSelectorV1 &input_selector,
-    TxWeightGetter &tx_weight_getter_inout,
+    TxFeeGetter &tx_fee_getter_inout,
     std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out)
 {
     // 1. select inputs to cover requested output amount (assume 0 change)
@@ -388,22 +374,22 @@ bool try_get_input_set_v1(const std::vector<SpOutputProposalV1> &output_proposal
             compute_num_additional_outputs(wallet_spend_pubkey, k_view_balance, output_proposals, 0)
         };
 
-    tx_weight_getter_inout.set_num_outputs(output_proposals.size() + num_additional_outputs_no_change);
+    tx_fee_getter_inout.set_num_outputs(output_proposals.size() + num_additional_outputs_no_change);
 
     // c. select inputs
     contextual_enote_records_out.clear();
 
     if (!try_select_inputs_v1(output_amount,
             fee_per_tx_weight,
-            tx_weight_getter_inout,
             max_inputs_allowed,
             input_selector,
+            tx_fee_getter_inout,
             contextual_enote_records_out))
         return false;
 
     // 2. compute fee for selected inputs
-    tx_weight_getter_inout.set_num_inputs(contextual_enote_records_out.size());
-    const rct::xmr_amount zero_change_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_getter_inout)};
+    tx_fee_getter_inout.set_num_inputs(contextual_enote_records_out.size());
+    const rct::xmr_amount zero_change_fee{tx_fee_getter_inout.get_fee(fee_per_tx_weight)};
 
     // 3. return if we are done (zero change is covered by input amounts) (very rare case)
     if (compute_total_amount(contextual_enote_records_out) == output_amount + zero_change_fee)
@@ -415,8 +401,8 @@ bool try_get_input_set_v1(const std::vector<SpOutputProposalV1> &output_proposal
             compute_num_additional_outputs(wallet_spend_pubkey, k_view_balance, output_proposals, 1)
         };
 
-    tx_weight_getter_inout.set_num_outputs(output_proposals.size() + num_additional_outputs_with_change);
-    rct::xmr_amount nonzero_change_fee{get_fee_from_parameters(fee_per_tx_weight, tx_weight_getter_inout)};
+    tx_fee_getter_inout.set_num_outputs(output_proposals.size() + num_additional_outputs_with_change);
+    rct::xmr_amount nonzero_change_fee{tx_fee_getter_inout.get_fee(fee_per_tx_weight)};
 
     CHECK_AND_ASSERT_THROW_MES(zero_change_fee <= nonzero_change_fee,
         "getting an input set: adding a change output reduced the tx fee (bug).");
@@ -428,14 +414,14 @@ bool try_get_input_set_v1(const std::vector<SpOutputProposalV1> &output_proposal
 
         if (!try_select_inputs_v1(output_amount + 1,  //+1 to force a non-zero change
                 fee_per_tx_weight,
-                tx_weight_getter_inout,
                 max_inputs_allowed,
                 input_selector,
+                tx_fee_getter_inout,
                 contextual_enote_records_out))
             return false;
 
-        tx_weight_getter_inout.set_num_inputs(contextual_enote_records_out.size());
-        nonzero_change_fee = get_fee_from_parameters(fee_per_tx_weight, tx_weight_getter_inout);
+        tx_fee_getter_inout.set_num_inputs(contextual_enote_records_out.size());
+        nonzero_change_fee = tx_fee_getter_inout.get_fee(fee_per_tx_weight);
     }
 
     // c. we are done (non-zero change is covered by input amounts)
