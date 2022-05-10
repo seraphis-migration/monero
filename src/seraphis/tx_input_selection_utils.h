@@ -34,11 +34,17 @@
 #pragma once
 
 //local headers
+#include "crypto/crypto.h"
+#include "ringct/rctTypes.h"
+#include "tx_builder_types.h"
+#include "tx_enote_record_types.h"
+#include "tx_weight_getter.h"
 
 //third party headers
+#include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
-#include <string>
+#include <list>
 #include <vector>
 
 //forward declarations
@@ -46,6 +52,25 @@
 
 namespace sp
 {
+
+class InputSelectorV1
+{
+public:
+//constructors: default
+//destructor
+    virtual ~InputSelectorV1() = default;
+
+//overloaded operators
+    /// disable copy/move (this is a pure virtual base class)
+    InputSelectorV1& operator=(InputSelectorV1&&) = delete;
+
+//member functions
+    /// select an available input
+    virtual bool try_select_input_v1(const boost::multiprecision::uint128_t desired_total_amount,
+        const std::list<SpContextualEnoteRecordV1> &already_added_inputs,
+        const std::list<SpContextualEnoteRecordV1> &already_excluded_inputs,
+        SpContextualEnoteRecordV1 &selected_input_out) const = 0;
+};
 
 /**
 * brief: make_tx_image_proof_message_v1 - message for tx image proofs
@@ -55,9 +80,13 @@ namespace sp
 * param: tx_supplement -
 * outparam: proof_message_out - message to insert in a tx image proof
 */
-void make_tx_image_proof_message_v1(const std::string &version_string,
-    const std::vector<SpEnoteV1> &output_enotes,
-    const SpTxSupplementV1 &tx_supplement,
-    rct::key &proof_message_out);
+bool try_get_input_set_v1(const std::vector<SpOutputProposalV1> &output_proposals,
+    const rct::xmr_amount fee_per_tx_weight,
+    const std::size_t max_inputs_allowed,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const InputSelectorV1 &input_selector,
+    std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out,
+    TxWeightGetter &tx_weight_getter_inout);
 
 } //namespace sp

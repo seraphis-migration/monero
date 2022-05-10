@@ -175,10 +175,10 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
         // input image amount commitment blinding factor: t_c + x
         sc_add(to_bytes(blinding_factors_out[input_index]),
             to_bytes(image_amount_masks[input_index]),  // t_c
-            to_bytes(input_proposals[input_index].m_core.m_amount_blinding_factor));  // x
+            to_bytes(input_proposals[input_index].get_amount_blinding_factor()));  // x
 
         // input amount: a
-        input_amounts_out.emplace_back(input_proposals[input_index].m_core.m_amount);
+        input_amounts_out.emplace_back(input_proposals[input_index].get_amount());
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -471,11 +471,11 @@ void make_v1_partial_input_v1(const SpInputProposalV1 &input_proposal,
     input_proposal.get_enote_image_v1(partial_input_out.m_input_image);
 
     // copy misc. proposal info
-    partial_input_out.m_address_mask           = input_proposal.m_core.m_address_mask;
-    partial_input_out.m_commitment_mask        = input_proposal.m_core.m_commitment_mask;
+    partial_input_out.m_address_mask                 = input_proposal.m_core.m_address_mask;
+    partial_input_out.m_commitment_mask              = input_proposal.m_core.m_commitment_mask;
     partial_input_out.m_proposal_prefix              = proposal_prefix;
-    partial_input_out.m_input_amount                 = input_proposal.m_core.m_amount;
-    partial_input_out.m_input_amount_blinding_factor = input_proposal.m_core.m_amount_blinding_factor;
+    partial_input_out.m_input_amount                 = input_proposal.get_amount();
+    partial_input_out.m_input_amount_blinding_factor = input_proposal.get_amount_blinding_factor();
     input_proposal.m_core.get_enote_core(partial_input_out.m_input_enote_core);
 
     // construct image proof

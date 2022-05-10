@@ -121,6 +121,30 @@ struct SpEnoteRecordV1 final
 ///
 struct SpContextualEnoteRecordV1 final
 {
+    enum class OriginStatus
+    {
+        // location unknown
+        UNKNOWN,
+        // is only located off-chain
+        OFF_CHAIN,
+        // is in the tx pool (but not the blockchain)
+        UNCONFIRMED,
+        // is in the blockchain in a locked block
+        CONFIRMED_LOCKED,
+        // is in the blockchain in an unlocked block
+        CONFIRMED_UNLOCKED
+    };
+
+    enum class SpentStatus
+    {
+        // is not spendable (e.g. its onetime address is duplicated in another enote)
+        UNSPENDABLE,
+        // is not spent in the blockchain
+        UNSPENT,
+        // is spent in the blockchain
+        SPENT
+    };
+
     /// info about the enote
     SpEnoteRecordV1 m_core;
     /// associated memo fields
@@ -131,6 +155,11 @@ struct SpContextualEnoteRecordV1 final
     std::uint64_t m_transaction_height;
     /// ledger index of the enote (-1 if index is unknown)
     std::uint64_t m_ledger_index;
+
+    /// origin status
+    OriginStatus m_origin_status;
+    /// spent status
+    SpentStatus m_spent_status;
 
     /// get this enote's amount
     rct::xmr_amount get_amount() const { return m_core.m_amount; }

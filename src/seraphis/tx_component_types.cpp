@@ -78,7 +78,10 @@ void SpEnoteV1::gen()
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpMembershipProofV1::get_size_bytes(const std::size_t n, const std::size_t m, const std::size_t num_bin_members)
 {
-    return sp::ConciseGrootleProof::get_size_bytes(n, m) + SpBinnedReferenceSetV1::get_size_bytes(num_bin_members);
+    const std::size_t ref_set_size{ref_set_size_from_decomp(n, m)};
+
+    return sp::ConciseGrootleProof::get_size_bytes(n, m) +
+        SpBinnedReferenceSetV1::get_size_bytes(ref_set_size / num_bin_members);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpMembershipProofV1::get_size_bytes() const

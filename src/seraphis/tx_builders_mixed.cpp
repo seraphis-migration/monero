@@ -162,10 +162,10 @@ bool balance_check_in_out_amnts_v1(const std::vector<SpInputProposalV1> &input_p
     out_amounts.reserve(output_proposals.size());
 
     for (const auto &input_proposal : input_proposals)
-        in_amounts.emplace_back(input_proposal.m_core.m_amount);
+        in_amounts.emplace_back(input_proposal.get_amount());
 
     for (const auto &output_proposal : output_proposals)
-        out_amounts.emplace_back(output_proposal.m_core.m_amount);
+        out_amounts.emplace_back(output_proposal.get_amount());
 
     rct::xmr_amount raw_transaction_fee;
     CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(discretized_transaction_fee, raw_transaction_fee),

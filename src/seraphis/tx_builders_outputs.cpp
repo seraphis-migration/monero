@@ -206,7 +206,7 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     {
         // sanity check
         // note: a blinding factor of 0 is allowed (but not recommended)
-        CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(proposal.m_core.m_amount_blinding_factor)) == 0,
+        CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(proposal.get_amount_blinding_factor())) == 0,
             "making v1 outputs: invalid amount blinding factor (non-canonical).");
 
         // convert to enote
@@ -214,8 +214,8 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
         proposal.get_enote_v1(outputs_out.back());
 
         // prepare for range proofs
-        output_amounts_out.emplace_back(proposal.m_core.m_amount);
-        output_amount_commitment_blinding_factors_out.emplace_back(proposal.m_core.m_amount_blinding_factor);
+        output_amounts_out.emplace_back(proposal.get_amount());
+        output_amount_commitment_blinding_factors_out.emplace_back(proposal.get_amount_blinding_factor());
 
         // copy non-duplicate enote pubkeys to tx supplement
         if (std::find(output_enote_ephemeral_pubkeys_out.begin(),
@@ -552,7 +552,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     boost::multiprecision::uint128_t output_sum{transaction_fee};
 
     for (const SpOutputProposalV1 &proposal : original_output_proposals)
-        output_sum += proposal.m_core.m_amount;
+        output_sum += proposal.get_amount();
 
     CHECK_AND_ASSERT_THROW_MES(total_input_amount >= output_sum, "Finalize output proposals: input amount is too small.");
     CHECK_AND_ASSERT_THROW_MES(total_input_amount - output_sum <= static_cast<rct::xmr_amount>(-1),

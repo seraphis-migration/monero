@@ -74,16 +74,6 @@ struct SpTxSquashedV1 final
         ONE = 1
     };
 
-    struct WeightParams
-    {
-        std::size_t m_num_inputs;
-        std::size_t m_num_outputs;
-        std::size_t m_ref_set_decomp_m;
-        std::size_t m_ref_set_decomp_n;
-        std::size_t m_num_bin_members;
-        TxExtra m_tx_extra;
-    };
-
     /// tx input images (spent e-notes)
     std::vector<SpEnoteImageV1> m_input_images;
     /// tx outputs (new e-notes)
@@ -109,7 +99,6 @@ struct SpTxSquashedV1 final
         const std::size_t ref_set_decomp_n,
         const std::size_t num_bin_members,
         const TxExtra &tx_extra);
-    static std::size_t get_size_bytes(const WeightParams &params);
     /// get size of the tx
     std::size_t get_size_bytes() const;
     /// get weight of a possible tx
@@ -119,7 +108,6 @@ struct SpTxSquashedV1 final
         const std::size_t ref_set_decomp_m,
         const std::size_t num_bin_members,
         const TxExtra &tx_extra);
-    static std::size_t get_weight(const WeightParams &params);
     /// get weight of the tx
     std::size_t get_weight() const;
 };

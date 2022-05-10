@@ -74,6 +74,12 @@ struct SpInputProposalV1 final
         return m_core.get_enote_image_core(image_out.m_core);
     }
 
+    /// get the amount of this proposal
+    rct::xmr_amount get_amount() const { return m_core.m_amount; }
+
+    /// get the amount blinding factor of this proposal
+    const crypto::secret_key& get_amount_blinding_factor() const { return m_core.m_amount_blinding_factor; }
+
     /// generate a v1 input (all random; does not support info recovery)
     void gen(const rct::xmr_amount amount) { m_core.gen(amount); }
 };
@@ -106,6 +112,12 @@ struct SpOutputProposalV1 final
 
     /// convert this destination into a v1 enote
     void get_enote_v1(SpEnoteV1 &enote_out) const;
+
+    /// get the amount of this proposal
+    rct::xmr_amount get_amount() const { return m_core.m_amount; }
+
+    /// get the amount blinding factor of this proposal
+    const crypto::secret_key& get_amount_blinding_factor() const { return m_core.m_amount_blinding_factor; }
 
     /**
     * brief: gen - generate a V1 Destination (random)
