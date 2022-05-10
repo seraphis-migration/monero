@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "tx_fee_getter_squashedv1.h"
+#include "tx_fee_calculator_squashed_v1.h"
 
 //local headers
 #include "misc_log_ex.h"
@@ -46,21 +46,17 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-TxFeeGetterSquashedV1::TxFeeGetterSquashedV1(const std::size_t num_inputs,
-    const std::size_t num_outputs,
-    const std::size_t ref_set_decomp_m,
+FeeCalculatorSpTxSquashedV1::FeeCalculatorSpTxSquashedV1(const std::size_t ref_set_decomp_m,
     const std::size_t ref_set_decomp_n,
     const std::size_t num_bin_members,
     const TxExtra &tx_extra) :
-        m_num_inputs{num_inputs},
-        m_num_outputs{num_outputs},
         m_ref_set_decomp_m{ref_set_decomp_m},
         m_ref_set_decomp_n{ref_set_decomp_n},
         m_num_bin_members{num_bin_members},
         m_tx_extra{tx_extra}
 {}
 //-------------------------------------------------------------------------------------------------------------------
-rct::xmr_amount TxFeeGetterSquashedV1::get_fee(const std::size_t fee_per_weight, const std::size_t weight)
+rct::xmr_amount FeeCalculatorSpTxSquashedV1::get_fee(const std::size_t fee_per_weight, const std::size_t weight)
 {
     const DiscretizedFee fee_discretized{fee_per_weight * weight};
 
@@ -71,15 +67,17 @@ rct::xmr_amount TxFeeGetterSquashedV1::get_fee(const std::size_t fee_per_weight,
     return fee_value;
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::xmr_amount TxFeeGetterSquashedV1::get_fee(const std::size_t fee_per_weight, const SpTxSquashedV1 &tx)
+rct::xmr_amount FeeCalculatorSpTxSquashedV1::get_fee(const std::size_t fee_per_weight, const SpTxSquashedV1 &tx)
 {
     return get_fee(fee_per_weight, tx.get_weight());
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::xmr_amount TxFeeGetterSquashedV1::get_fee(const std::size_t fee_per_weight) const
+rct::xmr_amount FeeCalculatorSpTxSquashedV1::get_fee(const std::size_t fee_per_weight,
+    const std::size_t num_inputs,
+    const std::size_t num_outputs) const
 {
-    const std::size_t weight{SpTxSquashedV1::get_weight(m_num_inputs,
-        m_num_outputs,
+    const std::size_t weight{SpTxSquashedV1::get_weight(num_inputs,
+        num_outputs,
         m_ref_set_decomp_m,
         m_ref_set_decomp_n,
         m_num_bin_members,

@@ -54,7 +54,7 @@ set(seraphis_sources
   tx_discretized_fee.cpp
   tx_enote_record_utils.cpp
   tx_extra.cpp
-  tx_fee_getter_squashedv1.cpp
+  tx_fee_calculator_squashed_v1.cpp
   tx_input_selector.cpp
   tx_misc_utils.cpp
   tx_ref_set_index_mapper_flat.cpp

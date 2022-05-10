@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Get a tx's fee given a fee/weight ratio (interface).
+// Calculator a tx's fee given a fee/weight ratio and number of inputs/outputs (interface).
 
 
 #pragma once
@@ -47,23 +47,21 @@
 namespace sp
 {
 
-class TxFeeGetter
+class FeeCalculator
 {
 public:
 //constructors: default
 //destructor
-    virtual ~TxFeeGetter() = default;
+    virtual ~FeeCalculator() = default;
 
 //overloaded operators
     /// disable copy/move (this is a pure virtual base class)
-    TxFeeGetter& operator=(TxFeeGetter&&) = delete;
+    FeeCalculator& operator=(FeeCalculator&&) = delete;
 
 //getters
-    virtual rct::xmr_amount get_fee(const std::size_t fee_per_weight) const = 0;
-
-//setters
-    virtual void set_num_inputs(const std::size_t num_inputs) = 0;
-    virtual void set_num_outputs(const std::size_t num_outputs) = 0;
+    virtual rct::xmr_amount get_fee(const std::size_t fee_per_weight,
+        const std::size_t num_inputs,
+        const std::size_t num_outputs) const = 0;
 };
 
 } //namespace sp

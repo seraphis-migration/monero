@@ -36,7 +36,7 @@
 //local headers
 #include "ringct/rctTypes.h"
 #include "tx_extra.h"
-#include "tx_fee_getter.h"
+#include "tx_fee_calculator.h"
 #include "txtype_squashed_v1.h"
 
 //third party headers
@@ -49,34 +49,29 @@
 namespace sp
 {
 
-class TxFeeGetterSquashedV1 final : public TxFeeGetter
+class FeeCalculatorSpTxSquashedV1 final : public FeeCalculator
 {
 public:
 //constructors
-    TxFeeGetterSquashedV1() = default;
+    FeeCalculatorSpTxSquashedV1() = default;
 
-    TxFeeGetterSquashedV1(const std::size_t num_inputs,
-        const std::size_t num_outputs,
-        const std::size_t ref_set_decomp_m,
+    FeeCalculatorSpTxSquashedV1(const std::size_t ref_set_decomp_m,
         const std::size_t ref_set_decomp_n,
         const std::size_t num_bin_members,
         const TxExtra &tx_extra);
 
 //destructor: default
 
-//setters
-    void set_num_inputs(const std::size_t num_inputs) override { m_num_inputs = num_inputs; }
-    void set_num_outputs(const std::size_t num_outputs) override { m_num_outputs = num_outputs; }
-
 //getters
     static rct::xmr_amount get_fee(const std::size_t fee_per_weight, const std::size_t weight);
     static rct::xmr_amount get_fee(const std::size_t fee_per_weight, const SpTxSquashedV1 &tx);
-    rct::xmr_amount get_fee(const std::size_t fee_per_weight) const override;
+    rct::xmr_amount get_fee(const std::size_t fee_per_weight,
+        const std::size_t num_inputs,
+        const std::size_t num_outputs) const override;
 
 private:
 //member variables
-    std::size_t m_num_inputs;
-    std::size_t m_num_outputs;
+    /// misc. info for calculating tx weight
     std::size_t m_ref_set_decomp_m;
     std::size_t m_ref_set_decomp_n;
     std::size_t m_num_bin_members;

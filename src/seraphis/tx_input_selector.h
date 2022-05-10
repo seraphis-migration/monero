@@ -38,7 +38,7 @@
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
 #include "tx_enote_record_types.h"
-#include "tx_fee_getter.h"
+#include "tx_fee_calculator.h"
 
 //third party headers
 #include "boost/multiprecision/cpp_int.hpp"
@@ -86,7 +86,7 @@ bool try_get_input_set_v1(const std::vector<SpOutputProposalV1> &output_proposal
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const InputSelectorV1 &input_selector,
-    TxFeeGetter &tx_fee_getter_inout,
+    const FeeCalculator &tx_fee_calculator,
     std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out);
 
 } //namespace sp
