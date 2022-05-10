@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "tx_input_selection_utils.h"
+#include "tx_input_selector.h"
 
 //local headers
 #include "crypto/crypto.h"
