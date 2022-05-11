@@ -415,14 +415,6 @@ void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
         "binned reference set: real element is above its proposed bin.");
 
 
-    /// make bins
-    std::vector<SpReferenceBinV1> bins;
-    bins.resize(bin_loci.size());
-
-    for (std::size_t bin_index{0}; bin_index < bin_loci.size(); ++bin_index)
-        bins[bin_index].m_bin_locus = bin_loci[bin_index];
-
-
     /// set real reference's bin rotation factor
 
     // 1) generate the bin members' element set indices (normalized and not rotated)
@@ -451,7 +443,7 @@ void make_binned_reference_set_v1(const SpRefSetIndexMapper &index_mapper,
     /// set remaining pieces of the output reference set
     binned_reference_set_out.m_bin_config = bin_config;
     binned_reference_set_out.m_bin_generator_seed = generator_seed;
-    binned_reference_set_out.m_bins = std::move(bins);
+    binned_reference_set_out.m_bin_loci = std::move(bin_loci);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedReferenceSetV1 &binned_reference_set,
@@ -460,7 +452,7 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
     // initialization
     const std::uint64_t bin_width{compute_bin_width(binned_reference_set.m_bin_config.m_bin_radius)};
     const std::uint64_t reference_set_size{
-            binned_reference_set.m_bins.size() * binned_reference_set.m_bin_config.m_num_bin_members
+            binned_reference_set.m_bin_loci.size() * binned_reference_set.m_bin_config.m_num_bin_members
         };
 
     // sanity check the bin config
@@ -472,12 +464,12 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
         return false;
 
     // validate bins
-    for (const SpReferenceBinV1 &bin : binned_reference_set.m_bins)
+    for (const std::uint64_t &bin_locus : binned_reference_set.m_bin_loci)
     {
         // bins must all fit in the range [0, 2^64 - 1]
-        if (bin.m_bin_locus < binned_reference_set.m_bin_config.m_bin_radius)
+        if (bin_locus < binned_reference_set.m_bin_config.m_bin_radius)
             return false;
-        if (bin.m_bin_locus > std::numeric_limits<std::uint64_t>::max() - binned_reference_set.m_bin_config.m_bin_radius)
+        if (bin_locus > std::numeric_limits<std::uint64_t>::max() - binned_reference_set.m_bin_config.m_bin_radius)
             return false;
     }
 
@@ -487,12 +479,12 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
 
     std::vector<std::uint64_t> bin_members;
 
-    for (std::size_t bin_index{0}; bin_index < binned_reference_set.m_bins.size(); ++bin_index)
+    for (std::size_t bin_index{0}; bin_index < binned_reference_set.m_bin_loci.size(); ++bin_index)
     {
         // 1) make normalized bin members
         make_normalized_bin_members(binned_reference_set.m_bin_config,
             binned_reference_set.m_bin_generator_seed,
-            binned_reference_set.m_bins[bin_index].m_bin_locus,
+            binned_reference_set.m_bin_loci[bin_index],
             bin_index,
             bin_members);
 
@@ -501,7 +493,7 @@ bool try_get_reference_indices_from_binned_reference_set_v1(const SpBinnedRefere
 
         // 3) de-normalize the bin members
         denormalize_elements(
-            binned_reference_set.m_bins[bin_index].m_bin_locus - binned_reference_set.m_bin_config.m_bin_radius,
+            binned_reference_set.m_bin_loci[bin_index] - binned_reference_set.m_bin_config.m_bin_radius,
             bin_members);
 
         // 4) save the bin members

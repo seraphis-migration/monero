@@ -75,31 +75,11 @@ struct SpBinnedReferenceSetConfigV1 final
 };
 
 ////
-// SpReferenceBinV1
-// - bin: a selection of elements from a range of elements in a larger set
-// - bin locus: the center of the bin range, as an index into that larger set
-///
-struct SpReferenceBinV1 final
-{
-    /// bin locus (index into original set)
-    std::uint64_t m_bin_locus;
-
-    /// less-than operator for sorting
-    bool operator<(const SpReferenceBinV1 &other_bin) const
-    {
-        return m_bin_locus < other_bin.m_bin_locus;
-    }
-
-    /// convert to a string and append to existing string (for proof transcripts)
-    void append_to_string(std::string &str_inout) const;
-
-    static std::size_t get_size_bytes() { return sizeof(m_bin_locus); }
-};
-
-////
 // SpBinnedReferenceSetV1
 // - reference set: a set of elements that are in a larger set
 // - binned: the reference set is split into 'bins'
+// - bin: a selection of elements from a range of elements in a larger set
+// - bin locus: the center of the bin range, as an index into that larger set
 // - rotation factor: rotates deterministically-generated bin members within each bin, so that a pre-selected
 //                    member of the larger set becomes a member of one of the bins
 ///
@@ -111,11 +91,11 @@ struct SpBinnedReferenceSetV1 final
     rct::key m_bin_generator_seed;
     /// rotation factor (shared by all bins)
     ref_set_bin_dimension_v1_t m_bin_rotation_factor;
-    /// bins
-    std::vector<SpReferenceBinV1> m_bins;
+    /// bin loci
+    std::vector<std::uint64_t> m_bin_loci;
 
     /// compute the reference set size
-    std::uint64_t reference_set_size() const { return m_bin_config.m_num_bin_members * m_bins.size(); }
+    std::uint64_t reference_set_size() const { return m_bin_config.m_num_bin_members * m_bin_loci.size(); }
 
     /// convert to a string and append to existing string (for proof transcripts)
     void append_to_string(std::string &str_inout) const;

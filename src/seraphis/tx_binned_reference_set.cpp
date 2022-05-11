@@ -52,12 +52,6 @@ void SpBinnedReferenceSetConfigV1::append_to_string(std::string &str_inout) cons
     append_uint_to_string(m_num_bin_members, str_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpReferenceBinV1::append_to_string(std::string &str_inout) const
-{
-    // str || bin locus
-    append_uint_to_string(m_bin_locus, str_inout);
-}
-//-------------------------------------------------------------------------------------------------------------------
 void SpBinnedReferenceSetV1::append_to_string(std::string &str_inout) const
 {
     // str || bin config || bin generator seed || bin rotation factor || {bins}
@@ -72,21 +66,21 @@ void SpBinnedReferenceSetV1::append_to_string(std::string &str_inout) const
     // bin rotation factor
     append_uint_to_string(m_bin_rotation_factor, str_inout);
 
-    // bins
-    for (const SpReferenceBinV1 &bin : m_bins)
-        bin.append_to_string(str_inout);
+    // bin loci
+    for (const std::uint64_t &bin_locus : m_bin_loci)
+        append_uint_to_string(bin_locus, str_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBinnedReferenceSetV1::get_size_bytes(const std::size_t num_bins, const bool include_seed /*= false*/)
 {
-    return num_bins * SpReferenceBinV1::get_size_bytes() +
+    return num_bins * 8 +
         sizeof(ref_set_bin_dimension_v1_t) +
         (include_seed ? sizeof(m_bin_generator_seed) : 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBinnedReferenceSetV1::get_size_bytes(const bool include_seed /*= false*/) const
 {
-    return SpBinnedReferenceSetV1::get_size_bytes(m_bins.size(), include_seed);
+    return SpBinnedReferenceSetV1::get_size_bytes(m_bin_loci.size(), include_seed);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

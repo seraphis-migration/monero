@@ -227,7 +227,7 @@ static bool test_binned_reference_set(const std::uint64_t distribution_min_index
             return false;
 
         // bins should be sorted
-        if (!std::is_sorted(binned_reference_set.m_bins.begin(), binned_reference_set.m_bins.end()))
+        if (!std::is_sorted(binned_reference_set.m_bin_loci.begin(), binned_reference_set.m_bin_loci.end()))
             return false;
 
         // extract the references twice (should get the same results)

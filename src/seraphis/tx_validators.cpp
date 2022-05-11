@@ -218,7 +218,7 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
     // note: duplicate bin locations are allowed
     for (const auto &proof : membership_proofs)
     {
-        if (!std::is_sorted(proof.m_binned_reference_set.m_bins.begin(), proof.m_binned_reference_set.m_bins.end()))
+        if (!std::is_sorted(proof.m_binned_reference_set.m_bin_loci.begin(), proof.m_binned_reference_set.m_bin_loci.end()))
             return false;
     }
 
