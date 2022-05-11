@@ -119,7 +119,7 @@ namespace multisig
 
     // 2) initialize keyshare pubkeys and keyshare map
     m_multisig_keyshare_pubkeys.reserve(m_multisig_privkeys.size());
-    rct::key primary_generator(get_primary_generator(m_account_era));
+    const rct::key primary_generator{get_primary_generator(m_account_era)};
     for (const crypto::secret_key &multisig_privkey : m_multisig_privkeys)
     {
       m_multisig_keyshare_pubkeys.emplace_back(
@@ -136,16 +136,25 @@ namespace multisig
     CHECK_AND_ASSERT_THROW_MES(m_kex_rounds_complete <= kex_rounds_required + 1,
       "multisig account: tried to reconstruct account, but kex rounds complete counter is invalid.");
 
-    // 4. once an account is done with kex, the 'next kex msg' is always the post-kex verification message
+    // 4) add all other signers available for aggregation-style signing
+    signer_set_filter temp_filter;
+    for (const auto &keyshare_and_origins : m_keyshare_to_origins_map)
+    {
+      multisig_signers_to_filter(keyshare_and_origins.second, m_signers, temp_filter);
+      m_available_signers_for_aggregation |= temp_filter;
+    }
+
+    // 5) once an account is done with kex, the 'next kex msg' is always the post-kex verification message
     //   i.e. the multisig account pubkey signed by the signer's privkey AND the common pubkey
     if (main_kex_rounds_done())
     {
-      m_next_round_kex_message = multisig_kex_msg{kex_rounds_required + 1,
+      m_next_round_kex_message = multisig_kex_msg{get_kex_msg_version(m_account_era),
+        kex_rounds_required + 1,
         m_base_privkey,
         std::vector<crypto::public_key>{m_multisig_pubkey, m_common_pubkey}}.get_msg();
     }
 
-    // 5) final checks
+    // 6) final checks
     CHECK_AND_ASSERT_THROW_MES(m_kex_rounds_complete > 0,
       "multisig account: can't reconstruct account if its kex wasn't initialized");
 
@@ -303,7 +312,7 @@ namespace multisig
     m_available_signers_for_aggregation |= new_signer_flag;
 
     // abuse conversion msg api to get keyshares we care about
-    // note: prior assert ensures one of these conditions will be true
+    // note: prior assert ensures we will get keyshares in our current account era
     const std::vector<crypto::public_key> &recommended_keys{
         m_account_era == conversion_msg.get_old_era()
         ? conversion_msg.get_old_keyshares()
@@ -400,25 +409,25 @@ namespace multisig
     // - and save them to a new keyshare map (and preserve existing recommendations)
     std::unordered_set<crypto::public_key> old_keyshares;
     std::unordered_set<crypto::public_key> new_keyshares;
-    multisig_account::keyshare_origins_map_t keyshare_origins_map;
+    multisig_keyshare_origins_map_t keyshare_origins_map;
     const multisig_account_era_conversion_msg local_conversion_msg{original_account.get_account_era_conversion_msg(new_era)};
 
-    const std::vector<crypto::public_key> &local_old_keyshares = local_conversion_msg.get_old_keyshares();
+    const std::vector<crypto::public_key> &local_old_keyshares{local_conversion_msg.get_old_keyshares()};
     for (const crypto::public_key &local_old_keyshare : local_old_keyshares)
-        old_keyshares.insert(local_old_keyshare);
+      old_keyshares.insert(local_old_keyshare);
 
-    const std::vector<crypto::public_key> &local_new_keyshares = local_conversion_msg.get_new_keyshares();
-    const multisig_account::keyshare_origins_map_t &original_keyshare_origins_map = original_account.get_keyshares_to_origins_map();
+    const std::vector<crypto::public_key> &local_new_keyshares{local_conversion_msg.get_new_keyshares()};
+    const multisig_keyshare_origins_map_t &original_keyshare_origins_map{original_account.get_keyshares_to_origins_map()};
     for (std::size_t keyshare_index{0}; keyshare_index < local_new_keyshares.size(); ++keyshare_index)
     {
-        new_keyshares.insert(local_new_keyshares[keyshare_index]);
+      new_keyshares.insert(local_new_keyshares[keyshare_index]);
 
-        // copy over old recommendations
-        // NOTE: assumes the conversion message preserves ordering between old/new keyshares
-        keyshare_origins_map[local_new_keyshares[keyshare_index]].insert(
-            original_keyshare_origins_map.at(local_old_keyshares[keyshare_index]).begin(),
-            original_keyshare_origins_map.at(local_old_keyshares[keyshare_index]).end()
-          );
+      // copy over old recommendations
+      // NOTE: assumes the conversion message preserves ordering between old/new keyshares
+      keyshare_origins_map[local_new_keyshares[keyshare_index]].insert(
+          original_keyshare_origins_map.at(local_old_keyshares[keyshare_index]).begin(),
+          original_keyshare_origins_map.at(local_old_keyshares[keyshare_index]).end()
+        );
     }
 
     // validate input messages and collect their keyshares
@@ -491,7 +500,7 @@ namespace multisig
         rct::rct2pk(new_multisig_pubkey),
         std::move(keyshare_origins_map),
         original_account.get_kex_rounds_complete(),
-        multisig_account::kex_origins_map_t{},  //note: only accounts that completed kex can be converted
+        multisig_keyset_map_memsafe_t{},  //note: only accounts that completed kex can be converted
         ""};
   }
   //----------------------------------------------------------------------------------------------------------------------

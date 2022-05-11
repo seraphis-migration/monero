@@ -145,7 +145,7 @@ namespace multisig
     // get common pubkey
     const crypto::public_key& get_common_pubkey() const { return m_common_pubkey; }
     // get keyshare to origins map
-    const keyshare_origins_map_t& get_keyshares_to_origins_map() const { return m_keyshare_to_origins_map; }
+    const multisig_keyshare_origins_map_t& get_keyshares_to_origins_map() const { return m_keyshare_to_origins_map; }
     // get kex rounds complete
     std::uint32_t get_kex_rounds_complete() const { return m_kex_rounds_complete; }
     // get kex keys to origins map

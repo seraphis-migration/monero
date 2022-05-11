@@ -668,7 +668,7 @@ namespace multisig
 
       // exclude all keys the local account recommends
       // - in the first round, only the local pubkey is recommended by the local signer
-      rct::key initial_pubkey{rct::scalarmultKey(generators.m_primary, rct::sk2rct(m_base_privkey))};
+      const rct::key initial_pubkey{rct::scalarmultKey(generators.m_primary, rct::sk2rct(m_base_privkey))};
       exclude_pubkeys_out.emplace_back(rct::rct2pk(initial_pubkey));
     }
     else
@@ -841,8 +841,7 @@ namespace multisig
     // process messages into a [pubkey : {origins}] map
     multisig_keyset_map_memsafe_t result_keys_to_origins_map;
 
-    m_next_round_kex_message = multisig_kex_process_round_msgs(
-      m_account_era,
+    multisig_kex_process_round_msgs(
       m_base_privkey,
       m_base_pubkey,
       m_kex_rounds_complete + 1,
