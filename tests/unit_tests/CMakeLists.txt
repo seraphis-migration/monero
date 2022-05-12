@@ -81,6 +81,7 @@ set(unit_tests_sources
   scaling_2021.cpp
   serialization.cpp
   seraphis.cpp
+  seraphis_input_selection.cpp
   seraphis_integration.cpp
   seraphis_multisig.cpp
   seraphis_tx.cpp

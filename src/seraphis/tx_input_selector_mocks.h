@@ -42,6 +42,7 @@
 #include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
+#include <algorithm>
 #include <list>
 
 //forward declarations
@@ -92,7 +93,7 @@ public:
             if (std::find_if(already_added_inputs.begin(), already_added_inputs.end(), record_finder) ==
                     already_added_inputs.end()
                 &&
-                std::find(already_excluded_inputs.begin(), already_excluded_inputs.end(), record_finder) ==
+                std::find_if(already_excluded_inputs.begin(), already_excluded_inputs.end(), record_finder) ==
                     already_excluded_inputs.end())
             {
                 selected_input_out = enote_record;
