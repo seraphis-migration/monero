@@ -36,6 +36,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "jamtis_support_types.h"
+#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
 #include "tx_component_types.h"
@@ -137,29 +138,42 @@ struct SpContextualEnoteRecordV1 final
 
     enum class SpentStatus
     {
+        // is not spent in any known tx
+        UNSPENT,
+        // is spent in an off-chain tx
+        SPENT_OFF_CHAIN,
+        // is spent in a tx in the mempool
+        SPENT_UNCONFIRMED,
+        // is spent in a locked block
+        SPENT_LOCKED,
+        // is spent in an unlocked block
+        SPENT_UNLOCKED,
         // is not spendable (e.g. its onetime address is duplicated in another enote)
         UNSPENDABLE,
-        // is not spent in the blockchain
-        UNSPENT,
-        // is spent in the blockchain
-        SPENT
     };
 
     /// info about the enote
     SpEnoteRecordV1 m_core;
-    /// associated memo fields
-    TxExtra m_memo;
+    /// associated memo fields (none by default)
+    TxExtra m_memo{};
     /// tx id (0 if tx is unknown)
-    rct::key m_transaction_id;
+    rct::key m_transaction_id{rct::zero()};
     /// block height of transaction (0 if height is unknown)
-    std::uint64_t m_transaction_height;
+    std::uint64_t m_transaction_height{0};
     /// ledger index of the enote (-1 if index is unknown)
-    std::uint64_t m_ledger_index;
+    std::uint64_t m_ledger_index{static_cast<std::uint64_t>(-1)};
 
-    /// origin status
-    OriginStatus m_origin_status;
-    /// spent status
-    SpentStatus m_spent_status;
+    /// origin status (unknown by default)
+    OriginStatus m_origin_status{OriginStatus::UNKNOWN};
+    /// spent status (unspent by default)
+    SpentStatus m_spent_status{SpentStatus::UNSPENT};
+
+    /// onetime address equivalence
+    static bool same_destination(const SpContextualEnoteRecordV1 &record1,
+        const SpContextualEnoteRecordV1 &record2)
+    {
+        return record1.m_core.m_enote.m_core.m_onetime_address == record2.m_core.m_enote.m_core.m_onetime_address;
+    }
 
     /// get this enote's amount
     rct::xmr_amount get_amount() const { return m_core.m_amount; }
