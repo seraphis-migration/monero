@@ -85,9 +85,15 @@ struct jamtis_keys
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static crypto::secret_key make_secret_key()
+{
+    return rct::rct2sk(rct::skGen());
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void make_secret_key(crypto::secret_key &skey_out)
 {
-    skey_out = rct::rct2sk(rct::skGen());
+    skey_out = make_secret_key();
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -593,7 +599,7 @@ TEST(seraphis, information_recovery_enote_v1_plain)
 
     // make a plain enote paying to address
     rct::xmr_amount amount{crypto::rand_idx(static_cast<rct::xmr_amount>(-1))};
-    crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
+    crypto::secret_key enote_privkey{make_secret_key()};
 
     JamtisPaymentProposalV1 payment_proposal{user_address, amount, enote_privkey};
     SpOutputProposalV1 output_proposal;
@@ -625,7 +631,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
 
     // make a self-spend enote paying to address
     rct::xmr_amount amount{crypto::rand_idx(static_cast<rct::xmr_amount>(-1))};
-    crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
+    crypto::secret_key enote_privkey{make_secret_key()};
 
     JamtisPaymentProposalSelfSendV1 payment_proposal_selfspend{user_address,
         amount,
@@ -639,7 +645,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
 
     // make a change enote paying to address
     amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));
-    enote_privkey = rct::rct2sk(rct::skGen());
+    enote_privkey = make_secret_key();
 
     JamtisPaymentProposalSelfSendV1 payment_proposal_change{user_address,
         amount,
