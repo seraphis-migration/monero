@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Calculator a tx's fee given a fee/weight ratio and number of inputs/outputs (interface).
+// Calculate a tx's fee given a fee/weight ratio and number of inputs/outputs (interface).
 
 
 #pragma once

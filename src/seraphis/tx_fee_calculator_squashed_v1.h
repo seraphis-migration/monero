@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Get an SpTxSquashedV1 weight.
+// Calculate the fee for an SpTxSquashedV1 tx.
 
 
 #pragma once

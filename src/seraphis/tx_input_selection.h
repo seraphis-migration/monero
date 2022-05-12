@@ -72,20 +72,13 @@ public:
         SpContextualEnoteRecordV1 &selected_input_out) const = 0;
 };
 
-/**
-* brief: make_tx_image_proof_message_v1 - message for tx image proofs
-*   - H(crypto project name, version string, output enotes, enote ephemeral pubkeys, memos)
-* param: version_string -
-* param: output_enotes -
-* param: tx_supplement -
-* outparam: proof_message_out - message to insert in a tx image proof
-*/
-bool try_get_input_set_v1(const std::vector<SpOutputProposalV1> &output_proposals,
-    const rct::xmr_amount fee_per_tx_weight,
-    const std::size_t max_inputs_allowed,
-    const rct::key &wallet_spend_pubkey,
+//todo
+bool try_get_input_set_v1(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
+    const std::vector<SpOutputProposalV1> &output_proposals,
+    const std::size_t max_inputs_allowed,
     const InputSelectorV1 &input_selector,
+    const rct::xmr_amount fee_per_tx_weight,
     const FeeCalculator &tx_fee_calculator,
     std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out);
 

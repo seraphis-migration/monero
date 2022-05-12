@@ -119,8 +119,8 @@ static bool try_update_added_inputs_replace_excluded_v1(std::list<SpContextualEn
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static bool try_update_added_inputs_add_excluded_v1(const rct::xmr_amount fee_per_tx_weight,
-    const std::size_t max_inputs_allowed,
+static bool try_update_added_inputs_add_excluded_v1(const std::size_t max_inputs_allowed,
+    const rct::xmr_amount fee_per_tx_weight,
     const FeeCalculator &tx_fee_calculator,
     const std::size_t num_outputs,
     std::list<SpContextualEnoteRecordV1> &added_inputs_inout,
@@ -158,9 +158,9 @@ static bool try_update_added_inputs_add_excluded_v1(const rct::xmr_amount fee_pe
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static bool try_update_added_inputs_selection_v1(const boost::multiprecision::uint128_t output_amount,
-    const rct::xmr_amount fee_per_tx_weight,
     const std::size_t max_inputs_allowed,
     const InputSelectorV1 &input_selector,
+    const rct::xmr_amount fee_per_tx_weight,
     const FeeCalculator &tx_fee_calculator,
     const std::size_t num_outputs,
     std::list<SpContextualEnoteRecordV1> &added_inputs_inout,
@@ -228,8 +228,8 @@ static bool try_update_added_inputs_selection_v1(const boost::multiprecision::ui
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static bool try_update_added_inputs_range_v1(const rct::xmr_amount fee_per_tx_weight,
-    const std::size_t max_inputs_allowed,
+static bool try_update_added_inputs_range_v1(const std::size_t max_inputs_allowed,
+    const rct::xmr_amount fee_per_tx_weight,
     const FeeCalculator &tx_fee_calculator,
     const std::size_t num_outputs,
     std::list<SpContextualEnoteRecordV1> &added_inputs_inout,
@@ -283,9 +283,9 @@ static bool try_update_added_inputs_range_v1(const rct::xmr_amount fee_per_tx_we
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_amount,
-    const rct::xmr_amount fee_per_tx_weight,
     const std::size_t max_inputs_allowed,
     const InputSelectorV1 &input_selector,
+    const rct::xmr_amount fee_per_tx_weight,
     const FeeCalculator &tx_fee_calculator,
     const std::size_t num_outputs,
     std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out)
@@ -318,8 +318,8 @@ static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_a
             continue;
 
         // 3. try to add the best excluded input to the added inputs set
-        if (try_update_added_inputs_add_excluded_v1(fee_per_tx_weight,
-                max_inputs_allowed,
+        if (try_update_added_inputs_add_excluded_v1(max_inputs_allowed,
+                fee_per_tx_weight,
                 tx_fee_calculator,
                 num_outputs,
                 added_inputs,
@@ -328,9 +328,9 @@ static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_a
 
         // 4. try to get a new input that can get us closer to a solution
         if (try_update_added_inputs_selection_v1(output_amount,
-                fee_per_tx_weight,
                 max_inputs_allowed,
                 input_selector,
+                fee_per_tx_weight,
                 tx_fee_calculator,
                 num_outputs,
                 added_inputs,
@@ -338,8 +338,8 @@ static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_a
             continue;
 
         // 5. try to use a range of excluded inputs to get us closer to a solution
-        if (try_update_added_inputs_range_v1(fee_per_tx_weight,
-                max_inputs_allowed,
+        if (try_update_added_inputs_range_v1(max_inputs_allowed,
+                fee_per_tx_weight,
                 tx_fee_calculator,
                 num_outputs,
                 added_inputs,
@@ -363,12 +363,12 @@ static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_a
           actually occur, so it probably isn't worthwhile to implement)
 */
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_input_set_v1(const std::vector<SpOutputProposalV1> &output_proposals,
-    const rct::xmr_amount fee_per_tx_weight,
-    const std::size_t max_inputs_allowed,
-    const rct::key &wallet_spend_pubkey,
+bool try_get_input_set_v1(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
+    const std::vector<SpOutputProposalV1> &output_proposals,
+    const std::size_t max_inputs_allowed,
     const InputSelectorV1 &input_selector,
+    const rct::xmr_amount fee_per_tx_weight,
     const FeeCalculator &tx_fee_calculator,
     std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out)
 {
@@ -390,9 +390,9 @@ bool try_get_input_set_v1(const std::vector<SpOutputProposalV1> &output_proposal
     contextual_enote_records_out.clear();
 
     if (!try_select_inputs_v1(output_amount,
-            fee_per_tx_weight,
             max_inputs_allowed,
             input_selector,
+            fee_per_tx_weight,
             tx_fee_calculator,
             num_outputs_nochange,
             contextual_enote_records_out))
@@ -428,9 +428,9 @@ bool try_get_input_set_v1(const std::vector<SpOutputProposalV1> &output_proposal
         contextual_enote_records_out.clear();
 
         if (!try_select_inputs_v1(output_amount + 1,  //+1 to force a non-zero change
-                fee_per_tx_weight,
                 max_inputs_allowed,
                 input_selector,
+                fee_per_tx_weight,
                 tx_fee_calculator,
                 num_outputs_withchange,
                 contextual_enote_records_out))
