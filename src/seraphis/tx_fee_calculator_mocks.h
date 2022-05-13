@@ -87,30 +87,4 @@ public:
     }
 };
 
-/// fee = fee_per_weight * (num_inputs + num_outputs / 2)
-class FeeCalculatorMockOutputsStepped final : public FeeCalculator
-{
-public:
-//getters
-    rct::xmr_amount get_fee(const std::size_t fee_per_weight,
-        const std::size_t num_inputs,
-        const std::size_t num_outputs) const override
-    {
-        return fee_per_weight * (num_inputs + num_outputs / 2);
-    }
-};
-
-/// fee = fee_per_weight * ((num_inputs + num_outputs) / 2)
-class FeeCalculatorMockStepped final : public FeeCalculator
-{
-public:
-//getters
-    rct::xmr_amount get_fee(const std::size_t fee_per_weight,
-        const std::size_t num_inputs,
-        const std::size_t num_outputs) const override
-    {
-        return fee_per_weight * ((num_inputs + num_outputs) / 2);
-    }
-};
-
 } //namespace sp

@@ -90,16 +90,15 @@ static void input_selection_test(const std::vector<rct::xmr_amount> &stored_amou
     // try to get an input set
     rct::xmr_amount final_fee;
     std::list<sp::SpContextualEnoteRecordV1> inputs_selected;
-    bool result{false};
-    ASSERT_NO_THROW(
-            result = sp::try_get_input_set_v1(output_set_context,
+    const bool result{
+            sp::try_get_input_set_v1(output_set_context,
                 max_inputs_allowed,
                 input_selector,
                 fee_per_tx_weight,
                 tx_fee_calculator,
                 final_fee,
                 inputs_selected)
-        );
+        };
 
     // check results
 
@@ -111,7 +110,8 @@ static void input_selection_test(const std::vector<rct::xmr_amount> &stored_amou
         return;
 
     // 3. inputs selected have expected amounts in expected order
-    CHECK_AND_ASSERT_THROW_MES(inputs_selected.size() == input_amounts_expected.size(), "selected inputs quantity mismatch");
+    CHECK_AND_ASSERT_THROW_MES(inputs_selected.size() == input_amounts_expected.size(),
+        "selected inputs quantity mismatch");
 
     std::size_t input_index{0};
     boost::multiprecision::uint128_t total_input_amount{0};
@@ -129,7 +129,9 @@ static void input_selection_test(const std::vector<rct::xmr_amount> &stored_amou
     // a. test zero-change case
     const std::size_t num_inputs{inputs_selected.size()};
     const std::size_t num_outputs_nochange{output_amounts.size()};
-    const rct::xmr_amount fee_nochange{tx_fee_calculator.get_fee(fee_per_tx_weight, num_inputs, num_outputs_nochange)};
+    const rct::xmr_amount fee_nochange{
+            tx_fee_calculator.get_fee(fee_per_tx_weight, num_inputs, num_outputs_nochange)
+        };
 
     CHECK_AND_ASSERT_THROW_MES(total_input_amount >= total_output_amount + fee_nochange,
         "input amount does not cover output amount + fee_nochange");
@@ -137,20 +139,20 @@ static void input_selection_test(const std::vector<rct::xmr_amount> &stored_amou
     // - early return if inputs selected satisfy the zero-change case
     if (total_input_amount == total_output_amount + fee_nochange)
     {
-        CHECK_AND_ASSERT_THROW_MES(final_fee == fee_nochange,
-            "obtained fee doesn't match nochange fee (it should)");
+        CHECK_AND_ASSERT_THROW_MES(final_fee == fee_nochange, "obtained fee doesn't match nochange fee (it should)");
         return;
     }
 
     // b. test non-zero-change case
     const std::size_t num_outputs_withchange{output_amounts.size() + num_additional_outputs_with_change};
-    const rct::xmr_amount fee_withchange{tx_fee_calculator.get_fee(fee_per_tx_weight, num_inputs, num_outputs_withchange)};
+    const rct::xmr_amount fee_withchange{
+            tx_fee_calculator.get_fee(fee_per_tx_weight, num_inputs, num_outputs_withchange)
+        };
 
     CHECK_AND_ASSERT_THROW_MES(total_input_amount > total_output_amount + fee_withchange,
         "input amount does not exceed output amount + fee_withchange");
 
-    CHECK_AND_ASSERT_THROW_MES(final_fee == fee_withchange,
-        "obtained fee doesn't match withchange fee (it should)");
+    CHECK_AND_ASSERT_THROW_MES(final_fee == fee_withchange, "obtained fee doesn't match withchange fee (it should)");
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -159,7 +161,7 @@ TEST(seraphis_input_selection, trivial)
     //test(stored_enotes, out_amnts, +outs_w_change, fee/wght, fee_calc, max_ins, expect_in_amnts, result)
 
     // trivial calculator: fee = fee per weight
-    sp::FeeCalculatorMockTrivial fee_calculator;
+    const sp::FeeCalculatorMockTrivial fee_calculator;
 
     // one input, one output
     EXPECT_NO_THROW(input_selection_test({2}, {1}, 0, 1, fee_calculator, 1, {2}, true));
@@ -184,6 +186,9 @@ TEST(seraphis_input_selection, trivial)
 
     // no solution: insufficient funds
     EXPECT_NO_THROW(input_selection_test({0, 1}, {1}, 0, 1, fee_calculator, 2, {}, false));
+
+    // replacement: max inputs constrain which can be selected
+    EXPECT_NO_THROW(input_selection_test({0, 2, 1, 1, 3}, {3}, 0, 1, fee_calculator, 2, {2, 3}, true));
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_input_selection, simple)
@@ -191,7 +196,7 @@ TEST(seraphis_input_selection, simple)
     //test(stored_enotes, out_amnts, +outs_w_change, fee/wght, fee_calc, max_ins, expect_in_amnts, result)
 
     // simple calculator: fee = fee per weight * (num_inputs + num_outputs)
-    sp::FeeCalculatorMockSimple fee_calculator;
+    const sp::FeeCalculatorMockSimple fee_calculator;
 
     // one input, one output
     EXPECT_NO_THROW(input_selection_test({1}, {0}, 1, 1, fee_calculator, 1, {}, false));
@@ -211,5 +216,28 @@ TEST(seraphis_input_selection, simple)
     //    a. the other 'no change' pass solution is '2', which would permit a zero-change final solution
     // 3. the 'with change' solution is '3', but 'with change' solutions must have non-zero change, so we failed
     EXPECT_NO_THROW(input_selection_test({3, 2}, {0}, 1, 1, fee_calculator, 1, {}, false));
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_input_selection, inputs_stepped)
+{
+    //test(stored_enotes, out_amnts, +outs_w_change, fee/wght, fee_calc, max_ins, expect_in_amnts, result)
+
+    // fee = fee_per_weight * (num_inputs / 2 + num_outputs)
+    const sp::FeeCalculatorMockInputsStepped fee_calculator;
+
+    // accumulation: no single input amount can cover the differential fee at each step
+    // fee [0 in, 1 out, 3 weight]: 3
+    // fee [1 in, 1 out, 3 weight]: 3
+    // fee [2 in, 1 out, 3 weight]: 6
+    // fee [3 in, 1 out, 3 weight]: 6
+    // fee [4 in, 1 out, 3 weight]: 9
+    EXPECT_NO_THROW(input_selection_test({2, 2, 2}, {0}, 1, 3, fee_calculator, 2, {}, false));  //input limit
+    EXPECT_NO_THROW(input_selection_test({1, 1, 2, 2, 2}, {0}, 1, 3, fee_calculator, 3, {2, 2, 2}, true));
+
+    // don't fall back on accumulation if there is a simpler solution
+    EXPECT_NO_THROW(input_selection_test({2, 2, 2, 10}, {0}, 1, 3, fee_calculator, 3, {2, 10}, true));
+
+    // replacement: an excluded input gets re-selected when input limit is encountered
+    EXPECT_NO_THROW(input_selection_test({1, 2, 4}, {0}, 1, 3, fee_calculator, 2, {4, 2}, true));
 }
 //-------------------------------------------------------------------------------------------------------------------

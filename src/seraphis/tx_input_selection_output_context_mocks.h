@@ -52,14 +52,6 @@ class OutputSetContextForInputSelectionMockSimple final : public OutputSetContex
 {
 public:
 //constructors
-    OutputSetContextForInputSelectionMockSimple(const std::size_t num_outputs,
-        const boost::multiprecision::uint128_t output_amount,
-        const std::size_t num_additional_with_change) :
-            m_num_outputs{num_outputs},
-            m_output_amount{output_amount},
-            m_num_additional_with_change{num_additional_with_change}
-    {}
-
     OutputSetContextForInputSelectionMockSimple(const std::vector<rct::xmr_amount> &output_amounts,
         const std::size_t num_additional_with_change) :
             m_num_outputs{output_amounts.size()},
