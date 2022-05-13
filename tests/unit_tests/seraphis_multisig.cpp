@@ -52,6 +52,11 @@
 #include "seraphis/tx_discretized_fee.h"
 #include "seraphis/tx_enote_record_types.h"
 #include "seraphis/tx_enote_record_utils.h"
+#include "seraphis/tx_enote_store.h"
+#include "seraphis/tx_fee_calculator_mocks.h"
+#include "seraphis/tx_input_selection.h"
+#include "seraphis/tx_input_selection_output_context_v1.h"
+#include "seraphis/tx_input_selector_mocks.h"
 #include "seraphis/tx_extra.h"
 #include "seraphis/txtype_squashed_v1.h"
 
@@ -355,6 +360,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     // c) extract info from the enotes 'sent' to the multisig address
     std::vector<SpEnoteRecordV1> input_enote_records;
     input_enote_records.resize(input_enotes.size());
+    SpEnoteStoreV1 enote_store;
 
     for (std::size_t input_index{0}; input_index < input_enotes.size(); ++input_index)
     {
@@ -368,35 +374,25 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         ASSERT_TRUE(input_enote_records[input_index].m_amount == in_amounts[input_index]);
         ASSERT_TRUE(input_enote_records[input_index].m_address_index == j);
         ASSERT_TRUE(input_enote_records[input_index].m_type == JamtisEnoteType::PLAIN);
+
+        // store the enote record
+        enote_store.m_contextual_enote_records.emplace_back();
+        enote_store.m_contextual_enote_records.back().m_core = input_enote_records[input_index];
     }
 
 
     /// 3) propose tx
 
-    // a) prepare input proposals (inputs to spend)
-    std::vector<SpMultisigInputProposalV1> full_input_proposals;
-    full_input_proposals.reserve(input_enote_records.size());
+    // config
+    const std::size_t max_inputs{10000};
+    rct::xmr_amount specified_fee;
+    ASSERT_TRUE(try_get_fee_value(fee, specified_fee));
+    const std::size_t tx_fee_per_weight{specified_fee};
+    const std::size_t ref_set_decomp_m{2};
+    const std::size_t ref_set_decomp_n{2};
+    const std::size_t num_bin_members{2};
 
-    for (const SpEnoteRecordV1 &input_enote_record : input_enote_records)
-    {
-        full_input_proposals.emplace_back();
-        ASSERT_NO_THROW(make_v1_multisig_input_proposal_v1(input_enote_record,
-            make_secret_key(),
-            make_secret_key(),
-            full_input_proposals.back()));
-    }
-
-    // b) prepare outputs
-
-    // - enote ephemeral privkey entropy and seed
-    crypto::secret_key enote_ephemeral_privkey_entropy;
-    crypto::rand(32, to_bytes(enote_ephemeral_privkey_entropy));
-
-    crypto::secret_key enote_ephemeral_privkey_seed;
-    ASSERT_NO_THROW(make_multisig_enote_ephemeral_privkey_seed_v1(enote_ephemeral_privkey_entropy,
-        full_input_proposals,
-        enote_ephemeral_privkey_seed));
-
+    // a) prepare outputs
     // - explicit self-send payments
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> explicit_payments_selfsend;
     explicit_payments_selfsend.reserve(out_amounts_explicit_selfsend.size());
@@ -434,12 +430,70 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         opaque_payments.back().gen(out_amount, 0);
     }
 
-    // - prepare the output set for finalization
+    // - prepare the output set for finalization (must do this before selecting inputs)
     prepare_multisig_output_proposals_v1(explicit_payments_selfsend.size() + explicit_payments.size(), opaque_payments);
 
-    // - add change/dummy outputs
+    // b) select inputs to spend
+    // - collect all output proposals
+    std::vector<SpOutputProposalV1> all_output_proposals{opaque_payments};
+
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment_proposal : explicit_payments_selfsend)
+    {
+        all_output_proposals.emplace_back();
+        selfsend_payment_proposal.get_output_proposal_v1(keys.k_vb, all_output_proposals.back());
+    }
+
+    for (const jamtis::JamtisPaymentProposalV1 &payment_proposal : explicit_payments)
+    {
+        all_output_proposals.emplace_back();
+        payment_proposal.get_output_proposal_v1(all_output_proposals.back());
+    }
+
+    // - select inputs
+    const sp::OutputSetContextForInputSelectionV1 output_set_context{
+            keys.K_1_base,
+            keys.k_vb,
+            all_output_proposals
+        };
+    const sp::InputSelectorMockSimpleV1 input_selector{enote_store};
+    const sp::FeeCalculatorMockTrivial tx_fee_calculator;  //trivial fee calculator so we can use specified input fee
+
+    rct::xmr_amount reported_final_fee;
+    std::list<SpContextualEnoteRecordV1> contextual_inputs;
+    ASSERT_TRUE(try_get_input_set_v1(output_set_context,
+        max_inputs,
+        input_selector,
+        tx_fee_per_weight,
+        tx_fee_calculator,
+        reported_final_fee,
+        contextual_inputs));
+
+    // - convert inputs to input proposals (inputs to spend)
+    std::vector<SpMultisigInputProposalV1> full_input_proposals;
+    full_input_proposals.reserve(input_enote_records.size());
+
+    for (const SpContextualEnoteRecordV1 &contextual_input : contextual_inputs)
+    {
+        full_input_proposals.emplace_back();
+        ASSERT_NO_THROW(make_v1_multisig_input_proposal_v1(contextual_input.m_core,
+            make_secret_key(),
+            make_secret_key(),
+            full_input_proposals.back()));
+    }
+
+    // c) finalize output set (add change/dummy outputs)
+    // - enote ephemeral privkey entropy and seed
+    crypto::secret_key enote_ephemeral_privkey_entropy;
+    crypto::rand(32, to_bytes(enote_ephemeral_privkey_entropy));
+
+    crypto::secret_key enote_ephemeral_privkey_seed;
+    ASSERT_NO_THROW(make_multisig_enote_ephemeral_privkey_seed_v1(enote_ephemeral_privkey_entropy,
+        full_input_proposals,
+        enote_ephemeral_privkey_seed));
+
+    // - finalize the set
     ASSERT_NO_THROW(finalize_multisig_output_proposals_v1(full_input_proposals,
-        fee,
+        reported_final_fee,
         user_address,
         user_address,
         keys.K_1_base,
@@ -449,7 +503,13 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         explicit_payments,
         opaque_payments));
 
-    // c) set signers who are requested to participate
+    // - check fee after finalizing output proposal set (trivial fee calculator makes this meaningless here)
+    ASSERT_TRUE(tx_fee_calculator.get_fee(tx_fee_per_weight,
+            full_input_proposals.size(),
+            opaque_payments.size() + explicit_payments.size()) ==
+        reported_final_fee);
+
+    // d) set signers who are requested to participate
     std::vector<crypto::public_key> requested_signers_ids;
     requested_signers_ids.reserve(requested_signers.size());
 
@@ -464,7 +524,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         accounts[0].get_signers(),
         aggregate_filter));
 
-    // d) make multisig tx proposal
+    // e) make multisig tx proposal
     SpMultisigTxProposalV1 multisig_tx_proposal;
     std::string version_string;
     make_versioning_string(semantic_rules_version, version_string);
@@ -589,9 +649,9 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
             gen_mock_sp_membership_proof_preps_v1(partial_tx.m_input_enotes,
                 partial_tx.m_address_masks,
                 partial_tx.m_commitment_masks,
-                2,
-                2,
-                SpBinnedReferenceSetConfigV1{.m_bin_radius = 1, .m_num_bin_members = 2},
+                ref_set_decomp_m,
+                ref_set_decomp_n,
+                SpBinnedReferenceSetConfigV1{.m_bin_radius = 1, .m_num_bin_members = num_bin_members},
                 ledger_context)
         };
 
@@ -610,7 +670,10 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         completed_tx));
 
     // f) verify tx
-    EXPECT_NO_THROW(EXPECT_TRUE(validate_tx(completed_tx, ledger_context, false)));
+    ASSERT_NO_THROW(ASSERT_TRUE(validate_tx(completed_tx, ledger_context, false)));
+
+    // - sanity check fee (trivial fee calculator makes this meaningless here)
+    //ASSERT_TRUE(completed_tx.m_fee == tx_fee_calculator.get_fee(tx_fee_per_weight, completed_tx));
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

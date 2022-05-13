@@ -162,7 +162,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
         "Failed to create a self-send-type output proposal: could not decipher the destination's address tag.");
 
     // 2. make a raw address tag (not ciphered) from {j || selfspend_type} (with the type as mac)
-    address_tag_t raw_addr_tag{address_index_to_tag(j, static_cast<address_tag_MAC_t>(m_type))};
+    const address_tag_t raw_addr_tag{address_index_to_tag(j, static_cast<address_tag_MAC_t>(m_type))};
 
     // 3. encrypt the raw address tag: addr_tag_enc = addr_tag(j || mac) ^ H_8(q)
     output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, raw_addr_tag);

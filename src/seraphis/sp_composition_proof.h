@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 ////
-// Schnorr-like composition proof for a se key of the form K = x*G + y*X + z*U
+// Schnorr-like composition proof for a secret key of the form K = x*G + y*X + z*U
 // - demonstrates knowledge of x, y, z
 //   - x >= 0
 //   - y, z > 0
