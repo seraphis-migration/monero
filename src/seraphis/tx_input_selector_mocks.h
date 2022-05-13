@@ -56,8 +56,6 @@ class InputSelectorMockSimpleV1 final : public InputSelectorV1
 {
 public:
 //constructors
-    /// default constructor: disabled
-
     /// normal constructor
     InputSelectorMockSimpleV1(const SpEnoteStoreV1 &enote_store) :
         m_enote_store{enote_store}

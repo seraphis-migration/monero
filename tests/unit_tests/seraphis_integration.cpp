@@ -59,6 +59,10 @@ extern "C"
 #include "seraphis/tx_enote_record_types.h"
 #include "seraphis/tx_enote_record_utils.h"
 #include "seraphis/tx_extra.h"
+#include "seraphis/tx_fee_calculator_squashed_v1.h"
+#include "seraphis/tx_input_selection.h"
+#include "seraphis/tx_input_selection_output_context_v1.h"
+#include "seraphis/tx_input_selector_mocks.h"
 #include "seraphis/tx_misc_utils.h"
 #include "seraphis/txtype_squashed_v1.h"
 
@@ -115,6 +119,14 @@ TEST(seraphis_integration, txtype_squashed_v1)
     using namespace jamtis;
 
 
+    /// config
+    const std::size_t max_inputs{10000};
+    const std::size_t tx_fee_per_weight{1};
+    const std::size_t ref_set_decomp_m{2};
+    const std::size_t ref_set_decomp_n{2};
+    const std::size_t num_bin_members{2};
+
+
     /// fake ledger context for this test
     sp::MockLedgerContext ledger_context{};
 
@@ -138,7 +150,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
         user_address_A));
 
     // b) make a plain enote paying to user A
-    const rct::xmr_amount in_amount_A{10};
+    const rct::xmr_amount in_amount_A{1000000};  //enough for fee
 
     const JamtisPaymentProposalV1 payment_proposal_A{
             .m_destination = user_address_A,
@@ -153,7 +165,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
     output_proposal_A.get_enote_v1(input_enote_A);
     const rct::key input_enote_ephemeral_pubkey_A{output_proposal_A.m_enote_ephemeral_pubkey};
 
-    // c) extract info from the enote 'sent' to the multisig address   //todo: find enote in mock ledger -> enote store
+    // c) extract info from the enote 'sent' to the address   //todo: find enote in mock ledger -> enote store
     SpEnoteRecordV1 input_enote_record_A;
 
     ASSERT_TRUE(try_get_enote_record_v1(input_enote_A,
@@ -166,6 +178,11 @@ TEST(seraphis_integration, txtype_squashed_v1)
     ASSERT_TRUE(input_enote_record_A.m_amount == in_amount_A);
     ASSERT_TRUE(input_enote_record_A.m_address_index == j_A);
     ASSERT_TRUE(input_enote_record_A.m_type == JamtisEnoteType::PLAIN);
+
+    // e) add enote record to enote store
+    sp::SpEnoteStoreV1 enote_store_A;
+    enote_store_A.m_contextual_enote_records.emplace_back();
+    enote_store_A.m_contextual_enote_records.back().m_core = input_enote_record_A;
 
 
     /// 2] user A makes tx sending money to user B   //todo: use wallet to make tx
@@ -192,45 +209,75 @@ TEST(seraphis_integration, txtype_squashed_v1)
     SpOutputProposalV1 output_proposal_B;
     payment_proposal_B.get_output_proposal_v1(output_proposal_B);
 
-    // c) finalize output proposals
-    const rct::xmr_amount real_transaction_fee{1};
-    DiscretizedFee discretized_transaction_fee;  //todo: use fee oracle mockup
-    ASSERT_NO_THROW(discretized_transaction_fee = DiscretizedFee{real_transaction_fee});
-    ASSERT_TRUE(discretized_transaction_fee == real_transaction_fee);  //a tx fee of 1 should discretize perfectly
-
     std::vector<SpOutputProposalV1> output_proposals;
     output_proposals.emplace_back(output_proposal_B);
 
+    // c) select inputs for the tx
+    const sp::OutputSetContextForInputSelectionV1 output_set_context{
+            keys_user_A.K_1_base,
+            keys_user_A.k_vb,
+            output_proposals
+        };
+    const sp::InputSelectorMockSimpleV1 input_selector{enote_store_A};
+    const sp::FeeCalculatorSpTxSquashedV1 tx_fee_calculator{
+            ref_set_decomp_m,
+            ref_set_decomp_n,
+            num_bin_members,
+            TxExtra{}
+        };
+
+    rct::xmr_amount reported_final_fee;
+    std::list<SpContextualEnoteRecordV1> contextual_inputs;
+    ASSERT_TRUE(try_get_input_set_v1(output_set_context,
+        max_inputs,
+        input_selector,
+        tx_fee_per_weight,
+        tx_fee_calculator,
+        reported_final_fee,
+        contextual_inputs));
+
+    // d) finalize output proposals
+    DiscretizedFee discretized_transaction_fee;
+    ASSERT_NO_THROW(discretized_transaction_fee = DiscretizedFee{reported_final_fee});
+    ASSERT_TRUE(discretized_transaction_fee == reported_final_fee);
+
     ASSERT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount_A,
-        real_transaction_fee,
+        reported_final_fee,
         user_address_A,
         user_address_A,
         keys_user_A.K_1_base,
         keys_user_A.k_vb,
         output_proposals));
 
-    // d) make an input proposal to fund the tx
+    ASSERT_TRUE(tx_fee_calculator.get_fee(tx_fee_per_weight, contextual_inputs.size(), output_proposals.size()) ==
+        reported_final_fee);
+
+    // e) make an input proposal to fund the tx
     std::vector<SpInputProposalV1> input_proposals;
-    input_proposals.emplace_back();
 
-    ASSERT_NO_THROW(make_v1_input_proposal_v1(input_enote_record_A,
-        keys_user_A.k_m,
-        make_secret_key(),
-        make_secret_key(),
-        input_proposals.back()));
+    for (const sp::SpContextualEnoteRecordV1 &contextual_input : contextual_inputs)
+    {
+        input_proposals.emplace_back();
 
-    // e) prepare a reference set for the input's membership proof
+        ASSERT_NO_THROW(make_v1_input_proposal_v1(contextual_input.m_core,
+            keys_user_A.k_m,
+            make_secret_key(),
+            make_secret_key(),
+            input_proposals.back()));
+    }
+
+    // f) prepare a reference set for the input's membership proof
     std::vector<SpMembershipProofPrepV1> membership_proof_preps;
 
     ASSERT_NO_THROW(membership_proof_preps =
             gen_mock_sp_membership_proof_preps_v1(input_proposals,
-                2,
-                2,
-                SpBinnedReferenceSetConfigV1{.m_bin_radius = 1, .m_num_bin_members = 2},
+                ref_set_decomp_m,
+                ref_set_decomp_n,
+                SpBinnedReferenceSetConfigV1{.m_bin_radius = 1, .m_num_bin_members = num_bin_members},
                 ledger_context)
         );
 
-    // f) make the transaction
+    // g) make the transaction
     SpTxSquashedV1 completed_tx;
 
     ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(input_proposals,
@@ -240,6 +287,8 @@ TEST(seraphis_integration, txtype_squashed_v1)
         std::vector<ExtraFieldElement>{},
         SpTxSquashedV1::SemanticRulesVersion::MOCK,
         completed_tx));
+
+    ASSERT_TRUE(completed_tx.m_fee == tx_fee_calculator.get_fee(tx_fee_per_weight, completed_tx));
 
 
     /// 3] add tx to ledger
