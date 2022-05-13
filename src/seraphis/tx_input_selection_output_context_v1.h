@@ -37,15 +37,12 @@
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
-#include "tx_enote_record_types.h"
-#include "tx_fee_calculator.h"
 #include "tx_input_selection_output_context.h"
 
 //third party headers
 #include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
-#include <list>
 #include <vector>
 
 //forward declarations
@@ -54,32 +51,35 @@
 namespace sp
 {
 
-class InputSelectorV1
+class OutputSetContextForInputSelectionV1 final : public OutputSetContextForInputSelection
 {
 public:
-//constructors: default
-//destructor
-    virtual ~InputSelectorV1() = default;
+//constructors
+    OutputSetContextForInputSelectionV1(const rct::key &wallet_spend_pubkey,
+        const crypto::secret_key &k_view_balance,
+        const std::vector<SpOutputProposalV1> &output_proposals) :
+            m_wallet_spend_pubkey{wallet_spend_pubkey},
+            m_k_view_balance{k_view_balance},
+            m_output_proposals{output_proposals}
+    {}
 
 //overloaded operators
-    /// disable copy/move (this is a pure virtual base class)
-    InputSelectorV1& operator=(InputSelectorV1&&) = delete;
+    /// disable copy/move (this is a scoped manager (reference wrapper))
+    OutputSetContextForInputSelectionV1& operator=(OutputSetContextForInputSelectionV1&&) = delete;
 
 //member functions
-    /// select an available input
-    virtual bool try_select_input_v1(const boost::multiprecision::uint128_t desired_total_amount,
-        const std::list<SpContextualEnoteRecordV1> &already_added_inputs,
-        const std::list<SpContextualEnoteRecordV1> &already_excluded_inputs,
-        SpContextualEnoteRecordV1 &selected_input_out) const = 0;
-};
+    /// get total output amount
+    boost::multiprecision::uint128_t get_total_amount() const override;
+    /// get number of outputs assuming no change
+    std::size_t get_num_outputs_nochange() const override;
+    /// get number of outputs assuming non-zero change
+    std::size_t get_num_outputs_withchange() const override;
 
-//todo
-bool try_get_input_set_v1(const OutputSetContextForInputSelection &output_set_context,
-    const std::size_t max_inputs_allowed,
-    const InputSelectorV1 &input_selector,
-    const rct::xmr_amount fee_per_tx_weight,
-    const FeeCalculator &tx_fee_calculator,
-    rct::xmr_amount &final_fee_out,
-    std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out);
+//member variables
+private:
+    const rct::key &m_wallet_spend_pubkey;
+    const crypto::secret_key &m_k_view_balance;
+    const std::vector<SpOutputProposalV1> &m_output_proposals;
+};
 
 } //namespace sp

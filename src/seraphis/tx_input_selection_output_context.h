@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Utilities for selecting tx inputs from an enote storage.
+// Output set context for use during input selection.
 
 
 #pragma once
@@ -39,7 +39,6 @@
 #include "tx_builder_types.h"
 #include "tx_enote_record_types.h"
 #include "tx_fee_calculator.h"
-#include "tx_input_selection_output_context.h"
 
 //third party headers
 #include "boost/multiprecision/cpp_int.hpp"
@@ -54,32 +53,24 @@
 namespace sp
 {
 
-class InputSelectorV1
+class OutputSetContextForInputSelection
 {
 public:
 //constructors: default
 //destructor
-    virtual ~InputSelectorV1() = default;
+    virtual ~OutputSetContextForInputSelection() = default;
 
 //overloaded operators
     /// disable copy/move (this is a pure virtual base class)
-    InputSelectorV1& operator=(InputSelectorV1&&) = delete;
+    OutputSetContextForInputSelection& operator=(OutputSetContextForInputSelection&&) = delete;
 
 //member functions
-    /// select an available input
-    virtual bool try_select_input_v1(const boost::multiprecision::uint128_t desired_total_amount,
-        const std::list<SpContextualEnoteRecordV1> &already_added_inputs,
-        const std::list<SpContextualEnoteRecordV1> &already_excluded_inputs,
-        SpContextualEnoteRecordV1 &selected_input_out) const = 0;
+    /// get total output amount
+    virtual boost::multiprecision::uint128_t get_total_amount() const = 0;
+    /// get number of outputs assuming no change
+    virtual std::size_t get_num_outputs_nochange() const = 0;
+    /// get number of outputs assuming non-zero change
+    virtual std::size_t get_num_outputs_withchange() const = 0;
 };
-
-//todo
-bool try_get_input_set_v1(const OutputSetContextForInputSelection &output_set_context,
-    const std::size_t max_inputs_allowed,
-    const InputSelectorV1 &input_selector,
-    const rct::xmr_amount fee_per_tx_weight,
-    const FeeCalculator &tx_fee_calculator,
-    rct::xmr_amount &final_fee_out,
-    std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out);
 
 } //namespace sp

@@ -43,6 +43,7 @@
 #include "seraphis/tx_fee_calculator.h"
 #include "seraphis/tx_fee_calculator_mocks.h"
 #include "seraphis/tx_input_selection.h"
+#include "seraphis/tx_input_selection_output_context_v1.h"
 #include "seraphis/tx_input_selector_mocks.h"
 
 #include "boost/multiprecision/cpp_int.hpp"
@@ -161,23 +162,19 @@ static void input_selection_test(const std::vector<rct::xmr_amount> &stored_amou
     jamtis_keys user_keys;
     make_jamtis_keys(user_keys);
 
-    // prepare output proposals (represents pre-finalization tx outputs)
+    // prepare output set context (represents pre-finalization tx outputs)
     const std::vector<sp::SpOutputProposalV1> output_proposals{prepare_output_proposals(user_keys, output_amounts)};
+    const sp::OutputSetContextForInputSelectionV1 output_set_context{user_keys.K_1_base, user_keys.k_vb, output_proposals};
 
     // collect total output amount
-    boost::multiprecision::uint128_t total_output_amount{0};
-
-    for (const sp::SpOutputProposalV1 &output_proposal : output_proposals)
-        total_output_amount += output_proposal.get_amount();
+    const boost::multiprecision::uint128_t total_output_amount{output_set_context.get_total_amount()};
 
     // try to get an input set
     rct::xmr_amount final_fee;
     std::list<sp::SpContextualEnoteRecordV1> inputs_selected;
     bool result{false};
     ASSERT_NO_THROW(
-            result = sp::try_get_input_set_v1(user_keys.K_1_base,
-                user_keys.k_vb,
-                output_proposals,
+            result = sp::try_get_input_set_v1(output_set_context,
                 max_inputs_allowed,
                 input_selector,
                 fee_per_tx_weight,

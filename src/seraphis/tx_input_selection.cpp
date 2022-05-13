@@ -35,10 +35,9 @@
 #include "crypto/crypto.h"
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
-#include "tx_builder_types.h"
-#include "tx_builders_outputs.h"
 #include "tx_enote_record_types.h"
 #include "tx_fee_calculator.h"
+#include "tx_input_selection_output_context.h"
 
 //third party headers
 #include "boost/multiprecision/cpp_int.hpp"
@@ -53,25 +52,6 @@
 
 namespace sp
 {
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static std::size_t compute_num_additional_outputs(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const std::vector<SpOutputProposalV1> &output_proposals,
-    const rct::xmr_amount change_amount)
-{
-    OutputProposalSetExtraTypesContextV1 dummy;
-    std::vector<OutputProposalSetExtraTypesV1> additional_outputs_from_change;
-
-    get_additional_output_types_for_output_set_v1(wallet_spend_pubkey,
-        k_view_balance,
-        output_proposals,
-        change_amount,
-        dummy,
-        additional_outputs_from_change);
-
-    return additional_outputs_from_change.size();
-}
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static boost::multiprecision::uint128_t compute_total_amount(
@@ -363,9 +343,7 @@ static bool try_select_inputs_v1(const boost::multiprecision::uint128_t output_a
           actually occur, so it probably isn't worthwhile to implement)
 */
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_input_set_v1(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const std::vector<SpOutputProposalV1> &output_proposals,
+bool try_get_input_set_v1(const OutputSetContextForInputSelection &output_set_context,
     const std::size_t max_inputs_allowed,
     const InputSelectorV1 &input_selector,
     const rct::xmr_amount fee_per_tx_weight,
@@ -374,21 +352,8 @@ bool try_get_input_set_v1(const rct::key &wallet_spend_pubkey,
     std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out)
 {
     // 1. select inputs to cover requested output amount (assume 0 change)
-    // a. compute output amount
-    boost::multiprecision::uint128_t output_amount{0};
-
-    for (const SpOutputProposalV1 &output_proposal : output_proposals)
-        output_amount += output_proposal.get_amount();
-
-    // b. get number of additional outputs assuming zero change amount
-    const std::size_t num_additional_outputs_no_change{
-            compute_num_additional_outputs(wallet_spend_pubkey, k_view_balance, output_proposals, 0)
-        };
-
-    const std::size_t num_outputs_nochange{output_proposals.size() + num_additional_outputs_no_change};
-
-    // c. select inputs
-    contextual_enote_records_out.clear();
+    const boost::multiprecision::uint128_t output_amount{output_set_context.get_total_amount()};
+    const std::size_t num_outputs_nochange{output_set_context.get_num_outputs_nochange()};
 
     if (!try_select_inputs_v1(output_amount,
             max_inputs_allowed,
@@ -414,11 +379,7 @@ bool try_get_input_set_v1(const rct::key &wallet_spend_pubkey,
 
     // 4. if non-zero change with computed fee, assume change must be non-zero (typical case)
     // a. update fee assuming non-zero change
-    const std::size_t num_additional_outputs_with_change{
-            compute_num_additional_outputs(wallet_spend_pubkey, k_view_balance, output_proposals, 1)
-        };
-
-    const std::size_t num_outputs_withchange{output_proposals.size() + num_additional_outputs_with_change};
+    const std::size_t num_outputs_withchange{output_set_context.get_num_outputs_withchange()};
     rct::xmr_amount nonzero_change_fee{
             tx_fee_calculator.get_fee(fee_per_tx_weight, num_inputs_first_try, num_outputs_withchange)
         };
@@ -429,8 +390,6 @@ bool try_get_input_set_v1(const rct::key &wallet_spend_pubkey,
     // b. if previously selected inputs are insufficient for non-zero change, select inputs again (very rare case)
     if (compute_total_amount(contextual_enote_records_out) <= output_amount + nonzero_change_fee)
     {
-        contextual_enote_records_out.clear();
-
         if (!try_select_inputs_v1(output_amount + 1,  //+1 to force a non-zero change
                 max_inputs_allowed,
                 input_selector,
