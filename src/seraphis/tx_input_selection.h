@@ -80,6 +80,7 @@ bool try_get_input_set_v1(const rct::key &wallet_spend_pubkey,
     const InputSelectorV1 &input_selector,
     const rct::xmr_amount fee_per_tx_weight,
     const FeeCalculator &tx_fee_calculator,
+    rct::xmr_amount &final_fee_out,
     std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out);
 
 } //namespace sp

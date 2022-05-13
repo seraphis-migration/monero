@@ -370,6 +370,7 @@ bool try_get_input_set_v1(const rct::key &wallet_spend_pubkey,
     const InputSelectorV1 &input_selector,
     const rct::xmr_amount fee_per_tx_weight,
     const FeeCalculator &tx_fee_calculator,
+    rct::xmr_amount &final_fee_out,
     std::list<SpContextualEnoteRecordV1> &contextual_enote_records_out)
 {
     // 1. select inputs to cover requested output amount (assume 0 change)
@@ -406,7 +407,10 @@ bool try_get_input_set_v1(const rct::key &wallet_spend_pubkey,
 
     // 3. return if we are done (zero change is covered by input amounts) (very rare case)
     if (compute_total_amount(contextual_enote_records_out) == output_amount + zero_change_fee)
+    {
+        final_fee_out = zero_change_fee;
         return true;
+    }
 
     // 4. if non-zero change with computed fee, assume change must be non-zero (typical case)
     // a. update fee assuming non-zero change
@@ -444,6 +448,7 @@ bool try_get_input_set_v1(const rct::key &wallet_spend_pubkey,
     CHECK_AND_ASSERT_THROW_MES(compute_total_amount(contextual_enote_records_out) > output_amount + nonzero_change_fee,
         "getting an input set: selecting inputs for the non-zero change amount case failed (bug).");
 
+    final_fee_out = nonzero_change_fee;
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------

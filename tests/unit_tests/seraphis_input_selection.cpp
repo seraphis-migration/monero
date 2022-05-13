@@ -171,6 +171,7 @@ static void input_selection_test(const std::vector<rct::xmr_amount> &stored_amou
         total_output_amount += output_proposal.get_amount();
 
     // try to get an input set
+    rct::xmr_amount final_fee;
     std::list<sp::SpContextualEnoteRecordV1> inputs_selected;
     bool result{false};
     ASSERT_NO_THROW(
@@ -181,6 +182,7 @@ static void input_selection_test(const std::vector<rct::xmr_amount> &stored_amou
                 input_selector,
                 fee_per_tx_weight,
                 tx_fee_calculator,
+                final_fee,
                 inputs_selected)
         );
 
@@ -225,14 +227,21 @@ static void input_selection_test(const std::vector<rct::xmr_amount> &stored_amou
 
     // - early return if inputs selected satisfy the zero-change case
     if (total_input_amount == total_output_amount + fee_nochange)
+    {
+        CHECK_AND_ASSERT_THROW_MES(final_fee == fee_nochange,
+            "obtained fee doesn't match nochange fee (it should)");
         return;
+    }
 
     // b. test non-zero-change case
-    const std::size_t num_outputs_withchange{output_amounts.size() < 2 ? 2 : output_amounts.size() + 1};
+    const std::size_t num_outputs_withchange{output_amounts.size() < 2 ? 3 : output_amounts.size() + 1};
     const rct::xmr_amount fee_withchange{tx_fee_calculator.get_fee(fee_per_tx_weight, num_inputs, num_outputs_withchange)};
 
     CHECK_AND_ASSERT_THROW_MES(total_input_amount > total_output_amount + fee_withchange,
         "input amount does not exceed output amount + fee_withchange");
+
+    CHECK_AND_ASSERT_THROW_MES(final_fee == fee_withchange,
+        "obtained fee doesn't match withchange fee (it should)");
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
