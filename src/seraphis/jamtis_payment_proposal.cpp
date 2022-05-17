@@ -210,9 +210,10 @@ void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount,
     make_tx_extra(std::move(memo_elements), m_partial_memo);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool is_self_send_output_proposal(const SpOutputProposalV1 &output_proposal,
+bool try_get_self_send_type(const SpOutputProposalV1 &output_proposal,
     const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance)
+    const crypto::secret_key &k_view_balance,
+    JamtisSelfSendType &type_out)
 {
     // extract enote from output proposal
     SpEnoteV1 temp_enote;
@@ -221,11 +222,26 @@ bool is_self_send_output_proposal(const SpOutputProposalV1 &output_proposal,
     // try to get an enote record from the enote (via selfsend path)
     SpEnoteRecordV1 temp_enote_record;
 
-    return try_get_enote_record_v1_selfsend(temp_enote,
-        output_proposal.m_enote_ephemeral_pubkey,
-        wallet_spend_pubkey,
-        k_view_balance,
-        temp_enote_record);
+    if (!try_get_enote_record_v1_selfsend(temp_enote,
+            output_proposal.m_enote_ephemeral_pubkey,
+            wallet_spend_pubkey,
+            k_view_balance,
+            temp_enote_record))
+        return false;
+
+    // convert to a self-send type
+    CHECK_AND_ASSERT_THROW_MES(try_get_self_send_type(temp_enote_record.m_type, type_out),
+        "getting jamtis self-send type from output proposal: failed to convert enote type to self-send type (bug).");
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool is_self_send_output_proposal(const SpOutputProposalV1 &output_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance)
+{
+    JamtisSelfSendType dummy_type;
+    return try_get_self_send_type(output_proposal, wallet_spend_pubkey, k_view_balance, dummy_type);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

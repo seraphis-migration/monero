@@ -148,5 +148,16 @@ JamtisEnoteType self_send_type_to_enote_type(const JamtisSelfSendType self_send_
     };
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool try_get_self_send_type(const JamtisEnoteType enote_type, JamtisSelfSendType &self_send_type_out)
+{
+    switch (enote_type)
+    {
+        case (JamtisEnoteType::DUMMY)      : self_send_type_out = JamtisSelfSendType::DUMMY;      return true;
+        case (JamtisEnoteType::CHANGE)     : self_send_type_out = JamtisSelfSendType::CHANGE;     return true;
+        case (JamtisEnoteType::SELF_SPEND) : self_send_type_out = JamtisSelfSendType::SELF_SPEND; return true;
+        default                            : return false;
+    };
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis
 } //namespace sp

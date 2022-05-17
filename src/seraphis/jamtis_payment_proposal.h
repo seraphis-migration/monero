@@ -125,14 +125,27 @@ struct JamtisPaymentProposalSelfSendV1 final
 };
 
 /**
-* brief: is_self_send_output_proposal - test if an output proposal is a self-send-type
-* param: proposal -
-* param: wallet_spend_key -
+* brief: try_get_self_send_type - if the proposal passed in is a self-send type, get the type
+* param: output_proposal -
+* param: wallet_spend_pubkey -
 * param: k_view_balance -
-* return: true if it's a self-send proposal (either change or self-spend)
+* outparam: type_out -
+* return: true if it's a self-send proposal
 */
-bool is_self_send_output_proposal(const SpOutputProposalV1 &proposal,
-    const rct::key &wallet_spend_key,
+bool try_get_self_send_type(const SpOutputProposalV1 &output_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    JamtisSelfSendType &type_out);
+
+/**
+* brief: is_self_send_output_proposal - test if an output proposal is a self-send-type
+* param: output_proposal -
+* param: wallet_spend_pubkey -
+* param: k_view_balance -
+* return: true if it's a self-send proposal
+*/
+bool is_self_send_output_proposal(const SpOutputProposalV1 &output_proposal,
+    const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance);
 
 } //namespace jamtis

@@ -131,6 +131,7 @@ enum class JamtisSelfSendType : unsigned char
 };
 
 JamtisEnoteType self_send_type_to_enote_type(const JamtisSelfSendType self_send_type);
+bool try_get_self_send_type(const JamtisEnoteType enote_type, JamtisSelfSendType &self_send_type_out);
 
 /// jamtis view tags
 using view_tag_t = unsigned char;
