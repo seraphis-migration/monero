@@ -206,9 +206,38 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_view_balance,
     const rct::key &enote_ephemeral_pubkey,
+    const jamtis::JamtisSelfSendType self_send_type,
     rct::key &sender_receiver_secret_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF};
+    static const std::string dummy_separator{
+            config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_DUMMY
+        };
+    static const std::string change_separator{
+            config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_CHANGE
+        };
+    static const std::string self_spend_separator{
+            config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_SELF_SPEND
+        };
+
+    CHECK_AND_ASSERT_THROW_MES(self_send_type <= jamtis::JamtisSelfSendType::MAX,
+        "jamtis self-send sender-receiver secret: unknown self-send type.");
+
+    const std::string &domain_separator{
+            [&]() -> const std::string&
+            {
+                if (self_send_type == jamtis::JamtisSelfSendType::DUMMY)
+                    return dummy_separator;
+                else if (self_send_type == jamtis::JamtisSelfSendType::CHANGE)
+                    return change_separator;
+                else if (self_send_type == jamtis::JamtisSelfSendType::SELF_SPEND)
+                    return self_spend_separator;
+                else
+                {
+                    CHECK_AND_ASSERT_THROW_MES(false, "jamtis self-send sender-receiver secret domain separator error");
+                    return dummy_separator;
+                }
+            }()
+        };
 
     // q = H_32[k_vb](K_e)
     jamtis_derive_secret(domain_separator,

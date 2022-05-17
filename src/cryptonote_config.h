@@ -267,7 +267,6 @@ namespace config
   const constexpr char HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG[] = "jamtis_encrypted_address_tag";
   const constexpr char HASH_KEY_JAMTIS_VIEW_TAG[] = "jamtis_enote_view_tag";
   const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN[] = "jamtis_sender_receiver_secret_plain";
-  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF[] = "jamtis_sender_receiver_secret_self_send";
   const constexpr char HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION[] = "jamtis_sender_onetime_address_extension";
   const constexpr char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN[] = "jamtis_enote_amount_commitment_blinding_factor_plain";
   const constexpr char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF[] = "jamtis_enote_amount_commitment_blinding_factor_self";

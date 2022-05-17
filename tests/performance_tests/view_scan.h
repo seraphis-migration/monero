@@ -336,10 +336,10 @@ public:
     bool init()
     {
         // user wallet keys (incomplete set)
-        rct::key wallet_spend_pubkey{rct::pkGen()};
-        crypto::secret_key s_generate_address{rct::rct2sk(rct::skGen())};
+        const rct::key wallet_spend_pubkey{rct::pkGen()};
+        const crypto::secret_key s_generate_address{rct::rct2sk(rct::skGen())};
         m_recipient_findreceived_key = rct::rct2sk(rct::skGen());
-        rct::key findreceived_pubkey{rct::scalarmultBase(rct::sk2rct(m_recipient_findreceived_key))};
+        const rct::key findreceived_pubkey{rct::scalarmultBase(rct::sk2rct(m_recipient_findreceived_key))};
 
         // user address
         sp::jamtis::JamtisDestinationV1 user_address;
@@ -353,8 +353,8 @@ public:
         m_recipient_spend_key = user_address.m_addr_K1;
 
         // make enote paying to address
-        crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
-        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, 0, enote_privkey};
+        const crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
+        const sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, 0, enote_privkey};
         sp::SpOutputProposalV1 output_proposal;
         payment_proposal.get_output_proposal_v1(output_proposal);
         m_enote_ephemeral_pubkey = output_proposal.m_enote_ephemeral_pubkey;

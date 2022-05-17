@@ -136,8 +136,8 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
         "jamtis payment proposal self-send: invalid view-balance privkey (zero).");
     CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(viewbalance_privkey)) == 0,
         "jamtis payment proposal self-send: invalid view-balance privkey (not canonical).");
-    CHECK_AND_ASSERT_THROW_MES(is_known_self_send_MAC(static_cast<address_tag_MAC_t>(m_type)),
-        "jamtis payment proposal self-send: unknown self-send MAC.");
+    CHECK_AND_ASSERT_THROW_MES(m_type <= JamtisSelfSendType::MAX,
+        "jamtis payment proposal self-send: unknown self-send type.");
 
     // enote ephemeral pubkey: K_e = r K_3
     make_jamtis_enote_ephemeral_pubkey(m_enote_ephemeral_privkey,
@@ -148,9 +148,12 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
     // sender-receiver shared secret: q = H_32[k_vb](K_e)  //note: K_e not K_d
     rct::key q;
     auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
-    make_jamtis_sender_receiver_secret_selfsend(viewbalance_privkey, output_proposal_out.m_enote_ephemeral_pubkey, q);
+    make_jamtis_sender_receiver_secret_selfsend(viewbalance_privkey,
+        output_proposal_out.m_enote_ephemeral_pubkey,
+        m_type,
+        q);
 
-    // encrypt address index and mac: addr_tag_enc = addr_tag(j, mac) ^ H_8(q)
+    // encrypt address index: addr_tag_enc = addr_tag(j, mac) ^ H_8(q)
 
     // 1. extract the address index from the destination address's address tag
     crypto::secret_key generateaddress_secret;
@@ -161,11 +164,11 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
     CHECK_AND_ASSERT_THROW_MES(try_decipher_address_index(rct::sk2rct(ciphertag_secret), m_destination.m_addr_tag, j),
         "Failed to create a self-send-type output proposal: could not decipher the destination's address tag.");
 
-    // 2. make a raw address tag (not ciphered) from {j || selfspend_type} (with the type as mac)
-    const address_tag_t raw_addr_tag{address_index_to_tag(j, static_cast<address_tag_MAC_t>(m_type))};
+    // 2. make a raw address tag (not ciphered)
+    const address_tag_t raw_address_tag{j};
 
     // 3. encrypt the raw address tag: addr_tag_enc = addr_tag(j || mac) ^ H_8(q)
-    output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, raw_addr_tag);
+    output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, raw_address_tag);
 
 
     // derived key: K_d = 8*r*K_2
@@ -192,7 +195,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount,
-    const JamtisSelfSendMAC type,
+    const JamtisSelfSendType type,
     const std::size_t num_random_memo_elements)
 {
     m_destination.gen();

@@ -397,17 +397,15 @@ static bool test_info_recovery_addressindex(const sp::jamtis::address_index_t j)
     using namespace jamtis;
 
     // convert the index to/from raw tag form
-    address_tag_t raw_tag{address_index_to_tag(j, 0)};
-    address_tag_MAC_t raw_mac;
-    if (address_tag_to_index(raw_tag, raw_mac) != j)
-        return false;
-    if (raw_mac != 0)
+    const address_tag_t raw_address_tag{j};
+    address_index_t j_recovered;
+    if (!try_get_address_index(raw_address_tag, j_recovered))
         return false;
 
     // cipher and decipher the index
     crypto::secret_key cipher_key;
     make_secret_key(cipher_key);
-    address_tag_t ciphered_tag{cipher_address_index(rct::sk2rct(cipher_key), j)};
+    const address_tag_t ciphered_tag{cipher_address_index(rct::sk2rct(cipher_key), j)};
     address_tag_MAC_t decipher_mac;
     address_index_t decipher_j;
     if (!try_decipher_address_index(rct::sk2rct(cipher_key), ciphered_tag, decipher_j))
@@ -418,7 +416,7 @@ static bool test_info_recovery_addressindex(const sp::jamtis::address_index_t j)
     // encrypt and decrypt an address tag
     crypto::secret_key encryption_key;
     make_secret_key(encryption_key);
-    encrypted_address_tag_t encrypted_ciphered_tag{encrypt_address_tag(rct::sk2rct(encryption_key), ciphered_tag)};
+    const encrypted_address_tag_t encrypted_ciphered_tag{encrypt_address_tag(rct::sk2rct(encryption_key), ciphered_tag)};
     if (decrypt_address_tag(rct::sk2rct(encryption_key), encrypted_ciphered_tag) != ciphered_tag)
         return false;
 
@@ -431,7 +429,7 @@ TEST(seraphis, composition_proof)
     rct::key K;
     crypto::key_image KI;
     crypto::secret_key x, y, z;
-    rct::key message{rct::zero()};
+    const rct::key message{rct::zero()};
     sp::SpCompositionProof proof;
 
     try
@@ -511,7 +509,7 @@ TEST(seraphis, information_recovery_amountencoding)
     // encoding/decoding amounts
     crypto::secret_key sender_receiver_secret;
     make_secret_key(sender_receiver_secret);
-    rct::xmr_amount amount = rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)});
+    const rct::xmr_amount amount{rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)})};
 
     crypto::key_derivation fake_baked_key;
     memcpy(&fake_baked_key, rct::zero().bytes, sizeof(rct::key));
@@ -598,7 +596,7 @@ TEST(seraphis, information_recovery_enote_v1_plain)
         user_address);
 
     // make a plain enote paying to address
-    rct::xmr_amount amount{crypto::rand_idx(static_cast<rct::xmr_amount>(-1))};
+    const rct::xmr_amount amount{crypto::rand_idx(static_cast<rct::xmr_amount>(-1))};
     crypto::secret_key enote_privkey{make_secret_key()};
 
     JamtisPaymentProposalV1 payment_proposal{user_address, amount, enote_privkey};
@@ -635,7 +633,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
 
     JamtisPaymentProposalSelfSendV1 payment_proposal_selfspend{user_address,
         amount,
-        JamtisSelfSendMAC::SELF_SPEND,
+        JamtisSelfSendType::SELF_SPEND,
         enote_privkey};
     SpOutputProposalV1 output_proposal;
     payment_proposal_selfspend.get_output_proposal_v1(keys.k_vb, output_proposal);
@@ -649,7 +647,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
 
     JamtisPaymentProposalSelfSendV1 payment_proposal_change{user_address,
         amount,
-        JamtisSelfSendMAC::CHANGE,
+        JamtisSelfSendType::CHANGE,
         enote_privkey};
     payment_proposal_change.get_output_proposal_v1(keys.k_vb, output_proposal);
 
@@ -686,7 +684,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     SpOutputProposalV1 self_spend_proposal_amnt_1;
     self_spend_payment_proposal.m_destination = selfspend_dest;
     self_spend_payment_proposal.m_amount = 1;
-    self_spend_payment_proposal.m_type = JamtisSelfSendMAC::SELF_SPEND;
+    self_spend_payment_proposal.m_type = JamtisSelfSendType::SELF_SPEND;
     make_secret_key(self_spend_payment_proposal.m_enote_ephemeral_privkey);
     self_spend_payment_proposal.get_output_proposal_v1(keys.k_vb, self_spend_proposal_amnt_1);
     check_is_owned(self_spend_proposal_amnt_1, keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
@@ -699,7 +697,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
 
     /// test cases
     boost::multiprecision::uint128_t in_amount{0};
-    rct::xmr_amount fee{1};
+    const rct::xmr_amount fee{1};
     std::vector<SpOutputProposalV1> out_proposals{};
 
     // 0 outputs, 0 change: error

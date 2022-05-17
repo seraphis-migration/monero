@@ -141,7 +141,7 @@ jamtis_address_tag_cipher_context::~jamtis_address_tag_cipher_context()
 address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t &j) const
 {
     // concatenate index and MAC
-    address_tag_t addr_tag{address_index_to_tag(j, address_tag_MAC_t{0})};
+    address_tag_t addr_tag{j};
 
     ///*  //Twofish
     // expect address index to fit in one Twofish block (16 bytes), and for there to be no more than 2 Twofish blocks
@@ -263,12 +263,10 @@ bool jamtis_address_tag_cipher_context::try_decipher(address_tag_t addr_tag, add
         addr_tag.bytes[offset_index + TWOFISH_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
     }
 
-    // extract the mac
-    address_tag_MAC_t mac_temp;
-    address_tag_to_index(addr_tag, mac_temp);
-
     // check the mac
-    if (mac_temp != address_tag_MAC_t{0})
+    address_index_t j_temp;
+
+    if (!try_get_address_index(addr_tag, j_temp))
         return false;
 
     // decrypt the remaining bytes (if there are any)
@@ -341,29 +339,20 @@ bool jamtis_address_tag_cipher_context::try_decipher(address_tag_t addr_tag, add
     */
 
     // extract the index j
-    j_out = address_tag_to_index(addr_tag, mac_temp);
+    if (!try_get_address_index(addr_tag, j_out))
+        return false;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_t address_index_to_tag(const address_index_t &j, const address_tag_MAC_t &mac)
-{
-    // addr_tag = j || MAC
-    address_tag_t addr_tag{};
-    memcpy(addr_tag.bytes, &j, ADDRESS_INDEX_BYTES);
-    memcpy(addr_tag.bytes + ADDRESS_INDEX_BYTES, &mac, ADDRESS_TAG_MAC_BYTES);
-
-    return addr_tag;
-}
-//-------------------------------------------------------------------------------------------------------------------
-address_index_t address_tag_to_index(const address_tag_t &addr_tag, address_tag_MAC_t &mac_out)
+bool try_get_address_index(const address_tag_t &addr_tag, address_index_t &j_out)
 {
     // addr_tag -> {j, MAC}
-    address_index_t j{};
-    memcpy(&j, addr_tag.bytes, ADDRESS_INDEX_BYTES);
-    memcpy(&mac_out, addr_tag.bytes + ADDRESS_INDEX_BYTES, ADDRESS_TAG_MAC_BYTES);
+    address_tag_MAC_t mac{};
+    memcpy(&j_out, addr_tag.bytes, ADDRESS_INDEX_BYTES);
+    memcpy(&mac, addr_tag.bytes + ADDRESS_INDEX_BYTES, ADDRESS_TAG_MAC_BYTES);
 
-    return j;
+    return mac == address_tag_MAC_t{};
 }
 //-------------------------------------------------------------------------------------------------------------------
 address_tag_t cipher_address_index(const jamtis_address_tag_cipher_context &cipher_context, const address_index_t &j)

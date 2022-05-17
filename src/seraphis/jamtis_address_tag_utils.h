@@ -86,9 +86,8 @@ private:
     //BLOWFISH_CTX m_blowfish_context;
 };
 
-/// convert {j, mac} to/from an address tag byte-representation
-address_tag_t address_index_to_tag(const address_index_t &j, const address_tag_MAC_t &mac);
-address_index_t address_tag_to_index(const address_tag_t &addr_tag, address_tag_MAC_t &mac_out);
+/// try to get j from an address tag representation (fails if MAC != 0)
+bool try_get_address_index(const address_tag_t &addr_tag, address_index_t &j_out);
 
 /// cipher[k](j || addr_tag_MAC) -> addr_tag
 address_tag_t cipher_address_index(const jamtis_address_tag_cipher_context &cipher_context, const address_index_t &j);

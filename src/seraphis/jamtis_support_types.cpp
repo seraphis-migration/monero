@@ -109,19 +109,18 @@ address_tag_MAC_t::address_tag_MAC_t()
     std::memset(this->bytes, 0, ADDRESS_TAG_MAC_BYTES);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_MAC_t::address_tag_MAC_t(unsigned char mac)
-{
-    static_assert(sizeof(mac) <= ADDRESS_TAG_MAC_BYTES, "");
-
-    // copy the mac over (as little endian bytes)
-    std::memset(this->bytes, 0, ADDRESS_TAG_MAC_BYTES);
-    mac = swap_le(mac);
-    memcpy(this->bytes, &mac, sizeof(mac));
-}
-//-------------------------------------------------------------------------------------------------------------------
 bool address_tag_MAC_t::operator==(const address_tag_MAC_t &other_mac) const
 {
     return memcmp(this->bytes, other_mac.bytes, sizeof(address_tag_MAC_t)) == 0;
+}
+//-------------------------------------------------------------------------------------------------------------------
+address_tag_t::address_tag_t(const address_index_t &j)
+{
+    const address_tag_MAC_t mac{};
+
+    // addr_tag = j || MAC
+    memcpy(this->bytes, &j, ADDRESS_INDEX_BYTES);
+    memcpy(this->bytes + ADDRESS_INDEX_BYTES, &mac, ADDRESS_TAG_MAC_BYTES);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool address_tag_t::operator==(const address_tag_t &other_tag) const
@@ -138,38 +137,15 @@ address_tag_t address_tag_t::operator^(const address_tag_t &other_tag) const
     return temp;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool operator==(JamtisSelfSendMAC a, const address_tag_MAC_t b)
+JamtisEnoteType self_send_type_to_enote_type(const JamtisSelfSendType self_send_type)
 {
-    static_assert(sizeof(JamtisSelfSendMAC) <= sizeof(address_tag_MAC_t), "");
-    const address_tag_MAC_t temp_mac{a};
-    return temp_mac == b;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool is_known_self_send_MAC(const address_tag_MAC_t mac)
-{
-    return mac == JamtisSelfSendMAC::DUMMY ||
-        mac == JamtisSelfSendMAC::CHANGE ||
-        mac == JamtisSelfSendMAC::SELF_SPEND;
-}
-//-------------------------------------------------------------------------------------------------------------------
-JamtisEnoteType self_send_MAC_to_type(const JamtisSelfSendMAC mac)
-{
-    switch (mac)
+    switch (self_send_type)
     {
-        case (JamtisSelfSendMAC::DUMMY)      : return JamtisEnoteType::DUMMY;
-        case (JamtisSelfSendMAC::CHANGE)     : return JamtisEnoteType::CHANGE;
-        case (JamtisSelfSendMAC::SELF_SPEND) : return JamtisEnoteType::SELF_SPEND;
-        default                              : return JamtisEnoteType::UNKNOWN;
+        case (JamtisSelfSendType::DUMMY)      : return JamtisEnoteType::DUMMY;
+        case (JamtisSelfSendType::CHANGE)     : return JamtisEnoteType::CHANGE;
+        case (JamtisSelfSendType::SELF_SPEND) : return JamtisEnoteType::SELF_SPEND;
+        default                               : return JamtisEnoteType::UNKNOWN;
     };
-}
-//-------------------------------------------------------------------------------------------------------------------
-JamtisEnoteType self_send_MAC_to_type(const address_tag_MAC_t mac)
-{
-    static_assert(1 <= sizeof(address_tag_MAC_t), "");
-    unsigned char mac_converted;
-    memcpy(&mac_converted, mac.bytes, 1);
-
-    return self_send_MAC_to_type(static_cast<JamtisSelfSendMAC>(mac_converted));
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

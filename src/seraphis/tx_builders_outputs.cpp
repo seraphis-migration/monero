@@ -81,7 +81,7 @@ static bool ephemeral_pubkeys_are_unique_v1(const std::vector<SpOutputProposalV1
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void make_additional_output_normal_self_send_v1(const jamtis::JamtisSelfSendMAC self_send_MAC,
+static void make_additional_output_normal_self_send_v1(const jamtis::JamtisSelfSendType self_send_type,
     const jamtis::JamtisDestinationV1 &destination,
     const rct::xmr_amount amount,
     jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal_out)
@@ -89,13 +89,13 @@ static void make_additional_output_normal_self_send_v1(const jamtis::JamtisSelfS
     // build payment proposal for a 'normal' self-send
     selfsend_proposal_out.m_destination = destination;
     selfsend_proposal_out.m_amount = amount;
-    selfsend_proposal_out.m_type = self_send_MAC;
+    selfsend_proposal_out.m_type = self_send_type;
     selfsend_proposal_out.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
     selfsend_proposal_out.m_partial_memo = TxExtra{};
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void make_additional_output_special_self_send_v1(const jamtis::JamtisSelfSendMAC self_send_MAC,
+static void make_additional_output_special_self_send_v1(const jamtis::JamtisSelfSendType self_send_type,
     const rct::key &enote_ephemeral_pubkey,
     const jamtis::JamtisDestinationV1 &destination,
     const crypto::secret_key &k_view_balance,
@@ -113,7 +113,7 @@ static void make_additional_output_special_self_send_v1(const jamtis::JamtisSelf
     selfsend_proposal_out.m_destination.m_addr_K2 = special_addr_K2;  //k_fr * K_e_other
     selfsend_proposal_out.m_destination.m_addr_K3 = enote_ephemeral_pubkey;  //K_e_other
     selfsend_proposal_out.m_amount = amount;
-    selfsend_proposal_out.m_type = self_send_MAC;
+    selfsend_proposal_out.m_type = self_send_type;
     selfsend_proposal_out.m_enote_ephemeral_privkey = rct::rct2sk(rct::identity());  //r = 1 (not needed)
     selfsend_proposal_out.m_partial_memo = TxExtra{};
 }
@@ -493,7 +493,7 @@ void make_additional_output_selfsend_v1(const OutputProposalSetExtraTypesV1 addi
     {
         // normal self-send dummy
         // - 0 amount
-        make_additional_output_normal_self_send_v1(jamtis::JamtisSelfSendMAC::DUMMY,
+        make_additional_output_normal_self_send_v1(jamtis::JamtisSelfSendType::DUMMY,
             dummy_destination,
             0,
             selfsend_proposal_out);
@@ -502,7 +502,7 @@ void make_additional_output_selfsend_v1(const OutputProposalSetExtraTypesV1 addi
     {
         // normal change
         // - 'change' amount
-        make_additional_output_normal_self_send_v1(jamtis::JamtisSelfSendMAC::CHANGE,
+        make_additional_output_normal_self_send_v1(jamtis::JamtisSelfSendType::CHANGE,
             change_destination,
             change_amount,
             selfsend_proposal_out);
@@ -512,7 +512,7 @@ void make_additional_output_selfsend_v1(const OutputProposalSetExtraTypesV1 addi
         // special self-send dummy
         // - 0 amount
         // - shared enote ephemeral pubkey
-        make_additional_output_special_self_send_v1(jamtis::JamtisSelfSendMAC::DUMMY,
+        make_additional_output_special_self_send_v1(jamtis::JamtisSelfSendType::DUMMY,
             additional_outputs_context.m_shared_enote_ephemeral_pubkey,
             dummy_destination,
             k_view_balance,
@@ -525,7 +525,7 @@ void make_additional_output_selfsend_v1(const OutputProposalSetExtraTypesV1 addi
         // special change
         // - 'change' amount
         // - shared enote ephemeral pubkey
-        make_additional_output_special_self_send_v1(jamtis::JamtisSelfSendMAC::CHANGE,
+        make_additional_output_special_self_send_v1(jamtis::JamtisSelfSendType::CHANGE,
             additional_outputs_context.m_shared_enote_ephemeral_pubkey,
             change_destination,
             k_view_balance,

@@ -75,8 +75,8 @@ struct address_tag_MAC_t final
 {
     unsigned char bytes[ADDRESS_TAG_MAC_BYTES];
 
+    /// default constructor: default initializes MAC to 0 bytes
     address_tag_MAC_t();
-    address_tag_MAC_t(unsigned char mac);
 
     /// comparison operators
     bool operator==(const address_tag_MAC_t &other_mac) const;
@@ -87,6 +87,9 @@ struct address_tag_MAC_t final
 struct address_tag_t final
 {
     unsigned char bytes[ADDRESS_INDEX_BYTES + ADDRESS_TAG_MAC_BYTES];
+
+    address_tag_t() = default;
+    address_tag_t(const address_index_t &j);
 
     /// comparison operators
     bool operator==(const address_tag_t &other_tag) const;
@@ -118,22 +121,16 @@ enum class JamtisEnoteType : unsigned char
     SELF_SPEND = 4
 };
 
-/// jamtis self-send MACs, used to define enote-construction procedure for self-sends
-enum JamtisSelfSendMAC : unsigned char
+/// jamtis self-send types, used to define enote-construction procedure for self-sends
+enum class JamtisSelfSendType : unsigned char
 {
     DUMMY = 0,
     CHANGE = 1,
-    SELF_SPEND = 2
+    SELF_SPEND = 2,
+    MAX = SELF_SPEND
 };
 
-bool operator==(JamtisSelfSendMAC a, const address_tag_MAC_t b);
-inline bool operator==(const address_tag_MAC_t a, const JamtisSelfSendMAC b) { return b == a; }
-inline bool operator!=(const JamtisSelfSendMAC a, const address_tag_MAC_t b) { return !(a == b); }
-inline bool operator!=(const address_tag_MAC_t a, const JamtisSelfSendMAC b) { return !(a == b); }
-
-bool is_known_self_send_MAC(const address_tag_MAC_t mac);
-JamtisEnoteType self_send_MAC_to_type(const JamtisSelfSendMAC mac);
-JamtisEnoteType self_send_MAC_to_type(const address_tag_MAC_t mac);
+JamtisEnoteType self_send_type_to_enote_type(const JamtisSelfSendType self_send_type);
 
 /// jamtis view tags
 using view_tag_t = unsigned char;

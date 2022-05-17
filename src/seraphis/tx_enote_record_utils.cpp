@@ -368,26 +368,23 @@ void get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_r
     record_out.m_type = jamtis::JamtisEnoteType::PLAIN;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
+bool try_get_enote_record_v1_selfsend_for_type(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &s_generate_address,
+    const jamtis::JamtisSelfSendType expected_type,
     SpEnoteRecordV1 &record_out)
 {
-    // sender-receiver secret
+    // sender-receiver secret for expected self-send type
     rct::key q;
-    jamtis::make_jamtis_sender_receiver_secret_selfsend(k_view_balance, enote_ephemeral_pubkey, q);
+    jamtis::make_jamtis_sender_receiver_secret_selfsend(k_view_balance, enote_ephemeral_pubkey, expected_type, q);
 
     // decrypt encrypted address tag
     jamtis::address_tag_t decrypted_addr_tag{decrypt_address_tag(q, enote.m_addr_tag_enc)};
 
-    // convert raw address tag to address index
-    jamtis::address_tag_MAC_t enote_tag_mac;
-    record_out.m_address_index = address_tag_to_index(decrypted_addr_tag, enote_tag_mac);
-    
-    // check if deciphering j succeeded
-    if (!jamtis::is_known_self_send_MAC(enote_tag_mac))
+    // try to get the address index (includes MAC check)
+    if (!try_get_address_index(decrypted_addr_tag, record_out.m_address_index))
         return false;
 
     // nominal spend key
@@ -425,9 +422,34 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     // copy enote and set type
     record_out.m_enote = enote;
     record_out.m_enote_ephemeral_pubkey = enote_ephemeral_pubkey;
-    record_out.m_type = jamtis::self_send_MAC_to_type(enote_tag_mac);
+    record_out.m_type = jamtis::self_send_type_to_enote_type(expected_type);
 
     return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &s_generate_address,
+    SpEnoteRecordV1 &record_out)
+{
+    // try to get an enote record with all the self-send types
+    for (unsigned char self_send_type{0};
+        self_send_type <= static_cast<unsigned char>(jamtis::JamtisSelfSendType::MAX);
+        ++self_send_type)
+    {
+        if (try_get_enote_record_v1_selfsend_for_type(enote,
+            enote_ephemeral_pubkey,
+            wallet_spend_pubkey,
+            k_view_balance,
+            s_generate_address,
+            static_cast<jamtis::JamtisSelfSendType>(self_send_type),
+            record_out))
+        return true;
+    }
+
+    return false;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,

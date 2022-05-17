@@ -108,15 +108,17 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
     hw::device &hwdev,
     rct::key &sender_receiver_secret_out);
 /**
-* brief: make_jamtis_sender_receiver_secret_selfsend - sender-receiver secret q for a self-send enote
+* brief: make_jamtis_sender_receiver_secret_selfsend - sender-receiver secret q for a self-send enote of a specific type
 *    q = H_32[k_vb](K_e)
 * param: k_view_balance - k_vb
 * param: enote_ephemeral_pubkey - K_e
+* param: self_send_type - type of the self-send enote, used to select the domain separator
 * outparam: sender_receiver_secret_out - q
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 */
 void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_view_balance,
     const rct::key &enote_ephemeral_pubkey,
+    const jamtis::JamtisSelfSendType self_send_type,
     rct::key &sender_receiver_secret_out);
 /**
 * brief: make_jamtis_onetime_address_extension - extension for transforming a recipient spendkey into an

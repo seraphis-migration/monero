@@ -145,6 +145,13 @@ void get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_r
 * outparam: record_out -
 * return: true if an extraction succeeded
 */
+bool try_get_enote_record_v1_selfsend_for_type(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &s_generate_address,
+    const jamtis::JamtisSelfSendType expected_type,
+    SpEnoteRecordV1 &record_out);
 bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const rct::key &wallet_spend_pubkey,

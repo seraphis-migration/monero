@@ -403,7 +403,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
                 JamtisPaymentProposalSelfSendV1{
                     .m_destination = user_address,
                     .m_amount = out_amount,
-                    .m_type = JamtisSelfSendMAC::SELF_SPEND,
+                    .m_type = JamtisSelfSendType::SELF_SPEND,
                     .m_enote_ephemeral_privkey = make_secret_key(),
                     .m_partial_memo = TxExtra{}
                 }

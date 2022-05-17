@@ -98,7 +98,7 @@ struct JamtisPaymentProposalSelfSendV1 final
     rct::xmr_amount m_amount;
 
     /// self-send type
-    JamtisSelfSendMAC m_type;
+    JamtisSelfSendType m_type;
     /// enote ephemeral privkey: r
     crypto::secret_key m_enote_ephemeral_privkey;
 
@@ -120,7 +120,7 @@ struct JamtisPaymentProposalSelfSendV1 final
     * param: num_random_memo_elements
     */
     void gen(const rct::xmr_amount amount,
-        const JamtisSelfSendMAC type,
+        const JamtisSelfSendType type,
         const std::size_t num_random_memo_elements);
 };
 
