@@ -136,10 +136,27 @@ struct SpEnoteRecordContextV1 final
         CONFIRMED_UNLOCKED
     };
 
+    /// associated memo fields (none by default)
+    TxExtra m_memo{};
+    /// tx id (0 if tx is unknown)
+    rct::key m_transaction_id{rct::zero()};
+    /// block height of transaction (0 if height is unknown)
+    std::uint64_t m_transaction_height{0};
+    /// ledger index of the enote (-1 if index is unknown)
+    std::uint64_t m_enote_ledger_index{static_cast<std::uint64_t>(-1)};
+
+    /// origin status (unknown by default)
+    OriginStatus m_origin_status{OriginStatus::UNKNOWN};
+};
+
+////
+// SpEnoteRecordSpentContextV1
+// - info related to where an enote was spent
+///
+struct SpEnoteRecordSpentContextV1 final
+{
     enum class SpentStatus
     {
-        // is not spent in any known tx
-        UNSPENT,
         // is spent in an off-chain tx
         SPENT_OFF_CHAIN,
         // is spent in a tx in the mempool
@@ -152,19 +169,13 @@ struct SpEnoteRecordContextV1 final
         UNSPENDABLE,
     };
 
-    /// associated memo fields (none by default)
-    TxExtra m_memo{};
-    /// tx id (0 if tx is unknown)
+    /// tx id where it was spent (0 if tx is unknown)
     rct::key m_transaction_id{rct::zero()};
-    /// block height of transaction (0 if height is unknown)
+    /// block height of transaction where it was spent (0 if height is unknown)
     std::uint64_t m_transaction_height{0};
-    /// ledger index of the enote (-1 if index is unknown)
-    std::uint64_t m_enote_ledger_index{static_cast<std::uint64_t>(-1)};
 
-    /// origin status (unknown by default)
-    OriginStatus m_origin_status{OriginStatus::UNKNOWN};
-    /// spent status (unspent by default)
-    SpentStatus m_spent_status{SpentStatus::UNSPENT};
+    /// spent status (unspendable by default)
+    SpentStatus m_spent_status{SpentStatus::UNSPENDABLE};
 };
 
 ////
@@ -227,6 +238,17 @@ struct SpContextualEnoteRecordV1 final
 
     /// get this enote's amount
     rct::xmr_amount get_amount() const { return m_record.m_amount; }
+};
+
+////
+// SpSpentEnoteV1
+///
+struct SpSpentEnoteV1 final
+{
+    /// info about the enote and where it was found
+    SpContextualEnoteRecordV1 m_enote_context;
+    /// info about where the enote was spent
+    SpEnoteRecordSpentContextV1 m_spent_context;
 };
 
 } //namespace sp

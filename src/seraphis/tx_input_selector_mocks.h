@@ -77,10 +77,6 @@ public:
     {
         for (const SpContextualEnoteRecordV1 &contextual_enote_record : m_enote_store.m_contextual_enote_records)
         {
-            // ignore unspendable enotes
-            if (contextual_enote_record.m_context.m_spent_status == SpEnoteRecordContextV1::SpentStatus::UNSPENDABLE)
-                continue;
-
             // find the next enote record that hasn't already been selected (via onetime address comparisons)
             auto record_finder =
                 [&contextual_enote_record](const SpContextualEnoteRecordV1 &comparison_record) -> bool
