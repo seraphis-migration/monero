@@ -182,7 +182,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
     // e) add enote record to enote store
     sp::SpEnoteStoreV1 enote_store_A;
     enote_store_A.m_contextual_enote_records.emplace_back();
-    enote_store_A.m_contextual_enote_records.back().m_core = input_enote_record_A;
+    enote_store_A.m_contextual_enote_records.back().m_record = input_enote_record_A;
 
 
     /// 2] user A makes tx sending money to user B   //todo: use wallet to make tx
@@ -259,7 +259,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
     {
         input_proposals.emplace_back();
 
-        ASSERT_NO_THROW(make_v1_input_proposal_v1(contextual_input.m_core,
+        ASSERT_NO_THROW(make_v1_input_proposal_v1(contextual_input.m_record,
             keys_user_A.k_m,
             make_secret_key(),
             make_secret_key(),

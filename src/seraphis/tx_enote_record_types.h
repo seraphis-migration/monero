@@ -117,10 +117,10 @@ struct SpEnoteRecordV1 final
 };
 
 ////
-// SpContextualEnoteRecordV1
-// - info extracted from a v1 enote, with additional info related to where it was found
+// SpEnoteRecordContextV1
+// - info related to where an enote record was found
 ///
-struct SpContextualEnoteRecordV1 final
+struct SpEnoteRecordContextV1 final
 {
     enum class OriginStatus
     {
@@ -152,8 +152,6 @@ struct SpContextualEnoteRecordV1 final
         UNSPENDABLE,
     };
 
-    /// info about the enote
-    SpEnoteRecordV1 m_core;
     /// associated memo fields (none by default)
     TxExtra m_memo{};
     /// tx id (0 if tx is unknown)
@@ -161,22 +159,74 @@ struct SpContextualEnoteRecordV1 final
     /// block height of transaction (0 if height is unknown)
     std::uint64_t m_transaction_height{0};
     /// ledger index of the enote (-1 if index is unknown)
-    std::uint64_t m_ledger_index{static_cast<std::uint64_t>(-1)};
+    std::uint64_t m_enote_ledger_index{static_cast<std::uint64_t>(-1)};
 
     /// origin status (unknown by default)
     OriginStatus m_origin_status{OriginStatus::UNKNOWN};
     /// spent status (unspent by default)
     SpentStatus m_spent_status{SpentStatus::UNSPENT};
+};
+
+////
+// SpContextualBasicEnoteRecordV1
+// - info extracted from a v1 enote, with additional info related to where it was found
+///
+struct SpContextualBasicEnoteRecordV1 final
+{
+    /// basic info about the enote
+    SpBasicEnoteRecordV1 m_record;
+    /// info about where the enote was found
+    SpEnoteRecordContextV1 m_context;
 
     /// onetime address equivalence
-    static bool same_destination(const SpContextualEnoteRecordV1 &record1,
-        const SpContextualEnoteRecordV1 &record2)
+    static bool same_destination(const SpContextualBasicEnoteRecordV1 &record1,
+        const SpContextualBasicEnoteRecordV1 &record2)
     {
-        return record1.m_core.m_enote.m_core.m_onetime_address == record2.m_core.m_enote.m_core.m_onetime_address;
+        return record1.m_record.m_enote.m_core.m_onetime_address == record2.m_record.m_enote.m_core.m_onetime_address;
+    }
+};
+
+////
+// SpContextualIntermediateEnoteRecordV1
+// - info extracted from a v1 enote, with additional info related to where it was found
+///
+struct SpContextualIntermediateEnoteRecordV1 final
+{
+    /// intermediate info about the enote
+    SpIntermediateEnoteRecordV1 m_record;
+    /// info about where the enote was found
+    SpEnoteRecordContextV1 m_context;
+
+    /// onetime address equivalence
+    static bool same_destination(const SpContextualIntermediateEnoteRecordV1 &record1,
+        const SpContextualIntermediateEnoteRecordV1 &record2)
+    {
+        return record1.m_record.m_enote.m_core.m_onetime_address == record2.m_record.m_enote.m_core.m_onetime_address;
     }
 
     /// get this enote's amount
-    rct::xmr_amount get_amount() const { return m_core.m_amount; }
+    rct::xmr_amount get_amount() const { return m_record.m_amount; }
+};
+
+////
+// SpContextualEnoteRecordV1
+// - info extracted from a v1 enote, with additional info related to where it was found
+///
+struct SpContextualEnoteRecordV1 final
+{
+    /// info about the enote
+    SpEnoteRecordV1 m_record;
+    /// info about where the enote was found
+    SpEnoteRecordContextV1 m_context;
+
+    /// onetime address equivalence
+    static bool same_destination(const SpContextualEnoteRecordV1 &record1, const SpContextualEnoteRecordV1 &record2)
+    {
+        return record1.m_record.m_enote.m_core.m_onetime_address == record2.m_record.m_enote.m_core.m_onetime_address;
+    }
+
+    /// get this enote's amount
+    rct::xmr_amount get_amount() const { return m_record.m_amount; }
 };
 
 } //namespace sp

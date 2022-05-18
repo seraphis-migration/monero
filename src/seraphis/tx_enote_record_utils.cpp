@@ -482,18 +482,4 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
         try_get_enote_record_v1_plain(enote, enote_ephemeral_pubkey, wallet_spend_pubkey, k_view_balance, record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_contextual_enote_record_v1(const SpEnoteRecordV1 &core_record,
-    TxExtra memo,
-    const rct::key &transaction_id,
-    const std::uint64_t transaction_height,
-    const std::uint64_t ledger_index,
-    SpContextualEnoteRecordV1 &contextual_record_out)
-{
-    contextual_record_out.m_core = core_record;
-    contextual_record_out.m_memo = std::move(memo);
-    contextual_record_out.m_transaction_id = transaction_id;
-    contextual_record_out.m_transaction_height = transaction_height;
-    contextual_record_out.m_ledger_index = ledger_index;
-}
-//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

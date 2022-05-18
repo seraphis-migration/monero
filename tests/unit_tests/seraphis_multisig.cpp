@@ -377,7 +377,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
         // store the enote record
         enote_store.m_contextual_enote_records.emplace_back();
-        enote_store.m_contextual_enote_records.back().m_core = input_enote_records[input_index];
+        enote_store.m_contextual_enote_records.back().m_record = input_enote_records[input_index];
     }
 
 
@@ -475,7 +475,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     for (const SpContextualEnoteRecordV1 &contextual_input : contextual_inputs)
     {
         full_input_proposals.emplace_back();
-        ASSERT_NO_THROW(make_v1_multisig_input_proposal_v1(contextual_input.m_core,
+        ASSERT_NO_THROW(make_v1_multisig_input_proposal_v1(contextual_input.m_record,
             make_secret_key(),
             make_secret_key(),
             full_input_proposals.back()));

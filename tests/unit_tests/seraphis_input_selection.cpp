@@ -52,8 +52,8 @@ static sp::SpEnoteStoreV1 prepare_enote_store(const std::vector<rct::xmr_amount>
     for (const rct::xmr_amount amount : amounts)
     {
         enote_store.m_contextual_enote_records.emplace_back();
-        enote_store.m_contextual_enote_records.back().m_core.m_enote.gen();
-        enote_store.m_contextual_enote_records.back().m_core.m_amount = amount;
+        enote_store.m_contextual_enote_records.back().m_record.m_enote.gen();
+        enote_store.m_contextual_enote_records.back().m_record.m_amount = amount;
     }
 
     return enote_store;

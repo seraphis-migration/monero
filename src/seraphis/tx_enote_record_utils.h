@@ -177,20 +177,5 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out);
-/**
-* brief: make_contextual_enote_record_v1 - make a contextual enote record from a normal enote record
-* param: core_record -
-* param: memo -
-* param: transaction_id -
-* param: transaction_height -
-* param: ledger_index -
-* outparam: contextual_record_out -
-*/
-void make_contextual_enote_record_v1(const SpEnoteRecordV1 &core_record,
-    TxExtra memo,
-    const rct::key &transaction_id,
-    const std::uint64_t transaction_height,
-    const std::uint64_t ledger_index,
-    SpContextualEnoteRecordV1 &contextual_record_out);
 
 } //namespace sp

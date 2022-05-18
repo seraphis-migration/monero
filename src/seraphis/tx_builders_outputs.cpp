@@ -240,7 +240,6 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
 
         CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: 0 outputs specified. If you want to send money to "
             "yourself, use a self-spend enote type instead of forcing it via a change enote type.");
-        return;
     }
 
     // set the shared enote ephemeral pubkey here: it will always be the first one when it is needed

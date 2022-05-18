@@ -75,17 +75,17 @@ public:
         const std::list<SpContextualEnoteRecordV1> &already_excluded_inputs,
         SpContextualEnoteRecordV1 &selected_input_out) const override
     {
-        for (const SpContextualEnoteRecordV1 &enote_record : m_enote_store.m_contextual_enote_records)
+        for (const SpContextualEnoteRecordV1 &contextual_enote_record : m_enote_store.m_contextual_enote_records)
         {
             // ignore unspendable enotes
-            if (enote_record.m_spent_status == SpContextualEnoteRecordV1::SpentStatus::UNSPENDABLE)
+            if (contextual_enote_record.m_context.m_spent_status == SpEnoteRecordContextV1::SpentStatus::UNSPENDABLE)
                 continue;
 
             // find the next enote record that hasn't already been selected (via onetime address comparisons)
             auto record_finder =
-                [&enote_record](const SpContextualEnoteRecordV1 &comparison_record) -> bool
+                [&contextual_enote_record](const SpContextualEnoteRecordV1 &comparison_record) -> bool
                 {
-                    return SpContextualEnoteRecordV1::same_destination(enote_record, comparison_record);
+                    return SpContextualEnoteRecordV1::same_destination(contextual_enote_record, comparison_record);
                 };
 
             if (std::find_if(already_added_inputs.begin(), already_added_inputs.end(), record_finder) ==
@@ -94,7 +94,7 @@ public:
                 std::find_if(already_excluded_inputs.begin(), already_excluded_inputs.end(), record_finder) ==
                     already_excluded_inputs.end())
             {
-                selected_input_out = enote_record;
+                selected_input_out = contextual_enote_record;
                 return true;
             }
         }
