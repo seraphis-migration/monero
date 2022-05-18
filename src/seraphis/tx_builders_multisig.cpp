@@ -112,7 +112,9 @@ static bool validate_v1_multisig_input_init_set_for_partial_sig_set_v1(const SpM
     // signer is in aggregate filter
     try
     {
-        if (!multisig::signer_is_in_filter(input_init_set.m_signer_id, multisig_signers, expected_aggregate_signer_set_filter))
+        if (!multisig::signer_is_in_filter(input_init_set.m_signer_id,
+                multisig_signers,
+                expected_aggregate_signer_set_filter))
             return false;
     }
     catch (...) { return false; }
@@ -470,7 +472,7 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
     if (new_selfsend_proposals.size() == 1 &&
         output_proposals_temp.size() + new_output_proposals.size() == 1)
     {
-        // special type: do nothing (it must be shared with an explicit normal payment that was passed in)
+        // special type: do nothing (it must be shared with an explicit payment that was passed in)
     }
     else
     {
@@ -489,7 +491,8 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
 
     /// set output variables
 
-    // 1. insert pre-existing self-send proposals to the original opaque output set (we did this above)
+    // 1. insert pre-existing self-send proposals to the original opaque output set
+    //we did this above
 
     // 2. add new opaque output proposals to the original opaque output set
     for (const SpOutputProposalV1 &new_normal_payment_proposal : new_output_proposals)
@@ -519,7 +522,8 @@ void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 
             wallet_spend_pubkey,
             k_view_balance,
             converted_input_proposals),
-        "multisig tx proposal balance check: could not extract data from an input proposal (maybe input not owned by user).");
+        "multisig tx proposal balance check: could not extract data from an input proposal "
+        "(maybe input not owned by user).");
 
     for (const SpMultisigInputProposalV1 &input_proposal : converted_input_proposals)
         in_amounts.emplace_back(input_proposal.m_input_amount);
@@ -596,7 +600,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
             multisig_tx_proposal.m_opaque_payments.size() + multisig_tx_proposal.m_explicit_payments.size()
         };
 
-    // 1. convert to a plain tx proposal to validate outputs (should call full semantics check of tx proposal)
+    // 1. convert to a plain tx proposal to validate outputs (should internally call full semantics check of tx proposal)
     // note: for 2-out txs, that semantics check will ensure they share an enote ephemeral pubkey
     SpTxProposalV1 tx_proposal;
     multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
@@ -643,7 +647,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     }
 
     // c. there must be at least one opaque self-send output (all of which have reproducible enote ephemeral privkeys)
-    std::size_t num_self_sends{0};
+    std::vector<jamtis::JamtisEnoteType> self_send_types_found;
     SpEnoteRecordV1 temp_enote_record;
     SpEnoteV1 temp_enote;
     crypto::secret_key temp_address_privkey;
@@ -663,7 +667,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
             s_generate_address,
             temp_enote_record))
         {
-            ++num_self_sends;
+            self_send_types_found.emplace_back(temp_enote_record.m_type);
 
             // - self-send outputs' enote ephemeral privkeys should be reproducible
             // note: if there are exactly two opaque proposals, one of which is a self-send, then the second branch
@@ -710,13 +714,17 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
         }
     }
 
-    CHECK_AND_ASSERT_THROW_MES(num_self_sends > 0, "multisig tx proposal: there are no self-send outputs.");
+    CHECK_AND_ASSERT_THROW_MES(self_send_types_found.size() > 0, "multisig tx proposal: there are no self-send outputs.");
 
-    // d. there cannot be two self-send outputs and no other outputs (postcondition of the output set finalizer)
-    if (num_self_sends == 2)
+    // d. there cannot be two self-send outputs of the same type and no other outputs (postcondition of the
+    //    output set finalizer)
+    if (self_send_types_found.size() == 2)
     {
-        CHECK_AND_ASSERT_THROW_MES(num_outputs > 2,
-            "multisig tx proposal: there are two self-send outputs but no other outputs (not allowed).");
+        if (self_send_types_found[0] == self_send_types_found[1])
+        {
+            CHECK_AND_ASSERT_THROW_MES(num_outputs > 2, "multisig tx proposal: there are two self-send outputs of the "
+                "same type but no other outputs (not allowed).");
+        }
     }
 
 
@@ -1350,7 +1358,8 @@ bool try_make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_pro
     {
         for (const auto &masked_address_partial_sigs : signer_group_partial_sigs.second)
         {
-            // skip partial sig sets for masked addresses that already have a completed proof (from a different signer group)
+            // skip partial sig sets for masked addresses that already have a completed proof (from a different
+            //   signer group)
             if (masked_addresses_with_partial_inputs.find(masked_address_partial_sigs.first) != 
                     masked_addresses_with_partial_inputs.end())
                 continue;
