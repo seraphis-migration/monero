@@ -385,15 +385,15 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
             "combination with <= 1 explicit payments.");
     }
 
-    // 2. prepare enough enote ephemeral privkeys for all explicit payments (finalize will add 2 at most)
+    // 2. prepare enough enote ephemeral privkeys for all explicit payments (finalize will add 1 at most)
     std::vector<crypto::secret_key> enote_ephemeral_privkeys;
     make_multisig_enote_ephemeral_privkeys_v1(enote_ephemeral_privkey_seed,
-        explicit_payments_normal_inout.size() + explicit_payments_selfsend.size() + 2,
+        explicit_payments_normal_inout.size() + explicit_payments_selfsend.size() + 1,
         enote_ephemeral_privkeys);
 
     // - sanity check
     CHECK_AND_ASSERT_THROW_MES(enote_ephemeral_privkeys.size() ==
-            explicit_payments_normal_inout.size() + explicit_payments_selfsend.size() + 2,
+            explicit_payments_normal_inout.size() + explicit_payments_selfsend.size() + 1,
         "finalize multisig output proposals: incorrect number of enote ephemeral privkeys (bug).");
 
     std::size_t enote_ephemeral_privkey_index{0};
@@ -484,7 +484,7 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
         }
 
         // sanity check
-        CHECK_AND_ASSERT_THROW_MES(enote_ephemeral_privkey_index + 1 <= enote_ephemeral_privkeys.size(),
+        CHECK_AND_ASSERT_THROW_MES(enote_ephemeral_privkey_index <= enote_ephemeral_privkeys.size(),
             "finalize multisig output proposals: enote ephemeral privkey index error (bug).");
     }
 

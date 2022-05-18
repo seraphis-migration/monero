@@ -800,15 +800,11 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
     check_is_owned(out_proposals[1], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
-    // 1 change output, >0 change: 3 outputs (1 dummy, 1 change)
+    // 1 change output, >0 change: error
     in_amount = 2 + fee;
     out_proposals.resize(1);
     out_proposals[0] = change_proposal_amnt_1;  //change = 1
-    EXPECT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, dummy_dest, keys.K_1_base, keys.k_vb, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned(out_proposals[0], keys, j_change, 1, JamtisEnoteType::CHANGE);
-    EXPECT_FALSE(is_self_send_output_proposal(out_proposals[1], keys.K_1_base, keys.k_vb));  //dummy
-    check_is_owned(out_proposals[2], keys, j_change, 1, JamtisEnoteType::CHANGE);
+    EXPECT_ANY_THROW(finalize_v1_output_proposal_set_v1(in_amount, fee, change_dest, dummy_dest, keys.K_1_base, keys.k_vb, out_proposals));
 
     // 1 self-send output & 1 normal output (shared ephemeral pubkey), 0 change: 2 outputs
     in_amount = 2 + fee;

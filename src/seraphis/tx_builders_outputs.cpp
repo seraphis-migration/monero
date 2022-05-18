@@ -293,13 +293,10 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
             //         secret, which could cause problems (e.g. the outputs would have the same view tags, and could even
             //         have the same onetime address if the destinations of the two outputs are the same)
 
-            // add a normal dummy output
-            // - 0 amount
-            additional_outputs_out.emplace_back(OutputProposalSetExtraTypesV1::NORMAL_DUMMY);
-
-            // add a normal change output
-            // - 'change' amount
-            additional_outputs_out.emplace_back(OutputProposalSetExtraTypesV1::NORMAL_CHANGE);
+            // two change outputs doesn't make sense, so just ban it
+            CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: there is 1 change-type output already specified, "
+                "but the change amount is non-zero and a tx with just two change outputs is not allowed for privacy reasons. "
+                "If you want to make a tx with just two change outputs, avoid calling this function (not recommended).");
         }
         else //(change_amount > 0 && single output is not a self-send change)
         {
