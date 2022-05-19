@@ -151,6 +151,145 @@ static void get_masked_addresses(const std::vector<SpMultisigPublicInputProposal
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void check_v1_multisig_tx_proposal_semantics_outputs_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const std::vector<SpMultisigInputProposalV1> &converted_input_proposals,
+    rct::key &proposal_prefix_out)
+{
+    /// check semantics of a multisig tx proposal's outputs
+    const std::size_t num_outputs{
+            multisig_tx_proposal.m_opaque_payments.size() + multisig_tx_proposal.m_explicit_payments.size()
+        };
+
+    // 1. convert to a plain tx proposal to validate outputs (should internally call full semantics check of tx proposal)
+    // note: for 2-out txs, that semantics check will ensure they share an enote ephemeral pubkey
+    SpTxProposalV1 tx_proposal;
+    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
+
+    // - get prefix from proposal
+    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, proposal_prefix_out);
+
+    // 2. validate self-sends and enote ephemeral privkeys
+    // goal: it should not be possible for a multisig tx proposer to burn funds (either of normal destinations or
+    //       of the multisig account) by re-using an enote ephemeral privkey between different txs
+    //       - non-self-send opaque outputs are an exception to this in order to permit some tx modularity, BUT to avoid
+    //         self-sends getting burnt it isn't permitted for self-sends to be in a 2-out tx with an opaque non-self-send
+    //         output (because outputs in 2-out txs share an enote ephemeral privkey, and non-self-send opaque outputs'
+    //         enote ephemeral privkeys are not validated)
+
+    // a. make enote view privkeys
+    crypto::secret_key enote_ephemeral_privkey_seed;
+    make_multisig_enote_ephemeral_privkey_seed_v1(multisig_tx_proposal.m_enote_ephemeral_privkey_entropy,
+        converted_input_proposals,
+        enote_ephemeral_privkey_seed);
+
+    std::vector<crypto::secret_key> enote_ephemeral_privkeys;
+    make_multisig_enote_ephemeral_privkeys_v1(enote_ephemeral_privkey_seed,
+        num_outputs == 2 ? 1 : num_outputs,
+        enote_ephemeral_privkeys);
+
+    // - sanity check
+    CHECK_AND_ASSERT_THROW_MES(enote_ephemeral_privkeys.size() == (num_outputs == 2 ? 1 : num_outputs),
+        "multisig tx proposal: incorrect number of enote ephemeral privkeys (bug).");
+
+    std::size_t enote_ephemeral_privkey_index{0};
+
+    // b. explicit outputs' enote ephemeral privkeys should be reproducible
+    for (const jamtis::JamtisPaymentProposalV1 &explicit_payment : multisig_tx_proposal.m_explicit_payments)
+    {
+        CHECK_AND_ASSERT_THROW_MES(explicit_payment.m_enote_ephemeral_privkey ==
+                enote_ephemeral_privkeys[enote_ephemeral_privkey_index],
+            "multisig tx proposal: an explicit payment did not have a reproducible enote ephemeral privkey.");
+
+        // go to the next enote ephemeral privkey (if there is one)
+        if (enote_ephemeral_privkey_index + 1 < enote_ephemeral_privkeys.size())
+            ++enote_ephemeral_privkey_index;
+    }
+
+    // c. there must be at least one opaque self-send output (all of which have reproducible enote ephemeral privkeys)
+    std::vector<jamtis::JamtisEnoteType> self_send_types_found;
+    SpEnoteRecordV1 temp_enote_record;
+    SpEnoteV1 temp_enote;
+    crypto::secret_key temp_address_privkey;
+    rct::key temp_reproduced_enote_ephemeral_pubkey;
+
+    crypto::secret_key s_generate_address;
+    jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
+
+    for (const SpOutputProposalV1 &output_proposal : multisig_tx_proposal.m_opaque_payments)
+    {
+        output_proposal.get_enote_v1(temp_enote);
+
+        if (try_get_enote_record_v1_selfsend(temp_enote,
+            output_proposal.m_enote_ephemeral_pubkey,
+            wallet_spend_pubkey,
+            k_view_balance,
+            s_generate_address,
+            temp_enote_record))
+        {
+            self_send_types_found.emplace_back(temp_enote_record.m_type);
+
+            // - self-send outputs' enote ephemeral privkeys should be reproducible
+            // note: if there are exactly two opaque proposals, one of which is a self-send, then the second branch
+            //       will fail (even if the enote ephemeral privkey is reproducible) because there is insufficient
+            //       information to validate that case
+            if (num_outputs == 2 && multisig_tx_proposal.m_explicit_payments.size() == 1)
+            {
+                // if our self-send is a 'special' type and there is one explicit payment, then the self-send will share
+                //   the explicit payment's enote ephemeral privkey; for sanity, we double-check here (even though the
+                //   tx_proposal semantics check should ensure our two outputs have the same enote ephemeral pubkey)
+                SpOutputProposalV1 temp_other_proposal;
+                multisig_tx_proposal.m_explicit_payments[0].get_output_proposal_v1(temp_other_proposal);
+
+                CHECK_AND_ASSERT_THROW_MES(temp_other_proposal.m_enote_ephemeral_pubkey ==
+                        output_proposal.m_enote_ephemeral_pubkey,
+                    "multisig tx proposal: a special self-send did not share its enote ephemeral pubkey with the "
+                    "explicit payment in its tx.");
+            }
+            else
+            {
+                // otherwise, this should be a normal self-send, so just reproduce the enote ephemeral pubkey
+
+                // address privkey of address that owns this output (k^j_a)
+                jamtis::make_jamtis_address_privkey(s_generate_address,
+                    temp_enote_record.m_address_index,
+                    temp_address_privkey);
+
+                // K_e = r * k^j_a * G
+                temp_reproduced_enote_ephemeral_pubkey =
+                    rct::scalarmultKey(
+                            rct::scalarmultBase(rct::sk2rct(temp_address_privkey)),  //k^j_a * G
+                            rct::sk2rct(enote_ephemeral_privkeys[enote_ephemeral_privkey_index])  //r
+                        );
+
+                // check that the enote ephemeral pubkey was reproduced
+                CHECK_AND_ASSERT_THROW_MES(temp_reproduced_enote_ephemeral_pubkey ==
+                        output_proposal.m_enote_ephemeral_pubkey,
+                    "multisig tx proposal: could not reproduce the enote ephemeral pubkey for a self-send.");
+
+                // go to the next enote ephemeral privkey (if there is one)
+                if (enote_ephemeral_privkey_index + 1 < enote_ephemeral_privkeys.size())
+                    ++enote_ephemeral_privkey_index;
+            }
+        }
+    }
+
+    CHECK_AND_ASSERT_THROW_MES(self_send_types_found.size() > 0, "multisig tx proposal: there are no self-send outputs.");
+
+    // d. there cannot be two self-send outputs of the same type and no other outputs (postcondition of the
+    //    output set finalizer)
+    if (self_send_types_found.size() == 2)
+    {
+        if (self_send_types_found[0] == self_send_types_found[1])
+        {
+            CHECK_AND_ASSERT_THROW_MES(num_outputs > 2, "multisig tx proposal: there are two self-send outputs of the "
+                "same type but no other outputs (not allowed).");
+        }
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_public_input_proposal_semantics_v1(const SpMultisigPublicInputProposalV1 &public_input_proposal)
 {
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(public_input_proposal.m_address_mask)),
@@ -595,137 +734,13 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 
 
     /// output checks
-
-    const std::size_t num_outputs{
-            multisig_tx_proposal.m_opaque_payments.size() + multisig_tx_proposal.m_explicit_payments.size()
-        };
-
-    // 1. convert to a plain tx proposal to validate outputs (should internally call full semantics check of tx proposal)
-    // note: for 2-out txs, that semantics check will ensure they share an enote ephemeral pubkey
-    SpTxProposalV1 tx_proposal;
-    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
-
-    // - get prefix from proposal
     rct::key proposal_prefix;
-    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, proposal_prefix);
 
-    // 2. validate self-sends and enote ephemeral privkeys
-    // goal: it should not be possible for a multisig tx proposer to burn funds (either of normal destinations or
-    //       of the multisig account) by re-using an enote ephemeral privkey between different txs
-    //       - non-self-send opaque outputs are an exception to this in order to permit some tx modularity, BUT to avoid
-    //         self-sends getting burnt it isn't permitted for self-sends to be in a 2-out tx with an opaque non-self-send
-    //         output (because outputs in 2-out txs share an enote ephemeral privkey, and non-self-send opaque outputs'
-    //         enote ephemeral privkeys are not validated)
-
-    // a. make enote view privkeys
-    crypto::secret_key enote_ephemeral_privkey_seed;
-    make_multisig_enote_ephemeral_privkey_seed_v1(multisig_tx_proposal.m_enote_ephemeral_privkey_entropy,
+    check_v1_multisig_tx_proposal_semantics_outputs_v1(multisig_tx_proposal,
+        wallet_spend_pubkey,
+        k_view_balance,
         converted_input_proposals,
-        enote_ephemeral_privkey_seed);
-
-    std::vector<crypto::secret_key> enote_ephemeral_privkeys;
-    make_multisig_enote_ephemeral_privkeys_v1(enote_ephemeral_privkey_seed,
-        num_outputs == 2 ? 1 : num_outputs,
-        enote_ephemeral_privkeys);
-
-    // - sanity check
-    CHECK_AND_ASSERT_THROW_MES(enote_ephemeral_privkeys.size() == (num_outputs == 2 ? 1 : num_outputs),
-        "multisig tx proposal: incorrect number of enote ephemeral privkeys (bug).");
-
-    std::size_t enote_ephemeral_privkey_index{0};
-
-    // b. explicit outputs' enote ephemeral privkeys should be reproducible
-    for (const jamtis::JamtisPaymentProposalV1 &explicit_payment : multisig_tx_proposal.m_explicit_payments)
-    {
-        CHECK_AND_ASSERT_THROW_MES(explicit_payment.m_enote_ephemeral_privkey ==
-                enote_ephemeral_privkeys[enote_ephemeral_privkey_index],
-            "multisig tx proposal: an explicit payment did not have a reproducible enote ephemeral privkey.");
-
-        // go to the next enote ephemeral privkey (if there is one)
-        if (enote_ephemeral_privkey_index + 1 < enote_ephemeral_privkeys.size())
-            ++enote_ephemeral_privkey_index;
-    }
-
-    // c. there must be at least one opaque self-send output (all of which have reproducible enote ephemeral privkeys)
-    std::vector<jamtis::JamtisEnoteType> self_send_types_found;
-    SpEnoteRecordV1 temp_enote_record;
-    SpEnoteV1 temp_enote;
-    crypto::secret_key temp_address_privkey;
-    rct::key temp_reproduced_enote_ephemeral_pubkey;
-
-    crypto::secret_key s_generate_address;
-    jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
-
-    for (const SpOutputProposalV1 &output_proposal : multisig_tx_proposal.m_opaque_payments)
-    {
-        output_proposal.get_enote_v1(temp_enote);
-
-        if (try_get_enote_record_v1_selfsend(temp_enote,
-            output_proposal.m_enote_ephemeral_pubkey,
-            wallet_spend_pubkey,
-            k_view_balance,
-            s_generate_address,
-            temp_enote_record))
-        {
-            self_send_types_found.emplace_back(temp_enote_record.m_type);
-
-            // - self-send outputs' enote ephemeral privkeys should be reproducible
-            // note: if there are exactly two opaque proposals, one of which is a self-send, then the second branch
-            //       will fail (even if the enote ephemeral privkey is reproducible) because there is insufficient
-            //       information to validate that case
-            if (num_outputs == 2 && multisig_tx_proposal.m_explicit_payments.size() == 1)
-            {
-                // if our self-send is a 'special' type and there is one explicit payment, then the self-send will share
-                //   the explicit payment's enote ephemeral privkey; for sanity, we double-check here (even though the
-                //   tx_proposal semantics check should ensure our two outputs have the same enote ephemeral pubkey)
-                SpOutputProposalV1 temp_other_proposal;
-                multisig_tx_proposal.m_explicit_payments[0].get_output_proposal_v1(temp_other_proposal);
-
-                CHECK_AND_ASSERT_THROW_MES(temp_other_proposal.m_enote_ephemeral_pubkey ==
-                        output_proposal.m_enote_ephemeral_pubkey,
-                    "multisig tx proposal: a special self-send did not share its enote ephemeral pubkey with the "
-                    "explicit payment in its tx.");
-            }
-            else
-            {
-                // otherwise, this should be a normal self-send, so just reproduce the enote ephemeral pubkey
-
-                // address privkey of address that owns this output (k^j_a)
-                jamtis::make_jamtis_address_privkey(s_generate_address,
-                    temp_enote_record.m_address_index,
-                    temp_address_privkey);
-
-                // K_e = r * k^j_a * G
-                temp_reproduced_enote_ephemeral_pubkey =
-                    rct::scalarmultKey(
-                            rct::scalarmultBase(rct::sk2rct(temp_address_privkey)),  //k^j_a * G
-                            rct::sk2rct(enote_ephemeral_privkeys[enote_ephemeral_privkey_index])  //r
-                        );
-
-                // check that the enote ephemeral pubkey was reproduced
-                CHECK_AND_ASSERT_THROW_MES(temp_reproduced_enote_ephemeral_pubkey ==
-                        output_proposal.m_enote_ephemeral_pubkey,
-                    "multisig tx proposal: could not reproduce the enote ephemeral pubkey for a self-send.");
-
-                // go to the next enote ephemeral privkey (if there is one)
-                if (enote_ephemeral_privkey_index + 1 < enote_ephemeral_privkeys.size())
-                    ++enote_ephemeral_privkey_index;
-            }
-        }
-    }
-
-    CHECK_AND_ASSERT_THROW_MES(self_send_types_found.size() > 0, "multisig tx proposal: there are no self-send outputs.");
-
-    // d. there cannot be two self-send outputs of the same type and no other outputs (postcondition of the
-    //    output set finalizer)
-    if (self_send_types_found.size() == 2)
-    {
-        if (self_send_types_found[0] == self_send_types_found[1])
-        {
-            CHECK_AND_ASSERT_THROW_MES(num_outputs > 2, "multisig tx proposal: there are two self-send outputs of the "
-                "same type but no other outputs (not allowed).");
-        }
-    }
+        proposal_prefix);
 
 
     /// input checks
