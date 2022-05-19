@@ -290,6 +290,224 @@ static void check_v1_multisig_tx_proposal_semantics_outputs_v1(const SpMultisigT
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void validate_and_prepare_input_inits_for_partial_sig_sets_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::uint32_t threshold,
+    const std::vector<crypto::public_key> &multisig_signers,
+    const crypto::public_key &local_signer_id,
+    const rct::keyV &input_masked_addresses,
+    const rct::key &proposal_prefix,
+    const SpMultisigInputInitSetV1 &local_input_init_set,
+    std::vector<SpMultisigInputInitSetV1> other_input_init_sets,
+    std::vector<SpMultisigInputInitSetV1> &all_input_init_sets_out)
+{
+    /// validate and filter input inits
+
+    // 1) local input init set must be valid
+    CHECK_AND_ASSERT_THROW_MES(local_input_init_set.m_signer_id == local_signer_id,
+        "multisig input partial sigs: local input init set is not from local signer.");
+    CHECK_AND_ASSERT_THROW_MES(validate_v1_multisig_input_init_set_for_partial_sig_set_v1(
+            local_input_init_set,
+            threshold,
+            multisig_signers,
+            proposal_prefix,
+            multisig_tx_proposal.m_aggregate_signer_set_filter,
+            input_masked_addresses),
+        "multisig input partial sigs: the local signer's input initializer doesn't match the multisig tx proposal.");
+
+    // 2) weed out invalid other input init sets
+    auto removed_end = std::remove_if(other_input_init_sets.begin(), other_input_init_sets.end(),
+            [&](const SpMultisigInputInitSetV1 &other_input_init_set) -> bool
+            {
+                return !validate_v1_multisig_input_init_set_for_partial_sig_set_v1(
+                    other_input_init_set,
+                    threshold,
+                    multisig_signers,
+                    proposal_prefix,
+                    multisig_tx_proposal.m_aggregate_signer_set_filter,
+                    input_masked_addresses);
+            }
+        );
+    other_input_init_sets.erase(removed_end, other_input_init_sets.end());
+
+    // 3) collect all input init sets
+    all_input_init_sets_out = std::move(other_input_init_sets);
+    all_input_init_sets_out.emplace_back(local_input_init_set);
+
+    // 4) remove inits from duplicate signers (including duplicate local signer inits)
+    std::sort(all_input_init_sets_out.begin(), all_input_init_sets_out.end(),
+            [](const SpMultisigInputInitSetV1 &set1, const SpMultisigInputInitSetV1 &set2) -> bool
+            {
+                return set1.m_signer_id < set2.m_signer_id;
+            }
+        );
+    auto unique_end = std::unique(all_input_init_sets_out.begin(), all_input_init_sets_out.end(),
+            [](const SpMultisigInputInitSetV1 &set1, const SpMultisigInputInitSetV1 &set2) -> bool
+            {
+                return set1.m_signer_id == set2.m_signer_id;
+            }
+        );
+    all_input_init_sets_out.erase(unique_end, all_input_init_sets_out.end());
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void make_v1_multisig_input_partial_sig_sets_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const multisig::multisig_account &signer_account,
+    const rct::key &proposal_prefix,
+    const rct::keyV &input_masked_addresses,
+    const std::vector<multisig::signer_set_filter> &filter_permutations,
+    const multisig::signer_set_filter local_signer_filter,
+    const std::vector<crypto::public_key> &available_signers,
+    const std::vector<SpMultisigInputInitSetV1> &all_input_init_sets,
+    const multisig::signer_set_filter available_signers_filter,
+    const std::vector<multisig::signer_set_filter> &available_signers_as_filters,
+    const std::vector<crypto::secret_key> &squash_prefixes,
+    const std::vector<SpMultisigInputProposalV1> &converted_input_proposals,
+    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sig_sets_out)
+{
+    /// make partial signatures for every available group of signers of size threshold that includes the local signer
+    CHECK_AND_ASSERT_THROW_MES(signer_account.multisig_is_ready(),
+        "multisig input partial sigs: signer account is not complete, so it can't make partial signatures.");
+
+    // misc from account
+    const std::uint32_t threshold{signer_account.get_threshold()};
+    const std::vector<crypto::public_key> &multisig_signers{signer_account.get_signers()};
+    const crypto::public_key &local_signer_id{signer_account.get_base_pubkey()};
+
+    // checks
+    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() == 
+            multisig_tx_proposal.m_input_proof_proposals.size(),
+        "multisig input partial sigs: input proposals don't line up with input proof proposals (bug).");
+    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() == 
+            converted_input_proposals.size(),
+        "multisig input partial sigs: input proposals don't line up with converted input proposals (bug).");
+    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() == 
+            squash_prefixes.size(),
+        "multisig input partial sigs: input proposals don't line up with prepared enote squash prefixes (bug).");
+    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() == 
+            input_masked_addresses.size(),
+        "multisig input partial sigs: input proposals don't line up with masked addresses (bug).");
+
+    // signer nonce trackers are pointers into the nonce vectors in each signer's init set
+    // - a signer's nonce vectors line up 1:1 with the filters in 'filter_permutations' of which the signer is a member
+    // - we want to track through each signers' vectors as we go through the full set of 'filter_permutations'
+    std::vector<std::size_t> signer_nonce_trackers(available_signers.size(), 0);
+
+    std::vector<SpCompositionProofMultisigPubNonces> signer_pub_nonces_temp;
+    signer_pub_nonces_temp.reserve(threshold);
+
+    crypto::secret_key enote_view_privkey_with_squash_prefix, z_temp, z_temp_with_squash_prefix;
+
+    const std::uint32_t expected_num_partial_sig_sets{
+            n_choose_k(available_signers.size() - 1, threshold - 1)
+        };
+    input_partial_sig_sets_out.clear();
+    input_partial_sig_sets_out.reserve(expected_num_partial_sig_sets);
+    std::uint32_t num_aborted_partial_sig_sets{0};
+
+    for (const multisig::signer_set_filter filter : filter_permutations)
+    {
+        // for filters that contain only available signers (and include the local signer), make a partial signature set
+        // - throw on failure so the partial sig set can be rolled back
+        if ((filter & available_signers_filter) == filter &&
+            (filter & local_signer_filter))
+        {
+            // if this throws, then the signer's nonces for this filter/proposal/input_set combo that were used before
+            //   the throw will be completely lost; however, if it does throw then this signing attempt was futile to
+            //   begin with
+            // - note: one scenario where this design could be undesirable is if the signer wants 'at least one' input's
+            //   partial signature to succeed; the design implemented here relies on the stronger precondition of 'all or
+            //   nothing' because the basic multisig model assumes honest players are 100% honest, and anything less should
+            //   be ignored
+            input_partial_sig_sets_out.emplace_back();
+            try
+            {
+                // local signer's signing key for this group
+                if (!signer_account.try_get_aggregate_signing_key(filter, z_temp))
+                    throw;
+
+                // make a partial signature for each input
+                input_partial_sig_sets_out.back().m_partial_signatures.reserve(input_masked_addresses.size());
+
+                for (std::size_t input_index{0};
+                    input_index < multisig_tx_proposal.m_input_proposals.size();
+                    ++input_index)
+                {
+                    // collect nonces from all signers in this signing group
+                    signer_pub_nonces_temp.clear();
+                    for (std::size_t signer_index{0}; signer_index < all_input_init_sets.size(); ++signer_index)
+                    {
+                        if ((available_signers_as_filters[signer_index] & filter) == 0)
+                            continue;
+
+                        // indexing:
+                        // - this signer's init set
+                        // - select the input we are working on (via this input's masked address)
+                        // - select the nonces that line up with the signer's nonce tracker
+                        signer_pub_nonces_temp.emplace_back();
+                        if (!all_input_init_sets[signer_index].try_get_nonces(input_masked_addresses[input_index],
+                                signer_nonce_trackers[signer_index],
+                                signer_pub_nonces_temp.back()))
+                            throw;
+                    }
+
+                    // sanity check
+                    if (signer_pub_nonces_temp.size() != threshold)
+                        throw;
+
+                    // apply squash prefix to signing keys y and z_e
+                    sc_mul(to_bytes(enote_view_privkey_with_squash_prefix),
+                        to_bytes(squash_prefixes[input_index]),
+                        to_bytes(converted_input_proposals[input_index].m_enote_view_privkey));
+                    sc_mul(to_bytes(z_temp_with_squash_prefix),
+                        to_bytes(squash_prefixes[input_index]),
+                        to_bytes(z_temp));
+
+                    // local signer's partial sig for this input
+                    input_partial_sig_sets_out.back().m_partial_signatures.emplace_back();
+
+                    if (!try_make_sp_composition_multisig_partial_sig(
+                            multisig_tx_proposal.m_input_proof_proposals[input_index],
+                            multisig_tx_proposal.m_input_proposals[input_index].m_address_mask,  //x
+                            enote_view_privkey_with_squash_prefix,                               //y
+                            z_temp_with_squash_prefix,                                           //z_e
+                            signer_pub_nonces_temp,
+                            filter,
+                            nonce_record_inout,
+                            input_partial_sig_sets_out.back().m_partial_signatures.back()))
+                        throw;
+                }
+
+                // copy miscellanea
+                input_partial_sig_sets_out.back().m_signer_id = local_signer_id;
+                input_partial_sig_sets_out.back().m_proposal_prefix = proposal_prefix;
+                input_partial_sig_sets_out.back().m_signer_set_filter = filter;
+
+                // final sanity check
+                check_v1_multisig_input_partial_sig_semantics_v1(input_partial_sig_sets_out.back(), multisig_signers);
+            }
+            catch (...)
+            {
+                input_partial_sig_sets_out.pop_back();
+                ++num_aborted_partial_sig_sets;
+            }
+        }
+
+        // increment nonce trackers for all signers in this filter
+        for (std::size_t signer_index{0}; signer_index < available_signers.size(); ++signer_index)
+        {
+            if (available_signers_as_filters[signer_index] & filter)
+                ++signer_nonce_trackers[signer_index];
+        }
+    }
+
+    // sanity check
+    CHECK_AND_ASSERT_THROW_MES(expected_num_partial_sig_sets - num_aborted_partial_sig_sets ==
+            input_partial_sig_sets_out.size(),
+        "multisig input partial sigs: did not produce expected number of partial sig sets (bug).");
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_public_input_proposal_semantics_v1(const SpMultisigPublicInputProposalV1 &public_input_proposal)
 {
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(public_input_proposal.m_address_mask)),
@@ -990,7 +1208,6 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sig_sets_out)
 {
-    //TODO: break this function into pieces somehow
     CHECK_AND_ASSERT_THROW_MES(signer_account.multisig_is_ready(),
         "multisig input partial sigs: signer account is not complete, so it can't make partial signatures.");
 
@@ -1020,53 +1237,18 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
         filter_permutations);
 
 
-    /// validate and filter input inits
+    /// validate and assemble input inits
+    std::vector<SpMultisigInputInitSetV1> all_input_init_sets;
 
-    // 1) local input init set must be valid
-    CHECK_AND_ASSERT_THROW_MES(local_input_init_set.m_signer_id == local_signer_id,
-        "multisig input partial sigs: local input init set is not from local signer.");
-    CHECK_AND_ASSERT_THROW_MES(validate_v1_multisig_input_init_set_for_partial_sig_set_v1(
-            local_input_init_set,
-            threshold,
-            multisig_signers,
-            proposal_prefix,
-            multisig_tx_proposal.m_aggregate_signer_set_filter,
-            input_masked_addresses),
-        "multisig input partial sigs: the local signer's input initializer doesn't match the multisig tx proposal.");
-
-    // 2) weed out invalid other input init sets
-    auto removed_end = std::remove_if(other_input_init_sets.begin(), other_input_init_sets.end(),
-            [&](const SpMultisigInputInitSetV1 &other_input_init_set) -> bool
-            {
-                return !validate_v1_multisig_input_init_set_for_partial_sig_set_v1(
-                    other_input_init_set,
-                    threshold,
-                    multisig_signers,
-                    proposal_prefix,
-                    multisig_tx_proposal.m_aggregate_signer_set_filter,
-                    input_masked_addresses);
-            }
-        );
-    other_input_init_sets.erase(removed_end, other_input_init_sets.end());
-
-    // 3) collect all input init sets
-    std::vector<SpMultisigInputInitSetV1> all_input_init_sets{std::move(other_input_init_sets)};
-    all_input_init_sets.emplace_back(local_input_init_set);
-
-    // 4) remove inits from duplicate signers (including duplicate local signer inits)
-    std::sort(all_input_init_sets.begin(), all_input_init_sets.end(),
-            [](const SpMultisigInputInitSetV1 &set1, const SpMultisigInputInitSetV1 &set2) -> bool
-            {
-                return set1.m_signer_id < set2.m_signer_id;
-            }
-        );
-    auto unique_end = std::unique(all_input_init_sets.begin(), all_input_init_sets.end(),
-            [](const SpMultisigInputInitSetV1 &set1, const SpMultisigInputInitSetV1 &set2) -> bool
-            {
-                return set1.m_signer_id == set2.m_signer_id;
-            }
-        );
-    all_input_init_sets.erase(unique_end, all_input_init_sets.end());
+    validate_and_prepare_input_inits_for_partial_sig_sets_v1(multisig_tx_proposal,
+        threshold,
+        multisig_signers,
+        local_signer_id,
+        input_masked_addresses,
+        proposal_prefix,
+        local_input_init_set,
+        std::move(other_input_init_sets),
+        all_input_init_sets);
 
 
     /// prepare for signing
@@ -1120,134 +1302,21 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
         return false;
 
 
-    /// make partial signatures for every available group of signers of size threshold that includes the local signer
-
-    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() == 
-            multisig_tx_proposal.m_input_proof_proposals.size(),
-        "multisig input partial sigs: input proposals don't line up with input proof proposals (bug).");
-    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() == 
-            converted_input_proposals.size(),
-        "multisig input partial sigs: input proposals don't line up with converted input proposals (bug).");
-    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() == 
-            squash_prefixes.size(),
-        "multisig input partial sigs: input proposals don't line up with prepared enote squash prefixes (bug).");
-    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() == 
-            input_masked_addresses.size(),
-        "multisig input partial sigs: input proposals don't line up with masked addresses (bug).");
-
-    // signer nonce trackers are pointers into the nonce vectors in each signer's init set
-    // - a signer's nonce vectors line up 1:1 with the filters in 'filter_permutations' of which the signer is a member
-    // - we want to track through each signers' vectors as we go through the full set of 'filter_permutations'
-    std::vector<std::size_t> signer_nonce_trackers(available_signers.size(), 0);
-
-    std::vector<SpCompositionProofMultisigPubNonces> signer_pub_nonces_temp;
-    signer_pub_nonces_temp.reserve(threshold);
-
-    crypto::secret_key enote_view_privkey_with_squash_prefix, z_temp, z_temp_with_squash_prefix;
-
-    const std::uint32_t expected_partial_sig_sets{
-            n_choose_k(available_signers.size() - 1, threshold - 1)
-        };
-    input_partial_sig_sets_out.clear();
-    input_partial_sig_sets_out.reserve(expected_partial_sig_sets);
-    std::uint32_t aborted_partial_sig_sets{0};
-
-    for (const multisig::signer_set_filter filter : filter_permutations)
-    {
-        // for filters that contain only available signers (and include the local signer), make a partial signature set
-        // - throw on failure so the partial sig set can be rolled back
-        if ((filter & available_signers_filter) == filter &&
-            (filter & local_signer_filter))
-        {
-            // if this throws, then the signer's nonces for this filter/proposal/input_set combo that were used before
-            //   the throw will be completely lost; however, if it does throw then this signing attempt was futile to
-            //   begin with
-            // - note: one scenario where this design could be undesirable is if the signer wants 'at least one' input's
-            //   partial signature to succeed; the design implemetned here relies on the stronger precondition of 'all or
-            //   nothing' because the basic multisig model assumes honest players are 100% honest, and anything less should
-            //   be ignored
-            input_partial_sig_sets_out.emplace_back();
-            try
-            {
-                // local signer's signing key for this group
-                if (!signer_account.try_get_aggregate_signing_key(filter, z_temp))
-                    throw;
-
-                // make a partial signature for each input
-                input_partial_sig_sets_out.back().m_partial_signatures.reserve(input_masked_addresses.size());
-
-                for (std::size_t input_index{0}; input_index < multisig_tx_proposal.m_input_proposals.size(); ++input_index)
-                {
-                    // collect nonces from all signers in this signing group
-                    signer_pub_nonces_temp.clear();
-                    for (std::size_t signer_index{0}; signer_index < all_input_init_sets.size(); ++signer_index)
-                    {
-                        if ((available_signers_as_filters[signer_index] & filter) == 0)
-                            continue;
-
-                        // indexing:
-                        // - this signer's init set
-                        // - select the input we are working on (via this input's masked address)
-                        // - select the nonces that line up with the signer's nonce tracker
-                        signer_pub_nonces_temp.emplace_back();
-                        if (!all_input_init_sets[signer_index].try_get_nonces(input_masked_addresses[input_index],
-                                signer_nonce_trackers[signer_index],
-                                signer_pub_nonces_temp.back()))
-                            throw;
-                    }
-
-                    // sanity check
-                    CHECK_AND_ASSERT_THROW_MES(signer_pub_nonces_temp.size() == threshold, "");
-
-                    // apply squash prefix to signing keys y and z_e
-                    sc_mul(to_bytes(enote_view_privkey_with_squash_prefix),
-                        to_bytes(squash_prefixes[input_index]),
-                        to_bytes(converted_input_proposals[input_index].m_enote_view_privkey));
-                    sc_mul(to_bytes(z_temp_with_squash_prefix),
-                        to_bytes(squash_prefixes[input_index]),
-                        to_bytes(z_temp));
-
-                    // local signer's partial sig for this input
-                    input_partial_sig_sets_out.back().m_partial_signatures.emplace_back();
-
-                    if (!try_make_sp_composition_multisig_partial_sig(
-                            multisig_tx_proposal.m_input_proof_proposals[input_index],
-                            multisig_tx_proposal.m_input_proposals[input_index].m_address_mask,  //x
-                            enote_view_privkey_with_squash_prefix,                               //y
-                            z_temp_with_squash_prefix,                                           //z_e
-                            signer_pub_nonces_temp,
-                            filter,
-                            nonce_record_inout,
-                            input_partial_sig_sets_out.back().m_partial_signatures.back()))
-                        throw;
-                }
-
-                // copy miscellanea
-                input_partial_sig_sets_out.back().m_signer_id = local_signer_id;
-                input_partial_sig_sets_out.back().m_proposal_prefix = proposal_prefix;
-                input_partial_sig_sets_out.back().m_signer_set_filter = filter;
-
-                // final sanity check
-                check_v1_multisig_input_partial_sig_semantics_v1(input_partial_sig_sets_out.back(), multisig_signers);
-            }
-            catch (...)
-            {
-                input_partial_sig_sets_out.pop_back();
-                ++aborted_partial_sig_sets;
-            }
-        }
-
-        // increment nonce trackers for all signers in this filter
-        for (std::size_t signer_index{0}; signer_index < available_signers.size(); ++signer_index)
-        {
-            if (available_signers_as_filters[signer_index] & filter)
-                ++signer_nonce_trackers[signer_index];
-        }
-    }
-
-    // sanity check
-    CHECK_AND_ASSERT_THROW_MES(expected_partial_sig_sets - aborted_partial_sig_sets == input_partial_sig_sets_out.size(),
-        "multisig input partial sigs: did not produce expected number of partial sig sets (bug).");
+    /// make partial signatures
+    make_v1_multisig_input_partial_sig_sets_v1(multisig_tx_proposal,
+        signer_account,
+        proposal_prefix,
+        input_masked_addresses,
+        filter_permutations,
+        local_signer_filter,
+        available_signers,
+        all_input_init_sets,
+        available_signers_filter,
+        available_signers_as_filters,
+        squash_prefixes,
+        converted_input_proposals,
+        nonce_record_inout,
+        input_partial_sig_sets_out);
 
     if (input_partial_sig_sets_out.size() == 0)
         return false;
