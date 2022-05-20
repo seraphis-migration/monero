@@ -79,17 +79,6 @@ bool SpInputProposal::operator<(const SpInputProposal &other_proposal) const
     return this_KI < other_KI;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpInputProposal::get_key_image(crypto::key_image &key_image_out) const
-{
-    // KI = k_b/k_a U
-    make_seraphis_key_image(m_enote_view_privkey, m_spendbase_privkey, key_image_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpInputProposal::get_enote_core(SpEnote &enote_out) const
-{
-    make_seraphis_enote_core(m_enote_view_privkey, m_spendbase_privkey, m_amount_blinding_factor, m_amount, enote_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
 void SpInputProposal::get_enote_image_core(SpEnoteImage &image_out) const
 {
     // {Ko, C}
@@ -105,16 +94,17 @@ void SpInputProposal::get_enote_image_core(SpEnoteImage &image_out) const
     // C' = t_c G + C
     sp::mask_key(m_commitment_mask, enote_temp.m_amount_commitment, image_out.m_masked_commitment);
 
-    // KI = k_a X + k_b U
+    // KI = k_b/k_a U
     this->get_key_image(image_out.m_key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpInputProposal::gen(const rct::xmr_amount amount)
+void SpInputProposal::gen(const crypto::secret_key &spendbase_privkey, const rct::xmr_amount amount)
 {
     m_enote_view_privkey = rct::rct2sk(rct::skGen());
-    m_spendbase_privkey = rct::rct2sk(rct::skGen());
+    make_seraphis_key_image(m_enote_view_privkey, spendbase_privkey, m_key_image);
     m_amount_blinding_factor = rct::rct2sk(rct::skGen());
     m_amount = amount;
+    make_seraphis_enote_core(m_enote_view_privkey, spendbase_privkey, m_amount_blinding_factor, m_amount, m_enote_core);
     m_address_mask = rct::rct2sk(rct::skGen());;
     m_commitment_mask = rct::rct2sk(rct::skGen());;
 }

@@ -233,7 +233,8 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
     make_seraphis_tx_squashed_v1(std::move(partial_tx), std::move(tx_membership_proofs), semantic_rules_version, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_proposals,
+void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
+    const std::vector<SpInputProposalV1> &input_proposals,
     std::vector<SpOutputProposalV1> output_proposals,
     const DiscretizedFee &discretized_transaction_fee,
     std::vector<SpMembershipProofPrepV1> membership_proof_preps,
@@ -261,7 +262,7 @@ void make_seraphis_tx_squashed_v1(const std::vector<SpInputProposalV1> &input_pr
 
     // partial inputs
     std::vector<SpPartialInputV1> partial_inputs;
-    make_v1_partial_inputs_v1(input_proposals, proposal_prefix, partial_inputs);
+    make_v1_partial_inputs_v1(input_proposals, proposal_prefix, spendbase_privkey, partial_inputs);
 
     // partial tx
     SpPartialTxV1 partial_tx;
@@ -497,9 +498,12 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
     CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "SpTxSquashedV1: tried to make mock tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "SpTxSquashedV1: tried to make mock tx without any outputs.");
 
+    // make wallet spendbase privkey (master key)
+    const crypto::secret_key spendbase_privkey{rct::rct2sk(rct::skGen())};
+
     // make mock inputs
-    // enote, ks, view key stuff, amount, amount blinding factor
-    const std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(in_amounts)};
+    // enote, view key stuff, amount, amount blinding factor
+    const std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(spendbase_privkey, in_amounts)};
 
     // make mock outputs
     std::vector<SpOutputProposalV1> output_proposals{
@@ -533,7 +537,8 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
         element.gen();
 
     // make tx
-    make_seraphis_tx_squashed_v1(input_proposals,
+    make_seraphis_tx_squashed_v1(spendbase_privkey,
+        input_proposals,
         std::move(output_proposals),
         discretized_transaction_fee,
         std::move(membership_proof_preps),

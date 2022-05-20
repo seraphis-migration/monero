@@ -251,11 +251,11 @@ struct SpContextualEnoteRecordV1 final
 struct SpContextualKeyImageSetV1 final
 {
     /// a set of key images found in a single tx
-    std::vector<rct::key> m_key_images;
+    std::vector<crypto::key_image> m_key_images;
     /// info about where the corresponding inputs were spent
     SpEnoteRecordSpentContextV1 m_spent_context;
 
-    bool has_key_image(const rct::key &test_key_image) const
+    bool has_key_image(const crypto::key_image &test_key_image) const
     {
         return std::find(m_key_images.begin(), m_key_images.end(), test_key_image) != m_key_images.end();
     }

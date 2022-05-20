@@ -497,7 +497,7 @@ bool try_make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_r
     if (!contextual_key_image_set.has_key_image(contextual_enote_record.m_record.m_key_image))
         return false;
 
-    make_spent_enote_v1(contextual_enote_record, contextual_key_image_set.m_spent_context);
+    make_spent_enote_v1(contextual_enote_record, contextual_key_image_set.m_spent_context, spent_enote_out);
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------

@@ -111,10 +111,13 @@ struct SpEnoteImage final
 ///
 struct SpInputProposal final
 {
+    /// core of the original enote
+    SpEnote m_enote_core;
+    /// the enote's key image
+    crypto::key_image m_key_image;
+
     /// k_{a, sender} + k_{a, recipient}
     crypto::secret_key m_enote_view_privkey;
-    /// k_{b, recipient}
-    crypto::secret_key m_spendbase_privkey;
     /// x
     crypto::secret_key m_amount_blinding_factor;
     /// a
@@ -132,13 +135,13 @@ struct SpInputProposal final
     * brief: get_key_image - get this input's key image
     * outparam: key_image_out - KI
     */
-    void get_key_image(crypto::key_image &key_image_out) const;
+    void get_key_image(crypto::key_image &key_image_out) const { key_image_out = m_key_image; }
 
     /**
     * brief: get_enote_core - get the enote this input proposal represents
     * outparam: enote_out -
     */
-    void get_enote_core(SpEnote &enote_out) const;
+    void get_enote_core(SpEnote &enote_out) const { enote_out = m_enote_core; }
 
     /**
     * brief: get_enote_image_core - get this input's enote image in the squashed enote model
@@ -148,9 +151,10 @@ struct SpInputProposal final
 
     /**
     * brief: gen - generate random enote keys
+    * param: spendbase_privkey -
     * param: amount -
     */
-    void gen(const rct::xmr_amount amount);
+    void gen(const crypto::secret_key &spendbase_privkey, const rct::xmr_amount amount);
 };
 
 ////

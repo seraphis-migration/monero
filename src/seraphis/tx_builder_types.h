@@ -81,7 +81,10 @@ struct SpInputProposalV1 final
     const crypto::secret_key& get_amount_blinding_factor() const { return m_core.m_amount_blinding_factor; }
 
     /// generate a v1 input (all random; does not support info recovery)
-    void gen(const rct::xmr_amount amount) { m_core.gen(amount); }
+    void gen(const crypto::secret_key &spendbase_privkey, const rct::xmr_amount amount)
+    {
+        m_core.gen(spendbase_privkey, amount);
+    }
 };
 
 ////

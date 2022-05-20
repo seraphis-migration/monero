@@ -105,16 +105,18 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     std::vector<crypto::secret_key> &blinding_factors_out);
 /**
 * brief: make_input_proposal - make the core of an input proposal
+* param: enote_core -
+* param: key_image -
 * param: enote_view_privkey -
-* param: spendbase_privkey -
 * param: input_amount_blinding_factor -
 * param: input_amount -
 * param: address_mask -
 * param: commitment_mask -
 * outparam: proposal_out -
 */
-void make_input_proposal(const crypto::secret_key &enote_view_privkey,
-    const crypto::secret_key &spendbase_privkey,
+void make_input_proposal(const SpEnote &enote_core,
+    const crypto::key_image &key_image,
+    const crypto::secret_key &enote_view_privkey,
     const crypto::secret_key &input_amount_blinding_factor,
     const rct::xmr_amount &input_amount,
     const crypto::secret_key &address_mask,
@@ -123,13 +125,11 @@ void make_input_proposal(const crypto::secret_key &enote_view_privkey,
 /**
 * brief: make_v1_input_proposal_v1 - make an input proposal
 * param: enote_record -
-* param: spendbase_privkey -
 * param: address_mask -
 * param: commitment_mask -
 * outparam: proposal_out -
 */
 void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
-    const crypto::secret_key &spendbase_privkey,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpInputProposalV1 &proposal_out);
@@ -137,7 +137,6 @@ void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
 * brief: try_make_v1_input_proposal_v1 - try to make an input proposal from an enote
 * param: enote -
 * param: enote_ephemeral_pubkey -
-* param: spendbase_privkey -
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
 * param: address_mask -
@@ -146,7 +145,6 @@ void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
 */
 bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
-    const crypto::secret_key &spendbase_privkey,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &address_mask,
@@ -156,19 +154,23 @@ bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
 * brief: make_v1_image_proof_v1 - make a seraphis composition proof in the squashed enote model
 * param: input_proposal -
 * param: message -
+* param: spendbase_privkey -
 * outparam: image_proof_out -
 */
 void make_v1_image_proof_v1(const SpInputProposal &input_proposal,
     const rct::key &message,
+    const crypto::secret_key &spendbase_privkey,
     SpImageProofV1 &image_proof_out);
 /**
 * brief: make_v1_image_proofs_v1 - make a set of seraphis composition proofs in the squashed enote model
 * param: input_proposals -
 * param: message -
+* param: spendbase_privkey -
 * outparam: image_proofs_out -
 */
 void make_v1_image_proofs_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const rct::key &message,
+    const crypto::secret_key &spendbase_privkey,
     std::vector<SpImageProofV1> &image_proofs_out);
 /**
 * brief: make_v1_membership_proof_v1 - make a concise grootle membership proof in the squashed enote model
@@ -207,26 +209,32 @@ void make_v1_membership_proofs_v1(std::vector<SpMembershipProofPrepV1> membershi
 * brief: make_v1_partial_input_v1 - make a v1 partial input
 * param: input_proposal -
 * param: proposal_prefix -
+* param: spendbase_privkey -
 * outparam: partial_input_out -
 */
 void make_v1_partial_input_v1(const SpInputProposalV1 &input_proposal,
     const rct::key &proposal_prefix,
+    const crypto::secret_key &spendbase_privkey,
     SpPartialInputV1 &partial_input_out);
 /**
 * brief: make_v1_partial_inputs_v1 - make a full set of v1 partial inputs
 * param: input_proposals -
 * param: proposal_prefix -
+* param: spendbase_privkey -
 * outparam: partial_inputs_out -
 */
 void make_v1_partial_inputs_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const rct::key &proposal_prefix,
+    const crypto::secret_key &spendbase_privkey,
     std::vector<SpPartialInputV1> &partial_inputs_out);
 /**
 * brief: gen_mock_sp_input_proposals_v1 - create random mock inputs
+* param: spendbase_privkey -
 * param: in_amounts -
 * return: set of transaction inputs ready to spend
 */
-std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts);
+std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const crypto::secret_key &spendbase_privkey,
+    const std::vector<rct::xmr_amount> in_amounts);
 /**
 * brief: gen_mock_sp_membership_proof_prep_v1 - create a random reference set for an enote, with real spend at a random index,
 *   and update mock ledger to include all members of the reference set (including squashed enotes)

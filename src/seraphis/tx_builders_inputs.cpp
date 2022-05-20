@@ -205,8 +205,9 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_input_proposal(const crypto::secret_key &enote_view_privkey,
-    const crypto::secret_key &spendbase_privkey,
+void make_input_proposal(const SpEnote &enote_core,
+    const crypto::key_image &key_image,
+    const crypto::secret_key &enote_view_privkey,
     const crypto::secret_key &input_amount_blinding_factor,
     const rct::xmr_amount &input_amount,
     const crypto::secret_key &address_mask,
@@ -214,9 +215,9 @@ void make_input_proposal(const crypto::secret_key &enote_view_privkey,
     SpInputProposal &proposal_out)
 {
     // make an input proposal
-
+    proposal_out.m_enote_core             = enote_core;
+    proposal_out.m_key_image              = key_image;
     proposal_out.m_enote_view_privkey     = enote_view_privkey;
-    proposal_out.m_spendbase_privkey      = spendbase_privkey;
     proposal_out.m_amount_blinding_factor = input_amount_blinding_factor;
     proposal_out.m_amount                 = input_amount;
     proposal_out.m_address_mask           = address_mask;
@@ -224,14 +225,14 @@ void make_input_proposal(const crypto::secret_key &enote_view_privkey,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
-    const crypto::secret_key &spendbase_privkey,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpInputProposalV1 &proposal_out)
 {
     // make input proposal from enote record
-    make_input_proposal(enote_record.m_enote_view_privkey,
-        spendbase_privkey,
+    make_input_proposal(enote_record.m_enote.m_core,
+        enote_record.m_key_image,
+        enote_record.m_enote_view_privkey,
         enote_record.m_amount_blinding_factor,
         enote_record.m_amount,
         address_mask,
@@ -241,7 +242,6 @@ void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
 //-------------------------------------------------------------------------------------------------------------------
 bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
-    const crypto::secret_key &spendbase_privkey,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &address_mask,
@@ -253,13 +253,14 @@ bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
     if (!try_get_enote_record_v1(enote, enote_ephemeral_pubkey, wallet_spend_pubkey, k_view_balance, enote_record))
         return false;
 
-    make_v1_input_proposal_v1(enote_record, spendbase_privkey, address_mask, commitment_mask, proposal_out);
+    make_v1_input_proposal_v1(enote_record, address_mask, commitment_mask, proposal_out);
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_image_proof_v1(const SpInputProposal &input_proposal,
     const rct::key &message,
+    const crypto::secret_key &spendbase_privkey,
     SpImageProofV1 &image_proof_out)
 {
     // make image proof
@@ -282,7 +283,7 @@ void make_v1_image_proof_v1(const SpInputProposal &input_proposal,
     // H(Ko,C) (k_{a, recipient} + k_{a, sender})
     sc_mul(to_bytes(y), to_bytes(squash_prefix), to_bytes(input_proposal.m_enote_view_privkey));
     // H(Ko,C) k_{b, recipient}
-    sc_mul(to_bytes(z), to_bytes(squash_prefix), to_bytes(input_proposal.m_spendbase_privkey));
+    sc_mul(to_bytes(z), to_bytes(squash_prefix), to_bytes(spendbase_privkey));
 
     // make seraphis composition proof
     image_proof_out.m_composition_proof =
@@ -291,6 +292,7 @@ void make_v1_image_proof_v1(const SpInputProposal &input_proposal,
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_image_proofs_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const rct::key &message,
+    const crypto::secret_key &spendbase_privkey,
     std::vector<SpImageProofV1> &image_proofs_out)
 {
     // make multiple image proofs
@@ -302,7 +304,7 @@ void make_v1_image_proofs_v1(const std::vector<SpInputProposalV1> &input_proposa
     for (const SpInputProposalV1 &input_proposal : input_proposals)
     {
         image_proofs_out.emplace_back();
-        make_v1_image_proof_v1(input_proposal.m_core, message, image_proofs_out.back());
+        make_v1_image_proof_v1(input_proposal.m_core, message, spendbase_privkey, image_proofs_out.back());
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -465,6 +467,7 @@ void make_v1_membership_proofs_v1(std::vector<SpMembershipProofPrepV1> membershi
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_partial_input_v1(const SpInputProposalV1 &input_proposal,
     const rct::key &proposal_prefix,
+    const crypto::secret_key &spendbase_privkey,
     SpPartialInputV1 &partial_input_out)
 {
     // prepare input image
@@ -479,11 +482,15 @@ void make_v1_partial_input_v1(const SpInputProposalV1 &input_proposal,
     input_proposal.m_core.get_enote_core(partial_input_out.m_input_enote_core);
 
     // construct image proof
-    make_v1_image_proof_v1(input_proposal.m_core, partial_input_out.m_proposal_prefix, partial_input_out.m_image_proof);
+    make_v1_image_proof_v1(input_proposal.m_core,
+        partial_input_out.m_proposal_prefix,
+        spendbase_privkey,
+        partial_input_out.m_image_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_partial_inputs_v1(const std::vector<SpInputProposalV1> &input_proposals,
     const rct::key &proposal_prefix,
+    const crypto::secret_key &spendbase_privkey,
     std::vector<SpPartialInputV1> &partial_inputs_out)
 {
     CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "Can't make partial tx inputs without any input proposals.");
@@ -495,11 +502,12 @@ void make_v1_partial_inputs_v1(const std::vector<SpInputProposalV1> &input_propo
     for (const SpInputProposalV1 &input_proposal : input_proposals)
     {
         partial_inputs_out.emplace_back();
-        make_v1_partial_input_v1(input_proposal, proposal_prefix, partial_inputs_out.back());
+        make_v1_partial_input_v1(input_proposal, proposal_prefix, spendbase_privkey, partial_inputs_out.back());
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<rct::xmr_amount> in_amounts)
+std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const crypto::secret_key &spendbase_privkey,
+    const std::vector<rct::xmr_amount> in_amounts)
 {
     // generate random inputs
     std::vector<SpInputProposalV1> input_proposals;
@@ -508,7 +516,7 @@ std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const std::vector<
     for (const rct::xmr_amount in_amount : in_amounts)
     {
         input_proposals.emplace_back();
-        input_proposals.back().gen(in_amount);
+        input_proposals.back().gen(spendbase_privkey, in_amount);
     }
 
     return input_proposals;

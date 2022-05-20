@@ -260,7 +260,6 @@ TEST(seraphis_integration, txtype_squashed_v1)
         input_proposals.emplace_back();
 
         ASSERT_NO_THROW(make_v1_input_proposal_v1(contextual_input.m_record,
-            keys_user_A.k_m,
             make_secret_key(),
             make_secret_key(),
             input_proposals.back()));
@@ -280,7 +279,8 @@ TEST(seraphis_integration, txtype_squashed_v1)
     // g) make the transaction
     SpTxSquashedV1 completed_tx;
 
-    ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(input_proposals,
+    ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(keys_user_A.k_m,
+        input_proposals,
         std::move(output_proposals),
         discretized_transaction_fee,
         std::move(membership_proof_preps),

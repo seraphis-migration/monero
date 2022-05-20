@@ -293,9 +293,12 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, out_amounts, raw_transaction_fee),
         "SpTxSquashedV1: tried to raw make tx with unbalanced amounts.");
 
+    // make wallet spendbase privkey (master key)
+    const crypto::secret_key spendbase_privkey{rct::rct2sk(rct::skGen())};
+
     // make mock inputs
     // enote, ks, view key stuff, amount, amount blinding factor
-    std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(in_amounts)};
+    std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(spendbase_privkey, in_amounts)};
 
     // make mock output proposals
     std::vector<SpOutputProposalV1> output_proposals{
@@ -370,6 +373,7 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
     make_tx_image_proof_message_v1(version_string, outputs, tx_supplement, image_proofs_message);
     make_v1_image_proofs_v1(input_proposals,
         image_proofs_message,
+        spendbase_privkey,
         tx_image_proofs);
     prepare_input_commitment_factors_for_balance_proof_v1(input_proposals,
         image_amount_masks,
