@@ -482,4 +482,23 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
         try_get_enote_record_v1_plain(enote, enote_ephemeral_pubkey, wallet_spend_pubkey, k_view_balance, record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,
+    const SpEnoteRecordSpentContextV1 &spent_context,
+    SpSpentEnoteV1 &spent_enote_out)
+{
+    spent_enote_out.m_contextual_enote_record = contextual_enote_record;
+    spent_enote_out.m_spent_context = spent_context;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,
+    const SpContextualKeyImageSetV1 &contextual_key_image_set,
+    SpSpentEnoteV1 &spent_enote_out)
+{
+    if (!contextual_key_image_set.has_key_image(contextual_enote_record.m_record.m_key_image))
+        return false;
+
+    make_spent_enote_v1(contextual_enote_record, contextual_key_image_set.m_spent_context);
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

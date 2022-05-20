@@ -45,6 +45,8 @@
 //third party headers
 
 //standard headers
+#include <algorithm>
+#include <vector>
 
 //forward declarations
 
@@ -140,13 +142,15 @@ struct SpEnoteRecordContextV1 final
     TxExtra m_memo{};
     /// tx id (0 if tx is unknown)
     rct::key m_transaction_id{rct::zero()};
-    /// block height of transaction (0 if height is unknown)
-    std::uint64_t m_transaction_height{0};
+    /// block height of transaction (-1 if height is unknown)
+    std::uint64_t m_transaction_height{static_cast<std::uint64_t>(-1)};
     /// ledger index of the enote (-1 if index is unknown)
     std::uint64_t m_enote_ledger_index{static_cast<std::uint64_t>(-1)};
 
     /// origin status (unknown by default)
     OriginStatus m_origin_status{OriginStatus::UNKNOWN};
+    /// note if the enote is spendable (true by default)
+    bool m_is_spendable{true};
 };
 
 ////
@@ -157,6 +161,8 @@ struct SpEnoteRecordSpentContextV1 final
 {
     enum class SpentStatus
     {
+        // spent status is unknown
+        UNKNOWN,
         // is spent in an off-chain tx
         SPENT_OFF_CHAIN,
         // is spent in a tx in the mempool
@@ -164,18 +170,16 @@ struct SpEnoteRecordSpentContextV1 final
         // is spent in a locked block
         SPENT_LOCKED,
         // is spent in an unlocked block
-        SPENT_UNLOCKED,
-        // is not spendable (e.g. its onetime address is duplicated in another enote)
-        UNSPENDABLE,
+        SPENT_UNLOCKED
     };
 
     /// tx id where it was spent (0 if tx is unknown)
     rct::key m_transaction_id{rct::zero()};
-    /// block height of transaction where it was spent (0 if height is unknown)
-    std::uint64_t m_transaction_height{0};
+    /// block height of transaction where it was spent (-1 if height is unknown)
+    std::uint64_t m_transaction_height{static_cast<std::uint64_t>(-1)};
 
-    /// spent status (unspendable by default)
-    SpentStatus m_spent_status{SpentStatus::UNSPENDABLE};
+    /// spent status (unknown by default)
+    SpentStatus m_spent_status{SpentStatus::UNKNOWN};
 };
 
 ////
@@ -241,12 +245,30 @@ struct SpContextualEnoteRecordV1 final
 };
 
 ////
+// SpContextualKeyImageSetV1
+// - info about the tx where a set of key images was found
+///
+struct SpContextualKeyImageSetV1 final
+{
+    /// a set of key images found in a single tx
+    std::vector<rct::key> m_key_images;
+    /// info about where the corresponding inputs were spent
+    SpEnoteRecordSpentContextV1 m_spent_context;
+
+    bool has_key_image(const rct::key &test_key_image) const
+    {
+        return std::find(m_key_images.begin(), m_key_images.end(), test_key_image) != m_key_images.end();
+    }
+};
+
+////
 // SpSpentEnoteV1
+// - a spent enote with all related contextual information
 ///
 struct SpSpentEnoteV1 final
 {
     /// info about the enote and where it was found
-    SpContextualEnoteRecordV1 m_enote_context;
+    SpContextualEnoteRecordV1 m_contextual_enote_record;
     /// info about where the enote was spent
     SpEnoteRecordSpentContextV1 m_spent_context;
 };

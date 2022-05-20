@@ -177,5 +177,12 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out);
+//todo
+void make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,
+    const SpEnoteRecordSpentContextV1 &spent_context,
+    SpSpentEnoteV1 &spent_enote_out);
+bool try_make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,
+    const SpContextualKeyImageSetV1 &contextual_key_image_set,
+    SpSpentEnoteV1 &spent_enote_out);
 
 } //namespace sp
