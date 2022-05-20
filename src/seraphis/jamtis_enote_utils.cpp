@@ -48,11 +48,13 @@ extern "C"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
+#include "tx_misc_utils.h"
 #include "wipeable_string.h"
 
 //third party headers
 
 //standard headers
+#include <algorithm>
 #include <string>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -112,7 +114,10 @@ static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::xmr_amount origina
     get_doublekey_hash_data(sender_receiver_secret.bytes, to_bytes(baked_key), data);
 
     crypto::secret_key hash_result;
-    jamtis_hash8(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), to_bytes(hash_result));
+    jamtis_hash8(domain_separator,
+        reinterpret_cast<const unsigned char*>(data.data()),
+        data.size(),
+        to_bytes(hash_result));
 
     rct::xmr_amount mask;
     memcpy(&mask, &hash_result, 8);
@@ -161,7 +166,7 @@ void make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_deriv
     epee::wipeable_string data;
     get_doublekey_hash_data(to_bytes(sender_receiver_DH_derivation), onetime_address.bytes, data);
 
-    jamtis_hash1(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), &view_tag_out);
+    jamtis_hash1(domain_separator, reinterpret_cast<const unsigned char*>(data.data()), data.size(), &view_tag_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_view_tag(const crypto::secret_key &privkey,
@@ -179,6 +184,43 @@ void make_jamtis_view_tag(const crypto::secret_key &privkey,
     make_jamtis_view_tag(derivation, onetime_address, view_tag_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_jamtis_input_context_coinbase(const std::uint64_t block_height, rct::key &input_context_out)
+{
+    static const std::string domain_separator{config::HASH_KEY_JAMTIS_INPUT_CONTEXT_COINBASE};
+
+    // block height as varint
+    std::string data;
+    append_uint_to_string(block_height, data);
+
+    // input_context (coinbase) = H(block height)
+    jamtis_hash32(domain_separator,
+        reinterpret_cast<const unsigned char*>(data.data()), 
+        data.size(),
+        input_context_out.bytes);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &input_key_images,
+    rct::key &input_context_out)
+{
+    static const std::string domain_separator{config::HASH_KEY_JAMTIS_INPUT_CONTEXT_STANDARD};
+
+    CHECK_AND_ASSERT_THROW_MES(std::is_sorted(input_key_images.begin(), input_key_images.end()),
+        "jamtis input context (standard): key images are not sorted.");
+
+    // {KI}
+    std::string data;
+    data.reserve(input_key_images.size() * sizeof(crypto::key_image));
+
+    for (const crypto::key_image &key_image : input_key_images)
+        data.append(reinterpret_cast<const char*>(&key_image), sizeof(key_image));
+
+    // input_context (standard) = H({KI})
+    jamtis_hash32(domain_separator,
+        reinterpret_cast<const unsigned char*>(data.data()), 
+        data.size(),
+        input_context_out.bytes);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
     const rct::key &input_context,
     rct::key &sender_receiver_secret_out)
@@ -190,7 +232,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &send
     get_doublekey_hash_data(to_bytes(sender_receiver_DH_derivation), input_context.bytes, data);
 
     jamtis_hash32(domain_separator,
-        reinterpret_cast<unsigned char *>(data.data()), 
+        reinterpret_cast<const unsigned char*>(data.data()), 
         data.size(),
         sender_receiver_secret_out.bytes);
 }
@@ -251,7 +293,7 @@ void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_vie
 
     jamtis_derive_secret(domain_separator,
         to_bytes(k_view_balance),
-        reinterpret_cast<unsigned char *>(data.data()), 
+        reinterpret_cast<const unsigned char*>(data.data()), 
         data.size(),
         sender_receiver_secret_out.bytes);
 }
@@ -304,7 +346,10 @@ void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_se
     epee::wipeable_string data;
     get_doublekey_hash_data(sender_receiver_secret.bytes, to_bytes(baked_key), data);  //q || 8 r G
 
-    jamtis_hash_scalar(domain_separator, reinterpret_cast<unsigned char *>(data.data()), data.size(), to_bytes(mask_out));
+    jamtis_hash_scalar(domain_separator,
+        reinterpret_cast<const unsigned char*>(data.data()),
+        data.size(),
+        to_bytes(mask_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver_secret,

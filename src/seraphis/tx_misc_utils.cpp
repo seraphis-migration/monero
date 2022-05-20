@@ -77,7 +77,7 @@ void append_uint_to_string(const std::size_t value, std::string &str_inout)
     unsigned char v_variable[(sizeof(std::size_t) * 8 + 6) / 7];
     unsigned char *v_variable_end = v_variable;
 
-    // bin locus
+    // append uint to string as a varint
     v_variable_end = v_variable;
     tools::write_varint(v_variable_end, value);
     assert(v_variable_end <= v_variable + sizeof(v_variable));

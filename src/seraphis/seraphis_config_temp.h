@@ -41,6 +41,8 @@ namespace config
   const constexpr std::uint64_t DISCRETIZED_FEE_LEVEL_NUMERATOR_X100 = 150;  //fee level factor = 1.5
   const constexpr std::uint64_t DISCRETIZED_FEE_SIG_FIGS = 1;
 
+  const constexpr char HASH_KEY_JAMTIS_INPUT_CONTEXT_COINBASE[] = "jamtis_input_context_coinbase";
+  const constexpr char HASH_KEY_JAMTIS_INPUT_CONTEXT_STANDARD[] = "jamtis_input_context_standard";
   const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_DUMMY[] = "jamtis_self_send_enote_dummy";
   const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_CHANGE[] = "jamtis_self_send_enote_change";
   const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_SELF_SPEND[] = "jamtis_self_send_enote_self_spend";
