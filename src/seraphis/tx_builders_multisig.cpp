@@ -223,6 +223,7 @@ static void check_v1_multisig_tx_proposal_semantics_outputs_v1(const SpMultisigT
 
         if (try_get_enote_record_v1_selfsend(temp_enote,
             output_proposal.m_enote_ephemeral_pubkey,
+            rct::zero(),
             wallet_spend_pubkey,
             k_view_balance,
             s_generate_address,
@@ -240,7 +241,7 @@ static void check_v1_multisig_tx_proposal_semantics_outputs_v1(const SpMultisigT
                 //   the explicit payment's enote ephemeral privkey; for sanity, we double-check here (even though the
                 //   tx_proposal semantics check should ensure our two outputs have the same enote ephemeral pubkey)
                 SpOutputProposalV1 temp_other_proposal;
-                multisig_tx_proposal.m_explicit_payments[0].get_output_proposal_v1(temp_other_proposal);
+                multisig_tx_proposal.m_explicit_payments[0].get_output_proposal_v1(rct::zero(), temp_other_proposal);
 
                 CHECK_AND_ASSERT_THROW_MES(temp_other_proposal.m_enote_ephemeral_pubkey ==
                         output_proposal.m_enote_ephemeral_pubkey,
@@ -598,6 +599,7 @@ bool try_get_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1
     SpEnoteRecordV1 enote_record;
     if (!try_get_enote_record_v1(public_input_proposal.m_enote,
             public_input_proposal.m_enote_ephemeral_pubkey,
+            rct::zero(),
             wallet_spend_pubkey,
             k_view_balance,
             enote_record))
@@ -782,13 +784,13 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
     for (const jamtis::JamtisPaymentProposalV1 &normal_payment_proposal : explicit_payments_normal_inout)
     {
         output_proposals_temp.emplace_back();
-        normal_payment_proposal.get_output_proposal_v1(output_proposals_temp.back());
+        normal_payment_proposal.get_output_proposal_v1(rct::zero(), output_proposals_temp.back());
     }
 
     for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment_proposal : explicit_payments_selfsend)
     {
         output_proposals_temp.emplace_back();
-        selfsend_payment_proposal.get_output_proposal_v1(k_view_balance, output_proposals_temp.back());
+        selfsend_payment_proposal.get_output_proposal_v1(k_view_balance, rct::zero(), output_proposals_temp.back());
 
         // insert to the output opaque set (for efficiency)
         opaque_payments_inout.emplace_back(output_proposals_temp.back());
@@ -816,6 +818,7 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
         raw_transaction_fee,
         change_destination,
         dummy_destination,
+        rct::zero(),
         wallet_spend_pubkey,
         k_view_balance,
         output_proposals_temp,
@@ -859,7 +862,7 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
     for (const jamtis::JamtisPaymentProposalSelfSendV1 &new_selfsend_payment_proposal : new_selfsend_proposals)
     {
         opaque_payments_inout.emplace_back();
-        new_selfsend_payment_proposal.get_output_proposal_v1(k_view_balance, opaque_payments_inout.back());
+        new_selfsend_payment_proposal.get_output_proposal_v1(k_view_balance, rct::zero(), opaque_payments_inout.back());
     }
 }
 //-------------------------------------------------------------------------------------------------------------------

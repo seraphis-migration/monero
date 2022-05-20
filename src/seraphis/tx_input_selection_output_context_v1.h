@@ -57,10 +57,12 @@ public:
 //constructors
     OutputSetContextForInputSelectionV1(const rct::key &wallet_spend_pubkey,
         const crypto::secret_key &k_view_balance,
-        const std::vector<SpOutputProposalV1> &output_proposals) :
+        const std::vector<SpOutputProposalV1> &output_proposals,
+        const rct::key &input_context) :
             m_wallet_spend_pubkey{wallet_spend_pubkey},
             m_k_view_balance{k_view_balance},
-            m_output_proposals{output_proposals}
+            m_output_proposals{output_proposals},
+            m_input_context{input_context}
     {}
 
 //overloaded operators
@@ -80,6 +82,7 @@ private:
     const rct::key &m_wallet_spend_pubkey;
     const crypto::secret_key &m_k_view_balance;
     const std::vector<SpOutputProposalV1> &m_output_proposals;
+    const rct::key &m_input_context;
 };
 
 } //namespace sp

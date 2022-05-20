@@ -207,10 +207,10 @@ public:
         m_recipient_spend_key = user_address.m_addr_K1;
 
         // make enote paying to address
-        crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
+        const crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
         sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, rct::xmr_amount{0}, enote_privkey};
         sp::SpOutputProposalV1 output_proposal;
-        payment_proposal.get_output_proposal_v1(output_proposal);
+        payment_proposal.get_output_proposal_v1(rct::zero(), output_proposal);
         m_enote_ephemeral_pubkey = output_proposal.m_enote_ephemeral_pubkey;
         output_proposal.get_enote_v1(m_enote);
 
@@ -226,6 +226,7 @@ public:
         sp::SpBasicEnoteRecordV1 basic_enote_record;
         if (!sp::try_get_basic_enote_record_v1(m_enote,
                 m_enote_ephemeral_pubkey,
+                rct::zero(),
                 m_keys.k_fr,
                 m_hwdev,
                 basic_enote_record))
@@ -306,7 +307,7 @@ inline bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_der
     rct::key &nominal_spend_key_out)
 {
     // tag'_t = H(q_t)
-    unsigned char nominal_view_tag{make_seraphis_view_tag_siphash(sender_receiver_DH_derivation)};
+    const unsigned char nominal_view_tag{make_seraphis_view_tag_siphash(sender_receiver_DH_derivation)};
 
     // check that recomputed tag matches original tag; short-circuit on failure
     if (nominal_view_tag != view_tag)
@@ -315,6 +316,7 @@ inline bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_der
     // q_t
     // note: computing this after view tag check is an optimization
     sp::jamtis::make_jamtis_sender_receiver_secret_plain(sender_receiver_DH_derivation,
+        rct::zero(),
         sender_receiver_secret_out);
 
     // K'^s_t = Ko_t - H(q_t) X
@@ -356,7 +358,7 @@ public:
         const crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
         const sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, 0, enote_privkey};
         sp::SpOutputProposalV1 output_proposal;
-        payment_proposal.get_output_proposal_v1(output_proposal);
+        payment_proposal.get_output_proposal_v1(rct::zero(), output_proposal);
         m_enote_ephemeral_pubkey = output_proposal.m_enote_ephemeral_pubkey;
         output_proposal.get_enote_v1(m_enote);
 
@@ -690,7 +692,7 @@ public:
         crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
         sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, rct::xmr_amount{0}, enote_privkey};
         sp::SpOutputProposalV1 output_proposal;
-        payment_proposal.get_output_proposal_v1(output_proposal);
+        payment_proposal.get_output_proposal_v1(rct::zero(), output_proposal);
         sp::SpEnoteV1 real_enote;
         output_proposal.get_enote_v1(real_enote);
 
@@ -698,6 +700,7 @@ public:
         sp::SpBasicEnoteRecordV1 basic_record;
         if (!sp::try_get_basic_enote_record_v1(real_enote,
                 output_proposal.m_enote_ephemeral_pubkey,
+                rct::zero(),
                 m_keys.k_fr,
                 hw::get_device("default"),
                 basic_record))

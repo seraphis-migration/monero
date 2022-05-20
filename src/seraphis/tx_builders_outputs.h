@@ -133,6 +133,7 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
 void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::vector<SpOutputProposalV1> &output_proposals,
+    const rct::key &input_context,
     const rct::xmr_amount change_amount,
     OutputProposalSetExtraTypesContextV1 &additional_outputs_context_out,
     std::vector<OutputProposalSetExtraTypesV1> &additional_outputs_out);
@@ -141,6 +142,7 @@ void make_additional_output_dummy_v1(const OutputProposalSetExtraTypesV1 additio
     SpOutputProposalV1 &output_proposal_out);
 void make_additional_output_selfsend_v1(const OutputProposalSetExtraTypesV1 additional_output_type,
     const OutputProposalSetExtraTypesContextV1 &additional_outputs_context,
+    const rct::key &input_context,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::xmr_amount change_amount,
@@ -149,6 +151,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::vector<SpOutputProposalV1> &original_output_proposals,
@@ -158,6 +161,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<SpOutputProposalV1> &output_proposals_inout);

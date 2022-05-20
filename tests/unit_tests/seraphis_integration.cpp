@@ -159,7 +159,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
             .m_partial_memo = TxExtra{}
         };
     SpOutputProposalV1 output_proposal_A;
-    payment_proposal_A.get_output_proposal_v1(output_proposal_A);
+    payment_proposal_A.get_output_proposal_v1(rct::zero(), output_proposal_A);
 
     SpEnoteV1 input_enote_A;
     output_proposal_A.get_enote_v1(input_enote_A);
@@ -170,6 +170,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
     ASSERT_TRUE(try_get_enote_record_v1(input_enote_A,
         input_enote_ephemeral_pubkey_A,
+        rct::zero(),
         keys_user_A.K_1_base,
         keys_user_A.k_vb,
         input_enote_record_A));
@@ -207,7 +208,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
             .m_partial_memo = TxExtra{}
         };
     SpOutputProposalV1 output_proposal_B;
-    payment_proposal_B.get_output_proposal_v1(output_proposal_B);
+    payment_proposal_B.get_output_proposal_v1(rct::zero(), output_proposal_B);
 
     std::vector<SpOutputProposalV1> output_proposals;
     output_proposals.emplace_back(output_proposal_B);
@@ -216,7 +217,8 @@ TEST(seraphis_integration, txtype_squashed_v1)
     const sp::OutputSetContextForInputSelectionV1 output_set_context{
             keys_user_A.K_1_base,
             keys_user_A.k_vb,
-            output_proposals
+            output_proposals,
+            rct::zero()
         };
     const sp::InputSelectorMockSimpleV1 input_selector{enote_store_A};
     const sp::FeeCalculatorSpTxSquashedV1 tx_fee_calculator{
@@ -245,6 +247,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
         reported_final_fee,
         user_address_A,
         user_address_A,
+        rct::zero(),
         keys_user_A.K_1_base,
         keys_user_A.k_vb,
         output_proposals));

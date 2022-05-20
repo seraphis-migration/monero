@@ -60,7 +60,8 @@ namespace sp
 namespace jamtis
 {
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const
+void JamtisPaymentProposalV1::get_output_proposal_v1(const rct::key &input_context,
+    SpOutputProposalV1 &output_proposal_out) const
 {
     // sanity checks
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(m_enote_ephemeral_privkey)),
@@ -79,10 +80,10 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(SpOutputProposalV1 &output_
     auto Kd_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&K_d, sizeof(K_d)); });
     crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
 
-    // sender-receiver shared secret: q = H_32(K_d)
+    // sender-receiver shared secret: q = H_32(K_d, input_context)
     rct::key q;
     auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
-    make_jamtis_sender_receiver_secret_plain(K_d, q);
+    make_jamtis_sender_receiver_secret_plain(K_d, input_context, q);
 
     // encrypt address tag: addr_tag_enc = addr_tag(blowfish(j || mac)) ^ H_8(q)
     output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, m_destination.m_addr_tag);
@@ -125,6 +126,7 @@ void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount, const std::size_
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secret_key &viewbalance_privkey,
+    const rct::key &input_context,
     SpOutputProposalV1 &output_proposal_out) const
 {
     // sanity checks
@@ -145,11 +147,12 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
             output_proposal_out.m_enote_ephemeral_pubkey
         );
 
-    // sender-receiver shared secret: q = H_32[k_vb](K_e)  //note: K_e not K_d
+    // sender-receiver shared secret: q = H_32[k_vb](K_e, input_context)  //note: K_e not K_d
     rct::key q;
     auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
     make_jamtis_sender_receiver_secret_selfsend(viewbalance_privkey,
         output_proposal_out.m_enote_ephemeral_pubkey,
+        input_context,
         m_type,
         q);
 
@@ -211,6 +214,7 @@ void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount,
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_self_send_type(const SpOutputProposalV1 &output_proposal,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     JamtisSelfSendType &type_out)
@@ -224,6 +228,7 @@ bool try_get_self_send_type(const SpOutputProposalV1 &output_proposal,
 
     if (!try_get_enote_record_v1_selfsend(temp_enote,
             output_proposal.m_enote_ephemeral_pubkey,
+            input_context,
             wallet_spend_pubkey,
             k_view_balance,
             temp_enote_record))
@@ -237,11 +242,12 @@ bool try_get_self_send_type(const SpOutputProposalV1 &output_proposal,
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool is_self_send_output_proposal(const SpOutputProposalV1 &output_proposal,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance)
 {
     JamtisSelfSendType dummy_type;
-    return try_get_self_send_type(output_proposal, wallet_spend_pubkey, k_view_balance, dummy_type);
+    return try_get_self_send_type(output_proposal, input_context, wallet_spend_pubkey, k_view_balance, dummy_type);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

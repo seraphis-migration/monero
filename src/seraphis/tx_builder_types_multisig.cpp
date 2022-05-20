@@ -110,7 +110,7 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_o
     for (const jamtis::JamtisPaymentProposalV1 &explicit_payment : m_explicit_payments)
     {
         output_proposals.emplace_back();
-        explicit_payment.get_output_proposal_v1(output_proposals.back());
+        explicit_payment.get_output_proposal_v1(rct::zero(), output_proposals.back());
     }
 
     // extract memo field elements

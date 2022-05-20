@@ -230,6 +230,7 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
 void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::vector<SpOutputProposalV1> &output_proposals,
+    const rct::key &input_context,
     const rct::xmr_amount change_amount,
     OutputProposalSetExtraTypesContextV1 &additional_outputs_context_out,
     std::vector<OutputProposalSetExtraTypesV1> &additional_outputs_out)
@@ -256,6 +257,7 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
 
         const bool single_is_self_send{
                 jamtis::try_get_self_send_type(output_proposals[0],
+                    input_context,
                     wallet_spend_pubkey,
                     k_view_balance,
                     single_self_send_type)
@@ -315,8 +317,14 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
             // 2-out txs need 1 shared enote ephemeral pubkey; add a dummy output here since the outputs have different
             //   enote ephemeral pubkeys
 
-            if (jamtis::is_self_send_output_proposal(output_proposals[0], wallet_spend_pubkey, k_view_balance) ||
-                jamtis::is_self_send_output_proposal(output_proposals[1], wallet_spend_pubkey, k_view_balance))
+            if (jamtis::is_self_send_output_proposal(output_proposals[0],
+                    input_context,
+                    wallet_spend_pubkey,
+                    k_view_balance) ||
+                jamtis::is_self_send_output_proposal(output_proposals[1],
+                    input_context,
+                    wallet_spend_pubkey,
+                    k_view_balance))
             {
                 // if we have at least 1 self-send already, we can just make a normal dummy output
 
@@ -352,12 +360,14 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
 
             const bool first_is_self_send{
                     jamtis::try_get_self_send_type(output_proposals[0],
+                        input_context,
                         wallet_spend_pubkey,
                         k_view_balance,
                         first_self_send_type)
                 };
             const bool second_is_self_send{
                     jamtis::try_get_self_send_type(output_proposals[1],
+                        input_context,
                         wallet_spend_pubkey,
                         k_view_balance,
                         second_self_send_type)
@@ -401,7 +411,10 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
 
             for (const SpOutputProposalV1 &output_proposal : output_proposals)
             {
-                if (jamtis::is_self_send_output_proposal(output_proposal, wallet_spend_pubkey, k_view_balance))
+                if (jamtis::is_self_send_output_proposal(output_proposal,
+                    input_context,
+                    wallet_spend_pubkey,
+                    k_view_balance))
                 {
                     has_self_send = true;
                     break;
@@ -519,6 +532,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::vector<SpOutputProposalV1> &original_output_proposals,
@@ -544,6 +558,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     get_additional_output_types_for_output_set_v1(wallet_spend_pubkey,
         k_view_balance,
         original_output_proposals,
+        input_context,
         change_amount,
         additional_outputs_context,
         additional_outputs);
@@ -580,6 +595,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const rct::xmr_amount transaction_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<SpOutputProposalV1> &output_proposals_inout)
@@ -592,6 +608,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
         transaction_fee,
         change_destination,
         dummy_destination,
+        input_context,
         wallet_spend_pubkey,
         k_view_balance,
         output_proposals_inout,
@@ -608,7 +625,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal : new_selfsend_proposals)
     {
         output_proposals_inout.emplace_back();
-        selfsend_proposal.get_output_proposal_v1(k_view_balance, output_proposals_inout.back());
+        selfsend_proposal.get_output_proposal_v1(k_view_balance, input_context, output_proposals_inout.back());
     }
 }
 //-------------------------------------------------------------------------------------------------------------------

@@ -350,7 +350,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
                 .m_enote_ephemeral_privkey = make_secret_key(),
                 .m_partial_memo = TxExtra{}
             };
-        payment_proposal_temp.get_output_proposal_v1(output_proposal_temp);
+        payment_proposal_temp.get_output_proposal_v1(rct::zero(), output_proposal_temp);
 
         input_enotes.emplace_back();
         output_proposal_temp.get_enote_v1(input_enotes.back());
@@ -366,6 +366,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     {
         ASSERT_TRUE(try_get_enote_record_v1(input_enotes[input_index],
             input_enote_ephemeral_pubkeys[input_index],
+            rct::zero(),
             keys.K_1_base,
             keys.k_vb,
             input_enote_records[input_index]));
@@ -440,20 +441,21 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment_proposal : explicit_payments_selfsend)
     {
         all_output_proposals.emplace_back();
-        selfsend_payment_proposal.get_output_proposal_v1(keys.k_vb, all_output_proposals.back());
+        selfsend_payment_proposal.get_output_proposal_v1(keys.k_vb, rct::zero(), all_output_proposals.back());
     }
 
     for (const jamtis::JamtisPaymentProposalV1 &payment_proposal : explicit_payments)
     {
         all_output_proposals.emplace_back();
-        payment_proposal.get_output_proposal_v1(all_output_proposals.back());
+        payment_proposal.get_output_proposal_v1(rct::zero(), all_output_proposals.back());
     }
 
     // - select inputs
     const sp::OutputSetContextForInputSelectionV1 output_set_context{
             keys.K_1_base,
             keys.k_vb,
-            all_output_proposals
+            all_output_proposals,
+            rct::zero()
         };
     const sp::InputSelectorMockSimpleV1 input_selector{enote_store};
     const sp::FeeCalculatorMockTrivial tx_fee_calculator;  //trivial fee calculator so we can use specified input fee

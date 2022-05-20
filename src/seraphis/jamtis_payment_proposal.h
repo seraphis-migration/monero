@@ -73,9 +73,10 @@ struct JamtisPaymentProposalV1 final
 
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
+    * param: input_context -
     * outparam: output_proposal_out -
     */
-    void get_output_proposal_v1(SpOutputProposalV1 &output_proposal_out) const;
+    void get_output_proposal_v1(const rct::key &input_context, SpOutputProposalV1 &output_proposal_out) const;
 
     /**
     * brief: gen - generate a random proposal
@@ -108,9 +109,11 @@ struct JamtisPaymentProposalSelfSendV1 final
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
     * param: viewbalance_privkey -
+    * param: input_context -
     * outparam: output_proposal_out -
     */
     void get_output_proposal_v1(const crypto::secret_key &viewbalance_privkey,
+        const rct::key &input_context,
         SpOutputProposalV1 &output_proposal_out) const;
 
     /**
@@ -127,24 +130,27 @@ struct JamtisPaymentProposalSelfSendV1 final
 /**
 * brief: try_get_self_send_type - if the proposal passed in is a self-send type, get the type
 * param: output_proposal -
+* param: input_context -
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
 * outparam: type_out -
 * return: true if it's a self-send proposal
 */
 bool try_get_self_send_type(const SpOutputProposalV1 &output_proposal,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     JamtisSelfSendType &type_out);
-
 /**
 * brief: is_self_send_output_proposal - test if an output proposal is a self-send-type
 * param: output_proposal -
+* param: input_contex t-
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
 * return: true if it's a self-send proposal
 */
 bool is_self_send_output_proposal(const SpOutputProposalV1 &output_proposal,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance);
 

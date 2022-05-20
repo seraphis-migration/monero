@@ -163,12 +163,14 @@ static void get_final_enote_record_info_v1_helper(const rct::key &sender_receive
 bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const crypto::key_derivation &sender_receiver_DH_derivation,
+    const rct::key &input_context,
     SpBasicEnoteRecordV1 &basic_record_out)
 {
     // get basic record
 
     // q', K'_1 (jamtis plain variants)
     if (!jamtis::try_get_jamtis_nominal_spend_key_plain(sender_receiver_DH_derivation,
+            input_context,
             enote.m_core.m_onetime_address,
             enote.m_view_tag,
             basic_record_out.m_nominal_sender_receiver_secret,
@@ -188,6 +190,7 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const crypto::secret_key &k_find_received,
     hw::device &hwdev,
     SpBasicEnoteRecordV1 &basic_record_out)
@@ -198,7 +201,7 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     crypto::key_derivation derivation;
     hwdev.generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey), k_find_received, derivation);
 
-    return try_get_basic_enote_record_v1(enote, enote_ephemeral_pubkey, derivation, basic_record_out);
+    return try_get_basic_enote_record_v1(enote, enote_ephemeral_pubkey, derivation, input_context, basic_record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
@@ -247,6 +250,7 @@ bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_reco
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
@@ -256,6 +260,7 @@ bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
     SpBasicEnoteRecordV1 basic_record;
     if (!try_get_basic_enote_record_v1(enote,
             enote_ephemeral_pubkey,
+            input_context,
             k_find_received,
             hw::get_device("default"),
             basic_record))
@@ -323,6 +328,7 @@ bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_enote_record_v1_plain(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out)
@@ -334,6 +340,7 @@ bool try_get_enote_record_v1_plain(const SpEnoteV1 &enote,
     SpBasicEnoteRecordV1 basic_record;
     if (!try_get_basic_enote_record_v1(enote,
             enote_ephemeral_pubkey,
+            input_context,
             k_find_received,
             hw::get_device("default"),
             basic_record))
@@ -370,6 +377,7 @@ void get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_r
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_enote_record_v1_selfsend_for_type(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &s_generate_address,
@@ -378,10 +386,14 @@ bool try_get_enote_record_v1_selfsend_for_type(const SpEnoteV1 &enote,
 {
     // sender-receiver secret for expected self-send type
     rct::key q;
-    jamtis::make_jamtis_sender_receiver_secret_selfsend(k_view_balance, enote_ephemeral_pubkey, expected_type, q);
+    jamtis::make_jamtis_sender_receiver_secret_selfsend(k_view_balance,
+        enote_ephemeral_pubkey,
+        input_context,
+        expected_type,
+        q);
 
     // decrypt encrypted address tag
-    jamtis::address_tag_t decrypted_addr_tag{decrypt_address_tag(q, enote.m_addr_tag_enc)};
+    const jamtis::address_tag_t decrypted_addr_tag{decrypt_address_tag(q, enote.m_addr_tag_enc)};
 
     // try to get the address index (includes MAC check)
     if (!try_get_address_index(decrypted_addr_tag, record_out.m_address_index))
@@ -429,6 +441,7 @@ bool try_get_enote_record_v1_selfsend_for_type(const SpEnoteV1 &enote,
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &s_generate_address,
@@ -441,6 +454,7 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     {
         if (try_get_enote_record_v1_selfsend_for_type(enote,
             enote_ephemeral_pubkey,
+            input_context,
             wallet_spend_pubkey,
             k_view_balance,
             s_generate_address,
@@ -454,6 +468,7 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out)
@@ -464,6 +479,7 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
 
     return try_get_enote_record_v1_selfsend(enote,
         enote_ephemeral_pubkey,
+        input_context,
         wallet_spend_pubkey,
         k_view_balance,
         s_generate_address,
@@ -472,14 +488,25 @@ bool try_get_enote_record_v1_selfsend(const SpEnoteV1 &enote,
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out)
 {
     // note: check for selfsend first since it is more efficient
     //       (assumes selfsends and plain enotes appear in similar quantities)
-    return try_get_enote_record_v1_selfsend(enote, enote_ephemeral_pubkey, wallet_spend_pubkey, k_view_balance, record_out) ||
-        try_get_enote_record_v1_plain(enote, enote_ephemeral_pubkey, wallet_spend_pubkey, k_view_balance, record_out);
+    return try_get_enote_record_v1_selfsend(enote,
+            enote_ephemeral_pubkey,
+            input_context,
+            wallet_spend_pubkey,
+            k_view_balance,
+            record_out) ||
+        try_get_enote_record_v1_plain(enote,
+            enote_ephemeral_pubkey,
+            input_context,
+            wallet_spend_pubkey,
+            k_view_balance,
+            record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,
