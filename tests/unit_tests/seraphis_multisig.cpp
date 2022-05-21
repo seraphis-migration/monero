@@ -292,9 +292,8 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     const std::uint32_t num_signers,
     const std::vector<std::uint32_t> &requested_signers,
     const std::vector<rct::xmr_amount> &in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts_explicit_selfsend,
-    const std::vector<rct::xmr_amount> &out_amounts_explicit,
-    const std::vector<rct::xmr_amount> &out_amounts_opaque,
+    const std::vector<rct::xmr_amount> &out_amounts_normal,
+    const std::vector<rct::xmr_amount> &out_amounts_selfsend,
     const sp::DiscretizedFee &fee,
     const sp::SpTxSquashedV1::SemanticRulesVersion semantic_rules_version)
 {
@@ -394,13 +393,24 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     const std::size_t num_bin_members{2};
 
     // a) prepare outputs
-    // - explicit self-send payments
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> explicit_payments_selfsend;
-    explicit_payments_selfsend.reserve(out_amounts_explicit_selfsend.size());
 
-    for (const rct::xmr_amount out_amount : out_amounts_explicit_selfsend)
+    // - normal payments
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payments;
+    normal_payments.reserve(out_amounts_normal.size());
+
+    for (const rct::xmr_amount out_amount : out_amounts_normal)
     {
-        explicit_payments_selfsend.emplace_back(
+        normal_payments.emplace_back();
+        normal_payments.back().gen(out_amount, 0);
+    }
+
+    // - self-send payments
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments;
+    selfsend_payments.reserve(out_amounts_selfsend.size());
+
+    for (const rct::xmr_amount out_amount : out_amounts_selfsend)
+    {
+        selfsend_payments.emplace_back(
                 JamtisPaymentProposalSelfSendV1{
                     .m_destination = user_address,
                     .m_amount = out_amount,
@@ -411,52 +421,10 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
             );
     }
 
-    // - explicit payments
-    std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments;
-    explicit_payments.reserve(out_amounts_explicit.size());
-
-    for (const rct::xmr_amount out_amount : out_amounts_explicit)
-    {
-        explicit_payments.emplace_back();
-        explicit_payments.back().gen(out_amount, 0);
-    }
-
-    // - opaque payments
-    std::vector<SpOutputProposalV1> opaque_payments;
-    opaque_payments.reserve(out_amounts_opaque.size());
-
-    for (const rct::xmr_amount out_amount : out_amounts_opaque)
-    {
-        opaque_payments.emplace_back();
-        opaque_payments.back().gen(out_amount, 0);
-    }
-
-    // - prepare the output set for finalization (must do this before selecting inputs)
-    prepare_multisig_output_proposals_v1(explicit_payments_selfsend.size() + explicit_payments.size(), opaque_payments);
-
     // b) select inputs to spend
-    // - collect all output proposals
-    std::vector<SpOutputProposalV1> all_output_proposals{opaque_payments};
-
-    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment_proposal : explicit_payments_selfsend)
-    {
-        all_output_proposals.emplace_back();
-        selfsend_payment_proposal.get_output_proposal_v1(keys.k_vb, rct::zero(), all_output_proposals.back());
-    }
-
-    for (const jamtis::JamtisPaymentProposalV1 &payment_proposal : explicit_payments)
-    {
-        all_output_proposals.emplace_back();
-        payment_proposal.get_output_proposal_v1(rct::zero(), all_output_proposals.back());
-    }
 
     // - select inputs
-    const sp::OutputSetContextForInputSelectionV1 output_set_context{
-            keys.K_1_base,
-            keys.k_vb,
-            all_output_proposals,
-            rct::zero()
-        };
+    const sp::OutputSetContextForInputSelectionV1 output_set_context{normal_payments, selfsend_payments};
     const sp::InputSelectorMockSimpleV1 input_selector{enote_store};
     const sp::FeeCalculatorMockTrivial tx_fee_calculator;  //trivial fee calculator so we can use specified input fee
 
@@ -484,31 +452,20 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     }
 
     // c) finalize output set (add change/dummy outputs)
-    // - enote ephemeral privkey entropy and seed
-    crypto::secret_key enote_ephemeral_privkey_entropy;
-    crypto::rand(32, to_bytes(enote_ephemeral_privkey_entropy));
-
-    crypto::secret_key enote_ephemeral_privkey_seed;
-    ASSERT_NO_THROW(make_multisig_enote_ephemeral_privkey_seed_v1(enote_ephemeral_privkey_entropy,
-        full_input_proposals,
-        enote_ephemeral_privkey_seed));
 
     // - finalize the set
     ASSERT_NO_THROW(finalize_multisig_output_proposals_v1(full_input_proposals,
         reported_final_fee,
         user_address,
         user_address,
-        keys.K_1_base,
         keys.k_vb,
-        enote_ephemeral_privkey_seed,
-        std::move(explicit_payments_selfsend),
-        explicit_payments,
-        opaque_payments));
+        normal_payments,
+        selfsend_payments));
 
     // - check fee after finalizing output proposal set (trivial fee calculator makes this meaningless here)
     ASSERT_TRUE(tx_fee_calculator.get_fee(tx_fee_per_weight,
             full_input_proposals.size(),
-            opaque_payments.size() + explicit_payments.size()) ==
+            normal_payments.size() + selfsend_payments.size()) ==
         reported_final_fee);
 
     // d) set signers who are requested to participate
@@ -531,11 +488,11 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     std::string version_string;
     make_versioning_string(semantic_rules_version, version_string);
 
-    ASSERT_NO_THROW(make_v1_multisig_tx_proposal_v1(accounts[0].get_threshold(),
+    ASSERT_NO_THROW(make_v1_multisig_tx_proposal_v1(keys.k_vb,
+        accounts[0].get_threshold(),
         accounts[0].get_signers().size(),
-        enote_ephemeral_privkey_entropy,
-        std::move(explicit_payments),
-        std::move(opaque_payments),
+        std::move(normal_payments),
+        std::move(selfsend_payments),
         TxExtra{},
         version_string,
         full_input_proposals,
@@ -564,7 +521,8 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
         if (std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end())
         {
-            ASSERT_NO_THROW(make_v1_multisig_input_init_set_v1(accounts[signer_index].get_base_pubkey(),
+            ASSERT_NO_THROW(make_v1_multisig_input_init_set_v1(keys.k_vb,
+                accounts[signer_index].get_base_pubkey(),
                 accounts[signer_index].get_threshold(),
                 accounts[signer_index].get_signers(),
                 multisig_tx_proposal,
@@ -577,7 +535,8 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         }
         else
         {
-            ASSERT_ANY_THROW(make_v1_multisig_input_init_set_v1(accounts[signer_index].get_base_pubkey(),
+            ASSERT_ANY_THROW(make_v1_multisig_input_init_set_v1(keys.k_vb,
+                accounts[signer_index].get_base_pubkey(),
                 accounts[signer_index].get_threshold(),
                 accounts[signer_index].get_signers(),
                 multisig_tx_proposal,
@@ -637,7 +596,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
     // b) build partial tx
     SpTxProposalV1 tx_proposal;
-    multisig_tx_proposal.get_v1_tx_proposal_v1(tx_proposal);
+    multisig_tx_proposal.get_v1_tx_proposal_v1(keys.k_vb, tx_proposal);
 
     SpPartialTxV1 partial_tx;
     ASSERT_NO_THROW(make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), fee, version_string, partial_tx));
@@ -707,29 +666,28 @@ TEST(seraphis_multisig, txtype_squashed_v1)
     EXPECT_TRUE(fee_one == rct::xmr_amount{1});
 
     // test M-of-N combos (and combinations of requested signers)
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 2, {0,1},   {2}, {}, {1}, {}, fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {0},     {2}, {}, {1}, {}, fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {1},     {2}, {}, {1}, {}, fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 3, {0,2},   {2}, {}, {1}, {}, fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(3, 3, {0,1,2}, {2}, {}, {1}, {}, fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {1,3},   {2}, {}, {1}, {}, fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {0,1,2,3}, {2}, {}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 2, {0,1},     {2}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {0},       {2}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 3, {1},       {2}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 3, {0,2},     {2}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(3, 3, {0,1,2},   {2}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {1,3},     {2}, {1}, {}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(2, 4, {0,1,2,3}, {2}, {1}, {}, fee_one, semantic_rules_version));
 
     // test various combinations of inputs/outputs
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {1},   { },   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {1},   {0},   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {1},   { },   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {1},   { },   { },   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   { },   {1},   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {2},   { },   fee_zero, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, { },   {2},   {0},   fee_zero, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {2},   { },   fee_zero, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2}, {0},   {1},   {0},   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3}, { },   {1},   {0},   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3}, {1},   {1},   {0},   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {1},   {1},   {0},   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {1},   {1},   {1},   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4}, {0},   {1},   {1},   fee_one, semantic_rules_version));
-    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {6,6}, {1,1}, {1,1}, {1,1}, fee_one, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2},   {1},   { },   fee_one,  semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2},   {1},   { },   fee_one,  semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2},   {1},   {0},   fee_one,  semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2},   { },   {1},   fee_one,  semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2},   {2},   { },   fee_zero, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2},   {2},   { },   fee_zero, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2},   {2},   {0},   fee_zero, semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {2},   {1},   {0},   fee_one,  semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3},   {1},   { },   fee_one,  semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {3},   {1},   {1},   fee_one,  semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4},   {1},   {1},   fee_one,  semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4},   {1},   {1},   fee_one,  semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {4},   {1},   {0},   fee_one,  semantic_rules_version));
+    EXPECT_NO_THROW(seraphis_multisig_tx_v1_test(1, 2, {0}, {6,6}, {1,1}, {1,1}, fee_one,  semantic_rules_version));
 }
 //-------------------------------------------------------------------------------------------------------------------

@@ -126,12 +126,10 @@ struct SpMultisigInputProposalV1 final
 ///
 struct SpMultisigTxProposalV1 final
 {
-    /// entropy for generating enote ephemeral privkeys of outputs (explicit payments and opaque self-sends)
-    crypto::secret_key m_enote_ephemeral_privkey_entropy;
-    /// tx outputs with known addresses
-    std::vector<jamtis::JamtisPaymentProposalV1> m_explicit_payments;
-    /// tx outputs with unknown addresses (may include self-sends and dummy outputs)
-    std::vector<SpOutputProposalV1> m_opaque_payments;
+    /// normal tx outputs
+    std::vector<jamtis::JamtisPaymentProposalV1> m_normal_payments;
+    /// self-send tx outputs
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> m_selfsend_payments;
     /// miscellaneous memo elements to add to the tx memo
     TxExtra m_partial_memo;
     /// tx inputs to sign with multisig
@@ -146,15 +144,16 @@ struct SpMultisigTxProposalV1 final
     std::string m_version_string;
 
     /// convert to plain tx proposal (auto-checks the tx proposal semantics)
-    void get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_out) const;
+    void get_v1_tx_proposal_v1(const crypto::secret_key &k_view_balance, SpTxProposalV1 &tx_proposal_out) const;
 
     /// get the tx proposal prefix that will be signed by input composition proofs
-    void get_proposal_prefix_v1(rct::key &proposal_prefix_out) const;
+    void get_proposal_prefix_v1(const crypto::secret_key &k_view_balance, rct::key &proposal_prefix_out) const;
 
     /// statically get the tx proposal prefix that will be signed by input composition proofs
     /// - use this when the proposal prefix is needed but a complete multisig tx proposal isn't available
-    static void get_proposal_prefix_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
-        std::vector<SpOutputProposalV1> opaque_payments,
+    static void get_proposal_prefix_v1(const crypto::secret_key &k_view_balance,
+        std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
+        std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
         TxExtra partial_memo,
         std::string version_string,
         rct::key &proposal_prefix_out);

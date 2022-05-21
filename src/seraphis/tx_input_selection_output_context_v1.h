@@ -37,7 +37,6 @@
 #include "crypto/crypto.h"
 #include "jamtis_payment_proposal.h"
 #include "ringct/rctTypes.h"
-#include "tx_builder_types.h"
 #include "tx_input_selection_output_context.h"
 
 //third party headers
@@ -56,13 +55,7 @@ class OutputSetContextForInputSelectionV1 final : public OutputSetContextForInpu
 {
 public:
 //constructors
-    OutputSetContextForInputSelectionV1(const rct::key &wallet_spend_pubkey,
-        const crypto::secret_key &k_view_balance,
-        const std::vector<SpOutputProposalV1> &output_proposals,
-        const rct::key &input_context);
-
-    OutputSetContextForInputSelectionV1(
-        const std::vector<jamtis::JamtisPaymentProposalV1> &normal_payment_proposals,
+    OutputSetContextForInputSelectionV1(const std::vector<jamtis::JamtisPaymentProposalV1> &normal_payment_proposals,
         const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payment_proposals);
 
 //overloaded operators

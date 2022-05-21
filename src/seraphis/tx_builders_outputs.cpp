@@ -64,6 +64,23 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 // check that all enote ephemeral pubkeys in an output proposal set are unique
 //-------------------------------------------------------------------------------------------------------------------
+static bool ephemeral_pubkeys_are_unique(const std::vector<SpOutputProposalV1> &output_proposals)
+{
+    // record all as 8*K_e to remove torsion elements if they exist
+    std::unordered_set<rct::key> enote_ephemeral_pubkeys;
+    rct::key temp_enote_ephemeral_pubkey;
+
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
+    {
+        temp_enote_ephemeral_pubkey = output_proposal.m_enote_ephemeral_pubkey;
+        enote_ephemeral_pubkeys.insert(rct::scalarmultKey(temp_enote_ephemeral_pubkey, rct::EIGHT));
+    }
+
+    return enote_ephemeral_pubkeys.size() == output_proposals.size();
+}
+//-------------------------------------------------------------------------------------------------------------------
+// check that all enote ephemeral pubkeys in an output proposal set are unique
+//-------------------------------------------------------------------------------------------------------------------
 static bool ephemeral_pubkeys_are_unique(const std::vector<jamtis::JamtisPaymentProposalV1> &normal_payment_proposals,
     const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payment_proposals)
 {
@@ -582,7 +599,6 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &input_context,
-    const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::vector<jamtis::JamtisPaymentProposalV1> &original_normal_proposals,
     const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &original_selfsend_proposals,
@@ -609,7 +625,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
         new_normal_proposals.size() +
         new_selfsend_proposals.size());
 
-    for (jamtis::JamtisPaymentProposalV1 &normal_proposal : original_normal_proposals)
+    for (const jamtis::JamtisPaymentProposalV1 &normal_proposal : original_normal_proposals)
     {
         output_proposals_out.emplace_back();
         normal_proposal.get_output_proposal_v1(input_context, output_proposals_out.back());
@@ -621,7 +637,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
         selfsend_proposal.get_output_proposal_v1(k_view_balance, input_context, output_proposals_out.back());
     }
 
-    for (jamtis::JamtisPaymentProposalV1 &normal_proposal : new_normal_proposals)
+    for (const jamtis::JamtisPaymentProposalV1 &normal_proposal : new_normal_proposals)
     {
         output_proposals_out.emplace_back();
         normal_proposal.get_output_proposal_v1(input_context, output_proposals_out.back());
@@ -633,7 +649,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
         selfsend_proposal.get_output_proposal_v1(k_view_balance, input_context, output_proposals_out.back());
     }
 
-    std::sort(output_proposals_out.begin(), output_proposals_out.end());
+    //note: don't sort output proposals here so unit tests are easier
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal)

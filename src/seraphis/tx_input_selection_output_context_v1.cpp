@@ -37,7 +37,6 @@
 #include "jamtis_support_types.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "tx_builder_types.h"
 #include "tx_builders_outputs.h"
 
 //third party headers
@@ -53,24 +52,6 @@
 
 namespace sp
 {
-//-------------------------------------------------------------------------------------------------------------------
-// check that all enote ephemeral pubkeys in an output proposal set are unique
-//-------------------------------------------------------------------------------------------------------------------
-static bool ephemeral_pubkeys_are_unique(const std::vector<SpOutputProposalV1> &output_proposals)
-{
-    for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
-    {
-        if (std::find_if(output_proposals.begin(), output_it,
-                    [&output_it](const SpOutputProposalV1 &previous_proposal) -> bool
-                    {
-                        return previous_proposal.m_enote_ephemeral_pubkey == output_it->m_enote_ephemeral_pubkey;
-                    }
-                ) != output_it)
-            return false;
-    }
-
-    return true;
-}
 //-------------------------------------------------------------------------------------------------------------------
 // check that all enote ephemeral pubkeys in an output proposal set are unique
 //-------------------------------------------------------------------------------------------------------------------
@@ -114,33 +95,6 @@ static std::size_t compute_num_additional_outputs(const std::size_t num_outputs,
     return additional_outputs.size();
 }
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-OutputSetContextForInputSelectionV1::OutputSetContextForInputSelectionV1(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const std::vector<SpOutputProposalV1> &output_proposals,
-    const rct::key &input_context) :
-        m_num_outputs{output_proposals.size()},
-        m_output_ephemeral_pubkeys_are_unique{ephemeral_pubkeys_are_unique(output_proposals)}
-{
-    // collect self-send output types
-    jamtis::JamtisSelfSendType temp_self_send_output_type;
-
-    for (const SpOutputProposalV1 &output_proposal : output_proposals)
-    {
-        if (jamtis::try_get_self_send_type(output_proposal,
-                input_context,
-                wallet_spend_pubkey,
-                k_view_balance,
-                temp_self_send_output_type))
-            m_self_send_output_types.emplace_back(temp_self_send_output_type);
-    }
-
-    // collect total amount
-    m_total_output_amount = 0;
-
-    for (const SpOutputProposalV1 &output_proposal : output_proposals)
-        m_total_output_amount += output_proposal.get_amount();
-}
 //-------------------------------------------------------------------------------------------------------------------
 OutputSetContextForInputSelectionV1::OutputSetContextForInputSelectionV1(
     const std::vector<jamtis::JamtisPaymentProposalV1> &normal_payment_proposals,

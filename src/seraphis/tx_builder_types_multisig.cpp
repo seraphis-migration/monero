@@ -99,18 +99,23 @@ void SpMultisigInputProposalV1::get_enote_image(SpEnoteImage &image_out) const
     this->get_key_image(image_out.m_key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_out) const
+void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(const crypto::secret_key &k_view_balance,
+    SpTxProposalV1 &tx_proposal_out) const
 {
     // assemble output proposals
     std::vector<SpOutputProposalV1> output_proposals;
-    output_proposals.reserve(m_explicit_payments.size() + m_opaque_payments.size());
+    output_proposals.reserve(m_normal_payments.size() + m_selfsend_payments.size());
 
-    output_proposals = m_opaque_payments;
-
-    for (const jamtis::JamtisPaymentProposalV1 &explicit_payment : m_explicit_payments)
+    for (const jamtis::JamtisPaymentProposalV1 &normal_payment : m_normal_payments)
     {
         output_proposals.emplace_back();
-        explicit_payment.get_output_proposal_v1(rct::zero(), output_proposals.back());
+        normal_payment.get_output_proposal_v1(rct::zero(), output_proposals.back());
+    }
+
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment : m_selfsend_payments)
+    {
+        output_proposals.emplace_back();
+        selfsend_payment.get_output_proposal_v1(k_view_balance, rct::zero(), output_proposals.back());
     }
 
     // extract memo field elements
@@ -125,29 +130,31 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(SpTxProposalV1 &tx_proposal_o
     check_v1_tx_proposal_semantics_v1(tx_proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpMultisigTxProposalV1::get_proposal_prefix_v1(rct::key &proposal_prefix_out) const
+void SpMultisigTxProposalV1::get_proposal_prefix_v1(const crypto::secret_key &k_view_balance,
+    rct::key &proposal_prefix_out) const
 {
     // extract proposal
     SpTxProposalV1 tx_proposal;
-    this->get_v1_tx_proposal_v1(tx_proposal);
+    this->get_v1_tx_proposal_v1(k_view_balance, tx_proposal);
 
     // get prefix from proposal
     tx_proposal.get_proposal_prefix(m_version_string, proposal_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpMultisigTxProposalV1::get_proposal_prefix_v1(std::vector<jamtis::JamtisPaymentProposalV1> explicit_payments,
-    std::vector<SpOutputProposalV1> opaque_payments,
+void SpMultisigTxProposalV1::get_proposal_prefix_v1(const crypto::secret_key &k_view_balance,
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
     TxExtra partial_memo,
     std::string version_string,
     rct::key &proposal_prefix_out)
 {
     SpMultisigTxProposalV1 temp_proposal;
-    temp_proposal.m_explicit_payments = std::move(explicit_payments);
-    temp_proposal.m_opaque_payments = std::move(opaque_payments);
+    temp_proposal.m_normal_payments = std::move(normal_payments);
+    temp_proposal.m_selfsend_payments = std::move(selfsend_payments);
     temp_proposal.m_partial_memo = std::move(partial_memo);
     temp_proposal.m_version_string = std::move(version_string);
 
-    temp_proposal.get_proposal_prefix_v1(proposal_prefix_out);
+    temp_proposal.get_proposal_prefix_v1(k_view_balance, proposal_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpMultisigInputInitSetV1::try_get_nonces(const rct::key &masked_address,

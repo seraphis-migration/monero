@@ -144,7 +144,6 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &input_context,
-    const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::vector<jamtis::JamtisPaymentProposalV1> &original_normal_proposals,
     const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &original_selfsend_proposals,

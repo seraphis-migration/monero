@@ -207,18 +207,17 @@ TEST(seraphis_integration, txtype_squashed_v1)
             .m_enote_ephemeral_privkey = make_secret_key(),
             .m_partial_memo = TxExtra{}
         };
-    SpOutputProposalV1 output_proposal_B;
-    payment_proposal_B.get_output_proposal_v1(rct::zero(), output_proposal_B);
 
-    std::vector<SpOutputProposalV1> output_proposals;
-    output_proposals.emplace_back(output_proposal_B);
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals;
+    normal_payment_proposals.emplace_back(payment_proposal_B);
+
+    // - no self-send payments
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals;
 
     // c) select inputs for the tx
     const sp::OutputSetContextForInputSelectionV1 output_set_context{
-            keys_user_A.K_1_base,
-            keys_user_A.k_vb,
-            output_proposals,
-            rct::zero()
+            normal_payment_proposals,
+            selfsend_payment_proposals
         };
     const sp::InputSelectorMockSimpleV1 input_selector{enote_store_A};
     const sp::FeeCalculatorSpTxSquashedV1 tx_fee_calculator{
@@ -243,13 +242,15 @@ TEST(seraphis_integration, txtype_squashed_v1)
     ASSERT_NO_THROW(discretized_transaction_fee = DiscretizedFee{reported_final_fee});
     ASSERT_TRUE(discretized_transaction_fee == reported_final_fee);
 
+    std::vector<SpOutputProposalV1> output_proposals;
     ASSERT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount_A,
         reported_final_fee,
         user_address_A,
         user_address_A,
         rct::zero(),
-        keys_user_A.K_1_base,
         keys_user_A.k_vb,
+        normal_payment_proposals,
+        selfsend_payment_proposals,
         output_proposals));
 
     ASSERT_TRUE(tx_fee_calculator.get_fee(tx_fee_per_weight, contextual_inputs.size(), output_proposals.size()) ==
