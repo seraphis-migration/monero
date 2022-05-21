@@ -128,8 +128,8 @@ struct SpInputProposal final
     /// t_c
     crypto::secret_key m_commitment_mask;
 
-    /// less-than operator for sorting (VERY SLOW: USE WITH CAUTION)
-    bool operator<(const SpInputProposal &other_proposal) const;
+    /// less-than operator for sorting
+    bool operator<(const SpInputProposal &other_proposal) const { return m_key_image < other_proposal.m_key_image; }
 
     /**
     * brief: get_key_image - get this input's key image

@@ -71,14 +71,6 @@ void SpEnote::gen()
     m_amount_commitment = rct::pkGen();
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool SpInputProposal::operator<(const SpInputProposal &other_proposal) const
-{
-    crypto::key_image this_KI, other_KI;
-    this->get_key_image(this_KI);
-    other_proposal.get_key_image(other_KI);
-    return this_KI < other_KI;
-}
-//-------------------------------------------------------------------------------------------------------------------
 void SpInputProposal::get_enote_image_core(SpEnoteImage &image_out) const
 {
     // {Ko, C}

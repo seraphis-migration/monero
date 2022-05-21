@@ -60,19 +60,13 @@ struct SpInputProposalV1 final
     SpInputProposal m_core;
 
     /// less-than operator for sorting
-    bool operator<(const SpInputProposalV1 &other_proposal) const
-    {
-        return m_core < other_proposal.m_core;
-    }
+    bool operator<(const SpInputProposalV1 &other_proposal) const { return m_core < other_proposal.m_core; }
 
     /**
     * brief: get_enote_image_v1 - get this input's enote image in the squashed enote model
     * outparam: image_out -
     */
-    void get_enote_image_v1(SpEnoteImageV1 &image_out) const
-    {
-        return m_core.get_enote_image_core(image_out.m_core);
-    }
+    void get_enote_image_v1(SpEnoteImageV1 &image_out) const { return m_core.get_enote_image_core(image_out.m_core); }
 
     /// get the amount of this proposal
     rct::xmr_amount get_amount() const { return m_core.m_amount; }
@@ -108,10 +102,7 @@ struct SpOutputProposalV1 final
     TxExtra m_partial_memo;
 
     /// less-than operator for sorting
-    bool operator<(const SpOutputProposalV1 &other_proposal) const
-    {
-        return m_core < other_proposal.m_core;
-    }
+    bool operator<(const SpOutputProposalV1 &other_proposal) const { return m_core < other_proposal.m_core; }
 
     /// convert this destination into a v1 enote
     void get_enote_v1(SpEnoteV1 &enote_out) const;
