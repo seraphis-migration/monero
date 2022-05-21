@@ -33,6 +33,8 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "jamtis_payment_proposal.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
 #include "tx_builders_outputs.h"
@@ -41,12 +43,32 @@
 #include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
+#include <algorithm>
+#include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
 
 namespace sp
 {
+//-------------------------------------------------------------------------------------------------------------------
+// check that all enote ephemeral pubkeys in an output proposal set are unique
+//-------------------------------------------------------------------------------------------------------------------
+static bool ephemeral_pubkeys_are_unique_v1(const std::vector<SpOutputProposalV1> &output_proposals)
+{
+    for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
+    {
+        if (std::find_if(output_proposals.begin(), output_it,
+                    [&output_it](const SpOutputProposalV1 &previous_proposal) -> bool
+                    {
+                        return previous_proposal.m_enote_ephemeral_pubkey == output_it->m_enote_ephemeral_pubkey;
+                    }
+                ) != output_it)
+            return false;
+    }
+
+    return true;
+}
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static std::size_t compute_num_additional_outputs(const rct::key &wallet_spend_pubkey,
@@ -55,15 +77,27 @@ static std::size_t compute_num_additional_outputs(const rct::key &wallet_spend_p
     const rct::key &input_context,
     const rct::xmr_amount change_amount)
 {
-    OutputProposalSetExtraTypesContextV1 dummy;
+    // collect self-send output types
+    std::vector<jamtis::JamtisSelfSendType> self_send_output_types;
+    jamtis::JamtisSelfSendType temp_self_send_output_type;
+
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
+    {
+        if (jamtis::try_get_self_send_type(output_proposal,
+                input_context,
+                wallet_spend_pubkey,
+                k_view_balance,
+                temp_self_send_output_type))
+            self_send_output_types.emplace_back(temp_self_send_output_type);
+    }
+
+    // get additional outputs
     std::vector<OutputProposalSetExtraTypesV1> additional_outputs;
 
-    get_additional_output_types_for_output_set_v1(wallet_spend_pubkey,
-        k_view_balance,
-        output_proposals,
-        input_context,
+    get_additional_output_types_for_output_set_v1(output_proposals.size(),
+        self_send_output_types,
+        ephemeral_pubkeys_are_unique_v1(output_proposals),
         change_amount,
-        dummy,
         additional_outputs);
 
     return additional_outputs.size();

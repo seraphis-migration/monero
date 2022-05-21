@@ -34,6 +34,7 @@
 #include "crypto/crypto.h"
 #include "jamtis_destination.h"
 #include "jamtis_payment_proposal.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
@@ -130,12 +131,10 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
 * param: k_view_balance -
 * inoutparam: output_proposals_inout -
 */
-void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const std::vector<SpOutputProposalV1> &output_proposals,
-    const rct::key &input_context,
+void get_additional_output_types_for_output_set_v1(const std::size_t num_outputs,
+    const std::vector<jamtis::JamtisSelfSendType> &self_send_output_types,
+    const bool output_ephemeral_pubkeys_are_unique,
     const rct::xmr_amount change_amount,
-    OutputProposalSetExtraTypesContextV1 &additional_outputs_context_out,
     std::vector<OutputProposalSetExtraTypesV1> &additional_outputs_out);
 void make_additional_output_dummy_v1(const OutputProposalSetExtraTypesV1 additional_output_type,
     const OutputProposalSetExtraTypesContextV1 &additional_outputs_context,

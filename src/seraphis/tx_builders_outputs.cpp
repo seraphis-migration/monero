@@ -227,45 +227,28 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const std::vector<SpOutputProposalV1> &output_proposals,
-    const rct::key &input_context,
+void get_additional_output_types_for_output_set_v1(const std::size_t num_outputs,
+    const std::vector<jamtis::JamtisSelfSendType> &self_send_output_types,
+    const bool output_ephemeral_pubkeys_are_unique,
     const rct::xmr_amount change_amount,
-    OutputProposalSetExtraTypesContextV1 &additional_outputs_context_out,
     std::vector<OutputProposalSetExtraTypesV1> &additional_outputs_out)
 {
-    if (output_proposals.size() == 0)
-    {
-        // txs should have at least 1 non-change output
+    // txs should have at least 1 non-change output
+    CHECK_AND_ASSERT_THROW_MES(num_outputs > 0, "Finalize output proposals: 0 outputs specified. If you want to send "
+        "money to yourself, use a self-spend enote type instead of forcing it via a change enote type.");
 
-        CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: 0 outputs specified. If you want to send money to "
-            "yourself, use a self-spend enote type instead of forcing it via a change enote type.");
-    }
+    // sanity check
+    CHECK_AND_ASSERT_THROW_MES(self_send_output_types.size() <= num_outputs,
+        "Finalize output proposals: there are more self send outputs than outputs (bug).");
 
-    // set the shared enote ephemeral pubkey here: it will always be the first one when it is needed
-    additional_outputs_context_out.m_shared_enote_ephemeral_pubkey = output_proposals[0].m_enote_ephemeral_pubkey;
-
-    // add the extra outputs needed
+    // add the extra output needed
     additional_outputs_out.clear();
-    additional_outputs_out.reserve(2);
 
-    if (output_proposals.size() == 1)
+    if (num_outputs == 1)
     {
-        // if the output is a self-send, get its type
-        jamtis::JamtisSelfSendType single_self_send_type;
-
-        const bool single_is_self_send{
-                jamtis::try_get_self_send_type(output_proposals[0],
-                    input_context,
-                    wallet_spend_pubkey,
-                    k_view_balance,
-                    single_self_send_type)
-                };
-
         if (change_amount == 0)
         {
-            if (single_is_self_send)
+            if (self_send_output_types.size() == 1)
             {
                 // txs need at least 2 outputs; we already have a self-send, so make a random special dummy output
 
@@ -285,8 +268,8 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
             }
         }
         else if (/*change_amount > 0 &&*/
-            single_is_self_send &&
-            single_self_send_type == jamtis::JamtisSelfSendType::CHANGE)
+            self_send_output_types.size() == 1 &&
+            self_send_output_types[0] == jamtis::JamtisSelfSendType::CHANGE)
         {
             // 2-out txs may not have 2 self-send type enotes of the same type from the same wallet, so since
             //   we already have a change output (for some dubious reason) we can't have a special change here
@@ -310,21 +293,14 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
             additional_outputs_out.emplace_back(OutputProposalSetExtraTypesV1::SPECIAL_CHANGE);
         }
     }
-    else if (output_proposals.size() == 2 && ephemeral_pubkeys_are_unique_v1(output_proposals))
+    else if (num_outputs == 2 && output_ephemeral_pubkeys_are_unique)
     {
         if (change_amount == 0)
         {
             // 2-out txs need 1 shared enote ephemeral pubkey; add a dummy output here since the outputs have different
             //   enote ephemeral pubkeys
 
-            if (jamtis::is_self_send_output_proposal(output_proposals[0],
-                    input_context,
-                    wallet_spend_pubkey,
-                    k_view_balance) ||
-                jamtis::is_self_send_output_proposal(output_proposals[1],
-                    input_context,
-                    wallet_spend_pubkey,
-                    k_view_balance))
+            if (self_send_output_types.size() > 0)
             {
                 // if we have at least 1 self-send already, we can just make a normal dummy output
 
@@ -350,36 +326,18 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
             additional_outputs_out.emplace_back(OutputProposalSetExtraTypesV1::NORMAL_CHANGE);
         }
     }
-    else if (output_proposals.size() == 2 && !ephemeral_pubkeys_are_unique_v1(output_proposals))
+    else if (num_outputs == 2 && !output_ephemeral_pubkeys_are_unique)
     {
         if (change_amount == 0)
         {
-            // if the two outputs are self-sends, get their types
-            jamtis::JamtisSelfSendType first_self_send_type;
-            jamtis::JamtisSelfSendType second_self_send_type;
-
-            const bool first_is_self_send{
-                    jamtis::try_get_self_send_type(output_proposals[0],
-                        input_context,
-                        wallet_spend_pubkey,
-                        k_view_balance,
-                        first_self_send_type)
-                };
-            const bool second_is_self_send{
-                    jamtis::try_get_self_send_type(output_proposals[1],
-                        input_context,
-                        wallet_spend_pubkey,
-                        k_view_balance,
-                        second_self_send_type)
-                };
-
-            if (first_is_self_send && second_is_self_send && first_self_send_type == second_self_send_type)
+            if (self_send_output_types.size() == 2 &&
+                self_send_output_types[0] == self_send_output_types[1])
             {
                 CHECK_AND_ASSERT_THROW_MES(false, "Finalize output proposals: there are 2 self-send outputs with the same "
                     "type that share an enote ephemeral pubkey, but this can reduce user privacy. If you want to send "
                     "money to yourself, make independent self-spend types, or avoid calling this function (not recommended).");
             }
-            else if (first_is_self_send || second_is_self_send)
+            else if (self_send_output_types.size() > 0)
             {
                 // do nothing: the proposal set is already 'final'
             }
@@ -401,27 +359,12 @@ void get_additional_output_types_for_output_set_v1(const rct::key &wallet_spend_
     }
     else //(output_proposals.size() > 2)
     {
-        CHECK_AND_ASSERT_THROW_MES(ephemeral_pubkeys_are_unique_v1(output_proposals),
+        CHECK_AND_ASSERT_THROW_MES(output_ephemeral_pubkeys_are_unique,
             "Finalize output proposals: there are >2 outputs but their enote ephemeral pubkeys aren't all unique.");
 
         if (change_amount == 0)
         {
-            // see if there is a self-send proposal
-            bool has_self_send{false};
-
-            for (const SpOutputProposalV1 &output_proposal : output_proposals)
-            {
-                if (jamtis::is_self_send_output_proposal(output_proposal,
-                    input_context,
-                    wallet_spend_pubkey,
-                    k_view_balance))
-                {
-                    has_self_send = true;
-                    break;
-                }
-            }
-
-            if (has_self_send)
+            if (self_send_output_types.size() > 0)
             {
                 // do nothing: the proposal set is already 'final'
             }
@@ -551,16 +494,33 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
 
     const rct::xmr_amount change_amount{total_input_amount - output_sum};
 
-    // get output types to add
+    // collect self-send output types
+    std::vector<jamtis::JamtisSelfSendType> self_send_output_types;
+    jamtis::JamtisSelfSendType temp_self_send_output_type;
+
+    for (const SpOutputProposalV1 &output_proposal : original_output_proposals)
+    {
+        if (jamtis::try_get_self_send_type(output_proposal,
+                input_context,
+                wallet_spend_pubkey,
+                k_view_balance,
+                temp_self_send_output_type))
+            self_send_output_types.emplace_back(temp_self_send_output_type);
+    }
+
+    // set the shared enote ephemeral pubkey here: it will always be the first one when it is needed
     OutputProposalSetExtraTypesContextV1 additional_outputs_context;
+
+    if (original_output_proposals.size() > 0)
+        additional_outputs_context.m_shared_enote_ephemeral_pubkey = original_output_proposals[0].m_enote_ephemeral_pubkey;
+
+    // get output types to add
     std::vector<OutputProposalSetExtraTypesV1> additional_outputs;
 
-    get_additional_output_types_for_output_set_v1(wallet_spend_pubkey,
-        k_view_balance,
-        original_output_proposals,
-        input_context,
+    get_additional_output_types_for_output_set_v1(original_output_proposals.size(),
+        self_send_output_types,
+        ephemeral_pubkeys_are_unique_v1(original_output_proposals),
         change_amount,
-        additional_outputs_context,
         additional_outputs);
 
     // add the new outputs

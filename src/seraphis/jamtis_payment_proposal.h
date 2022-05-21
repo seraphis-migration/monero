@@ -77,7 +77,6 @@ struct JamtisPaymentProposalV1 final
     * outparam: output_proposal_out -
     */
     void get_output_proposal_v1(const rct::key &input_context, SpOutputProposalV1 &output_proposal_out) const;
-
     /**
     * brief: gen - generate a random proposal
     * param: amount -
@@ -115,7 +114,6 @@ struct JamtisPaymentProposalSelfSendV1 final
     void get_output_proposal_v1(const crypto::secret_key &viewbalance_privkey,
         const rct::key &input_context,
         SpOutputProposalV1 &output_proposal_out) const;
-
     /**
     * brief: gen - generate a random proposal
     * param: amount -
