@@ -53,6 +53,7 @@ extern "C"
 //third party headers
 
 //standard headers
+#include <list>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -184,6 +185,7 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     // copy enote
     basic_record_out.m_enote = enote;
     basic_record_out.m_enote_ephemeral_pubkey = enote_ephemeral_pubkey;
+    basic_record_out.m_input_context = input_context;
 
     return true;
 }
@@ -225,6 +227,7 @@ bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_reco
     // copy enote and record sender-receiver secret
     record_out.m_enote = basic_record.m_enote;
     record_out.m_enote_ephemeral_pubkey = basic_record.m_enote_ephemeral_pubkey;
+    record_out.m_input_context = basic_record.m_input_context;
     record_out.m_nominal_sender_receiver_secret = basic_record.m_nominal_sender_receiver_secret;
 
     return true;
@@ -300,6 +303,7 @@ bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     // copy enote and set type
     record_out.m_enote = basic_record.m_enote;
     record_out.m_enote_ephemeral_pubkey = basic_record.m_enote_ephemeral_pubkey;
+    record_out.m_input_context = basic_record.m_input_context;
     record_out.m_type = jamtis::JamtisEnoteType::PLAIN;
 
     return true;
@@ -369,6 +373,7 @@ void get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_r
     // copy misc pieces from the intermediate record
     record_out.m_enote = intermediate_record.m_enote;
     record_out.m_enote_ephemeral_pubkey = intermediate_record.m_enote_ephemeral_pubkey;
+    record_out.m_input_context = intermediate_record.m_input_context;
     record_out.m_amount = intermediate_record.m_amount;
     record_out.m_amount_blinding_factor = intermediate_record.m_amount_blinding_factor;
     record_out.m_address_index = intermediate_record.m_address_index;
@@ -434,6 +439,7 @@ bool try_get_enote_record_v1_selfsend_for_type(const SpEnoteV1 &enote,
     // copy enote and set type
     record_out.m_enote = enote;
     record_out.m_enote_ephemeral_pubkey = enote_ephemeral_pubkey;
+    record_out.m_input_context = input_context;
     record_out.m_type = jamtis::self_send_type_to_enote_type(expected_type);
 
     return true;
@@ -507,6 +513,23 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
             wallet_spend_pubkey,
             k_view_balance,
             record_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_standard_input_context_from_contextual_enote_records_v1(
+    const std::list<SpContextualEnoteRecordV1> &contextual_enote_records,
+    rct::key &input_context_out)
+{
+    // collect key images
+    std::vector<crypto::key_image> key_images;
+
+    for (const SpContextualEnoteRecordV1 &contextual_enote_record : contextual_enote_records)
+        key_images.emplace_back(contextual_enote_record.m_record.m_key_image);
+
+    // sort the key images
+    std::sort(key_images.begin(), key_images.end());
+
+    // make the input context
+    jamtis::make_jamtis_input_context_standard(key_images, input_context_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,

@@ -65,6 +65,8 @@ struct SpBasicEnoteRecordV1 final
     SpEnoteV1 m_enote;
     /// the enote's ephemeral pubkey
     rct::key m_enote_ephemeral_pubkey;
+    /// context of the tx input(s) associated with this enote
+    rct::key m_input_context;
     /// q': nominal shared secret
     rct::key m_nominal_sender_receiver_secret;
     /// K'_1: nominal spend key
@@ -84,6 +86,8 @@ struct SpIntermediateEnoteRecordV1 final
     SpEnoteV1 m_enote;
     /// the enote's ephemeral pubkey
     rct::key m_enote_ephemeral_pubkey;
+    /// context of the tx input(s) associated with this enote
+    rct::key m_input_context;
     /// q': nominal shared secret
     rct::key m_nominal_sender_receiver_secret;
     /// a: amount
@@ -104,6 +108,8 @@ struct SpEnoteRecordV1 final
     SpEnoteV1 m_enote;
     /// the enote's ephemeral pubkey
     rct::key m_enote_ephemeral_pubkey;
+    /// context of the tx input(s) associated with this enote
+    rct::key m_input_context;
     /// k_a: enote view privkey
     crypto::secret_key m_enote_view_privkey;
     /// a: amount
@@ -149,8 +155,6 @@ struct SpEnoteRecordContextV1 final
 
     /// origin status (unknown by default)
     OriginStatus m_origin_status{OriginStatus::UNKNOWN};
-    /// note if the enote is spendable (true by default)
-    bool m_is_spendable{true};
 };
 
 ////

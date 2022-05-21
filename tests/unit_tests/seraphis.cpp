@@ -1050,7 +1050,8 @@ TEST(seraphis, binned_reference_set)
         0)));  //max range, real at bottom
     EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 40000, 127, 8, 128, 40000/2)));  //realistic example
 
-    // intermittently fails if bins are unstably sorted after defining the real element's bin's rotation factor
+    // intermittently fails if unstably sorting bins will make the resulting reference set malformed
+    // note: this is a legacy test (current implementation is agnostic to unstable sorting)
     EXPECT_NO_THROW(EXPECT_TRUE(test_binned_reference_set(0, 100, 40, 4, 100, 0)));
 }
 //-------------------------------------------------------------------------------------------------------------------

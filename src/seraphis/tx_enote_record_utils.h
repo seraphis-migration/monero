@@ -47,13 +47,13 @@
 //third party headers
 
 //standard headers
+#include <list>
 
 //forward declarations
 
 
 namespace sp
 {
-
 
 /**
 * brief: try_get_basic_enote_record_v1 - try to extract a basic enote record from an enote
@@ -188,6 +188,10 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out);
+//todo
+void make_standard_input_context_from_contextual_enote_records_v1(
+    const std::list<SpContextualEnoteRecordV1> &contextual_enote_records,
+    rct::key &input_context_out);
 //todo
 void make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,
     const SpEnoteRecordSpentContextV1 &spent_context,

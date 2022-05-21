@@ -35,6 +35,7 @@
 #include "crypto/crypto.h"
 #include "jamtis_address_utils.h"
 #include "jamtis_core_utils.h"
+#include "jamtis_enote_utils.h"
 #include "misc_language.h"
 #include "misc_log_ex.h"
 #include "multisig/multisig_signer_set_filter.h"
@@ -383,6 +384,7 @@ void check_v1_multisig_public_input_proposal_semantics_v1(const SpMultisigPublic
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpMultisigPublicInputProposalV1 &proposal_out)
@@ -390,6 +392,7 @@ void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     // add components
     proposal_out.m_enote = enote;
     proposal_out.m_enote_ephemeral_pubkey = enote_ephemeral_pubkey;
+    proposal_out.m_input_context = input_context;
     proposal_out.m_address_mask = address_mask;
     proposal_out.m_commitment_mask = commitment_mask;
 
@@ -409,6 +412,7 @@ void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposal
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const crypto::secret_key &enote_view_privkey,
     const crypto::secret_key &input_amount_blinding_factor,
     const rct::xmr_amount &input_amount,
@@ -421,6 +425,7 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
     // set core
     make_v1_multisig_public_input_proposal_v1(enote,
         enote_ephemeral_pubkey,
+        input_context,
         address_mask,
         commitment_mask,
         proposal_out.m_core);
@@ -442,6 +447,7 @@ void make_v1_multisig_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
     // make multisig input proposal from enote record
     make_v1_multisig_input_proposal_v1(enote_record.m_enote,
         enote_record.m_enote_ephemeral_pubkey,
+        enote_record.m_input_context,
         enote_record.m_enote_view_privkey,
         enote_record.m_amount_blinding_factor,
         enote_record.m_amount,
@@ -459,7 +465,7 @@ bool try_get_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1
     SpEnoteRecordV1 enote_record;
     if (!try_get_enote_record_v1(public_input_proposal.m_enote,
             public_input_proposal.m_enote_ephemeral_pubkey,
-            rct::zero(),
+            public_input_proposal.m_input_context,
             wallet_spend_pubkey,
             k_view_balance,
             enote_record))
@@ -718,9 +724,24 @@ void make_v1_multisig_tx_proposal_v1(const crypto::secret_key &k_view_balance,
     proposal_out.m_aggregate_signer_set_filter = aggregate_signer_set_filter;
     proposal_out.m_version_string = std::move(version_string);
 
+    // compute input context
+    std::vector<crypto::key_image> key_images;
+
+    for (const SpMultisigInputProposalV1 &full_input_proposal : full_input_proposals)
+    {
+        key_images.emplace_back();
+        full_input_proposal.get_key_image(key_images.back());
+    }
+
+    std::sort(key_images.begin(), key_images.end());
+
+    rct::key input_context;
+    jamtis::make_jamtis_input_context_standard(key_images, input_context);
+
     // get proposal prefix
     rct::key proposal_prefix;
     SpMultisigTxProposalV1::get_proposal_prefix_v1(k_view_balance,
+        input_context,
         proposal_out.m_normal_payments,
         proposal_out.m_selfsend_payments,
         proposal_out.m_partial_memo,
@@ -731,16 +752,16 @@ void make_v1_multisig_tx_proposal_v1(const crypto::secret_key &k_view_balance,
     proposal_out.m_input_proof_proposals.clear();
     proposal_out.m_input_proof_proposals.reserve(full_input_proposals.size());
     rct::key masked_address_temp;
-    SpEnoteImage enote_image_temp;
+    crypto::key_image key_image_temp;
 
     for (const SpMultisigInputProposalV1 &full_input_proposal : full_input_proposals)
     {
         full_input_proposal.m_core.get_masked_address(masked_address_temp);
-        full_input_proposal.get_enote_image(enote_image_temp);
+        full_input_proposal.get_key_image(key_image_temp);
         proposal_out.m_input_proof_proposals.emplace_back(
                 sp_composition_multisig_proposal(proposal_prefix,
                     masked_address_temp,
-                    enote_image_temp.m_key_image)
+                    key_image_temp)
             );
     }
 

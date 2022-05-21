@@ -211,10 +211,9 @@ TEST(seraphis_integration, txtype_squashed_v1)
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals;
     normal_payment_proposals.emplace_back(payment_proposal_B);
 
-    // - no self-send payments
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals;
-
     // c) select inputs for the tx
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals;  //no self-send payments
+
     const sp::OutputSetContextForInputSelectionV1 output_set_context{
             normal_payment_proposals,
             selfsend_payment_proposals
@@ -237,6 +236,10 @@ TEST(seraphis_integration, txtype_squashed_v1)
         reported_final_fee,
         contextual_inputs));
 
+    // - compute input context
+    rct::key input_context;
+    make_standard_input_context_from_contextual_enote_records_v1(contextual_inputs, input_context);
+
     // d) finalize output proposals
     DiscretizedFee discretized_transaction_fee;
     ASSERT_NO_THROW(discretized_transaction_fee = DiscretizedFee{reported_final_fee});
@@ -247,7 +250,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
         reported_final_fee,
         user_address_A,
         user_address_A,
-        rct::zero(),
+        input_context,
         keys_user_A.k_vb,
         normal_payment_proposals,
         selfsend_payment_proposals,

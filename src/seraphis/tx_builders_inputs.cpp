@@ -40,12 +40,13 @@ extern "C"
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
-#include "seraphis_config_temp.h"
+#include "jamtis_enote_utils.h"
 #include "misc_language.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "seraphis_config_temp.h"
 #include "sp_composition_proof.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
@@ -256,6 +257,25 @@ bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
     make_v1_input_proposal_v1(enote_record, address_mask, commitment_mask, proposal_out);
 
     return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_standard_input_context_from_v1_input_proposals(const std::vector<SpInputProposalV1> &input_proposals,
+    rct::key &input_context_out)
+{
+    // collect key images
+    std::vector<crypto::key_image> key_images;
+
+    for (const SpInputProposalV1 &input_proposal : input_proposals)
+    {
+        key_images.emplace_back();
+        input_proposal.m_core.get_key_image(key_images.back());
+    }
+
+    // sort the key images
+    std::sort(key_images.begin(), key_images.end());
+
+    // make the input context
+    jamtis::make_jamtis_input_context_standard(key_images, input_context_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_image_proof_v1(const SpInputProposal &input_proposal,

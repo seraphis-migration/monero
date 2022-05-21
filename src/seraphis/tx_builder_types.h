@@ -160,20 +160,17 @@ struct SpAlignableMembershipProofV1 final
 };
 /*
 jamtis payment proposals -> select inputs and fee
+selected inputs -> input proposals
 selected inputs -> input context
 jamtis payment proposals + input amount + fee -> all jamtis payment proposals
 all jamtis payment proposals + input context -> output proposals
-output proposals + input context + fee -> tx proposal
-selected inputs + tx proposal -> input proposals
+output proposals -> tx proposal
 */
 ////
-// SpTxProposalV1: the context of the inputs, the set of outputs, miscellaneous memos, and the proposed fee
+// SpTxProposalV1: the proposed set of outputs, with miscellaneous memos
 ///
 struct SpTxProposalV1 final
 {
-    /// proposed input context (for consistency checks)
-    rct::key m_input_context;
-
     /// proposed outputs
     std::vector<SpEnoteV1> m_outputs;
     /// proposed tx supplement
@@ -181,9 +178,6 @@ struct SpTxProposalV1 final
     /// output amounts and blinding factors (for future balance proofs)
     std::vector<rct::xmr_amount> m_output_amounts;
     std::vector<crypto::secret_key> m_output_amount_commitment_blinding_factors;
-
-    /// proposed tx fee
-    DiscretizedFee m_proposed_fee;
 
     /// message to be signed by input spend proofs
     void get_proposal_prefix(const std::string &version_string, rct::key &proposal_prefix_out) const;

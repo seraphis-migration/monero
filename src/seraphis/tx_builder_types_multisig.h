@@ -65,6 +65,8 @@ struct SpMultisigPublicInputProposalV1 final
     SpEnoteV1 m_enote;
     /// the enote's ephemeral pubkey
     rct::key m_enote_ephemeral_pubkey;
+    /// the enote's input context
+    rct::key m_input_context;
 
     /// t_k
     crypto::secret_key m_address_mask;
@@ -144,6 +146,9 @@ struct SpMultisigTxProposalV1 final
     std::string m_version_string;
 
     /// convert to plain tx proposal (auto-checks the tx proposal semantics)
+    void get_v1_tx_proposal_v1(const crypto::secret_key &k_view_balance,
+        const rct::key &input_context,
+        SpTxProposalV1 &tx_proposal_out) const;
     void get_v1_tx_proposal_v1(const crypto::secret_key &k_view_balance, SpTxProposalV1 &tx_proposal_out) const;
 
     /// get the tx proposal prefix that will be signed by input composition proofs
@@ -152,10 +157,11 @@ struct SpMultisigTxProposalV1 final
     /// statically get the tx proposal prefix that will be signed by input composition proofs
     /// - use this when the proposal prefix is needed but a complete multisig tx proposal isn't available
     static void get_proposal_prefix_v1(const crypto::secret_key &k_view_balance,
+        const rct::key &input_context,
         std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
         std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
         TxExtra partial_memo,
-        std::string version_string,
+        const std::string &version_string,
         rct::key &proposal_prefix_out);
 };
 

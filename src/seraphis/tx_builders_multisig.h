@@ -78,12 +78,14 @@ void check_v1_multisig_public_input_proposal_semantics_v1(const SpMultisigPublic
 * brief: make_v1_multisig_public_input_proposal_v1 - make a public input proposal for multisig (can be sent to other people)
 * param: enote -
 * param: enote_ephemeral_pubkey -
+* param: input_context -
 * param: address_mask -
 * param: commitment_mask -
 * outparam: proposal_out -
 */
 void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpMultisigPublicInputProposalV1 &proposal_out);

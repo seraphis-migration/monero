@@ -33,9 +33,11 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "jamtis_enote_utils.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "sp_composition_proof.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
@@ -100,6 +102,7 @@ void SpMultisigInputProposalV1::get_enote_image(SpEnoteImage &image_out) const
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(const crypto::secret_key &k_view_balance,
+    const rct::key &input_context,
     SpTxProposalV1 &tx_proposal_out) const
 {
     // assemble output proposals
@@ -109,13 +112,13 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(const crypto::secret_key &k_v
     for (const jamtis::JamtisPaymentProposalV1 &normal_payment : m_normal_payments)
     {
         output_proposals.emplace_back();
-        normal_payment.get_output_proposal_v1(rct::zero(), output_proposals.back());
+        normal_payment.get_output_proposal_v1(input_context, output_proposals.back());
     }
 
     for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment : m_selfsend_payments)
     {
         output_proposals.emplace_back();
-        selfsend_payment.get_output_proposal_v1(k_view_balance, rct::zero(), output_proposals.back());
+        selfsend_payment.get_output_proposal_v1(k_view_balance, input_context, output_proposals.back());
     }
 
     // extract memo field elements
@@ -130,6 +133,27 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(const crypto::secret_key &k_v
     check_v1_tx_proposal_semantics_v1(tx_proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(const crypto::secret_key &k_view_balance,
+    SpTxProposalV1 &tx_proposal_out) const
+{
+    // compute input context and get tx proposal
+
+    // get the input context (assumes key images in composition proof proposals equal those in the input proposals)
+    std::vector<crypto::key_image> key_images;
+    key_images.reserve(m_input_proof_proposals.size());
+
+    for (const SpCompositionProofMultisigProposal &proof_proposal : m_input_proof_proposals)
+        key_images.emplace_back(proof_proposal.KI);
+
+    std::sort(key_images.begin(), key_images.end());
+
+    rct::key input_context;
+    jamtis::make_jamtis_input_context_standard(key_images, input_context);
+
+    // finish getting the tx proposal
+    get_v1_tx_proposal_v1(k_view_balance, input_context, tx_proposal_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void SpMultisigTxProposalV1::get_proposal_prefix_v1(const crypto::secret_key &k_view_balance,
     rct::key &proposal_prefix_out) const
 {
@@ -142,19 +166,24 @@ void SpMultisigTxProposalV1::get_proposal_prefix_v1(const crypto::secret_key &k_
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultisigTxProposalV1::get_proposal_prefix_v1(const crypto::secret_key &k_view_balance,
+    const rct::key &input_context,
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
     TxExtra partial_memo,
-    std::string version_string,
+    const std::string &version_string,
     rct::key &proposal_prefix_out)
 {
     SpMultisigTxProposalV1 temp_proposal;
     temp_proposal.m_normal_payments = std::move(normal_payments);
     temp_proposal.m_selfsend_payments = std::move(selfsend_payments);
     temp_proposal.m_partial_memo = std::move(partial_memo);
-    temp_proposal.m_version_string = std::move(version_string);
 
-    temp_proposal.get_proposal_prefix_v1(k_view_balance, proposal_prefix_out);
+    // extract proposal
+    SpTxProposalV1 tx_proposal;
+    temp_proposal.get_v1_tx_proposal_v1(k_view_balance, input_context, tx_proposal);
+
+    // get prefix from proposal
+    tx_proposal.get_proposal_prefix(version_string, proposal_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpMultisigInputInitSetV1::try_get_nonces(const rct::key &masked_address,

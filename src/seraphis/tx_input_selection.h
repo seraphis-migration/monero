@@ -74,6 +74,14 @@ public:
 };
 
 //todo
+/*
+    - note: this algorithm will fail to find a possible solution if there are combinations that lead to 0-change successes,
+      but the combination that was found has non-zero change that doesn't cover the differential fee of adding a change
+      output (and there are no solutions that can cover that additional change output differential fee)
+        - only a brute force search can find the success solution(s) to this problem (e.g. if step (4) fails, you could
+          fall-back to brute force search on the 0-change case; however, such cases will be extremely rare if they ever
+          actually occur, so it probably isn't worthwhile to implement)
+*/
 bool try_get_input_set_v1(const OutputSetContextForInputSelection &output_set_context,
     const std::size_t max_inputs_allowed,
     const InputSelectorV1 &input_selector,
