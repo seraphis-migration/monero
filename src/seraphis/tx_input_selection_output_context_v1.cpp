@@ -71,14 +71,32 @@ static bool ephemeral_pubkeys_are_unique_v1(const std::vector<SpOutputProposalV1
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static std::size_t compute_num_additional_outputs(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const std::vector<SpOutputProposalV1> &output_proposals,
-    const rct::key &input_context,
+static std::size_t compute_num_additional_outputs(const std::size_t num_outputs,
+    const bool output_ephemeral_pubkeys_are_unique,
+    const std::vector<jamtis::JamtisSelfSendType> &self_send_output_types,
     const rct::xmr_amount change_amount)
 {
+    // get additional outputs
+    std::vector<OutputProposalSetExtraTypesV1> additional_outputs;
+
+    get_additional_output_types_for_output_set_v1(num_outputs,
+        self_send_output_types,
+        output_ephemeral_pubkeys_are_unique,
+        change_amount,
+        additional_outputs);
+
+    return additional_outputs.size();
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+OutputSetContextForInputSelectionV1::OutputSetContextForInputSelectionV1(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    const std::vector<SpOutputProposalV1> &output_proposals,
+    const rct::key &input_context) :
+        m_num_outputs{output_proposals.size()},
+        m_output_ephemeral_pubkeys_are_unique{ephemeral_pubkeys_are_unique_v1(output_proposals)}
+{
     // collect self-send output types
-    std::vector<jamtis::JamtisSelfSendType> self_send_output_types;
     jamtis::JamtisSelfSendType temp_self_send_output_type;
 
     for (const SpOutputProposalV1 &output_proposal : output_proposals)
@@ -88,48 +106,37 @@ static std::size_t compute_num_additional_outputs(const rct::key &wallet_spend_p
                 wallet_spend_pubkey,
                 k_view_balance,
                 temp_self_send_output_type))
-            self_send_output_types.emplace_back(temp_self_send_output_type);
+            m_self_send_output_types.emplace_back(temp_self_send_output_type);
     }
 
-    // get additional outputs
-    std::vector<OutputProposalSetExtraTypesV1> additional_outputs;
+    // collect total amount
+    m_total_output_amount = 0;
 
-    get_additional_output_types_for_output_set_v1(output_proposals.size(),
-        self_send_output_types,
-        ephemeral_pubkeys_are_unique_v1(output_proposals),
-        change_amount,
-        additional_outputs);
-
-    return additional_outputs.size();
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
+        m_total_output_amount += output_proposal.get_amount();
 }
-//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 boost::multiprecision::uint128_t OutputSetContextForInputSelectionV1::get_total_amount() const
 {
-    boost::multiprecision::uint128_t total_output_amount{0};
-
-    for (const SpOutputProposalV1 &output_proposal : m_output_proposals)
-        total_output_amount += output_proposal.get_amount();
-
-    return total_output_amount;
+    return m_total_output_amount;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t OutputSetContextForInputSelectionV1::get_num_outputs_nochange() const
 {
     const std::size_t num_additional_outputs_no_change{
-        compute_num_additional_outputs(m_wallet_spend_pubkey, m_k_view_balance, m_output_proposals, m_input_context, 0)
+        compute_num_additional_outputs(m_num_outputs, m_output_ephemeral_pubkeys_are_unique, m_self_send_output_types, 0)
     };
 
-    return m_output_proposals.size() + num_additional_outputs_no_change;
+    return m_num_outputs + num_additional_outputs_no_change;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t OutputSetContextForInputSelectionV1::get_num_outputs_withchange() const
 {
     const std::size_t num_additional_outputs_with_change{
-        compute_num_additional_outputs(m_wallet_spend_pubkey, m_k_view_balance, m_output_proposals, m_input_context, 1)
+        compute_num_additional_outputs(m_num_outputs, m_output_ephemeral_pubkeys_are_unique, m_self_send_output_types, 1)
     };
 
-    return m_output_proposals.size() + num_additional_outputs_with_change;
+    return m_num_outputs + num_additional_outputs_with_change;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

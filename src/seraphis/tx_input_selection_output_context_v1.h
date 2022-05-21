@@ -58,12 +58,7 @@ public:
     OutputSetContextForInputSelectionV1(const rct::key &wallet_spend_pubkey,
         const crypto::secret_key &k_view_balance,
         const std::vector<SpOutputProposalV1> &output_proposals,
-        const rct::key &input_context) :
-            m_wallet_spend_pubkey{wallet_spend_pubkey},
-            m_k_view_balance{k_view_balance},
-            m_output_proposals{output_proposals},
-            m_input_context{input_context}
-    {}
+        const rct::key &input_context);
 
 //overloaded operators
     /// disable copy/move (this is a scoped manager (reference wrapper))
@@ -79,10 +74,10 @@ public:
 
 //member variables
 private:
-    const rct::key &m_wallet_spend_pubkey;
-    const crypto::secret_key &m_k_view_balance;
-    const std::vector<SpOutputProposalV1> &m_output_proposals;
-    const rct::key &m_input_context;
+    std::size_t m_num_outputs;
+    bool m_output_ephemeral_pubkeys_are_unique;
+    std::vector<jamtis::JamtisSelfSendType> m_self_send_output_types;
+    boost::multiprecision::uint128_t m_total_output_amount;
 };
 
 } //namespace sp
