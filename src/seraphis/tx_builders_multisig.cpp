@@ -811,7 +811,7 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
     /// finalize the output proposal set
 
     // 1. finalize
-    std::vector<SpOutputProposalV1> new_output_proposals;
+    std::vector<jamtis::JamtisPaymentProposalV1> new_normal_proposals;
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> new_selfsend_proposals;
 
     finalize_v1_output_proposal_set_v1(total_input_amount,
@@ -822,15 +822,15 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
         wallet_spend_pubkey,
         k_view_balance,
         output_proposals_temp,
-        new_output_proposals,
+        new_normal_proposals,
         new_selfsend_proposals);
 
-    CHECK_AND_ASSERT_THROW_MES(new_output_proposals.size() + new_selfsend_proposals.size() <= 2,
+    CHECK_AND_ASSERT_THROW_MES(new_normal_proposals.size() + new_selfsend_proposals.size() <= 2,
         "finalize multisig output proposals: finalizing output proposals added more than 2 proposals (bug).");
 
     // 2. reset the new selfsend proposals' enote ephemeral privkeys if there are any
     if (new_selfsend_proposals.size() == 1 &&
-        output_proposals_temp.size() + new_output_proposals.size() == 1)
+        output_proposals_temp.size() + new_normal_proposals.size() == 1)
     {
         // special type: do nothing (it must be shared with an explicit payment that was passed in)
     }
@@ -855,8 +855,11 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
     //we did this above
 
     // 2. add new opaque output proposals to the original opaque output set
-    for (const SpOutputProposalV1 &new_normal_payment_proposal : new_output_proposals)
-        opaque_payments_inout.emplace_back(new_normal_payment_proposal);
+    for (const jamtis::JamtisPaymentProposalV1 &new_normal_payment_proposal : new_normal_proposals)
+    {
+        opaque_payments_inout.emplace_back();
+        new_normal_payment_proposal.get_output_proposal_v1(rct::zero(), opaque_payments_inout.back());
+    }
 
     // 3. insert new self-send output proposals to the original opaque output set
     for (const jamtis::JamtisPaymentProposalSelfSendV1 &new_selfsend_payment_proposal : new_selfsend_proposals)

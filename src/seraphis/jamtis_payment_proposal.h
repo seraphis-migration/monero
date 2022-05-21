@@ -72,6 +72,11 @@ struct JamtisPaymentProposalV1 final
     TxExtra m_partial_memo;
 
     /**
+    * brief: get_enote_ephemeral_pubkey - get this proposal's enote ephemeral pubkey K_e
+    * outparam: enote_ephemeral_pubkey_out -
+    */
+    void get_enote_ephemeral_pubkey(rct::key &enote_ephemeral_pubkey_out) const;
+    /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
     * param: input_context -
     * outparam: output_proposal_out -
@@ -105,6 +110,11 @@ struct JamtisPaymentProposalSelfSendV1 final
     /// memo elements to add to the tx memo
     TxExtra m_partial_memo;
 
+    /**
+    * brief: get_enote_ephemeral_pubkey - get this proposal's enote ephemeral pubkey K_e
+    * outparam: enote_ephemeral_pubkey_out -
+    */
+    void get_enote_ephemeral_pubkey(rct::key &enote_ephemeral_pubkey_out) const;
     /**
     * brief: get_output_proposal_v1 - convert this proposal to a concrete output proposal
     * param: viewbalance_privkey -

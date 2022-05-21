@@ -138,12 +138,12 @@ void get_additional_output_types_for_output_set_v1(const std::size_t num_outputs
     std::vector<OutputProposalSetExtraTypesV1> &additional_outputs_out);
 void make_additional_output_dummy_v1(const OutputProposalSetExtraTypesV1 additional_output_type,
     const OutputProposalSetExtraTypesContextV1 &additional_outputs_context,
-    SpOutputProposalV1 &output_proposal_out);
+    jamtis::JamtisPaymentProposalV1 &normal_proposal_out);
 void make_additional_output_selfsend_v1(const OutputProposalSetExtraTypesV1 additional_output_type,
     const OutputProposalSetExtraTypesContextV1 &additional_outputs_context,
-    const rct::key &input_context,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
+    const crypto::secret_key &k_view_balance,
     const rct::xmr_amount change_amount,
     jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal_out);
 void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &total_input_amount,
@@ -154,7 +154,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const std::vector<SpOutputProposalV1> &original_output_proposals,
-    std::vector<SpOutputProposalV1> &new_output_proposals_out,
+    std::vector<jamtis::JamtisPaymentProposalV1> &new_normal_proposals_out,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &new_selfsend_proposals_out);
 void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &total_input_amount,
     const rct::xmr_amount transaction_fee,

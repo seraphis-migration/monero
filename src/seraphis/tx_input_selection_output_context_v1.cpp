@@ -35,6 +35,7 @@
 #include "crypto/crypto.h"
 #include "jamtis_payment_proposal.h"
 #include "jamtis_support_types.h"
+#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
 #include "tx_builders_outputs.h"
@@ -44,6 +45,7 @@
 
 //standard headers
 #include <algorithm>
+#include <unordered_set>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -54,7 +56,7 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 // check that all enote ephemeral pubkeys in an output proposal set are unique
 //-------------------------------------------------------------------------------------------------------------------
-static bool ephemeral_pubkeys_are_unique_v1(const std::vector<SpOutputProposalV1> &output_proposals)
+static bool ephemeral_pubkeys_are_unique(const std::vector<SpOutputProposalV1> &output_proposals)
 {
     for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
     {
@@ -68,6 +70,30 @@ static bool ephemeral_pubkeys_are_unique_v1(const std::vector<SpOutputProposalV1
     }
 
     return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+// check that all enote ephemeral pubkeys in an output proposal set are unique
+//-------------------------------------------------------------------------------------------------------------------
+static bool ephemeral_pubkeys_are_unique(const std::vector<jamtis::JamtisPaymentProposalV1> &normal_payment_proposals,
+    const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payment_proposals)
+{
+    // record all as 8*K_e to remove torsion elements if they exist
+    std::unordered_set<rct::key> enote_ephemeral_pubkeys;
+    rct::key temp_enote_ephemeral_pubkey;
+
+    for (const jamtis::JamtisPaymentProposalV1 &normal_proposal : normal_payment_proposals)
+    {
+        normal_proposal.get_enote_ephemeral_pubkey(temp_enote_ephemeral_pubkey);
+        enote_ephemeral_pubkeys.insert(rct::scalarmultKey(temp_enote_ephemeral_pubkey, rct::EIGHT));
+    }
+
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal : selfsend_payment_proposals)
+    {
+        selfsend_proposal.get_enote_ephemeral_pubkey(temp_enote_ephemeral_pubkey);
+        enote_ephemeral_pubkeys.insert(rct::scalarmultKey(temp_enote_ephemeral_pubkey, rct::EIGHT));
+    }
+
+    return enote_ephemeral_pubkeys.size() == normal_payment_proposals.size() + selfsend_payment_proposals.size();
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -94,7 +120,7 @@ OutputSetContextForInputSelectionV1::OutputSetContextForInputSelectionV1(const r
     const std::vector<SpOutputProposalV1> &output_proposals,
     const rct::key &input_context) :
         m_num_outputs{output_proposals.size()},
-        m_output_ephemeral_pubkeys_are_unique{ephemeral_pubkeys_are_unique_v1(output_proposals)}
+        m_output_ephemeral_pubkeys_are_unique{ephemeral_pubkeys_are_unique(output_proposals)}
 {
     // collect self-send output types
     jamtis::JamtisSelfSendType temp_self_send_output_type;
@@ -114,6 +140,28 @@ OutputSetContextForInputSelectionV1::OutputSetContextForInputSelectionV1(const r
 
     for (const SpOutputProposalV1 &output_proposal : output_proposals)
         m_total_output_amount += output_proposal.get_amount();
+}
+//-------------------------------------------------------------------------------------------------------------------
+OutputSetContextForInputSelectionV1::OutputSetContextForInputSelectionV1(
+    const std::vector<jamtis::JamtisPaymentProposalV1> &normal_payment_proposals,
+    const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payment_proposals) :
+        m_num_outputs{normal_payment_proposals.size() + selfsend_payment_proposals.size()},
+        m_output_ephemeral_pubkeys_are_unique{
+                ephemeral_pubkeys_are_unique(normal_payment_proposals, selfsend_payment_proposals)
+            }
+{
+    // collect self-send output types
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal : selfsend_payment_proposals)
+        m_self_send_output_types.emplace_back(selfsend_proposal.m_type);
+
+    // collect total amount
+    m_total_output_amount = 0;
+
+    for (const jamtis::JamtisPaymentProposalV1 &normal_proposal : normal_payment_proposals)
+        m_total_output_amount += normal_proposal.m_amount;
+
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal : selfsend_payment_proposals)
+        m_total_output_amount += selfsend_proposal.m_amount;
 }
 //-------------------------------------------------------------------------------------------------------------------
 boost::multiprecision::uint128_t OutputSetContextForInputSelectionV1::get_total_amount() const
