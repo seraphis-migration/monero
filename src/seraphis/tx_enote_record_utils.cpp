@@ -523,7 +523,10 @@ void make_standard_input_context_from_contextual_enote_records_v1(
     std::vector<crypto::key_image> key_images;
 
     for (const SpContextualEnoteRecordV1 &contextual_enote_record : contextual_enote_records)
-        key_images.emplace_back(contextual_enote_record.m_record.m_key_image);
+    {
+        key_images.emplace_back();
+        contextual_enote_record.get_key_image(key_images.back());
+    }
 
     // sort the key images
     std::sort(key_images.begin(), key_images.end());
@@ -532,23 +535,91 @@ void make_standard_input_context_from_contextual_enote_records_v1(
     jamtis::make_jamtis_input_context_standard(key_images, input_context_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,
-    const SpEnoteRecordSpentContextV1 &spent_context,
-    SpSpentEnoteV1 &spent_enote_out)
+bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &origin_context,
+    SpEnoteOriginContextV1 &current_origin_context_inout)
 {
-    spent_enote_out.m_contextual_enote_record = contextual_enote_record;
-    spent_enote_out.m_spent_context = spent_context;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool try_make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,
-    const SpContextualKeyImageSetV1 &contextual_key_image_set,
-    SpSpentEnoteV1 &spent_enote_out)
-{
-    if (!contextual_key_image_set.has_key_image(contextual_enote_record.m_record.m_key_image))
+    // note: overwrite the context if the status is equal (in case existing context is incomplete)
+    if (origin_context.m_origin_status < current_origin_context_inout.m_origin_status)
         return false;
 
-    make_spent_enote_v1(contextual_enote_record, contextual_key_image_set.m_spent_context, spent_enote_out);
+    current_origin_context_inout = origin_context;
+
     return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_update_enote_spent_context_v1(const SpEnoteSpentContextV1 &spent_context,
+    SpEnoteSpentContextV1 &current_spent_context_inout)
+{
+    // note: overwrite the context if the status is equal (in case existing context is incomplete)
+    if (spent_context.m_spent_status < current_spent_context_inout.m_spent_status)
+        return false;
+
+    current_spent_context_inout = spent_context;
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_update_contextual_enote_record_spent_context_v1(const SpContextualKeyImageSetV1 &contextual_key_image_set,
+    SpContextualEnoteRecordV1 &contextual_enote_record_inout)
+{
+    crypto::key_image record_key_image;
+    contextual_enote_record_inout.get_key_image(record_key_image);
+
+    if (!contextual_key_image_set.has_key_image(record_key_image))
+        return false;
+
+    return try_update_enote_spent_context_v1(contextual_key_image_set.m_spent_context,
+        contextual_enote_record_inout.m_spent_context);
+}
+//-------------------------------------------------------------------------------------------------------------------
+SpEnoteOriginContextV1::OriginStatus origin_status_from_spent_status_v1(
+    const SpEnoteSpentContextV1::SpentStatus spent_status)
+{
+    switch (spent_status)
+    {
+        case (SpEnoteSpentContextV1::SpentStatus::UNSPENT) :
+            return SpEnoteOriginContextV1::OriginStatus::UNKNOWN;
+
+        case (SpEnoteSpentContextV1::SpentStatus::SPENT_OFF_CHAIN) :
+            return SpEnoteOriginContextV1::OriginStatus::OFF_CHAIN;
+
+        case (SpEnoteSpentContextV1::SpentStatus::SPENT_UNCONFIRMED) :
+            return SpEnoteOriginContextV1::OriginStatus::UNCONFIRMED;
+
+        case (SpEnoteSpentContextV1::SpentStatus::SPENT_LOCKED) :
+            return SpEnoteOriginContextV1::OriginStatus::CONFIRMED_LOCKED;
+
+        case (SpEnoteSpentContextV1::SpentStatus::SPENT_UNLOCKED) :
+            return SpEnoteOriginContextV1::OriginStatus::CONFIRMED_UNLOCKED;
+
+        default :
+            return SpEnoteOriginContextV1::OriginStatus::UNKNOWN;
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentContextV1::SpentStatus spent_status,
+    SpEnoteOriginContextV1::OriginStatus &origin_status_inout)
+{
+    const SpEnoteOriginContextV1::OriginStatus implied_origin_status{origin_status_from_spent_status_v1(spent_status)};
+
+    if (origin_status_inout > implied_origin_status)
+        return false;
+
+    origin_status_inout = implied_origin_status;
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void update_contextual_enote_record_contexts_v1(const SpContextualEnoteRecordV1 &fresh_record,
+    SpContextualEnoteRecordV1 &existing_record_inout)
+{
+    CHECK_AND_ASSERT_THROW_MES(fresh_record.m_record == existing_record_inout.m_record,
+        "updating a contextual enote record: the fresh record doesn't represent the same enote.");
+
+    try_update_enote_spent_context_v1(fresh_record.m_spent_context, existing_record_inout.m_spent_context);
+    try_update_enote_origin_context_v1(fresh_record.m_origin_context, existing_record_inout.m_origin_context);
+    try_bump_enote_record_origin_status_v1(existing_record_inout.m_spent_context.m_spent_status,
+        existing_record_inout.m_origin_context.m_origin_status);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

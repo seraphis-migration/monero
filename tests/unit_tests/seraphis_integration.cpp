@@ -58,6 +58,7 @@ extern "C"
 #include "seraphis/tx_discretized_fee.h"
 #include "seraphis/tx_enote_record_types.h"
 #include "seraphis/tx_enote_record_utils.h"
+#include "seraphis/tx_enote_store_mocks.h"
 #include "seraphis/tx_extra.h"
 #include "seraphis/tx_fee_calculator_squashed_v1.h"
 #include "seraphis/tx_input_selection.h"
@@ -181,9 +182,12 @@ TEST(seraphis_integration, txtype_squashed_v1)
     ASSERT_TRUE(input_enote_record_A.m_type == JamtisEnoteType::PLAIN);
 
     // e) add enote record to enote store
-    sp::SpEnoteStoreV1 enote_store_A;
-    enote_store_A.m_contextual_enote_records.emplace_back();
-    enote_store_A.m_contextual_enote_records.back().m_record = input_enote_record_A;
+    sp::SpEnoteStoreMockV1 enote_store_A;
+    enote_store_A.add_record(
+            SpContextualEnoteRecordV1{
+                    .m_record = input_enote_record_A
+                }
+        );
 
 
     /// 2] user A makes tx sending money to user B   //todo: use wallet to make tx
@@ -218,7 +222,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
             normal_payment_proposals,
             selfsend_payment_proposals
         };
-    const sp::InputSelectorMockSimpleV1 input_selector{enote_store_A};
+    const sp::InputSelectorMockV1 input_selector{enote_store_A};
     const sp::FeeCalculatorSpTxSquashedV1 tx_fee_calculator{
             ref_set_decomp_m,
             ref_set_decomp_n,

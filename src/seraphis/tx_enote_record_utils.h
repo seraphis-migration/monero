@@ -193,11 +193,19 @@ void make_standard_input_context_from_contextual_enote_records_v1(
     const std::list<SpContextualEnoteRecordV1> &contextual_enote_records,
     rct::key &input_context_out);
 //todo
-void make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,
-    const SpEnoteRecordSpentContextV1 &spent_context,
-    SpSpentEnoteV1 &spent_enote_out);
-bool try_make_spent_enote_v1(const SpContextualEnoteRecordV1 &contextual_enote_record,
-    const SpContextualKeyImageSetV1 &contextual_key_image_set,
-    SpSpentEnoteV1 &spent_enote_out);
+bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &origin_context,
+    SpEnoteOriginContextV1 &current_origin_context_inout);
+bool try_update_enote_spent_context_v1(const SpEnoteSpentContextV1 &spent_context,
+    SpEnoteSpentContextV1 &current_spent_context_inout);
+bool try_update_contextual_enote_record_spent_context_v1(const SpContextualKeyImageSetV1 &contextual_key_image_set,
+    SpContextualEnoteRecordV1 &contextual_enote_record_inout);
+//todo
+SpEnoteOriginContextV1::OriginStatus origin_status_from_spent_status_v1(
+    const SpEnoteSpentContextV1::SpentStatus spent_status);
+bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentContextV1::SpentStatus spent_status,
+    SpEnoteOriginContextV1::OriginStatus &origin_status_inout);
+//todo
+void update_contextual_enote_record_contexts_v1(const SpContextualEnoteRecordV1 &fresh_record,
+    SpContextualEnoteRecordV1 &existing_record_inout);
 
 } //namespace sp

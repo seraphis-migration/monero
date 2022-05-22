@@ -31,6 +31,7 @@
 #include "ringct/rctTypes.h"
 #include "seraphis/tx_enote_record_types.h"
 #include "seraphis/tx_enote_store.h"
+#include "seraphis/tx_enote_store_mocks.h"
 #include "seraphis/tx_fee_calculator.h"
 #include "seraphis/tx_fee_calculator_mocks.h"
 #include "seraphis/tx_input_selection.h"
@@ -45,18 +46,21 @@
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static sp::SpEnoteStoreV1 prepare_enote_store(const std::vector<rct::xmr_amount> &amounts)
+static void prepare_enote_store(const std::vector<rct::xmr_amount> &amounts, sp::SpEnoteStoreV1 &enote_store_inout)
 {
-    sp::SpEnoteStoreV1 enote_store;
-
     for (const rct::xmr_amount amount : amounts)
     {
-        enote_store.m_contextual_enote_records.emplace_back();
-        enote_store.m_contextual_enote_records.back().m_record.m_enote.gen();
-        enote_store.m_contextual_enote_records.back().m_record.m_amount = amount;
-    }
+        sp::SpEnoteRecordV1 temp_record{};
+        temp_record.m_enote.gen();
+        temp_record.m_amount = amount;
+        temp_record.m_key_image = rct::rct2ki(rct::pkGen());
 
-    return enote_store;
+        enote_store_inout.add_record(
+                sp::SpContextualEnoteRecordV1{
+                    .m_record = temp_record
+                }
+            );
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -73,7 +77,8 @@ static void input_selection_test(const std::vector<rct::xmr_amount> &stored_amou
     CHECK_AND_ASSERT_THROW_MES(input_amounts_expected.size() <= max_inputs_allowed, "too many expected input amounts");
 
     // prepare enote storage (inputs will be selected from this)
-    const sp::SpEnoteStoreV1 enote_store{prepare_enote_store(stored_amounts)};
+    sp::SpEnoteStoreMockSimpleV1 enote_store;
+    prepare_enote_store(stored_amounts, enote_store);
 
     // make input selector
     const sp::InputSelectorMockSimpleV1 input_selector{enote_store};

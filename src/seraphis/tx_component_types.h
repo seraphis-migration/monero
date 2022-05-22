@@ -74,6 +74,15 @@ struct SpEnoteV1 final
         return m_core < other_enote.m_core;
     }
 
+    /// equality operator for comparisons
+    bool operator==(const SpEnoteV1 &other_enote) const
+    {
+        return m_core == other_enote.m_core &&
+            m_encoded_amount == other_enote.m_encoded_amount &&
+            m_view_tag == other_enote.m_view_tag &&
+            m_addr_tag_enc == other_enote.m_addr_tag_enc;
+    }
+
     /**
     * brief: append_to_string - convert enote to a string and append to existing string
     *   str += Ko || C || enc(a) || view_tag || addr_tag_enc

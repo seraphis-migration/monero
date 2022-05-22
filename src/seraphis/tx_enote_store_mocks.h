@@ -34,11 +34,16 @@
 #pragma once
 
 //local headers
+#include "crypto/crypto.h"
 #include "tx_enote_record_types.h"
+#include "tx_enote_record_utils.h"
+#include "tx_enote_store.h"
 
 //third party headers
 
 //standard headers
+#include <list>
+#include <unordered_map>
 
 //forward declarations
 
@@ -47,19 +52,54 @@ namespace sp
 {
 
 ////
-// SpEnoteStoreV1
-// - enotes owned by a wallet
+// SpEnoteStoreMockSimpleV1
 ///
-class SpEnoteStoreV1
+class SpEnoteStoreMockSimpleV1 final : public SpEnoteStoreV1
 {
-public:
-//overloaded operators
-    /// disable copy/move (this is a virtual base class)
-    SpEnoteStoreV1& operator=(SpEnoteStoreV1&&) = delete;
+    friend class InputSelectorMockSimpleV1;
 
-//member functions
+public:
     /// add a record
-    virtual void add_record(const SpContextualEnoteRecordV1 &new_record) = 0;
+    void add_record(const SpContextualEnoteRecordV1 &new_record) override
+    {
+        m_contextual_enote_records.emplace_back(new_record);
+    }
+
+//member variables
+protected:
+    /// the enotes
+    std::list<SpContextualEnoteRecordV1> m_contextual_enote_records;
+};
+
+////
+// SpEnoteStoreMockV1
+///
+class SpEnoteStoreMockV1 final : public SpEnoteStoreV1
+{
+    friend class InputSelectorMockV1;
+
+public:
+    /// add a record
+    void add_record(const SpContextualEnoteRecordV1 &new_record) override
+    {
+        crypto::key_image record_key_image;
+        new_record.get_key_image(record_key_image);
+
+        // add the record or update an existing record's contexts
+        if (m_mapped_contextual_enote_records.find(record_key_image) == m_mapped_contextual_enote_records.end())
+        {
+            m_mapped_contextual_enote_records[record_key_image] = new_record;
+        }
+        else
+        {
+            update_contextual_enote_record_contexts_v1(new_record, m_mapped_contextual_enote_records[record_key_image]);
+        }
+    }
+
+//member variables
+protected:
+    /// the enotes
+    std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> m_mapped_contextual_enote_records;
 };
 
 } //namespace sp

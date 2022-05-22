@@ -57,7 +57,7 @@ class InputSelectorMockSimpleV1 final : public InputSelectorV1
 public:
 //constructors
     /// normal constructor
-    InputSelectorMockSimpleV1(const SpEnoteStoreV1 &enote_store) :
+    InputSelectorMockSimpleV1(const SpEnoteStoreMockSimpleV1 &enote_store) :
         m_enote_store{enote_store}
     {
         // in practice, lock the enote store with an 'input selection' mutex here for thread-safe input selection that
@@ -75,9 +75,12 @@ public:
         const std::list<SpContextualEnoteRecordV1> &already_excluded_inputs,
         SpContextualEnoteRecordV1 &selected_input_out) const override
     {
-        for (const SpContextualEnoteRecordV1 &contextual_enote_record : m_enote_store.m_contextual_enote_records)
+        for (const auto &contextual_enote_record : m_enote_store.m_contextual_enote_records)
         {
-            // find the next enote record that hasn't already been selected (via onetime address comparisons)
+            // find the next unspent enote record that hasn't already been selected (via key image comparisons)
+            if (!contextual_enote_record.has_spent_status(SpEnoteSpentContextV1::SpentStatus::UNSPENT))
+                continue;
+
             auto record_finder =
                 [&contextual_enote_record](const SpContextualEnoteRecordV1 &comparison_record) -> bool
                 {
@@ -101,7 +104,63 @@ public:
 //member variables
 private:
     /// read-only reference to an enote storage
-    const SpEnoteStoreV1 &m_enote_store;
+    const SpEnoteStoreMockSimpleV1 &m_enote_store;
+};
+
+/// mock input selector: select a pseudo-random available input in the enote store (input selection with this is not thread-safe)
+class InputSelectorMockV1 final : public InputSelectorV1
+{
+public:
+//constructors
+    /// normal constructor
+    InputSelectorMockV1(const SpEnoteStoreMockV1 &enote_store) :
+        m_enote_store{enote_store}
+    {
+        // in practice, lock the enote store with an 'input selection' mutex here for thread-safe input selection that
+        //   prevents two tx attempts from using the same inputs (take a reader-writer lock when selecting an input)
+    }
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [reference wrapper])
+    InputSelectorMockV1& operator=(InputSelectorMockV1&&) = delete;
+
+//member functions
+    /// select the next available input
+    bool try_select_input_v1(const boost::multiprecision::uint128_t desired_total_amount,
+        const std::list<SpContextualEnoteRecordV1> &already_added_inputs,
+        const std::list<SpContextualEnoteRecordV1> &already_excluded_inputs,
+        SpContextualEnoteRecordV1 &selected_input_out) const override
+    {
+        for (const auto &mapped_enote_record : m_enote_store.m_mapped_contextual_enote_records)
+        {
+            // find the next unspent enote record that hasn't already been selected (via key image comparisons)
+            if (!mapped_enote_record.second.has_spent_status(SpEnoteSpentContextV1::SpentStatus::UNSPENT))
+                continue;
+
+            auto record_finder =
+                [&mapped_enote_record](const SpContextualEnoteRecordV1 &comparison_record) -> bool
+                {
+                    return SpContextualEnoteRecordV1::same_destination(mapped_enote_record.second, comparison_record);
+                };
+
+            if (std::find_if(already_added_inputs.begin(), already_added_inputs.end(), record_finder) ==
+                    already_added_inputs.end()
+                &&
+                std::find_if(already_excluded_inputs.begin(), already_excluded_inputs.end(), record_finder) ==
+                    already_excluded_inputs.end())
+            {
+                selected_input_out = mapped_enote_record.second;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+//member variables
+private:
+    /// read-only reference to an enote storage
+    const SpEnoteStoreMockV1 &m_enote_store;
 };
 
 } //namespace sp

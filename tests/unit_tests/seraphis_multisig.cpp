@@ -52,7 +52,7 @@
 #include "seraphis/tx_discretized_fee.h"
 #include "seraphis/tx_enote_record_types.h"
 #include "seraphis/tx_enote_record_utils.h"
-#include "seraphis/tx_enote_store.h"
+#include "seraphis/tx_enote_store_mocks.h"
 #include "seraphis/tx_fee_calculator_mocks.h"
 #include "seraphis/tx_input_selection.h"
 #include "seraphis/tx_input_selection_output_context_v1.h"
@@ -359,7 +359,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     // c) extract info from the enotes 'sent' to the multisig address
     std::vector<SpEnoteRecordV1> input_enote_records;
     input_enote_records.resize(input_enotes.size());
-    SpEnoteStoreV1 enote_store;
+    SpEnoteStoreMockV1 enote_store;
 
     for (std::size_t input_index{0}; input_index < input_enotes.size(); ++input_index)
     {
@@ -376,8 +376,11 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         ASSERT_TRUE(input_enote_records[input_index].m_type == JamtisEnoteType::PLAIN);
 
         // store the enote record
-        enote_store.m_contextual_enote_records.emplace_back();
-        enote_store.m_contextual_enote_records.back().m_record = input_enote_records[input_index];
+        enote_store.add_record(
+                SpContextualEnoteRecordV1{
+                        .m_record = input_enote_records[input_index]
+                    }
+            );
     }
 
 
@@ -425,7 +428,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
     // - select inputs
     const sp::OutputSetContextForInputSelectionV1 output_set_context{normal_payments, selfsend_payments};
-    const sp::InputSelectorMockSimpleV1 input_selector{enote_store};
+    const sp::InputSelectorMockV1 input_selector{enote_store};
     const sp::FeeCalculatorMockTrivial tx_fee_calculator;  //trivial fee calculator so we can use specified input fee
 
     rct::xmr_amount reported_final_fee;
