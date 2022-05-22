@@ -332,7 +332,7 @@ void make_jamtis_amount_baked_key_plain_recipient(const crypto::secret_key &addr
 {
     // 8 * (1/k^j_a) * K_e = 8 r G
     //TODO: does this create a temporary that isn't properly memwiped?
-    crypto::secret_key address_privkey_inverted{rct::rct2sk(invert(rct::sk2rct(address_privkey)))};  //(1/k^j_a)
+    const crypto::secret_key address_privkey_inverted{rct::rct2sk(invert(rct::sk2rct(address_privkey)))};  //(1/k^j_a)
     crypto::generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey), address_privkey_inverted, baked_key_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -433,7 +433,7 @@ bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
     crypto::secret_key &amount_blinding_factor_out)
 {
     // a' = dec(enc_a)
-    rct::xmr_amount nominal_amount{decode_jamtis_amount_plain(encoded_amount, sender_receiver_secret, baked_key)};
+    const rct::xmr_amount nominal_amount{decode_jamtis_amount_plain(encoded_amount, sender_receiver_secret, baked_key)};
 
     // C' = x' G + a' H
     make_jamtis_amount_blinding_factor_plain(sender_receiver_secret, baked_key, amount_blinding_factor_out);  // x'
@@ -455,7 +455,7 @@ bool try_get_jamtis_amount_selfsend(const rct::key &sender_receiver_secret,
     crypto::secret_key &amount_blinding_factor_out)
 {
     // a' = dec(enc_a)
-    rct::xmr_amount nominal_amount{decode_jamtis_amount_selfsend(encoded_amount, sender_receiver_secret)};
+    const rct::xmr_amount nominal_amount{decode_jamtis_amount_selfsend(encoded_amount, sender_receiver_secret)};
 
     // C' = x' G + a' H
     make_jamtis_amount_blinding_factor_selfsend(sender_receiver_secret, amount_blinding_factor_out);  // x'

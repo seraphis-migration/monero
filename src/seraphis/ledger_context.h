@@ -95,7 +95,7 @@ public:
     *   TODO: version this somehow?
     * return: number of enotes in the ledger
     */
-    std::uint64_t num_enotes() const { return max_enote_index() - min_enote_index() + 1; }
+    virtual std::uint64_t num_enotes() const final { return max_enote_index() - min_enote_index() + 1; }
 };
 
 template<typename TxType>
