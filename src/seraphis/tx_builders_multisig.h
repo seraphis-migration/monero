@@ -153,23 +153,6 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
     std::vector<jamtis::JamtisPaymentProposalV1> &normal_payments_inout,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payments_inout);
 /**
-* brief: check_v1_multisig_tx_proposal_full_balance_v1 - check that a multisig tx proposal has a full balance
-*   - throws if a check fails
-*   - check: sum(inputs) != sum(outputs) + fee
-* param: multisig_tx_proposal -
-* param: wallet_spend_pubkey -
-* param: k_view_balance -
-* param: desired_fee -
-*/
-void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const rct::xmr_amount desired_fee);
-void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const DiscretizedFee &discretized_desired_fee);
-/**
 * brief: check_v1_multisig_tx_proposal_semantics_v1 - check semantics of a multisig tx proposal
 *   - throws if a check fails
 *   - not checked: input/output counts satisfy the desired tx semantic rules version
@@ -195,6 +178,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 * param: normal_payments -
 * param: selfsend_payments -
 * param: partial_memo -
+* param: tx_fee -
 * param: version_string -
 * param: full_input_proposals -
 * param: aggregate_signer_set_filter -
@@ -206,6 +190,7 @@ void make_v1_multisig_tx_proposal_v1(const crypto::secret_key &k_view_balance,
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
     TxExtra partial_memo,
+    const DiscretizedFee &tx_fee,
     std::string version_string,
     const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,

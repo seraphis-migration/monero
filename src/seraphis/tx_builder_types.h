@@ -158,14 +158,7 @@ struct SpAlignableMembershipProofV1 final
     bool operator==(const SpAlignableMembershipProofV1 &other) const { return m_masked_address == other.m_masked_address; }
     bool operator==(const rct::key &other_masked_address) const { return m_masked_address == other_masked_address; }
 };
-/*
-jamtis payment proposals -> select inputs and fee
-selected inputs -> input proposals
-selected inputs -> input context
-jamtis payment proposals + input amount + fee -> all jamtis payment proposals
-all jamtis payment proposals + input context -> output proposals
-output proposals -> tx proposal
-*/
+
 ////
 // SpTxProposalV1: the proposed set of outputs, with miscellaneous memos
 ///

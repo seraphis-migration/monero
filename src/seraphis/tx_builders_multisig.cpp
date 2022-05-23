@@ -152,6 +152,42 @@ static void get_masked_addresses(const std::vector<SpMultisigPublicInputProposal
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance)
+{
+    // check that the input and output amounts of a multisig tx proposal balance out
+
+    // extract the fee value
+    rct::xmr_amount raw_transaction_fee;
+    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(multisig_tx_proposal.m_tx_fee, raw_transaction_fee),
+        "multisig tx proposal balance check: could not extract fee value from discretized fee.");
+
+    // get input amounts
+    std::vector<rct::xmr_amount> in_amounts;
+    in_amounts.reserve(multisig_tx_proposal.m_input_proposals.size());
+
+    std::vector<SpMultisigInputProposalV1> converted_input_proposals;
+    CHECK_AND_ASSERT_THROW_MES(try_get_v1_multisig_input_proposals_v1(multisig_tx_proposal.m_input_proposals,
+            wallet_spend_pubkey,
+            k_view_balance,
+            converted_input_proposals),
+        "multisig tx proposal balance check: could not extract data from an input proposal "
+        "(maybe input not owned by user).");
+
+    for (const SpMultisigInputProposalV1 &input_proposal : converted_input_proposals)
+        in_amounts.emplace_back(input_proposal.m_input_amount);
+
+    // get output amounts
+    SpTxProposalV1 tx_proposal;
+    multisig_tx_proposal.get_v1_tx_proposal_v1(k_view_balance, tx_proposal);
+
+    // check: sum(input amnts) == sum(output amnts) + fee
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, tx_proposal.m_output_amounts, raw_transaction_fee),
+        "multisig tx proposal: input/output amounts did not balance with desired fee.");
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void validate_and_prepare_input_inits_for_partial_sig_sets_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers,
@@ -551,53 +587,6 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProp
         selfsend_payments_inout.emplace_back(new_selfsend_payment_proposal);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const rct::xmr_amount desired_fee)
-{
-    // check that a multisig tx proposal covers the full input amount of a tx
-
-    // get input amounts
-    std::vector<rct::xmr_amount> in_amounts;
-    in_amounts.reserve(multisig_tx_proposal.m_input_proposals.size());
-
-    std::vector<SpMultisigInputProposalV1> converted_input_proposals;
-    CHECK_AND_ASSERT_THROW_MES(try_get_v1_multisig_input_proposals_v1(multisig_tx_proposal.m_input_proposals,
-            wallet_spend_pubkey,
-            k_view_balance,
-            converted_input_proposals),
-        "multisig tx proposal balance check: could not extract data from an input proposal "
-        "(maybe input not owned by user).");
-
-    for (const SpMultisigInputProposalV1 &input_proposal : converted_input_proposals)
-        in_amounts.emplace_back(input_proposal.m_input_amount);
-
-    // get output amounts
-    SpTxProposalV1 tx_proposal;
-    multisig_tx_proposal.get_v1_tx_proposal_v1(k_view_balance, tx_proposal);
-
-    // check: sum(input amnts) == sum(output amnts) + fee
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, tx_proposal.m_output_amounts, desired_fee),
-        "multisig tx proposal: input/output amounts did not balance with desired fee.");
-}
-//-------------------------------------------------------------------------------------------------------------------
-void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const DiscretizedFee &discretized_desired_fee)
-{
-    // extract the feel value from a discretized fee then check the multisig tx proposal full balance
-    rct::xmr_amount raw_transaction_fee;
-    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(discretized_desired_fee, raw_transaction_fee),
-        "multisig tx proposal balance check: could not extract fee value from discretized fee.");
-
-    check_v1_multisig_tx_proposal_full_balance_v1(multisig_tx_proposal,
-        wallet_spend_pubkey,
-        k_view_balance,
-        raw_transaction_fee);
-}
-//-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const std::string &expected_version_string,
     const std::uint32_t threshold,
@@ -620,11 +609,14 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 
     /// input/output checks
 
-    // 1. check the public input proposal semantics
+    // 1. check the tx input/output amounts balance
+    check_v1_multisig_tx_proposal_full_balance_v1(multisig_tx_proposal, wallet_spend_pubkey, k_view_balance);
+
+    // 2. check the public input proposal semantics
     for (const SpMultisigPublicInputProposalV1 &public_input_proposal : multisig_tx_proposal.m_input_proposals)
         check_v1_multisig_public_input_proposal_semantics_v1(public_input_proposal);
 
-    // 2. convert the public input proposals
+    // 3. convert the public input proposals
     std::vector<SpMultisigInputProposalV1> converted_input_proposals;
     CHECK_AND_ASSERT_THROW_MES(try_get_v1_multisig_input_proposals_v1(multisig_tx_proposal.m_input_proposals,
             wallet_spend_pubkey,
@@ -632,7 +624,7 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
             converted_input_proposals),
         "multisig tx proposal: could not extract data from an input proposal (maybe input not owned by user).");
 
-    // 3. should be at least 1 input and 1 output
+    // 4. should be at least 1 input and 1 output
     CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() > 0, "multisig tx proposal: no inputs.");
     CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_normal_payments.size() +
             multisig_tx_proposal.m_selfsend_payments.size() > 0,
@@ -712,6 +704,7 @@ void make_v1_multisig_tx_proposal_v1(const crypto::secret_key &k_view_balance,
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
     TxExtra partial_memo,
+    const DiscretizedFee &tx_fee,
     std::string version_string,
     const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,
@@ -721,6 +714,7 @@ void make_v1_multisig_tx_proposal_v1(const crypto::secret_key &k_view_balance,
     proposal_out.m_normal_payments = std::move(normal_payments);
     proposal_out.m_selfsend_payments = std::move(selfsend_payments);
     proposal_out.m_partial_memo = std::move(partial_memo);
+    proposal_out.m_tx_fee = tx_fee;
     proposal_out.m_aggregate_signer_set_filter = aggregate_signer_set_filter;
     proposal_out.m_version_string = std::move(version_string);
 

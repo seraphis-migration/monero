@@ -134,6 +134,8 @@ struct SpMultisigTxProposalV1 final
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> m_selfsend_payments;
     /// miscellaneous memo elements to add to the tx memo
     TxExtra m_partial_memo;
+    /// proposed transaction fee
+    DiscretizedFee m_tx_fee;
     /// tx inputs to sign with multisig
     std::vector<SpMultisigPublicInputProposalV1> m_input_proposals;
     /// composition proof proposals for each input proposal

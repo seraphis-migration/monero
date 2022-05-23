@@ -440,6 +440,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         tx_fee_calculator,
         reported_final_fee,
         contextual_inputs));
+    ASSERT_TRUE(fee == reported_final_fee);
 
     // - convert inputs to input proposals (inputs to spend)
     std::vector<SpMultisigInputProposalV1> full_input_proposals;
@@ -497,6 +498,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         std::move(normal_payments),
         std::move(selfsend_payments),
         TxExtra{},
+        fee,
         version_string,
         full_input_proposals,
         aggregate_filter,
@@ -508,7 +510,6 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         accounts[0].get_signers().size(),
         keys.K_1_base,
         keys.k_vb));
-    ASSERT_NO_THROW(check_v1_multisig_tx_proposal_full_balance_v1(multisig_tx_proposal, keys.K_1_base, keys.k_vb, fee));
 
 
     /// 4) get inits from all requested signers
@@ -602,7 +603,11 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     multisig_tx_proposal.get_v1_tx_proposal_v1(keys.k_vb, tx_proposal);
 
     SpPartialTxV1 partial_tx;
-    ASSERT_NO_THROW(make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), fee, version_string, partial_tx));
+    ASSERT_NO_THROW(make_v1_partial_tx_v1(tx_proposal,
+        std::move(partial_inputs),
+        multisig_tx_proposal.m_tx_fee,
+        version_string,
+        partial_tx));
     ASSERT_NO_THROW(check_v1_partial_tx_semantics_v1(partial_tx, semantic_rules_version));
 
     // c) add enotes owned by multisig address to the ledger and prepare membership ref sets (one step)
