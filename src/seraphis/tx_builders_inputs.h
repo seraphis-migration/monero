@@ -103,6 +103,10 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<SpPartialInputV1> &partial_inputs,
     std::vector<rct::xmr_amount> &input_amounts_out,
     std::vector<crypto::secret_key> &blinding_factors_out);
+//todo
+void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance);
 /**
 * brief: make_input_proposal - make the core of an input proposal
 * param: enote_core -
@@ -137,6 +141,7 @@ void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
 * brief: try_make_v1_input_proposal_v1 - try to make an input proposal from an enote
 * param: enote -
 * param: enote_ephemeral_pubkey -
+* param: input_context -
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
 * param: address_mask -
@@ -145,6 +150,7 @@ void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
 */
 bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &address_mask,

@@ -68,6 +68,9 @@ struct SpInputProposalV1 final
     */
     void get_enote_image_v1(SpEnoteImageV1 &image_out) const { return m_core.get_enote_image_core(image_out.m_core); }
 
+    /// get a reference to this proposal's key image
+    const crypto::key_image& key_image() const { return m_core.m_key_image; }
+
     /// get the amount of this proposal
     rct::xmr_amount get_amount() const { return m_core.m_amount; }
 
@@ -160,20 +163,35 @@ struct SpAlignableMembershipProofV1 final
 };
 
 ////
-// SpTxProposalV1: the proposed set of outputs, with miscellaneous memos
+// SpTxProposalV1: the proposed set of inputs and outputs, with tx fee and miscellaneous memos
 ///
 struct SpTxProposalV1 final
 {
-    /// proposed outputs
-    std::vector<SpEnoteV1> m_outputs;
-    /// proposed tx supplement
-    SpTxSupplementV1 m_tx_supplement;
-    /// output amounts and blinding factors (for future balance proofs)
-    std::vector<rct::xmr_amount> m_output_amounts;
-    std::vector<crypto::secret_key> m_output_amount_commitment_blinding_factors;
+    /// outputs
+    std::vector<jamtis::JamtisPaymentProposalV1> m_normal_payments;
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> m_selfsend_payments;
+    /// tx fee
+    DiscretizedFee m_tx_fee;
+    /// inputs
+    std::vector<SpInputProposalV1> m_input_proposals;
+    /// additional memo elements
+    std::vector<ExtraFieldElement> m_additional_memo_elements;
 
-    /// message to be signed by input spend proofs
-    void get_proposal_prefix(const std::string &version_string, rct::key &proposal_prefix_out) const;
+    /// convert the tx proposal's payment proposals into output proposals
+    void get_output_proposals_v1(const crypto::secret_key &k_view_balance,
+        std::vector<SpOutputProposalV1> &output_proposals_out) const;
+
+    /// convert the tx proposal's payment proposals and parial memo into a full output set
+    void get_outputs_v1(const crypto::secret_key &k_view_balance,
+        std::vector<SpEnoteV1> &outputs_out,
+        std::vector<rct::xmr_amount> &output_amounts_out,
+        std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
+        SpTxSupplementV1 &tx_supplement_out) const;
+
+    /// get the message to be signed by input spend proofs
+    void get_proposal_prefix(const std::string &version_string,
+        const crypto::secret_key &k_view_balance,
+        rct::key &proposal_prefix_out) const;
 };
 
 ////
@@ -193,7 +211,7 @@ struct SpPartialInputV1 final
     crypto::secret_key m_address_mask;
     crypto::secret_key m_commitment_mask;
 
-    /// proposal prefix (represents the set of destinations and memos; signed by this partial input's image proof)
+    /// proposal prefix (represents the inputs/outputs/fee/memo; signed by this partial input's image proof)
     rct::key m_proposal_prefix;
 
     /// the input enote's core; used for making a membership proof
@@ -208,6 +226,9 @@ struct SpPartialInputV1 final
     {
         return m_input_image < other_input.m_input_image;
     }
+
+    /// get a reference to this input's key image
+    const crypto::key_image& key_image() const { return m_input_image.m_core.m_key_image; }
 };
 
 ////
@@ -235,9 +256,6 @@ struct SpPartialTxV1 final
     std::vector<crypto::secret_key> m_commitment_masks;
 };
 
-// need these for validating externally-sourced objects (e.g. deserialized, custom construction, etc.)
-//todo
-void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposal);
 //todo
 void check_v1_output_proposal_semantics_v1(const SpOutputProposalV1 &output_proposal);
 //todo

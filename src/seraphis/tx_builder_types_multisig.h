@@ -84,41 +84,16 @@ struct SpMultisigPublicInputProposalV1 final
     * outparam: squash_prefix_out - H(Ko, C)
     */
     void get_squash_prefix(crypto::secret_key &squash_prefix_out) const;
-};
-
-////
-// SpMultisigInputProposalV1
-// - proposed tx input to be signed with multisig (convenience struct, for internal use)
-///
-struct SpMultisigInputProposalV1 final
-{
-    /// enote proposed as a tx input
-    SpMultisigPublicInputProposalV1 m_core;
-
-    /// k_{a, sender} + k_{a, recipient}
-    crypto::secret_key m_enote_view_privkey;
-    /// x: input amount commitment's blinding factor
-    crypto::secret_key m_input_amount_blinding_factor;
-    /// a: input amount
-    rct::xmr_amount m_input_amount;
 
     /**
-    * brief: get_key_image - get this input's key image
-    * outparam: key_image_out - KI
+    * brief: get_input_proposal_v1 - convert this input to a plain input proposal (throws on failure to convert)
+    * param: wallet_spend_pubkey -
+    * param: k_view_balance -
+    * outparam: input_proposal_out -
     */
-    void get_key_image(crypto::key_image &key_image_out) const;
-
-    /**
-    * brief: get_enote_core - get the enote this input proposal represents
-    * outparam: enote_out -
-    */
-    void get_enote_core(SpEnote &enote_out) const;
-
-    /**
-    * brief: get_enote_image - get this input's enote image in the squashed enote model
-    * outparam: image_out -
-    */
-    void get_enote_image(SpEnoteImage &image_out) const;
+    void get_input_proposal_v1(const rct::key &wallet_spend_pubkey,
+        const crypto::secret_key &k_view_balance,
+        SpInputProposalV1 &input_proposal_out) const;
 };
 
 ////
@@ -147,24 +122,15 @@ struct SpMultisigTxProposalV1 final
     /// encoding of intended tx version
     std::string m_version_string;
 
-    /// convert to plain tx proposal (auto-checks the tx proposal semantics)
-    void get_v1_tx_proposal_v1(const crypto::secret_key &k_view_balance,
-        const rct::key &input_context,
+    /// convert to plain tx proposal
+    void get_v1_tx_proposal_v1(const rct::key &wallet_spend_pubkey,
+        const crypto::secret_key &k_view_balance,
         SpTxProposalV1 &tx_proposal_out) const;
-    void get_v1_tx_proposal_v1(const crypto::secret_key &k_view_balance, SpTxProposalV1 &tx_proposal_out) const;
 
     /// get the tx proposal prefix that will be signed by input composition proofs
-    void get_proposal_prefix_v1(const crypto::secret_key &k_view_balance, rct::key &proposal_prefix_out) const;
-
-    /// statically get the tx proposal prefix that will be signed by input composition proofs
-    /// - use this when the proposal prefix is needed but a complete multisig tx proposal isn't available
-    static void get_proposal_prefix_v1(const crypto::secret_key &k_view_balance,
-        const rct::key &input_context,
-        std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
-        std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
-        TxExtra partial_memo,
-        const std::string &version_string,
-        rct::key &proposal_prefix_out);
+    void get_proposal_prefix_v1(const rct::key &wallet_spend_pubkey,
+        const crypto::secret_key &k_view_balance,
+        rct::key &proposal_prefix_out) const;
 };
 
 ////

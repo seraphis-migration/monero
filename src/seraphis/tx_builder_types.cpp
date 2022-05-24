@@ -79,10 +79,83 @@ void SpOutputProposalV1::gen(const rct::xmr_amount amount, const std::size_t num
     make_tx_extra(std::move(memo_elements), m_partial_memo);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpTxProposalV1::get_proposal_prefix(const std::string &version_string, rct::key &proposal_prefix_out) const
+void SpTxProposalV1::get_output_proposals_v1(const crypto::secret_key &k_view_balance,
+    std::vector<SpOutputProposalV1> &output_proposals_out) const
 {
-    CHECK_AND_ASSERT_THROW_MES(m_outputs.size() > 0, "Tried to get proposal prefix for a tx proposal with no outputs!");
-    make_tx_image_proof_message_v1(version_string, m_outputs, m_tx_supplement, proposal_prefix_out);
+    CHECK_AND_ASSERT_THROW_MES(m_normal_payments.size() + m_selfsend_payments.size() > 0,
+        "Tried to get output proposals for a tx proposal with no outputs!");
+
+    // input context
+    rct::key input_context;
+    make_standard_input_context_v1(m_input_proposals, input_context);
+
+    // output proposals
+    output_proposals_out.clear();
+    output_proposals_out.reserve(m_normal_payments.size() + m_selfsend_payments.size());
+
+    for (const jamtis::JamtisPaymentProposalV1 &normal_proposal : m_normal_proposals)
+    {
+        output_proposals_out.emplace_back();
+        normal_proposal.get_output_proposal_v1(input_context, output_proposals_out.back());
+    }
+
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal : m_selfsend_proposals)
+    {
+        output_proposals_out.emplace_back();
+        selfsend_proposal.get_output_proposal_v1(k_view_balance, input_context, output_proposals_out.back());
+    }
+
+    // sort output proposals
+    std::sort(output_proposals.begin(), output_proposals.end());
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpTxProposalV1::get_outputs_v1(const crypto::secret_key &k_view_balance,
+    std::vector<SpEnoteV1> &outputs_out,
+    std::vector<rct::xmr_amount> &output_amounts_out,
+    std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
+    SpTxSupplementV1 &tx_supplement_out) const
+{
+    // get output proposals
+    std::vector<SpOutputProposalV1> output_proposals;
+    this->get_output_proposals_v1(k_view_balance, output_proposals);
+
+    // sanity check semantics
+    check_v1_output_proposal_set_semantics_v1(output_proposals);
+
+    // make the outputs
+    make_v1_outputs_v1(output_proposals,
+        outputs_out,
+        output_amounts_out,
+        output_amount_commitment_blinding_factors_out,
+        tx_supplement_out.m_output_enote_ephemeral_pubkeys);
+
+    // add all memo fields to the tx supplement
+    std::vector<ExtraFieldElement> additional_memo_elements{m_additional_memo_elements};
+
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
+        accumulate_extra_field_elements(output_proposal.m_partial_memo, additional_memo_elements);
+
+    make_tx_extra(std::move(additional_memo_elements), tx_supplement_out.m_tx_extra);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpTxProposalV1::get_proposal_prefix(const std::string &version_string,
+    const crypto::secret_key &k_view_balance,
+    rct::key &proposal_prefix_out) const
+{
+    // get this tx proposal's outputs
+    std::vector<SpEnoteV1> proposed_enotes;
+    std::vector<rct::xmr_amount> proposed_output_amounts;
+    std::vector<crypto::secret_key> proposed_output_amount_commitment_blinding_factors;
+    SpTxSupplementV1 proposed_tx_supplement;
+
+    this->get_outputs_v1(k_view_balance,
+        proposed_enotes,
+        proposed_output_amounts,
+        proposed_output_amount_commitment_blinding_factors,
+        proposed_tx_supplement);
+
+    // make the proposal prefix
+    make_tx_image_proof_message_v1(version_string, proposed_enotes, proposed_tx_supplement, proposal_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

@@ -33,17 +33,15 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "jamtis_enote_utils.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "sp_composition_proof.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
+#include "tx_builders_inputs.h"
 #include "tx_builders_mixed.h"
-#include "tx_builders_outputs.h"
-#include "tx_component_types.h"
+#include "tx_extra.h"
 
 //third party headers
 
@@ -71,54 +69,32 @@ void SpMultisigPublicInputProposalV1::get_squash_prefix(crypto::secret_key &squa
     make_seraphis_squash_prefix(m_enote.m_core.m_onetime_address, m_enote.m_core.m_amount_commitment, squash_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpMultisigInputProposalV1::get_key_image(crypto::key_image &key_image_out) const
+void SpMultisigPublicInputProposalV1::get_input_proposal_v1(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    SpInputProposalV1 &input_proposal_out) const
 {
-    // KI = k_b/k_a U
-    rct::key temp_K;
-    temp_K = m_core.m_enote.m_core.m_onetime_address;  //Ko = k_a X + k_b U
-    reduce_seraphis_spendkey(m_enote_view_privkey, temp_K);  //k_b U
-    make_seraphis_key_image(m_enote_view_privkey, rct::rct2pk(temp_K), key_image_out);  //k_b/k_a U
+    CHECK_AND_ASSERT_THROW_MES(try_make_v1_input_proposal_v1(m_enote,
+            m_enote_ephemeral_pubkey,
+            m_input_context,
+            wallet_spend_pubkey,
+            k_view_balance,
+            m_address_mask,
+            m_commitment_mask,
+            input_proposal_out),
+        "multisig public input proposal to plain input proposal: conversion failed (wallet may not own this input.");
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpMultisigInputProposalV1::get_enote_core(SpEnote &enote_out) const
-{
-    enote_out = m_core.m_enote.m_core;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpMultisigInputProposalV1::get_enote_image(SpEnoteImage &image_out) const
-{
-    // {Ko, C}
-    SpEnote enote_temp;
-    this->get_enote_core(enote_temp);
-
-    // Ko' = t_k G + H(Ko,C) Ko
-    m_core.get_masked_address(image_out.m_masked_address);
-
-    // C' = t_c G + C
-    sp::mask_key(m_core.m_commitment_mask, enote_temp.m_amount_commitment, image_out.m_masked_commitment);
-
-    // KI = k_a X + k_b U
-    this->get_key_image(image_out.m_key_image);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(const crypto::secret_key &k_view_balance,
-    const rct::key &input_context,
+void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     SpTxProposalV1 &tx_proposal_out) const
 {
-    // assemble output proposals
-    std::vector<SpOutputProposalV1> output_proposals;
-    output_proposals.reserve(m_normal_payments.size() + m_selfsend_payments.size());
+    // extract input proposals
+    std::vector<SpInputProposalV1> plain_input_proposals;
 
-    for (const jamtis::JamtisPaymentProposalV1 &normal_payment : m_normal_payments)
+    for (const SpMultisigPublicInputProposalV1 &public_input_proposal : m_input_proposals)
     {
-        output_proposals.emplace_back();
-        normal_payment.get_output_proposal_v1(input_context, output_proposals.back());
-    }
-
-    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment : m_selfsend_payments)
-    {
-        output_proposals.emplace_back();
-        selfsend_payment.get_output_proposal_v1(k_view_balance, input_context, output_proposals.back());
+        plain_input_proposals.emplace_back();
+        public_input_proposal.get_input_proposal_v1(wallet_spend_pubkey, k_view_balance, plain_input_proposals.back());
     }
 
     // extract memo field elements
@@ -127,63 +103,24 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(const crypto::secret_key &k_v
         "multisig tx proposal: could not parse partial memo.");
 
     // make the tx proposal
-    make_v1_tx_proposal_v1(std::move(output_proposals), std::move(additional_memo_elements), tx_proposal_out);
-
-    // validate the tx proposal
-    check_v1_tx_proposal_semantics_v1(tx_proposal_out);
+    make_v1_tx_proposal_v1(m_normal_payments,
+        m_selfsend_payments,
+        m_tx_fee,
+        std::move(plain_input_proposals),
+        std::move(additional_memo_elements),
+        tx_proposal_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(const crypto::secret_key &k_view_balance,
-    SpTxProposalV1 &tx_proposal_out) const
-{
-    // compute input context and get tx proposal
-
-    // get the input context (assumes key images in composition proof proposals equal those in the input proposals)
-    std::vector<crypto::key_image> key_images;
-    key_images.reserve(m_input_proof_proposals.size());
-
-    for (const SpCompositionProofMultisigProposal &proof_proposal : m_input_proof_proposals)
-        key_images.emplace_back(proof_proposal.KI);
-
-    std::sort(key_images.begin(), key_images.end());
-
-    rct::key input_context;
-    jamtis::make_jamtis_input_context_standard(key_images, input_context);
-
-    // finish getting the tx proposal
-    get_v1_tx_proposal_v1(k_view_balance, input_context, tx_proposal_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpMultisigTxProposalV1::get_proposal_prefix_v1(const crypto::secret_key &k_view_balance,
+void SpMultisigTxProposalV1::get_proposal_prefix_v1(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     rct::key &proposal_prefix_out) const
 {
     // extract proposal
     SpTxProposalV1 tx_proposal;
-    this->get_v1_tx_proposal_v1(k_view_balance, tx_proposal);
+    this->get_v1_tx_proposal_v1(wallet_spend_pubkey, k_view_balance, tx_proposal);
 
     // get prefix from proposal
-    tx_proposal.get_proposal_prefix(m_version_string, proposal_prefix_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpMultisigTxProposalV1::get_proposal_prefix_v1(const crypto::secret_key &k_view_balance,
-    const rct::key &input_context,
-    std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
-    TxExtra partial_memo,
-    const std::string &version_string,
-    rct::key &proposal_prefix_out)
-{
-    SpMultisigTxProposalV1 temp_proposal;
-    temp_proposal.m_normal_payments = std::move(normal_payments);
-    temp_proposal.m_selfsend_payments = std::move(selfsend_payments);
-    temp_proposal.m_partial_memo = std::move(partial_memo);
-
-    // extract proposal
-    SpTxProposalV1 tx_proposal;
-    temp_proposal.get_v1_tx_proposal_v1(k_view_balance, input_context, tx_proposal);
-
-    // get prefix from proposal
-    tx_proposal.get_proposal_prefix(version_string, proposal_prefix_out);
+    tx_proposal.get_proposal_prefix(m_version_string, k_view_balance, proposal_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpMultisigInputInitSetV1::try_get_nonces(const rct::key &masked_address,

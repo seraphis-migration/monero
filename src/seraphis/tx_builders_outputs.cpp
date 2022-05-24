@@ -314,6 +314,15 @@ void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, 
                 "Semantics check tx supplement v1: enote pubkeys must be unique.");
         }
     }
+
+    // the tx extra must be well-formed
+    std::vector<ExtraFieldElement> extra_field_elements;
+
+    CHECK_AND_ASSERT_THROW_MES(try_get_extra_field_elements(tx_supplement.m_tx_extra, extra_field_elements),
+        "Semantics check tx supplement v1: could not extract extra field elements.");
+
+    CHECK_AND_ASSERT_THROW_MES(std::is_sorted(extra_field_elements.begin(), extra_field_elements.end()),
+        "Semantics check tx supplement v1: extra field elements are not sorted.");
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
@@ -650,73 +659,6 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     }
 
     //note: don't sort output proposals here so unit tests are easier
-}
-//-------------------------------------------------------------------------------------------------------------------
-void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal)
-{
-    // outputs should be sorted
-    CHECK_AND_ASSERT_THROW_MES(std::is_sorted(tx_proposal.m_outputs.begin(), tx_proposal.m_outputs.end()),
-        "Semantics check tx proposal v1: outputs aren't sorted.");
-
-    // outputs should be unique (can use adjacent_find when sorted)
-    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(tx_proposal.m_outputs.begin(),
-            tx_proposal.m_outputs.end(),
-            equals_from_less{}) == tx_proposal.m_outputs.end(),
-        "Semantics check tx proposal v1: output onetime addresses are not all unique.");
-
-    // onetime addresses should be canonical (sanity check so our tx outputs don't have duplicate key images)
-    for (const SpEnoteV1 &output_enote : tx_proposal.m_outputs)
-    {
-        CHECK_AND_ASSERT_THROW_MES(output_enote.m_core.onetime_address_is_canonical(),
-            "Semantics check tx proposal v1: an output onetime address is not in the prime subgroup.");
-    }
-
-    // check that output amount commitments can be reproduced
-    CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_outputs.size() == tx_proposal.m_output_amounts.size(),
-        "Semantics check tx proposal v1: outputs don't line up with output amounts.");
-    CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_outputs.size() ==
-            tx_proposal.m_output_amount_commitment_blinding_factors.size(),
-        "Semantics check tx proposal v1: outputs don't line up with output amount commitment blinding factors.");
-
-    for (std::size_t output_index{0}; output_index < tx_proposal.m_outputs.size(); ++output_index)
-    {
-        CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_outputs[output_index].m_core.m_amount_commitment ==
-                rct::commit(tx_proposal.m_output_amounts[output_index],
-                    rct::sk2rct(tx_proposal.m_output_amount_commitment_blinding_factors[output_index])),
-            "Semantics check tx proposal v1: could not reproduce an output's amount commitment.");
-    }
-
-    // check tx supplement (especially enote ephemeral pubkeys)
-    check_v1_tx_supplement_semantics_v1(tx_proposal.m_tx_supplement, tx_proposal.m_outputs.size());
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
-    std::vector<ExtraFieldElement> additional_memo_elements,
-    SpTxProposalV1 &proposal_out)
-{
-    // outputs should be sorted by onetime address
-    std::sort(output_proposals.begin(), output_proposals.end());
-
-    // sanity-check semantics
-    check_v1_output_proposal_set_semantics_v1(output_proposals);
-
-    // make outputs
-    // make tx supplement
-    // prepare for range proofs
-    make_v1_outputs_v1(output_proposals,
-        proposal_out.m_outputs,
-        proposal_out.m_output_amounts,
-        proposal_out.m_output_amount_commitment_blinding_factors,
-        proposal_out.m_tx_supplement.m_output_enote_ephemeral_pubkeys);
-
-    // add all memo fields to the tx supplement
-    for (const SpOutputProposalV1 &output_proposal : output_proposals)
-        accumulate_extra_field_elements(output_proposal.m_partial_memo, additional_memo_elements);
-
-    make_tx_extra(std::move(additional_memo_elements), proposal_out.m_tx_supplement.m_tx_extra);
-
-    // sanity-check supplement semantics
-    check_v1_tx_supplement_semantics_v1(proposal_out.m_tx_supplement, proposal_out.m_outputs.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::vector<SpOutputProposalV1> gen_mock_sp_output_proposals_v1(const std::vector<rct::xmr_amount> &out_amounts,

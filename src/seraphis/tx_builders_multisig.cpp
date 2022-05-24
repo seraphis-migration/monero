@@ -138,53 +138,18 @@ static bool validate_v1_multisig_input_init_set_for_partial_sig_set_v1(const SpM
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void get_masked_addresses(const std::vector<SpMultisigPublicInputProposalV1> &public_input_proposals,
+static void get_masked_addresses(const std::vector<SpInputProposalV1> &plain_input_proposals,
     rct::keyV &masked_addresses_out)
 {
     masked_addresses_out.clear();
     masked_addresses_out.reserve(public_input_proposals.size());
+    SpEnoteImageV1 enote_image_temp;
 
-    for (const SpMultisigPublicInputProposalV1 &input_proposal : public_input_proposals)
+    for (const SpInputProposalV1 &input_proposal : plain_input_proposals)
     {
-        masked_addresses_out.emplace_back();
-        input_proposal.get_masked_address(masked_addresses_out.back());
+        input_proposal.get_enote_image_v1(enote_image_temp);
+        masked_addresses_out.emplace_back(enote_image_temp.m_masked_address);
     }
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void check_v1_multisig_tx_proposal_full_balance_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance)
-{
-    // check that the input and output amounts of a multisig tx proposal balance out
-
-    // extract the fee value
-    rct::xmr_amount raw_transaction_fee;
-    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(multisig_tx_proposal.m_tx_fee, raw_transaction_fee),
-        "multisig tx proposal balance check: could not extract fee value from discretized fee.");
-
-    // get input amounts
-    std::vector<rct::xmr_amount> in_amounts;
-    in_amounts.reserve(multisig_tx_proposal.m_input_proposals.size());
-
-    std::vector<SpMultisigInputProposalV1> converted_input_proposals;
-    CHECK_AND_ASSERT_THROW_MES(try_get_v1_multisig_input_proposals_v1(multisig_tx_proposal.m_input_proposals,
-            wallet_spend_pubkey,
-            k_view_balance,
-            converted_input_proposals),
-        "multisig tx proposal balance check: could not extract data from an input proposal "
-        "(maybe input not owned by user).");
-
-    for (const SpMultisigInputProposalV1 &input_proposal : converted_input_proposals)
-        in_amounts.emplace_back(input_proposal.m_input_amount);
-
-    // get output amounts
-    SpTxProposalV1 tx_proposal;
-    multisig_tx_proposal.get_v1_tx_proposal_v1(k_view_balance, tx_proposal);
-
-    // check: sum(input amnts) == sum(output amnts) + fee
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, tx_proposal.m_output_amounts, raw_transaction_fee),
-        "multisig tx proposal: input/output amounts did not balance with desired fee.");
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -259,7 +224,7 @@ static void make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_
     const multisig::signer_set_filter available_signers_filter,
     const std::vector<multisig::signer_set_filter> &available_signers_as_filters,
     const std::vector<crypto::secret_key> &squash_prefixes,
-    const std::vector<SpMultisigInputProposalV1> &converted_input_proposals,
+    const std::vector<SpInputProposalV1> &plain_input_proposals,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sig_sets_out)
 {
@@ -277,7 +242,7 @@ static void make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_
             multisig_tx_proposal.m_input_proof_proposals.size(),
         "multisig input partial sigs: input proposals don't line up with input proof proposals (bug).");
     CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() == 
-            converted_input_proposals.size(),
+            plain_input_proposals.size(),
         "multisig input partial sigs: input proposals don't line up with converted input proposals (bug).");
     CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() == 
             squash_prefixes.size(),
@@ -356,7 +321,7 @@ static void make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_
                     // apply squash prefix to signing keys y and z_e
                     sc_mul(to_bytes(enote_view_privkey_with_squash_prefix),
                         to_bytes(squash_prefixes[input_index]),
-                        to_bytes(converted_input_proposals[input_index].m_enote_view_privkey));
+                        to_bytes(plain_input_proposals[input_index].m_enote_view_privkey));
                     sc_mul(to_bytes(z_temp_with_squash_prefix),
                         to_bytes(squash_prefixes[input_index]),
                         to_bytes(z_temp));
@@ -431,109 +396,6 @@ void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     proposal_out.m_input_context = input_context;
     proposal_out.m_address_mask = address_mask;
     proposal_out.m_commitment_mask = commitment_mask;
-
-    // make sure it is well-formed
-    check_v1_multisig_public_input_proposal_semantics_v1(proposal_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void check_v1_multisig_input_proposal_semantics_v1(const SpMultisigInputProposalV1 &input_proposal)
-{
-    // input amount components should be able to reproduce the amount commitment
-    rct::key reconstructed_amount_commitment{
-            rct::commit(input_proposal.m_input_amount, rct::sk2rct(input_proposal.m_input_amount_blinding_factor))
-        };
-    CHECK_AND_ASSERT_THROW_MES(reconstructed_amount_commitment == input_proposal.m_core.m_enote.m_core.m_amount_commitment,
-        "multisig input proposal: could not reconstruct the amount commitment.");
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_multisig_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
-    const rct::key &input_context,
-    const crypto::secret_key &enote_view_privkey,
-    const crypto::secret_key &input_amount_blinding_factor,
-    const rct::xmr_amount &input_amount,
-    const crypto::secret_key &address_mask,
-    const crypto::secret_key &commitment_mask,
-    SpMultisigInputProposalV1 &proposal_out)
-{
-    // make multisig input proposal
-
-    // set core
-    make_v1_multisig_public_input_proposal_v1(enote,
-        enote_ephemeral_pubkey,
-        input_context,
-        address_mask,
-        commitment_mask,
-        proposal_out.m_core);
-
-    // add components
-    proposal_out.m_enote_view_privkey = enote_view_privkey;
-    proposal_out.m_input_amount_blinding_factor = input_amount_blinding_factor;
-    proposal_out.m_input_amount = input_amount;
-
-    // make sure it is well-formed
-    check_v1_multisig_input_proposal_semantics_v1(proposal_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void make_v1_multisig_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
-    const crypto::secret_key &address_mask,
-    const crypto::secret_key &commitment_mask,
-    SpMultisigInputProposalV1 &proposal_out)
-{
-    // make multisig input proposal from enote record
-    make_v1_multisig_input_proposal_v1(enote_record.m_enote,
-        enote_record.m_enote_ephemeral_pubkey,
-        enote_record.m_input_context,
-        enote_record.m_enote_view_privkey,
-        enote_record.m_amount_blinding_factor,
-        enote_record.m_amount,
-        address_mask,
-        commitment_mask,
-        proposal_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool try_get_v1_multisig_input_proposal_v1(const SpMultisigPublicInputProposalV1 &public_input_proposal,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    SpMultisigInputProposalV1 &proposal_out)
-{
-    // try to extract info from enote then make multisig input proposal
-    SpEnoteRecordV1 enote_record;
-    if (!try_get_enote_record_v1(public_input_proposal.m_enote,
-            public_input_proposal.m_enote_ephemeral_pubkey,
-            public_input_proposal.m_input_context,
-            wallet_spend_pubkey,
-            k_view_balance,
-            enote_record))
-        return false;
-
-    make_v1_multisig_input_proposal_v1(enote_record,
-        public_input_proposal.m_address_mask,
-        public_input_proposal.m_commitment_mask,
-        proposal_out);
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool try_get_v1_multisig_input_proposals_v1(const std::vector<SpMultisigPublicInputProposalV1> &public_input_proposals,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    std::vector<SpMultisigInputProposalV1> &converted_input_proposals_out)
-{
-    // convert the public input proposals
-    converted_input_proposals_out.reserve(public_input_proposals.size());
-
-    for (const SpMultisigPublicInputProposalV1 &input_proposal : public_input_proposals)
-    {
-        converted_input_proposals_out.emplace_back();
-        if (!try_get_v1_multisig_input_proposal_v1(input_proposal,
-                wallet_spend_pubkey,
-                k_view_balance,
-                converted_input_proposals_out.back()))
-            return false;
-    }
-
-    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
@@ -609,107 +471,110 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 
     /// input/output checks
 
-    // 1. check the tx input/output amounts balance
-    check_v1_multisig_tx_proposal_full_balance_v1(multisig_tx_proposal, wallet_spend_pubkey, k_view_balance);
-
-    // 2. check the public input proposal semantics
+    // 1. check the public input proposal semantics
     for (const SpMultisigPublicInputProposalV1 &public_input_proposal : multisig_tx_proposal.m_input_proposals)
         check_v1_multisig_public_input_proposal_semantics_v1(public_input_proposal);
 
-    // 3. convert the public input proposals
-    std::vector<SpMultisigInputProposalV1> converted_input_proposals;
-    CHECK_AND_ASSERT_THROW_MES(try_get_v1_multisig_input_proposals_v1(multisig_tx_proposal.m_input_proposals,
-            wallet_spend_pubkey,
-            k_view_balance,
-            converted_input_proposals),
-        "multisig tx proposal: could not extract data from an input proposal (maybe input not owned by user).");
-
-    // 4. should be at least 1 input and 1 output
-    CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() > 0, "multisig tx proposal: no inputs.");
-    CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_normal_payments.size() +
-            multisig_tx_proposal.m_selfsend_payments.size() > 0,
-        "multisig tx proposal: no outputs.");
-
-
-    /// output checks
-
-    // 1. convert to a plain tx proposal to validate outputs (should internally call full semantics check of tx proposal)
-    // note: for 2-out txs, that semantics check will ensure they share an enote ephemeral pubkey
+    // 2. convert the proposal to a plain tx proposal and check its semantics (a comprehensive set of tests)
     SpTxProposalV1 tx_proposal;
-    multisig_tx_proposal.get_v1_tx_proposal_v1(k_view_balance, tx_proposal);
+    multisig_tx_proposal.get_v1_tx_proposal_v1(wallet_spend_pubkey, k_view_balance, tx_proposal);
+
+    check_v1_tx_proposal_semantics_v1(tx_proposal, wallet_spend_pubkey, k_view_balance);
 
     // - get prefix from proposal
     rct::key proposal_prefix;
-    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, proposal_prefix);
-
-    // 2. there cannot be two self-send outputs of the same type and no other outputs (postcondition of the
-    //    output set finalizer)
-    if (multisig_tx_proposal.m_normal_payments.size() == 0 &&
-        multisig_tx_proposal.m_selfsend_payments.size() == 2)
-    {
-        CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_selfsend_payments[0].m_type !=
-                multisig_tx_proposal.m_selfsend_payments[1].m_type,
-            "multisig tx proposal: there are two self-send outputs of the same type but no other outputs (not allowed).");
-    }
+    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, k_view_balance, proposal_prefix);
 
 
-    /// input checks
+    /// multisig-related input checks
 
-    // 1. input proposals line up 1:1 with input proof proposals, each input has a unique key image
-    CHECK_AND_ASSERT_THROW_MES(converted_input_proposals.size() ==
-        multisig_tx_proposal.m_input_proof_proposals.size(),
+    // 1. input proposals line up 1:1 with multisig input proof proposals, each input has a unique key image
+    CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_input_proposals.size() == multisig_tx_proposal.m_input_proof_proposals.size(),
         "multisig tx proposal: input proposals don't line up with input proposal proofs.");
 
     // 2. assess each input proposal
-    rct::key image_address_with_squash_prefix;
-    std::vector<crypto::key_image> key_images;
-    key_images.reserve(converted_input_proposals.size());
+    SpEnoteImageV1 enote_image_temp;
 
-    for (std::size_t input_index{0}; input_index < converted_input_proposals.size(); ++input_index)
+    for (std::size_t input_index{0}; input_index < multisig_tx_proposal.m_input_proof_proposals.size(); ++input_index)
     {
-        // a. converted proposals should be well-formed
-        check_v1_multisig_input_proposal_semantics_v1(converted_input_proposals[input_index]);
-
-        // b. input proof proposal messages all equal proposal prefix of core tx proposal
+        // a. input proof proposal messages all equal proposal prefix of core tx proposal
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].message == proposal_prefix,
             "multisig tx proposal: input proof proposal does not match the tx proposal (different proposal prefix).");
 
-        // c. input proof proposal keys line up 1:1 and match with input proposals
-        converted_input_proposals[input_index].m_core.get_masked_address(image_address_with_squash_prefix);
+        // b. input proof proposal keys line up 1:1 and match with input proposals
+        tx_proposal.m_input_proposals[input_index].get_enote_image_v1(enote_image_temp);
+
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].K ==
-                image_address_with_squash_prefix,
+                enote_image_temp.m_masked_address,
             "multisig tx proposal: input proof proposal does not match input proposal (different proof keys).");
 
-        // d. input proof proposal key images line up 1:1 and match with input proposals
-        key_images.emplace_back();
-        converted_input_proposals[input_index].get_key_image(key_images.back());
+        // c. input proof proposal key images line up 1:1 and match with input proposals
         CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proof_proposals[input_index].KI ==
-                key_images.back(),
+                enote_image_temp.m_key_image,
             "multisig tx proposal: input proof proposal does not match input proposal (different key images).");
-
-        // e. check that the key image obtained is canonical
-        CHECK_AND_ASSERT_THROW_MES(key_domain_is_prime_subgroup(rct::ki2rct(key_images.back())),
-            "multisig tx proposal: an input's key image is not in the prime subgroup.");
     }
-
-    // 3. key images should be unique
-    std::sort(key_images.begin(), key_images.end());
-    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(key_images.begin(), key_images.end()) == key_images.end(),
-        "multisig tx proposal: inputs are not unique (found duplicate key image).");
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_multisig_tx_proposal_v1(const crypto::secret_key &k_view_balance,
-    const std::uint32_t threshold,
-    const std::uint32_t num_signers,
+void make_v1_multisig_tx_proposal_v1(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
     TxExtra partial_memo,
     const DiscretizedFee &tx_fee,
     std::string version_string,
-    const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
+    const std::vector<SpMultisigPublicInputProposalV1> &public_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpMultisigTxProposalV1 &proposal_out)
 {
+    // convert public input proposals to plain input proposals
+    std::vector<SpInputProposalV1> input_proposals;
+
+    for (const SpMultisigPublicInputProposalV1 &public_input_proposal : public_input_proposals)
+    {
+        plain_input_proposals.emplace_back();
+        public_input_proposal.get_input_proposal_v1(wallet_spend_pubkey, k_view_balance, plain_input_proposals.back());
+    }
+
+    // extract memo field elements
+    std::vector<ExtraFieldElement> additional_memo_elements;
+    CHECK_AND_ASSERT_THROW_MES(try_get_extra_field_elements(partial_memo, additional_memo_elements),
+        "make multisig tx proposal: could not parse partial memo.");
+
+    // make a temporary normal tx proposal
+    SpTxProposalV1 tx_proposal;
+    make_v1_tx_proposal_v1(normal_payments,
+        selfsend_payments,
+        tx_fee,
+        std::move(input_proposals),
+        std::move(additional_memo_elements),
+        tx_proposal);
+
+    // get proposal prefix
+    rct::key proposal_prefix;
+    tx_proposal.get_proposal_prefix(version_string, k_view_balance, proposal_prefix);
+
+    // prepare composition proofs for each input (note: using the tx proposal here ensures proof proposals are sorted)
+    proposal_out.m_input_proof_proposals.clear();
+    proposal_out.m_input_proof_proposals.reserve(public_input_proposals.size());
+    SpEnoteImageV1 enote_image_temp;
+
+    for (const SpInputProposalV1 &input_proposal : tx_proposal.m_input_proposals)
+    {
+        input_proposal.get_enote_image_v1(enote_image_temp);
+
+        proposal_out.m_input_proof_proposals.emplace_back(
+                sp_composition_multisig_proposal(proposal_prefix,
+                    enote_image_temp.m_masked_address,
+                    enote_image_temp.m_key_image)
+            );
+    }
+
+    // set public input proposals
+    proposal_out.m_input_proposals.reserve(full_input_proposals.size());
+
+    for (const SpMultisigInputProposalV1 &full_input_proposal : full_input_proposals)
+        proposal_out.m_input_proposals.emplace_back(full_input_proposal.m_core);
+
     // add miscellaneous components
     proposal_out.m_normal_payments = std::move(normal_payments);
     proposal_out.m_selfsend_payments = std::move(selfsend_payments);
@@ -717,52 +582,6 @@ void make_v1_multisig_tx_proposal_v1(const crypto::secret_key &k_view_balance,
     proposal_out.m_tx_fee = tx_fee;
     proposal_out.m_aggregate_signer_set_filter = aggregate_signer_set_filter;
     proposal_out.m_version_string = std::move(version_string);
-
-    // compute input context
-    std::vector<crypto::key_image> key_images;
-
-    for (const SpMultisigInputProposalV1 &full_input_proposal : full_input_proposals)
-    {
-        key_images.emplace_back();
-        full_input_proposal.get_key_image(key_images.back());
-    }
-
-    std::sort(key_images.begin(), key_images.end());
-
-    rct::key input_context;
-    jamtis::make_jamtis_input_context_standard(key_images, input_context);
-
-    // get proposal prefix
-    rct::key proposal_prefix;
-    SpMultisigTxProposalV1::get_proposal_prefix_v1(k_view_balance,
-        input_context,
-        proposal_out.m_normal_payments,
-        proposal_out.m_selfsend_payments,
-        proposal_out.m_partial_memo,
-        proposal_out.m_version_string,
-        proposal_prefix);
-
-    // prepare composition proofs for each input
-    proposal_out.m_input_proof_proposals.clear();
-    proposal_out.m_input_proof_proposals.reserve(full_input_proposals.size());
-    rct::key masked_address_temp;
-    crypto::key_image key_image_temp;
-
-    for (const SpMultisigInputProposalV1 &full_input_proposal : full_input_proposals)
-    {
-        full_input_proposal.m_core.get_masked_address(masked_address_temp);
-        full_input_proposal.get_key_image(key_image_temp);
-        proposal_out.m_input_proof_proposals.emplace_back(
-                sp_composition_multisig_proposal(proposal_prefix,
-                    masked_address_temp,
-                    key_image_temp)
-            );
-    }
-
-    // set public input proposals
-    proposal_out.m_input_proposals.reserve(full_input_proposals.size());
-    for (const SpMultisigInputProposalV1 &full_input_proposal : full_input_proposals)
-        proposal_out.m_input_proposals.emplace_back(full_input_proposal.m_core);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_input_init_set_semantics_v1(const SpMultisigInputInitSetV1 &input_init_set,
@@ -783,7 +602,7 @@ void check_v1_multisig_input_init_set_semantics_v1(const SpMultisigInputInitSetV
             input_init_set.m_aggregate_signer_set_filter),
         "multisig tx proposal: invalid aggregate signer set filter.");
 
-    // for each enote image to sign, there should be one nonce set (signing attemp) per signer set that contains the signer
+    // for each enote image to sign, there should be one nonce set (signing attempt) per signer set that contains the signer
     // - there are 'num signers requested' choose 'threshold' total signer sets per enote image
     // - remove our signer, then choose 'threshold - 1' signers from the remaining 'num signers requested - 1'
     const std::uint32_t num_sets_with_signer_expected(
@@ -864,7 +683,8 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     check_v1_multisig_input_init_set_semantics_v1(input_init_set_out, threshold, multisig_signers);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_multisig_input_init_set_v1(const crypto::secret_key &k_view_balance,
+void make_v1_multisig_input_init_set_v1(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     const crypto::public_key &signer_id,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers,
@@ -877,12 +697,14 @@ void make_v1_multisig_input_init_set_v1(const crypto::secret_key &k_view_balance
         "multisig input initializer: no inputs to initialize.");
 
     // make proposal prefix
+    SpTxProposalV1 tx_proposal;
     rct::key proposal_prefix;
-    multisig_tx_proposal.get_proposal_prefix_v1(k_view_balance, proposal_prefix);
+    multisig_tx_proposal.get_v1_tx_proposal_v1(wallet_spend_pubkey, k_view_balance, proposal_prefix);
+    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, k_view_balance, proposal_prefix);
 
     // prepare masked addresses
     rct::keyV masked_addresses;
-    get_masked_addresses(multisig_tx_proposal.m_input_proposals, masked_addresses);
+    get_masked_addresses(tx_proposal.m_input_proposals, masked_addresses);
 
     make_v1_multisig_input_init_set_v1(signer_id,
         threshold,
@@ -901,7 +723,7 @@ void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputParti
     CHECK_AND_ASSERT_THROW_MES(multisig::signer_is_in_filter(input_partial_sig_set.m_signer_id,
             multisig_signers,
             input_partial_sig_set.m_signer_set_filter),
-        "multisig input partial sig set: the signer is not a member of the signer group.");
+        "multisig input partial sig set: the signer is not a member of the signer group (or the filter is invalid).");
 
     // all inputs sign the same message
     for (const SpCompositionProofMultisigPartial &partial_sig : input_partial_sig_set.m_partial_signatures)
@@ -934,10 +756,13 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     extend_seraphis_spendkey(k_view_balance, wallet_spend_pubkey);
 
     // misc. from multisig tx proposal
+    SpTxProposalV1 tx_proposal;
     rct::key proposal_prefix;
-    multisig_tx_proposal.get_proposal_prefix_v1(k_view_balance, proposal_prefix);
+    multisig_tx_proposal.get_v1_tx_proposal_v1(wallet_spend_pubkey, k_view_balance, proposal_prefix);
+    tx_proposal.get_proposal_prefix(multisig_tx_proposal.m_version_string, k_view_balance, proposal_prefix);
+
     rct::keyV input_masked_addresses;
-    get_masked_addresses(multisig_tx_proposal.m_input_proposals, input_masked_addresses);
+    get_masked_addresses(tx_proposal.m_input_proposals, input_masked_addresses);
 
     // filter permutations
     std::vector<multisig::signer_set_filter> filter_permutations;
@@ -1002,15 +827,6 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
         input_proposal.get_squash_prefix(squash_prefixes.back());
     }
 
-    // 6) extract data from input proposals so input enote view privkeys are available
-    std::vector<SpMultisigInputProposalV1> converted_input_proposals;
-
-    if (!try_get_v1_multisig_input_proposals_v1(multisig_tx_proposal.m_input_proposals,
-            wallet_spend_pubkey,
-            k_view_balance,
-            converted_input_proposals))
-        return false;
-
 
     /// make partial signatures
     make_v1_multisig_input_partial_sig_sets_v1(signer_account,
@@ -1024,7 +840,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
         available_signers_filter,
         available_signers_as_filters,
         squash_prefixes,
-        converted_input_proposals,
+        tx_proposal.m_input_proposals,
         nonce_record_inout,
         input_partial_sig_sets_out);
 
@@ -1034,7 +850,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposal,
+bool try_make_v1_partial_input_v1(const SpInputProposal &input_proposal,
     const rct::key &expected_proposal_prefix,
     const std::vector<SpCompositionProofMultisigPartial> &input_proof_partial_sigs,
     SpPartialInputV1 &partial_input_out)
@@ -1052,13 +868,13 @@ bool try_make_v1_partial_input_v1(const SpMultisigInputProposalV1 &input_proposa
         partial_input_out.m_image_proof.m_composition_proof = sp_composition_prove_multisig_final(input_proof_partial_sigs);
 
         // copy miscellaneous pieces
-        input_proposal.get_enote_image(partial_input_out.m_input_image.m_core);
-        partial_input_out.m_address_mask = input_proposal.m_core.m_address_mask;
-        partial_input_out.m_commitment_mask = input_proposal.m_core.m_commitment_mask;
+        input_proposal.get_enote_image_core(partial_input_out.m_input_image.m_core);
+        partial_input_out.m_address_mask = input_proposal.m_address_mask;
+        partial_input_out.m_commitment_mask = input_proposal.m_commitment_mask;
         partial_input_out.m_proposal_prefix = expected_proposal_prefix;
         input_proposal.get_enote_core(partial_input_out.m_input_enote_core);
-        partial_input_out.m_input_amount = input_proposal.m_input_amount;
-        partial_input_out.m_input_amount_blinding_factor = input_proposal.m_input_amount_blinding_factor;
+        partial_input_out.m_input_amount = input_proposal.m_amount;
+        partial_input_out.m_input_amount_blinding_factor = input_proposal.m_amount_blinding_factor;
     }
     catch (...)
     {
@@ -1075,30 +891,26 @@ bool try_make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_pro
     std::unordered_map<crypto::public_key, std::vector<SpMultisigInputPartialSigSetV1>> input_partial_sigs_per_signer,
     std::vector<SpPartialInputV1> &partial_inputs_out)
 {
-    // convert to full input proposals so key images are available
-    std::vector<SpMultisigInputProposalV1> converted_input_proposals;
-    CHECK_AND_ASSERT_THROW_MES(try_get_v1_multisig_input_proposals_v1(multisig_tx_proposal.m_input_proposals,
-            wallet_spend_pubkey,
-            k_view_balance,
-            converted_input_proposals),
-        "multisig make partial inputs: failed to extract data from input proposals (maybe user doesn't own an input).");
+    // get normal tx proposal
+    SpTxProposalV1 tx_proposal;
+    multisig_tx_proposal.get_v1_tx_proposal_v1(wallet_spend_pubkey, k_view_balance, proposal_prefix);
 
     // collect masked addresses of input images
     // and map input proposals to their masked addresses for ease of use later
     std::unordered_set<rct::key> expected_masked_addresses;
-    std::unordered_map<rct::key, SpMultisigInputProposalV1> mapped_converted_input_proposals;
-    rct::key temp_masked_address;
+    std::unordered_map<rct::key, SpInputProposalV1> mapped_input_proposals;
+    SpEnoteImageV1 enote_image_temp;
 
-    for (const SpMultisigInputProposalV1 &input_proposal : converted_input_proposals)
+    for (const SpInputProposalV1 &input_proposal : tx_proposal.m_input_proposals)
     {
-        input_proposal.m_core.get_masked_address(temp_masked_address);
-        expected_masked_addresses.insert(temp_masked_address);
-        mapped_converted_input_proposals[temp_masked_address] = input_proposal;
+        input_proposal.get_enote_image_v1(enote_image_temp);
+        expected_masked_addresses.insert(enote_image_temp.m_masked_address);
+        mapped_input_proposals[enote_image_temp.m_masked_address] = input_proposal;
     }
 
     // get expected proposal prefix
     rct::key expected_proposal_prefix;
-    multisig_tx_proposal.get_proposal_prefix_v1(k_view_balance, expected_proposal_prefix);
+    tx_proposal.get_proposal_prefix_v1(multisig_tx_proposal.m_version_string, k_view_balance, expected_proposal_prefix);
 
     // filter the partial signatures into maps
     std::unordered_map<multisig::signer_set_filter, std::unordered_set<crypto::public_key>> collected_signers_per_filter;
@@ -1161,7 +973,7 @@ bool try_make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_pro
             // try to make the partial input
             partial_inputs_out.emplace_back();
 
-            if (!try_make_v1_partial_input_v1(mapped_converted_input_proposals[masked_address_partial_sigs.first],
+            if (!try_make_v1_partial_input_v1(mapped_input_proposals[masked_address_partial_sigs.first],
                     expected_proposal_prefix,
                     masked_address_partial_sigs.second,
                     partial_inputs_out.back()))

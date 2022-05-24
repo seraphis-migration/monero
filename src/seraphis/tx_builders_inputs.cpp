@@ -206,6 +206,40 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance)
+{
+    // 1. the onetime address must be reproducible
+    rct::key wallet_spend_pubkey_base{wallet_spend_pubkey};
+    reduce_seraphis_spendkey(k_view_balance, wallet_spend_pubkey_base);
+
+    rct::key onetime_address_reproduced{wallet_spend_pubkey_base};
+    extend_seraphis_spendkey(input_proposal.m_core.m_enote_view_privkey, onetime_address_reproduced);
+
+    CHECK_AND_ASSERT_THROW_MES(onetime_address_reproduced == input_proposal.m_core.m_enote_core.m_onetime_address,
+        "input proposal v1 semantics check: could not reproduce the one-time address.");
+
+    // 2. the key image must be reproducible and canonical
+    crypto::key_image key_image_reproduced;
+    make_seraphis_key_image(input_proposal.m_core.m_enote_view_privkey,
+        rct::rct2pk(wallet_spend_pubkey_base),
+        key_image_reproduced);
+
+    CHECK_AND_ASSERT_THROW_MES(key_image_reproduced == input_proposal.m_core.m_key_image,
+        "input proposal v1 semantics check: could not reproduce the key image.");
+    CHECK_AND_ASSERT_THROW_MES(key_domain_is_prime_subgroup(rct::ki2rct(key_image_reproduced)),
+        "input proposal v1 semantics check: the key image is not canonical.");
+
+    // 3. the amount commitment must be reproducible
+    const rct::key amount_commitment_reproduced{
+            rct::commit(input_proposal.m_core.m_amount, input_proposal.m_core.m_amount_blinding_factor)
+        };
+
+    CHECK_AND_ASSERT_THROW_MES(amount_commitment_reproduced == input_proposal.m_core.m_enote_core.m_amount_commitment,
+        "input proposal v1 semantics check: could not reproduce the amount commitment.");
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_input_proposal(const SpEnote &enote_core,
     const crypto::key_image &key_image,
     const crypto::secret_key &enote_view_privkey,
@@ -243,6 +277,7 @@ void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
 //-------------------------------------------------------------------------------------------------------------------
 bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &address_mask,
@@ -251,7 +286,12 @@ bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
 {
     // try to extract info from enote then make an input proposal
     SpEnoteRecordV1 enote_record;
-    if (!try_get_enote_record_v1(enote, enote_ephemeral_pubkey, rct::zero(), wallet_spend_pubkey, k_view_balance, enote_record))
+    if (!try_get_enote_record_v1(enote,
+            enote_ephemeral_pubkey,
+            input_context,
+            wallet_spend_pubkey,
+            k_view_balance,
+            enote_record))
         return false;
 
     make_v1_input_proposal_v1(enote_record, address_mask, commitment_mask, proposal_out);

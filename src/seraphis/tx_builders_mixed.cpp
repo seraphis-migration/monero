@@ -74,7 +74,7 @@ static auto convert_skv_to_rctv(const std::vector<crypto::secret_key> &skv, rct:
     rctv_out.clear();
     rctv_out.reserve(skv.size());
 
-    for (const auto &skey : skv)
+    for (const crypto::secret_key &skey : skv)
         rctv_out.emplace_back(rct::sk2rct(skey));
 
     return a_wiper;
@@ -95,17 +95,164 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
 
     hash = CRYPTONOTE_NAME;
     hash += version_string;
-    for (const auto &output_enote : output_enotes)
+    for (const SpEnoteV1 &output_enote : output_enotes)
     {
         output_enote.append_to_string(hash);
     }
-    for (const auto &enote_pubkey : tx_supplement.m_output_enote_ephemeral_pubkeys)
+    for (const rct::key &enote_pubkey : tx_supplement.m_output_enote_ephemeral_pubkeys)
     {
         hash.append(reinterpret_cast<const char*>(enote_pubkey.bytes), sizeof(enote_pubkey));
     }
     hash.append(reinterpret_cast<const char*>(tx_supplement.m_tx_extra.data()), tx_supplement.m_tx_extra.size());
 
     rct::hash_to_scalar(proof_message_out, hash.data(), hash.size());
+}
+//-------------------------------------------------------------------------------------------------------------------
+void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance)
+{
+    /// validate self-send payment proposals
+
+    // 1. there must be at least one self-send output
+    CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_selfsend_payments.size() > 0,
+        "Semantics check tx proposal v1: there are no self-send outputs (at least one is expected).");
+
+    // 2. there cannot be two self-send outputs of the same type and no other outputs
+    if (tx_proposal.m_normal_payments.size() == 0 &&
+        tx_proposal.m_selfsend_payments.size() == 2)
+    {
+        CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_selfsend_payments[0].m_type != tx_proposal.m_selfsend_payments[1].m_type,
+            "Semantics check tx proposal v1: there are two self-send outputs of the same type but no other outputs "
+            "(not allowed).");
+    }
+
+    // 3. all self-send destinations must be owned by the wallet
+    crypto::secret_key k_find_received;
+    crypto::secret_key s_generate_address;
+    rct::key findreceived_pubkey;
+    make_jamtis_findreceived_key(k_view_balance, k_find_received);
+    make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
+    rct::scalarmultBase(findreceived_pubkey, rct::sk2rct(k_find_received));
+
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment : tx_proposal.m_selfsend_payments)
+    {
+        CHECK_AND_ASSERT_THROW_MES(jamtis::try_get_jamtis_index_from_destination_v1(selfsend_payment.m_destination,
+                wallet_spend_pubkey,
+                findreceived_pubkey,
+                s_generate_address,
+                j_temp),
+            "Semantics check tx proposal v1: invalid self-send destination (not a destination of this wallet).");
+    }
+
+
+    /// check consistency of outputs
+    std::vector<SpEnoteV1> output_enotes;
+    std::vector<rct::xmr_amount> output_amounts;
+    std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
+    SpTxSupplementV1 tx_supplement;
+
+    tx_proposal.get_outputs_v1(k_view_balance,
+        output_enotes,
+        output_amounts,
+        output_amount_commitment_blinding_factors,
+        tx_supplement);
+
+    // 1. at least two outputs are expected
+    CHECK_AND_ASSERT_THROW_MES(output_enotes.size() >= 2,
+        "Semantics check tx proposal v1: there are fewer than 2 outputs.");
+
+    // 2. outputs should be sorted
+    CHECK_AND_ASSERT_THROW_MES(std::is_sorted(output_enotes.begin(), output_enotes.end()),
+        "Semantics check tx proposal v1: outputs aren't sorted.");
+
+    // 3. outputs should be unique (can use adjacent_find when sorted)
+    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(output_enotes.begin(),
+            output_enotes.end(),
+            equals_from_less{}) == output_enotes.end(),
+        "Semantics check tx proposal v1: output onetime addresses are not all unique.");
+
+    // 4. onetime addresses should be canonical (sanity check so our tx outputs don't have duplicate key images)
+    for (const SpEnoteV1 &output_enote : output_enotes)
+    {
+        CHECK_AND_ASSERT_THROW_MES(output_enote.m_core.onetime_address_is_canonical(),
+            "Semantics check tx proposal v1: an output onetime address is not in the prime subgroup.");
+    }
+
+    // 5. check that output amount commitments can be reproduced
+    CHECK_AND_ASSERT_THROW_MES(output_enotes.size() == output_amounts.size(),
+        "Semantics check tx proposal v1: outputs don't line up with output amounts.");
+    CHECK_AND_ASSERT_THROW_MES(output_enotes.size() == output_amount_commitment_blinding_factors.size(),
+        "Semantics check tx proposal v1: outputs don't line up with output amount commitment blinding factors.");
+
+    for (std::size_t output_index{0}; output_index < output_enotes.size(); ++output_index)
+    {
+        CHECK_AND_ASSERT_THROW_MES(output_enotes[output_index].m_core.m_amount_commitment ==
+                rct::commit(output_amounts[output_index],
+                    rct::sk2rct(output_amount_commitment_blinding_factors[output_index])),
+            "Semantics check tx proposal v1: could not reproduce an output's amount commitment.");
+    }
+
+    // 6. check tx supplement (especially enote ephemeral pubkeys)
+    check_v1_tx_supplement_semantics_v1(tx_supplement, output_enotes.size());
+
+
+    /// input checks
+
+    // 1. there should be at least one input
+    CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_input_proposals.size() >= 1,
+        "Semantics check tx proposal v1: there are no inputs.");
+
+    // 2. input proposals should be sorted and unique
+    CHECK_AND_ASSERT_THROW_MES(std::is_sorted(tx_proposal.m_input_proposals.begin(),
+            tx_proposal.m_input_proposals.end()),
+        "Semantics check tx proposal v1: input proposals are not sorted.");
+
+    CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(tx_proposal.m_input_proposals.begin(),
+            tx_proposal.m_input_proposals.end(),
+            equals_from_less{}) == tx_proposal.m_input_proposals.end(),
+        "Semantics check tx proposal v1: input proposal key images are not unique.");
+
+    // 3. input proposal semantics should be valid
+    for (const SpInputProposalV1 &input_proposal : tx_proposal.m_input_proposals)
+        check_v1_input_proposal_semantics_v1(input_proposal, wallet_spend_pubkey, k_view_balance);
+
+
+    /// check that amounts balance in the proposal
+
+    // 1. extract the fee value
+    rct::xmr_amount raw_transaction_fee;
+    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(tx_proposal.m_tx_fee, raw_transaction_fee),
+        "Semantics check tx proposal v1: could not extract fee value from discretized fee.");
+
+    // 2. get input amounts
+    std::vector<rct::xmr_amount> in_amounts;
+    in_amounts.reserve(tx_proposal.m_input_proposals.size());
+
+    for (const SpInputProposalV1 &input_proposal : converted_input_proposals)
+        in_amounts.emplace_back(input_proposal.get_amount());
+
+    // 3. check: sum(input amnts) == sum(output amnts) + fee
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts(in_amounts, output_amounts, raw_transaction_fee),
+        "Semantics check tx proposal v1: input/output amounts did not balance with desired fee.");
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_v1_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
+    const DiscretizedFee &tx_fee,
+    std::vector<SpInputProposalV1> input_proposals,
+    std::vector<ExtraFieldElement> additional_memo_elements,
+    SpTxProposalV1 &proposal_out)
+{
+    // inputs should be sorted by key image
+    std::sort(input_proposals.begin(), input_proposals.end());
+
+    // set fields
+    proposal_out.m_normal_payments = std::move(normal_payments);
+    proposal_out.m_selfsend_payments = std::move(selfsend_payments);
+    proposal_out.m_tx_fee = tx_fee;
+    proposal_out.m_input_proposals = std::move(input_proposals);
+    proposal_out.m_additional_memo_elements = std::move(additional_memo_elements);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_balance_proof_v1(const std::vector<rct::xmr_amount> &input_amounts,
@@ -161,10 +308,10 @@ bool balance_check_in_out_amnts_v1(const std::vector<SpInputProposalV1> &input_p
     in_amounts.reserve(input_proposals.size());
     out_amounts.reserve(output_proposals.size());
 
-    for (const auto &input_proposal : input_proposals)
+    for (const SpInputProposalV1 &input_proposal : input_proposals)
         in_amounts.emplace_back(input_proposal.get_amount());
 
-    for (const auto &output_proposal : output_proposals)
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
         out_amounts.emplace_back(output_proposal.get_amount());
 
     rct::xmr_amount raw_transaction_fee;
@@ -213,28 +360,48 @@ void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     std::vector<SpPartialInputV1> partial_inputs,
-    const DiscretizedFee &discretized_transaction_fee,
     const std::string &version_string,
+    const crypto::secret_key &k_view_balance,
     SpPartialTxV1 &partial_tx_out)
 {
-    // reset tx
+    /// preparation and checks
     partial_tx_out = SpPartialTxV1{};
 
+    // 1. sort the inputs by key image
+    std::sort(partial_inputs.begin(), partial_inputs.end());
 
-    /// prepare
-
-    // inputs and proposal must be compatible
+    // 2. inputs and proposal must have consistent proposal prefixes
     rct::key proposal_prefix;
-    tx_proposal.get_proposal_prefix(version_string, proposal_prefix);
+    tx_proposal.get_proposal_prefix(version_string, k_view_balance, proposal_prefix);
 
-    for (const auto &partial_input : partial_inputs)
+    for (const SpPartialInputV1 &partial_input : partial_inputs)
     {
         CHECK_AND_ASSERT_THROW_MES(proposal_prefix == partial_input.m_proposal_prefix,
-            "Incompatible tx pieces when making partial tx.");
+            "making partial tx: a partial input's proposal prefix doesn't match with the tx proposal.");
     }
 
-    // sort the inputs by key image
-    std::sort(partial_inputs.begin(), partial_inputs.end());
+    // 3. partial inputs must line up with input proposals in the tx proposal
+    CHECK_AND_ASSERT_THROW_MES(partial_inputs.size() == tx_proposal.m_input_proposals.size(),
+        "making partial tx: number of partial inputs doesn't match number of input proposals.");
+
+    for (std::size_t input_index{0}; input_index < partial_inputs.size(); ++input_index)
+    {
+        CHECK_AND_ASSERT_THROW_MES(partial_inputs[input_index].key_image() == 
+                tx_proposal.m_input_proposals[input_index].key_image(),
+            "making partial tx: partial inputs and input proposals don't line up (inconsistent key images).");
+    }
+
+    // 4. extract info from tx proposal
+    std::vector<SpEnoteV1> output_enotes;
+    std::vector<rct::xmr_amount> output_amounts;
+    std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
+    SpTxSupplementV1 tx_supplement;
+
+    tx_proposal.get_outputs_v1(k_view_balance,
+        output_enotes,
+        output_amounts,
+        output_amount_commitment_blinding_factors,
+        tx_supplement);
 
 
     /// balance proof
@@ -248,15 +415,15 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
 
     // extract the fee
     rct::xmr_amount raw_transaction_fee;
-    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(discretized_transaction_fee, raw_transaction_fee),
+    CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(tx_proposal.m_tx_fee, raw_transaction_fee),
         "making partial tx: could not extract a fee value from the discretized fee.");
 
     // make balance proof
     make_v1_balance_proof_v1(input_amounts,
-        tx_proposal.m_output_amounts,
+        output_amounts,
         raw_transaction_fee,
         input_image_amount_commitment_blinding_factors,
-        tx_proposal.m_output_amount_commitment_blinding_factors,
+        output_amount_commitment_blinding_factors,
         partial_tx_out.m_balance_proof);
 
 
@@ -269,7 +436,7 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     partial_tx_out.m_address_masks.reserve(partial_inputs.size());
     partial_tx_out.m_commitment_masks.reserve(partial_inputs.size());
 
-    for (auto &partial_input : partial_inputs)
+    for (SpPartialInputV1 &partial_input : partial_inputs)
     {
         partial_tx_out.m_input_images.emplace_back(partial_input.m_input_image);
         partial_tx_out.m_image_proofs.emplace_back(std::move(partial_input.m_image_proof));
@@ -279,9 +446,9 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     }
 
     // gather tx output parts
-    partial_tx_out.m_outputs = tx_proposal.m_outputs;
-    partial_tx_out.m_tx_supplement = tx_proposal.m_tx_supplement;
-    partial_tx_out.m_tx_fee = discretized_transaction_fee;
+    partial_tx_out.m_outputs = std::move(output_enotes);
+    partial_tx_out.m_tx_supplement = std::move(tx_supplement);
+    partial_tx_out.m_tx_fee = tx_proposal.m_tx_fee;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

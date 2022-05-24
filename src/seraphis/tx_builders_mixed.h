@@ -67,6 +67,35 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
     const SpTxSupplementV1 &tx_supplement,
     rct::key &proof_message_out);
 /**
+* brief: check_v1_tx_proposal_semantics_v1 - check semantics of a tx proposal
+*   - throws if a check fails
+*   - outputs should have unique and canonical onetime addresses
+*   - self-send payment proposals should have destinations owned by the user
+*   - amount commitments are consistent with masks/amounts recorded in the proposal
+*   - the tx supplement should have valid semantics
+* param: tx_proposal -
+* param: wallet_spend_pubkey -
+* param: k_view_balance -
+*/
+void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance);
+/**
+* brief: make_v1_tx_proposal_v1 - make v1 tx proposal
+* param: normal_payments -
+* param: selfsend_payments -
+* param: tx_fee -
+* param: input_proposals -
+* param: additional_memo_elements -
+* outparam: proposal_out -
+*/
+void make_v1_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
+    const DiscretizedFee &tx_fee,
+    std::vector<SpInputProposalV1> input_proposals,
+    std::vector<ExtraFieldElement> additional_memo_elements,
+    SpTxProposalV1 &proposal_out);
+/**
 * brief: make_v1_balance_proof_v1 - make v1 tx balance proof (BP+ for range proofs; balance check is sum-to-zero)
 *   - range proofs: for input image amount commitments and output commitments (squashed enote model)
 * param: input_amounts -
@@ -105,14 +134,14 @@ void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
 * brief: make_v1_partial_tx_v1 - make v1 partial transaction (everything ready for a full tx except membership proofs)
 * param: tx_proposal -
 * param: partial_inputs -
-* param: discretized_transaction_fee -
 * param: version_string -
+* param: k_view_balance -
 * outparam: partial_tx_out -
 */
 void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     std::vector<SpPartialInputV1> partial_inputs,
-    const DiscretizedFee &discretized_transaction_fee,
     const std::string &version_string,
+    const crypto::secret_key &k_view_balance,
     SpPartialTxV1 &partial_tx_out);
 
 } //namespace sp

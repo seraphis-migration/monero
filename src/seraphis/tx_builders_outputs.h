@@ -111,12 +111,11 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
 *     - A self-send dummy will only be made if there are no other self-sends; otherwise dummies will be purely random.
 *     - The goal of this is for all txs made from output sets produced by this function to be identifiable by view
 *       tag checks. If the local signer is scanning for enotes, then they only need key images from txs that are flagged
-*       by a view tag check in order to identify all of their enotes spent in txs that use output sets from this function.
-*       This optimizes third-party view-tag scanning services, which only need to transmit key images from txs with view
-*       tag matches to the local client. Only txs that don't use this function to define the output set _might_ cause
-*       failures to identify spent enotes in that workflow. At the time of writing this, it is assumed that only
-*       collaboratively-funded txs will cause that failure mode, since collaborative txs should not contain any
-*       self-send outputs.
+*       by a view tag check in order to identify all of their self-send enotes spent in txs that use output sets from this
+*       function. This optimizes third-party view-tag scanning services, which only need to transmit key images from txs
+*       with view tag matches to the local client. Only txs that don't use this function to define the output set _might_
+*       cause failures to identify spent enotes in that workflow. At the time of writing this, it is assumed there are no
+*       workflows where skipping this function would be valuable.
 * param: total_input_amount -
 * param: transaction_fee -
 * param: change_destination -
@@ -148,25 +147,6 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const std::vector<jamtis::JamtisPaymentProposalV1> &original_normal_proposals,
     const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &original_selfsend_proposals,
     std::vector<SpOutputProposalV1> &output_proposals_out);
-/**
-* brief: check_v1_tx_proposal_semantics_v1 - check semantics of a tx proposal
-*   - throws if a check fails
-*   - outputs should be sorted
-*   - outputs should have unique and canonical onetime addresses
-*   - amount commitments are consistent with masks/amounts recorded in the proposal
-*   - the tx supplement should have valid semantics
-* param: tx_proposal -
-*/
-void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal);
-/**
-* brief: make_v1_tx_proposal_v1 - make v1 tx proposal (set of outputs that can be incorporated in a full tx)
-* param: output_proposals -
-* param: additional_memo_elements -
-* outparam: proposal_out --
-*/
-void make_v1_tx_proposal_v1(std::vector<SpOutputProposalV1> output_proposals,
-    std::vector<ExtraFieldElement> additional_memo_elements,
-    SpTxProposalV1 &proposal_out);
 /**
 * brief: gen_mock_sp_output_proposals_v1 - create random output proposals
 * param: out_amounts -
