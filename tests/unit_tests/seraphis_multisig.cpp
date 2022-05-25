@@ -642,7 +642,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         completed_tx));
 
     // f) verify tx
-    ASSERT_NO_THROW(ASSERT_TRUE(validate_tx(completed_tx, ledger_context, false)));
+    ASSERT_NO_THROW(ASSERT_TRUE(validate_tx(completed_tx, ledger_context)));
 
     // - sanity check fee (trivial fee calculator makes this meaningless here)
     //ASSERT_TRUE(completed_tx.m_fee == tx_fee_calculator.get_fee(tx_fee_per_weight, completed_tx));

@@ -266,8 +266,7 @@ bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images
 bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
     const DiscretizedFee &discretized_transaction_fee,
-    const SpBalanceProofV1 &balance_proof,
-    const bool defer_batchable)
+    const SpBalanceProofV1 &balance_proof)
 {
     const rct::BulletproofPlus &range_proofs = balance_proof.m_bpp_proof;
 
@@ -307,15 +306,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
             return false;
     }
 
-    // range proofs must be valid
-    if (!defer_batchable)
-    {
-        std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
-        range_proof_ptrs.emplace_back(&range_proofs);  //note: there is only one range proofs aggregate per tx
-
-        if (!rct::bulletproof_plus_VERIFY(range_proof_ptrs))
-            return false;
-    }
+    // BP+: deferred for batch-verification
 
     return true;
 }
@@ -391,19 +382,6 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
         messages);
 
     return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV1*> &membership_proofs,
-    const std::vector<const SpEnoteImage*> &input_images,
-    const LedgerContext &ledger_context)
-{
-    // get multiexponentiation data set representing all the membership proofs
-    rct::pippenger_prep_data validation_data;
-    if (!try_get_sp_membership_proofs_v1_validation_data(membership_proofs, input_images, ledger_context, validation_data))
-        return false;
-
-    // check that the membership proof multiexp data resolves to the identity element
-    return multiexp_is_identity(std::move(validation_data));
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_composition_proofs_v1(const std::vector<SpImageProofV1> &image_proofs,

@@ -198,11 +198,9 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx);
 template <>
 bool validate_tx_linking_tags<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context);
 template <>
-bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const bool defer_batchable);
+bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx);
 template <>
-bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
-    const LedgerContext &ledger_context,
-    const bool defer_batchable);
+bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context);
 template <>
 bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs,
     const LedgerContext &ledger_context);

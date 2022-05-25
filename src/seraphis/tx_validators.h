@@ -158,37 +158,32 @@ bool validate_sp_semantics_fee_v1(const DiscretizedFee &discretized_transaction_
 bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images, const LedgerContext &ledger_context);
 /**
 * brief: validate_sp_amount_balance_v1 - check that amounts balance in the tx (inputs = outputs)
-*   - check BP+ range proofs on input image amount commitments and output commitments (e.g. for squashed enote model)
-*     - do not check these if 'defer_batchable' is set; BP+ range proofs can be batch-verified
 *   - check sum(input image masked commitments) == sum(output commitments) + fee*H + remainder*G
+*   - note: BP+ verification is NOT done here (deferred for batch-verification)
 * param: input_images -
 * param: outputs -
 * param: discretized_transaction_fee -
 * param: balance_proof -
-* param: defer_batchable -
 * return: true/false on validation result
 */
 bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
     const DiscretizedFee &discretized_transaction_fee,
-    const SpBalanceProofV1 &balance_proof,
-    const bool defer_batchable);
+    const SpBalanceProofV1 &balance_proof);
 /**
-* brief: validate_sp_membership_proofs_v1 - verify that tx inputs exist in the ledger
+* brief: try_get_sp_membership_proofs_v1_validation_data - get verification data to verify that tx inputs exist in the
+*     ledger
 *   - try to get referenced enotes from ledger in 'squashed enote' form (TODO: NOT txpool)
-*   - check concise grootle proofs (membership proofs)
+*   - get verification data for concise grootle proofs (membership proofs)
 * param: membership_proofs -
 * param: input_images -
 * param: ledger_context -
-* return: true/false on validation result
+* outparam: validation_data_out -
 */
 bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
     const LedgerContext &ledger_context,
     rct::pippenger_prep_data &validation_data_out);
-bool validate_sp_membership_proofs_v1(const std::vector<const SpMembershipProofV1*> &membership_proofs,
-    const std::vector<const SpEnoteImage*> &input_images,
-    const LedgerContext &ledger_context);
 /**
 * brief: validate_sp_composition_proofs_v1 - check that spending tx inputs is authorized by their owners,
 *        and key images are properly constructed

@@ -440,37 +440,21 @@ bool validate_tx_linking_tags<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const Le
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const bool defer_batchable)
+bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
 {
     // balance proof
-    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, tx.m_fee, tx.m_balance_proof, defer_batchable))
+    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, tx.m_fee, tx.m_balance_proof))
         return false;
+
+    // deferred for batching: range proofs
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx,
-    const LedgerContext &ledger_context,
-    const bool defer_batchable)
+bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context)
 {
-    // membership proofs (can be deferred for batching)
-    if (!defer_batchable)
-    {
-        std::vector<const SpMembershipProofV1*> membership_proof_ptrs;
-        std::vector<const SpEnoteImage*> input_image_ptrs;
-        membership_proof_ptrs.reserve(tx.m_membership_proofs.size());
-        input_image_ptrs.reserve(tx.m_input_images.size());
-
-        for (const auto &membership_proof : tx.m_membership_proofs)
-            membership_proof_ptrs.push_back(&membership_proof);
-
-        for (const auto &input_image : tx.m_input_images)
-            input_image_ptrs.push_back(&(input_image.m_core));
-
-        if (!validate_sp_membership_proofs_v1(membership_proof_ptrs, input_image_ptrs, ledger_context))
-            return false;
-    }
+    // deferred for batching: membership proofs
 
     // ownership proof (and proof that key images are well-formed)
     std::string version_string;

@@ -401,7 +401,7 @@ void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
     make_seraphis_tx_squashed_v1(partial_tx, std::move(membership_proofs), semantic_rules_version, test_tx);
 
     // validate tx
-    CHECK_AND_ASSERT_THROW_MES(validate_tx(test_tx, mock_ledger, false),
+    CHECK_AND_ASSERT_THROW_MES(validate_tx(test_tx, mock_ledger),
         "v1 partial tx semantics check (v1): test transaction was invalid using requested semantics rules version!");
 }
 //-------------------------------------------------------------------------------------------------------------------

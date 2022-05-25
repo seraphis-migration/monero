@@ -309,7 +309,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
     /// 3] add tx to ledger
     // a) validate tx
-    ASSERT_TRUE(validate_tx(completed_tx, ledger_context, false));
+    ASSERT_TRUE(validate_tx(completed_tx, ledger_context));
 
     // b) add the tx to the ledger
     ASSERT_TRUE(try_add_tx_to_ledger<sp::SpTxSquashedV1>(completed_tx, ledger_context));

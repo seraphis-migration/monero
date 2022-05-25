@@ -44,9 +44,10 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_tx(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context, const bool defer_batchable)
+bool validate_tx(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context)
 {
-    return validate_tx_impl<SpTxSquashedV1>(tx, ledger_context, defer_batchable);
+    const std::vector<const SpTxSquashedV1*> tx_ptrs{&tx};
+    return validate_txs_impl<SpTxSquashedV1>(tx_ptrs, ledger_context);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_txs(const std::vector<const SpTxSquashedV1*> &txs, const LedgerContext &ledger_context)
