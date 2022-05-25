@@ -157,7 +157,8 @@ bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
     const crypto::secret_key &commitment_mask,
     SpInputProposalV1 &proposal_out);
 //todo
-void make_standard_input_context_from_v1_input_proposals(const std::vector<SpInputProposalV1> &input_proposals,
+void make_standard_input_context_v1(const std::vector<SpInputProposalV1> &input_proposals, rct::key &input_context_out);
+void make_standard_input_context_v1(const std::list<SpContextualEnoteRecordV1> &contextual_enote_records,
     rct::key &input_context_out);
 /**
 * brief: make_v1_image_proof_v1 - make a seraphis composition proof in the squashed enote model

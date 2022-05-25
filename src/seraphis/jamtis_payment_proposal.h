@@ -46,7 +46,7 @@
 //standard headers
 
 //forward declarations
-
+namespace sp { struct SpOutputProposalV1; }
 
 namespace sp
 {

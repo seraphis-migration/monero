@@ -36,6 +36,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
+#include "jamtis_payment_proposal.h"
 #include "sp_core_types.h"
 #include "tx_component_types.h"
 #include "tx_discretized_fee.h"
@@ -46,7 +47,14 @@
 //standard headers
 
 //forward declarations
-
+namespace sp
+{
+namespace jamtis
+{
+    struct JamtisPaymentProposalV1;
+    struct JamtisPaymentProposalSelfSendV1;
+}
+}
 
 namespace sp
 {
@@ -174,19 +182,12 @@ struct SpTxProposalV1 final
     DiscretizedFee m_tx_fee;
     /// inputs
     std::vector<SpInputProposalV1> m_input_proposals;
-    /// additional memo elements
-    std::vector<ExtraFieldElement> m_additional_memo_elements;
+    /// partial memo
+    TxExtra m_partial_memo;
 
     /// convert the tx proposal's payment proposals into output proposals
     void get_output_proposals_v1(const crypto::secret_key &k_view_balance,
         std::vector<SpOutputProposalV1> &output_proposals_out) const;
-
-    /// convert the tx proposal's payment proposals and parial memo into a full output set
-    void get_outputs_v1(const crypto::secret_key &k_view_balance,
-        std::vector<SpEnoteV1> &outputs_out,
-        std::vector<rct::xmr_amount> &output_amounts_out,
-        std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
-        SpTxSupplementV1 &tx_supplement_out) const;
 
     /// get the message to be signed by input spend proofs
     void get_proposal_prefix(const std::string &version_string,

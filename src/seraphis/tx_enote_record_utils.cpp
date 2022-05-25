@@ -515,26 +515,6 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
             record_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_standard_input_context_from_contextual_enote_records_v1(
-    const std::list<SpContextualEnoteRecordV1> &contextual_enote_records,
-    rct::key &input_context_out)
-{
-    // collect key images
-    std::vector<crypto::key_image> key_images;
-
-    for (const SpContextualEnoteRecordV1 &contextual_enote_record : contextual_enote_records)
-    {
-        key_images.emplace_back();
-        contextual_enote_record.get_key_image(key_images.back());
-    }
-
-    // sort the key images
-    std::sort(key_images.begin(), key_images.end());
-
-    // make the input context
-    jamtis::make_jamtis_input_context_standard(key_images, input_context_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
 bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &origin_context,
     SpEnoteOriginContextV1 &current_origin_context_inout)
 {

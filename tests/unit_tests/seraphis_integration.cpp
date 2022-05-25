@@ -242,7 +242,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
     // - compute input context
     rct::key input_context;
-    make_standard_input_context_from_contextual_enote_records_v1(contextual_inputs, input_context);
+    make_standard_input_context_v1(contextual_inputs, input_context);
 
     // d) finalize output proposals
     DiscretizedFee discretized_transaction_fee;

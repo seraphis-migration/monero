@@ -66,6 +66,10 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
     const std::vector<SpEnoteV1> &output_enotes,
     const SpTxSupplementV1 &tx_supplement,
     rct::key &proof_message_out);
+void make_tx_image_proof_message_v1(const std::string &version_string,
+    const std::vector<SpOutputProposalV1> &output_proposals,
+    const TxExtra &partial_memo,
+    rct::key &proof_message_out);
 /**
 * brief: check_v1_tx_proposal_semantics_v1 - check semantics of a tx proposal
 *   - throws if a check fails
@@ -138,6 +142,12 @@ void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
 * param: k_view_balance -
 * outparam: partial_tx_out -
 */
+void make_v1_partial_tx_v1(std::vector<SpPartialInputV1> partial_inputs,
+    std::vector<SpOutputProposalV1> output_proposals,
+    const TxExtra &partial_memo,
+    const DiscretizedFee &tx_fee,
+    const std::string &version_string,
+    SpPartialTxV1 &partial_tx_out);
 void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     std::vector<SpPartialInputV1> partial_inputs,
     const std::string &version_string,

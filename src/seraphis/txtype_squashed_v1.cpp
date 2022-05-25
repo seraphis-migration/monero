@@ -40,6 +40,7 @@
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/multiexp.h"
 #include "ringct/rctTypes.h"
+#include "sp_core_enote_utils.h"
 #include "sp_core_types.h"
 #include "sp_crypto_utils.h"
 #include "tx_binned_reference_set.h"
@@ -205,7 +206,7 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
 {
-    // finish tx from pieces
+    // finish tx
     make_seraphis_tx_squashed_v1(
         std::move(partial_tx.m_input_images),
         std::move(partial_tx.m_outputs),
@@ -233,40 +234,24 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
     make_seraphis_tx_squashed_v1(std::move(partial_tx), std::move(tx_membership_proofs), semantic_rules_version, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
-    const std::vector<SpInputProposalV1> &input_proposals,
-    std::vector<SpOutputProposalV1> output_proposals,
-    const DiscretizedFee &discretized_transaction_fee,
+void make_seraphis_tx_squashed_v1(const crypto::secret_key &k_view_balance,
+    const SpTxProposalV1 &tx_proposal,
+    std::vector<SpPartialInputV1> partial_inputs,
     std::vector<SpMembershipProofPrepV1> membership_proof_preps,
-    std::vector<ExtraFieldElement> additional_memo_elements,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(input_proposals.size() > 0, "SpTxTypeSquashedV1: tried to make tx without any inputs.");
-    CHECK_AND_ASSERT_THROW_MES(output_proposals.size() > 0, "SpTxTypeSquashedV1: tried to make tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_v1(input_proposals,
-            output_proposals,
-            discretized_transaction_fee),
-        "SpTxTypeSquashedV1: tried to make tx with unbalanced amounts.");
-
     // versioning for proofs
     std::string version_string;
     version_string.reserve(3);
     make_versioning_string(semantic_rules_version, version_string);
 
-    // tx proposal
-    SpTxProposalV1 tx_proposal;
-    make_v1_tx_proposal_v1(std::move(output_proposals), std::move(additional_memo_elements), tx_proposal);
-    rct::key proposal_prefix;
-    tx_proposal.get_proposal_prefix(version_string, proposal_prefix);
-
-    // partial inputs
-    std::vector<SpPartialInputV1> partial_inputs;
-    make_v1_partial_inputs_v1(input_proposals, proposal_prefix, spendbase_privkey, partial_inputs);
-
     // partial tx
     SpPartialTxV1 partial_tx;
-    make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), discretized_transaction_fee, version_string, partial_tx);
+    make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), version_string, k_view_balance, partial_tx);
+
+    // check partial tx semantics
+    check_v1_partial_tx_semantics_v1(partial_tx, semantic_rules_version);
 
     // membership proofs (assumes the caller prepared to make a membership proof for each input)
     std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
@@ -275,6 +260,70 @@ void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
     // finish tx
     make_seraphis_tx_squashed_v1(std::move(partial_tx),
         std::move(alignable_membership_proofs),
+        semantic_rules_version,
+        tx_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
+    const crypto::secret_key &k_view_balance,
+    const SpTxProposalV1 &tx_proposal,
+    std::vector<SpMembershipProofPrepV1> membership_proof_preps,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    SpTxSquashedV1 &tx_out)
+{
+    // versioning for proofs
+    std::string version_string;
+    version_string.reserve(3);
+    make_versioning_string(semantic_rules_version, version_string);
+
+    // tx proposal prefix
+    rct::key proposal_prefix;
+    tx_proposal.get_proposal_prefix(version_string, k_view_balance, proposal_prefix);
+
+    // partial inputs
+    std::vector<SpPartialInputV1> partial_inputs;
+    make_v1_partial_inputs_v1(tx_proposal.m_input_proposals, proposal_prefix, spendbase_privkey, partial_inputs);
+
+    // finish tx
+    make_seraphis_tx_squashed_v1(k_view_balance,
+        tx_proposal,
+        std::move(partial_inputs),
+        std::move(membership_proof_preps),
+        semantic_rules_version,
+        tx_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
+    const crypto::secret_key &k_view_balance,
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
+    const DiscretizedFee &tx_fee,
+    std::vector<SpInputProposalV1> input_proposals,
+    std::vector<ExtraFieldElement> additional_memo_elements,
+    std::vector<SpMembershipProofPrepV1> membership_proof_preps,
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    SpTxSquashedV1 &tx_out)
+{
+    // tx proposal
+    SpTxProposalV1 tx_proposal;
+    make_v1_tx_proposal_v1(std::move(normal_payments),
+        std::move(selfsend_payments),
+        tx_fee,
+        std::move(input_proposals),
+        std::move(additional_memo_elements),
+        tx_proposal);
+
+    // check tx proposal semantics (e.g. check balance, output rules, etc.)
+    rct::key wallet_spend_pubkey;
+    make_seraphis_spendkey(k_view_balance, spendbase_privkey, wallet_spend_pubkey);
+
+    check_v1_tx_proposal_semantics_v1(tx_proposal, wallet_spend_pubkey, k_view_balance);
+
+    // finish tx
+    make_seraphis_tx_squashed_v1(spendbase_privkey,
+        k_view_balance,
+        tx_proposal,
+        std::move(membership_proof_preps),
         semantic_rules_version,
         tx_out);
 }
@@ -491,12 +540,15 @@ template <>
 void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
     const std::vector<rct::xmr_amount> &in_amounts,
     const std::vector<rct::xmr_amount> &out_amounts,
-    const DiscretizedFee &discretized_transaction_fee,
+    const DiscretizedFee &tx_fee,
     MockLedgerContext &ledger_context_inout,
     SpTxSquashedV1 &tx_out)
 {
     CHECK_AND_ASSERT_THROW_MES(in_amounts.size() > 0, "SpTxSquashedV1: tried to make mock tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "SpTxSquashedV1: tried to make mock tx without any outputs.");
+
+    // mock semantics version
+    const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version{SpTxSquashedV1::SemanticRulesVersion::MOCK};
 
     // make wallet spendbase privkey (master key)
     const crypto::secret_key spendbase_privkey{rct::rct2sk(rct::skGen())};
@@ -510,15 +562,46 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
             gen_mock_sp_output_proposals_v1(out_amounts, params.num_random_memo_elements)
         };
 
-    // expect amounts to balance
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_v1(input_proposals,
-            output_proposals,
-            discretized_transaction_fee),
-        "SpTxSquashedV1: tried to make mock tx with unbalanced amounts.");
-
     // for 2-out tx, the enote ephemeral pubkey is shared by both outputs
     if (output_proposals.size() == 2)
         output_proposals[1].m_enote_ephemeral_pubkey = output_proposals[0].m_enote_ephemeral_pubkey;
+
+    // expect amounts to balance
+    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_v1(input_proposals, output_proposals, tx_fee),
+        "SpTxSquashedV1: tried to make mock tx with unbalanced amounts.");
+
+    // make partial memo
+    std::vector<ExtraFieldElement> additional_memo_elements;
+    additional_memo_elements.resize(params.num_random_memo_elements);
+
+    for (ExtraFieldElement &element : additional_memo_elements)
+        element.gen();
+
+    TxExtra partial_memo;
+    make_tx_extra(std::move(additional_memo_elements), partial_memo);
+
+    // versioning for proofs
+    std::string version_string;
+    version_string.reserve(3);
+    make_versioning_string(semantic_rules_version, version_string);
+
+    // proposal prefix
+    rct::key proposal_prefix;
+    make_tx_image_proof_message_v1(version_string, output_proposals, partial_memo, proposal_prefix);
+
+    // make partial inputs
+    std::vector<SpPartialInputV1> partial_inputs;
+    make_v1_partial_inputs_v1(input_proposals, proposal_prefix, spendbase_privkey, partial_inputs);
+
+    // prepare partial tx
+    SpPartialTxV1 partial_tx;
+
+    make_v1_partial_tx_v1(std::move(partial_inputs),
+        std::move(output_proposals),
+        partial_memo,
+        tx_fee,
+        version_string,
+        partial_tx);
 
     // make mock membership proof ref sets
     std::vector<SpMembershipProofPrepV1> membership_proof_preps{
@@ -529,21 +612,14 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
                 ledger_context_inout)
         };
 
-    // make additional mock memo elements
-    std::vector<ExtraFieldElement> additional_memo_elements;
-    additional_memo_elements.resize(params.num_random_memo_elements);
-
-    for (ExtraFieldElement &element : additional_memo_elements)
-        element.gen();
+    // membership proofs (assumes the caller prepared to make a membership proof for each input)
+    std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
+    make_v1_membership_proofs_v1(std::move(membership_proof_preps), alignable_membership_proofs);
 
     // make tx
-    make_seraphis_tx_squashed_v1(spendbase_privkey,
-        input_proposals,
-        std::move(output_proposals),
-        discretized_transaction_fee,
-        std::move(membership_proof_preps),
-        std::move(additional_memo_elements),
-        SpTxSquashedV1::SemanticRulesVersion::MOCK,
+    make_seraphis_tx_squashed_v1(std::move(partial_tx),
+        std::move(alignable_membership_proofs),
+        semantic_rules_version,
         tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------

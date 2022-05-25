@@ -91,18 +91,20 @@ void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     SpMultisigPublicInputProposalV1 &proposal_out);
 /**
 * brief: finalize_multisig_output_proposals_v1 - finalize output set for a multisig tx proposal (add change/dummy outputs)
-* param: input_proposals -
-* param: discretized_transaction_fee -
+* param: public_input_proposals -
+* param: tx_fee -
 * param: change_destination -
 * param: dummy_destination -
+* param: wallet_spend_pubkey -
 * param: k_view_balance -
 * inoutparam: normal_payments_inout -
 * inoutparam: selfsend_payments_inout -
 */
-void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigInputProposalV1> &full_input_proposals,
-    const DiscretizedFee &discretized_transaction_fee,
+void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigPublicInputProposalV1> &public_input_proposals,
+    const DiscretizedFee &tx_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
+    const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     std::vector<jamtis::JamtisPaymentProposalV1> &normal_payments_inout,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payments_inout);

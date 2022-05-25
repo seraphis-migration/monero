@@ -233,7 +233,7 @@ void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposa
 
     // 3. the amount commitment must be reproducible
     const rct::key amount_commitment_reproduced{
-            rct::commit(input_proposal.m_core.m_amount, input_proposal.m_core.m_amount_blinding_factor)
+            rct::commit(input_proposal.m_core.m_amount, rct::sk2rct(input_proposal.m_core.m_amount_blinding_factor))
         };
 
     CHECK_AND_ASSERT_THROW_MES(amount_commitment_reproduced == input_proposal.m_core.m_enote_core.m_amount_commitment,
@@ -299,8 +299,7 @@ bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_standard_input_context_from_v1_input_proposals(const std::vector<SpInputProposalV1> &input_proposals,
-    rct::key &input_context_out)
+void make_standard_input_context_v1(const std::vector<SpInputProposalV1> &input_proposals, rct::key &input_context_out)
 {
     // collect key images
     std::vector<crypto::key_image> key_images;
@@ -309,6 +308,25 @@ void make_standard_input_context_from_v1_input_proposals(const std::vector<SpInp
     {
         key_images.emplace_back();
         input_proposal.m_core.get_key_image(key_images.back());
+    }
+
+    // sort the key images
+    std::sort(key_images.begin(), key_images.end());
+
+    // make the input context
+    jamtis::make_jamtis_input_context_standard(key_images, input_context_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_standard_input_context_v1(const std::list<SpContextualEnoteRecordV1> &contextual_enote_records,
+    rct::key &input_context_out)
+{
+    // collect key images
+    std::vector<crypto::key_image> key_images;
+
+    for (const SpContextualEnoteRecordV1 &contextual_enote_record : contextual_enote_records)
+    {
+        key_images.emplace_back();
+        contextual_enote_record.get_key_image(key_images.back());
     }
 
     // sort the key images

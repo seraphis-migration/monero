@@ -365,6 +365,21 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void finalize_tx_extra_v1(const TxExtra &partial_memo,
+    const std::vector<SpOutputProposalV1> &output_proposals,
+    TxExtra &tx_extra_out)
+{
+    // collect all memo elements
+    std::vector<ExtraFieldElement> collected_memo_elements;
+    accumulate_extra_field_elements(partial_memo, collected_memo_elements);
+
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
+        accumulate_extra_field_elements(output_proposal.m_partial_memo, collected_memo_elements);
+
+    // finalize the extra field
+    make_tx_extra(std::move(collected_memo_elements), tx_extra_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void get_additional_output_types_for_output_set_v1(const std::size_t num_outputs,
     const std::vector<jamtis::JamtisSelfSendType> &self_send_output_types,
     const bool output_ephemeral_pubkeys_are_unique,

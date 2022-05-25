@@ -189,10 +189,6 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out);
 //todo
-void make_standard_input_context_from_contextual_enote_records_v1(
-    const std::list<SpContextualEnoteRecordV1> &contextual_enote_records,
-    rct::key &input_context_out);
-//todo
 bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &origin_context,
     SpEnoteOriginContextV1 &current_origin_context_inout);
 bool try_update_enote_spent_context_v1(const SpEnoteSpentContextV1 &spent_context,
