@@ -57,6 +57,7 @@ set(seraphis_sources
   tx_fee_calculator_squashed_v1.cpp
   tx_input_selection.cpp
   tx_input_selection_output_context_v1.cpp
+  tx_input_selector_mocks.cpp
   tx_misc_utils.cpp
   tx_ref_set_index_mapper_flat.cpp
   tx_validators.cpp
