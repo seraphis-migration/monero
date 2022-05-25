@@ -398,22 +398,22 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     // a) prepare outputs
 
     // - normal payments
-    std::vector<jamtis::JamtisPaymentProposalV1> normal_payments;
-    normal_payments.reserve(out_amounts_normal.size());
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals;
+    normal_payment_proposals.reserve(out_amounts_normal.size());
 
     for (const rct::xmr_amount out_amount : out_amounts_normal)
     {
-        normal_payments.emplace_back();
-        normal_payments.back().gen(out_amount, 0);
+        normal_payment_proposals.emplace_back();
+        normal_payment_proposals.back().gen(out_amount, 0);
     }
 
     // - self-send payments
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments;
-    selfsend_payments.reserve(out_amounts_selfsend.size());
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals;
+    selfsend_payment_proposals.reserve(out_amounts_selfsend.size());
 
     for (const rct::xmr_amount out_amount : out_amounts_selfsend)
     {
-        selfsend_payments.emplace_back(
+        selfsend_payment_proposals.emplace_back(
                 JamtisPaymentProposalSelfSendV1{
                     .m_destination = user_address,
                     .m_amount = out_amount,
@@ -427,7 +427,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     // b) select inputs to spend
 
     // - select inputs
-    const sp::OutputSetContextForInputSelectionV1 output_set_context{normal_payments, selfsend_payments};
+    const sp::OutputSetContextForInputSelectionV1 output_set_context{normal_payment_proposals, selfsend_payment_proposals};
     const sp::InputSelectorMockV1 input_selector{enote_store};
     const sp::FeeCalculatorMockTrivial tx_fee_calculator;  //trivial fee calculator so we can use specified input fee
 
@@ -443,33 +443,34 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     ASSERT_TRUE(fee == reported_final_fee);
 
     // - convert inputs to input proposals (inputs to spend)
-    std::vector<SpMultisigInputProposalV1> full_input_proposals;
-    full_input_proposals.reserve(input_enote_records.size());
+    std::vector<SpMultisigPublicInputProposalV1> public_input_proposals;
+    public_input_proposals.reserve(input_enote_records.size());
 
     for (const SpContextualEnoteRecordV1 &contextual_input : contextual_inputs)
     {
-        full_input_proposals.emplace_back();
-        ASSERT_NO_THROW(make_v1_multisig_input_proposal_v1(contextual_input.m_record,
+        public_input_proposals.emplace_back();
+        ASSERT_NO_THROW(make_v1_multisig_public_input_proposal_v1(contextual_input.m_record,
             make_secret_key(),
             make_secret_key(),
-            full_input_proposals.back()));
+            public_input_proposals.back()));
     }
 
     // c) finalize output set (add change/dummy outputs)
 
     // - finalize the set
-    ASSERT_NO_THROW(finalize_multisig_output_proposals_v1(full_input_proposals,
-        reported_final_fee,
+    ASSERT_NO_THROW(finalize_multisig_output_proposals_v1(public_input_proposals,
+        fee,
         user_address,
         user_address,
+        keys.K_1_base,
         keys.k_vb,
-        normal_payments,
-        selfsend_payments));
+        normal_payment_proposals,
+        selfsend_payment_proposals));
 
     // - check fee after finalizing output proposal set (trivial fee calculator makes this meaningless here)
     ASSERT_TRUE(tx_fee_calculator.get_fee(tx_fee_per_weight,
-            full_input_proposals.size(),
-            normal_payments.size() + selfsend_payments.size()) ==
+            public_input_proposals.size(),
+            normal_payment_proposals.size() + selfsend_payment_proposals.size()) ==
         reported_final_fee);
 
     // d) set signers who are requested to participate
@@ -492,15 +493,14 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     std::string version_string;
     make_versioning_string(semantic_rules_version, version_string);
 
-    ASSERT_NO_THROW(make_v1_multisig_tx_proposal_v1(keys.k_vb,
-        accounts[0].get_threshold(),
-        accounts[0].get_signers().size(),
-        std::move(normal_payments),
-        std::move(selfsend_payments),
+    ASSERT_NO_THROW(make_v1_multisig_tx_proposal_v1(keys.K_1_base,
+        keys.k_vb,
+        std::move(normal_payment_proposals),
+        std::move(selfsend_payment_proposals),
         TxExtra{},
         fee,
         version_string,
-        full_input_proposals,
+        std::move(public_input_proposals),
         aggregate_filter,
         multisig_tx_proposal));
 
@@ -525,7 +525,8 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
         if (std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end())
         {
-            ASSERT_NO_THROW(make_v1_multisig_input_init_set_v1(keys.k_vb,
+            ASSERT_NO_THROW(make_v1_multisig_input_init_set_v1(keys.K_1_base,
+                keys.k_vb,
                 accounts[signer_index].get_base_pubkey(),
                 accounts[signer_index].get_threshold(),
                 accounts[signer_index].get_signers(),
@@ -539,7 +540,8 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         }
         else
         {
-            ASSERT_ANY_THROW(make_v1_multisig_input_init_set_v1(keys.k_vb,
+            ASSERT_ANY_THROW(make_v1_multisig_input_init_set_v1(keys.K_1_base,
+                keys.k_vb,
                 accounts[signer_index].get_base_pubkey(),
                 accounts[signer_index].get_threshold(),
                 accounts[signer_index].get_signers(),
@@ -600,13 +602,14 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
     // b) build partial tx
     SpTxProposalV1 tx_proposal;
-    multisig_tx_proposal.get_v1_tx_proposal_v1(keys.k_vb, tx_proposal);
+    multisig_tx_proposal.get_v1_tx_proposal_v1(keys.K_1_base, keys.k_vb, tx_proposal);
+    ASSERT_NO_THROW(check_v1_tx_proposal_semantics_v1(tx_proposal, keys.K_1_base, keys.k_vb));
 
     SpPartialTxV1 partial_tx;
     ASSERT_NO_THROW(make_v1_partial_tx_v1(tx_proposal,
         std::move(partial_inputs),
-        multisig_tx_proposal.m_tx_fee,
         version_string,
+        keys.k_vb,
         partial_tx));
     ASSERT_NO_THROW(check_v1_partial_tx_semantics_v1(partial_tx, semantic_rules_version));
 

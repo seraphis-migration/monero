@@ -295,8 +295,8 @@ void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
     const crypto::secret_key &k_view_balance,
-    std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     const DiscretizedFee &tx_fee,
     std::vector<SpInputProposalV1> input_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
@@ -306,8 +306,8 @@ void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
 {
     // tx proposal
     SpTxProposalV1 tx_proposal;
-    make_v1_tx_proposal_v1(std::move(normal_payments),
-        std::move(selfsend_payments),
+    make_v1_tx_proposal_v1(std::move(normal_payment_proposals),
+        std::move(selfsend_payment_proposals),
         tx_fee,
         std::move(input_proposals),
         std::move(additional_memo_elements),

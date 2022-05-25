@@ -317,25 +317,6 @@ void make_standard_input_context_v1(const std::vector<SpInputProposalV1> &input_
     jamtis::make_jamtis_input_context_standard(key_images, input_context_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_standard_input_context_v1(const std::list<SpContextualEnoteRecordV1> &contextual_enote_records,
-    rct::key &input_context_out)
-{
-    // collect key images
-    std::vector<crypto::key_image> key_images;
-
-    for (const SpContextualEnoteRecordV1 &contextual_enote_record : contextual_enote_records)
-    {
-        key_images.emplace_back();
-        contextual_enote_record.get_key_image(key_images.back());
-    }
-
-    // sort the key images
-    std::sort(key_images.begin(), key_images.end());
-
-    // make the input context
-    jamtis::make_jamtis_input_context_standard(key_images, input_context_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
 void make_v1_image_proof_v1(const SpInputProposal &input_proposal,
     const rct::key &message,
     const crypto::secret_key &spendbase_privkey,

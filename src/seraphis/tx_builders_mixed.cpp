@@ -142,34 +142,43 @@ void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
     /// validate self-send payment proposals
 
     // 1. there must be at least one self-send output
-    CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_selfsend_payments.size() > 0,
+    CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_selfsend_payment_proposals.size() > 0,
         "Semantics check tx proposal v1: there are no self-send outputs (at least one is expected).");
 
     // 2. there cannot be two self-send outputs of the same type and no other outputs
-    if (tx_proposal.m_normal_payments.size() == 0 &&
-        tx_proposal.m_selfsend_payments.size() == 2)
+    if (tx_proposal.m_normal_payment_proposals.size() == 0 &&
+        tx_proposal.m_selfsend_payment_proposals.size() == 2)
     {
-        CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_selfsend_payments[0].m_type != tx_proposal.m_selfsend_payments[1].m_type,
+        CHECK_AND_ASSERT_THROW_MES(tx_proposal.m_selfsend_payment_proposals[0].m_type !=
+                tx_proposal.m_selfsend_payment_proposals[1].m_type,
             "Semantics check tx proposal v1: there are two self-send outputs of the same type but no other outputs "
             "(not allowed).");
     }
 
     // 3. all self-send destinations must be owned by the wallet
-    crypto::secret_key k_find_received;
-    crypto::secret_key s_generate_address;
-    rct::key findreceived_pubkey;
-    jamtis::make_jamtis_findreceived_key(k_view_balance, k_find_received);
-    jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
-    rct::scalarmultBase(findreceived_pubkey, rct::sk2rct(k_find_received));
-    jamtis::address_index_t j_temp;
 
-    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment : tx_proposal.m_selfsend_payments)
+    // a. convert self-sends to full output proposals
+    // - input context
+    rct::key input_context;
+    make_standard_input_context_v1(tx_proposal.m_input_proposals, input_context);
+
+    // - output proposals
+    std::vector<SpOutputProposalV1> selfsend_output_proposals;
+    selfsend_output_proposals.reserve(tx_proposal.m_selfsend_payment_proposals.size());
+
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment : tx_proposal.m_selfsend_payment_proposals)
     {
-        CHECK_AND_ASSERT_THROW_MES(jamtis::try_get_jamtis_index_from_destination_v1(selfsend_payment.m_destination,
+        selfsend_output_proposals.emplace_back();
+        selfsend_payment.get_output_proposal_v1(k_view_balance, input_context, selfsend_output_proposals.back());
+    }
+
+    // b. check if owned by the wallet
+    for (const SpOutputProposalV1 &selfsend_output_proposal : selfsend_output_proposals)
+    {
+        CHECK_AND_ASSERT_THROW_MES(jamtis::is_self_send_output_proposal(selfsend_output_proposal,
+                input_context,
                 wallet_spend_pubkey,
-                findreceived_pubkey,
-                s_generate_address,
-                j_temp),
+                k_view_balance),
             "Semantics check tx proposal v1: invalid self-send destination (not a destination of this wallet).");
     }
 
@@ -275,8 +284,8 @@ void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
         "Semantics check tx proposal v1: input/output amounts did not balance with desired fee.");
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
+void make_v1_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     const DiscretizedFee &tx_fee,
     std::vector<SpInputProposalV1> input_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
@@ -286,8 +295,8 @@ void make_v1_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_
     std::sort(input_proposals.begin(), input_proposals.end());
 
     // set fields
-    proposal_out.m_normal_payments = std::move(normal_payments);
-    proposal_out.m_selfsend_payments = std::move(selfsend_payments);
+    proposal_out.m_normal_payment_proposals = std::move(normal_payment_proposals);
+    proposal_out.m_selfsend_payment_proposals = std::move(selfsend_payment_proposals);
     proposal_out.m_tx_fee = tx_fee;
     proposal_out.m_input_proposals = std::move(input_proposals);
     make_tx_extra(std::move(additional_memo_elements), proposal_out.m_partial_memo);

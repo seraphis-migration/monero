@@ -398,14 +398,27 @@ void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     proposal_out.m_commitment_mask = commitment_mask;
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_v1_multisig_public_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    SpMultisigPublicInputProposalV1 &proposal_out)
+{
+    make_v1_multisig_public_input_proposal_v1(enote_record.m_enote,
+        enote_record.m_enote_ephemeral_pubkey,
+        enote_record.m_input_context,
+        address_mask,
+        commitment_mask,
+        proposal_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigPublicInputProposalV1> &public_input_proposals,
     const DiscretizedFee &tx_fee,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    std::vector<jamtis::JamtisPaymentProposalV1> &normal_payments_inout,
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payments_inout)
+    std::vector<jamtis::JamtisPaymentProposalV1> &normal_payment_proposals_inout,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payment_proposals_inout)
 {
     /// prepare to finalize the output set
 
@@ -426,32 +439,24 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigPublicInp
 
 
     /// finalize the output proposal set
-    std::vector<jamtis::JamtisPaymentProposalV1> new_normal_proposals;
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> new_selfsend_proposals;
+    const std::size_t num_outputs_prefinalize{
+            normal_payment_proposals_inout.size() + selfsend_payment_proposals_inout.size()
+        };
 
     finalize_v1_output_proposal_set_v1(total_input_amount,
         raw_transaction_fee,
         change_destination,
         dummy_destination,
         k_view_balance,
-        normal_payments_inout,
-        selfsend_payments_inout,
-        new_normal_proposals,
-        new_selfsend_proposals);
+        normal_payment_proposals_inout,
+        selfsend_payment_proposals_inout);
 
-    CHECK_AND_ASSERT_THROW_MES(new_normal_proposals.size() + new_selfsend_proposals.size() <= 1,
+    const std::size_t num_outputs_postfinalize{
+            normal_payment_proposals_inout.size() + selfsend_payment_proposals_inout.size()
+        };
+
+    CHECK_AND_ASSERT_THROW_MES(num_outputs_postfinalize - num_outputs_prefinalize <= 1,
         "finalize multisig output proposals: finalizing output proposals added more than 1 proposal (bug).");
-
-
-    /// set output variables
-
-    // 1. add new opaque output proposals to the original opaque output set
-    for (const jamtis::JamtisPaymentProposalV1 &new_normal_payment_proposal : new_normal_proposals)
-        normal_payments_inout.emplace_back(new_normal_payment_proposal);
-
-    // 2. insert new self-send output proposals to the original opaque output set
-    for (const jamtis::JamtisPaymentProposalSelfSendV1 &new_selfsend_payment_proposal : new_selfsend_proposals)
-        selfsend_payments_inout.emplace_back(new_selfsend_payment_proposal);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &multisig_tx_proposal,
@@ -522,12 +527,12 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_tx_proposal_v1(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     TxExtra partial_memo,
     const DiscretizedFee &tx_fee,
     std::string version_string,
-    const std::vector<SpMultisigPublicInputProposalV1> &public_input_proposals,
+    std::vector<SpMultisigPublicInputProposalV1> public_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpMultisigTxProposalV1 &proposal_out)
 {
@@ -547,8 +552,8 @@ void make_v1_multisig_tx_proposal_v1(const rct::key &wallet_spend_pubkey,
 
     // make a temporary normal tx proposal
     SpTxProposalV1 tx_proposal;
-    make_v1_tx_proposal_v1(normal_payments,
-        selfsend_payments,
+    make_v1_tx_proposal_v1(normal_payment_proposals,
+        selfsend_payment_proposals,
         tx_fee,
         std::move(plain_input_proposals),
         std::move(additional_memo_elements),
@@ -574,15 +579,10 @@ void make_v1_multisig_tx_proposal_v1(const rct::key &wallet_spend_pubkey,
             );
     }
 
-    // set public input proposals
-    proposal_out.m_input_proposals.reserve(public_input_proposals.size());
-
-    for (const SpMultisigPublicInputProposalV1 &public_input_proposal : public_input_proposals)
-        proposal_out.m_input_proposals.emplace_back(public_input_proposal);
-
     // add miscellaneous components
-    proposal_out.m_normal_payments = std::move(normal_payments);
-    proposal_out.m_selfsend_payments = std::move(selfsend_payments);
+    proposal_out.m_input_proposals = std::move(public_input_proposals);
+    proposal_out.m_normal_payment_proposals = std::move(normal_payment_proposals);
+    proposal_out.m_selfsend_payment_proposals = std::move(selfsend_payment_proposals);
     proposal_out.m_partial_memo = std::move(partial_memo);
     proposal_out.m_tx_fee = tx_fee;
     proposal_out.m_aggregate_signer_set_filter = aggregate_signer_set_filter;

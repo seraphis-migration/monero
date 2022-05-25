@@ -126,7 +126,8 @@ void finalize_tx_extra_v1(const TxExtra &partial_memo,
 * param: dummy_destination -
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
-* inoutparam: output_proposals_inout -
+* inoutparam: normal_payment_proposals_inout -
+* inoutparam: selfsend_payment_proposals_inout -
 */
 void get_additional_output_types_for_output_set_v1(const std::size_t num_outputs,
     const std::vector<jamtis::JamtisSelfSendType> &self_send_output_types,
@@ -138,19 +139,8 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const crypto::secret_key &k_view_balance,
-    const std::vector<jamtis::JamtisPaymentProposalV1> &original_normal_proposals,
-    const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &original_selfsend_proposals,
-    std::vector<jamtis::JamtisPaymentProposalV1> &new_normal_proposals_out,
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &new_selfsend_proposals_out);
-void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &total_input_amount,
-    const rct::xmr_amount transaction_fee,
-    const jamtis::JamtisDestinationV1 &change_destination,
-    const jamtis::JamtisDestinationV1 &dummy_destination,
-    const rct::key &input_context,
-    const crypto::secret_key &k_view_balance,
-    const std::vector<jamtis::JamtisPaymentProposalV1> &original_normal_proposals,
-    const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &original_selfsend_proposals,
-    std::vector<SpOutputProposalV1> &output_proposals_out);
+    std::vector<jamtis::JamtisPaymentProposalV1> &normal_payment_proposals_inout,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payment_proposals_inout);
 /**
 * brief: gen_mock_sp_output_proposals_v1 - create random output proposals
 * param: out_amounts -

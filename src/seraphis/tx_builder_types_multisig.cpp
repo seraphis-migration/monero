@@ -103,8 +103,8 @@ void SpMultisigTxProposalV1::get_v1_tx_proposal_v1(const rct::key &wallet_spend_
         "multisig tx proposal: could not parse partial memo.");
 
     // make the tx proposal
-    make_v1_tx_proposal_v1(m_normal_payments,
-        m_selfsend_payments,
+    make_v1_tx_proposal_v1(m_normal_payment_proposals,
+        m_selfsend_payment_proposals,
         m_tx_fee,
         std::move(plain_input_proposals),
         std::move(additional_memo_elements),

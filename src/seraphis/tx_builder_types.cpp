@@ -84,7 +84,7 @@ void SpOutputProposalV1::gen(const rct::xmr_amount amount, const std::size_t num
 void SpTxProposalV1::get_output_proposals_v1(const crypto::secret_key &k_view_balance,
     std::vector<SpOutputProposalV1> &output_proposals_out) const
 {
-    CHECK_AND_ASSERT_THROW_MES(m_normal_payments.size() + m_selfsend_payments.size() > 0,
+    CHECK_AND_ASSERT_THROW_MES(m_normal_payment_proposals.size() + m_selfsend_payment_proposals.size() > 0,
         "Tried to get output proposals for a tx proposal with no outputs!");
 
     // input context
@@ -93,18 +93,18 @@ void SpTxProposalV1::get_output_proposals_v1(const crypto::secret_key &k_view_ba
 
     // output proposals
     output_proposals_out.clear();
-    output_proposals_out.reserve(m_normal_payments.size() + m_selfsend_payments.size());
+    output_proposals_out.reserve(m_normal_payment_proposals.size() + m_selfsend_payment_proposals.size());
 
-    for (const jamtis::JamtisPaymentProposalV1 &normal_proposal : m_normal_payments)
+    for (const jamtis::JamtisPaymentProposalV1 &normal_payment_proposal : m_normal_payment_proposals)
     {
         output_proposals_out.emplace_back();
-        normal_proposal.get_output_proposal_v1(input_context, output_proposals_out.back());
+        normal_payment_proposal.get_output_proposal_v1(input_context, output_proposals_out.back());
     }
 
-    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal : m_selfsend_payments)
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment_proposal : m_selfsend_payment_proposals)
     {
         output_proposals_out.emplace_back();
-        selfsend_proposal.get_output_proposal_v1(k_view_balance, input_context, output_proposals_out.back());
+        selfsend_payment_proposal.get_output_proposal_v1(k_view_balance, input_context, output_proposals_out.back());
     }
 
     // sort output proposals

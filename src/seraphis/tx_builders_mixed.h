@@ -86,15 +86,15 @@ void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
     const crypto::secret_key &k_view_balance);
 /**
 * brief: make_v1_tx_proposal_v1 - make v1 tx proposal
-* param: normal_payments -
-* param: selfsend_payments -
+* param: normal_payment_proposals -
+* param: selfsend_payment_proposals -
 * param: tx_fee -
 * param: input_proposals -
 * param: additional_memo_elements -
 * outparam: proposal_out -
 */
-void make_v1_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
+void make_v1_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     const DiscretizedFee &tx_fee,
     std::vector<SpInputProposalV1> input_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,

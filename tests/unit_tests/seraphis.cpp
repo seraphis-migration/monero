@@ -206,6 +206,21 @@ static void check_is_owned(const sp::SpOutputProposalV1 &test_proposal,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void check_is_owned(const sp::jamtis::JamtisPaymentProposalSelfSendV1 &test_proposal,
+    const jamtis_keys &keys,
+    const sp::jamtis::address_index_t j_expected,
+    const rct::xmr_amount amount_expected,
+    const sp::jamtis::JamtisEnoteType type_expected)
+{
+    // convert to output proposal
+    sp::SpOutputProposalV1 output_proposal;
+    test_proposal.get_output_proposal_v1(keys.k_vb, rct::zero(), output_proposal);
+
+    // check ownership
+    check_is_owned(output_proposal, keys, j_expected, amount_expected, type_expected);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static bool test_binned_reference_set(const std::uint64_t distribution_min_index,
     const std::uint64_t distribution_max_index,
     const sp::ref_set_bin_dimension_v1_t bin_radius,
@@ -723,53 +738,51 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     const rct::xmr_amount fee{1};
     std::vector<jamtis::JamtisPaymentProposalV1> normal_proposals;
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_proposals;
-    std::vector<SpOutputProposalV1> out_proposals{};
 
     auto finalize_outputs_for_test =
-        [&](const std::vector<jamtis::JamtisPaymentProposalV1> &original_normal_proposals,
-            const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &original_selfsend_proposals,
-            std::vector<SpOutputProposalV1> &out_proposals_out)
+        [&](std::vector<jamtis::JamtisPaymentProposalV1> &normal_payment_proposals_inout,
+            std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payment_proposals_inout)
         {
             finalize_v1_output_proposal_set_v1(in_amount,
                 fee,
                 change_dest,
                 dummy_dest,
-                rct::zero(),
                 keys.k_vb,
-                original_normal_proposals,
-                original_selfsend_proposals,
-                out_proposals_out);
+                normal_payment_proposals_inout,
+                selfsend_payment_proposals_inout);
         };
 
     // 0 outputs, 0 change: error
     in_amount = 0 + fee;
     normal_proposals.clear();
     selfsend_proposals.clear();
-    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
+    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
 
     // 0 outputs, >0 change: error
     in_amount = 1 + fee;
     normal_proposals.clear();
     selfsend_proposals.clear();  //change = 1
-    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
+    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
 
     // 1 normal output, 0 change: 2 outputs (1 self-send dummy)
     in_amount = 1 + fee;
     normal_proposals.resize(1);
     normal_proposals[0].gen(1, 0);
     selfsend_proposals.clear();
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 2);
-    check_is_owned(out_proposals[1], keys, j_dummy, 0, JamtisEnoteType::DUMMY);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 1);
+    EXPECT_TRUE(selfsend_proposals.size() == 1);
+    check_is_owned(selfsend_proposals[0], keys, j_dummy, 0, JamtisEnoteType::DUMMY);
 
     // 1 normal output, >0 change: 2 outputs (1 change)
     in_amount = 2 + fee;
     normal_proposals.resize(1);
     normal_proposals[0].gen(1, 0);  //change = 1
     selfsend_proposals.clear();
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 2);
-    check_is_owned(out_proposals[1], keys, j_change, 1, JamtisEnoteType::CHANGE);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 1);
+    EXPECT_TRUE(selfsend_proposals.size() == 1);
+    check_is_owned(selfsend_proposals[0], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
     // 2 normal outputs, 0 change: 3 outputs (1 self-send dummy)
     in_amount = 2 + fee;
@@ -777,9 +790,10 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     normal_proposals[0].gen(1, 0);
     normal_proposals[1].gen(1, 0);
     selfsend_proposals.clear();
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned(out_proposals[2], keys, j_dummy, 0, JamtisEnoteType::DUMMY);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 2);
+    EXPECT_TRUE(selfsend_proposals.size() == 1);
+    check_is_owned(selfsend_proposals[0], keys, j_dummy, 0, JamtisEnoteType::DUMMY);
 
     // 2 normal outputs (shared ephemeral pubkey), 0 change: error
     in_amount = 2 + fee;
@@ -789,7 +803,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     normal_proposals[1].m_enote_ephemeral_privkey = normal_proposals[0].m_enote_ephemeral_privkey;
     normal_proposals[1].m_destination.m_addr_K3 = normal_proposals[0].m_destination.m_addr_K3;
     selfsend_proposals.clear();
-    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
+    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
 
     // 2 normal outputs (shared ephemeral pubkey), >0 change: error
     in_amount = 3 + fee;
@@ -799,7 +813,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     normal_proposals[1].m_enote_ephemeral_privkey = normal_proposals[0].m_enote_ephemeral_privkey;
     normal_proposals[1].m_destination.m_addr_K3 = normal_proposals[0].m_destination.m_addr_K3;
     selfsend_proposals.clear();
-    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
+    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
 
     // 3 normal outputs, 0 change: 4 outputs (1 self-send dummy)
     in_amount = 3 + fee;
@@ -808,9 +822,10 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     normal_proposals[1].gen(1, 0);
     normal_proposals[2].gen(1, 0);
     selfsend_proposals.clear();
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 4);
-    check_is_owned(out_proposals[3], keys, j_dummy, 0, JamtisEnoteType::DUMMY);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 3);
+    EXPECT_TRUE(selfsend_proposals.size() == 1);
+    check_is_owned(selfsend_proposals[0], keys, j_dummy, 0, JamtisEnoteType::DUMMY);
 
     // 3 normal outputs, >0 change: 4 outputs (1 change)
     in_amount = 4 + fee;
@@ -819,36 +834,38 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     normal_proposals[1].gen(1, 0);
     normal_proposals[2].gen(1, 0);  //change = 1
     selfsend_proposals.clear();
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 4);
-    check_is_owned(out_proposals[3], keys, j_change, 1, JamtisEnoteType::CHANGE);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 3);
+    EXPECT_TRUE(selfsend_proposals.size() == 1);
+    check_is_owned(selfsend_proposals[0], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
     // 1 self-send output, 0 change: 2 outputs (1 dummy)
     in_amount = 1 + fee;
     normal_proposals.clear();
     selfsend_proposals.resize(1);
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 2);
-    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
-    EXPECT_FALSE(is_self_send_output_proposal(out_proposals[1], rct::zero(), keys.K_1_base, keys.k_vb));  //dummy
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 1);
+    EXPECT_TRUE(selfsend_proposals.size() == 1);
+    check_is_owned(selfsend_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     // 1 self-send output, >0 change: 2 outputs (1 change)
     in_amount = 2 + fee;
     normal_proposals.clear();
     selfsend_proposals.resize(1);
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;  //change = 1
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 2);
-    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
-    check_is_owned(out_proposals[1], keys, j_change, 1, JamtisEnoteType::CHANGE);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 0);
+    EXPECT_TRUE(selfsend_proposals.size() == 2);
+    check_is_owned(selfsend_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(selfsend_proposals[1], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
     // 1 change output, >0 change: error
     in_amount = 2 + fee;
     normal_proposals.clear();
     selfsend_proposals.resize(1);
     selfsend_proposals[0] = change_payment_proposal_amnt_1;  //change = 1
-    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
+    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
 
     // 1 self-send output & 1 normal output (shared ephemeral pubkey), 0 change: 2 outputs
     in_amount = 2 + fee;
@@ -858,9 +875,10 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;
     normal_proposals[0].m_enote_ephemeral_privkey = selfsend_proposals[0].m_enote_ephemeral_privkey;
     normal_proposals[0].m_destination.m_addr_K3 = selfsend_proposals[0].m_destination.m_addr_K3;
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 2);
-    check_is_owned(out_proposals[1], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 1);
+    EXPECT_TRUE(selfsend_proposals.size() == 1);
+    check_is_owned(selfsend_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     // 1 self-send output & 1 normal output (shared ephemeral pubkey), >0 change: error
     in_amount = 3 + fee;
@@ -870,7 +888,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;  //change = 1
     normal_proposals[0].m_enote_ephemeral_privkey = selfsend_proposals[0].m_enote_ephemeral_privkey;
     normal_proposals[0].m_destination.m_addr_K3 = selfsend_proposals[0].m_destination.m_addr_K3;
-    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
+    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
 
     // 1 self-send output, 1 normal output, 0 change: 3 outputs (1 dummy)
     in_amount = 2 + fee;
@@ -878,10 +896,10 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     normal_proposals[0].gen(1, 0);
     selfsend_proposals.resize(1);
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned(out_proposals[1], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
-    EXPECT_FALSE(is_self_send_output_proposal(out_proposals[2], rct::zero(), keys.K_1_base, keys.k_vb));
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 2);
+    EXPECT_TRUE(selfsend_proposals.size() == 1);
+    check_is_owned(selfsend_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     // 1 self-send output, 1 normal output, >0 change: 3 outputs (1 change)
     in_amount = 3 + fee;
@@ -889,10 +907,11 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     normal_proposals[0].gen(1, 0);
     selfsend_proposals.resize(1);
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;  //change = 1
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned(out_proposals[1], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
-    check_is_owned(out_proposals[2], keys, j_change, 1, JamtisEnoteType::CHANGE);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 1);
+    EXPECT_TRUE(selfsend_proposals.size() == 2);
+    check_is_owned(selfsend_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(selfsend_proposals[1], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
     // 1 self-send output, 2 normal outputs, 0 change: 3 outputs
     in_amount = 3 + fee;
@@ -901,9 +920,10 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     normal_proposals[1].gen(1, 0);
     selfsend_proposals.resize(1);
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned(out_proposals[2], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 2);
+    EXPECT_TRUE(selfsend_proposals.size() == 1);
+    check_is_owned(selfsend_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     // 1 self-send output, 2 normal outputs, >0 change: 4 outputs (1 change)
     in_amount = 4 + fee;
@@ -912,10 +932,11 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     normal_proposals[1].gen(1, 0);
     selfsend_proposals.resize(1);
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;  //change = 1
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 4);
-    check_is_owned(out_proposals[2], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
-    check_is_owned(out_proposals[3], keys, j_change, 1, JamtisEnoteType::CHANGE);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 2);
+    EXPECT_TRUE(selfsend_proposals.size() == 2);
+    check_is_owned(selfsend_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(selfsend_proposals[1], keys, j_change, 1, JamtisEnoteType::CHANGE);
 
     // 2 self-send outputs (shared ephemeral pubkey), 0 change: error
     in_amount = 2 + fee;
@@ -923,7 +944,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     selfsend_proposals.resize(2);
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;
     selfsend_proposals[1] = self_spend_payment_proposal1_amnt_1;
-    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
+    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
 
     // 2 self-send outputs (shared ephemeral pubkey), >0 change: error
     in_amount = 3 + fee;
@@ -931,7 +952,7 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     selfsend_proposals.resize(2);
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;
     selfsend_proposals[1] = self_spend_payment_proposal1_amnt_1;  //change = 1
-    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
+    EXPECT_ANY_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
 
     // 2 self-send outputs, 0 change: 3 outputs (1 dummy)
     in_amount = 2 + fee;
@@ -939,11 +960,11 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     selfsend_proposals.resize(2);
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;
     selfsend_proposals[1] = self_spend_payment_proposal2_amnt_1;
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
-    check_is_owned(out_proposals[1], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
-    EXPECT_FALSE(is_self_send_output_proposal(out_proposals[2], rct::zero(), keys.K_1_base, keys.k_vb));
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 1);
+    EXPECT_TRUE(selfsend_proposals.size() == 2);
+    check_is_owned(selfsend_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(selfsend_proposals[1], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
 
     // 2 self-send outputs, >0 change: 3 outputs (1 change)
     in_amount = 3 + fee;
@@ -951,11 +972,12 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     selfsend_proposals.resize(2);
     selfsend_proposals[0] = self_spend_payment_proposal1_amnt_1;
     selfsend_proposals[1] = self_spend_payment_proposal2_amnt_1;  //change = 1
-    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals, out_proposals));
-    EXPECT_TRUE(out_proposals.size() == 3);
-    check_is_owned(out_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
-    check_is_owned(out_proposals[1], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
-    check_is_owned(out_proposals[2], keys, j_change, 1, JamtisEnoteType::CHANGE);
+    EXPECT_NO_THROW(finalize_outputs_for_test(normal_proposals, selfsend_proposals));
+    EXPECT_TRUE(normal_proposals.size() == 0);
+    EXPECT_TRUE(selfsend_proposals.size() == 3);
+    check_is_owned(selfsend_proposals[0], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(selfsend_proposals[1], keys, j_selfspend, 1, JamtisEnoteType::SELF_SPEND);
+    check_is_owned(selfsend_proposals[2], keys, j_change, 1, JamtisEnoteType::CHANGE);
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, tx_extra)

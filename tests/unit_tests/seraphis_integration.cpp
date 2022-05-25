@@ -240,30 +240,25 @@ TEST(seraphis_integration, txtype_squashed_v1)
         reported_final_fee,
         contextual_inputs));
 
-    // - compute input context
-    rct::key input_context;
-    make_standard_input_context_v1(contextual_inputs, input_context);
-
     // d) finalize output proposals
     DiscretizedFee discretized_transaction_fee;
     ASSERT_NO_THROW(discretized_transaction_fee = DiscretizedFee{reported_final_fee});
     ASSERT_TRUE(discretized_transaction_fee == reported_final_fee);
 
-    std::vector<SpOutputProposalV1> output_proposals;
     ASSERT_NO_THROW(finalize_v1_output_proposal_set_v1(in_amount_A,
         reported_final_fee,
         user_address_A,
         user_address_A,
-        input_context,
         keys_user_A.k_vb,
         normal_payment_proposals,
-        selfsend_payment_proposals,
-        output_proposals));
+        selfsend_payment_proposals));
 
-    ASSERT_TRUE(tx_fee_calculator.get_fee(tx_fee_per_weight, contextual_inputs.size(), output_proposals.size()) ==
+    ASSERT_TRUE(tx_fee_calculator.get_fee(tx_fee_per_weight,
+            contextual_inputs.size(),
+            normal_payment_proposals.size() + selfsend_payment_proposals.size()) ==
         reported_final_fee);
 
-    // e) make an input proposal to fund the tx
+    // e) make input proposals to fund the tx
     std::vector<SpInputProposalV1> input_proposals;
 
     for (const sp::SpContextualEnoteRecordV1 &contextual_input : contextual_inputs)
@@ -276,26 +271,36 @@ TEST(seraphis_integration, txtype_squashed_v1)
             input_proposals.back()));
     }
 
-    // f) prepare a reference set for the input's membership proof
+    // f) make a tx proposal
+    SpTxProposalV1 tx_proposal;
+
+    sp::make_v1_tx_proposal_v1(std::move(normal_payment_proposals),
+        std::move(selfsend_payment_proposals),
+        discretized_transaction_fee,
+        std::move(input_proposals),
+        std::vector<ExtraFieldElement>{},
+        tx_proposal);
+
+    ASSERT_NO_THROW(check_v1_tx_proposal_semantics_v1(tx_proposal, keys_user_A.K_1_base, keys_user_A.k_vb));
+
+    // g) prepare a reference set for the input's membership proof
     std::vector<SpMembershipProofPrepV1> membership_proof_preps;
 
     ASSERT_NO_THROW(membership_proof_preps =
-            gen_mock_sp_membership_proof_preps_v1(input_proposals,
+            gen_mock_sp_membership_proof_preps_v1(tx_proposal.m_input_proposals,
                 ref_set_decomp_m,
                 ref_set_decomp_n,
                 SpBinnedReferenceSetConfigV1{.m_bin_radius = 1, .m_num_bin_members = num_bin_members},
                 ledger_context)
         );
 
-    // g) make the transaction
+    // h) make the transaction
     SpTxSquashedV1 completed_tx;
 
     ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(keys_user_A.k_m,
-        input_proposals,
-        std::move(output_proposals),
-        discretized_transaction_fee,
+        keys_user_A.k_vb,
+        tx_proposal,
         std::move(membership_proof_preps),
-        std::vector<ExtraFieldElement>{},
         SpTxSquashedV1::SemanticRulesVersion::MOCK,
         completed_tx));
 

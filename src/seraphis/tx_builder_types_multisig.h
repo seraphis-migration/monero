@@ -104,9 +104,9 @@ struct SpMultisigPublicInputProposalV1 final
 struct SpMultisigTxProposalV1 final
 {
     /// normal tx outputs
-    std::vector<jamtis::JamtisPaymentProposalV1> m_normal_payments;
+    std::vector<jamtis::JamtisPaymentProposalV1> m_normal_payment_proposals;
     /// self-send tx outputs
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> m_selfsend_payments;
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> m_selfsend_payment_proposals;
     /// miscellaneous memo elements to add to the tx memo
     TxExtra m_partial_memo;
     /// proposed transaction fee

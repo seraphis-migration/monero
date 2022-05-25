@@ -176,8 +176,8 @@ struct SpAlignableMembershipProofV1 final
 struct SpTxProposalV1 final
 {
     /// outputs
-    std::vector<jamtis::JamtisPaymentProposalV1> m_normal_payments;
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> m_selfsend_payments;
+    std::vector<jamtis::JamtisPaymentProposalV1> m_normal_payment_proposals;
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> m_selfsend_payment_proposals;
     /// tx fee
     DiscretizedFee m_tx_fee;
     /// inputs

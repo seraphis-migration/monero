@@ -89,6 +89,10 @@ void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
     SpMultisigPublicInputProposalV1 &proposal_out);
+void make_v1_multisig_public_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    SpMultisigPublicInputProposalV1 &proposal_out);
 /**
 * brief: finalize_multisig_output_proposals_v1 - finalize output set for a multisig tx proposal (add change/dummy outputs)
 * param: public_input_proposals -
@@ -97,8 +101,8 @@ void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
 * param: dummy_destination -
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
-* inoutparam: normal_payments_inout -
-* inoutparam: selfsend_payments_inout -
+* inoutparam: normal_payment_proposals_inout -
+* inoutparam: selfsend_payment_proposals_inout -
 */
 void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigPublicInputProposalV1> &public_input_proposals,
     const DiscretizedFee &tx_fee,
@@ -106,8 +110,8 @@ void finalize_multisig_output_proposals_v1(const std::vector<SpMultisigPublicInp
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    std::vector<jamtis::JamtisPaymentProposalV1> &normal_payments_inout,
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payments_inout);
+    std::vector<jamtis::JamtisPaymentProposalV1> &normal_payment_proposals_inout,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payment_proposals_inout);
 /**
 * brief: check_v1_multisig_tx_proposal_semantics_v1 - check semantics of a multisig tx proposal
 *   - throws if a check fails
@@ -130,8 +134,8 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 * brief: make_v1_multisig_tx_proposal_v1 - make a multisig tx proposal
 * param: wallet_spend_pubkey
 * param: k_view_balance -
-* param: normal_payments -
-* param: selfsend_payments -
+* param: normal_payment_proposals -
+* param: selfsend_payment_proposals -
 * param: partial_memo -
 * param: tx_fee -
 * param: version_string -
@@ -141,12 +145,12 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 */
 void make_v1_multisig_tx_proposal_v1(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    std::vector<jamtis::JamtisPaymentProposalV1> normal_payments,
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments,
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     TxExtra partial_memo,
     const DiscretizedFee &tx_fee,
     std::string version_string,
-    const std::vector<SpMultisigPublicInputProposalV1> &public_input_proposals,
+    std::vector<SpMultisigPublicInputProposalV1> public_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpMultisigTxProposalV1 &proposal_out);
 /**
