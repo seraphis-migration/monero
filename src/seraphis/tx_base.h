@@ -141,28 +141,32 @@ void make_versioning_string(const unsigned char tx_semantic_rules_version, std::
 template <typename SpTxType>
 bool validate_txs_impl(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context)
 {
-    // validate non-batchable
-    for (const SpTxType *tx : txs)
+    try
     {
-        if (!tx)
-            return false;
+        // validate non-batchable
+        for (const SpTxType *tx : txs)
+        {
+            if (!tx)
+                return false;
 
-        if (!validate_tx_semantics(*tx))
-            return false;
+            if (!validate_tx_semantics(*tx))
+                return false;
 
-        if (!validate_tx_linking_tags(*tx, ledger_context))
-            return false;
+            if (!validate_tx_linking_tags(*tx, ledger_context))
+                return false;
 
-        if (!validate_tx_amount_balance(*tx))
-            return false;
+            if (!validate_tx_amount_balance(*tx))
+                return false;
 
-        if (!validate_tx_input_proofs(*tx, ledger_context))
+            if (!validate_tx_input_proofs(*tx, ledger_context))
+                return false;
+        }
+
+        // validate batchable
+        if (!validate_txs_batchable(txs, ledger_context))
             return false;
     }
-
-    // validate batchable
-    if (!validate_txs_batchable(txs, ledger_context))
-        return false;
+    catch (...) { return false; }
 
     return true;
 }
