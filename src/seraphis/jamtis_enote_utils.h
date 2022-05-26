@@ -102,13 +102,15 @@ void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &in
     rct::key &input_context_out);
 /**
 * brief: make_jamtis_sender_receiver_secret_plain - sender-receiver secret q for a normal enote
-*    q = H_32(DH_derivation, input_context)
+*    q = H_32(DH_derivation, K_e, input_context)
 * param: sender_receiver_DH_derivation - K_d = 8 * privkey * DH_key
+* param: enote_ephemeral_pubkey - K_e
 * param: input_context - [normal: H({input KI}); coinbase: H(block height)]
 * outparam: sender_receiver_secret_out - q
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 */
 void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     rct::key &sender_receiver_secret_out);
 /**
@@ -116,6 +118,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &send
 *    q = H_32(8 * r * k_fr * G, input_context) => H_32(8 * privkey * DH_key, input_context)
 * param: privkey - [sender: r] [recipient: k_fr]
 * param: DH_key - [sender: K_2] [sender-change-2out: k_fr * K_3_other] [recipient: K_e = r K_3]
+* param: enote_ephemeral_pubkey - K_e
 * param: input_context - [normal: H({input KI}); coinbase: H(block height)]
 * param: hwdev - abstract reference to a hardware-specific implemention of key derivation
 * outparam: sender_receiver_secret_out - q
@@ -123,6 +126,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &send
 */
 void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
     const rct::key &DH_key,
+    const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     hw::device &hwdev,
     rct::key &sender_receiver_secret_out);
@@ -252,6 +256,7 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
 * brief: try_get_jamtis_nominal_spend_key_plain - test view tag; if it passes, compute and return the nominal spend key
 *    and sender-receiver secret (for a normal enote)
 * param: sender_receiver_DH_derivation - 8 * privkey * DH_key
+* param: enote_ephemeral_pubkey - K_e
 * param: input_context - [normal: H({input KI}); coinbase: H(block height)]
 * param: onetime_address - Ko
 * param: view_tag - view_tag
@@ -260,6 +265,7 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
 * return: true if successfully recomputed the view tag
 */
 bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &onetime_address,
     const view_tag_t view_tag,

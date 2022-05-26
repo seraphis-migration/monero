@@ -301,6 +301,7 @@ inline unsigned char make_seraphis_view_tag_siphash(const crypto::secret_key &pr
 }
 
 inline bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const rct::key &enote_ephemeral_pubkey,
     const rct::key &onetime_address,
     const unsigned char view_tag,
     rct::key &sender_receiver_secret_out,
@@ -316,6 +317,7 @@ inline bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_der
     // q_t
     // note: computing this after view tag check is an optimization
     sp::jamtis::make_jamtis_sender_receiver_secret_plain(sender_receiver_DH_derivation,
+        enote_ephemeral_pubkey,
         rct::zero(),
         sender_receiver_secret_out);
 
@@ -382,6 +384,7 @@ public:
         rct::key nominal_recipient_spendkey;
 
         if (!try_get_jamtis_nominal_spend_key_plain_siphash(derivation,
+            enote_ephemeral_pubkey,
             m_enote.m_core.m_onetime_address,
             m_enote.m_view_tag,
             sender_receiver_secret_dummy,  //outparam not used

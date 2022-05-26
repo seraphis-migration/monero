@@ -85,7 +85,7 @@ static auto make_derivation_with_wiper(const crypto::secret_key &privkey,
 }
 //-------------------------------------------------------------------------------------------------------------------
 // key1 || key2
-// - assumes both keys are 32 bytes
+// - assumes keys are 32 bytes
 //-------------------------------------------------------------------------------------------------------------------
 static void get_doublekey_hash_data(const unsigned char *key1,
     const unsigned char *key2,
@@ -96,6 +96,22 @@ static void get_doublekey_hash_data(const unsigned char *key1,
 
     data_out.append(reinterpret_cast<const char *>(key1), 32);
     data_out.append(reinterpret_cast<const char *>(key2), 32);
+}
+//-------------------------------------------------------------------------------------------------------------------
+// key1 || key2 || key3
+// - assumes keys are 32 bytes
+//-------------------------------------------------------------------------------------------------------------------
+static void get_trikey_hash_data(const unsigned char *key1,
+    const unsigned char *key2,
+    const unsigned char *key3,
+    epee::wipeable_string &data_out)
+{
+    data_out.clear();
+    data_out.reserve(3 * 32);
+
+    data_out.append(reinterpret_cast<const char *>(key1), 32);
+    data_out.append(reinterpret_cast<const char *>(key2), 32);
+    data_out.append(reinterpret_cast<const char *>(key3), 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
 // a = a_enc XOR H_8(q, 8 r G)
@@ -222,14 +238,18 @@ void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &in
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     rct::key &sender_receiver_secret_out)
 {
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN};
 
-    // q = H_32(DH_derivation, input_context)
+    // q = H_32(DH_derivation, K_e, input_context)
     epee::wipeable_string data;
-    get_doublekey_hash_data(to_bytes(sender_receiver_DH_derivation), input_context.bytes, data);
+    get_trikey_hash_data(to_bytes(sender_receiver_DH_derivation),
+        enote_ephemeral_pubkey.bytes,
+        input_context.bytes,
+        data);
 
     jamtis_hash32(domain_separator,
         reinterpret_cast<const unsigned char*>(data.data()), 
@@ -239,6 +259,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &send
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
     const rct::key &DH_key,
+    const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     hw::device &hwdev,
     rct::key &sender_receiver_secret_out)
@@ -247,8 +268,11 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
     crypto::key_derivation derivation;
     auto a_wiper = make_derivation_with_wiper(privkey, DH_key, hwdev, derivation);
 
-    // q = H_32(DH_derivation)
-    make_jamtis_sender_receiver_secret_plain(derivation, input_context, sender_receiver_secret_out);
+    // q = H_32(DH_derivation, K_e, input_context)
+    make_jamtis_sender_receiver_secret_plain(derivation,
+        enote_ephemeral_pubkey,
+        input_context,
+        sender_receiver_secret_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_view_balance,
@@ -403,6 +427,7 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
+    const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &onetime_address,
     const view_tag_t view_tag,
@@ -417,7 +442,10 @@ bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender
         return false;
 
     // q (normal derivation path)
-    make_jamtis_sender_receiver_secret_plain(sender_receiver_DH_derivation, input_context, sender_receiver_secret_out);
+    make_jamtis_sender_receiver_secret_plain(sender_receiver_DH_derivation,
+        enote_ephemeral_pubkey,
+        input_context,
+        sender_receiver_secret_out);
 
     // K'_1 = Ko - H_n(q) X
     make_jamtis_nominal_spend_key(sender_receiver_secret_out, onetime_address, nominal_spend_key_out);

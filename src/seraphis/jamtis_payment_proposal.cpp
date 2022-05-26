@@ -89,10 +89,10 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(const rct::key &input_conte
     auto Kd_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&K_d, sizeof(K_d)); });
     crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
 
-    // sender-receiver shared secret: q = H_32(K_d, input_context)
+    // sender-receiver shared secret: q = H_32(K_d, K_e, input_context)
     rct::key q;
     auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
-    make_jamtis_sender_receiver_secret_plain(K_d, input_context, q);
+    make_jamtis_sender_receiver_secret_plain(K_d, output_proposal_out.m_enote_ephemeral_pubkey, input_context, q);
 
     // encrypt address tag: addr_tag_enc = addr_tag(blowfish(j || mac)) ^ H_8(q)
     output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, m_destination.m_addr_tag);

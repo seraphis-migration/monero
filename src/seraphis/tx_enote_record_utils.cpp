@@ -171,6 +171,7 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
 
     // q', K'_1 (jamtis plain variants)
     if (!jamtis::try_get_jamtis_nominal_spend_key_plain(sender_receiver_DH_derivation,
+            enote_ephemeral_pubkey,
             input_context,
             enote.m_core.m_onetime_address,
             enote.m_view_tag,
