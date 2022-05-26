@@ -56,7 +56,7 @@ void SpOutputProposalV1::get_enote_v1(SpEnoteV1 &enote_out) const
 {
     // enote core
     enote_out.m_core.m_onetime_address = m_core.m_onetime_address;
-    enote_out.m_core.m_amount_commitment = rct::commit(this->get_amount(), rct::sk2rct(this->get_amount_blinding_factor()));
+    enote_out.m_core.m_amount_commitment = rct::commit(this->get_amount(), rct::sk2rct(m_core.m_amount_blinding_factor));
 
     // enote misc. details
     enote_out.m_encoded_amount = m_encoded_amount;

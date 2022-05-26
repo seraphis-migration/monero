@@ -597,7 +597,7 @@ void make_v1_multisig_tx_proposal_v1(const rct::key &wallet_spend_pubkey,
     rct::key proposal_prefix;
     tx_proposal.get_proposal_prefix(version_string, k_view_balance, proposal_prefix);
 
-    // prepare composition proofs for each input (note: using the tx proposal here ensures proof proposals are sorted)
+    // prepare composition proofs for each input (note: use the tx proposal to ensure proof proposals are sorted)
     proposal_out.m_input_proof_proposals.clear();
     proposal_out.m_input_proof_proposals.reserve(public_input_proposals.size());
     SpEnoteImageV1 enote_image_temp;
@@ -1006,6 +1006,7 @@ bool try_make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_pro
     }
 
     // try to make one partial input per masked address
+    partial_inputs_out.clear();
     partial_inputs_out.reserve(expected_masked_addresses.size());
     std::unordered_set<rct::key> masked_addresses_with_partial_inputs;
 

@@ -68,12 +68,12 @@ static bool ephemeral_pubkeys_are_unique(const std::vector<SpOutputProposalV1> &
 {
     // record all as 8*K_e to remove torsion elements if they exist
     std::unordered_set<rct::key> enote_ephemeral_pubkeys;
-    rct::key temp_enote_ephemeral_pubkey;
 
     for (const SpOutputProposalV1 &output_proposal : output_proposals)
     {
-        temp_enote_ephemeral_pubkey = output_proposal.m_enote_ephemeral_pubkey;
-        enote_ephemeral_pubkeys.insert(rct::scalarmultKey(temp_enote_ephemeral_pubkey, rct::EIGHT));
+        enote_ephemeral_pubkeys.insert(
+                rct::scalarmultKey(output_proposal.m_enote_ephemeral_pubkey, rct::EIGHT)
+            );
     }
 
     return enote_ephemeral_pubkeys.size() == output_proposals.size();
@@ -315,6 +315,16 @@ void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, 
         }
     }
 
+    // enote ephemeral pubkeys should not be zero or identity
+    // note: these are easy checks to do, but in no way guarantee the enote ephemeral pubkeys are valid/usable
+    for (const rct::key &enote_ephemeral_pubkey : tx_supplement.m_output_enote_ephemeral_pubkeys)
+    {
+        CHECK_AND_ASSERT_THROW_MES(!(enote_ephemeral_pubkey == rct::identity()),
+            "Semantics check tx supplement v1: an enote ephemeral pubkey is the identity element.");
+        CHECK_AND_ASSERT_THROW_MES(!(enote_ephemeral_pubkey == rct::zero()),
+            "Semantics check tx supplement v1: an enote ephemeral pubkey is zero.");
+    }
+
     // the tx extra must be well-formed
     std::vector<ExtraFieldElement> extra_field_elements;
 
@@ -331,6 +341,7 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
     std::vector<rct::key> &output_enote_ephemeral_pubkeys_out)
 {
+    // extract tx output information from output proposals
     outputs_out.clear();
     outputs_out.reserve(output_proposals.size());
     output_amounts_out.clear();
@@ -340,28 +351,26 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     output_enote_ephemeral_pubkeys_out.clear();
     output_enote_ephemeral_pubkeys_out.reserve(output_proposals.size());
 
-    for (const SpOutputProposalV1 &proposal : output_proposals)
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
     {
         // sanity check
         // note: a blinding factor of 0 is allowed (but not recommended)
-        CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(proposal.get_amount_blinding_factor())) == 0,
+        CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(output_proposal.m_core.m_amount_blinding_factor)) == 0,
             "making v1 outputs: invalid amount blinding factor (non-canonical).");
 
         // convert to enote
         outputs_out.emplace_back();
-        proposal.get_enote_v1(outputs_out.back());
+        output_proposal.get_enote_v1(outputs_out.back());
 
         // prepare for range proofs
-        output_amounts_out.emplace_back(proposal.get_amount());
-        output_amount_commitment_blinding_factors_out.emplace_back(proposal.get_amount_blinding_factor());
+        output_amounts_out.emplace_back(output_proposal.get_amount());
+        output_amount_commitment_blinding_factors_out.emplace_back(output_proposal.m_core.m_amount_blinding_factor);
 
         // copy non-duplicate enote pubkeys to tx supplement
         if (std::find(output_enote_ephemeral_pubkeys_out.begin(),
-            output_enote_ephemeral_pubkeys_out.end(),
-            proposal.m_enote_ephemeral_pubkey) == output_enote_ephemeral_pubkeys_out.end())
-        {
-            output_enote_ephemeral_pubkeys_out.emplace_back(proposal.m_enote_ephemeral_pubkey);
-        }
+                output_enote_ephemeral_pubkeys_out.end(),
+                output_proposal.m_enote_ephemeral_pubkey) == output_enote_ephemeral_pubkeys_out.end())
+            output_enote_ephemeral_pubkeys_out.emplace_back(output_proposal.m_enote_ephemeral_pubkey);
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -573,7 +582,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
         self_send_output_types.emplace_back(selfsend_proposal.m_type);
 
     // set the shared enote ephemeral pubkey here: it will always be the first one when it is needed
-    rct::key first_enote_ephemeral_pubkey;
+    rct::key first_enote_ephemeral_pubkey{rct::identity()};
 
     if (normal_payment_proposals_inout.size() > 0)
         normal_payment_proposals_inout[0].get_enote_ephemeral_pubkey(first_enote_ephemeral_pubkey);

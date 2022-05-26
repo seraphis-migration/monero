@@ -84,6 +84,12 @@ static auto convert_skv_to_rctv(const std::vector<crypto::secret_key> &skv, rct:
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static bool same_key_image(const SpPartialInputV1 &partial_input, const SpInputProposalV1 &input_proposal)
+{
+    return partial_input.m_input_image.m_core.m_key_image == input_proposal.m_core.m_key_image;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 void make_tx_image_proof_message_v1(const std::string &version_string,
     const std::vector<SpEnoteV1> &output_enotes,
     const SpTxSupplementV1 &tx_supplement,
@@ -509,8 +515,8 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
 
     for (std::size_t input_index{0}; input_index < partial_inputs.size(); ++input_index)
     {
-        CHECK_AND_ASSERT_THROW_MES(partial_inputs[input_index].key_image() == 
-                tx_proposal.m_input_proposals[input_index].key_image(),
+        CHECK_AND_ASSERT_THROW_MES(same_key_image(partial_inputs[input_index],
+                tx_proposal.m_input_proposals[input_index]),
             "making partial tx: partial inputs and input proposals don't line up (inconsistent key images).");
     }
 

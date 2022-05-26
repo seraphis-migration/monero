@@ -76,14 +76,8 @@ struct SpInputProposalV1 final
     */
     void get_enote_image_v1(SpEnoteImageV1 &image_out) const { return m_core.get_enote_image_core(image_out.m_core); }
 
-    /// get a reference to this proposal's key image
-    const crypto::key_image& key_image() const { return m_core.m_key_image; }
-
     /// get the amount of this proposal
     rct::xmr_amount get_amount() const { return m_core.m_amount; }
-
-    /// get the amount blinding factor of this proposal
-    const crypto::secret_key& get_amount_blinding_factor() const { return m_core.m_amount_blinding_factor; }
 
     /// generate a v1 input (all random; does not support info recovery)
     void gen(const crypto::secret_key &spendbase_privkey, const rct::xmr_amount amount)
@@ -120,9 +114,6 @@ struct SpOutputProposalV1 final
 
     /// get the amount of this proposal
     rct::xmr_amount get_amount() const { return m_core.m_amount; }
-
-    /// get the amount blinding factor of this proposal
-    const crypto::secret_key& get_amount_blinding_factor() const { return m_core.m_amount_blinding_factor; }
 
     /**
     * brief: gen - generate a V1 Destination (random)
@@ -227,9 +218,6 @@ struct SpPartialInputV1 final
     {
         return m_input_image < other_input.m_input_image;
     }
-
-    /// get a reference to this input's key image
-    const crypto::key_image& key_image() const { return m_input_image.m_core.m_key_image; }
 };
 
 ////
