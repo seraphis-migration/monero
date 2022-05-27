@@ -1017,24 +1017,48 @@ TEST(seraphis, tx_extra)
 
 
     /// validate field and recover elemeents
+    auto validate_field_and_recover =
+        [&]()
+        {
+            extra_field_elements.clear();
+            EXPECT_TRUE(sp::try_get_extra_field_elements(tx_extra, extra_field_elements));
+            ASSERT_TRUE(extra_field_elements.size() == 3);
+            EXPECT_TRUE(extra_field_elements[0].m_type == 0);
+            EXPECT_TRUE(extra_field_elements[0].m_value.size() == 8);
+            std::uint64_t element0;
+            memcpy(&element0, extra_field_elements[0].m_value.data(), 8);
+            EXPECT_TRUE(element0 == one);
+            EXPECT_TRUE(extra_field_elements[1].m_type == 1);
+            EXPECT_TRUE(extra_field_elements[1].m_value.size() == 32);
+            rct::key element1;
+            memcpy(element1.bytes, extra_field_elements[1].m_value.data(), 32);
+            EXPECT_TRUE(element1 == rct::identity());
+            EXPECT_TRUE(extra_field_elements[2].m_type == 2);
+            EXPECT_TRUE(extra_field_elements[2].m_value.size() == 8);
+            std::uint64_t element2;
+            memcpy(&element2, extra_field_elements[2].m_value.data(), 8);
+            EXPECT_TRUE(element2 == one);
+        };
+
+    // basic recovery
+    validate_field_and_recover();
+
+    // partial field to full field reconstruction
+    std::vector<sp::ExtraFieldElement> extra_field_elements2;
+    std::vector<sp::ExtraFieldElement> extra_field_elements3;
+    EXPECT_TRUE(sp::try_get_extra_field_elements(tx_extra, extra_field_elements2));
+    extra_field_elements3.push_back(extra_field_elements2.back());
+    extra_field_elements2.pop_back();
+
+    sp::TxExtra tx_extra_partial;
+    sp::make_tx_extra(std::move(extra_field_elements2), tx_extra_partial);
+
     extra_field_elements.clear();
-    EXPECT_TRUE(sp::try_get_extra_field_elements(tx_extra, extra_field_elements));
-    EXPECT_TRUE(extra_field_elements.size() == 3);
-    EXPECT_TRUE(extra_field_elements[0].m_type == 0);
-    EXPECT_TRUE(extra_field_elements[0].m_value.size() == 8);
-    std::uint64_t element0;
-    memcpy(&element0, extra_field_elements[0].m_value.data(), 8);
-    EXPECT_TRUE(element0 == one);
-    EXPECT_TRUE(extra_field_elements[1].m_type == 1);
-    EXPECT_TRUE(extra_field_elements[1].m_value.size() == 32);
-    rct::key element1;
-    memcpy(element1.bytes, extra_field_elements[1].m_value.data(), 32);
-    EXPECT_TRUE(element1 == rct::identity());
-    EXPECT_TRUE(extra_field_elements[2].m_type == 2);
-    EXPECT_TRUE(extra_field_elements[2].m_value.size() == 8);
-    std::uint64_t element2;
-    memcpy(&element2, extra_field_elements[2].m_value.data(), 8);
-    EXPECT_TRUE(element2 == one);
+    sp::accumulate_extra_field_elements(tx_extra_partial, extra_field_elements);        //first two elements
+    sp::accumulate_extra_field_elements(extra_field_elements3, extra_field_elements);   //last element
+    sp::make_tx_extra(std::move(extra_field_elements), tx_extra);
+
+    validate_field_and_recover();
 
 
     /// adding a byte to the end causes failure

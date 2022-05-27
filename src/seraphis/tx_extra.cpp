@@ -163,9 +163,7 @@ void accumulate_extra_field_elements(const std::vector<ExtraFieldElement> &eleme
     std::vector<ExtraFieldElement> &elements_inout)
 {
     elements_inout.reserve(elements_inout.size() + elements_to_add.size());
-    memcpy(elements_inout.data() + elements_inout.size() - elements_to_add.size(),
-        elements_to_add.data(),
-        elements_to_add.size());
+    elements_inout.insert(elements_inout.end(), elements_to_add.begin(), elements_to_add.end());
 }
 //-------------------------------------------------------------------------------------------------------------------
 void accumulate_extra_field_elements(const TxExtra &partial_memo,
