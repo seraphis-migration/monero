@@ -384,7 +384,7 @@ public:
         rct::key nominal_recipient_spendkey;
 
         if (!try_get_jamtis_nominal_spend_key_plain_siphash(derivation,
-            enote_ephemeral_pubkey,
+            m_enote_ephemeral_pubkey,
             m_enote.m_core.m_onetime_address,
             m_enote.m_view_tag,
             sender_receiver_secret_dummy,  //outparam not used

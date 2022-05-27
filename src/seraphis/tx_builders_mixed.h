@@ -56,19 +56,49 @@ namespace sp
 
 /**
 * brief: make_tx_image_proof_message_v1 - message for tx image proofs
-*   - H(crypto project name, version string, output enotes, enote ephemeral pubkeys, memos)
+*   - H(crypto project name, version string, input key images, output enotes, enote ephemeral pubkeys, memos, fee)
 * param: version_string -
+* param: input_key_images -
 * param: output_enotes -
 * param: tx_supplement -
+* param: transaction_fee -
 * outparam: proof_message_out - message to insert in a tx image proof
 */
 void make_tx_image_proof_message_v1(const std::string &version_string,
+    const std::vector<crypto::key_image> &input_key_images,
     const std::vector<SpEnoteV1> &output_enotes,
     const SpTxSupplementV1 &tx_supplement,
+    const rct::xmr_amount transaction_fee,
     rct::key &proof_message_out);
 void make_tx_image_proof_message_v1(const std::string &version_string,
+    const std::vector<crypto::key_image> &input_key_images,
+    const std::vector<SpEnoteV1> &output_enotes,
+    const SpTxSupplementV1 &tx_supplement,
+    const DiscretizedFee &transaction_fee,
+    rct::key &proof_message_out);
+void make_tx_image_proof_message_v1(const std::string &version_string,
+    const std::vector<SpEnoteImageV1> &input_enote_images,
+    const std::vector<SpEnoteV1> &output_enotes,
+    const SpTxSupplementV1 &tx_supplement,
+    const DiscretizedFee &transaction_fee,
+    rct::key &proof_message_out);
+void make_tx_image_proof_message_v1(const std::string &version_string,
+    const std::vector<crypto::key_image> &input_key_images,
     const std::vector<SpOutputProposalV1> &output_proposals,
     const TxExtra &partial_memo,
+    const DiscretizedFee &transaction_fee,
+    rct::key &proof_message_out);
+void make_tx_image_proof_message_v1(const std::string &version_string,
+    const std::vector<SpPartialInputV1> &partial_inputs,
+    const std::vector<SpOutputProposalV1> &output_proposals,
+    const TxExtra &partial_memo,
+    const DiscretizedFee &transaction_fee,
+    rct::key &proof_message_out);
+void make_tx_image_proof_message_v1(const std::string &version_string,
+    const std::vector<SpInputProposalV1> &input_proposals,
+    const std::vector<SpOutputProposalV1> &output_proposals,
+    const TxExtra &partial_memo,
+    const DiscretizedFee &transaction_fee,
     rct::key &proof_message_out);
 /**
 * brief: check_v1_tx_proposal_semantics_v1 - check semantics of a tx proposal

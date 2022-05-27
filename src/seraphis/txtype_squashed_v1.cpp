@@ -462,7 +462,12 @@ bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const Le
     make_versioning_string(tx.m_tx_semantic_rules_version, version_string);
 
     rct::key image_proofs_message;
-    make_tx_image_proof_message_v1(version_string, tx.m_outputs, tx.m_supplement, image_proofs_message);
+    make_tx_image_proof_message_v1(version_string,
+        tx.m_input_images,
+        tx.m_outputs,
+        tx.m_supplement,
+        tx.m_fee,
+        image_proofs_message);
 
     if (!validate_sp_composition_proofs_v1(tx.m_image_proofs, tx.m_input_images, image_proofs_message))
         return false;
@@ -539,7 +544,8 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
 
     // make mock inputs
     // enote, view key stuff, amount, amount blinding factor
-    const std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(spendbase_privkey, in_amounts)};
+    std::vector<SpInputProposalV1> input_proposals{gen_mock_sp_input_proposals_v1(spendbase_privkey, in_amounts)};
+    std::sort(input_proposals.begin(), input_proposals.end());
 
     // make mock outputs
     std::vector<SpOutputProposalV1> output_proposals{
@@ -571,7 +577,12 @@ void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
 
     // proposal prefix
     rct::key proposal_prefix;
-    make_tx_image_proof_message_v1(version_string, output_proposals, partial_memo, proposal_prefix);
+    make_tx_image_proof_message_v1(version_string,
+        input_proposals,
+        output_proposals,
+        partial_memo,
+        tx_fee,
+        proposal_prefix);
 
     // make partial inputs
     std::vector<SpPartialInputV1> partial_inputs;

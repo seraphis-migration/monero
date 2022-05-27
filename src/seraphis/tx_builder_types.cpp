@@ -123,7 +123,12 @@ void SpTxProposalV1::get_proposal_prefix(const std::string &version_string,
     check_v1_output_proposal_set_semantics_v1(output_proposals);
 
     // make the proposal prefix
-    make_tx_image_proof_message_v1(version_string, output_proposals, m_partial_memo, proposal_prefix_out);
+    make_tx_image_proof_message_v1(version_string,
+        m_input_proposals,
+        output_proposals,
+        m_partial_memo,
+        m_tx_fee,
+        proposal_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

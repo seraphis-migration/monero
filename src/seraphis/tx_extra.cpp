@@ -162,7 +162,7 @@ bool try_get_extra_field_elements(const TxExtra &tx_extra, std::vector<ExtraFiel
 void accumulate_extra_field_elements(const std::vector<ExtraFieldElement> &elements_to_add,
     std::vector<ExtraFieldElement> &elements_inout)
 {
-    elements_inout.resize(elements_inout.size() + elements_to_add.size());
+    elements_inout.reserve(elements_inout.size() + elements_to_add.size());
     memcpy(elements_inout.data() + elements_inout.size() - elements_to_add.size(),
         elements_to_add.data(),
         elements_to_add.size());

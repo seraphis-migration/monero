@@ -387,7 +387,12 @@ static void make_sp_txtype_squashed_v1(const std::size_t ref_set_decomp_n,
         image_address_masks[input_index] = input_proposals[input_index].m_core.m_address_mask;
         image_amount_masks[input_index] = input_proposals[input_index].m_core.m_commitment_mask;
     }
-    make_tx_image_proof_message_v1(version_string, outputs, tx_supplement, image_proofs_message);
+    make_tx_image_proof_message_v1(version_string,
+        input_images,
+        outputs,
+        tx_supplement,
+        discretized_transaction_fee,
+        image_proofs_message);
     make_v1_image_proofs_v1(input_proposals,
         image_proofs_message,
         spendbase_privkey,
@@ -1144,8 +1149,7 @@ TEST(seraphis, txtype_squashed_v1)
     }
 
     // set fee
-    sp::DiscretizedFee discretized_transaction_fee;
-    EXPECT_NO_THROW(discretized_transaction_fee = sp::DiscretizedFee{num_ins_outs});
+    const sp::DiscretizedFee discretized_transaction_fee{num_ins_outs};
     rct::xmr_amount real_transaction_fee;
     EXPECT_TRUE(try_get_fee_value(discretized_transaction_fee, real_transaction_fee));
 
