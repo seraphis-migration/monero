@@ -132,8 +132,6 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     const crypto::secret_key &k_view_balance);
 /**
 * brief: make_v1_multisig_tx_proposal_v1 - make a multisig tx proposal
-* param: wallet_spend_pubkey
-* param: k_view_balance -
 * param: normal_payment_proposals -
 * param: selfsend_payment_proposals -
 * param: partial_memo -
@@ -141,17 +139,19 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
 * param: version_string -
 * param: full_input_proposals -
 * param: aggregate_signer_set_filter -
+* param: wallet_spend_pubkey
+* param: k_view_balance -
 * outparam: proposal_out -
 */
-void make_v1_multisig_tx_proposal_v1(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+void make_v1_multisig_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     TxExtra partial_memo,
     const DiscretizedFee &tx_fee,
     std::string version_string,
     std::vector<SpMultisigPublicInputProposalV1> public_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     SpMultisigTxProposalV1 &proposal_out);
 /**
 * brief: check_v1_multisig_input_init_set_semantics_v1 - check semantics of a multisig input initializer set
@@ -184,13 +184,13 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const multisig::signer_set_filter aggregate_signer_set_filter,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputInitSetV1 &input_init_set_out);
-void make_v1_multisig_input_init_set_v1(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const crypto::public_key &signer_id,
+void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers,
     const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const std::string &expected_version_string,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputInitSetV1 &input_init_set_out);
 /**

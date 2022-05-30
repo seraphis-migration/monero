@@ -559,15 +559,15 @@ void check_v1_multisig_tx_proposal_semantics_v1(const SpMultisigTxProposalV1 &mu
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_multisig_tx_proposal_v1(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+void make_v1_multisig_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     TxExtra partial_memo,
     const DiscretizedFee &tx_fee,
     std::string version_string,
     std::vector<SpMultisigPublicInputProposalV1> public_input_proposals,
     const multisig::signer_set_filter aggregate_signer_set_filter,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     SpMultisigTxProposalV1 &proposal_out)
 {
     // convert public input proposals to plain input proposals
@@ -722,13 +722,13 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     check_v1_multisig_input_init_set_semantics_v1(input_init_set_out, threshold, multisig_signers);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_v1_multisig_input_init_set_v1(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const crypto::public_key &signer_id,
+void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers,
     const SpMultisigTxProposalV1 &multisig_tx_proposal,
     const std::string &expected_version_string,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputInitSetV1 &input_init_set_out)
 {

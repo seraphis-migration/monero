@@ -493,15 +493,15 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     std::string version_string;
     make_versioning_string(semantic_rules_version, version_string);
 
-    ASSERT_NO_THROW(make_v1_multisig_tx_proposal_v1(keys.K_1_base,
-        keys.k_vb,
-        std::move(normal_payment_proposals),
+    ASSERT_NO_THROW(make_v1_multisig_tx_proposal_v1(std::move(normal_payment_proposals),
         std::move(selfsend_payment_proposals),
         TxExtra{},
         fee,
         version_string,
         std::move(public_input_proposals),
         aggregate_filter,
+        keys.K_1_base,
+        keys.k_vb,
         multisig_tx_proposal));
 
 
@@ -518,25 +518,25 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
         if (std::find(requested_signers.begin(), requested_signers.end(), signer_index) != requested_signers.end())
         {
-            ASSERT_NO_THROW(make_v1_multisig_input_init_set_v1(keys.K_1_base,
-                keys.k_vb,
-                accounts[signer_index].get_base_pubkey(),
+            ASSERT_NO_THROW(make_v1_multisig_input_init_set_v1(accounts[signer_index].get_base_pubkey(),
                 accounts[signer_index].get_threshold(),
                 accounts[signer_index].get_signers(),
                 multisig_tx_proposal,
                 version_string,
+                keys.K_1_base,
+                keys.k_vb,
                 signer_nonce_records.back(),
                 input_inits.back()));
         }
         else
         {
-            ASSERT_ANY_THROW(make_v1_multisig_input_init_set_v1(keys.K_1_base,
-                keys.k_vb,
-                accounts[signer_index].get_base_pubkey(),
+            ASSERT_ANY_THROW(make_v1_multisig_input_init_set_v1(accounts[signer_index].get_base_pubkey(),
                 accounts[signer_index].get_threshold(),
                 accounts[signer_index].get_signers(),
                 multisig_tx_proposal,
                 version_string,
+                keys.K_1_base,
+                keys.k_vb,
                 signer_nonce_records.back(),
                 input_inits.back()));
         }

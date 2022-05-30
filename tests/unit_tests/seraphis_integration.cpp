@@ -295,11 +295,11 @@ TEST(seraphis_integration, txtype_squashed_v1)
     // h) make the transaction
     SpTxSquashedV1 completed_tx;
 
-    ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(keys_user_A.k_m,
-        keys_user_A.k_vb,
-        tx_proposal,
+    ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(tx_proposal,
         std::move(membership_proof_preps),
         SpTxSquashedV1::SemanticRulesVersion::MOCK,
+        keys_user_A.k_m,
+        keys_user_A.k_vb,
         completed_tx));
 
     ASSERT_TRUE(completed_tx.m_fee == tx_fee_calculator.get_fee(tx_fee_per_weight, completed_tx));

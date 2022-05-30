@@ -239,12 +239,12 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
     make_seraphis_tx_squashed_v1(std::move(partial_tx), std::move(tx_membership_proofs), semantic_rules_version, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_tx_squashed_v1(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const SpTxProposalV1 &tx_proposal,
+void make_seraphis_tx_squashed_v1(const SpTxProposalV1 &tx_proposal,
     std::vector<SpPartialInputV1> partial_inputs,
     std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     SpTxSquashedV1 &tx_out)
 {
     // versioning for proofs
@@ -272,11 +272,11 @@ void make_seraphis_tx_squashed_v1(const rct::key &wallet_spend_pubkey,
         tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
-    const crypto::secret_key &k_view_balance,
-    const SpTxProposalV1 &tx_proposal,
+void make_seraphis_tx_squashed_v1(const SpTxProposalV1 &tx_proposal,
     std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    const crypto::secret_key &spendbase_privkey,
+    const crypto::secret_key &k_view_balance,
     SpTxSquashedV1 &tx_out)
 {
     // versioning for proofs
@@ -297,24 +297,24 @@ void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
     make_seraphis_spendkey(k_view_balance, spendbase_privkey, wallet_spend_pubkey);
 
     // finish tx
-    make_seraphis_tx_squashed_v1(wallet_spend_pubkey,
-        k_view_balance,
-        tx_proposal,
+    make_seraphis_tx_squashed_v1(tx_proposal,
         std::move(partial_inputs),
         std::move(membership_proof_preps),
         semantic_rules_version,
+        wallet_spend_pubkey,
+        k_view_balance,
         tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
-    const crypto::secret_key &k_view_balance,
-    std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+void make_seraphis_tx_squashed_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     const DiscretizedFee &tx_fee,
     std::vector<SpInputProposalV1> input_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
     std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
+    const crypto::secret_key &spendbase_privkey,
+    const crypto::secret_key &k_view_balance,
     SpTxSquashedV1 &tx_out)
 {
     // tx proposal
@@ -327,11 +327,11 @@ void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
         tx_proposal);
 
     // finish tx
-    make_seraphis_tx_squashed_v1(spendbase_privkey,
-        k_view_balance,
-        tx_proposal,
+    make_seraphis_tx_squashed_v1(tx_proposal,
         std::move(membership_proof_preps),
         semantic_rules_version,
+        spendbase_privkey,
+        k_view_balance,
         tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
