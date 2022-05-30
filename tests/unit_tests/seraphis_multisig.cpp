@@ -504,13 +504,6 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         aggregate_filter,
         multisig_tx_proposal));
 
-    ASSERT_NO_THROW(check_v1_multisig_tx_proposal_semantics_v1(multisig_tx_proposal,
-        version_string,
-        accounts[0].get_threshold(),
-        accounts[0].get_signers().size(),
-        keys.K_1_base,
-        keys.k_vb));
-
 
     /// 4) get inits from all requested signers
     std::vector<SpCompositionProofMultisigNonceRecord> signer_nonce_records;
@@ -531,12 +524,9 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
                 accounts[signer_index].get_threshold(),
                 accounts[signer_index].get_signers(),
                 multisig_tx_proposal,
+                version_string,
                 signer_nonce_records.back(),
                 input_inits.back()));
-
-            ASSERT_NO_THROW(check_v1_multisig_input_init_set_semantics_v1(input_inits.back(),
-                accounts[signer_index].get_threshold(),
-                accounts[signer_index].get_signers()));
         }
         else
         {
@@ -546,6 +536,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
                 accounts[signer_index].get_threshold(),
                 accounts[signer_index].get_signers(),
                 multisig_tx_proposal,
+                version_string,
                 signer_nonce_records.back(),
                 input_inits.back()));
         }
@@ -561,22 +552,17 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         {
             ASSERT_NO_THROW(ASSERT_TRUE(try_make_v1_multisig_input_partial_sig_sets_v1(accounts[signer_index],
                 multisig_tx_proposal,
+                version_string,
                 input_inits[signer_index],
                 input_inits,  //don't need to remove the local init (will be filtered out internally)
                 signer_nonce_records[signer_index],
                 input_partial_sigs_per_signer[accounts[signer_index].get_base_pubkey()])));
-
-            for (const SpMultisigInputPartialSigSetV1 &partial_sigs :
-                    input_partial_sigs_per_signer[accounts[signer_index].get_base_pubkey()])
-            {
-                ASSERT_NO_THROW(check_v1_multisig_input_partial_sig_semantics_v1(partial_sigs,
-                    accounts[signer_index].get_signers()));
-            }
         }
         else
         {
             ASSERT_ANY_THROW(try_make_v1_multisig_input_partial_sig_sets_v1(accounts[signer_index],
                 multisig_tx_proposal,
+                version_string,
                 input_inits[signer_index],
                 input_inits,  //don't need to remove the local init (will be filtered out internally)
                 signer_nonce_records[signer_index],
@@ -603,15 +589,14 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     // b) build partial tx
     SpTxProposalV1 tx_proposal;
     multisig_tx_proposal.get_v1_tx_proposal_v1(keys.K_1_base, keys.k_vb, tx_proposal);
-    ASSERT_NO_THROW(check_v1_tx_proposal_semantics_v1(tx_proposal, keys.K_1_base, keys.k_vb));
 
     SpPartialTxV1 partial_tx;
     ASSERT_NO_THROW(make_v1_partial_tx_v1(tx_proposal,
         std::move(partial_inputs),
         version_string,
+        keys.K_1_base,
         keys.k_vb,
         partial_tx));
-    ASSERT_NO_THROW(check_v1_partial_tx_semantics_v1(partial_tx, semantic_rules_version));
 
     // c) add enotes owned by multisig address to the ledger and prepare membership ref sets (one step)
     // note: use ring size 2^2 = 4 for speed

@@ -181,6 +181,7 @@ void make_v1_partial_tx_v1(std::vector<SpPartialInputV1> partial_inputs,
 void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     std::vector<SpPartialInputV1> partial_inputs,
     const std::string &version_string,
+    const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpPartialTxV1 &partial_tx_out);
 

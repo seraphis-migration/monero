@@ -35,14 +35,15 @@
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
 #include "jamtis_core_utils.h"
+#include "jamtis_support_types.h"
 #include "misc_language.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "seraphis/jamtis_support_types.h"
 #include "seraphis_config_temp.h"
+#include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
 #include "tx_builders_inputs.h"
@@ -370,8 +371,11 @@ void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
         "Semantics check tx proposal v1: input proposal key images are not unique.");
 
     // 3. input proposal semantics should be valid
+    rct::key wallet_spend_pubkey_base{wallet_spend_pubkey};
+    reduce_seraphis_spendkey(k_view_balance, wallet_spend_pubkey_base);
+
     for (const SpInputProposalV1 &input_proposal : tx_proposal.m_input_proposals)
-        check_v1_input_proposal_semantics_v1(input_proposal, wallet_spend_pubkey, k_view_balance);
+        check_v1_input_proposal_semantics_v1(input_proposal, wallet_spend_pubkey_base);
 
 
     /// check that amounts balance in the proposal
@@ -505,9 +509,18 @@ void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
     std::vector<SpMembershipProofV1> membership_proofs;
     make_v1_membership_proofs_v1(std::move(membership_proof_preps), membership_proofs);
 
-    // make tx
+    // make tx (use raw constructor instead of partial tx constructor to avoid infinite loop)
     SpTxSquashedV1 test_tx;
-    make_seraphis_tx_squashed_v1(partial_tx, std::move(membership_proofs), semantic_rules_version, test_tx);
+    make_seraphis_tx_squashed_v1(
+        std::move(partial_tx.m_input_images),
+        std::move(partial_tx.m_outputs),
+        std::move(partial_tx.m_balance_proof),
+        std::move(partial_tx.m_image_proofs),
+        std::move(membership_proofs),
+        std::move(partial_tx.m_tx_supplement),
+        partial_tx.m_tx_fee,
+        semantic_rules_version,
+        test_tx);
 
     // validate tx
     CHECK_AND_ASSERT_THROW_MES(validate_tx(test_tx, mock_ledger),
@@ -530,7 +543,13 @@ void make_v1_partial_tx_v1(std::vector<SpPartialInputV1> partial_inputs,
     // 2. sort the outputs by onetime address
     std::sort(output_proposals.begin(), output_proposals.end());
 
-    // 3. extract info from output proposals
+    // 3. semantics checks for inputs and outputs
+    for (const SpPartialInputV1 &partial_input : partial_inputs)
+        check_v1_partial_input_semantics_v1(partial_input);
+
+    check_v1_output_proposal_set_semantics_v1(output_proposals);  //do this after sorting the proposals
+
+    // 4. extract info from output proposals
     std::vector<SpEnoteV1> output_enotes;
     std::vector<rct::xmr_amount> output_amounts;
     std::vector<crypto::secret_key> output_amount_commitment_blinding_factors;
@@ -542,10 +561,10 @@ void make_v1_partial_tx_v1(std::vector<SpPartialInputV1> partial_inputs,
         output_amount_commitment_blinding_factors,
         tx_supplement.m_output_enote_ephemeral_pubkeys);
 
-    // 4. collect full memo
+    // 5. collect full memo
     finalize_tx_extra_v1(partial_memo, output_proposals, tx_supplement.m_tx_extra);
 
-    // 5. check: inputs and proposal must have consistent proposal prefixes
+    // 6. check: inputs and proposal must have consistent proposal prefixes
     rct::key proposal_prefix;
     make_tx_image_proof_message_v1(version_string,
         partial_inputs,
@@ -557,25 +576,25 @@ void make_v1_partial_tx_v1(std::vector<SpPartialInputV1> partial_inputs,
     for (const SpPartialInputV1 &partial_input : partial_inputs)
     {
         CHECK_AND_ASSERT_THROW_MES(proposal_prefix == partial_input.m_proposal_prefix,
-            "making partial tx: a partial input's proposal prefix doesn't match with the tx proposal.");
+            "making partial tx: a partial input's proposal prefix is invalid/inconsistent.");
     }
 
 
     /// balance proof
 
-    // get input amounts and image amount commitment blinding factors
+    // 1. get input amounts and image amount commitment blinding factors
     std::vector<rct::xmr_amount> input_amounts;
     std::vector<crypto::secret_key> input_image_amount_commitment_blinding_factors;
     prepare_input_commitment_factors_for_balance_proof_v1(partial_inputs,
         input_amounts,
         input_image_amount_commitment_blinding_factors);
 
-    // extract the fee
+    // 2. extract the fee
     rct::xmr_amount raw_transaction_fee;
     CHECK_AND_ASSERT_THROW_MES(try_get_fee_value(tx_fee, raw_transaction_fee),
         "making partial tx: could not extract a fee value from the discretized fee.");
 
-    // make balance proof
+    // 3. make balance proof
     make_v1_balance_proof_v1(input_amounts,
         output_amounts,
         raw_transaction_fee,
@@ -586,7 +605,7 @@ void make_v1_partial_tx_v1(std::vector<SpPartialInputV1> partial_inputs,
 
     /// copy misc tx pieces
 
-    // gather tx input parts
+    // 1. gather tx input parts
     partial_tx_out.m_input_images.reserve(partial_inputs.size());
     partial_tx_out.m_image_proofs.reserve(partial_inputs.size());
     partial_tx_out.m_input_enotes.reserve(partial_inputs.size());
@@ -602,7 +621,7 @@ void make_v1_partial_tx_v1(std::vector<SpPartialInputV1> partial_inputs,
         partial_tx_out.m_commitment_masks.emplace_back(partial_input.m_commitment_mask);
     }
 
-    // gather tx output parts
+    // 2. gather tx output parts
     partial_tx_out.m_outputs = std::move(output_enotes);
     partial_tx_out.m_tx_supplement = std::move(tx_supplement);
     partial_tx_out.m_tx_fee = tx_fee;
@@ -611,13 +630,17 @@ void make_v1_partial_tx_v1(std::vector<SpPartialInputV1> partial_inputs,
 void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
     std::vector<SpPartialInputV1> partial_inputs,
     const std::string &version_string,
+    const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpPartialTxV1 &partial_tx_out)
 {
-    // 1. sort the inputs by key image
+    // 1. validate tx proposal
+    check_v1_tx_proposal_semantics_v1(tx_proposal, wallet_spend_pubkey, k_view_balance);
+
+    // 2. sort the inputs by key image
     std::sort(partial_inputs.begin(), partial_inputs.end());
 
-    // 2. partial inputs must line up with input proposals in the tx proposal
+    // 3. partial inputs must line up with input proposals in the tx proposal
     CHECK_AND_ASSERT_THROW_MES(partial_inputs.size() == tx_proposal.m_input_proposals.size(),
         "making partial tx: number of partial inputs doesn't match number of input proposals.");
 
@@ -628,11 +651,11 @@ void make_v1_partial_tx_v1(const SpTxProposalV1 &tx_proposal,
             "making partial tx: partial inputs and input proposals don't line up (inconsistent key images).");
     }
 
-    // 3. extract output proposals from tx proposal
+    // 4. extract output proposals from tx proposal
     std::vector<SpOutputProposalV1> output_proposals;
     tx_proposal.get_output_proposals_v1(k_view_balance, output_proposals);
 
-    // 4. construct partial tx
+    // 5. construct partial tx
     make_v1_partial_tx_v1(std::move(partial_inputs),
         std::move(output_proposals),
         tx_proposal.m_partial_memo,

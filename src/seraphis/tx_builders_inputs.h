@@ -105,8 +105,7 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     std::vector<crypto::secret_key> &blinding_factors_out);
 //todo
 void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposal,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance);
+    const rct::key &wallet_spend_pubkey_base);
 /**
 * brief: make_input_proposal - make the core of an input proposal
 * param: enote_core -
@@ -213,6 +212,8 @@ void make_v1_membership_proofs_v1(std::vector<SpMembershipProofPrepV1> membershi
     std::vector<SpMembershipProofV1> &membership_proofs_out);
 void make_v1_membership_proofs_v1(std::vector<SpMembershipProofPrepV1> membership_proof_preps,
     std::vector<SpAlignableMembershipProofV1> &alignable_membership_proof_out);
+//todo
+void check_v1_partial_input_semantics_v1(const SpPartialInputV1 &partial_input);
 /**
 * brief: make_v1_partial_input_v1 - make a v1 partial input
 * param: input_proposal -

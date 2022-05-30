@@ -78,13 +78,13 @@ void SpInputProposal::get_enote_image_core(SpEnoteImage &image_out) const
     this->get_enote_core(enote_temp);
 
     // Ko' = t_k G + H(Ko,C) Ko
-    make_seraphis_squashed_address_key(enote_temp.m_onetime_address,
-        enote_temp.m_amount_commitment,
-        image_out.m_masked_address);  //H(Ko,C) Ko
-    sp::mask_key(m_address_mask, image_out.m_masked_address, image_out.m_masked_address);  //t_k G + H(Ko,C) Ko
-
     // C' = t_c G + C
-    sp::mask_key(m_commitment_mask, enote_temp.m_amount_commitment, image_out.m_masked_commitment);
+    make_seraphis_enote_image_masked_keys(enote_temp.m_onetime_address,
+        enote_temp.m_amount_commitment,
+        m_address_mask,
+        m_commitment_mask,
+        image_out.m_masked_address,
+        image_out.m_masked_commitment);
 
     // KI = k_b/k_a U
     this->get_key_image(image_out.m_key_image);

@@ -206,6 +206,11 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version,
     SpTxSquashedV1 &tx_out)
 {
+    // check partial tx semantics
+    check_v1_partial_tx_semantics_v1(partial_tx, semantic_rules_version);
+
+    // note: membership proofs cannot be validated without the ledger used to construct them, so there is no check here
+
     // finish tx
     make_seraphis_tx_squashed_v1(
         std::move(partial_tx.m_input_images),
@@ -234,7 +239,8 @@ void make_seraphis_tx_squashed_v1(SpPartialTxV1 partial_tx,
     make_seraphis_tx_squashed_v1(std::move(partial_tx), std::move(tx_membership_proofs), semantic_rules_version, tx_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_seraphis_tx_squashed_v1(const crypto::secret_key &k_view_balance,
+void make_seraphis_tx_squashed_v1(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
     const SpTxProposalV1 &tx_proposal,
     std::vector<SpPartialInputV1> partial_inputs,
     std::vector<SpMembershipProofPrepV1> membership_proof_preps,
@@ -248,10 +254,12 @@ void make_seraphis_tx_squashed_v1(const crypto::secret_key &k_view_balance,
 
     // partial tx
     SpPartialTxV1 partial_tx;
-    make_v1_partial_tx_v1(tx_proposal, std::move(partial_inputs), version_string, k_view_balance, partial_tx);
-
-    // check partial tx semantics
-    check_v1_partial_tx_semantics_v1(partial_tx, semantic_rules_version);
+    make_v1_partial_tx_v1(tx_proposal,
+        std::move(partial_inputs),
+        version_string,
+        wallet_spend_pubkey,
+        k_view_balance,
+        partial_tx);
 
     // membership proofs (assumes the caller prepared to make a membership proof for each input)
     std::vector<SpAlignableMembershipProofV1> alignable_membership_proofs;
@@ -284,8 +292,13 @@ void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
     std::vector<SpPartialInputV1> partial_inputs;
     make_v1_partial_inputs_v1(tx_proposal.m_input_proposals, proposal_prefix, spendbase_privkey, partial_inputs);
 
+    // wallet spend pubkey
+    rct::key wallet_spend_pubkey;
+    make_seraphis_spendkey(k_view_balance, spendbase_privkey, wallet_spend_pubkey);
+
     // finish tx
-    make_seraphis_tx_squashed_v1(k_view_balance,
+    make_seraphis_tx_squashed_v1(wallet_spend_pubkey,
+        k_view_balance,
         tx_proposal,
         std::move(partial_inputs),
         std::move(membership_proof_preps),
@@ -312,12 +325,6 @@ void make_seraphis_tx_squashed_v1(const crypto::secret_key &spendbase_privkey,
         std::move(input_proposals),
         std::move(additional_memo_elements),
         tx_proposal);
-
-    // check tx proposal semantics (e.g. check balance, output rules, etc.)
-    rct::key wallet_spend_pubkey;
-    make_seraphis_spendkey(k_view_balance, spendbase_privkey, wallet_spend_pubkey);
-
-    check_v1_tx_proposal_semantics_v1(tx_proposal, wallet_spend_pubkey, k_view_balance);
 
     // finish tx
     make_seraphis_tx_squashed_v1(spendbase_privkey,

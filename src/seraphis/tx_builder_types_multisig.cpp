@@ -54,15 +54,6 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void SpMultisigPublicInputProposalV1::get_masked_address(rct::key &masked_address_out) const
-{
-    // Ko' = t_k G + H(Ko,C) Ko
-    make_seraphis_squashed_address_key(m_enote.m_core.m_onetime_address,
-        m_enote.m_core.m_amount_commitment,
-        masked_address_out);  //H(Ko,C) Ko
-    sp::mask_key(m_address_mask, masked_address_out, masked_address_out);  //t_k G + H(Ko,C) Ko
-}
-//-------------------------------------------------------------------------------------------------------------------
 void SpMultisigPublicInputProposalV1::get_squash_prefix(crypto::secret_key &squash_prefix_out) const
 {
     // H(Ko,C)

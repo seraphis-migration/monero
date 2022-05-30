@@ -190,6 +190,7 @@ void make_v1_multisig_input_init_set_v1(const rct::key &wallet_spend_pubkey,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers,
     const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::string &expected_version_string,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputInitSetV1 &input_init_set_out);
 /**
@@ -207,6 +208,7 @@ void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputParti
 *   - will only succeed if a partial sig set can be made for each of the inputs found in the multisig tx proposal
 * param: signer_account -
 * param: multisig_tx_proposal -
+* param: expected_version_string -
 * param: local_input_init_set -
 * param: other_input_init_sets -
 * inoutparam: nonce_record_inout -
@@ -215,6 +217,7 @@ void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputParti
 */
 bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_account &signer_account,
     const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::string &expected_version_string,
     const SpMultisigInputInitSetV1 &local_input_init_set,
     std::vector<SpMultisigInputInitSetV1> other_input_init_sets,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,

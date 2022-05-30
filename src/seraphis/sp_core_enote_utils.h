@@ -175,6 +175,20 @@ void make_seraphis_enote_core(const crypto::secret_key &enote_view_privkey,
     const crypto::secret_key &amount_blinding_factor,
     const rct::xmr_amount amount,
     SpEnote &enote_core_out);
-
+/**
+* brief: make_seraphis_enote_image_masked_keys - make the masked keys for a seraphis enote image
+* param: onetime_address -
+* param: amount_commitment -
+* param: address_mask -
+* param: commitment_mask -
+* outparam: masked_address_out -
+* outparam: masked_commitment_out -
+*/
+void make_seraphis_enote_image_masked_keys(const rct::key &onetime_address,
+    const rct::key &amount_commitment,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    rct::key &masked_address_out,
+    rct::key &masked_commitment_out);
 
 } //namespace sp

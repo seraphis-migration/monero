@@ -203,4 +203,19 @@ void make_seraphis_enote_core(const crypto::secret_key &enote_view_privkey,
     make_seraphis_enote_core(enote_view_privkey, spendbase, amount_blinding_factor, amount, enote_core_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_seraphis_enote_image_masked_keys(const rct::key &onetime_address,
+    const rct::key &amount_commitment,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    rct::key &masked_address_out,
+    rct::key &masked_commitment_out)
+{
+    // Ko' = t_k G + H(Ko,C) Ko
+    make_seraphis_squashed_address_key(onetime_address, amount_commitment, masked_address_out);  //H(Ko,C) Ko
+    sp::mask_key(address_mask, masked_address_out, masked_address_out);  //t_k G + H(Ko,C) Ko
+
+    // C' = t_c G + C
+    sp::mask_key(commitment_mask, amount_commitment, masked_commitment_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

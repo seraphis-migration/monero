@@ -281,8 +281,6 @@ TEST(seraphis_integration, txtype_squashed_v1)
         std::vector<ExtraFieldElement>{},
         tx_proposal);
 
-    ASSERT_NO_THROW(check_v1_tx_proposal_semantics_v1(tx_proposal, keys_user_A.K_1_base, keys_user_A.k_vb));
-
     // g) prepare a reference set for the input's membership proof
     std::vector<SpMembershipProofPrepV1> membership_proof_preps;
 

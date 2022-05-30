@@ -99,14 +99,15 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &onetime_address,
 {
     // make binned reference set generator seed from pieces
 
-    // masked address
-    rct::key masked_address;
-    make_seraphis_squashed_address_key(onetime_address, amount_commitment, masked_address);  //H(Ko,C) Ko
-    mask_key(address_mask, masked_address, masked_address);  //K' = t_k G + H(Ko,C) Ko
-
-    // masked commitment
-    rct::key masked_commitment;
-    mask_key(commitment_mask, amount_commitment, masked_commitment);  //C' = t_c G + C
+    // masked address and commitment
+    rct::key masked_address;     //K' = t_k G + H(Ko,C) Ko
+    rct::key masked_commitment;  //C' = t_c G + C
+    make_seraphis_enote_image_masked_keys(onetime_address,
+        amount_commitment,
+        address_mask,
+        commitment_mask,
+        masked_address,
+        masked_commitment);
 
     // finish making the seed
     make_binned_ref_set_generator_seed_v1(masked_address, masked_commitment, generator_seed_out);
@@ -207,13 +208,9 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposal,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance)
+    const rct::key &wallet_spend_pubkey_base)
 {
     // 1. the onetime address must be reproducible
-    rct::key wallet_spend_pubkey_base{wallet_spend_pubkey};
-    reduce_seraphis_spendkey(k_view_balance, wallet_spend_pubkey_base);
-
     rct::key onetime_address_reproduced{wallet_spend_pubkey_base};
     extend_seraphis_spendkey(input_proposal.m_core.m_enote_view_privkey, onetime_address_reproduced);
 
@@ -333,15 +330,16 @@ void make_v1_image_proof_v1(const SpInputProposal &input_proposal,
     input_proposal.get_enote_image_core(input_enote_image_core);
 
     // prepare for proof (squashed enote model): y, z
-    crypto::secret_key y, z;
     crypto::secret_key squash_prefix;
     make_seraphis_squash_prefix(input_enote_core.m_onetime_address,
         input_enote_core.m_amount_commitment,
         squash_prefix);  // H(Ko,C)
 
     // H(Ko,C) (k_{a, recipient} + k_{a, sender})
+    crypto::secret_key y;
     sc_mul(to_bytes(y), to_bytes(squash_prefix), to_bytes(input_proposal.m_enote_view_privkey));
     // H(Ko,C) k_{b, recipient}
+    crypto::secret_key z;
     sc_mul(to_bytes(z), to_bytes(squash_prefix), to_bytes(spendbase_privkey));
 
     // make seraphis composition proof
@@ -524,11 +522,50 @@ void make_v1_membership_proofs_v1(std::vector<SpMembershipProofPrepV1> membershi
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void check_v1_partial_input_semantics_v1(const SpPartialInputV1 &partial_input)
+{
+    // input amount commitment can be reconstructed
+    const rct::key reconstructed_amount_commitment{
+            rct::commit(partial_input.m_input_amount, rct::sk2rct(partial_input.m_input_amount_blinding_factor))
+        };
+
+    CHECK_AND_ASSERT_THROW_MES(reconstructed_amount_commitment == partial_input.m_input_enote_core.m_amount_commitment,
+        "partial input semantics (v1): could not reconstruct amount commitment.");
+
+    // input image masked address and commitment can be reconstructed
+    rct::key reconstructed_masked_address;
+    rct::key reconstructed_masked_commitment;
+    make_seraphis_enote_image_masked_keys(partial_input.m_input_enote_core.m_onetime_address,
+        partial_input.m_input_enote_core.m_amount_commitment,
+        partial_input.m_address_mask,
+        partial_input.m_commitment_mask,
+        reconstructed_masked_address,
+        reconstructed_masked_commitment);
+
+    CHECK_AND_ASSERT_THROW_MES(reconstructed_masked_address == partial_input.m_input_image.m_core.m_masked_address,
+        "partial input semantics (v1): could not reconstruct masked address.");
+    CHECK_AND_ASSERT_THROW_MES(reconstructed_masked_commitment == partial_input.m_input_image.m_core.m_masked_commitment,
+        "partial input semantics (v1): could not reconstruct masked address.");
+
+    // image proof is valid
+    CHECK_AND_ASSERT_THROW_MES(sp_composition_verify(partial_input.m_image_proof.m_composition_proof,
+            partial_input.m_proposal_prefix,
+            reconstructed_masked_address,
+            partial_input.m_input_image.m_core.m_key_image),
+        "partial input semantics (v1): image proof is invalid.");
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_v1_partial_input_v1(const SpInputProposalV1 &input_proposal,
     const rct::key &proposal_prefix,
     const crypto::secret_key &spendbase_privkey,
     SpPartialInputV1 &partial_input_out)
 {
+    // check input proposal semantics
+    rct::key wallet_spend_pubkey_base;
+    make_seraphis_spendbase(spendbase_privkey, wallet_spend_pubkey_base);
+
+    check_v1_input_proposal_semantics_v1(input_proposal, wallet_spend_pubkey_base);
+
     // prepare input image
     input_proposal.get_enote_image_v1(partial_input_out.m_input_image);
 

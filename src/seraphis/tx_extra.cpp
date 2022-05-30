@@ -171,7 +171,7 @@ void accumulate_extra_field_elements(const TxExtra &partial_memo,
 {
     std::vector<ExtraFieldElement> temp_memo_elements;
     CHECK_AND_ASSERT_THROW_MES(try_get_extra_field_elements(partial_memo, temp_memo_elements),
-        "Could not accumultate extra field elements: malformed partial memo.");
+        "Could not accumulate extra field elements: malformed partial memo.");
     accumulate_extra_field_elements(temp_memo_elements, elements_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------

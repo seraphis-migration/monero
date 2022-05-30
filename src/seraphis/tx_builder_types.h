@@ -245,13 +245,4 @@ struct SpPartialTxV1 final
     std::vector<crypto::secret_key> m_commitment_masks;
 };
 
-//todo
-void check_v1_output_proposal_semantics_v1(const SpOutputProposalV1 &output_proposal);
-//todo
-void check_v1_membership_proof_prep_semantics_v1(const SpMembershipProofPrepV1 &reference_set);
-//todo
-void check_v1_alignable_membership_proof_semantics_v1(const SpAlignableMembershipProofV1 &reference_set);
-//todo
-void check_v1_partial_input_semantics_v1(const SpPartialInputV1 &partial_input);
-
 } //namespace sp

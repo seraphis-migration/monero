@@ -728,9 +728,18 @@ void make_v1_multisig_input_init_set_v1(const rct::key &wallet_spend_pubkey,
     const std::uint32_t threshold,
     const std::vector<crypto::public_key> &multisig_signers,
     const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::string &expected_version_string,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputInitSetV1 &input_init_set_out)
 {
+    // validate multisig tx proposal
+    check_v1_multisig_tx_proposal_semantics_v1(multisig_tx_proposal,
+        expected_version_string,
+        threshold,
+        multisig_signers.size(),
+        wallet_spend_pubkey,
+        k_view_balance);
+
     // make multisig input inits from a tx proposal
     CHECK_AND_ASSERT_THROW_MES(multisig_tx_proposal.m_input_proposals.size() > 0,
         "multisig input initializer: no inputs to initialize.");
@@ -774,6 +783,7 @@ void check_v1_multisig_input_partial_sig_semantics_v1(const SpMultisigInputParti
 //-------------------------------------------------------------------------------------------------------------------
 bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_account &signer_account,
     const SpMultisigTxProposalV1 &multisig_tx_proposal,
+    const std::string &expected_version_string,
     const SpMultisigInputInitSetV1 &local_input_init_set,
     std::vector<SpMultisigInputInitSetV1> other_input_init_sets,
     SpCompositionProofMultisigNonceRecord &nonce_record_inout,
@@ -794,7 +804,18 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     rct::key wallet_spend_pubkey{rct::pk2rct(signer_account.get_multisig_pubkey())};
     extend_seraphis_spendkey(k_view_balance, wallet_spend_pubkey);
 
-    // 3. misc. from multisig tx proposal
+    // 3. validate multisig tx proposal
+    // note: this check is effectively redundant because it is called when making the local input init set,
+    //       so validating the local input init set (which was successfully created) with the tx proposal's proposal
+    //       prefix should imply the multisig tx proposal here is valid; but, redundancy is good
+    check_v1_multisig_tx_proposal_semantics_v1(multisig_tx_proposal,
+        expected_version_string,
+        threshold,
+        multisig_signers.size(),
+        wallet_spend_pubkey,
+        k_view_balance);
+
+    // 4. misc. from multisig tx proposal
     SpTxProposalV1 tx_proposal;
     multisig_tx_proposal.get_v1_tx_proposal_v1(wallet_spend_pubkey, k_view_balance, tx_proposal);
 
@@ -813,7 +834,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     for (const SpInputProposalV1 &input_proposal : tx_proposal.m_input_proposals)
         enote_view_privkeys.emplace_back(input_proposal.m_core.m_enote_view_privkey);
 
-    // 4. filter permutations
+    // 5. filter permutations
     std::vector<multisig::signer_set_filter> filter_permutations;
     multisig::aggregate_multisig_signer_set_filter_to_permutations(threshold,
         multisig_signers.size(),
@@ -940,6 +961,9 @@ bool try_make_v1_partial_inputs_v1(const SpMultisigTxProposalV1 &multisig_tx_pro
     std::unordered_map<crypto::public_key, std::vector<SpMultisigInputPartialSigSetV1>> input_partial_sigs_per_signer,
     std::vector<SpPartialInputV1> &partial_inputs_out)
 {
+    // note: do not validate semantics of multisig tx proposal or partial sig sets here, because this function is
+    //       just attempting to combine partial sig sets into partial inputs
+
     // get normal tx proposal
     SpTxProposalV1 tx_proposal;
     multisig_tx_proposal.get_v1_tx_proposal_v1(wallet_spend_pubkey, k_view_balance, tx_proposal);

@@ -69,6 +69,13 @@ enum class OutputProposalSetExtraTypesV1
 };
 
 /**
+* brief: check_v1_output_proposal_semantics_v1 - check semantics of an output proposal
+*   - throws if a check fails
+*   - partial memo should be valid
+* param: output_proposal -
+*/
+void check_v1_output_proposal_semantics_v1(const SpOutputProposalV1 &output_proposal);
+/**
 * brief: check_v1_output_proposal_set_semantics_v1 - check semantics of a set of output proposals
 *   - throws if a check fails
 *   - if 2 proposals, should be 1 unique enote ephemeral pubkey

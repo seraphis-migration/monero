@@ -248,9 +248,21 @@ static void make_additional_output_selfsend_v1(const OutputProposalSetExtraTypes
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+void check_v1_output_proposal_semantics_v1(const SpOutputProposalV1 &output_proposal)
+{
+    std::vector<ExtraFieldElement> additional_memo_elements;
+    CHECK_AND_ASSERT_THROW_MES(try_get_extra_field_elements(output_proposal.m_partial_memo,
+            additional_memo_elements),
+        "output proposal semantics (v1): invalid partial memo.");
+}
+//-------------------------------------------------------------------------------------------------------------------
 void check_v1_output_proposal_set_semantics_v1(const std::vector<SpOutputProposalV1> &output_proposals)
 {
     CHECK_AND_ASSERT_THROW_MES(output_proposals.size() >= 1, "Semantics check output proposals v1: insufficient outputs.");
+
+    // individual output proposals should be internally valid
+    for (const SpOutputProposalV1 &output_proposal : output_proposals)
+        check_v1_output_proposal_semantics_v1(output_proposal);
 
     // if 2 proposals, must be a shared enote ephemeral pubkey
     if (output_proposals.size() == 2)
@@ -263,12 +275,9 @@ void check_v1_output_proposal_set_semantics_v1(const std::vector<SpOutputProposa
     // if >2 proposals, all enote ephemeral pubkeys should be unique
     if (output_proposals.size() > 2)
     {
-        for (auto output_it = output_proposals.begin(); output_it != output_proposals.end(); ++output_it)
-        {
-            CHECK_AND_ASSERT_THROW_MES(ephemeral_pubkeys_are_unique(output_proposals),
-                "Semantics check output proposals v1: there are >2 outputs but their enote ephemeral pubkeys aren't all "
-                "unique.");
-        }
+        CHECK_AND_ASSERT_THROW_MES(ephemeral_pubkeys_are_unique(output_proposals),
+            "Semantics check output proposals v1: there are >2 outputs but their enote ephemeral pubkeys aren't all "
+            "unique.");
     }
 
     // proposals should be sorted
@@ -335,6 +344,9 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
     std::vector<rct::key> &output_enote_ephemeral_pubkeys_out)
 {
+    // output proposal set should be valid
+    check_v1_output_proposal_set_semantics_v1(output_proposals);
+
     // extract tx output information from output proposals
     outputs_out.clear();
     outputs_out.reserve(output_proposals.size());
