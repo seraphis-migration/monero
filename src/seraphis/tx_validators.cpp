@@ -209,9 +209,10 @@ bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &in
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
+bool validate_sp_semantics_layout_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
     const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
+    const std::vector<rct::key> &enote_ephemeral_pubkeys,
     const TxExtra &tx_extra)
 {
     // membership proof binned reference set bins should be sorted (ascending)
@@ -232,6 +233,10 @@ bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &me
     if (!std::is_sorted(outputs.begin(), outputs.end()))
         return false;
     if (std::adjacent_find(outputs.begin(), outputs.end(), equals_from_less{}) != outputs.end())
+        return false;
+
+    // enote ephemeral pubkeys should be unique (they don't need to be sorted)
+    if (!keys_are_unique(enote_ephemeral_pubkeys))
         return false;
 
     // tx extra fields should be in sorted TLV (Type-Length-Value) format

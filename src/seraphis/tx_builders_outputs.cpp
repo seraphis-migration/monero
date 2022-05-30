@@ -291,7 +291,7 @@ void check_v1_output_proposal_set_semantics_v1(const std::vector<SpOutputProposa
 void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, const std::size_t num_outputs)
 {
     // there may be either 1 or 3+ enote pubkeys
-    if (num_outputs == 2)
+    if (num_outputs <= 2)
     {
         CHECK_AND_ASSERT_THROW_MES(tx_supplement.m_output_enote_ephemeral_pubkeys.size() == 1,
             "Semantics check tx supplement v1: there must be 1 enote pubkey if there are 2 outputs.");
@@ -305,14 +305,8 @@ void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, 
     // if 3+ enote pubkeys, all should be unique
     if (tx_supplement.m_output_enote_ephemeral_pubkeys.size() >= 3)
     {
-        for (auto enote_pubkey_it = tx_supplement.m_output_enote_ephemeral_pubkeys.begin();
-            enote_pubkey_it != tx_supplement.m_output_enote_ephemeral_pubkeys.end();
-            ++enote_pubkey_it)
-        {
-            CHECK_AND_ASSERT_THROW_MES(std::find(tx_supplement.m_output_enote_ephemeral_pubkeys.begin(), enote_pubkey_it,
-                    *enote_pubkey_it) == enote_pubkey_it,
-                "Semantics check tx supplement v1: enote pubkeys must be unique.");
-        }
+        CHECK_AND_ASSERT_THROW_MES(keys_are_unique(tx_supplement.m_output_enote_ephemeral_pubkeys),
+            "Semantics check tx supplement v1: enote pubkeys must be unique.");
     }
 
     // enote ephemeral pubkeys should not be zero or identity

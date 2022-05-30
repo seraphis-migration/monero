@@ -319,24 +319,23 @@ void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
     CHECK_AND_ASSERT_THROW_MES(output_enotes.size() >= 2,
         "Semantics check tx proposal v1: there are fewer than 2 outputs.");
 
-    // 4. outputs should be sorted
+    // 4. outputs should be sorted and unique
     CHECK_AND_ASSERT_THROW_MES(std::is_sorted(output_enotes.begin(), output_enotes.end()),
         "Semantics check tx proposal v1: outputs aren't sorted.");
 
-    // 5. outputs should be unique (can use adjacent_find when sorted)
     CHECK_AND_ASSERT_THROW_MES(std::adjacent_find(output_enotes.begin(),
             output_enotes.end(),
             equals_from_less{}) == output_enotes.end(),
         "Semantics check tx proposal v1: output onetime addresses are not all unique.");
 
-    // 6. onetime addresses should be canonical (sanity check so our tx outputs don't have duplicate key images)
+    // 5. onetime addresses should be canonical (sanity check so our tx outputs don't have duplicate key images)
     for (const SpEnoteV1 &output_enote : output_enotes)
     {
         CHECK_AND_ASSERT_THROW_MES(output_enote.m_core.onetime_address_is_canonical(),
             "Semantics check tx proposal v1: an output onetime address is not in the prime subgroup.");
     }
 
-    // 7. check that output amount commitments can be reproduced
+    // 6. check that output amount commitments can be reproduced
     CHECK_AND_ASSERT_THROW_MES(output_enotes.size() == output_amounts.size(),
         "Semantics check tx proposal v1: outputs don't line up with output amounts.");
     CHECK_AND_ASSERT_THROW_MES(output_enotes.size() == output_amount_commitment_blinding_factors.size(),
@@ -350,7 +349,7 @@ void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
             "Semantics check tx proposal v1: could not reproduce an output's amount commitment.");
     }
 
-    // 8. check tx supplement (especially enote ephemeral pubkeys)
+    // 7. check tx supplement (especially enote ephemeral pubkeys)
     check_v1_tx_supplement_semantics_v1(tx_supplement, output_enotes.size());
 
 

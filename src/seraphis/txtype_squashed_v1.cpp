@@ -415,10 +415,11 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
     if (!validate_sp_semantics_input_images_v1(tx.m_input_images))
         return false;
 
-    // validate input images, membershio proof ref sets, outputs, and memo elements are sorted (and memo can be deserialized)
-    if (!validate_sp_semantics_sorting_v1(tx.m_membership_proofs,
+    // validate layout (sorting, uniqueness) of input images, membershio proof ref sets, outputs, and tx supplement
+    if (!validate_sp_semantics_layout_v1(tx.m_membership_proofs,
             tx.m_input_images,
             tx.m_outputs,
+            tx.m_supplement.m_output_enote_ephemeral_pubkeys,
             tx.m_supplement.m_tx_extra))
         return false;
 

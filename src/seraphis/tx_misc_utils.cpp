@@ -49,6 +49,17 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
+bool keys_are_unique(const std::vector<rct::key> &keys)
+{
+    for (auto key_it = keys.begin(); key_it != keys.end(); ++key_it)
+    {
+        if (std::find(keys.begin(), key_it, *key_it) != key_it)
+            return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t round_up_to_power_of_2(const std::size_t num)
 {
     // next power of 2 >= num

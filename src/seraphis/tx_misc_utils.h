@@ -89,6 +89,12 @@ constexpr std::size_t ref_set_size_from_decomp(const std::size_t ref_set_decomp_
     return ref_set_size;
 }
 /**
+* brief: keys_are_unique - check if keys in a vector are unique
+* param: keys -
+* return: true if keys are unique
+*/
+bool keys_are_unique(const std::vector<rct::key> &keys);
+/**
 * brief: round_up_to_power_of_2 - next power of 2 >= the input number
 *   TODO: move to better file?
 * param: num -

@@ -121,22 +121,25 @@ bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetV1 &confi
 */
 bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &input_images);
 /**
-* brief: validate_sp_semantics_sorting_v1 - check tx components are properly sorted
+* brief: validate_sp_semantics_layout_v1 - check tx components have the proper layout
 *   - membership proof binned reference set bins are sorted (ascending)
 *   - input images sorted by key image with byte-wise comparisons (ascending)
 *   - input key images are all unique
 *   - output enotes sorted by onetime addresses with byte-wise comparisons (ascending)
-*   - onetime addresses are all unique (ensures sorting is deterministic)
+*   - onetime addresses are all unique
+*   - enote ephemeral pubkeys are unique
 *   - extra field is in sorted TLV (Type-Length-Value) format
 * param: membership_proofs -
 * param: input_images -
 * param: outputs -
+* param: enote_ephemeral_pubkeys -
 * param: tx_extra -
 * return: true/false on validation result
 */
-bool validate_sp_semantics_sorting_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
+bool validate_sp_semantics_layout_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
     const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
+    const std::vector<rct::key> &enote_ephemeral_pubkeys,
     const TxExtra &tx_extra);
 /**
 * brief: validate_sp_semantics_fee_v1 - check that a discretized fee is a valid fee representation
