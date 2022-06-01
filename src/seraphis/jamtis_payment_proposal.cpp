@@ -231,12 +231,15 @@ void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount,
     make_tx_extra(std::move(memo_elements), m_partial_memo);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_self_send_type(const SpOutputProposalV1 &output_proposal,
+void check_jamtis_payment_proposal_selfsend_semantics_v1(const JamtisPaymentProposalSelfSendV1 &selfsend_payment_proposal,
     const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    JamtisSelfSendType &type_out)
+    const crypto::secret_key &k_view_balance)
 {
+    // convert to an output proposal
+    SpOutputProposalV1 output_proposal;
+    selfsend_payment_proposal.get_output_proposal_v1(k_view_balance, input_context, output_proposal);
+
     // extract enote from output proposal
     SpEnoteV1 temp_enote;
     output_proposal.get_enote_v1(temp_enote);
@@ -244,28 +247,18 @@ bool try_get_self_send_type(const SpOutputProposalV1 &output_proposal,
     // try to get an enote record from the enote (via selfsend path)
     SpEnoteRecordV1 temp_enote_record;
 
-    if (!try_get_enote_record_v1_selfsend(temp_enote,
+    CHECK_AND_ASSERT_THROW_MES(try_get_enote_record_v1_selfsend(temp_enote,
             output_proposal.m_enote_ephemeral_pubkey,
             input_context,
             wallet_spend_pubkey,
             k_view_balance,
-            temp_enote_record))
-        return false;
+            temp_enote_record),
+        "semantics check jamtis self-send payment proposal: failed to extract enote record from the proposal.");
 
     // convert to a self-send type
-    CHECK_AND_ASSERT_THROW_MES(try_get_self_send_type(temp_enote_record.m_type, type_out),
-        "getting jamtis self-send type from output proposal: failed to convert enote type to self-send type (bug).");
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool is_self_send_output_proposal(const SpOutputProposalV1 &output_proposal,
-    const rct::key &input_context,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance)
-{
     JamtisSelfSendType dummy_type;
-    return try_get_self_send_type(output_proposal, input_context, wallet_spend_pubkey, k_view_balance, dummy_type);
+    CHECK_AND_ASSERT_THROW_MES(try_get_jamtis_self_send_type(temp_enote_record.m_type, dummy_type),
+        "semantics check jamtis self-send payment proposal: failed to convert enote type to self-send type (bug).");
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

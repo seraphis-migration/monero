@@ -267,30 +267,15 @@ void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
     }
 
     // 3. all self-send destinations must be owned by the wallet
-
-    // a. convert self-sends to full output proposals
-    // - input context
     rct::key input_context;
     make_standard_input_context_v1(tx_proposal.m_input_proposals, input_context);
 
-    // - output proposals
-    std::vector<SpOutputProposalV1> selfsend_output_proposals;
-    selfsend_output_proposals.reserve(tx_proposal.m_selfsend_payment_proposals.size());
-
-    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment : tx_proposal.m_selfsend_payment_proposals)
+    for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_payment_proposal : tx_proposal.m_selfsend_payment_proposals)
     {
-        selfsend_output_proposals.emplace_back();
-        selfsend_payment.get_output_proposal_v1(k_view_balance, input_context, selfsend_output_proposals.back());
-    }
-
-    // b. check if owned by the wallet
-    for (const SpOutputProposalV1 &selfsend_output_proposal : selfsend_output_proposals)
-    {
-        CHECK_AND_ASSERT_THROW_MES(jamtis::is_self_send_output_proposal(selfsend_output_proposal,
-                input_context,
-                wallet_spend_pubkey,
-                k_view_balance),
-            "Semantics check tx proposal v1: invalid self-send destination (not a destination of this wallet).");
+        check_jamtis_payment_proposal_selfsend_semantics_v1(selfsend_payment_proposal,
+            input_context,
+            wallet_spend_pubkey,
+            k_view_balance);
     }
 
 

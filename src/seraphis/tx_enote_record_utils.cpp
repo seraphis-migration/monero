@@ -441,7 +441,8 @@ bool try_get_enote_record_v1_selfsend_for_type(const SpEnoteV1 &enote,
     record_out.m_enote = enote;
     record_out.m_enote_ephemeral_pubkey = enote_ephemeral_pubkey;
     record_out.m_input_context = input_context;
-    record_out.m_type = jamtis::self_send_type_to_enote_type(expected_type);
+    CHECK_AND_ASSERT_THROW_MES(jamtis::try_get_jamtis_enote_type(expected_type, record_out.m_type),
+        "getting self-send enote record: could not convert expected self-send type to enote type (bug).");
 
     return true;
 }

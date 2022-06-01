@@ -114,11 +114,10 @@ static_assert(
 /// jamtis enote types
 enum class JamtisEnoteType : unsigned char
 {
-    UNKNOWN = 0,
-    PLAIN = 1,
-    DUMMY = 2,
-    CHANGE = 3,
-    SELF_SPEND = 4
+    PLAIN = 0,
+    DUMMY = 1,
+    CHANGE = 2,
+    SELF_SPEND = 3
 };
 
 /// jamtis self-send types, used to define enote-construction procedure for self-sends
@@ -130,8 +129,9 @@ enum class JamtisSelfSendType : unsigned char
     MAX = SELF_SPEND
 };
 
-JamtisEnoteType self_send_type_to_enote_type(const JamtisSelfSendType self_send_type);
-bool try_get_self_send_type(const JamtisEnoteType enote_type, JamtisSelfSendType &self_send_type_out);
+/// convert between jamtis enote types and self-send types
+bool try_get_jamtis_enote_type(const JamtisSelfSendType self_send_type, JamtisEnoteType &enote_type_out);
+bool try_get_jamtis_self_send_type(const JamtisEnoteType enote_type, JamtisSelfSendType &self_send_type_out);
 
 /// jamtis view tags
 using view_tag_t = unsigned char;

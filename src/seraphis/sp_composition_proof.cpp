@@ -321,8 +321,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     ge_dsmp temp_dsmp;
 
     // get K
-    CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&K_p3, K.bytes) == 0,
-        "ge_frombytes_vartime failed!");
+    CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&K_p3, K.bytes) == 0, "ge_frombytes_vartime failed!");
 
     // get K_t1
     rct::scalarmult8(K_t1_p3, proof.K_t1);

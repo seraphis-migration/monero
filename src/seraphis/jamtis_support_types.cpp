@@ -137,18 +137,18 @@ address_tag_t address_tag_t::operator^(const address_tag_t &other_tag) const
     return temp;
 }
 //-------------------------------------------------------------------------------------------------------------------
-JamtisEnoteType self_send_type_to_enote_type(const JamtisSelfSendType self_send_type)
+bool try_get_jamtis_enote_type(const JamtisSelfSendType self_send_type, JamtisEnoteType &enote_type_out)
 {
     switch (self_send_type)
     {
-        case (JamtisSelfSendType::DUMMY)      : return JamtisEnoteType::DUMMY;
-        case (JamtisSelfSendType::CHANGE)     : return JamtisEnoteType::CHANGE;
-        case (JamtisSelfSendType::SELF_SPEND) : return JamtisEnoteType::SELF_SPEND;
-        default                               : return JamtisEnoteType::UNKNOWN;
+        case (JamtisSelfSendType::DUMMY)      : enote_type_out = JamtisEnoteType::DUMMY;      return true;
+        case (JamtisSelfSendType::CHANGE)     : enote_type_out = JamtisEnoteType::CHANGE;     return true;
+        case (JamtisSelfSendType::SELF_SPEND) : enote_type_out = JamtisEnoteType::SELF_SPEND; return true;
+        default                               : return false;
     };
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_self_send_type(const JamtisEnoteType enote_type, JamtisSelfSendType &self_send_type_out)
+bool try_get_jamtis_self_send_type(const JamtisEnoteType enote_type, JamtisSelfSendType &self_send_type_out)
 {
     switch (enote_type)
     {
