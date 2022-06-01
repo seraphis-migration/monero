@@ -146,8 +146,6 @@ struct SpEnoteOriginContextV1 final
 {
     enum class OriginStatus
     {
-        // location unknown
-        UNKNOWN,
         // is only located off-chain
         OFF_CHAIN,
         // is in the tx pool (but not the blockchain)
@@ -167,8 +165,8 @@ struct SpEnoteOriginContextV1 final
     /// ledger index of the enote (-1 if index is unknown)
     std::uint64_t m_enote_ledger_index{static_cast<std::uint64_t>(-1)};
 
-    /// origin status (unknown by default)
-    OriginStatus m_origin_status{OriginStatus::UNKNOWN};
+    /// origin status (off chain by default)
+    OriginStatus m_origin_status{OriginStatus::OFF_CHAIN};
 };
 
 ////
