@@ -56,7 +56,7 @@ namespace sp
 
 /**
 * brief: make_binned_ref_set_generator_seed_v1 - compute a generator seed for making a binned reference set
-*   s = H("domain-sep", Ko', C')
+*   s = H("domain-sep", K', C')
 * param: masked_address -
 * param: masked_commitment -
 * outparam: generator_seed_out -
@@ -103,6 +103,13 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     const std::vector<SpPartialInputV1> &partial_inputs,
     std::vector<rct::xmr_amount> &input_amounts_out,
     std::vector<crypto::secret_key> &blinding_factors_out);
+/**
+* brief: make_input_images_prefix_v1 - hash of enote images (for tx hashes)
+*   - H("domain-sep", {K', C', KI})
+* param: enote_images -
+* outparam: input_images_prefix_out -
+*/
+void make_input_images_prefix_v1(const std::vector<SpEnoteImageV1> &enote_images, rct::key &input_images_prefix_out);
 //todo
 void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposal,
     const rct::key &wallet_spend_pubkey_base);

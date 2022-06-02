@@ -86,7 +86,7 @@ struct SpEnoteV1 final
     /**
     * brief: append_to_string - convert enote to a string and append to existing string
     *   str += Ko || C || enc(a) || view_tag || addr_tag_enc
-    * inoutparam: str_inout - enote contents concatenated to a string
+    * inoutparam: str_inout - contents concatenated to a string
     */
     void append_to_string(std::string &str_inout) const;
 
@@ -116,6 +116,13 @@ struct SpEnoteImageV1 final
         return m_core < other_image.m_core;
     }
 
+    /**
+    * brief: append_to_string - convert enote image to a string and append to existing string
+    *   str += K' || C' || KI
+    * inoutparam: str_inout - contents concatenated to a string
+    */
+    void append_to_string(std::string &str_inout) const;
+
     static std::size_t get_size_bytes() { return SpEnoteImage::get_size_bytes(); }
 };
 
@@ -133,6 +140,13 @@ struct SpMembershipProofV1 final
     std::size_t m_ref_set_decomp_n;
     std::size_t m_ref_set_decomp_m;
 
+    /**
+    * brief: append_to_string - convert membership proof to a string and append to existing string
+    *   str += concise grootle proof || binned reference set || n || m
+    * inoutparam: str_inout - contents concatenated to a string
+    */
+    void append_to_string(std::string &str_inout) const;
+
     /// size of the membership proof (does not include the ref set decomp)
     static std::size_t get_size_bytes(const std::size_t n, const std::size_t m, const std::size_t num_bin_members);
     std::size_t get_size_bytes() const;
@@ -148,6 +162,13 @@ struct SpImageProofV1 final
     /// a seraphis composition proof
     sp::SpCompositionProof m_composition_proof;
 
+    /**
+    * brief: append_to_string - convert image proof to a string and append to existing string
+    *   str += composition proof
+    * inoutparam: str_inout - contents concatenated to a string
+    */
+    void append_to_string(std::string &str_inout) const;
+
     static std::size_t get_size_bytes() { return sp::SpCompositionProof::get_size_bytes(); }
 };
 
@@ -162,6 +183,13 @@ struct SpBalanceProofV1 final
     rct::BulletproofPlus m_bpp_proof;
     /// the remainder blinding factor
     rct::key m_remainder_blinding_factor;
+
+    /**
+    * brief: append_to_string - convert balance proof to a string and append to existing string
+    *   str += bpp proof || remainder blinding factor
+    * inoutparam: str_inout - contents concatenated to a string
+    */
+    void append_to_string(std::string &str_inout) const;
 
     static std::size_t get_size_bytes(const std::size_t num_inputs,
         const std::size_t num_outputs,

@@ -92,6 +92,9 @@ struct SpTxSquashedV1 final
     /// semantic rules version
     SemanticRulesVersion m_tx_semantic_rules_version;
 
+    /// get the tx hash
+    void get_hash(rct::key &tx_hash_out) const;
+
     /// get size of a possible tx
     static std::size_t get_size_bytes(const std::size_t num_inputs,
         const std::size_t num_outputs,

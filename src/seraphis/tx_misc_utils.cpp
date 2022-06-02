@@ -114,6 +114,27 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     range_proofs_out = rct::bulletproof_plus_PROVE(amounts, amount_commitment_blinding_factors);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void append_bpp_to_string(const rct::BulletproofPlus &bpp_proof, std::string &str_inout)
+{
+    // str += {V} || A || A1 || B || r1 || s1 || d1 || {L} || {R}
+
+    // append all proof contents to the string
+    str_inout.reserve(str_inout.size() + bpp_size_bytes(bpp_proof.V.size(), true));
+
+    for (const rct::key &V_single : bpp_proof.V)
+        str_inout.append(reinterpret_cast<const char *>(V_single.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(bpp_proof.A.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(bpp_proof.A1.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(bpp_proof.B.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(bpp_proof.r1.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(bpp_proof.s1.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(bpp_proof.d1.bytes), sizeof(rct::key));
+    for (const rct::key &L_single : bpp_proof.L)
+        str_inout.append(reinterpret_cast<const char *>(L_single.bytes), sizeof(rct::key));
+    for (const rct::key &R_single : bpp_proof.R)
+        str_inout.append(reinterpret_cast<const char *>(R_single.bytes), sizeof(rct::key));
+}
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t bpp_size_bytes(const std::size_t num_range_proofs, const bool include_commitments)
 {
     // BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)

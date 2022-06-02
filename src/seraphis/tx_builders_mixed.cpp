@@ -246,6 +246,29 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
         proof_message_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_tx_proofs_prefix_v1(const SpBalanceProofV1 &balance_proof,
+    const std::vector<SpImageProofV1> &image_proofs,
+    const std::vector<SpMembershipProofV1> &membership_proofs,
+    rct::key &tx_proofs_prefix_out)
+{
+    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1};
+
+    // H("domain-sep", balance proof, image proofs, membership proofs)
+    std::string data;
+    data.reserve(domain_separator.size() +
+        balance_proof.get_size_bytes() +
+        image_proofs.size() * SpImageProofV1::get_size_bytes() +
+        membership_proofs.size() ? membership_proofs.size() * membership_proofs[0].get_size_bytes() : 0);
+    data = domain_separator;
+    balance_proof.append_to_string(data);
+    for (const SpImageProofV1 &image_proof : image_proofs)
+        image_proof.append_to_string(data);
+    for (const SpMembershipProofV1 &membership_proof : membership_proofs)
+        membership_proof.append_to_string(data);
+
+    rct::cn_fast_hash(tx_proofs_prefix_out, data.data(), data.size());
+}
+//-------------------------------------------------------------------------------------------------------------------
 void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance)

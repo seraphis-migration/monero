@@ -101,6 +101,18 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
     const DiscretizedFee &transaction_fee,
     rct::key &proof_message_out);
 /**
+* brief: make_tx_proofs_prefix_v1 - hash of all proofs in a tx (for tx hashes)
+*   - H("domain-sep", balance proof, image proofs, membership proofs)
+* param: balance_proof -
+* param: image_proofs -
+* param: membership_proofs -
+* outparam: tx_proofs_prefix_out -
+*/
+void make_tx_proofs_prefix_v1(const SpBalanceProofV1 &balance_proof,
+    const std::vector<SpImageProofV1> &image_proofs,
+    const std::vector<SpMembershipProofV1> &membership_proofs,
+    rct::key &tx_proofs_prefix_out);
+/**
 * brief: check_v1_tx_proposal_semantics_v1 - check semantics of a tx proposal
 *   - throws if a check fails
 *   - outputs should have unique and canonical onetime addresses

@@ -210,7 +210,7 @@ void make_seraphis_enote_image_masked_keys(const rct::key &onetime_address,
     rct::key &masked_address_out,
     rct::key &masked_commitment_out)
 {
-    // Ko' = t_k G + H(Ko,C) Ko
+    // K' = t_k G + H(Ko,C) Ko
     make_seraphis_squashed_address_key(onetime_address, amount_commitment, masked_address_out);  //H(Ko,C) Ko
     sp::mask_key(address_mask, masked_address_out, masked_address_out);  //t_k G + H(Ko,C) Ko
 

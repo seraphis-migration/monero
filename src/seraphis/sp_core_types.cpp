@@ -71,13 +71,23 @@ void SpEnote::gen()
     m_amount_commitment = rct::pkGen();
 }
 //-------------------------------------------------------------------------------------------------------------------
+void SpEnoteImage::append_to_string(std::string &str_inout) const
+{
+    // append all enote image contents to the string
+    str_inout.reserve(str_inout.size() + get_size_bytes());
+
+    str_inout.append(reinterpret_cast<const char *>(m_masked_address.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(m_masked_commitment.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(to_bytes(m_key_image)), sizeof(crypto::key_image));
+}
+//-------------------------------------------------------------------------------------------------------------------
 void SpInputProposal::get_enote_image_core(SpEnoteImage &image_out) const
 {
     // {Ko, C}
     SpEnote enote_temp;
     this->get_enote_core(enote_temp);
 
-    // Ko' = t_k G + H(Ko,C) Ko
+    // K' = t_k G + H(Ko,C) Ko
     // C' = t_c G + C
     make_seraphis_enote_image_masked_keys(enote_temp.m_onetime_address,
         enote_temp.m_amount_commitment,

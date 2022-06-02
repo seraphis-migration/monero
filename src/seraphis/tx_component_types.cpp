@@ -76,6 +76,25 @@ void SpEnoteV1::gen()
     crypto::rand(sizeof(jamtis::encrypted_address_tag_t), m_addr_tag_enc.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void SpEnoteImageV1::append_to_string(std::string &str_inout) const
+{
+    // append all enote image contents to the string
+    str_inout.reserve(str_inout.size() + get_size_bytes());
+
+    m_core.append_to_string(str_inout);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpMembershipProofV1::append_to_string(std::string &str_inout) const
+{
+    // append all proof contents to the string
+    str_inout.reserve(str_inout.size() + get_size_bytes());
+
+    m_concise_grootle_proof.append_to_string(str_inout);
+    m_binned_reference_set.append_to_string(str_inout);
+    append_uint_to_string(m_ref_set_decomp_n, str_inout);
+    append_uint_to_string(m_ref_set_decomp_m, str_inout);
+}
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t SpMembershipProofV1::get_size_bytes(const std::size_t n, const std::size_t m, const std::size_t num_bin_members)
 {
     const std::size_t ref_set_size{ref_set_size_from_decomp(n, m)};
@@ -89,6 +108,23 @@ std::size_t SpMembershipProofV1::get_size_bytes() const
     return SpMembershipProofV1::get_size_bytes(m_ref_set_decomp_n,
         m_ref_set_decomp_m,
         m_binned_reference_set.m_bin_config.m_num_bin_members);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpImageProofV1::append_to_string(std::string &str_inout) const
+{
+    // append all proof contents to the string
+    str_inout.reserve(str_inout.size() + get_size_bytes());
+
+    m_composition_proof.append_to_string(str_inout);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpBalanceProofV1::append_to_string(std::string &str_inout) const
+{
+    // append all proof contents to the string
+    str_inout.reserve(str_inout.size() + get_size_bytes());
+
+    append_bpp_to_string(m_bpp_proof, str_inout);
+    str_inout.append(reinterpret_cast<const char *>(m_remainder_blinding_factor.bytes), sizeof(rct::key));
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBalanceProofV1::get_size_bytes(const std::size_t num_inputs,

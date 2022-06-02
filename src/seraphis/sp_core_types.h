@@ -79,7 +79,8 @@ struct SpEnote final
 
     /**
     * brief: append_to_string - convert enote to a string and append to existing string (for proof transcripts)
-    * inoutparam: str_inout - enote contents concatenated to a string
+    *   str += Ko || C
+    * inoutparam: str_inout - contents concatenated to a string
     */
     void append_to_string(std::string &str_inout) const;
 
@@ -96,7 +97,7 @@ struct SpEnote final
 ///
 struct SpEnoteImage final
 {
-    /// Ko' = t_k G + H(Ko,C)*[(k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U]   (in the squashed enote model)
+    /// K' = t_k G + H(Ko,C)*[(k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U]   (in the squashed enote model)
     rct::key m_masked_address;
     /// C' = (t_c + x) G + a H
     rct::key m_masked_commitment;
@@ -108,6 +109,13 @@ struct SpEnoteImage final
     {
         return m_key_image < other_image.m_key_image;
     }
+
+    /**
+    * brief: append_to_string - convert enote image to a string and append to existing string
+    *   str += K' || C' || KI
+    * inoutparam: str_inout - contents concatenated to a string
+    */
+    void append_to_string(std::string &str_inout) const;
 
     static std::size_t get_size_bytes() { return 32*3; }
 };

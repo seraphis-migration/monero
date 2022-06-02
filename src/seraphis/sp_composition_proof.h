@@ -125,6 +125,13 @@ struct SpCompositionProof final
     // main proof key K: not stored with proof
     // message m: not stored with proof
 
+    /**
+    * brief: append_to_string - convert composition proof to a string and append to existing string
+    *   str += c || r_t1 || r_t2 || r_ki || K_t1
+    * inoutparam: str_inout - contents concatenated to a string
+    */
+    void append_to_string(std::string &str_inout) const;
+
     static std::size_t get_size_bytes() { return 32*5; }
 };
 

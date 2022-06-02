@@ -278,12 +278,30 @@ static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+void ConciseGrootleProof::append_to_string(std::string &str_inout) const
+{
+    // append proof contents to the string
+    str_inout.reserve(str_inout.size() + get_size_bytes());
+
+    str_inout.append(reinterpret_cast<const char *>(A.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(B.bytes), sizeof(rct::key));
+    for (const rct::keyV &f_layer : f)
+    {
+        for (const rct::key &f_single : f_layer)
+            str_inout.append(reinterpret_cast<const char *>(f_single.bytes), sizeof(rct::key));
+    }
+    for (const rct::key &X_single : X)
+        str_inout.append(reinterpret_cast<const char *>(X_single.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(zA.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(z.bytes), sizeof(rct::key));
+}
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t ConciseGrootleProof::get_size_bytes(const std::size_t n, const std::size_t m)
 {
     return 32 * (m + m*(n-1) + 4);  // X + f + {A, B, zA, z}
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t ConciseGrootleProof::get_size_bytes()
+std::size_t ConciseGrootleProof::get_size_bytes() const
 {
     const std::size_t n{f.size() ? f[0].size() : 0};
     const std::size_t m{X.size()};

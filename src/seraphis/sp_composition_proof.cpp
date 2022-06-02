@@ -213,6 +213,18 @@ static rct::key multisig_binonce_merge_factor(const rct::key &message,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+void SpCompositionProof::append_to_string(std::string &str_inout) const
+{
+    // append proof contents to the string
+    str_inout.reserve(str_inout.size() + get_size_bytes());
+
+    str_inout.append(reinterpret_cast<const char *>(c.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(r_t1.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(r_t2.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(r_ki.bytes), sizeof(rct::key));
+    str_inout.append(reinterpret_cast<const char *>(K_t1.bytes), sizeof(rct::key));
+}
+//-------------------------------------------------------------------------------------------------------------------
 SpCompositionProof sp_composition_prove(const rct::key &message,
     const rct::key &K,
     const crypto::secret_key &x,

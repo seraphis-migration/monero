@@ -80,15 +80,15 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
     // make binned reference set generator seed
     static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_GENERATOR_SEED};
 
-    // seed = H("domain-sep", Ko', C')
-    std::string hash;
-    hash.reserve(domain_separator.size() + 2*sizeof(rct::key));
-    hash = domain_separator;
-    hash.append(reinterpret_cast<const char*>(masked_address.bytes), sizeof(rct::key));
-    hash.append(reinterpret_cast<const char*>(masked_commitment.bytes), sizeof(rct::key));
+    // seed = H("domain-sep", K', C')
+    std::string data;
+    data.reserve(domain_separator.size() + 2*sizeof(rct::key));
+    data = domain_separator;
+    data.append(reinterpret_cast<const char*>(masked_address.bytes), sizeof(rct::key));
+    data.append(reinterpret_cast<const char*>(masked_commitment.bytes), sizeof(rct::key));
 
     // hash to the result
-    rct::cn_fast_hash(generator_seed_out, hash.data(), hash.size());
+    rct::cn_fast_hash(generator_seed_out, data.data(), data.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_binned_ref_set_generator_seed_v1(const rct::key &onetime_address,
@@ -205,6 +205,20 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
         // input amount: a
         input_amounts_out.emplace_back(partial_inputs[input_index].m_input_amount);
     }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_input_images_prefix_v1(const std::vector<SpEnoteImageV1> &enote_images, rct::key &input_images_prefix_out)
+{
+    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_INPUT_IMAGES_PREFIX_V1};
+
+    // input images prefix = H("domain-sep", {K', C', KI})
+    std::string data;
+    data.reserve(domain_separator.size() + enote_images.size()*SpEnoteImageV1::get_size_bytes());
+    data = domain_separator;
+    for (const SpEnoteImageV1 &enote_image : enote_images)
+        enote_image.append_to_string(data);
+
+    rct::cn_fast_hash(input_images_prefix_out, data.data(), data.size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposal,

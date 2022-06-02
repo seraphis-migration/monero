@@ -47,6 +47,9 @@ namespace config
   const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_CHANGE[] = "jamtis_self_send_enote_change";
   const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_SELF_SPEND[] = "jamtis_self_send_enote_self_spend";
 
+  const constexpr char HASH_KEY_SERAPHIS_TRANSACTION[] = "seraphis_transaction";
+  const constexpr char HASH_KEY_SERAPHIS_INPUT_IMAGES_PREFIX_V1[] = "seraphis_input_images_prefix_v1";
+  const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1[] = "seraphis_transaction_proofs_prefix_v1";
   const constexpr char HASH_KEY_GROOTLE_Hi_A[] = "grootle_Hi_A";
   const constexpr char HASH_KEY_GROOTLE_Hi_B[] = "grootle_Hi_B";
   const constexpr char HASH_KEY_BINNED_REF_SET_GENERATOR_SEED[] = "binned_ref_set_generator_seed";

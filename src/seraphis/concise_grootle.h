@@ -85,8 +85,15 @@ struct ConciseGrootleProof
     rct::keyV X;
     rct::key zA, z;
 
+    /**
+    * brief: append_to_string - convert grootle proof to a string and append to existing string
+    *   str += A || B || {f} || {X} || zA || z
+    * inoutparam: str_inout - contents concatenated to a string
+    */
+    void append_to_string(std::string &str_inout) const;
+
     static std::size_t get_size_bytes(const std::size_t n, const std::size_t m);
-    std::size_t get_size_bytes();
+    std::size_t get_size_bytes() const;
 };
 
 
