@@ -32,6 +32,7 @@
 #include "seraphis/mock_ledger_context.h"
 #include "seraphis/tx_base.h"
 #include "seraphis/tx_binned_reference_set.h"
+#include "seraphis/tx_validation_context_mock.h"
 #include "seraphis/txtype_squashed_v1.h"
 
 #include "gtest/gtest.h"
@@ -64,6 +65,7 @@ template <typename SpTxType>
 static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
 {
     sp::MockLedgerContext ledger_context{};
+    const sp::TxValidationContextMock tx_validation_context{ledger_context};
 
     for (const auto &gen : gen_data)
     {
@@ -86,7 +88,7 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
                 tx);
 
             // validate tx
-            EXPECT_TRUE(sp::validate_tx(tx, ledger_context));
+            EXPECT_TRUE(sp::validate_tx(tx, tx_validation_context));
 
             if (gen.test_double_spend)
             {
@@ -95,7 +97,7 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
 
                 // re-validate tx
                 // - should fail now that key images were added to the ledger
-                EXPECT_FALSE(sp::validate_tx(tx, ledger_context));
+                EXPECT_FALSE(sp::validate_tx(tx, tx_validation_context));
             }
         }
         catch (...)
@@ -109,6 +111,7 @@ template <typename SpTxType>
 static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
 {
     sp::MockLedgerContext ledger_context{};
+    const sp::TxValidationContextMock tx_validation_context{ledger_context};
     std::vector<SpTxType> txs_to_verify;
     std::vector<const SpTxType*> txs_to_verify_ptrs;
     txs_to_verify.reserve(gen_data.size());
@@ -148,7 +151,7 @@ static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
     try
     {
         // validate tx
-        EXPECT_TRUE(sp::validate_txs(txs_to_verify_ptrs, ledger_context));
+        EXPECT_TRUE(sp::validate_txs(txs_to_verify_ptrs, tx_validation_context));
     }
     catch (...)
     {

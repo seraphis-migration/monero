@@ -46,7 +46,7 @@
 #include <vector>
 
 //forward declarations
-namespace sp { class LedgerContext; }
+namespace sp { class TxValidationContext; }
 namespace rct { struct pippenger_prep_data; }
 
 
@@ -155,10 +155,11 @@ bool validate_sp_semantics_fee_v1(const DiscretizedFee &discretized_transaction_
 *         check to also check the tx pool
 * TODO: similarly, when appending a block, you could have a derived ledger context that checks for in-block duplicates
 * param: input_images -
-* param: ledger_context -
+* param: tx_validation_context -
 * return: true/false on validation result
 */
-bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images, const LedgerContext &ledger_context);
+bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images,
+    const TxValidationContext &tx_validation_context);
 /**
 * brief: validate_sp_amount_balance_v1 - check that amounts balance in the tx (inputs = outputs)
 *   - check sum(input image masked commitments) == sum(output commitments) + fee*H + remainder*G
@@ -180,12 +181,12 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 *   - get verification data for concise grootle proofs (membership proofs)
 * param: membership_proofs -
 * param: input_images -
-* param: ledger_context -
+* param: tx_validation_context -
 * outparam: validation_data_out -
 */
 bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
-    const LedgerContext &ledger_context,
+    const TxValidationContext &tx_validation_context,
     rct::pippenger_prep_data &validation_data_out);
 /**
 * brief: validate_sp_composition_proofs_v1 - check that spending tx inputs is authorized by their owners,

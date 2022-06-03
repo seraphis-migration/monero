@@ -225,14 +225,15 @@ public:
 private:
     // [message : [filter, nonces]]
     std::unordered_map<
-            rct::key,                                    //message
+        rct::key,                                    //message
+        std::unordered_map<
+            rct::key,                                //proof key
             std::unordered_map<
-                rct::key,                                //proof key
-                std::unordered_map<
-                        multisig::signer_set_filter,     //filter representing a signer group
-                        SpCompositionProofMultisigPrep   //nonces
-                    >
-            >> m_record;
+                multisig::signer_set_filter,     //filter representing a signer group
+                SpCompositionProofMultisigPrep   //nonces
+            >
+        >
+    > m_record;
 };
 
 ////

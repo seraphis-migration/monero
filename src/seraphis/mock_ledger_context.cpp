@@ -51,11 +51,11 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::linking_tag_exists_v1(const crypto::key_image &linking_tag) const
+bool MockLedgerContext::key_image_exists_v1(const crypto::key_image &key_image) const
 {
     std::lock_guard<std::mutex> lock{m_ledger_mutex};
 
-    return linking_tag_exists_v1_impl(linking_tag);
+    return key_image_exists_v1_impl(key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
@@ -88,15 +88,15 @@ bool MockLedgerContext::try_add_transaction_sp_squashed_v1(const SpTxSquashedV1 
 {
     std::lock_guard<std::mutex> lock{m_ledger_mutex};
 
-    // check that linking tags can all be added
+    // check that key images (linking tags) can all be added
     for (const auto &input_image : tx_to_add.m_input_images)
     {
-        if (linking_tag_exists_v1_impl(input_image.m_core.m_key_image))
+        if (key_image_exists_v1_impl(input_image.m_core.m_key_image))
             return false;
     }
-    // add linking tags
+    // add key images
     for (const auto &input_image : tx_to_add.m_input_images)
-        this->add_linking_tag_v1_impl(input_image.m_core.m_key_image);
+        this->add_key_image_v1_impl(input_image.m_core.m_key_image);
 
     // add new enotes
     for (const auto &output_enote : tx_to_add.m_outputs)
@@ -106,14 +106,14 @@ bool MockLedgerContext::try_add_transaction_sp_squashed_v1(const SpTxSquashedV1 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::try_add_linking_tag_v1(const crypto::key_image &linking_tag)
+bool MockLedgerContext::try_add_key_image_v1(const crypto::key_image &key_image)
 {
     std::lock_guard<std::mutex> lock{m_ledger_mutex};
 
-    if (linking_tag_exists_v1_impl(linking_tag))
+    if (key_image_exists_v1_impl(key_image))
         return false;
 
-    add_linking_tag_v1_impl(linking_tag);
+    add_key_image_v1_impl(key_image);
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -124,18 +124,19 @@ std::uint64_t MockLedgerContext::add_enote_v1(const SpEnoteV1 &enote)
     return add_enote_v1_impl(enote);
 }
 //-------------------------------------------------------------------------------------------------------------------
+// internal implementation details
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::linking_tag_exists_v1_impl(const crypto::key_image &linking_tag) const
+bool MockLedgerContext::key_image_exists_v1_impl(const crypto::key_image &key_image) const
 {
-    return m_sp_linking_tags.find(linking_tag) != m_sp_linking_tags.end();
+    return m_sp_key_images.find(key_image) != m_sp_key_images.end();
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::add_linking_tag_v1_impl(const crypto::key_image &linking_tag)
+void MockLedgerContext::add_key_image_v1_impl(const crypto::key_image &key_image)
 {
-    CHECK_AND_ASSERT_THROW_MES(!linking_tag_exists_v1_impl(linking_tag),
-        "Tried to add linking tag that already exists.");  //extra double sanity check
+    CHECK_AND_ASSERT_THROW_MES(!key_image_exists_v1_impl(key_image),
+        "Tried to add key image (linking tag) that already exists.");  //extra double sanity check
 
-    m_sp_linking_tags.insert(linking_tag);
+    m_sp_key_images.insert(key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t MockLedgerContext::add_enote_v1_impl(const SpEnoteV1 &enote)

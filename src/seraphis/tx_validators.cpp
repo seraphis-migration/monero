@@ -34,7 +34,6 @@
 //local headers
 #include "concise_grootle.h"
 #include "crypto/crypto.h"
-#include "ledger_context.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -46,6 +45,7 @@
 #include "tx_discretized_fee.h"
 #include "tx_extra.h"
 #include "tx_misc_utils.h"
+#include "tx_validation_context.h"
 
 //third party headers
 
@@ -256,12 +256,13 @@ bool validate_sp_semantics_fee_v1(const DiscretizedFee &discretized_transaction_
     return try_get_fee_value(discretized_transaction_fee, raw_transaction_fee);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images, const LedgerContext &ledger_context)
+bool validate_sp_linking_tags_v1(const std::vector<SpEnoteImageV1> &input_images,
+    const TxValidationContext &tx_validation_context)
 {
     // check no duplicates in ledger context
     for (std::size_t input_index{0}; input_index < input_images.size(); ++input_index)
     {
-        if (ledger_context.linking_tag_exists_v1(input_images[input_index].m_core.m_key_image))
+        if (tx_validation_context.key_image_exists_v1(input_images[input_index].m_core.m_key_image))
             return false;
     }
 
@@ -318,7 +319,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
-    const LedgerContext &ledger_context,
+    const TxValidationContext &tx_validation_context,
     rct::pippenger_prep_data &validation_data_out)
 {
     std::size_t num_proofs{membership_proofs.size()};
@@ -363,7 +364,7 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
 
         // get proof keys from enotes stored in the ledger
         membership_proof_keys[proof_index].emplace_back();
-        ledger_context.get_reference_set_proof_elements_v1(reference_indices, membership_proof_keys[proof_index][0]);
+        tx_validation_context.get_reference_set_proof_elements_v1(reference_indices, membership_proof_keys[proof_index][0]);
 
         // offset (input image masked keys squashed: Q' = K' + C')
         rct::addKeys(offsets[proof_index][0],

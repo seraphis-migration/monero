@@ -53,11 +53,12 @@
 #include "seraphis/tx_enote_record_types.h"
 #include "seraphis/tx_enote_record_utils.h"
 #include "seraphis/tx_enote_store_mocks.h"
+#include "seraphis/tx_extra.h"
 #include "seraphis/tx_fee_calculator_mocks.h"
 #include "seraphis/tx_input_selection.h"
 #include "seraphis/tx_input_selection_output_context_v1.h"
 #include "seraphis/tx_input_selector_mocks.h"
-#include "seraphis/tx_extra.h"
+#include "seraphis/tx_validation_context_mock.h"
 #include "seraphis/txtype_squashed_v1.h"
 
 #include "gtest/gtest.h"
@@ -627,7 +628,9 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         completed_tx));
 
     // f) verify tx
-    ASSERT_NO_THROW(ASSERT_TRUE(validate_tx(completed_tx, ledger_context)));
+    const TxValidationContextMock tx_validation_context{ledger_context};
+
+    ASSERT_NO_THROW(ASSERT_TRUE(validate_tx(completed_tx, tx_validation_context)));
 
     // - sanity check fee (trivial fee calculator makes this meaningless here)
     //ASSERT_TRUE(completed_tx.m_fee == tx_fee_calculator.get_fee(tx_fee_per_weight, completed_tx));

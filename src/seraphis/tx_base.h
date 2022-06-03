@@ -46,7 +46,7 @@
 namespace rct { using xmr_amount = uint64_t; }
 namespace sp
 {
-    class LedgerContext;
+    class TxValidationContext;
     class MockLedgerContext;
     struct SpTxSquashedV1;
     struct DiscretizedFee;
@@ -70,13 +70,13 @@ unsigned char get_structure_version();
 template <typename SpTxType>
 bool validate_tx_semantics(const SpTxType &tx);
 template <typename SpTxType>
-bool validate_tx_linking_tags(const SpTxType &tx, const LedgerContext &ledger_context);
+bool validate_tx_linking_tags(const SpTxType &tx, const TxValidationContext &tx_validation_context);
 template <typename SpTxType>
 bool validate_tx_amount_balance(const SpTxType &tx);
 template <typename SpTxType>
-bool validate_tx_input_proofs(const SpTxType &tx, const LedgerContext &ledger_context);
+bool validate_tx_input_proofs(const SpTxType &tx, const TxValidationContext &tx_validation_context);
 template <typename SpTxType>
-bool validate_txs_batchable(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context);
+bool validate_txs_batchable(const std::vector<const SpTxType*> &txs, const TxValidationContext &tx_validation_context);
 
 
 //// Versioning
@@ -128,18 +128,18 @@ void make_versioning_string(const unsigned char tx_semantic_rules_version, std::
 /// - note: specialize the following functions with definitions in tx_base.cpp, so the validate_txs_impl() function
 ///         will be explicitly instantiated using the formula written below (this way maliciously injected overloads
 ///         of validate_txs_impl() won't be available to the compiler)
-/// bool validate_tx(const SpTxType &tx, const LedgerContext &ledger_context);
-/// bool validate_txs(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context);
+/// bool validate_tx(const SpTxType &tx, const TxValidationContext &tx_validation_context);
+/// bool validate_txs(const std::vector<const SpTxType*> &txs, const TxValidationContext &tx_validation_context);
 
 /**
 * brief: validate_txs_impl - validate a set of tx (use batching if possible)
 * type: SpTxType - 
 * param: txs -
-* param: ledger_context -
+* param: tx_validation_context -
 * return: true/false on verification result
 */
 template <typename SpTxType>
-bool validate_txs_impl(const std::vector<const SpTxType*> &txs, const LedgerContext &ledger_context)
+bool validate_txs_impl(const std::vector<const SpTxType*> &txs, const TxValidationContext &tx_validation_context)
 {
     try
     {
@@ -152,18 +152,18 @@ bool validate_txs_impl(const std::vector<const SpTxType*> &txs, const LedgerCont
             if (!validate_tx_semantics(*tx))
                 return false;
 
-            if (!validate_tx_linking_tags(*tx, ledger_context))
+            if (!validate_tx_linking_tags(*tx, tx_validation_context))
                 return false;
 
             if (!validate_tx_amount_balance(*tx))
                 return false;
 
-            if (!validate_tx_input_proofs(*tx, ledger_context))
+            if (!validate_tx_input_proofs(*tx, tx_validation_context))
                 return false;
         }
 
         // validate batchable
-        if (!validate_txs_batchable(txs, ledger_context))
+        if (!validate_txs_batchable(txs, tx_validation_context))
             return false;
     }
     catch (...) { return false; }
@@ -172,8 +172,8 @@ bool validate_txs_impl(const std::vector<const SpTxType*> &txs, const LedgerCont
 }
 
 /// SpTxSquashedV1
-bool validate_tx(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context);
-bool validate_txs(const std::vector<const SpTxSquashedV1*> &txs, const LedgerContext &ledger_context);
+bool validate_tx(const SpTxSquashedV1 &tx, const TxValidationContext &tx_validation_context);
+bool validate_txs(const std::vector<const SpTxSquashedV1*> &txs, const TxValidationContext &tx_validation_context);
 
 
 //// mock-ups

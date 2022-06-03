@@ -42,7 +42,6 @@ extern "C"
 #include "seraphis/jamtis_enote_utils.h"
 #include "seraphis/jamtis_payment_proposal.h"
 #include "seraphis/jamtis_support_types.h"
-#include "seraphis/ledger_context.h"
 #include "seraphis/mock_ledger_context.h"
 #include "seraphis/sp_composition_proof.h"
 #include "seraphis/sp_core_enote_utils.h"
@@ -65,6 +64,7 @@ extern "C"
 #include "seraphis/tx_input_selection_output_context_v1.h"
 #include "seraphis/tx_input_selector_mocks.h"
 #include "seraphis/tx_misc_utils.h"
+#include "seraphis/tx_validation_context_mock.h"
 #include "seraphis/txtype_squashed_v1.h"
 
 #include "gtest/gtest.h"
@@ -307,7 +307,9 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
     /// 3] add tx to ledger
     // a) validate tx
-    ASSERT_TRUE(validate_tx(completed_tx, ledger_context));
+    const sp::TxValidationContextMock tx_validation_context{ledger_context};
+
+    ASSERT_TRUE(validate_tx(completed_tx, tx_validation_context));
 
     // b) add the tx to the ledger
     ASSERT_TRUE(try_add_tx_to_ledger<sp::SpTxSquashedV1>(completed_tx, ledger_context));

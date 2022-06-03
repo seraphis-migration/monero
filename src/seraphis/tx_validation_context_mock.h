@@ -28,31 +28,64 @@
 
 // NOT FOR PRODUCTION
 
-//paired header
-#include "tx_base.h"
+// Mock-up of interface for interacting with a context where a tx should be valid (a mock ledger).
 
-//local headers"
+
+#pragma once
+
+//local headers
+#include "crypto/crypto.h"
+#include "mock_ledger_context.h"
+#include "ringct/rctTypes.h"
+#include "tx_validation_context.h"
 
 //third party headers
 
 //standard headers
 #include <vector>
 
-#undef MONERO_DEFAULT_LOG_CATEGORY
-#define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
+//forward declarations
+
 
 namespace sp
 {
-//-------------------------------------------------------------------------------------------------------------------
-bool validate_tx(const SpTxSquashedV1 &tx, const TxValidationContext &tx_validation_context)
+
+class TxValidationContextMock final : public TxValidationContext
 {
-    const std::vector<const SpTxSquashedV1*> tx_ptrs{&tx};
-    return validate_txs_impl<SpTxSquashedV1>(tx_ptrs, tx_validation_context);
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool validate_txs(const std::vector<const SpTxSquashedV1*> &txs, const TxValidationContext &tx_validation_context)
-{
-    return validate_txs_impl<SpTxSquashedV1>(txs, tx_validation_context);
-}
-//-------------------------------------------------------------------------------------------------------------------
+public:
+//constructors
+    TxValidationContextMock(const MockLedgerContext &mock_ledger_context) :
+        m_mock_ledger_context{mock_ledger_context}
+    {}
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [reference wrapper])
+    TxValidationContextMock& operator=(TxValidationContextMock&&) = delete;
+
+//member functions
+    /**
+    * brief: key_image_exists_v1 - checks if a Seraphis key image (linking tag) exists in the mock ledger
+    * param: key_image -
+    * return: true/false on check result
+    */
+    bool key_image_exists_v1(const crypto::key_image &key_image) const override
+    {
+        return m_mock_ledger_context.key_image_exists_v1(key_image);
+    }
+    /**
+    * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the mock ledger
+    * param: indices -
+    * outparam: proof_elements_out - {squashed enote}
+    */
+    void get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
+        rct::keyV &proof_elements_out) const override
+    {
+        return m_mock_ledger_context.get_reference_set_proof_elements_v1(indices, proof_elements_out);
+    }
+
+//member variables
+private:
+    const MockLedgerContext &m_mock_ledger_context;
+};
+
 } //namespace sp

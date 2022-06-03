@@ -34,6 +34,7 @@
 #include "seraphis/mock_ledger_context.h"
 #include "seraphis/tx_binned_reference_set.h"
 #include "seraphis/tx_misc_utils.h"
+#include "seraphis/tx_validation_context_mock.h"
 #include "seraphis/txtype_squashed_v1.h"
 
 #include <iostream>
@@ -322,7 +323,8 @@ public:
     {
         try
         {
-            return sp::validate_txs(m_tx_ptrs, *m_ledger_contex);
+            const sp::TxValidationContextMock tx_validation_context{*m_ledger_contex};
+            return sp::validate_txs(m_tx_ptrs, tx_validation_context);
         }
         catch (...)
         {

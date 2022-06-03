@@ -50,6 +50,7 @@
 #include "tx_builders_outputs.h"
 #include "tx_component_types.h"
 #include "tx_misc_utils.h"
+#include "tx_validation_context_mock.h"
 #include "txtype_squashed_v1.h"
 
 //third party headers
@@ -531,7 +532,9 @@ void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
         test_tx);
 
     // validate tx
-    CHECK_AND_ASSERT_THROW_MES(validate_tx(test_tx, mock_ledger),
+    const TxValidationContextMock tx_validation_context{mock_ledger};
+
+    CHECK_AND_ASSERT_THROW_MES(validate_tx(test_tx, tx_validation_context),
         "v1 partial tx semantics check (v1): test transaction was invalid using requested semantics rules version!");
 }
 //-------------------------------------------------------------------------------------------------------------------

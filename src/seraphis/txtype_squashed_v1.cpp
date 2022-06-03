@@ -34,7 +34,6 @@
 //local headers
 #include "cryptonote_config.h"
 #include "seraphis_config_temp.h"
-#include "ledger_context.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
 #include "ringct/bulletproofs_plus.h"
@@ -51,6 +50,7 @@
 #include "tx_component_types.h"
 #include "tx_discretized_fee.h"
 #include "tx_misc_utils.h"
+#include "tx_validation_context.h"
 #include "tx_validators.h"
 
 //third party headers
@@ -479,10 +479,10 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-bool validate_tx_linking_tags<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context)
+bool validate_tx_linking_tags<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const TxValidationContext &tx_validation_context)
 {
     // unspentness proof (key images not in ledger)
-    if (!validate_sp_linking_tags_v1(tx.m_input_images, ledger_context))
+    if (!validate_sp_linking_tags_v1(tx.m_input_images, tx_validation_context))
         return false;
 
     return true;
@@ -501,7 +501,7 @@ bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
 }
 //-------------------------------------------------------------------------------------------------------------------
 template <>
-bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const LedgerContext &ledger_context)
+bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const TxValidationContext &tx_validation_context)
 {
     // deferred for batching: membership proofs
 
@@ -526,7 +526,7 @@ bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const Le
 //-------------------------------------------------------------------------------------------------------------------
 template <>
 bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashedV1*> &txs,
-    const LedgerContext &ledger_context)
+    const TxValidationContext &tx_validation_context)
 {
     std::vector<const SpMembershipProofV1*> membership_proof_ptrs;
     std::vector<const SpEnoteImage*> input_image_ptrs;
@@ -559,7 +559,7 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
     // membership proofs
     if (!try_get_sp_membership_proofs_v1_validation_data(membership_proof_ptrs,
             input_image_ptrs,
-            ledger_context,
+            tx_validation_context,
             validation_data[0]))
         return false;
 

@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Interface for interacting with a ledger when validating a tx.
+// Interface for interacting with a context where a tx should be valid (e.g. a ledger).
 
 
 #pragma once
@@ -43,69 +43,35 @@
 #include <vector>
 
 //forward declarations
-namespace sp
-{
-    struct SpEnoteV1;
-    struct SpTxSquashedV1;
-}
 
 
 namespace sp
 {
 
-class LedgerContext
+class TxValidationContext
 {
 public:
-    /// default destructor
-    virtual ~LedgerContext() = default;
+//destructor
+    virtual ~TxValidationContext() = default;
+
+//overloaded operators
+    /// disable copy/move (this is a pure virtual base class)
+    TxValidationContext& operator=(TxValidationContext&&) = delete;
+
+//member functions
     /**
-    * brief: linking_tag_exists_v1 - checks if a Seraphis linking tag exists in the ledger
-    * param: linking_tag -
+    * brief: key_image_exists_v1 - checks if a Seraphis key image (linking tag) exists in the validation context
+    * param: key_image -
     * return: true/false on check result
     */
-    virtual bool linking_tag_exists_v1(const crypto::key_image &linking_tag) const = 0;
+    virtual bool key_image_exists_v1(const crypto::key_image &key_image) const = 0;
     /**
-    * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the ledger
+    * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the validation context
     * param: indices -
     * outparam: proof_elements_out - {squashed enote}
     */
     virtual void get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
         rct::keyV &proof_elements_out) const = 0;
-    /**
-    * brief: min_enote_index - lowest index of an enote in the ledger
-    *   TODO: version this somehow?
-    * param: tx_to_add -
-    * return: lowest enote index (defaults to 0 if no enotes)
-    */
-    virtual std::uint64_t min_enote_index() const = 0;
-    /**
-    * brief: max_enote_index - highest index of an enote in the ledger
-    *   TODO: version this somehow?
-    * return: highest enote index (defaults to std::uint64_t::max if no enotes)
-    */
-    virtual std::uint64_t max_enote_index() const = 0;
-    /**
-    * brief: try_add_transaction_sp_squashed_v1 - try to add a SpTxSquashedV1 transaction to the ledger
-    * param: tx_to_add -
-    * return: true if adding tx succeeded
-    */
-    virtual bool try_add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add) = 0;
-    /**
-    * brief: num_enotes - number of enotes in the ledger
-    *   TODO: version this somehow?
-    * return: number of enotes in the ledger
-    */
-    virtual std::uint64_t num_enotes() const final { return max_enote_index() - min_enote_index() + 1; }
 };
-
-template<typename TxType>
-bool try_add_tx_to_ledger(const TxType &tx_to_add, LedgerContext &ledger_context_inout);
-
-template<>
-inline bool try_add_tx_to_ledger<SpTxSquashedV1>(const SpTxSquashedV1 &tx_to_add,
-    LedgerContext &ledger_context_inout)
-{
-    return ledger_context_inout.try_add_transaction_sp_squashed_v1(tx_to_add);
-}
 
 } //namespace sp

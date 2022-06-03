@@ -42,7 +42,6 @@ extern "C"
 #include "seraphis/jamtis_enote_utils.h"
 #include "seraphis/jamtis_payment_proposal.h"
 #include "seraphis/jamtis_support_types.h"
-#include "seraphis/ledger_context.h"
 #include "seraphis/mock_ledger_context.h"
 #include "seraphis/seraphis_config_temp.h"
 #include "seraphis/sp_composition_proof.h"
@@ -63,6 +62,7 @@ extern "C"
 #include "seraphis/tx_extra.h"
 #include "seraphis/tx_misc_utils.h"
 #include "seraphis/tx_ref_set_index_mapper_flat.h"
+#include "seraphis/tx_validation_context_mock.h"
 #include "seraphis/txtype_squashed_v1.h"
 
 #include "boost/multiprecision/cpp_int.hpp"
@@ -1208,13 +1208,15 @@ TEST(seraphis, txtype_squashed_v1)
         tx_ptrs.push_back(&(txs.back()));
     }
 
-    EXPECT_TRUE(sp::validate_txs(tx_ptrs, ledger_context));
+    const sp::TxValidationContextMock tx_validation_context{ledger_context};
+
+    EXPECT_TRUE(sp::validate_txs(tx_ptrs, tx_validation_context));
 
     // insert key images to ledger
     for (const sp::SpTxSquashedV1 &tx : txs)
         EXPECT_TRUE(sp::try_add_tx_to_ledger<sp::SpTxSquashedV1>(tx, ledger_context));
 
     // validation should fail due to double-spend
-    EXPECT_FALSE(sp::validate_txs(tx_ptrs, ledger_context));
+    EXPECT_FALSE(sp::validate_txs(tx_ptrs, tx_validation_context));
 }
 //-------------------------------------------------------------------------------------------------------------------
