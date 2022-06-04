@@ -86,9 +86,9 @@ struct SpTxSquashedV1 final
     /// concise Grootle proofs on squashed enotes: membership for each input
     std::vector<SpMembershipProofV1> m_membership_proofs;
     /// supplemental data for tx
-    SpTxSupplementV1 m_supplement;
+    SpTxSupplementV1 m_tx_supplement;
     /// the transaction fee (discretized representation)
-    DiscretizedFee m_fee;
+    DiscretizedFee m_tx_fee;
 
     /// semantic rules version
     SemanticRulesVersion m_tx_semantic_rules_version;

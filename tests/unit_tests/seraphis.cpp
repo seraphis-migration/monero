@@ -1214,7 +1214,7 @@ TEST(seraphis, txtype_squashed_v1)
 
     // insert key images to ledger
     for (const sp::SpTxSquashedV1 &tx : txs)
-        EXPECT_TRUE(sp::try_add_tx_to_ledger<sp::SpTxSquashedV1>(tx, ledger_context));
+        EXPECT_TRUE(sp::try_add_tx_to_ledger(tx, ledger_context));
 
     // validation should fail due to double-spend
     EXPECT_FALSE(sp::validate_txs(tx_ptrs, tx_validation_context));

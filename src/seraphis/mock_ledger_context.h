@@ -37,6 +37,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "tx_component_types.h"
 
@@ -46,7 +47,6 @@
 #include <map>
 #include <mutex>
 #include <tuple>
-#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -54,6 +54,7 @@
 namespace sp
 {
     struct SpEnoteV1;
+    struct SpPartialTxV1;
     struct SpTxSquashedV1;
 }
 
@@ -63,13 +64,37 @@ namespace sp
 
 class MockLedgerContext final
 {
+    struct sortable_key
+    {
+        unsigned char bytes[32];
+
+        sortable_key() = default;
+        sortable_key(const rct::key &rct_key)
+        {
+            memcpy(bytes, rct_key.bytes, 32);
+        }
+
+        bool operator<(const sortable_key &other) const
+        {
+            return memcmp(bytes, other.bytes, 32) < 0;
+        }
+    };
+
 public:
     /**
-    * brief: key_image_exists_v1 - checks if a Seraphis linking tag (key image) exists in the ledger
+    * brief: get_chain_height - get current chain height
+    *   - returns uint64{-1} if there are no blocks
+    * return: current chain height (num blocks - 1)
+    */
+    std::uint64_t get_chain_height() const;
+    /**
+    * brief: key_image_exists_onchain_v1 - checks if a Seraphis linking tag (key image) exists in the ledger
     * param: key_image -
     * return: true/false on check result
     */
-    bool key_image_exists_v1(const crypto::key_image &key_image) const;
+    bool key_image_exists_offchain_v1(const crypto::key_image &key_image) const;
+    bool key_image_exists_unconfirmed_v1(const crypto::key_image &key_image) const;
+    bool key_image_exists_onchain_v1(const crypto::key_image &key_image) const;
     /**
     * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the ledger
     * param: indices -
@@ -97,41 +122,106 @@ public:
     */
     std::uint64_t num_enotes() const { return max_enote_index() - min_enote_index() + 1; }
     /**
-    * brief: try_add_transaction_sp_squashed_v1 - try to add a SpTxSquashedV1 transaction to the ledger
-    * param: tx_to_add -
-    * return: true if adding tx succeeded
+    * brief: try_add_offchain_partial_tx_v1 - try to add a partial transaction to the 'offchain' tx cache
+    *   - fails if there are key image duplicates with: offchain, unconfirmed, onchain
+    * param: partial_tx -
+    * return: true if adding succeeded
     */
-    bool try_add_transaction_sp_squashed_v1(const SpTxSquashedV1 &tx_to_add);
+    bool try_add_offchain_partial_tx_v1(const SpPartialTxV1 &partial_tx);
     /**
-    * brief: try_add_key_image_v1 - add a Seraphis key image (linking tag) to the ledger
-    * param: key_image -
-    * return: false if linking tag can't be added (duplicate)
+    * brief: try_add_offchain_tx_v1 - try to add a full transaction to the 'offchain' tx cache
+    *   - fails if there are key image duplicates with: offchain, unconfirmed, onchain
+    * param: tx -
+    * return: true if adding succeeded
     */
-    bool try_add_key_image_v1(const crypto::key_image &key_image);
+    bool try_add_offchain_tx_v1(const SpTxSquashedV1 &tx);
     /**
-    * brief: add_enote_v1 - add a Seraphis v1 enote to the ledger (and store the squashed enote)
-    * param: enote -
-    * return: index in the ledger of the enote just added
+    * brief: try_add_unconfirmed_tx_v1 - try to add a full transaction to the 'unconfirmed' tx cache
+    *   - fails if there are key image duplicates with: unconfirmed, onchain
+    *   - auto-removes any offchain entries that have overlapping key images with this tx
+    * param: tx -
+    * return: true if adding succeeded
     */
-    std::uint64_t add_enote_v1(const SpEnoteV1 &enote);
+    bool try_add_unconfirmed_tx_v1(const SpTxSquashedV1 &tx);
+    /**
+    * brief: commit_unconfirmed_cache_v1 - move all unconfirmed txs onto the chain in a new block, with new mock coinbase tx
+    *   - clears the unconfirmed tx cache
+    *   - todo: use a real coinbase tx instead, with height that is expected to match the next block height (try commit)
+    * param: mock_coinbase_input_context -
+    * param: mock_coinbase_tx_supplement -
+    * param: mock_coinbase_output_enotes -
+    * return: block height of newly added block
+    */
+    std::uint64_t commit_unconfirmed_txs_v1(const rct::key &mock_coinbase_input_context,
+        SpTxSupplementV1 mock_coinbase_tx_supplement,
+        std::vector<SpEnoteV1> mock_coinbase_output_enotes);
+    /**
+    * brief: remove_tx_from_offchain_cache - remove a tx or partial tx from the offchain cache
+    * param: input_context - input context of tx/partial tx to remove
+    */
+    void remove_tx_from_offchain_cache(const rct::key &input_context);
+    /**
+    * brief: clear_offchain_cache - remove all data stored in offchain cache
+    */
+    void clear_offchain_cache();
+    /**
+    * brief: remove_tx_from_unconfirmed_cache - remove a tx from the unconfirmed cache
+    * param: tx_id - tx id of tx to remove
+    */
+    void remove_tx_from_unconfirmed_cache(const rct::key &tx_id);
+    /**
+    * brief: clear_unconfirmed_cache - remove all data stored in unconfirmed cache
+    */
+    void clear_unconfirmed_cache();
+    /**
+    * brief: pop_chain_at_height - remove all blocks >= the specified block height from the chain
+    * param: pop_height - first block to pop from the chain
+    * return: number of blocks popped
+    */
+    std::uint64_t pop_chain_at_height(const std::uint64_t pop_height);
+    /**
+    * brief: pop_blocks - remove a specified number of blocks from the chain
+    * param: num_blocks - number of blocks to remove
+    * return: number of blocks popped
+    */
+    std::uint64_t pop_blocks(const std::size_t num_blocks);
 
 private:
     /// implementations of the above, without internally locking the ledger mutex (all expected to be no-fail)
-    bool key_image_exists_v1_impl(const crypto::key_image &key_image) const;
-    void add_key_image_v1_impl(const crypto::key_image &key_image);
-    std::uint64_t add_enote_v1_impl(const SpEnoteV1 &enote);
+    bool key_image_exists_offchain_v1_impl(const crypto::key_image &key_image) const;
+    bool key_image_exists_unconfirmed_v1_impl(const crypto::key_image &key_image) const;
+    bool key_image_exists_onchain_v1_impl(const crypto::key_image &key_image) const;
+    bool try_add_offchain_v1_impl(const std::vector<SpEnoteImageV1> &input_images,
+        const SpTxSupplementV1 &tx_supplement,
+        const std::vector<SpEnoteV1> &output_enotes);
+    bool try_add_offchain_partial_tx_v1_impl(const SpPartialTxV1 &partial_tx);
+    bool try_add_offchain_tx_v1_impl(const SpTxSquashedV1 &tx);
+    bool try_add_unconfirmed_coinbase_v1_impl(const rct::key &tx_id,
+        const rct::key &input_context,
+        SpTxSupplementV1 tx_supplement,
+        std::vector<SpEnoteV1> output_enotes);
+    bool try_add_unconfirmed_tx_v1_impl(const SpTxSquashedV1 &tx);
+    std::uint64_t commit_unconfirmed_txs_v1_impl(const rct::key &mock_coinbase_input_context,
+        SpTxSupplementV1 mock_coinbase_tx_supplement,
+        std::vector<SpEnoteV1> mock_coinbase_output_enotes);
+    void remove_tx_from_offchain_cache_impl(const rct::key &input_context);
+    void clear_offchain_cache_impl();
+    void remove_tx_from_unconfirmed_cache_impl(const rct::key &tx_id);
+    void clear_unconfirmed_cache_impl();
+    std::uint64_t pop_chain_at_height_impl(const std::uint64_t pop_height);
+    std::uint64_t pop_blocks_impl(const std::size_t num_blocks);
 
     /// Ledger mutex (mutable for use in const member functions)
     mutable std::mutex m_ledger_mutex;
 
-/*
+
     //// OFF-CHAIN/OFFLINE FULL/PARTIAL TXs
 
     /// Seraphis key images
     std::unordered_set<crypto::key_image> m_offchain_sp_key_images;
     /// map of tx outputs
     std::map<
-        rct::key,         // input context
+        sortable_key,     // input context
         std::tuple<       // tx output contents
             SpTxSupplementV1,        // tx supplement
             std::vector<SpEnoteV1>   // output enotes
@@ -139,7 +229,7 @@ private:
     > m_offchain_output_contents;
     /// map of tx key images
     std::map<
-        rct::key,   // input context
+        sortable_key,     // input context
         std::vector<crypto::key_image>  // key images in tx
     > m_offchain_tx_key_images;
 
@@ -148,36 +238,46 @@ private:
 
     /// Seraphis key images
     std::unordered_set<crypto::key_image> m_unconfirmed_sp_key_images;
+    /// map of tx key images
+    std::map<
+        sortable_key,     // tx id
+        std::vector<crypto::key_image>  // key images in tx
+    > m_unconfirmed_tx_key_images;
     /// map of tx outputs
     std::map<
-        rct::key,         // tx id
+        sortable_key,     // tx id
         std::tuple<       // tx output contents
             rct::key,                // input context
             SpTxSupplementV1,        // tx supplement
             std::vector<SpEnoteV1>   // output enotes
         >
     > m_unconfirmed_tx_output_contents;
-    /// map of tx key images
-    std::map<
-        rct::key,   // tx id
-        std::vector<crypto::key_image>  // key images in tx
-    > m_unconfirmed_tx_key_images;
 
 
     //// ON-CHAIN BLOCKS & TXs
-*/
+
     /// Seraphis key images
     std::unordered_set<crypto::key_image> m_sp_key_images;
-    /// Seraphis v1 enotes (mapped to output index)
-    std::unordered_map<std::uint64_t, SpEnoteV1> m_sp_enotes;
+    /// map of tx key images
+    std::map<
+        std::uint64_t,      // block height
+        std::map<
+            sortable_key,   // tx id
+            std::vector<crypto::key_image>  // key images in tx
+        >
+    > m_blocks_of_tx_key_images;
     /// Seraphis squashed enotes (mapped to output index)
-    std::unordered_map<std::uint64_t, rct::key> m_sp_squashed_enotes;
-/*
+    std::map<std::uint64_t, rct::key> m_sp_squashed_enotes;
+    /// map of accumulated output counts
+    std::map<
+        std::uint64_t,  // block height
+        std::uint64_t   // total number of enotes including those in this block
+    > m_accumulated_output_counts;
     /// map of tx outputs
     std::map<
         std::uint64_t,        // block height
         std::map<
-            rct::key,         // tx id
+            sortable_key,     // tx id
             std::tuple<       // tx output contents
                 rct::key,                // input context
                 SpTxSupplementV1,        // tx supplement
@@ -185,35 +285,13 @@ private:
             >
         >
     > m_blocks_of_tx_output_contents;
-    /// map of accumulated output counts
-    std::map<
-        std::uint64_t,  // block height
-        std::uint64_t   // total number of enotes including those in this block
-    > m_accumulated_output_counts;
-    /// map of tx key images
-    std::map<
-        std::uint64_t,  // block height
-        std::map<
-            rct::key,   // tx id
-            std::vector<crypto::key_image>  // key images in tx
-        >
-    > m_blocks_of_tx_key_images;
     /// map of block IDs
     std::map<
         std::uint64_t,  // block height
         rct::key        // block ID
     > m_block_ids;
-*/
 };
 
-template<typename TxType>
-bool try_add_tx_to_ledger(const TxType &tx_to_add, MockLedgerContext &ledger_context_inout);
-
-template<>
-inline bool try_add_tx_to_ledger<SpTxSquashedV1>(const SpTxSquashedV1 &tx_to_add,
-    MockLedgerContext &ledger_context_inout)
-{
-    return ledger_context_inout.try_add_transaction_sp_squashed_v1(tx_to_add);
-}
+bool try_add_tx_to_ledger(const SpTxSquashedV1 &tx_to_add, MockLedgerContext &ledger_context_inout);
 
 } //namespace sp

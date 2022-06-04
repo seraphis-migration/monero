@@ -302,7 +302,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
         keys_user_A.k_vb,
         completed_tx));
 
-    ASSERT_TRUE(completed_tx.m_fee == tx_fee_calculator.get_fee(tx_fee_per_weight, completed_tx));
+    ASSERT_TRUE(completed_tx.m_tx_fee == tx_fee_calculator.get_fee(tx_fee_per_weight, completed_tx));
 
 
     /// 3] add tx to ledger
@@ -312,7 +312,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
     ASSERT_TRUE(validate_tx(completed_tx, tx_validation_context));
 
     // b) add the tx to the ledger
-    ASSERT_TRUE(try_add_tx_to_ledger<sp::SpTxSquashedV1>(completed_tx, ledger_context));
+    ASSERT_TRUE(try_add_tx_to_ledger(completed_tx, ledger_context));
 
 
     /// 4] user A finds change output in ledger (TODO)

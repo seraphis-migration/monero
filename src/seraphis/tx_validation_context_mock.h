@@ -70,7 +70,7 @@ public:
     */
     bool key_image_exists_v1(const crypto::key_image &key_image) const override
     {
-        return m_mock_ledger_context.key_image_exists_v1(key_image);
+        return m_mock_ledger_context.key_image_exists_onchain_v1(key_image);
     }
     /**
     * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the mock ledger

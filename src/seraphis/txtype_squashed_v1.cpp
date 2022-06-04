@@ -126,7 +126,7 @@ std::size_t SpTxSquashedV1::get_size_bytes() const
         ref_set_decomp_n,
         ref_set_decomp_m,
         num_bin_members,
-        m_supplement.m_tx_extra);
+        m_tx_supplement.m_tx_extra);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSquashedV1::get_weight(const std::size_t num_inputs,
@@ -176,7 +176,7 @@ std::size_t SpTxSquashedV1::get_weight() const
         ref_set_decomp_n,
         ref_set_decomp_m,
         num_bin_members,
-        m_supplement.m_tx_extra);
+        m_tx_supplement.m_tx_extra);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
@@ -194,8 +194,8 @@ void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
     make_tx_image_proof_message_v1(version_string,
         m_input_images,
         m_outputs,
-        m_supplement,
-        m_fee,
+        m_tx_supplement,
+        m_tx_fee,
         image_proofs_message);
 
     // 2. input images (note: key images are represented in the tx hash twice (image proofs message and input images))
@@ -235,8 +235,8 @@ void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
     tx_out.m_balance_proof = std::move(balance_proof);
     tx_out.m_image_proofs = std::move(image_proofs);
     tx_out.m_membership_proofs = std::move(membership_proofs);
-    tx_out.m_supplement = std::move(tx_supplement);
-    tx_out.m_fee = discretized_transaction_fee;
+    tx_out.m_tx_supplement = std::move(tx_supplement);
+    tx_out.m_tx_fee = discretized_transaction_fee;
     tx_out.m_tx_semantic_rules_version = semantic_rules_version;
 
     CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(tx_out), "Failed to assemble an SpTxSquashedV1.");
@@ -449,7 +449,7 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
             tx.m_membership_proofs.size(),
             tx.m_image_proofs.size(),
             tx.m_outputs.size(),
-            tx.m_supplement.m_output_enote_ephemeral_pubkeys.size(),
+            tx.m_tx_supplement.m_output_enote_ephemeral_pubkeys.size(),
             tx.m_balance_proof.m_bpp_proof.V.size()))
         return false;
 
@@ -467,12 +467,12 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
     if (!validate_sp_semantics_layout_v1(tx.m_membership_proofs,
             tx.m_input_images,
             tx.m_outputs,
-            tx.m_supplement.m_output_enote_ephemeral_pubkeys,
-            tx.m_supplement.m_tx_extra))
+            tx.m_tx_supplement.m_output_enote_ephemeral_pubkeys,
+            tx.m_tx_supplement.m_tx_extra))
         return false;
 
     // validate the tx fee is well-formed
-    if (!validate_sp_semantics_fee_v1(tx.m_fee))
+    if (!validate_sp_semantics_fee_v1(tx.m_tx_fee))
         return false;
 
     return true;
@@ -492,7 +492,7 @@ template <>
 bool validate_tx_amount_balance<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
 {
     // balance proof
-    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, tx.m_fee, tx.m_balance_proof))
+    if (!validate_sp_amount_balance_v1(tx.m_input_images, tx.m_outputs, tx.m_tx_fee, tx.m_balance_proof))
         return false;
 
     // deferred for batching: range proofs
@@ -514,8 +514,8 @@ bool validate_tx_input_proofs<SpTxSquashedV1>(const SpTxSquashedV1 &tx, const Tx
     make_tx_image_proof_message_v1(version_string,
         tx.m_input_images,
         tx.m_outputs,
-        tx.m_supplement,
-        tx.m_fee,
+        tx.m_tx_supplement,
+        tx.m_tx_fee,
         image_proofs_message);
 
     if (!validate_sp_composition_proofs_v1(tx.m_image_proofs, tx.m_input_images, image_proofs_message))

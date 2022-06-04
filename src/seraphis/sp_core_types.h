@@ -62,7 +62,7 @@ struct SpEnote final
     /// less-than operator for sorting
     bool operator<(const SpEnote &other_enote) const
     {
-        return memcmp(&m_onetime_address, &other_enote.m_onetime_address, sizeof(rct::key)) < 0;
+        return memcmp(m_onetime_address.bytes, other_enote.m_onetime_address.bytes, sizeof(rct::key)) < 0;
     }
 
     /// equality operator for direct comparisons
