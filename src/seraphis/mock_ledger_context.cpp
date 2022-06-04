@@ -270,6 +270,9 @@ bool MockLedgerContext::try_add_unconfirmed_coinbase_v1_impl(const rct::key &tx_
     // 2. add tx outputs
     m_unconfirmed_tx_output_contents[tx_id] = {input_context, std::move(tx_supplement), std::move(output_enotes)};
 
+    // 3. clean up off-chain if this tx is found there
+    remove_tx_from_offchain_cache_impl(input_context);
+
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -312,6 +315,9 @@ bool MockLedgerContext::try_add_unconfirmed_tx_v1_impl(const SpTxSquashedV1 &tx)
 
     // 2. add tx outputs
     m_unconfirmed_tx_output_contents[tx_id] = {input_context, tx.m_tx_supplement, tx.m_outputs};
+
+    // 3. clean up off-chain if this tx is found there
+    remove_tx_from_offchain_cache_impl(input_context);
 
     return true;
 }
