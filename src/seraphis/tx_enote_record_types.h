@@ -147,13 +147,11 @@ struct SpEnoteOriginContextV1 final
     enum class OriginStatus
     {
         // is only located off-chain
-        OFF_CHAIN,
+        OFFCHAIN,
         // is in the tx pool (but not the blockchain)
         UNCONFIRMED,
-        // is in the blockchain in a locked block
-        CONFIRMED_LOCKED,
-        // is in the blockchain in an unlocked block
-        CONFIRMED_UNLOCKED
+        // is in the blockchain
+        CONFIRMED
     };
 
     /// associated memo fields (none by default)
@@ -166,7 +164,7 @@ struct SpEnoteOriginContextV1 final
     std::uint64_t m_enote_ledger_index{static_cast<std::uint64_t>(-1)};
 
     /// origin status (off chain by default)
-    OriginStatus m_origin_status{OriginStatus::OFF_CHAIN};
+    OriginStatus m_origin_status{OriginStatus::OFFCHAIN};
 };
 
 ////
@@ -180,13 +178,11 @@ struct SpEnoteSpentContextV1 final
         // has not been spent anywhere
         UNSPENT,
         // is spent in an off-chain tx
-        SPENT_OFF_CHAIN,
+        SPENT_OFFCHAIN,
         // is spent in a tx in the mempool
         SPENT_UNCONFIRMED,
-        // is spent in a locked block
-        SPENT_LOCKED,
-        // is spent in an unlocked block
-        SPENT_UNLOCKED
+        // is spent in the ledger
+        SPENT_ON_CHAIN
     };
 
     /// tx id where it was spent (0 if unspent or tx is unknown)

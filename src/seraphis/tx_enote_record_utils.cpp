@@ -560,22 +560,19 @@ SpEnoteOriginContextV1::OriginStatus origin_status_from_spent_status_v1(
     switch (spent_status)
     {
         case (SpEnoteSpentContextV1::SpentStatus::UNSPENT) :
-            return SpEnoteOriginContextV1::OriginStatus::OFF_CHAIN;
+            return SpEnoteOriginContextV1::OriginStatus::OFFCHAIN;
 
-        case (SpEnoteSpentContextV1::SpentStatus::SPENT_OFF_CHAIN) :
-            return SpEnoteOriginContextV1::OriginStatus::OFF_CHAIN;
+        case (SpEnoteSpentContextV1::SpentStatus::SPENT_OFFCHAIN) :
+            return SpEnoteOriginContextV1::OriginStatus::OFFCHAIN;
 
         case (SpEnoteSpentContextV1::SpentStatus::SPENT_UNCONFIRMED) :
             return SpEnoteOriginContextV1::OriginStatus::UNCONFIRMED;
 
-        case (SpEnoteSpentContextV1::SpentStatus::SPENT_LOCKED) :
-            return SpEnoteOriginContextV1::OriginStatus::CONFIRMED_LOCKED;
-
-        case (SpEnoteSpentContextV1::SpentStatus::SPENT_UNLOCKED) :
-            return SpEnoteOriginContextV1::OriginStatus::CONFIRMED_UNLOCKED;
+        case (SpEnoteSpentContextV1::SpentStatus::SPENT_ON_CHAIN) :
+            return SpEnoteOriginContextV1::OriginStatus::CONFIRMED;
 
         default :
-            return SpEnoteOriginContextV1::OriginStatus::OFF_CHAIN;
+            return SpEnoteOriginContextV1::OriginStatus::OFFCHAIN;
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
