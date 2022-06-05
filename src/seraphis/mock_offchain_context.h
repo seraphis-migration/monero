@@ -77,6 +77,7 @@ class MockOffchainContext final
             return memcmp(bytes, other.bytes, 32) < 0;
         }
     };
+    static const rct::key& sortable2rct(const sortable_key &sortable)  { return reinterpret_cast<const rct::key&>(sortable); }
 
 public:
     /**
@@ -86,14 +87,14 @@ public:
     */
     bool key_image_exists_v1(const crypto::key_image &key_image) const;
     /**
-    * brief: try_add_partial_tx_v1 - try to add a partial transaction to the 'offchain' tx cache
+    * brief: try_add_partial_tx_v1 - try to add a partial transaction to the offchain tx cache
     *   - fails if there are key image duplicates with: offchain, unconfirmed, onchain
     * param: partial_tx -
     * return: true if adding succeeded
     */
     bool try_add_partial_tx_v1(const SpPartialTxV1 &partial_tx);
     /**
-    * brief: try_add_tx_v1 - try to add a full transaction to the 'offchain' tx cache
+    * brief: try_add_tx_v1 - try to add a full transaction to the offchain tx cache
     *   - fails if there are key image duplicates with: offchain, unconfirmed, onchain
     * param: tx -
     * return: true if adding succeeded
@@ -104,6 +105,11 @@ public:
     * param: input_context - input context of tx/partial tx to remove
     */
     void remove_tx_from_cache(const rct::key &input_context);
+    /**
+    * brief: remove_tx_with_key_image_from_cache - remove the tx with a specified key image from the offchain cache
+    * param: key_image - key image in tx/partial tx to remove
+    */
+    void remove_tx_with_key_image_from_cache(const crypto::key_image &key_image);
     /**
     * brief: clear_cache - remove all data stored in offchain cache
     */
@@ -118,6 +124,7 @@ private:
     bool try_add_partial_tx_v1_impl(const SpPartialTxV1 &partial_tx);
     bool try_add_tx_v1_impl(const SpTxSquashedV1 &tx);
     void remove_tx_from_cache_impl(const rct::key &input_context);
+    void remove_tx_with_key_image_from_cache_impl(const crypto::key_image &key_image);
     void clear_cache_impl();
 
     /// context mutex (mutable for use in const member functions)

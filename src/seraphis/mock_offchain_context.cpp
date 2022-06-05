@@ -80,6 +80,13 @@ void MockOffchainContext::remove_tx_from_cache(const rct::key &input_context)
     remove_tx_from_cache_impl(input_context);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void MockOffchainContext::remove_tx_with_key_image_from_cache(const crypto::key_image &key_image)
+{
+    std::lock_guard<std::mutex> lock{m_context_mutex};
+
+    remove_tx_with_key_image_from_cache_impl(key_image);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void MockOffchainContext::clear_cache()
 {
     std::lock_guard<std::mutex> lock{m_context_mutex};
@@ -158,6 +165,25 @@ void MockOffchainContext::remove_tx_from_cache_impl(const rct::key &input_contex
 
     // clear output contents
     m_output_contents.erase(input_context);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void MockOffchainContext::remove_tx_with_key_image_from_cache_impl(const crypto::key_image &key_image)
+{
+    // early return if key image isn't cached
+    if (m_sp_key_images.find(key_image) == m_sp_key_images.end())
+        return;
+
+    // remove the tx that has this key image (there should only be one)
+    auto tx_key_images_search_it = std::find_if(m_tx_key_images.begin(), m_tx_key_images.end(), 
+            [&key_image](const auto &tx_key_images) -> bool
+            {
+                return std::find(tx_key_images.second.begin(), tx_key_images.second.end(), key_image) !=
+                    tx_key_images.second.end();
+            }
+        );
+
+    if (tx_key_images_search_it != m_tx_key_images.end())
+        remove_tx_from_cache_impl(sortable2rct(tx_key_images_search_it->first));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockOffchainContext::clear_cache_impl()

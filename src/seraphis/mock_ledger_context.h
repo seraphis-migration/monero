@@ -52,7 +52,6 @@
 namespace sp
 {
     struct SpEnoteV1;
-    struct SpPartialTxV1;
     struct SpTxSquashedV1;
 }
 
