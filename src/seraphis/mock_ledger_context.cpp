@@ -57,23 +57,16 @@ std::uint64_t MockLedgerContext::get_chain_height() const
     return m_block_ids.size() - 1;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::key_image_exists_offchain_v1(const crypto::key_image &key_image) const
-{
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
-
-    return key_image_exists_offchain_v1_impl(key_image);
-}
-//-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::key_image_exists_unconfirmed_v1(const crypto::key_image &key_image) const
 {
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
+    std::lock_guard<std::mutex> lock{m_context_mutex};
 
     return key_image_exists_unconfirmed_v1_impl(key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::key_image_exists_onchain_v1(const crypto::key_image &key_image) const
 {
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
+    std::lock_guard<std::mutex> lock{m_context_mutex};
 
     return key_image_exists_onchain_v1_impl(key_image);
 }
@@ -81,7 +74,7 @@ bool MockLedgerContext::key_image_exists_onchain_v1(const crypto::key_image &key
 void MockLedgerContext::get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
     rct::keyV &proof_elements_out) const
 {
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
+    std::lock_guard<std::mutex> lock{m_context_mutex};
 
     // gets squashed enotes
     proof_elements_out.clear();
@@ -104,23 +97,9 @@ std::uint64_t MockLedgerContext::max_enote_index() const
     return m_sp_squashed_enotes.size() - 1;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::try_add_offchain_partial_tx_v1(const SpPartialTxV1 &partial_tx)
-{
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
-
-    return try_add_offchain_partial_tx_v1_impl(partial_tx);
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::try_add_offchain_tx_v1(const SpTxSquashedV1 &tx)
-{
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
-
-    return try_add_offchain_tx_v1_impl(tx);
-}
-//-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::try_add_unconfirmed_tx_v1(const SpTxSquashedV1 &tx)
 {
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
+    std::lock_guard<std::mutex> lock{m_context_mutex};
 
     return try_add_unconfirmed_tx_v1_impl(tx);
 }
@@ -129,61 +108,42 @@ std::uint64_t MockLedgerContext::commit_unconfirmed_txs_v1(const rct::key &mock_
     SpTxSupplementV1 mock_coinbase_tx_supplement,
     std::vector<SpEnoteV1> mock_coinbase_output_enotes)
 {
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
+    std::lock_guard<std::mutex> lock{m_context_mutex};
 
     return commit_unconfirmed_txs_v1_impl(mock_coinbase_input_context,
         std::move(mock_coinbase_tx_supplement),
         std::move(mock_coinbase_output_enotes));
 }
 //-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::remove_tx_from_offchain_cache(const rct::key &input_context)
-{
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
-
-    remove_tx_from_offchain_cache_impl(input_context);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::clear_offchain_cache()
-{
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
-
-    clear_offchain_cache_impl();
-}
-//-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::remove_tx_from_unconfirmed_cache(const rct::key &tx_id)
 {
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
+    std::lock_guard<std::mutex> lock{m_context_mutex};
 
     remove_tx_from_unconfirmed_cache_impl(tx_id);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::clear_unconfirmed_cache()
 {
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
+    std::lock_guard<std::mutex> lock{m_context_mutex};
 
     clear_unconfirmed_cache_impl();
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t MockLedgerContext::pop_chain_at_height(const std::uint64_t pop_height)
 {
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
+    std::lock_guard<std::mutex> lock{m_context_mutex};
 
     return pop_chain_at_height_impl(pop_height);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t MockLedgerContext::pop_blocks(const std::size_t num_blocks)
 {
-    std::lock_guard<std::mutex> lock{m_ledger_mutex};
+    std::lock_guard<std::mutex> lock{m_context_mutex};
 
     return pop_blocks_impl(num_blocks);
 }
 //-------------------------------------------------------------------------------------------------------------------
 // internal implementation details
-//-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::key_image_exists_offchain_v1_impl(const crypto::key_image &key_image) const
-{
-    return m_offchain_sp_key_images.find(key_image) != m_offchain_sp_key_images.end();
-}
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::key_image_exists_unconfirmed_v1_impl(const crypto::key_image &key_image) const
 {
@@ -193,59 +153,6 @@ bool MockLedgerContext::key_image_exists_unconfirmed_v1_impl(const crypto::key_i
 bool MockLedgerContext::key_image_exists_onchain_v1_impl(const crypto::key_image &key_image) const
 {
     return m_sp_key_images.find(key_image) != m_sp_key_images.end();
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::try_add_offchain_v1_impl(const std::vector<SpEnoteImageV1> &input_images,
-    const SpTxSupplementV1 &tx_supplement,
-    const std::vector<SpEnoteV1> &output_enotes)
-{
-    /// check failure modes
-
-    // 1. fail if new tx overlaps with cached key images: offchain, unconfirmed, onchain
-    std::vector<crypto::key_image> key_images_collected;
-
-    for (const SpEnoteImageV1 &enote_image : input_images)
-    {
-        if (key_image_exists_offchain_v1_impl(enote_image.m_core.m_key_image) ||
-            key_image_exists_unconfirmed_v1_impl(enote_image.m_core.m_key_image) ||
-            key_image_exists_onchain_v1_impl(enote_image.m_core.m_key_image))
-            return false;
-
-        key_images_collected.emplace_back(enote_image.m_core.m_key_image);
-    }
-
-    rct::key input_context;
-    jamtis::make_jamtis_input_context_standard(key_images_collected, input_context);
-
-    // 2. fail if input context is duplicated (bug since key image check should prevent this)
-    CHECK_AND_ASSERT_THROW_MES(m_offchain_tx_key_images.find(input_context) == m_offchain_tx_key_images.end(),
-        "mock tx ledger (adding offchain tx): input context already exists in key image map (bug).");
-    CHECK_AND_ASSERT_THROW_MES(m_offchain_output_contents.find(input_context) == m_offchain_output_contents.end(),
-        "mock tx ledger (adding offchain tx): input context already exists in output contents map (bug).");
-
-
-    /// update state
-
-    // 1. add key images
-    for (const SpEnoteImageV1 &enote_image : input_images)
-        m_offchain_sp_key_images.insert(enote_image.m_core.m_key_image);
-
-    m_offchain_tx_key_images[input_context] = std::move(key_images_collected);
-
-    // 2. add tx outputs
-    m_offchain_output_contents[input_context] = {tx_supplement, output_enotes};
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::try_add_offchain_partial_tx_v1_impl(const SpPartialTxV1 &partial_tx)
-{
-    return try_add_offchain_v1_impl(partial_tx.m_input_images, partial_tx.m_tx_supplement, partial_tx.m_outputs);
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::try_add_offchain_tx_v1_impl(const SpTxSquashedV1 &tx)
-{
-    return try_add_offchain_v1_impl(tx.m_input_images, tx.m_tx_supplement, tx.m_outputs);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::try_add_unconfirmed_coinbase_v1_impl(const rct::key &tx_id,
@@ -269,9 +176,6 @@ bool MockLedgerContext::try_add_unconfirmed_coinbase_v1_impl(const rct::key &tx_
 
     // 2. add tx outputs
     m_unconfirmed_tx_output_contents[tx_id] = {input_context, std::move(tx_supplement), std::move(output_enotes)};
-
-    // 3. clean up off-chain if this tx is found there
-    remove_tx_from_offchain_cache_impl(input_context);
 
     return true;
 }
@@ -315,9 +219,6 @@ bool MockLedgerContext::try_add_unconfirmed_tx_v1_impl(const SpTxSquashedV1 &tx)
 
     // 2. add tx outputs
     m_unconfirmed_tx_output_contents[tx_id] = {input_context, tx.m_tx_supplement, tx.m_outputs};
-
-    // 3. clean up off-chain if this tx is found there
-    remove_tx_from_offchain_cache_impl(input_context);
 
     return true;
 }
@@ -418,28 +319,6 @@ std::uint64_t MockLedgerContext::commit_unconfirmed_txs_v1_impl(const rct::key &
     clear_unconfirmed_cache_impl();
 
     return new_height;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::remove_tx_from_offchain_cache_impl(const rct::key &input_context)
-{
-    // clear key images
-    if (m_offchain_tx_key_images.find(input_context) != m_offchain_tx_key_images.end())
-    {
-        for (const crypto::key_image &key_image : m_offchain_tx_key_images[input_context])
-            m_offchain_sp_key_images.erase(key_image);
-
-        m_offchain_tx_key_images.erase(input_context);
-    }
-
-    // clear output contents
-    m_offchain_output_contents.erase(input_context);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void MockLedgerContext::clear_offchain_cache_impl()
-{
-    m_offchain_sp_key_images.clear();
-    m_offchain_output_contents.clear();
-    m_offchain_tx_key_images.clear();
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::remove_tx_from_unconfirmed_cache_impl(const rct::key &tx_id)

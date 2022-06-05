@@ -1,0 +1,170 @@
+// Copyright (c) 2021, The Monero Project
+//
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without modification, are
+// permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this list of
+//    conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice, this list
+//    of conditions and the following disclaimer in the documentation and/or other
+//    materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its contributors may be
+//    used to endorse or promote products derived from this software without specific
+//    prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+// THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+// THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+// NOT FOR PRODUCTION
+
+//paired header
+#include "mock_offchain_context.h"
+
+//local headers
+#include "crypto/crypto.h"
+#include "jamtis_enote_utils.h"
+#include "misc_log_ex.h"
+#include "ringct/rctTypes.h"
+#include "sp_core_enote_utils.h"
+#include "tx_component_types.h"
+#include "txtype_squashed_v1.h"
+
+//third party headers
+
+//standard headers
+#include <mutex>
+#include <vector>
+
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
+
+namespace sp
+{
+//-------------------------------------------------------------------------------------------------------------------
+bool MockOffchainContext::key_image_exists_v1(const crypto::key_image &key_image) const
+{
+    std::lock_guard<std::mutex> lock{m_context_mutex};
+
+    return key_image_exists_v1_impl(key_image);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool MockOffchainContext::try_add_partial_tx_v1(const SpPartialTxV1 &partial_tx)
+{
+    std::lock_guard<std::mutex> lock{m_context_mutex};
+
+    return try_add_partial_tx_v1_impl(partial_tx);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool MockOffchainContext::try_add_tx_v1(const SpTxSquashedV1 &tx)
+{
+    std::lock_guard<std::mutex> lock{m_context_mutex};
+
+    return try_add_tx_v1_impl(tx);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void MockOffchainContext::remove_tx_from_cache(const rct::key &input_context)
+{
+    std::lock_guard<std::mutex> lock{m_context_mutex};
+
+    remove_tx_from_cache_impl(input_context);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void MockOffchainContext::clear_cache()
+{
+    std::lock_guard<std::mutex> lock{m_context_mutex};
+
+    clear_cache_impl();
+}
+//-------------------------------------------------------------------------------------------------------------------
+// internal implementation details
+//-------------------------------------------------------------------------------------------------------------------
+bool MockOffchainContext::key_image_exists_v1_impl(const crypto::key_image &key_image) const
+{
+    return m_sp_key_images.find(key_image) != m_sp_key_images.end();
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool MockOffchainContext::try_add_v1_impl(const std::vector<SpEnoteImageV1> &input_images,
+    const SpTxSupplementV1 &tx_supplement,
+    const std::vector<SpEnoteV1> &output_enotes)
+{
+    /// check failure modes
+
+    // 1. fail if new tx overlaps with cached key images: offchain, unconfirmed, onchain
+    std::vector<crypto::key_image> key_images_collected;
+
+    for (const SpEnoteImageV1 &enote_image : input_images)
+    {
+        if (key_image_exists_v1_impl(enote_image.m_core.m_key_image))
+            return false;
+
+        key_images_collected.emplace_back(enote_image.m_core.m_key_image);
+    }
+
+    rct::key input_context;
+    jamtis::make_jamtis_input_context_standard(key_images_collected, input_context);
+
+    // 2. fail if input context is duplicated (bug since key image check should prevent this)
+    CHECK_AND_ASSERT_THROW_MES(m_tx_key_images.find(input_context) == m_tx_key_images.end(),
+        "mock tx ledger (adding offchain tx): input context already exists in key image map (bug).");
+    CHECK_AND_ASSERT_THROW_MES(m_output_contents.find(input_context) == m_output_contents.end(),
+        "mock tx ledger (adding offchain tx): input context already exists in output contents map (bug).");
+
+
+    /// update state
+
+    // 1. add key images
+    for (const SpEnoteImageV1 &enote_image : input_images)
+        m_sp_key_images.insert(enote_image.m_core.m_key_image);
+
+    m_tx_key_images[input_context] = std::move(key_images_collected);
+
+    // 2. add tx outputs
+    m_output_contents[input_context] = {tx_supplement, output_enotes};
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool MockOffchainContext::try_add_partial_tx_v1_impl(const SpPartialTxV1 &partial_tx)
+{
+    return try_add_v1_impl(partial_tx.m_input_images, partial_tx.m_tx_supplement, partial_tx.m_outputs);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool MockOffchainContext::try_add_tx_v1_impl(const SpTxSquashedV1 &tx)
+{
+    return try_add_v1_impl(tx.m_input_images, tx.m_tx_supplement, tx.m_outputs);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void MockOffchainContext::remove_tx_from_cache_impl(const rct::key &input_context)
+{
+    // clear key images
+    if (m_tx_key_images.find(input_context) != m_tx_key_images.end())
+    {
+        for (const crypto::key_image &key_image : m_tx_key_images[input_context])
+            m_sp_key_images.erase(key_image);
+
+        m_tx_key_images.erase(input_context);
+    }
+
+    // clear output contents
+    m_output_contents.erase(input_context);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void MockOffchainContext::clear_cache_impl()
+{
+    m_sp_key_images.clear();
+    m_output_contents.clear();
+    m_tx_key_images.clear();
+}
+//-------------------------------------------------------------------------------------------------------------------
+} //namespace sp

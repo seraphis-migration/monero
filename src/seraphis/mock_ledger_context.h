@@ -29,8 +29,6 @@
 // NOT FOR PRODUCTION
 
 // Mock ledger context: for testing
-// note: In a real ledger, new enotes and new linking tags from a tx must be committed in ONE atomic operation. Otherwise,
-//       the order of linking tags and enotes may be misaligned.
 
 
 #pragma once
@@ -122,20 +120,6 @@ public:
     */
     std::uint64_t num_enotes() const { return max_enote_index() - min_enote_index() + 1; }
     /**
-    * brief: try_add_offchain_partial_tx_v1 - try to add a partial transaction to the 'offchain' tx cache
-    *   - fails if there are key image duplicates with: offchain, unconfirmed, onchain
-    * param: partial_tx -
-    * return: true if adding succeeded
-    */
-    bool try_add_offchain_partial_tx_v1(const SpPartialTxV1 &partial_tx);
-    /**
-    * brief: try_add_offchain_tx_v1 - try to add a full transaction to the 'offchain' tx cache
-    *   - fails if there are key image duplicates with: offchain, unconfirmed, onchain
-    * param: tx -
-    * return: true if adding succeeded
-    */
-    bool try_add_offchain_tx_v1(const SpTxSquashedV1 &tx);
-    /**
     * brief: try_add_unconfirmed_tx_v1 - try to add a full transaction to the 'unconfirmed' tx cache
     *   - fails if there are key image duplicates with: unconfirmed, onchain
     *   - auto-removes any offchain entries that have overlapping key images with this tx
@@ -155,15 +139,6 @@ public:
     std::uint64_t commit_unconfirmed_txs_v1(const rct::key &mock_coinbase_input_context,
         SpTxSupplementV1 mock_coinbase_tx_supplement,
         std::vector<SpEnoteV1> mock_coinbase_output_enotes);
-    /**
-    * brief: remove_tx_from_offchain_cache - remove a tx or partial tx from the offchain cache
-    * param: input_context - input context of tx/partial tx to remove
-    */
-    void remove_tx_from_offchain_cache(const rct::key &input_context);
-    /**
-    * brief: clear_offchain_cache - remove all data stored in offchain cache
-    */
-    void clear_offchain_cache();
     /**
     * brief: remove_tx_from_unconfirmed_cache - remove a tx from the unconfirmed cache
     * param: tx_id - tx id of tx to remove
@@ -188,14 +163,8 @@ public:
 
 private:
     /// implementations of the above, without internally locking the ledger mutex (all expected to be no-fail)
-    bool key_image_exists_offchain_v1_impl(const crypto::key_image &key_image) const;
     bool key_image_exists_unconfirmed_v1_impl(const crypto::key_image &key_image) const;
     bool key_image_exists_onchain_v1_impl(const crypto::key_image &key_image) const;
-    bool try_add_offchain_v1_impl(const std::vector<SpEnoteImageV1> &input_images,
-        const SpTxSupplementV1 &tx_supplement,
-        const std::vector<SpEnoteV1> &output_enotes);
-    bool try_add_offchain_partial_tx_v1_impl(const SpPartialTxV1 &partial_tx);
-    bool try_add_offchain_tx_v1_impl(const SpTxSquashedV1 &tx);
     bool try_add_unconfirmed_coinbase_v1_impl(const rct::key &tx_id,
         const rct::key &input_context,
         SpTxSupplementV1 tx_supplement,
@@ -204,34 +173,13 @@ private:
     std::uint64_t commit_unconfirmed_txs_v1_impl(const rct::key &mock_coinbase_input_context,
         SpTxSupplementV1 mock_coinbase_tx_supplement,
         std::vector<SpEnoteV1> mock_coinbase_output_enotes);
-    void remove_tx_from_offchain_cache_impl(const rct::key &input_context);
-    void clear_offchain_cache_impl();
     void remove_tx_from_unconfirmed_cache_impl(const rct::key &tx_id);
     void clear_unconfirmed_cache_impl();
     std::uint64_t pop_chain_at_height_impl(const std::uint64_t pop_height);
     std::uint64_t pop_blocks_impl(const std::size_t num_blocks);
 
-    /// Ledger mutex (mutable for use in const member functions)
-    mutable std::mutex m_ledger_mutex;
-
-
-    //// OFF-CHAIN/OFFLINE FULL/PARTIAL TXs
-
-    /// Seraphis key images
-    std::unordered_set<crypto::key_image> m_offchain_sp_key_images;
-    /// map of tx outputs
-    std::map<
-        sortable_key,     // input context
-        std::tuple<       // tx output contents
-            SpTxSupplementV1,        // tx supplement
-            std::vector<SpEnoteV1>   // output enotes
-        >
-    > m_offchain_output_contents;
-    /// map of tx key images
-    std::map<
-        sortable_key,     // input context
-        std::vector<crypto::key_image>  // key images in tx
-    > m_offchain_tx_key_images;
+    /// context mutex (mutable for use in const member functions)
+    mutable std::mutex m_context_mutex;
 
 
     //// UNCONFIRMED TXs
