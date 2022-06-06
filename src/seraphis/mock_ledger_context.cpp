@@ -37,13 +37,15 @@
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
+#include "sp_crypto_utils.h"
 #include "tx_component_types.h"
 #include "txtype_squashed_v1.h"
 
 //third party headers
+#include <boost/thread/locks.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 //standard headers
-#include <mutex>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -59,14 +61,14 @@ std::uint64_t MockLedgerContext::get_chain_height() const
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::key_image_exists_unconfirmed_v1(const crypto::key_image &key_image) const
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
 
     return key_image_exists_unconfirmed_v1_impl(key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::key_image_exists_onchain_v1(const crypto::key_image &key_image) const
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
 
     return key_image_exists_onchain_v1_impl(key_image);
 }
@@ -74,7 +76,7 @@ bool MockLedgerContext::key_image_exists_onchain_v1(const crypto::key_image &key
 void MockLedgerContext::get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
     rct::keyV &proof_elements_out) const
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
 
     // gets squashed enotes
     proof_elements_out.clear();
@@ -99,7 +101,7 @@ std::uint64_t MockLedgerContext::max_enote_index() const
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::try_add_unconfirmed_tx_v1(const SpTxSquashedV1 &tx)
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     return try_add_unconfirmed_tx_v1_impl(tx);
 }
@@ -108,7 +110,7 @@ std::uint64_t MockLedgerContext::commit_unconfirmed_txs_v1(const rct::key &mock_
     SpTxSupplementV1 mock_coinbase_tx_supplement,
     std::vector<SpEnoteV1> mock_coinbase_output_enotes)
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     return commit_unconfirmed_txs_v1_impl(mock_coinbase_input_context,
         std::move(mock_coinbase_tx_supplement),
@@ -117,28 +119,28 @@ std::uint64_t MockLedgerContext::commit_unconfirmed_txs_v1(const rct::key &mock_
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::remove_tx_from_unconfirmed_cache(const rct::key &tx_id)
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     remove_tx_from_unconfirmed_cache_impl(tx_id);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::clear_unconfirmed_cache()
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     clear_unconfirmed_cache_impl();
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t MockLedgerContext::pop_chain_at_height(const std::uint64_t pop_height)
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     return pop_chain_at_height_impl(pop_height);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t MockLedgerContext::pop_blocks(const std::size_t num_blocks)
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     return pop_blocks_impl(num_blocks);
 }
@@ -264,7 +266,7 @@ std::uint64_t MockLedgerContext::commit_unconfirmed_txs_v1_impl(const rct::key &
     // e. accumulated output count is consistent
     const std::uint64_t accumulated_output_count =
         m_accumulated_output_counts.size()
-        ? (m_accumulated_output_counts.rbegin())->second
+        ? (m_accumulated_output_counts.rbegin())->second  //last block's accumulated output count
         : 0;
 
     CHECK_AND_ASSERT_THROW_MES(accumulated_output_count == m_sp_squashed_enotes.size(),

@@ -37,13 +37,14 @@
 #include "crypto/crypto.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 #include "tx_component_types.h"
 
 //third party headers
+#include <boost/thread/shared_mutex.hpp>
 
 //standard headers
 #include <map>
-#include <mutex>
 #include <tuple>
 #include <unordered_set>
 #include <vector>
@@ -61,22 +62,6 @@ namespace sp
 
 class MockLedgerContext final
 {
-    struct sortable_key
-    {
-        unsigned char bytes[32];
-
-        sortable_key() = default;
-        sortable_key(const rct::key &rct_key)
-        {
-            memcpy(bytes, rct_key.bytes, 32);
-        }
-
-        bool operator<(const sortable_key &other) const
-        {
-            return memcmp(bytes, other.bytes, 32) < 0;
-        }
-    };
-
 public:
     /**
     * brief: get_chain_height - get current chain height
@@ -178,7 +163,7 @@ private:
     std::uint64_t pop_blocks_impl(const std::size_t num_blocks);
 
     /// context mutex (mutable for use in const member functions)
-    mutable std::mutex m_context_mutex;
+    mutable boost::shared_mutex m_context_mutex;
 
 
     //// UNCONFIRMED TXs

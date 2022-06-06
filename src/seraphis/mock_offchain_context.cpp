@@ -37,13 +37,15 @@
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
+#include "sp_crypto_utils.h"
 #include "tx_component_types.h"
 #include "txtype_squashed_v1.h"
 
 //third party headers
+#include <boost/thread/locks.hpp>
+#include <boost/thread/shared_mutex.hpp>
 
 //standard headers
-#include <mutex>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -54,42 +56,42 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 bool MockOffchainContext::key_image_exists_v1(const crypto::key_image &key_image) const
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
 
     return key_image_exists_v1_impl(key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockOffchainContext::try_add_partial_tx_v1(const SpPartialTxV1 &partial_tx)
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     return try_add_partial_tx_v1_impl(partial_tx);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockOffchainContext::try_add_tx_v1(const SpTxSquashedV1 &tx)
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     return try_add_tx_v1_impl(tx);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockOffchainContext::remove_tx_from_cache(const rct::key &input_context)
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     remove_tx_from_cache_impl(input_context);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockOffchainContext::remove_tx_with_key_image_from_cache(const crypto::key_image &key_image)
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     remove_tx_with_key_image_from_cache_impl(key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockOffchainContext::clear_cache()
 {
-    std::lock_guard<std::mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     clear_cache_impl();
 }

@@ -37,13 +37,14 @@
 #include "crypto/crypto.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 #include "tx_component_types.h"
 
 //third party headers
+#include <boost/thread/shared_mutex.hpp>
 
 //standard headers
 #include <map>
-#include <mutex>
 #include <tuple>
 #include <unordered_set>
 #include <vector>
@@ -62,23 +63,6 @@ namespace sp
 
 class MockOffchainContext final
 {
-    struct sortable_key
-    {
-        unsigned char bytes[32];
-
-        sortable_key() = default;
-        sortable_key(const rct::key &rct_key)
-        {
-            memcpy(bytes, rct_key.bytes, 32);
-        }
-
-        bool operator<(const sortable_key &other) const
-        {
-            return memcmp(bytes, other.bytes, 32) < 0;
-        }
-    };
-    static const rct::key& sortable2rct(const sortable_key &sortable)  { return reinterpret_cast<const rct::key&>(sortable); }
-
 public:
     /**
     * brief: key_image_exists_onchain_v1 - checks if a Seraphis linking tag (key image) exists in the ledger
@@ -128,7 +112,7 @@ private:
     void clear_cache_impl();
 
     /// context mutex (mutable for use in const member functions)
-    mutable std::mutex m_context_mutex;
+    mutable boost::shared_mutex m_context_mutex;
 
     /// Seraphis key images
     std::unordered_set<crypto::key_image> m_sp_key_images;

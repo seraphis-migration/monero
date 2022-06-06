@@ -57,6 +57,27 @@ namespace sp
 static const rct::key MINUS_ONE = { {0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9,
     0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10} };
 
+/// sortable key (e.g. for hash maps)
+struct sortable_key
+{
+    unsigned char bytes[32];
+
+    sortable_key() = default;
+    sortable_key(const rct::key &rct_key)
+    {
+        memcpy(bytes, rct_key.bytes, 32);
+    }
+
+    bool operator<(const sortable_key &other) const
+    {
+        return memcmp(bytes, other.bytes, 32) < 0;
+    }
+};
+static inline const rct::key& sortable2rct(const sortable_key &sortable)
+{
+    return reinterpret_cast<const rct::key&>(sortable);
+}
+
 /**
 * brief: get generators
 */
