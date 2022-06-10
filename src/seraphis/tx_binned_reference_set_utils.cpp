@@ -38,6 +38,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_config_temp.h"
+#include "sp_hash_functions.h"
 #include "tx_binned_reference_set.h"
 #include "tx_misc_utils.h"
 #include "tx_ref_set_index_mapper.h"
@@ -162,16 +163,16 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
         "making normalized bin members: zero bin members were requested (at least one expected).");
 
     // make this bin's member generator
-    // g = H("..", bin_generator_seed, bin_locus, bin_index_in_set)
+    // g = H_32("..", bin_generator_seed, bin_locus, bin_index_in_set)
     static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_MEMBER};
 
     std::string data;
-    data.reserve(domain_separator.size() + sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set));
-    data = domain_separator;
+    data.reserve(sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set));
     data.append(reinterpret_cast<const char*>(bin_generator_seed.bytes), sizeof(bin_generator_seed));
     append_uint_to_string(bin_locus, data);
     append_uint_to_string(bin_index_in_set, data);
-    crypto::hash member_generator{crypto::cn_fast_hash(data.data(), data.size())};
+    rct::key member_generator;
+    sp_hash_to_32(domain_separator, data.data(), data.size(), member_generator.bytes);
 
     // set clip allowed max to be a large multiple of the bin width (minus 1 since we are zero-basis),
     //   to avoid bias in the bin members
@@ -208,8 +209,11 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
             // update the generator (find a generator that is within the allowed max)
             do
             {
-                crypto::cn_fast_hash(member_generator.data, sizeof(member_generator), member_generator);
-                memcpy(&generator_clip, member_generator.data, sizeof(generator_clip));
+                sp_hash_to_32(domain_separator,
+                    member_generator.bytes,
+                    sizeof(member_generator),
+                    member_generator.bytes);
+                memcpy(&generator_clip, member_generator.bytes, sizeof(generator_clip));
                 generator_clip = SWAP64LE(generator_clip);
             } while (generator_clip > clip_allowed_max);
 

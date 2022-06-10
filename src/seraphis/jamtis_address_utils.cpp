@@ -37,11 +37,11 @@
 #include "seraphis_config_temp.h"
 #include "jamtis_address_tag_utils.h"
 #include "jamtis_core_utils.h"
-#include "jamtis_hash_functions.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctOps.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
+#include "sp_hash_functions.h"
 
 //third party headers
 
@@ -64,7 +64,7 @@ void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
     // k^j_x = H_n[s_ga](j)
     const address_tag_t raw_address_tag{j};
 
-    jamtis_derive_key(domain_separator,
+    sp_derive_key(domain_separator,
         to_bytes(s_generate_address),
         raw_address_tag.bytes,
         ADDRESS_INDEX_BYTES,
@@ -80,7 +80,7 @@ void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
     // k^j_a = H_n[s_ga](j)
     const address_tag_t raw_address_tag{j};
 
-    jamtis_derive_key(domain_separator,
+    sp_derive_key(domain_separator,
         to_bytes(s_generate_address),
         raw_address_tag.bytes,
         ADDRESS_INDEX_BYTES,

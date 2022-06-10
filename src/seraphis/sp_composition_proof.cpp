@@ -45,6 +45,7 @@ extern "C"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
+#include "sp_hash_functions.h"
 #include "tx_misc_utils.h"  //for equals_from_less (todo: remove this dependency?)
 
 //third party headers
@@ -79,64 +80,57 @@ struct multisig_binonce_factors
 };
 
 //-------------------------------------------------------------------------------------------------------------------
-// Initialize transcript
-//-------------------------------------------------------------------------------------------------------------------
-static void transcript_init(rct::key &transcript)
-{
-    static const std::string salt{config::HASH_KEY_SP_COMPOSITION_PROOF_TRANSCRIPT};
-    rct::cn_fast_hash(transcript, salt.data(), salt.size());
-}
-//-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge message
 //
-// challenge_message = H(H("domain-sep"), X, U, m, K, KI, K_t1)
+// challenge_message = H_32(X, U, m, K, KI, K_t1)
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_challenge_message(const rct::key &message,
     const rct::key &K,
     const crypto::key_image &KI,
     const rct::key &K_t1)
 {
-    // initialize transcript message
-    rct::key challenge_message;
-    transcript_init(challenge_message);
+    static const std::string domain_separator{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE};
 
-    // collect challenge_message string
-    std::string hash;
-    hash.reserve(7 * sizeof(rct::key));
-    hash = std::string(reinterpret_cast<const char*>(challenge_message.bytes), sizeof(challenge_message));
-    hash.append(reinterpret_cast<const char*>((get_X_gen()).bytes), sizeof(message));
-    hash.append(reinterpret_cast<const char*>((get_U_gen()).bytes), sizeof(message));
-    hash.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    hash.append(reinterpret_cast<const char*>(K.bytes), sizeof(K));
-    hash.append(reinterpret_cast<const char*>(&KI), sizeof(KI));
-    hash.append(reinterpret_cast<const char*>(K_t1.bytes), sizeof(K_t1));
-    CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
+    // collect challenge message hash data
+    std::string data;
+    data.reserve(1 * sizeof(rct::key));
+    data.append(reinterpret_cast<const char*>((get_X_gen()).bytes), sizeof(message));
+    data.append(reinterpret_cast<const char*>((get_U_gen()).bytes), sizeof(message));
+    data.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
+    data.append(reinterpret_cast<const char*>(K.bytes), sizeof(K));
+    data.append(reinterpret_cast<const char*>(&KI), sizeof(KI));
+    data.append(reinterpret_cast<const char*>(K_t1.bytes), sizeof(K_t1));
+    CHECK_AND_ASSERT_THROW_MES(data.size() > 1, "Bad hash input size!");
 
     // challenge_message
-    rct::cn_fast_hash(challenge_message, hash.data(), hash.size());
+    rct::key challenge_message;
+    sp_hash_to_32(domain_separator, data.data(), data.size(), challenge_message.bytes);
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge_message.bytes), "Transcript challenge_message must be nonzero!");
 
     return challenge_message;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Fiat-Shamir challenge
+// Fiat-Shamir challenge: extend the challenge message
 // c = H_n(challenge_message, [K_t1 proof key], [K_t2 proof key], [KI proof key])
 //-------------------------------------------------------------------------------------------------------------------
-static rct::key compute_challenge(const rct::key &message,
+static rct::key compute_challenge(const rct::key &challenge_message,
     const rct::key &K_t1_proofkey,
     const rct::key &K_t2_proofkey,
     const rct::key &KI_proofkey)
 {
-    std::string hash;
-    hash.reserve(4 * sizeof(rct::key));
-    hash = std::string(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    hash.append(reinterpret_cast<const char*>(K_t1_proofkey.bytes), sizeof(K_t1_proofkey));
-    hash.append(reinterpret_cast<const char*>(K_t2_proofkey.bytes), sizeof(K_t2_proofkey));
-    hash.append(reinterpret_cast<const char*>(KI_proofkey.bytes), sizeof(KI_proofkey));
-    CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
+    static const std::string domain_separator{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE};
+
+    // collect challenge hash data
+    std::string data;
+    data.reserve(4 * sizeof(rct::key));
+    data = std::string(reinterpret_cast<const char*>(challenge_message.bytes), sizeof(challenge_message));
+    data.append(reinterpret_cast<const char*>(K_t1_proofkey.bytes), sizeof(K_t1_proofkey));
+    data.append(reinterpret_cast<const char*>(K_t2_proofkey.bytes), sizeof(K_t2_proofkey));
+    data.append(reinterpret_cast<const char*>(KI_proofkey.bytes), sizeof(KI_proofkey));
+    CHECK_AND_ASSERT_THROW_MES(data.size() > 1, "Bad hash input size!");
 
     rct::key challenge;
-    rct::hash_to_scalar(challenge, hash.data(), hash.size());
+    sp_hash_to_scalar(domain_separator, data.data(), data.size(), challenge.bytes);
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
 
     return challenge;
@@ -193,20 +187,20 @@ static void compute_K_t1_for_proof(const crypto::secret_key &y,
 static rct::key multisig_binonce_merge_factor(const rct::key &message,
     const std::vector<multisig_binonce_factors> &nonces)
 {
+    static const std::string domain_separator{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE};
+
     // build hash
-    std::string hash;
-    hash.reserve(sizeof(config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR) +
-        1 + 2 * nonces.size() * sizeof(rct::key));
-    hash = config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR;
-    hash.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
+    std::string data;
+    data.reserve(domain_separator.size() + 1 + 2 * nonces.size() * sizeof(rct::key));
+    data.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
     for (const multisig_binonce_factors &nonce_pair : nonces)
     {
-        hash.append(reinterpret_cast<const char*>(nonce_pair.nonce_1.bytes), sizeof(rct::key));
-        hash.append(reinterpret_cast<const char*>(nonce_pair.nonce_2.bytes), sizeof(rct::key));
+        data.append(reinterpret_cast<const char*>(nonce_pair.nonce_1.bytes), sizeof(rct::key));
+        data.append(reinterpret_cast<const char*>(nonce_pair.nonce_2.bytes), sizeof(rct::key));
     }
 
     rct::key merge_factor;
-    rct::hash_to_scalar(merge_factor, hash.data(), hash.size());
+    sp_hash_to_scalar(domain_separator, data.data(), data.size(), merge_factor.bytes);
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(merge_factor.bytes), "Binonce merge factor must be nonzero!");
 
     return merge_factor;

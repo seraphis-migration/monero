@@ -28,7 +28,7 @@
 
 // NOT FOR PRODUCTION
 
-// Hash functions required by the Jamtis specification.
+// Core hash functions for Seraphis (note: this implementation satisfies the Jamtis specification).
 
 
 #pragma once
@@ -45,46 +45,43 @@
 
 namespace sp
 {
-namespace jamtis
-{
 
 /// H_1(x): 1-byte output
-void jamtis_hash1(const std::string &domain_separator,
-    const unsigned char *input,
+void sp_hash_to_1(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out);
 /// H_8(x): 8-byte output
-void jamtis_hash8(const std::string &domain_separator,
-    const unsigned char *input,
+void sp_hash_to_8(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out);
 /// H_16(x): 16-byte output
-void jamtis_hash16(const std::string &domain_separator,
-    const unsigned char *input,
+void sp_hash_to_16(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out);
 /// H_32(x): 32-byte output
-void jamtis_hash32(const std::string &domain_separator,
-    const unsigned char *input,
+void sp_hash_to_32(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out);
 /// H_n(x): Ed25519 group scalar output (32 bytes)
-void jamtis_hash_scalar(const std::string &domain_separator,
-    const unsigned char *input,
+void sp_hash_to_scalar(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out);
 /// H_n[k](x): Ed25519 group scalar output (32 bytes)
-void jamtis_derive_key(const std::string &domain_separator,
+void sp_derive_key(const std::string &domain_separator,
     const unsigned char *derivation_key,  //32 bytes
-    const unsigned char *input,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out);
 /// H_32[k](x): 32-byte output
-void jamtis_derive_secret(const std::string &domain_separator,
+void sp_derive_secret(const std::string &domain_separator,
     const unsigned char *derivation_key,  //32 bytes
-    const unsigned char *input,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out);
 
-} //namespace jamtis
 } //namespace sp

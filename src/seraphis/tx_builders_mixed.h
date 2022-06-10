@@ -56,7 +56,7 @@ namespace sp
 
 /**
 * brief: make_tx_image_proof_message_v1 - message for tx image proofs
-*   - H(crypto project name, version string, input key images, output enotes, enote ephemeral pubkeys, memos, fee)
+*   - H_32(crypto project name, version string, input key images, output enotes, enote ephemeral pubkeys, memos, fee)
 * param: version_string -
 * param: input_key_images -
 * param: output_enotes -
@@ -102,7 +102,7 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
     rct::key &proof_message_out);
 /**
 * brief: make_tx_proofs_prefix_v1 - hash of all proofs in a tx (for tx hashes)
-*   - H("domain-sep", balance proof, image proofs, membership proofs)
+*   - H_32(balance proof, image proofs, membership proofs)
 * param: balance_proof -
 * param: image_proofs -
 * param: membership_proofs -

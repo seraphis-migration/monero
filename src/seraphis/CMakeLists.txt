@@ -33,7 +33,6 @@ set(seraphis_sources
   jamtis_core_utils.cpp
   jamtis_destination.cpp
   jamtis_enote_utils.cpp
-  jamtis_hash_functions.cpp
   jamtis_payment_proposal.cpp
   jamtis_support_types.cpp
   mock_ledger_context.cpp
@@ -42,6 +41,7 @@ set(seraphis_sources
   sp_core_enote_utils.cpp
   sp_core_types.cpp
   sp_crypto_utils.cpp
+  sp_hash_functions.cpp
   tx_base.cpp
   tx_binned_reference_set.cpp
   tx_binned_reference_set_utils.cpp

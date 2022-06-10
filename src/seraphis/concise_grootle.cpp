@@ -45,6 +45,7 @@ extern "C"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
+#include "sp_hash_functions.h"
 #include "tx_misc_utils.h"
 
 //third party headers
@@ -88,19 +89,22 @@ static void init_gens()
         [&](){
 
         // Build Hi generators
-        // H_i = keccak_to_pt("grootle Hi", i)
+        // H_i = keccak_to_pt(H_32("grootle Hi", i))
         const std::string Hi_A_salt{config::HASH_KEY_GROOTLE_Hi_A};
-        for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
-        {
-            std::string hash = Hi_A_salt + tools::get_varint_data(i);
-            hash_to_p3(Hi_A_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
-        }
-
         const std::string Hi_B_salt{config::HASH_KEY_GROOTLE_Hi_B};
+
+        std::string data;
+        rct::key intermediate_hash;
         for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
         {
-            std::string hash = Hi_B_salt + tools::get_varint_data(i);
-            hash_to_p3(Hi_B_p3[i], rct::hash2rct(crypto::cn_fast_hash(hash.data(), hash.size())));
+            data.clear();
+            append_uint_to_string(i, data);
+
+            sp_hash_to_32(Hi_A_salt, data.data(), data.size(), intermediate_hash.bytes);
+            hash_to_p3(Hi_A_p3[i], intermediate_hash);
+
+            sp_hash_to_32(Hi_B_salt, data.data(), data.size(), intermediate_hash.bytes);
+            hash_to_p3(Hi_B_p3[i], intermediate_hash);
         }
 
         // get G
@@ -195,16 +199,8 @@ static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Initialize transcript
-//-------------------------------------------------------------------------------------------------------------------
-static void transcript_init(rct::key &transcript_out)
-{
-    static const std::string salt{config::HASH_KEY_CONCISE_GROOTLE_TRANSCRIPT};
-    rct::cn_fast_hash(transcript_out, salt.data(), salt.size());
-}
-//-------------------------------------------------------------------------------------------------------------------
 // Base aggregation coefficient for concise structure
-// mu = H_n(H("domain-sep"), message, n, m, {{M}}, {C_offsets}, A, B)
+// mu = H_n(message, n, m, {{M}}, {C_offsets}, A, B)
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     const std::size_t n,
@@ -214,64 +210,63 @@ static rct::key compute_base_aggregation_coefficient(const rct::key &message,
     const rct::key &A,
     const rct::key &B)
 {
+    static const std::string domain_separator{config::HASH_KEY_CONCISE_GROOTLE_AGGREGATION_COEFFICIENT};
+
     CHECK_AND_ASSERT_THROW_MES(M.size() == C_offsets.size(), "Transcript challenge inputs have incorrect size!");
 
     const std::size_t N = std::pow(n, m);
     for (const rct::keyV &column : M)
         CHECK_AND_ASSERT_THROW_MES(column.size() == N, "Transcript challenge inputs have incorrect size!");
 
-    // initialize transcript message
-    rct::key challenge;
-    transcript_init(challenge);
-
     // collect challenge string
-    std::string hash;
-    hash.reserve(2*4 + ((M.size() + 1)*C_offsets.size() + 4)*sizeof(rct::key));
-    hash = std::string(reinterpret_cast<const char*>(challenge.bytes), sizeof(challenge));
-    hash.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    append_uint_to_string(n, hash);
-    append_uint_to_string(m, hash);
+    std::string data;
+    data.reserve(2*4 + ((M.size() + 1)*C_offsets.size() + 3)*sizeof(rct::key));
+    data.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
+    append_uint_to_string(n, data);
+    append_uint_to_string(m, data);
     for (const rct::keyV &column : M)
     {
         for (const rct::key &key : column)
-            hash.append(reinterpret_cast<const char*>(key.bytes), sizeof(key));
+            data.append(reinterpret_cast<const char*>(key.bytes), sizeof(key));
     }
     for (const rct::key &offset : C_offsets)
     {
-        hash.append(reinterpret_cast<const char*>(offset.bytes), sizeof(offset));
+        data.append(reinterpret_cast<const char*>(offset.bytes), sizeof(offset));
     }
-    hash.append(reinterpret_cast<const char*>(A.bytes), sizeof(A));
-    hash.append(reinterpret_cast<const char*>(B.bytes), sizeof(B));
-    CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
+    data.append(reinterpret_cast<const char*>(A.bytes), sizeof(A));
+    data.append(reinterpret_cast<const char*>(B.bytes), sizeof(B));
+    CHECK_AND_ASSERT_THROW_MES(data.size() > 1, "Bad hash input size!");
 
     // challenge
-    rct::hash_to_scalar(challenge, hash.data(), hash.size());
-    CHECK_AND_ASSERT_THROW_MES(!(challenge == ZERO), "Transcript challenge must be nonzero!");
+    rct::key mu;
+    sp_hash_to_scalar(domain_separator, data.data(), data.size(), mu.bytes);
+    CHECK_AND_ASSERT_THROW_MES(!(mu == ZERO), "Transcript mu must be nonzero!");
 
-    return challenge;
+    return mu;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Fiat-Shamir challenge
-// c = H_n(message, {X})
+// Fiat-Shamir challenge by extending the concise structure's aggregation coefficient
+// c = H_n(mu, {X})
 //
-// note: in practice, this extends the concise structure's aggregation coefficient (i.e. message = mu)
-// note2: in Triptych notation, c == xi
+// note: in Triptych notation, c == xi
 //-------------------------------------------------------------------------------------------------------------------
-static rct::key compute_challenge(const rct::key &message, const rct::keyV &X)
+static rct::key compute_challenge_from_mu(const rct::key &mu, const rct::keyV &X)
 {
+    static const std::string domain_separator{config::HASH_KEY_CONCISE_GROOTLE_CHALLENGE};
+
     // hash data
-    std::string hash;
-    hash.reserve((X.size() + 1)*sizeof(rct::key));
-    hash = std::string(reinterpret_cast<const char*>(message.bytes), sizeof(message));
+    std::string data;
+    data.reserve((X.size() + 1)*sizeof(rct::key));
+    data = std::string(reinterpret_cast<const char*>(mu.bytes), sizeof(mu));
     for (const rct::key &x : X)
     {
-        hash.append(reinterpret_cast<const char*>(x.bytes), sizeof(x));
+        data.append(reinterpret_cast<const char*>(x.bytes), sizeof(x));
     }
-    CHECK_AND_ASSERT_THROW_MES(hash.size() > 1, "Bad hash input size!");
+    CHECK_AND_ASSERT_THROW_MES(data.size() > 1, "Bad hash input size!");
 
     // challenge
     rct::key challenge;
-    rct::hash_to_scalar(challenge, hash.data(), hash.size());
+    sp_hash_to_scalar(domain_separator, data.data(), data.size(), challenge.bytes);
     CHECK_AND_ASSERT_THROW_MES(!(challenge == ZERO), "Transcript challenge must be nonzero!");
 
     return challenge;
@@ -497,7 +492,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     /// one-of-many sub-proof challenges
 
     // xi: challenge
-    const rct::key xi{compute_challenge(mu, proof.X)};
+    const rct::key xi{compute_challenge_from_mu(mu, proof.X)};
 
     // xi^j: challenge powers
     const rct::keyV xi_pow{powers_of_scalar(xi, m + 1)};
@@ -669,7 +664,7 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
                     proof.A,
                     proof.B)
             };
-        const rct::key xi{compute_challenge(mu, proof.X)};
+        const rct::key xi{compute_challenge_from_mu(mu, proof.X)};
 
         // Aggregation coefficient powers
         const rct::keyV mu_pow{powers_of_scalar(mu, num_keys)};

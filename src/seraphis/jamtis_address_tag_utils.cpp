@@ -42,12 +42,12 @@ extern "C"
 //#include "crypto/tiny_aes.h"
 #include "crypto/twofish.h"
 }
-#include "jamtis_hash_functions.h"
 #include "jamtis_support_types.h"
 #include "memwipe.h"
 #include "misc_language.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
+#include "sp_hash_functions.h"
 
 //third party headers
 
@@ -87,7 +87,10 @@ static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct
 
     // temp_encryption_secret = H_32(encryption_key)
     rct::key temp_encryption_secret;
-    jamtis_hash32(domain_separator, encryption_key.bytes, sizeof(rct::key), temp_encryption_secret.bytes);
+    sp_hash_to_32(domain_separator,
+        encryption_key.bytes,
+        sizeof(rct::key),
+        temp_encryption_secret.bytes);
 
     // truncate to desired size of the secret
     encrypted_address_tag_secret_t encryption_secret;

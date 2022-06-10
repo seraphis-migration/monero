@@ -50,6 +50,7 @@ extern "C"
 #include "sp_composition_proof.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
+#include "sp_hash_functions.h"
 #include "tx_binned_reference_set.h"
 #include "tx_binned_reference_set_utils.h"
 #include "tx_builder_types.h"
@@ -80,15 +81,14 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
     // make binned reference set generator seed
     static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_GENERATOR_SEED};
 
-    // seed = H("domain-sep", K', C')
+    // seed = H_32(K', C')
     std::string data;
-    data.reserve(domain_separator.size() + 2*sizeof(rct::key));
-    data = domain_separator;
+    data.reserve(2*sizeof(rct::key));
     data.append(reinterpret_cast<const char*>(masked_address.bytes), sizeof(rct::key));
     data.append(reinterpret_cast<const char*>(masked_commitment.bytes), sizeof(rct::key));
 
     // hash to the result
-    rct::cn_fast_hash(generator_seed_out, data.data(), data.size());
+    sp_hash_to_32(domain_separator, data.data(), data.size(), generator_seed_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_binned_ref_set_generator_seed_v1(const rct::key &onetime_address,
@@ -142,19 +142,20 @@ void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_imag
 //-------------------------------------------------------------------------------------------------------------------
 void make_tx_membership_proof_message_v1(const SpBinnedReferenceSetV1 &binned_reference_set, rct::key &message_out)
 {
-    static const std::string domain_separator{CRYPTONOTE_NAME};
+    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_MEMBERSHIP_PROOF_MESSAGE};
+    static const std::string project_name{CRYPTONOTE_NAME};
 
-    // m = H('project name', {binned reference set})
+    // m = H_32('project name', {binned reference set})
     std::string data;
-    data.reserve(domain_separator.size() +
+    data.reserve(project_name.size() +
         binned_reference_set.get_size_bytes(true) +
         SpBinnedReferenceSetConfigV1::get_size_bytes());
-    // project name
-    data = domain_separator;
+    // project name (i.e. referenced enotes are members of what project's ledger?)
+    data = project_name;
     // binned reference set
     binned_reference_set.append_to_string(data);
 
-    rct::cn_fast_hash(message_out, data.data(), data.size());
+    sp_hash_to_32(domain_separator, data.data(), data.size(), message_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void prepare_input_commitment_factors_for_balance_proof_v1(
@@ -211,14 +212,13 @@ void make_input_images_prefix_v1(const std::vector<SpEnoteImageV1> &enote_images
 {
     static const std::string domain_separator{config::HASH_KEY_SERAPHIS_INPUT_IMAGES_PREFIX_V1};
 
-    // input images prefix = H("domain-sep", {K', C', KI})
+    // input images prefix = H_32({K', C', KI})
     std::string data;
-    data.reserve(domain_separator.size() + enote_images.size()*SpEnoteImageV1::get_size_bytes());
-    data = domain_separator;
+    data.reserve(enote_images.size()*SpEnoteImageV1::get_size_bytes());
     for (const SpEnoteImageV1 &enote_image : enote_images)
         enote_image.append_to_string(data);
 
-    rct::cn_fast_hash(input_images_prefix_out, data.data(), data.size());
+    sp_hash_to_32(domain_separator, data.data(), data.size(), input_images_prefix_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_input_proposal_semantics_v1(const SpInputProposalV1 &input_proposal,

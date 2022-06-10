@@ -56,7 +56,7 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultisigPublicInputProposalV1::get_squash_prefix(crypto::secret_key &squash_prefix_out) const
 {
-    // H(Ko,C)
+    // H_n(Ko,C)
     make_seraphis_squash_prefix(m_enote.m_core.m_onetime_address, m_enote.m_core.m_amount_commitment, squash_prefix_out);
 }
 //-------------------------------------------------------------------------------------------------------------------

@@ -45,6 +45,7 @@
 #include "seraphis_config_temp.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
+#include "sp_hash_functions.h"
 #include "tx_builder_types.h"
 #include "tx_builders_inputs.h"
 #include "tx_builders_outputs.h"
@@ -99,14 +100,16 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
     const rct::xmr_amount transaction_fee,
     rct::key &proof_message_out)
 {
-    // H(crypto project name, version string, input key images, output enotes, enote ephemeral pubkeys, memos, fee)
+    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_IMAGE_PROOF_MESSAGE};
+    static const std::string project_name{CRYPTONOTE_NAME};
+
+    // H_32(crypto project name, version string, input key images, output enotes, enote ephemeral pubkeys, memos, fee)
     std::string hash;
-    hash.reserve(sizeof(CRYPTONOTE_NAME) +
+    hash.reserve(project_name.size() +
         version_string.size() +
         output_enotes.size()*SpEnoteV1::get_size_bytes() +
         tx_supplement.get_size_bytes());
-
-    hash = CRYPTONOTE_NAME;
+    hash = project_name;
     hash += version_string;
     for (const crypto::key_image &input_key_image : input_key_images)
     {
@@ -123,7 +126,7 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
     hash.append(reinterpret_cast<const char*>(tx_supplement.m_tx_extra.data()), tx_supplement.m_tx_extra.size());
     append_uint_to_string(transaction_fee, hash);
 
-    rct::hash_to_scalar(proof_message_out, hash.data(), hash.size());
+    sp_hash_to_32(domain_separator, hash.data(), hash.size(), proof_message_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_tx_image_proof_message_v1(const std::string &version_string,
@@ -254,20 +257,18 @@ void make_tx_proofs_prefix_v1(const SpBalanceProofV1 &balance_proof,
 {
     static const std::string domain_separator{config::HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1};
 
-    // H("domain-sep", balance proof, image proofs, membership proofs)
+    // H_32(balance proof, image proofs, membership proofs)
     std::string data;
-    data.reserve(domain_separator.size() +
-        balance_proof.get_size_bytes() +
+    data.reserve(balance_proof.get_size_bytes() +
         image_proofs.size() * SpImageProofV1::get_size_bytes() +
         membership_proofs.size() ? membership_proofs.size() * membership_proofs[0].get_size_bytes() : 0);
-    data = domain_separator;
     balance_proof.append_to_string(data);
     for (const SpImageProofV1 &image_proof : image_proofs)
         image_proof.append_to_string(data);
     for (const SpMembershipProofV1 &membership_proof : membership_proofs)
         membership_proof.append_to_string(data);
 
-    rct::cn_fast_hash(tx_proofs_prefix_out, data.data(), data.size());
+    sp_hash_to_32(domain_separator, data.data(), data.size(), tx_proofs_prefix_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,

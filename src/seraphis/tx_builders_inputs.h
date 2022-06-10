@@ -81,7 +81,7 @@ void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_imag
     std::vector<SpMembershipProofV1> &membership_proofs_out);
 /**
 * brief: make_tx_membership_proof_message_v1 - message for membership proofs
-*   - H(crypto project name, {binned reference set})
+*   - H_32(crypto project name, {binned reference set})
 * param: - binned_reference_set -
 * outparam: message_out - the message to sign in a membership proof
 */
@@ -105,7 +105,7 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     std::vector<crypto::secret_key> &blinding_factors_out);
 /**
 * brief: make_input_images_prefix_v1 - hash of enote images (for tx hashes)
-*   - H("domain-sep", {K', C', KI})
+*   - H_32("domain-sep", {K', C', KI})
 * param: enote_images -
 * outparam: input_images_prefix_out -
 */

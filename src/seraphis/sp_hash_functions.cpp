@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "jamtis_hash_functions.h"
+#include "sp_hash_functions.h"
 
 //local headers
 #include "crypto/blake2b.h"
@@ -37,6 +37,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "int-util.h"
 #include "wipeable_string.h"
 
 //third party headers
@@ -47,14 +48,11 @@ extern "C"
 
 namespace sp
 {
-namespace jamtis
-{
-
 //-------------------------------------------------------------------------------------------------------------------
 // data_out = 'domain-sep' || [input]
 //-------------------------------------------------------------------------------------------------------------------
-static void jamtis_hash_data(const std::string &domain_separator,
-    const unsigned char *input,
+static void hash_data(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     epee::wipeable_string &data_out)
 {
@@ -69,86 +67,91 @@ static void jamtis_hash_data(const std::string &domain_separator,
 // H_32[k]('domain-sep' || [input])
 // - if derivation_key == nullptr, then the hash is NOT keyed
 //-------------------------------------------------------------------------------------------------------------------
-static void jamtis_hash_base(const std::string &domain_separator,
+static void hash_base(const std::string &domain_separator,
     const unsigned char *derivation_key,  //32 bytes
-    const unsigned char *input,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out,
     const std::size_t out_length)
 {
-    epee::wipeable_string hash_data;
-    jamtis_hash_data(domain_separator, input, input_length, hash_data);
+    epee::wipeable_string data;
+    hash_data(domain_separator, input, input_length, data);
 
-    blake2b(hash_out, out_length, hash_data.data(), hash_data.size(), derivation_key, derivation_key ? 32 : 0);
+    blake2b(hash_out, out_length, data.data(), data.size(), derivation_key, derivation_key ? 32 : 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-void jamtis_hash1(const std::string &domain_separator,
-    const unsigned char *input,
+void sp_hash_to_1(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out)
 {
     // H_1(x): 1-byte output
-    jamtis_hash_base(domain_separator, nullptr, input, input_length, hash_out, 1);
+    hash_base(domain_separator, nullptr, input, input_length, hash_out, 1);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void jamtis_hash8(const std::string &domain_separator,
-    const unsigned char *input,
+void sp_hash_to_8(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out)
 {
     // H_8(x): 8-byte output
-    jamtis_hash_base(domain_separator, nullptr, input, input_length, hash_out, 8);
+    hash_base(domain_separator, nullptr, input, input_length, hash_out, 8);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void jamtis_hash16(const std::string &domain_separator,
-    const unsigned char *input,
+void sp_hash_to_16(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out)
 {
     // H_16(x): 16-byte output
-    jamtis_hash_base(domain_separator, nullptr, input, input_length, hash_out, 16);
+    hash_base(domain_separator, nullptr, input, input_length, hash_out, 16);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void jamtis_hash32(const std::string &domain_separator,
-    const unsigned char *input,
+void sp_hash_to_32(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out)
 {
     // H_32(x): 32-byte output
-    jamtis_hash_base(domain_separator, nullptr, input, input_length, hash_out, 32);
+    hash_base(domain_separator, nullptr, input, input_length, hash_out, 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void jamtis_hash_scalar(const std::string &domain_separator,
-    const unsigned char *input,
+void sp_hash_to_scalar(const std::string &domain_separator,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out)
 {
     // H_n(x): Ed25519 group scalar output (32 bytes)
-    jamtis_hash_base(domain_separator, nullptr, input, input_length, hash_out, 32);
-    sc_reduce32(hash_out);  //mod l
+    // note: hash to 64 bytes then mod l
+    unsigned char temp[64];
+    hash_base(domain_separator, nullptr, input, input_length, temp, 64);
+    sc_reduce(temp);  //mod l
+    memcpy(hash_out, temp, 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void jamtis_derive_key(const std::string &domain_separator,
+void sp_derive_key(const std::string &domain_separator,
     const unsigned char *derivation_key,  //32 bytes
-    const unsigned char *input,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out)
 {
     // H_n[k](x): Ed25519 group scalar output (32 bytes)
-    jamtis_hash_base(domain_separator, derivation_key, input, input_length, hash_out, 32);
-    sc_reduce32(hash_out);  //mod l
+    // note: hash to 64 bytes then mod l
+    unsigned char temp[64];
+    hash_base(domain_separator, derivation_key, input, input_length, temp, 64);
+    sc_reduce(temp);  //mod l
+    memcpy(hash_out, temp, 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void jamtis_derive_secret(const std::string &domain_separator,
+void sp_derive_secret(const std::string &domain_separator,
     const unsigned char *derivation_key,  //32 bytes
-    const unsigned char *input,
+    const void *input,
     const std::size_t input_length,
     unsigned char *hash_out)
 {
     // H_32[k](x): 32-byte output
-    jamtis_hash_base(domain_separator, derivation_key, input, input_length, hash_out, 32);
+    hash_base(domain_separator, derivation_key, input, input_length, hash_out, 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
-} //namespace jamtis
 } //namespace sp

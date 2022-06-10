@@ -42,6 +42,7 @@
 #include "sp_core_enote_utils.h"
 #include "sp_core_types.h"
 #include "sp_crypto_utils.h"
+#include "sp_hash_functions.h"
 #include "tx_binned_reference_set.h"
 #include "tx_builder_types.h"
 #include "tx_builders_inputs.h"
@@ -209,15 +210,14 @@ void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
     make_tx_proofs_prefix_v1(m_balance_proof, m_image_proofs, m_membership_proofs, tx_proofs_prefix);
 
     // 4. tx hash
-    // tx_hash = H("domain-sep", image_proofs_message, input images, proofs)
+    // tx_hash = H_32(image_proofs_message, input images, proofs)
     std::string data;
-    data.reserve(domain_separator.size() + 3*sizeof(rct::key));
-    data = domain_separator;
+    data.reserve(3*sizeof(rct::key));
     data.append(reinterpret_cast<const char*>(image_proofs_message.bytes), sizeof(rct::key));
     data.append(reinterpret_cast<const char*>(input_images_prefix.bytes), sizeof(rct::key));
     data.append(reinterpret_cast<const char*>(tx_proofs_prefix.bytes), sizeof(rct::key));
 
-    rct::cn_fast_hash(tx_hash_out, data.data(), data.size());
+    sp_hash_to_32(domain_separator, data.data(), data.size(), tx_hash_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,
