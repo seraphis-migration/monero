@@ -37,7 +37,6 @@
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
-#include "sp_crypto_utils.h"
 #include "tx_component_types.h"
 #include "txtype_squashed_v1.h"
 
@@ -185,7 +184,7 @@ void MockOffchainContext::remove_tx_with_key_image_from_cache_impl(const crypto:
         );
 
     if (tx_key_images_search_it != m_tx_key_images.end())
-        remove_tx_from_cache_impl(sortable2rct(tx_key_images_search_it->first));
+        remove_tx_from_cache_impl(tx_key_images_search_it->first);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockOffchainContext::clear_cache_impl()

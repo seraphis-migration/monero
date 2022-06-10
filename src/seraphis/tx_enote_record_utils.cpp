@@ -568,8 +568,8 @@ SpEnoteOriginContextV1::OriginStatus origin_status_from_spent_status_v1(
         case (SpEnoteSpentContextV1::SpentStatus::SPENT_UNCONFIRMED) :
             return SpEnoteOriginContextV1::OriginStatus::UNCONFIRMED;
 
-        case (SpEnoteSpentContextV1::SpentStatus::SPENT_ON_CHAIN) :
-            return SpEnoteOriginContextV1::OriginStatus::CONFIRMED;
+        case (SpEnoteSpentContextV1::SpentStatus::SPENT_ONCHAIN) :
+            return SpEnoteOriginContextV1::OriginStatus::ONCHAIN;
 
         default :
             return SpEnoteOriginContextV1::OriginStatus::OFFCHAIN;

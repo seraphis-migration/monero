@@ -151,7 +151,7 @@ struct SpEnoteOriginContextV1 final
         // is in the tx pool (but not the blockchain)
         UNCONFIRMED,
         // is in the blockchain
-        CONFIRMED
+        ONCHAIN
     };
 
     /// associated memo fields (none by default)
@@ -182,7 +182,7 @@ struct SpEnoteSpentContextV1 final
         // is spent in a tx in the mempool
         SPENT_UNCONFIRMED,
         // is spent in the ledger
-        SPENT_ON_CHAIN
+        SPENT_ONCHAIN
     };
 
     /// tx id where it was spent (0 if unspent or tx is unknown)
@@ -262,6 +262,12 @@ struct SpContextualEnoteRecordV1 final
 
     /// get this enote's amount
     rct::xmr_amount get_amount() const { return m_record.m_amount; }
+
+    /// check origin status
+    bool has_origin_status(const SpEnoteOriginContextV1::OriginStatus test_status) const
+    {
+        return m_origin_context.m_origin_status == test_status;
+    }
 
     /// check spent status
     bool has_spent_status(const SpEnoteSpentContextV1::SpentStatus test_status) const

@@ -165,7 +165,7 @@ static void validate_and_prepare_input_inits_for_partial_sig_sets_v1(const SpMul
 {
     /// validate and filter input inits
 
-    // 1) local input init set must be valid
+    // 1. local input init set must be valid
     CHECK_AND_ASSERT_THROW_MES(local_input_init_set.m_signer_id == local_signer_id,
         "multisig input partial sigs: local input init set is not from local signer.");
     CHECK_AND_ASSERT_THROW_MES(validate_v1_multisig_input_init_set_for_partial_sig_set_v1(
@@ -177,7 +177,7 @@ static void validate_and_prepare_input_inits_for_partial_sig_sets_v1(const SpMul
             input_masked_addresses),
         "multisig input partial sigs: the local signer's input initializer doesn't match the multisig tx proposal.");
 
-    // 2) weed out invalid other input init sets
+    // 2. weed out invalid other input init sets
     auto removed_end = std::remove_if(other_input_init_sets.begin(), other_input_init_sets.end(),
             [&](const SpMultisigInputInitSetV1 &other_input_init_set) -> bool
             {
@@ -192,11 +192,11 @@ static void validate_and_prepare_input_inits_for_partial_sig_sets_v1(const SpMul
         );
     other_input_init_sets.erase(removed_end, other_input_init_sets.end());
 
-    // 3) collect all input init sets
+    // 3. collect all input init sets
     all_input_init_sets_out = std::move(other_input_init_sets);
     all_input_init_sets_out.emplace_back(local_input_init_set);
 
-    // 4) remove inits from duplicate signers (including duplicate local signer inits)
+    // 4. remove inits from duplicate signers (including duplicate local signer inits)
     std::sort(all_input_init_sets_out.begin(), all_input_init_sets_out.end(),
             [](const SpMultisigInputInitSetV1 &set1, const SpMultisigInputInitSetV1 &set2) -> bool
             {
@@ -858,11 +858,11 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
 
     /// prepare for signing
 
-    // 1) save local signer as filter
+    // 1. save local signer as filter
     multisig::signer_set_filter local_signer_filter;
     multisig::multisig_signer_to_filter(local_signer_id, multisig_signers, local_signer_filter);
 
-    // 2) collect available signers
+    // 2. collect available signers
     std::vector<crypto::public_key> available_signers;
     available_signers.reserve(all_input_init_sets.size());
 
@@ -873,11 +873,11 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     if (available_signers.size() < threshold)
         return false;
 
-    // 3) available signers as a filter
+    // 3. available signers as a filter
     multisig::signer_set_filter available_signers_filter;
     multisig::multisig_signers_to_filter(available_signers, multisig_signers, available_signers_filter);
 
-    // 4) available signers as individual filters
+    // 4. available signers as individual filters
     std::vector<multisig::signer_set_filter> available_signers_as_filters;
     available_signers_as_filters.reserve(available_signers.size());
 
@@ -887,7 +887,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
         multisig::multisig_signer_to_filter(available_signer, multisig_signers, available_signers_as_filters.back());
     }
 
-    // 5) record input enote squash prefixes and enote view privkeys
+    // 5. record input enote squash prefixes and enote view privkeys
     std::vector<crypto::secret_key> squash_prefixes;
     squash_prefixes.reserve(multisig_tx_proposal.m_input_proposals.size());
 

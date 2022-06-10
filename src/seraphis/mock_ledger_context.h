@@ -29,6 +29,7 @@
 // NOT FOR PRODUCTION
 
 // Mock ledger context: for testing
+// note: txs added to the mock ledger aren't validated (aside from key image checks)
 
 
 #pragma once

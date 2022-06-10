@@ -37,7 +37,6 @@
 #include "crypto/crypto.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "sp_crypto_utils.h"
 #include "tx_component_types.h"
 
 //third party headers
@@ -117,16 +116,16 @@ private:
     /// Seraphis key images
     std::unordered_set<crypto::key_image> m_sp_key_images;
     /// map of tx outputs
-    std::map<
-        sortable_key,     // input context
+    std::unordered_map<
+        rct::key,     // input context
         std::tuple<       // tx output contents
             SpTxSupplementV1,        // tx supplement
             std::vector<SpEnoteV1>   // output enotes
         >
     > m_output_contents;
     /// map of tx key images
-    std::map<
-        sortable_key,     // input context
+    std::unordered_map<
+        rct::key,     // input context
         std::vector<crypto::key_image>  // key images in tx
     > m_tx_key_images;
 };
