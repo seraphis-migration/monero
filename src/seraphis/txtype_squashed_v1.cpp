@@ -182,11 +182,11 @@ std::size_t SpTxSquashedV1::get_weight() const
 //-------------------------------------------------------------------------------------------------------------------
 void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
 {
-    // tx_hash = H("domain-sep", image_proofs_message, input images, proofs)
+    // tx_hash = H_32(image_proofs_message, input images, proofs)
     static const std::string domain_separator{config::HASH_KEY_SERAPHIS_TRANSACTION};
 
     // 1. image proofs message
-    // H(crypto project name, version string, input key images, output enotes, enote ephemeral pubkeys, memos, fee)
+    // H_32(crypto project name, version string, input key images, output enotes, enote ephemeral pubkeys, memos, fee)
     std::string version_string;
     version_string.reserve(3);
     make_versioning_string(m_tx_semantic_rules_version, version_string);
@@ -200,12 +200,12 @@ void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
         image_proofs_message);
 
     // 2. input images (note: key images are represented in the tx hash twice (image proofs message and input images))
-    // H("domain-sep", {K', C', KI})
+    // H_32({K', C', KI})
     rct::key input_images_prefix;
     make_input_images_prefix_v1(m_input_images, input_images_prefix);
 
     // 3. proofs
-    // H("domain-sep", balance proof, image proofs, membership proofs)
+    // H_32(balance proof, image proofs, membership proofs)
     rct::key tx_proofs_prefix;
     make_tx_proofs_prefix_v1(m_balance_proof, m_image_proofs, m_membership_proofs, tx_proofs_prefix);
 

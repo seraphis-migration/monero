@@ -37,8 +37,8 @@
 //
 // proof outline
 // 0. preliminaries
-//    H(...)   = keccak(...) -> 32 bytes    hash to 32 bytes
-//    H_n(...) = H(...) mod l               hash to ed25519 scalar
+//    H_32(...) = blake2b(...) -> 32 bytes    hash to 32 bytes
+//    H_n(...)  = H_64(...) mod l             hash to ed25519 scalar
 //    G, X, U: ed25519 generators
 // 1. pubkeys
 //    K    = x*G + y*X + z*U
@@ -46,7 +46,7 @@
 //    K_t2 = (x/y)*G            = K_t1 - X - KI
 //    KI   = (z/y)*U
 // 2. proof nonces and challenge
-//    cm = H(H("domain-sep"), X, U, m, K, KI, K_t1)   challenge message
+//    cm = H_32(X, U, m, K, KI, K_t1)   challenge message
 //    a_t1, a_t2, a_ki = rand()                       prover nonces
 //    c = H_n(cm, [a_t1 K], [a_t2 G], [a_ki U])       challenge
 // 3. responses

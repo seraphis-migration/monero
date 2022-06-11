@@ -205,7 +205,7 @@ void make_jamtis_input_context_coinbase(const std::uint64_t block_height, rct::k
     std::string data;
     append_uint_to_string(block_height, data);
 
-    // input_context (coinbase) = H(block height)
+    // input_context (coinbase) = H_32(block height)
     sp_hash_to_32(domain_separator, data.data(), data.size(), input_context_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -224,7 +224,7 @@ void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &in
     for (const crypto::key_image &key_image : input_key_images)
         data.append(reinterpret_cast<const char*>(&key_image), sizeof(key_image));
 
-    // input_context (standard) = H({KI})
+    // input_context (standard) = H_32({KI})
     sp_hash_to_32(domain_separator, data.data(), data.size(), input_context_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -408,7 +408,7 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
     crypto::secret_key extension;
     make_jamtis_onetime_address_extension(sender_receiver_secret, extension);  //H_n(q)
     nominal_spend_key_out = onetime_address;  //Ko_t
-    reduce_seraphis_spendkey(extension, nominal_spend_key_out);  //(-H(q_t)) X + Ko_t
+    reduce_seraphis_spendkey(extension, nominal_spend_key_out);  //(-H_n(q_t)) X + Ko_t
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender_receiver_DH_derivation,

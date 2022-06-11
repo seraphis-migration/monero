@@ -100,7 +100,7 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &onetime_address,
     // make binned reference set generator seed from pieces
 
     // masked address and commitment
-    rct::key masked_address;     //K' = t_k G + H(Ko,C) Ko
+    rct::key masked_address;     //K' = t_k G + H_n(Ko,C) Ko
     rct::key masked_commitment;  //C' = t_c G + C
     make_seraphis_enote_image_masked_keys(onetime_address,
         amount_commitment,
@@ -347,12 +347,12 @@ void make_v1_image_proof_v1(const SpInputProposal &input_proposal,
     crypto::secret_key squash_prefix;
     make_seraphis_squash_prefix(input_enote_core.m_onetime_address,
         input_enote_core.m_amount_commitment,
-        squash_prefix);  // H(Ko,C)
+        squash_prefix);  // H_n(Ko,C)
 
-    // H(Ko,C) (k_{a, recipient} + k_{a, sender})
+    // H_n(Ko,C) (k_{a, recipient} + k_{a, sender})
     crypto::secret_key y;
     sc_mul(to_bytes(y), to_bytes(squash_prefix), to_bytes(input_proposal.m_enote_view_privkey));
-    // H(Ko,C) k_{b, recipient}
+    // H_n(Ko,C) k_{b, recipient}
     crypto::secret_key z;
     sc_mul(to_bytes(z), to_bytes(squash_prefix), to_bytes(spendbase_privkey));
 
@@ -404,14 +404,14 @@ void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
     rct::key transformed_address;
     make_seraphis_squashed_address_key(real_reference_enote.m_onetime_address,
         real_reference_enote.m_amount_commitment,
-        transformed_address);  //H(Ko,C) Ko
+        transformed_address);  //H_n(Ko,C) Ko
 
     rct::key real_Q;
     rct::addKeys(real_Q, transformed_address, real_reference_enote.m_amount_commitment);  //Hn(Ko, C) Ko + C
 
     // check binned reference set generator
     rct::key masked_address;
-    mask_key(address_mask, transformed_address, masked_address);  //K' = t_k G + H(Ko,C) Ko
+    mask_key(address_mask, transformed_address, masked_address);  //K' = t_k G + H_n(Ko,C) Ko
 
     rct::key masked_commitment;
     mask_key(commitment_mask, real_reference_enote.m_amount_commitment, masked_commitment);  //C' = t_c G + C
@@ -497,11 +497,11 @@ void make_v1_membership_proof_v1(SpMembershipProofPrepV1 membership_proof_prep,
     make_seraphis_squashed_address_key(
         membership_proof_prep.m_real_reference_enote.m_onetime_address,
         membership_proof_prep.m_real_reference_enote.m_amount_commitment,
-        alignable_membership_proof_out.m_masked_address);  //H(Ko,C) Ko
+        alignable_membership_proof_out.m_masked_address);  //H_n(Ko,C) Ko
 
     mask_key(membership_proof_prep.m_address_mask,
         alignable_membership_proof_out.m_masked_address,
-        alignable_membership_proof_out.m_masked_address);  //t_k G + H(Ko,C) Ko
+        alignable_membership_proof_out.m_masked_address);  //t_k G + H_n(Ko,C) Ko
 
     // make the membership proof
     make_v1_membership_proof_v1(std::move(membership_proof_prep), alignable_membership_proof_out.m_membership_proof);

@@ -182,7 +182,7 @@ static void compute_K_t1_for_proof(const crypto::secret_key &y,
 }
 //-------------------------------------------------------------------------------------------------------------------
 // MuSig2--style bi-nonce signing merge factor
-// rho_e = H_n("domain-sep", m, alpha_1_1, alpha_2_1, ..., alpha_1_N, alpha_2_N)
+// rho_e = H_n(m, alpha_1_1, alpha_2_1, ..., alpha_1_N, alpha_2_N)
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key multisig_binonce_merge_factor(const rct::key &message,
     const std::vector<multisig_binonce_factors> &nonces)
@@ -581,7 +581,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     rct::key alpha_ki_pub{rct::identity()};
 
     // alpha_ki_2 * U = rho * sum(alpha_ki_2_e * U)
-    // rho = H(m, {alpha_ki_1_e * U}, {alpha_ki_2_e * U})
+    // rho = H_n(m, {alpha_ki_1_e * U}, {alpha_ki_2_e * U})   (binonce merge factor)
     rct::key alpha_ki_2_pub{rct::identity()};
 
     for (const multisig_binonce_factors &nonce_pair : signer_nonces_pub_mul8)

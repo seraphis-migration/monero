@@ -49,7 +49,7 @@ extern "C"
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-// data_out = 'domain-sep' || [input]
+// data_out = 'domain-separator' || [input]
 //-------------------------------------------------------------------------------------------------------------------
 static void hash_data(const std::string &domain_separator,
     const void *input,
@@ -64,7 +64,7 @@ static void hash_data(const std::string &domain_separator,
         data_out.append(reinterpret_cast<const char *>(input), input_length);
 }
 //-------------------------------------------------------------------------------------------------------------------
-// H_32[k]('domain-sep' || [input])
+// H_32[k]('domain-separator' || [input])
 // - if derivation_key == nullptr, then the hash is NOT keyed
 //-------------------------------------------------------------------------------------------------------------------
 static void hash_base(const std::string &domain_separator,

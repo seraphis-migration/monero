@@ -75,7 +75,7 @@ struct SpMultisigPublicInputProposalV1 final
 
     /**
     * brief: get_squash_prefix - get this input's enote's squash prefix
-    * outparam: squash_prefix_out - H(Ko, C)
+    * outparam: squash_prefix_out - H_n(Ko, C)
     */
     void get_squash_prefix(crypto::secret_key &squash_prefix_out) const;
 

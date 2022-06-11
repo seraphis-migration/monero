@@ -123,7 +123,7 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
 *   Ko^t = H_n(Ko,C) Ko
 * param: onetime_address - Ko
 * param: amount_commitment - C
-* outparam: squashed_address_out - H(Ko,C) Ko
+* outparam: squashed_address_out - H_n(Ko,C) Ko
 */
 void make_seraphis_squashed_address_key(const rct::key &onetime_address,
     const rct::key &amount_commitment,

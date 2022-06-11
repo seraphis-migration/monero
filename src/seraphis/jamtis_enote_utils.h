@@ -87,16 +87,16 @@ void make_jamtis_view_tag(const crypto::secret_key &privkey,
     view_tag_t &view_tag_out);
 /**
 * brief: make_jamtis_input_context_coinbase - input context for a sender-receiver secret (coinbase txs)
-*    input_context = H(block_height)
+*    input_context = H_32(block_height)
 * param: block_height - block height of the coinbase tx
-* outparam: input_context_out - H(block height)
+* outparam: input_context_out - H_32(block height)
 */
 void make_jamtis_input_context_coinbase(const std::uint64_t block_height, rct::key &input_context_out);
 /**
 * brief: make_jamtis_input_context_standard - input context for a sender-receiver secret (standard txs)
-*    input_context = H({KI})
+*    input_context = H_32({KI})
 * param: input_key_images - {KI} from the inputs of the tx (sorted)
-* outparam: input_context_out - H({KI})
+* outparam: input_context_out - H_32({KI})
 */
 void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &input_key_images,
     rct::key &input_context_out);
@@ -105,7 +105,7 @@ void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &in
 *    q = H_32(DH_derivation, K_e, input_context)
 * param: sender_receiver_DH_derivation - K_d = 8 * privkey * DH_key
 * param: enote_ephemeral_pubkey - K_e
-* param: input_context - [normal: H({input KI}); coinbase: H(block height)]
+* param: input_context - [normal: H_32({input KI}); coinbase: H_32(block height)]
 * outparam: sender_receiver_secret_out - q
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 */
@@ -119,7 +119,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &send
 * param: privkey - [sender: r] [recipient: k_fr]
 * param: DH_key - [sender: K_2] [sender-change-2out: k_fr * K_3_other] [recipient: K_e = r K_3]
 * param: enote_ephemeral_pubkey - K_e
-* param: input_context - [normal: H({input KI}); coinbase: H(block height)]
+* param: input_context - [normal: H_32({input KI}); coinbase: H_32(block height)]
 * param: hwdev - abstract reference to a hardware-specific implemention of key derivation
 * outparam: sender_receiver_secret_out - q
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
@@ -135,7 +135,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
 *    q = H_32[k_vb](K_e)
 * param: k_view_balance - k_vb
 * param: enote_ephemeral_pubkey - K_e
-* param: input_context - [normal: H({input KI}); coinbase: H(block height)]
+* param: input_context - [normal: H_32({input KI}); coinbase: H_32(block height)]
 * param: self_send_type - type of the self-send enote, used to select the domain separator
 * outparam: sender_receiver_secret_out - q
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
@@ -257,11 +257,11 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
 *    and sender-receiver secret (for a normal enote)
 * param: sender_receiver_DH_derivation - 8 * privkey * DH_key
 * param: enote_ephemeral_pubkey - K_e
-* param: input_context - [normal: H({input KI}); coinbase: H(block height)]
+* param: input_context - [normal: H_32({input KI}); coinbase: H_32(block height)]
 * param: onetime_address - Ko
 * param: view_tag - view_tag
 * outparam: sender_receiver_secret_out - q
-* outparam: nominal_spend_key_out - K'_1 = Ko - H(q) X
+* outparam: nominal_spend_key_out - K'_1 = Ko - H_n(q) X
 * return: true if successfully recomputed the view tag
 */
 bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
