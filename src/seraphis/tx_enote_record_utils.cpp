@@ -589,16 +589,25 @@ bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentContextV1::SpentSt
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+void update_contextual_enote_record_contexts_v1(const SpEnoteOriginContextV1 &new_origin_context,
+    const SpEnoteSpentContextV1 &new_spent_context,
+    SpContextualEnoteRecordV1 &existing_record_inout)
+{
+    try_update_enote_spent_context_v1(new_spent_context, existing_record_inout.m_spent_context);
+    try_update_enote_origin_context_v1(new_origin_context, existing_record_inout.m_origin_context);
+    try_bump_enote_record_origin_status_v1(existing_record_inout.m_spent_context.m_spent_status,
+        existing_record_inout.m_origin_context.m_origin_status);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void update_contextual_enote_record_contexts_v1(const SpContextualEnoteRecordV1 &fresh_record,
     SpContextualEnoteRecordV1 &existing_record_inout)
 {
     CHECK_AND_ASSERT_THROW_MES(fresh_record.m_record == existing_record_inout.m_record,
         "updating a contextual enote record: the fresh record doesn't represent the same enote.");
 
-    try_update_enote_spent_context_v1(fresh_record.m_spent_context, existing_record_inout.m_spent_context);
-    try_update_enote_origin_context_v1(fresh_record.m_origin_context, existing_record_inout.m_origin_context);
-    try_bump_enote_record_origin_status_v1(existing_record_inout.m_spent_context.m_spent_status,
-        existing_record_inout.m_origin_context.m_origin_status);
+    update_contextual_enote_record_contexts_v1(fresh_record.m_origin_context,
+        fresh_record.m_spent_context,
+        existing_record_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

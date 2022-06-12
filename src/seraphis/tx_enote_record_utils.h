@@ -201,6 +201,9 @@ SpEnoteOriginContextV1::OriginStatus origin_status_from_spent_status_v1(
 bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentContextV1::SpentStatus spent_status,
     SpEnoteOriginContextV1::OriginStatus &origin_status_inout);
 //todo
+void update_contextual_enote_record_contexts_v1(const SpEnoteOriginContextV1 &new_origin_context,
+    const SpEnoteSpentContextV1 &new_spent_context,
+    SpContextualEnoteRecordV1 &existing_record_inout);
 void update_contextual_enote_record_contexts_v1(const SpContextualEnoteRecordV1 &fresh_record,
     SpContextualEnoteRecordV1 &existing_record_inout);
 
