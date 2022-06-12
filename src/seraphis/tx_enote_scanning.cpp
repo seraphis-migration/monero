@@ -36,8 +36,10 @@
 #include "jamtis_core_utils.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
+#include "tx_enote_finding_context.h"
 #include "tx_enote_record_types.h"
 #include "tx_enote_record_utils.h"
+#include "tx_enote_scanning_context.h"
 #include "tx_enote_store.h"
 
 //third party headers
@@ -53,13 +55,67 @@
 
 namespace sp
 {
+
+////
+// EnoteScanProcessLedger
+// - raii wrapper on a EnoteScanningContextLedger for a specific scanning process (begin ... terminate)
+///
+class EnoteScanProcessLedger final
+{
+public:
+//constructors
+    /// normal constructor
+    EnoteScanProcessLedger(const std::uint64_t initial_prefix_height,
+        const std::uint64_t max_chunk_size,
+        EnoteScanningContextLedger &enote_scan_context) :
+        m_enote_scan_context{enote_scan_context}
+    {
+        m_enote_scan_context.begin_scanning_from_height(initial_prefix_height, max_chunk_size);
+    }
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [reference wrapper])
+    EnoteScanProcessLedger& operator=(EnoteScanProcessLedger&&) = delete;
+
+//destructor
+    ~EnoteScanProcessLedger()
+    {
+        try { m_enote_scan_context.terminate_scanning(); }
+        catch (...) { /* todo: log error */ }
+    }
+
+//member functions
+    /// try to get the next available onchain chunk (must be contiguous with the last chunk acquired since starting to scan)
+    bool try_get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out)
+    {
+        return m_enote_scan_context.try_get_onchain_chunk(chunk_out);
+    }
+    /// try to get a scanning chunk for the unconfirmed txs in a ledger
+    bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out)
+    {
+        return m_enote_scan_context.try_get_unconfirmed_chunk(chunk_out);
+    }
+
+//member variables
+private:
+    /// reference to an enote finding context
+    EnoteScanningContextLedger &m_enote_scan_context;
+};
+
 enum class ScanStatus
 {
-    SCANNING,
     NEED_FULLSCAN,
     NEED_PARTIALSCAN,
     DONE,
     FAIL
+};
+
+struct ChainContiguityMarker final
+{
+    /// height of the block
+    std::uint64_t m_block_height;
+    /// id of the block (optional)
+    boost::optional<rct::key> m_block_id;
 };
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -285,7 +341,7 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     const SpEnoteStoreV1 &enote_store,
     const std::uint64_t first_contiguity_height,
-    EnoteScanChunkProcessLedger &scan_process_inout,
+    EnoteScanProcessLedger &scan_process_inout,
     ChainContiguityMarker &contiguity_marker_inout,
     ChainContiguityMarker &alignment_marker_inout,
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_inout,
@@ -375,7 +431,7 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
     const crypto::secret_key &k_view_balance,
     const std::uint64_t max_chunk_size,
     const SpEnoteStoreV1 &enote_store,
-    EnoteScanChunkContextLedger &scanning_context_inout,
+    EnoteScanningContextLedger &scanning_context_inout,
     ChainContiguityMarker &contiguity_marker_inout,
     ChainContiguityMarker &alignment_marker_inout,
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_out,
@@ -400,9 +456,7 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
     const std::uint64_t first_contiguity_height{contiguity_marker_inout.m_block_height};
 
     // create the scan process
-    EnoteScanChunkProcessLedger scan_process{contiguity_marker_inout.m_block_height,
-        max_chunk_size,
-        scanning_context_inout};
+    EnoteScanProcessLedger scan_process{contiguity_marker_inout.m_block_height, max_chunk_size, scanning_context_inout};
 
     // on-chain main loop
     const ScanStatus scan_status_first_onchain_pass{
@@ -550,7 +604,7 @@ void check_v1_enote_scan_chunk_nonledger_semantics_v1(const EnoteScanningChunkNo
 void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    EnoteScanChunkContextLedger &scanning_context_inout,
+    EnoteScanningContextLedger &scanning_context_inout,
     SpEnoteStoreV1 &enote_store_inout)
 {
     // we want to scan the first block after the last block that we scanned
@@ -713,7 +767,7 @@ void refresh_enote_store_full(const RefreshLedgerEnoteStoreConfig &ledger_refres
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const EnoteFindingContextOffchain &enote_finding_context,
-    EnoteScanChunkContextLedger &scanning_context_inout,
+    EnoteScanningContextLedger &scanning_context_inout,
     SpEnoteStoreV1 &enote_store_inout)
 {
     refresh_enote_store_ledger(ledger_refresh_config,

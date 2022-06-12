@@ -49,7 +49,11 @@
 #include <vector>
 
 //forward declarations
-
+namespace sp
+{
+    class EnoteScanningContextLedger;
+    class EnoteFindingContextOffchain;
+}
 
 namespace sp
 {
@@ -93,157 +97,6 @@ struct EnoteScanningChunkNonLedgerV1 final
 
 //todo? EnoteScanningChunkOffchainVariantV1: to encapsulate scanning chunk types
 
-////
-// EnoteScanChunkContextLedger
-// - manages a source of ledger-based enote scanning chunks (i.e. finding potentially owned enotes)
-///
-class EnoteScanChunkContextLedger
-{
-public:
-//overloaded operators
-    /// disable copy/move (this is a virtual base class)
-    EnoteScanChunkContextLedger& operator=(EnoteScanChunkContextLedger&&) = delete;
-
-//member functions
-    /// tell the enote finder it can start scanning from a specified block height
-    virtual void begin_scanning_from_height(const std::uint64_t initial_prefix_height,
-        const std::uint64_t max_chunk_size) = 0;
-    /// try to get the next available onchain chunk (must be contiguous with the last chunk acquired since starting to scan)
-    virtual bool try_get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out) = 0;
-    /// try to get a scanning chunk for the unconfirmed txs in a ledger
-    virtual bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) = 0;
-    /// tell the enote finder to stop its scanning process (should be no-throw no-fail)
-    virtual void terminate_scanning() = 0;
-};
-
-////
-// EnoteFindingContextLedger
-// - wraps a ledger context of some kind, produces chunks of potentially owned enotes (from find-received scanning)
-///
-class EnoteFindingContextLedger
-{
-public:
-//overloaded operators
-    /// disable copy/move (this is a virtual base class)
-    EnoteFindingContextLedger& operator=(EnoteFindingContextLedger&&) = delete;
-
-//member functions
-    /// try to get an onchain chunk
-    virtual void try_get_onchain_chunk(const std::uint64_t chunk_prefix_height,
-        const std::uint64_t chunk_max_size,
-        EnoteScanningChunkLedgerV1 &chunk_out) const = 0;
-    virtual void try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const = 0;
-};
-
-//EnoteFindingContextLedgerMock: take mock offchain context, find-received key as input
-
-////
-// EnoteScanChunkContextLedgerDefault
-// - manages an enote finding context for acquiring enote scanning chunks from a ledger context
-// - default implementation
-// - todo: give optional thread pool to constructor, do multi-threaded chunk collection
-///
-class EnoteScanChunkContextLedgerDefault final : public EnoteScanChunkContextLedger
-{
-public:
-//constructor
-    EnoteScanChunkContextLedgerDefault(const EnoteFindingContextLedger &enote_finding_context) :
-        m_enote_finding_context{enote_finding_context}
-    {}
-
-//overloaded operators
-    /// disable copy/move (this is a scoped manager [reference wrapper])
-    EnoteScanChunkContextLedgerDefault& operator=(EnoteScanChunkContextLedgerDefault&&) = delete;
-
-//member functions
-    /// start scanning from a specified block height
-    void begin_scanning_from_height(const std::uint64_t initial_prefix_height, const std::uint64_t max_chunk_size) override;
-    /// try to get the next available onchain chunk (contiguous with the last chunk acquired since starting to scan)
-    bool try_get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out) override;
-    /// try to get a scanning chunk for the unconfirmed txs in a ledger
-    bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) override;
-    /// stop the current scanning process (should be no-throw no-fail)
-    void terminate_scanning() override;
-
-//member variables
-private:
-    /// finds chunks of enotes that are potentially owned
-    const EnoteFindingContextLedger &m_enote_finding_context;
-
-    /// 
-    std::uint64_t m_initial_prefix_height{static_cast<std::uint64_t>(-1)};
-    /// 
-    std::uint64_t m_max_chunk_size{0};
-};
-
-//EnoteScanChunkContextLedgerTest: use mock ledger context, define test case that includes reorgs
-
-////
-// EnoteFindingContextOffchain
-// - wraps an offchain context of some kind, produces chunks of potentially owned enotes (from find-received scanning)
-///
-class EnoteFindingContextOffchain
-{
-public:
-//overloaded operators
-    /// disable copy/move (this is a virtual base class)
-    EnoteFindingContextOffchain& operator=(EnoteFindingContextOffchain&&) = delete;
-
-//member functions
-    /// try to get a fresh offchain chunk
-    virtual bool try_get_offchain_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const = 0;
-};
-
-//EnoteFindingContextOffchainMock: take mock offchain context, find-received key as input
-
-
-
-////
-// EnoteScanChunkProcessLedger
-// - raii wrapper on a EnoteScanChunkContextLedger for a specific scanning process (begin ... terminate)
-///
-class EnoteScanChunkProcessLedger final
-{
-public:
-//constructors
-    /// normal constructor
-    EnoteScanChunkProcessLedger(const std::uint64_t initial_prefix_height,
-        const std::uint64_t max_chunk_size,
-        EnoteScanChunkContextLedger &enote_scan_chunk_context) :
-        m_enote_scan_chunk_context{enote_scan_chunk_context}
-    {
-        m_enote_scan_chunk_context.begin_scanning_from_height(initial_prefix_height, max_chunk_size);
-    }
-
-//overloaded operators
-    /// disable copy/move (this is a scoped manager [reference wrapper])
-    EnoteScanChunkProcessLedger& operator=(EnoteScanChunkProcessLedger&&) = delete;
-
-//destructor
-    ~EnoteScanChunkProcessLedger()
-    {
-        try { m_enote_scan_chunk_context.terminate_scanning(); }
-        catch (...) { /* todo: log error */ }
-    }
-
-//member functions
-    /// try to get the next available onchain chunk (must be contiguous with the last chunk acquired since starting to scan)
-    bool try_get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out)
-    {
-        return m_enote_scan_chunk_context.try_get_onchain_chunk(chunk_out);
-    }
-    /// try to get a scanning chunk for the unconfirmed txs in a ledger
-    bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out)
-    {
-        return m_enote_scan_chunk_context.try_get_unconfirmed_chunk(chunk_out);
-    }
-
-//member variables
-private:
-    /// reference to an enote finding context
-    EnoteScanChunkContextLedger &m_enote_scan_chunk_context;
-};
-
 struct RefreshLedgerEnoteStoreConfig final
 {
     /// number of blocks below highest known contiguous block to start scanning
@@ -252,14 +105,6 @@ struct RefreshLedgerEnoteStoreConfig final
     std::uint64_t m_max_chunk_size{100};
     /// maximum number of times to try rescanning if a partial reorg is detected
     std::uint64_t m_max_partialscan_attempts{3};
-};
-
-struct ChainContiguityMarker final
-{
-    /// height of the block
-    std::uint64_t m_block_height;
-    /// id of the block (optional)
-    boost::optional<rct::key> m_block_id;
 };
 
 //todo
@@ -273,7 +118,7 @@ void check_v1_enote_scan_chunk_nonledger_semantics_v1(const EnoteScanningChunkNo
 void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    EnoteScanChunkContextLedger &scanning_context_inout,
+    EnoteScanningContextLedger &scanning_context_inout,
     SpEnoteStoreV1 &enote_store_inout);
 
 void refresh_enote_store_offchain(const rct::key &wallet_spend_pubkey,
@@ -285,7 +130,7 @@ void refresh_enote_store_full(const RefreshLedgerEnoteStoreConfig &ledger_refres
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const EnoteFindingContextOffchain &enote_finding_context,
-    EnoteScanChunkContextLedger &scanning_context_inout,
+    EnoteScanningContextLedger &scanning_context_inout,
     SpEnoteStoreV1 &enote_store_inout);
 
 } //namespace sp
