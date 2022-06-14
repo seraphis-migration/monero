@@ -440,10 +440,12 @@ static bool test_info_recovery_addressindex(const sp::jamtis::address_index_t j)
         return false;
 
     // encrypt and decrypt an address tag
-    crypto::secret_key encryption_key;
-    make_secret_key(encryption_key);
-    const encrypted_address_tag_t encrypted_ciphered_tag{encrypt_address_tag(rct::sk2rct(encryption_key), ciphered_tag)};
-    if (decrypt_address_tag(rct::sk2rct(encryption_key), encrypted_ciphered_tag) != ciphered_tag)
+    const rct::key sender_receiver_secret{rct::skGen()};
+    const rct::key onetime_address{rct::pkGen()};
+    const encrypted_address_tag_t encrypted_ciphered_tag{
+            encrypt_address_tag(sender_receiver_secret, onetime_address, ciphered_tag)
+        };
+    if (decrypt_address_tag(sender_receiver_secret, onetime_address, encrypted_ciphered_tag) != ciphered_tag)
         return false;
 
     return true;

@@ -77,20 +77,23 @@ constexpr std::size_t AES_BLOCK_SIZE{16};
 constexpr std::size_t TWOFISH_BLOCK_SIZE{16};
 
 //-------------------------------------------------------------------------------------------------------------------
-// encryption_secret = truncate_to_addr_tag_size(H_32(encryption_key))
+// encryption_secret = truncate_to_addr_tag_size(H_32(q, Ko))
 //-------------------------------------------------------------------------------------------------------------------
-static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct::key &encryption_key)
+static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct::key &sender_receiver_secret,
+    const rct::key &onetime_address)
 {
     static_assert(sizeof(encrypted_address_tag_secret_t) <= 32, "");
 
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG};
 
-    // temp_encryption_secret = H_32(encryption_key)
+    // temp_encryption_secret = H_32(q, Ko)
+    std::string data;
+    data.reserve(2 * sizeof(rct::key));
+    data.append(reinterpret_cast<const char*>(sender_receiver_secret.bytes), sizeof(rct::key));
+    data.append(reinterpret_cast<const char*>(onetime_address.bytes), sizeof(rct::key));
+
     rct::key temp_encryption_secret;
-    sp_hash_to_32(domain_separator,
-        encryption_key.bytes,
-        sizeof(rct::key),
-        temp_encryption_secret.bytes);
+    sp_hash_to_32(domain_separator, data.data(), data.size(), temp_encryption_secret.bytes);
 
     // truncate to desired size of the secret
     encrypted_address_tag_secret_t encryption_secret;
@@ -388,18 +391,22 @@ bool try_decipher_address_index(const rct::key &cipher_key, const address_tag_t 
     return try_decipher_address_index(cipher_context, addr_tag, j_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key, const address_tag_t &addr_tag)
+encrypted_address_tag_t encrypt_address_tag(const rct::key &sender_receiver_secret,
+    const rct::key &onetime_address,
+    const address_tag_t &addr_tag)
 {
     static_assert(sizeof(address_tag_t), "");
 
     // addr_tag_enc = addr_tag XOR encryption_secret
-    return addr_tag ^ get_encrypted_address_tag_secret(encryption_key);
+    return addr_tag ^ get_encrypted_address_tag_secret(sender_receiver_secret, onetime_address);
 }
 //-------------------------------------------------------------------------------------------------------------------
-address_tag_t decrypt_address_tag(const rct::key &encryption_key, const encrypted_address_tag_t &addr_tag_enc)
+address_tag_t decrypt_address_tag(const rct::key &sender_receiver_secret,
+    const rct::key &onetime_address,
+    const encrypted_address_tag_t &addr_tag_enc)
 {
     // addr_tag = addr_tag_enc XOR encryption_secret
-    return addr_tag_enc ^ get_encrypted_address_tag_secret(encryption_key);
+    return addr_tag_enc ^ get_encrypted_address_tag_secret(sender_receiver_secret, onetime_address);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void gen_address_tag(address_tag_t &addr_tag_inout)

@@ -94,9 +94,6 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(const rct::key &input_conte
     auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
     make_jamtis_sender_receiver_secret_plain(K_d, output_proposal_out.m_enote_ephemeral_pubkey, input_context, q);
 
-    // encrypt address tag: addr_tag_enc = addr_tag(cipher(j || mac)) ^ H(q)
-    output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, m_destination.m_addr_tag);
-
     // enote amount baked key: 8 r G
     crypto::key_derivation amount_baked_key;
     auto bk_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&amount_baked_key, sizeof(rct::key)); });
@@ -121,6 +118,10 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(const rct::key &input_conte
         temp_amount_commitment,
         m_destination.m_addr_K1,
         output_proposal_out.m_core.m_onetime_address);
+
+    // encrypt address tag: addr_tag_enc = addr_tag(cipher(j || mac)) ^ H(q, Ko)
+    output_proposal_out.m_addr_tag_enc =
+        encrypt_address_tag(q, output_proposal_out.m_core.m_onetime_address, m_destination.m_addr_tag);
 
     // view tag: view_tag = H_1(K_d, Ko)
     make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
@@ -182,24 +183,6 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
         m_type,
         q);
 
-    // encrypt address index: addr_tag_enc = addr_tag(j, mac) ^ H(q)
-
-    // 1. extract the address index from the destination address's address tag
-    crypto::secret_key generateaddress_secret;
-    crypto::secret_key ciphertag_secret;
-    make_jamtis_generateaddress_secret(viewbalance_privkey, generateaddress_secret);
-    make_jamtis_ciphertag_secret(generateaddress_secret, ciphertag_secret);
-    address_index_t j;
-    CHECK_AND_ASSERT_THROW_MES(try_decipher_address_index(rct::sk2rct(ciphertag_secret), m_destination.m_addr_tag, j),
-        "Failed to create a self-send-type output proposal: could not decipher the destination's address tag.");
-
-    // 2. make a raw address tag (not ciphered)
-    const address_tag_t raw_address_tag{j};
-
-    // 3. encrypt the raw address tag: addr_tag_enc = addr_tag(j || mac) ^ H(q)
-    output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, raw_address_tag);
-
-
     // amount blinding factor: y = H_n(q)  //note: no baked key
     make_jamtis_amount_blinding_factor_selfsend(q, output_proposal_out.m_core.m_amount_blinding_factor);
 
@@ -219,6 +202,24 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
         temp_amount_commitment,
         m_destination.m_addr_K1,
         output_proposal_out.m_core.m_onetime_address);
+
+    // encrypt address index: addr_tag_enc = addr_tag(j, mac) ^ H(q, Ko)
+
+    // 1. extract the address index from the destination address's address tag
+    crypto::secret_key generateaddress_secret;
+    crypto::secret_key ciphertag_secret;
+    make_jamtis_generateaddress_secret(viewbalance_privkey, generateaddress_secret);
+    make_jamtis_ciphertag_secret(generateaddress_secret, ciphertag_secret);
+    address_index_t j;
+    CHECK_AND_ASSERT_THROW_MES(try_decipher_address_index(rct::sk2rct(ciphertag_secret), m_destination.m_addr_tag, j),
+        "Failed to create a self-send-type output proposal: could not decipher the destination's address tag.");
+
+    // 2. make a raw address tag (not ciphered)
+    const address_tag_t raw_address_tag{j};
+
+    // 3. encrypt the raw address tag: addr_tag_enc = addr_tag(j || mac) ^ H(q, Ko)
+    output_proposal_out.m_addr_tag_enc =
+        encrypt_address_tag(q, output_proposal_out.m_core.m_onetime_address, raw_address_tag);
 
     // derived key: K_d = 8*r*K_2
     crypto::key_derivation K_d;

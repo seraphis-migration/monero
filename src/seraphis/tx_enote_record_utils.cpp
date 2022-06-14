@@ -201,7 +201,7 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
 
     // t'_addr
     basic_record_out.m_nominal_address_tag =
-        jamtis::decrypt_address_tag(nominal_sender_receiver_secret, enote.m_addr_tag_enc);
+        jamtis::decrypt_address_tag(nominal_sender_receiver_secret, enote.m_core.m_onetime_address, enote.m_addr_tag_enc);
 
     // copy enote
     basic_record_out.m_enote = enote;
@@ -438,7 +438,9 @@ bool try_get_enote_record_v1_selfsend_for_type(const SpEnoteV1 &enote,
         q);
 
     // decrypt encrypted address tag
-    const jamtis::address_tag_t decrypted_addr_tag{decrypt_address_tag(q, enote.m_addr_tag_enc)};
+    const jamtis::address_tag_t decrypted_addr_tag{
+            decrypt_address_tag(q, enote.m_core.m_onetime_address, enote.m_addr_tag_enc)
+        };
 
     // try to get the address index (includes MAC check)
     if (!try_get_address_index(decrypted_addr_tag, record_out.m_address_index))

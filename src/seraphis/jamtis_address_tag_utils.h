@@ -100,10 +100,14 @@ bool try_decipher_address_index(const jamtis_address_tag_cipher_context &cipher_
 bool try_decipher_address_index(const rct::key &cipher_key, const address_tag_t &addr_tag, address_index_t &j_out);
 
 /// addr_tag_enc = addr_tag XOR addr_tag_enc_secret
-encrypted_address_tag_t encrypt_address_tag(const rct::key &encryption_key, const address_tag_t &addr_tag);
+encrypted_address_tag_t encrypt_address_tag(const rct::key &sender_receiver_secret,
+    const rct::key &onetime_address,
+    const address_tag_t &addr_tag);
 
 /// addr_tag = addr_tag_enc XOR addr_tag_enc_secret
-address_tag_t decrypt_address_tag(const rct::key &encryption_key, const encrypted_address_tag_t &addr_tag_enc);
+address_tag_t decrypt_address_tag(const rct::key &sender_receiver_secret,
+    const rct::key &onetime_address,
+    const encrypted_address_tag_t &addr_tag_enc);
 
 /// generate a random tag
 void gen_address_tag(address_tag_t &addr_tag_inout);

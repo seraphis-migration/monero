@@ -232,7 +232,7 @@ public:
                 basic_enote_record))
             return m_test_view_tag_check;  // this branch is only valid if trying to trigger view tag check
 
-        return basic_enote_record.m_nominal_spend_key == m_recipient_spend_key;
+        return true;
     }
 
 private:
@@ -728,11 +728,11 @@ public:
                 record_index == num_records - 1)
                 continue;
 
-            // ONE_FAKE_TAG_MATCH: mangle the nominal spendkey if we are the last record (don't modify the address tag)
+            // ONE_FAKE_TAG_MATCH: mangle the onetime address if we are the last record (don't modify the address tag)
             if (m_mode == ScannerClientModes::ONE_FAKE_TAG_MATCH &&
                 record_index == num_records - 1)
             {
-                m_basic_records.back().m_nominal_spend_key = rct::pkGen();
+                m_basic_records.back().m_enote.m_core.m_onetime_address = rct::pkGen();
                 continue;
             }
 
@@ -764,6 +764,7 @@ public:
                     try_get_enote_record_v1_plain(m_basic_records[record_index],
                         m_keys.K_1_base,
                         m_keys.k_vb,
+                        m_keys.k_fr,
                         m_keys.s_ga,
                         *m_cipher_context,
                         enote_record)
