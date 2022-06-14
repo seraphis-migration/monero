@@ -94,14 +94,8 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(const rct::key &input_conte
     auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
     make_jamtis_sender_receiver_secret_plain(K_d, output_proposal_out.m_enote_ephemeral_pubkey, input_context, q);
 
-    // encrypt address tag: addr_tag_enc = addr_tag(blowfish(j || mac)) ^ H_8(q)
+    // encrypt address tag: addr_tag_enc = addr_tag(cipher(j || mac)) ^ H_8(q)
     output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, m_destination.m_addr_tag);
-
-    // onetime address: Ko = H_n(q) X + K_1
-    make_jamtis_onetime_address(q, m_destination.m_addr_K1, output_proposal_out.m_core.m_onetime_address);
-
-    // view tag: view_tag = H_1(K_d, Ko)
-    make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
 
     // enote amount baked key: 8 r G
     crypto::key_derivation amount_baked_key;
@@ -116,6 +110,20 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(const rct::key &input_conte
 
     // encrypted amount: enc_amount = a ^ H_8(q, 8 r G)
     output_proposal_out.m_encoded_amount = encode_jamtis_amount_plain(m_amount, q, amount_baked_key);
+
+    // amount commitment (temporary)
+    const rct::key temp_amount_commitment{
+            rct::commit(m_amount, rct::sk2rct(output_proposal_out.m_core.m_amount_blinding_factor))
+        };
+
+    // onetime address: Ko = H_n(q, C) X + K_1
+    make_jamtis_onetime_address(q,
+        temp_amount_commitment,
+        m_destination.m_addr_K1,
+        output_proposal_out.m_core.m_onetime_address);
+
+    // view tag: view_tag = H_1(K_d, Ko)
+    make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
 
     // memo elements
     output_proposal_out.m_partial_memo = m_partial_memo;
@@ -192,16 +200,6 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
     output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, raw_address_tag);
 
 
-    // derived key: K_d = 8*r*K_2
-    crypto::key_derivation K_d;
-    crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
-
-    // onetime address: Ko = H_n(q) X + K_1
-    make_jamtis_onetime_address(q, m_destination.m_addr_K1, output_proposal_out.m_core.m_onetime_address);
-
-    // view tag: view_tag = H_1(K_d, Ko)
-    make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
-
     // amount blinding factor: y = H_n(q)  //note: no baked key
     make_jamtis_amount_blinding_factor_selfsend(q, output_proposal_out.m_core.m_amount_blinding_factor);
 
@@ -210,6 +208,24 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
 
     // encrypted amount: enc_amount = a ^ H_8(q)  //note: no baked key
     output_proposal_out.m_encoded_amount = encode_jamtis_amount_selfsend(m_amount, q);
+
+    // amount commitment (temporary)
+    const rct::key temp_amount_commitment{
+            rct::commit(m_amount, rct::sk2rct(output_proposal_out.m_core.m_amount_blinding_factor))
+        };
+
+    // onetime address: Ko = H_n(q, C) X + K_1
+    make_jamtis_onetime_address(q,
+        temp_amount_commitment,
+        m_destination.m_addr_K1,
+        output_proposal_out.m_core.m_onetime_address);
+
+    // derived key: K_d = 8*r*K_2
+    crypto::key_derivation K_d;
+    crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
+
+    // view tag: view_tag = H_1(K_d, Ko)
+    make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
 
     // memo elements
     output_proposal_out.m_partial_memo = m_partial_memo;

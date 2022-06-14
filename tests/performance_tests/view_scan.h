@@ -303,6 +303,7 @@ inline unsigned char make_seraphis_view_tag_siphash(const crypto::secret_key &pr
 inline bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_derivation &sender_receiver_DH_derivation,
     const rct::key &enote_ephemeral_pubkey,
     const rct::key &onetime_address,
+    const rct::key &amount_commitment,
     const unsigned char view_tag,
     rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out)
@@ -323,7 +324,9 @@ inline bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_der
 
     // K'^s_t = Ko_t - H(q_t) X
     crypto::secret_key k_a_extender;
-    sp::jamtis::make_jamtis_onetime_address_extension(sender_receiver_secret_out, k_a_extender);  // H(q_t)
+    sp::jamtis::make_jamtis_onetime_address_extension(sender_receiver_secret_out,
+        amount_commitment,
+        k_a_extender);  // H(q_t)
     sc_mul(to_bytes(k_a_extender), sp::MINUS_ONE.bytes, to_bytes(k_a_extender));  // -H(q_t)
     nominal_spend_key_out = onetime_address;  // Ko_t
     sp::extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
@@ -379,13 +382,16 @@ public:
         rct::key sender_receiver_secret_dummy;
         crypto::key_derivation derivation;
 
-        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_ephemeral_pubkey), m_recipient_findreceived_key, derivation);
+        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_ephemeral_pubkey),
+            m_recipient_findreceived_key,
+            derivation);
 
         rct::key nominal_recipient_spendkey;
 
         if (!try_get_jamtis_nominal_spend_key_plain_siphash(derivation,
             m_enote_ephemeral_pubkey,
             m_enote.m_core.m_onetime_address,
+            m_enote.m_core.m_amount_commitment,
             m_enote.m_view_tag,
             sender_receiver_secret_dummy,  //outparam not used
             nominal_recipient_spendkey))

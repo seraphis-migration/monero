@@ -148,20 +148,24 @@ void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_vie
 /**
 * brief: make_jamtis_onetime_address_extension - extension for transforming a recipient spendkey into an
 *        enote one-time address
-*    k_{a, sender} = H_n(q)
+*    k_{a, sender} = H_n(q, C)
 * param: sender_receiver_secret - q
+* param: amount_commitment - C
 * outparam: sender_extension_out - k_{a, sender}
 */
 void make_jamtis_onetime_address_extension(const rct::key &sender_receiver_secret,
+    const rct::key &amount_commitment,
     crypto::secret_key &sender_extension_out);
 /**
 * brief: make_jamtis_onetime_address - create a onetime address
-*    Ko = H_n(q) X + K_1
+*    Ko = H_n(q, C) X + K_1
 * param: sender_receiver_secret - q
+* param: amount_commitment - C
 * param: recipient_spend_key - K_1
 * outparam: onetime_address_out - Ko
 */
 void make_jamtis_onetime_address(const rct::key &sender_receiver_secret,
+    const rct::key &amount_commitment,
     const rct::key &recipient_spend_key,
     rct::key &onetime_address_out);
 /**
@@ -244,13 +248,15 @@ rct::xmr_amount decode_jamtis_amount_selfsend(const rct::xmr_amount encoded_amou
     const rct::key &sender_receiver_secret);
 /**
 * brief: make_jamtis_nominal_spend_key - make a nominal spend key from a onetime address
-*   K'_1 = Ko - H_n(q) X
+*   K'_1 = Ko - H_n(q, C) X
 * param: sender_receiver_secret - q
 * param: onetime_address - Ko
+* param: amount_commitment - C
 * outparam: nominal_spend_key_out - K'_1
 */
 void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
     const rct::key &onetime_address,
+    const rct::key &amount_commitment,
     rct::key &nominal_spend_key_out);
 /**
 * brief: try_get_jamtis_nominal_spend_key_plain - test view tag; if it passes, compute and return the nominal spend key
@@ -259,15 +265,17 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
 * param: enote_ephemeral_pubkey - K_e
 * param: input_context - [normal: H_32({input KI}); coinbase: H_32(block height)]
 * param: onetime_address - Ko
+* param: amount_commitment - C
 * param: view_tag - view_tag
 * outparam: sender_receiver_secret_out - q
-* outparam: nominal_spend_key_out - K'_1 = Ko - H_n(q) X
+* outparam: nominal_spend_key_out - K'_1 = Ko - H_n(q, C) X
 * return: true if successfully recomputed the view tag
 */
 bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
     const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &onetime_address,
+    const rct::key &amount_commitment,
     const view_tag_t view_tag,
     rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out);

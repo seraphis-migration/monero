@@ -311,24 +311,29 @@ void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_vie
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_onetime_address_extension(const rct::key &sender_receiver_secret,
+    const rct::key &amount_commitment,
     crypto::secret_key &sender_extension_out)
 {
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION};
 
-    // k_{a, sender} = H_n(q)
-    sp_hash_to_scalar(domain_separator, sender_receiver_secret.bytes, sizeof(rct::key), to_bytes(sender_extension_out));
+    // k_{a, sender} = H_n(q, C)
+    epee::wipeable_string data;
+    get_doublekey_hash_data(sender_receiver_secret.bytes, amount_commitment.bytes, data);
+
+    sp_hash_to_scalar(domain_separator, data.data(), data.size(), to_bytes(sender_extension_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_onetime_address(const rct::key &sender_receiver_secret,
+    const rct::key &amount_commitment,
     const rct::key &recipient_spend_key,
     rct::key &onetime_address_out)
 {
-    // Ko = H_n(q) X + K_1
+    // Ko = H_n(q, C) X + K_1
     crypto::secret_key extension;
-    make_jamtis_onetime_address_extension(sender_receiver_secret, extension);  //H_n(q)
+    make_jamtis_onetime_address_extension(sender_receiver_secret, amount_commitment, extension);  //H_n(q, C)
 
     onetime_address_out = recipient_spend_key;
-    extend_seraphis_spendkey(extension, onetime_address_out);  //H_n(q) X + K_1
+    extend_seraphis_spendkey(extension, onetime_address_out);  //H_n(q, C) X + K_1
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_amount_baked_key_plain_sender(const crypto::secret_key &enote_privkey,
@@ -402,19 +407,21 @@ rct::xmr_amount decode_jamtis_amount_selfsend(const rct::xmr_amount encoded_amou
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
     const rct::key &onetime_address,
+    const rct::key &amount_commitment,
     rct::key &nominal_spend_key_out)
 {
-    // K'_1 = Ko - H_n(q) X
+    // K'_1 = Ko - H_n(q, C) X
     crypto::secret_key extension;
-    make_jamtis_onetime_address_extension(sender_receiver_secret, extension);  //H_n(q)
+    make_jamtis_onetime_address_extension(sender_receiver_secret, amount_commitment, extension);  //H_n(q, C)
     nominal_spend_key_out = onetime_address;  //Ko_t
-    reduce_seraphis_spendkey(extension, nominal_spend_key_out);  //(-H_n(q_t)) X + Ko_t
+    reduce_seraphis_spendkey(extension, nominal_spend_key_out);  //(-H_n(q, C)) X + Ko_t
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
     const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &onetime_address,
+    const rct::key &amount_commitment,
     const view_tag_t view_tag,
     rct::key &sender_receiver_secret_out,
     rct::key &nominal_spend_key_out)
@@ -433,7 +440,7 @@ bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender
         sender_receiver_secret_out);
 
     // K'_1 = Ko - H_n(q) X
-    make_jamtis_nominal_spend_key(sender_receiver_secret_out, onetime_address, nominal_spend_key_out);
+    make_jamtis_nominal_spend_key(sender_receiver_secret_out, onetime_address, amount_commitment, nominal_spend_key_out);
 
     return true;
 }
