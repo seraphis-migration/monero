@@ -153,7 +153,7 @@ static void check_is_owned_with_intermediate_record(const sp::SpOutputProposalV1
 
     // get full enote record from intermediate record
     sp::SpEnoteRecordV1 enote_record;
-    sp::get_enote_record_v1_plain(intermediate_enote_record, keys.K_1_base, keys.k_vb, keys.s_ga, enote_record);
+    EXPECT_TRUE(sp::try_get_enote_record_v1_plain(intermediate_enote_record, keys.K_1_base, keys.k_vb, enote_record));
 
     // check misc fields
     EXPECT_TRUE(enote_record.m_type == sp::jamtis::JamtisEnoteType::PLAIN);

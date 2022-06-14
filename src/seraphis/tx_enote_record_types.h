@@ -84,8 +84,6 @@ struct SpIntermediateEnoteRecordV1 final
     rct::key m_enote_ephemeral_pubkey;
     /// context of the tx input(s) associated with this enote
     rct::key m_input_context;
-    /// q': nominal shared secret
-    rct::key m_nominal_sender_receiver_secret;
     /// a: amount
     rct::xmr_amount m_amount;
     /// x: amount blinding factor

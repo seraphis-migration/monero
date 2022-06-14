@@ -59,15 +59,15 @@ namespace sp
 * brief: try_get_basic_enote_record_v1 - try to extract a basic enote record from an enote
 * param: enote -
 * param: enote_ephemeral_pubkey -
-* param: sender_receiver_DH_derivation -
 * param: input_context -
+* param: sender_receiver_DH_derivation -
 * outparam: basic_record_out -
 * return: true if an extraction succeeded
 */
 bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
-    const crypto::key_derivation &sender_receiver_DH_derivation,
     const rct::key &input_context,
+    const crypto::key_derivation &sender_receiver_DH_derivation,
     SpBasicEnoteRecordV1 &basic_record_out);
 bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
@@ -77,7 +77,9 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
     SpBasicEnoteRecordV1 &basic_record_out);
 /**
 * brief: try_get_intermediate_enote_record_v1 - try to extract an intermediate enote record from an enote
-* param: basic_record -
+* param: enote -
+* param: enote_ephemeral_pubkey -
+* param: input_context -
 * param: wallet_spend_pubkey -
 * param: k_find_received -
 * param: s_generate_address -
@@ -85,16 +87,13 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
 * outparam: record_out -
 * return: true if an extraction succeeded
 */
-bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
+bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
-    SpIntermediateEnoteRecordV1 &record_out);
-bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_find_received,
-    const crypto::secret_key &s_generate_address,
     SpIntermediateEnoteRecordV1 &record_out);
 bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
@@ -103,17 +102,33 @@ bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     SpIntermediateEnoteRecordV1 &record_out);
+bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_find_received,
+    const crypto::secret_key &s_generate_address,
+    const jamtis::jamtis_address_tag_cipher_context &cipher_context,
+    SpIntermediateEnoteRecordV1 &record_out);
+bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_find_received,
+    const crypto::secret_key &s_generate_address,
+    SpIntermediateEnoteRecordV1 &record_out);
 /**
 * brief: try_get_enote_record_v1_plain - try to extract an enote record from an enote treated as a plain jamtis enote
-* param: basic_record -
+* param: enote -
+* param: enote_ephemeral_pubkey -
+* param: input_context -
 * param: wallet_spend_pubkey -
 * param: k_view_balance -
-* param: k_find_received -
-* param: s_generate_address -
-* param: cipher_context -
 * outparam: record_out -
 * return: true if an extraction succeeded
 */
+bool try_get_enote_record_v1_plain(const SpEnoteV1 &enote,
+    const rct::key &enote_ephemeral_pubkey,
+    const rct::key &input_context,
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    SpEnoteRecordV1 &record_out);
 bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
@@ -125,25 +140,9 @@ bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out);
-bool try_get_enote_record_v1_plain(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
-    const rct::key &input_context,
+bool try_get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    SpEnoteRecordV1 &record_out);
-/**
-* brief: get_enote_record_v1_plain - get an enote record from an enote treated as a plain jamtis enote
-*   - precondition: data stored in the intermediate record is assumed to be correct/valid for this user
-* param: intermediate_record -
-* param: wallet_spend_pubkey -
-* param: k_view_balance -
-* param: s_generate_address -
-* outparam: record_out -
-*/
-void get_enote_record_v1_plain(const SpIntermediateEnoteRecordV1 &intermediate_record,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const crypto::secret_key &s_generate_address,
     SpEnoteRecordV1 &record_out);
 /**
 * brief: try_get_enote_record_v1_selfsend - try to extract an enote record from an enote treated as a selfsend jamtis enote
