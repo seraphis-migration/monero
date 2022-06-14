@@ -59,8 +59,8 @@ void SpEnoteV1::append_to_string(std::string &str_inout) const
     {
         str_inout += static_cast<char>(m_encoded_amount >> i*8);
     }
-    str_inout += static_cast<char>(m_view_tag);
     str_inout.append(reinterpret_cast<const char*>(m_addr_tag_enc.bytes), sizeof(jamtis::encrypted_address_tag_t));
+    str_inout += static_cast<char>(m_view_tag);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpEnoteV1::gen()

@@ -98,10 +98,10 @@ struct SpOutputProposalV1 final
     rct::key m_enote_ephemeral_pubkey;
     /// enc_a
     rct::xmr_amount m_encoded_amount;
-    /// view_tag
-    jamtis::view_tag_t m_view_tag;
     /// addr_tag_enc
     jamtis::encrypted_address_tag_t m_addr_tag_enc;
+    /// view_tag
+    jamtis::view_tag_t m_view_tag;
 
     /// memo elements to add to the tx memo
     TxExtra m_partial_memo;

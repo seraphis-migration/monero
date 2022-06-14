@@ -63,10 +63,10 @@ struct SpEnoteV1 final
 
     /// enc(a)
     rct::xmr_amount m_encoded_amount;
-    /// view_tag
-    jamtis::view_tag_t m_view_tag;
     /// addr_tag_enc
     jamtis::encrypted_address_tag_t m_addr_tag_enc;
+    /// view_tag
+    jamtis::view_tag_t m_view_tag;
 
     /// less-than operator for sorting
     bool operator<(const SpEnoteV1 &other_enote) const
@@ -85,7 +85,7 @@ struct SpEnoteV1 final
 
     /**
     * brief: append_to_string - convert enote to a string and append to existing string
-    *   str += Ko || C || enc(a) || view_tag || addr_tag_enc
+    *   str += Ko || C || enc(a) || addr_tag_enc || view_tag
     * inoutparam: str_inout - contents concatenated to a string
     */
     void append_to_string(std::string &str_inout) const;
@@ -97,8 +97,8 @@ struct SpEnoteV1 final
     {
         return SpEnote::get_size_bytes() +
             sizeof(rct::xmr_amount) +
-            sizeof(jamtis::view_tag_t) +
-            sizeof(jamtis::encrypted_address_tag_t);
+            sizeof(jamtis::encrypted_address_tag_t) +
+            sizeof(jamtis::view_tag_t);
     }
 };
 

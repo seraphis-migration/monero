@@ -60,8 +60,8 @@ void SpOutputProposalV1::get_enote_v1(SpEnoteV1 &enote_out) const
 
     // enote misc. details
     enote_out.m_encoded_amount = m_encoded_amount;
-    enote_out.m_view_tag = m_view_tag;
     enote_out.m_addr_tag_enc = m_addr_tag_enc;
+    enote_out.m_view_tag = m_view_tag;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpOutputProposalV1::gen(const rct::xmr_amount amount, const std::size_t num_random_memo_elements)
@@ -71,8 +71,8 @@ void SpOutputProposalV1::gen(const rct::xmr_amount amount, const std::size_t num
 
     m_enote_ephemeral_pubkey = rct::pkGen();
     m_encoded_amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));
-    m_view_tag = crypto::rand_idx(static_cast<jamtis::view_tag_t>(-1));
     crypto::rand(sizeof(m_addr_tag_enc), m_addr_tag_enc.bytes);
+    m_view_tag = crypto::rand_idx(static_cast<jamtis::view_tag_t>(-1));
 
     std::vector<ExtraFieldElement> memo_elements;
     memo_elements.resize(num_random_memo_elements);
