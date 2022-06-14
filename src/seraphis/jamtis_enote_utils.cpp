@@ -417,14 +417,12 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
     reduce_seraphis_spendkey(extension, nominal_spend_key_out);  //(-H_n(q, C)) X + Ko_t
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
+bool try_get_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
     const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &onetime_address,
-    const rct::key &amount_commitment,
     const view_tag_t view_tag,
-    rct::key &sender_receiver_secret_out,
-    rct::key &nominal_spend_key_out)
+    rct::key &sender_receiver_secret_out)
 {
     // recompute view tag and check that it matches; short-circuit on failure
     view_tag_t recomputed_view_tag;
@@ -438,9 +436,6 @@ bool try_get_jamtis_nominal_spend_key_plain(const crypto::key_derivation &sender
         enote_ephemeral_pubkey,
         input_context,
         sender_receiver_secret_out);
-
-    // K'_1 = Ko - H_n(q) X
-    make_jamtis_nominal_spend_key(sender_receiver_secret_out, onetime_address, amount_commitment, nominal_spend_key_out);
 
     return true;
 }

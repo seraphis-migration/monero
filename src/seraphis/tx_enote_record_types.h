@@ -56,7 +56,7 @@ namespace sp
 
 ////
 // SpBasicEnoteRecordV1  (jamtis 'plain' enote type only)
-// - info extracted from a v1 enote using a jamtis find-received key
+// - nominal address tag extracted from a v1 enote using a jamtis find-received key
 // - does not have: a, x, j, k_a, KI
 ///
 struct SpBasicEnoteRecordV1 final
@@ -67,10 +67,6 @@ struct SpBasicEnoteRecordV1 final
     rct::key m_enote_ephemeral_pubkey;
     /// context of the tx input(s) associated with this enote
     rct::key m_input_context;
-    /// q': nominal shared secret
-    rct::key m_nominal_sender_receiver_secret;
-    /// K'_1: nominal spend key
-    rct::key m_nominal_spend_key;
     /// t'_addr: nominal address tag
     jamtis::address_tag_t m_nominal_address_tag;
 };

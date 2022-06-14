@@ -239,6 +239,7 @@ static void process_chunk_new_record_update(const SpEnoteRecordV1 &new_enote_rec
 //-------------------------------------------------------------------------------------------------------------------
 static void process_chunk(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     const SpEnoteStoreV1 &enote_store,
@@ -279,6 +280,7 @@ static void process_chunk(const rct::key &wallet_spend_pubkey,
             if (try_get_enote_record_v1_plain(contextual_basic_record.m_record,
                 wallet_spend_pubkey,
                 k_view_balance,
+                k_find_received,
                 s_generate_address,
                 cipher_context,
                 new_enote_record))
@@ -337,6 +339,7 @@ static void process_chunk(const rct::key &wallet_spend_pubkey,
 //-------------------------------------------------------------------------------------------------------------------
 static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     const SpEnoteStoreV1 &enote_store,
@@ -389,6 +392,7 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
         // process the chunk (update found enote records and spent key images)
         process_chunk(wallet_spend_pubkey,
             k_view_balance,
+            k_find_received,
             s_generate_address,
             cipher_context,
             enote_store,
@@ -445,8 +449,10 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
     accumulated_output_counts_out.clear();
 
     // prepare for chunk processing
+    crypto::secret_key k_find_received;
     crypto::secret_key s_generate_address;
     crypto::secret_key s_cipher_tag;
+    jamtis::make_jamtis_findreceived_key(k_view_balance, k_find_received);
     jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
     jamtis::make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
 
@@ -462,6 +468,7 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
     const ScanStatus scan_status_first_onchain_pass{
         process_ledger_for_full_refresh_onchain_pass(wallet_spend_pubkey,
             k_view_balance,
+            k_find_received,
             s_generate_address,
             cipher_context,
             enote_store,
@@ -486,6 +493,7 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
         // process the chunk (update found enote records and spent key images)
         process_chunk(wallet_spend_pubkey,
             k_view_balance,
+            k_find_received,
             s_generate_address,
             cipher_context,
             enote_store,
@@ -503,6 +511,7 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
     //   than on-chain enotes)
     return process_ledger_for_full_refresh_onchain_pass(wallet_spend_pubkey,
         k_view_balance,
+        k_find_received,
         s_generate_address,
         cipher_context,
         enote_store,
@@ -740,8 +749,10 @@ void refresh_enote_store_offchain(const rct::key &wallet_spend_pubkey,
             SpEnoteSpentContextV1::SpentStatus::SPENT_OFFCHAIN);
 
         // prepare for chunk processing
+        crypto::secret_key k_find_received;
         crypto::secret_key s_generate_address;
         crypto::secret_key s_cipher_tag;
+        jamtis::make_jamtis_findreceived_key(k_view_balance, k_find_received);
         jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
         jamtis::make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
 
@@ -750,6 +761,7 @@ void refresh_enote_store_offchain(const rct::key &wallet_spend_pubkey,
         // process the chunk
         process_chunk(wallet_spend_pubkey,
             k_view_balance,
+            k_find_received,
             s_generate_address,
             cipher_context,
             enote_store_inout,

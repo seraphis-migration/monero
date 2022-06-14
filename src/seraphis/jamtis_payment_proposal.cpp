@@ -94,7 +94,7 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(const rct::key &input_conte
     auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
     make_jamtis_sender_receiver_secret_plain(K_d, output_proposal_out.m_enote_ephemeral_pubkey, input_context, q);
 
-    // encrypt address tag: addr_tag_enc = addr_tag(cipher(j || mac)) ^ H_8(q)
+    // encrypt address tag: addr_tag_enc = addr_tag(cipher(j || mac)) ^ H(q)
     output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, m_destination.m_addr_tag);
 
     // enote amount baked key: 8 r G
@@ -182,7 +182,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
         m_type,
         q);
 
-    // encrypt address index: addr_tag_enc = addr_tag(j, mac) ^ H_8(q)
+    // encrypt address index: addr_tag_enc = addr_tag(j, mac) ^ H(q)
 
     // 1. extract the address index from the destination address's address tag
     crypto::secret_key generateaddress_secret;
@@ -196,7 +196,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
     // 2. make a raw address tag (not ciphered)
     const address_tag_t raw_address_tag{j};
 
-    // 3. encrypt the raw address tag: addr_tag_enc = addr_tag(j || mac) ^ H_8(q)
+    // 3. encrypt the raw address tag: addr_tag_enc = addr_tag(j || mac) ^ H(q)
     output_proposal_out.m_addr_tag_enc = encrypt_address_tag(q, raw_address_tag);
 
 
