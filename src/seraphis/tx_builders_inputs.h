@@ -56,7 +56,7 @@ namespace sp
 
 /**
 * brief: make_binned_ref_set_generator_seed_v1 - compute a generator seed for making a binned reference set
-*   s = H_32(K', C')
+*   s = H_32(K", C")
 * param: masked_address -
 * param: masked_commitment -
 * outparam: generator_seed_out -
@@ -105,7 +105,7 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
     std::vector<crypto::secret_key> &blinding_factors_out);
 /**
 * brief: make_input_images_prefix_v1 - hash of enote images (for tx hashes)
-*   - H_32({K', C', KI})
+*   - H_32({K", C", KI})
 * param: enote_images -
 * outparam: input_images_prefix_out -
 */

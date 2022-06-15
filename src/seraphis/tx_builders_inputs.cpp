@@ -81,7 +81,7 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
     // make binned reference set generator seed
     static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_GENERATOR_SEED};
 
-    // seed = H_32(K', C')
+    // seed = H_32(K", C")
     std::string data;
     data.reserve(2*sizeof(rct::key));
     data.append(reinterpret_cast<const char*>(masked_address.bytes), sizeof(rct::key));
@@ -100,8 +100,8 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &onetime_address,
     // make binned reference set generator seed from pieces
 
     // masked address and commitment
-    rct::key masked_address;     //K' = t_k G + H_n(Ko,C) Ko
-    rct::key masked_commitment;  //C' = t_c G + C
+    rct::key masked_address;     //K" = t_k G + H_n(Ko,C) Ko
+    rct::key masked_commitment;  //C" = t_c G + C
     make_seraphis_enote_image_masked_keys(onetime_address,
         amount_commitment,
         address_mask,
@@ -212,7 +212,7 @@ void make_input_images_prefix_v1(const std::vector<SpEnoteImageV1> &enote_images
 {
     static const std::string domain_separator{config::HASH_KEY_SERAPHIS_INPUT_IMAGES_PREFIX_V1};
 
-    // input images prefix = H_32({K', C', KI})
+    // input images prefix = H_32({K", C", KI})
     std::string data;
     data.reserve(enote_images.size()*SpEnoteImageV1::get_size_bytes());
     for (const SpEnoteImageV1 &enote_image : enote_images)
@@ -411,10 +411,10 @@ void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
 
     // check binned reference set generator
     rct::key masked_address;
-    mask_key(address_mask, transformed_address, masked_address);  //K' = t_k G + H_n(Ko,C) Ko
+    mask_key(address_mask, transformed_address, masked_address);  //K" = t_k G + H_n(Ko,C) Ko
 
     rct::key masked_commitment;
-    mask_key(commitment_mask, real_reference_enote.m_amount_commitment, masked_commitment);  //C' = t_c G + C
+    mask_key(commitment_mask, real_reference_enote.m_amount_commitment, masked_commitment);  //C" = t_c G + C
 
     rct::key generator_seed_reproduced;
     make_binned_ref_set_generator_seed_v1(masked_address, masked_commitment, generator_seed_reproduced);
@@ -447,9 +447,9 @@ void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
 
     // proof offsets (only one in the squashed enote model)
     rct::keyV image_offsets;
-    image_offsets.push_back(rct::addKeys(masked_address, masked_commitment));  //Q' = K' + C'
+    image_offsets.push_back(rct::addKeys(masked_address, masked_commitment));  //Q" = K" + C"
 
-    // secret key of: Q[l] - Q' = -(t_k + t_c) G
+    // secret key of: Q[l] - Q" = -(t_k + t_c) G
     std::vector<crypto::secret_key> image_masks;
     image_masks.emplace_back();
     sc_add(to_bytes(image_masks[0]), to_bytes(address_mask), to_bytes(commitment_mask));  // t_k + t_c

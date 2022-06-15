@@ -338,7 +338,7 @@ void subtract_secret_key_vectors(const std::vector<crypto::secret_key> &keys_A,
 //-------------------------------------------------------------------------------------------------------------------
 void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &masked_key_out)
 {
-    // K' = mask G + K
+    // K" = mask G + K
     rct::addKeys1(masked_key_out, rct::sk2rct(mask), key);
 }
 //-------------------------------------------------------------------------------------------------------------------

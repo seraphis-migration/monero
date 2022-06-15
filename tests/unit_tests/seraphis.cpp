@@ -121,7 +121,7 @@ static void make_fake_sp_masked_address(crypto::secret_key &mask,
     make_secret_key(view_stuff);
     make_secret_key(spendkey);
 
-    // K' = x G + kv_stuff X + ks U
+    // K" = x G + kv_stuff X + ks U
     sp::make_seraphis_spendkey(view_stuff, spendkey, masked_address);
     sp::mask_key(mask, masked_address, masked_address);
 }

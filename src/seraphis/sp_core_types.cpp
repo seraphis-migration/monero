@@ -87,8 +87,8 @@ void SpInputProposal::get_enote_image_core(SpEnoteImage &image_out) const
     SpEnote enote_temp;
     this->get_enote_core(enote_temp);
 
-    // K' = t_k G + H_n(Ko,C) Ko
-    // C' = t_c G + C
+    // K" = t_k G + H_n(Ko,C) Ko
+    // C" = t_c G + C
     make_seraphis_enote_image_masked_keys(enote_temp.m_onetime_address,
         enote_temp.m_amount_commitment,
         m_address_mask,

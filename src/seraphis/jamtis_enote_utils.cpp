@@ -452,7 +452,7 @@ bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
 
     // C' = x' G + a' H
     make_jamtis_amount_blinding_factor_plain(sender_receiver_secret, baked_key, amount_blinding_factor_out);  // x'
-    rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(amount_blinding_factor_out));
+    const rct::key nominal_amount_commitment{rct::commit(nominal_amount, rct::sk2rct(amount_blinding_factor_out))};
 
     // check that recomputed commitment matches original commitment
     if (!(nominal_amount_commitment == amount_commitment))
@@ -474,7 +474,7 @@ bool try_get_jamtis_amount_selfsend(const rct::key &sender_receiver_secret,
 
     // C' = x' G + a' H
     make_jamtis_amount_blinding_factor_selfsend(sender_receiver_secret, amount_blinding_factor_out);  // x'
-    rct::key nominal_amount_commitment = rct::commit(nominal_amount, rct::sk2rct(amount_blinding_factor_out));
+    const rct::key nominal_amount_commitment{rct::commit(nominal_amount, rct::sk2rct(amount_blinding_factor_out))};
 
     // check that recomputed commitment matches original commitment
     if (!(nominal_amount_commitment == amount_commitment))

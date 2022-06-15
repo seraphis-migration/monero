@@ -148,10 +148,10 @@ void subtract_secret_key_vectors(const std::vector<crypto::secret_key> &keys_A,
     crypto::secret_key &result_out);
 /**
 * brief: mask_key - commit to an EC key
-*   K' = mask G + K
+*   K" = mask G + K
 * param: mask - commitment mask/blinding factor
 * param: key - EC key to commit to
-* outparam: masked_key_out - K', the masked key
+* outparam: masked_key_out - K", the masked key
 */
 void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &masked_key_out);
 /**

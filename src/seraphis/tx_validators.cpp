@@ -366,7 +366,7 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
         membership_proof_keys[proof_index].emplace_back();
         tx_validation_context.get_reference_set_proof_elements_v1(reference_indices, membership_proof_keys[proof_index][0]);
 
-        // offset (input image masked keys squashed: Q' = K' + C')
+        // offset (input image masked keys squashed: Q" = K" + C")
         rct::addKeys(offsets[proof_index][0],
             input_images[proof_index]->m_masked_address,
             input_images[proof_index]->m_masked_commitment);

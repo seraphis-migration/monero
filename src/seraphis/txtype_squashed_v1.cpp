@@ -200,7 +200,7 @@ void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
         image_proofs_message);
 
     // 2. input images (note: key images are represented in the tx hash twice (image proofs message and input images))
-    // H_32({K', C', KI})
+    // H_32({K", C", KI})
     rct::key input_images_prefix;
     make_input_images_prefix_v1(m_input_images, input_images_prefix);
 

@@ -90,9 +90,9 @@ struct SpEnote final
 ///
 struct SpEnoteImage final
 {
-    /// K' = t_k G + H_n(Ko,C)*[(k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U]   (in the squashed enote model)
+    /// K" = t_k G + H_n(Ko,C)*[(k_{a, sender} + k_{a, recipient}) X + k_{b, recipient} U]   (in the squashed enote model)
     rct::key m_masked_address;
-    /// C' = (t_c + x) G + a H
+    /// C" = (t_c + x) G + a H
     rct::key m_masked_commitment;
     /// KI = (k_{b, recipient} / (k_{a, sender} + k_{a, recipient})) U
     crypto::key_image m_key_image;
@@ -105,7 +105,7 @@ struct SpEnoteImage final
 
     /**
     * brief: append_to_string - convert enote image to a string and append to existing string
-    *   str += K' || C' || KI
+    *   str += K" || C" || KI
     * inoutparam: str_inout - contents concatenated to a string
     */
     void append_to_string(std::string &str_inout) const;

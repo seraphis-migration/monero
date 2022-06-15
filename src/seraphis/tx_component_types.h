@@ -109,7 +109,7 @@ struct SpEnoteImageV1 final
 
     /**
     * brief: append_to_string - convert enote image to a string and append to existing string
-    *   str += K' || C' || KI
+    *   str += K" || C" || KI
     * inoutparam: str_inout - contents concatenated to a string
     */
     void append_to_string(std::string &str_inout) const;
