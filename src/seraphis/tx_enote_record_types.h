@@ -116,20 +116,6 @@ struct SpEnoteRecordV1 final
     jamtis::address_index_t m_address_index;
     /// jamtis enote type
     jamtis::JamtisEnoteType m_type;
-
-    bool operator==(const SpEnoteRecordV1 &other_record) const
-    {
-        return
-            m_enote == other_record.m_enote &&
-            m_enote_ephemeral_pubkey == other_record.m_enote_ephemeral_pubkey &&
-            m_input_context == other_record.m_input_context &&
-            m_enote_view_privkey == other_record.m_enote_view_privkey &&
-            m_amount == other_record.m_amount &&
-            m_amount_blinding_factor == other_record.m_amount_blinding_factor &&
-            m_key_image == other_record.m_key_image &&
-            m_address_index == other_record.m_address_index &&
-            m_type == other_record.m_type;
-    }
 };
 
 ////

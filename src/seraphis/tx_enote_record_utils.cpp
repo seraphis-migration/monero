@@ -813,7 +813,7 @@ void update_contextual_enote_record_contexts_v1(const SpEnoteOriginContextV1 &ne
 void update_contextual_enote_record_contexts_v1(const SpContextualEnoteRecordV1 &fresh_record,
     SpContextualEnoteRecordV1 &existing_record_inout)
 {
-    CHECK_AND_ASSERT_THROW_MES(fresh_record.m_record == existing_record_inout.m_record,
+    CHECK_AND_ASSERT_THROW_MES(fresh_record.m_record.m_key_image == existing_record_inout.m_record.m_key_image,
         "updating a contextual enote record: the fresh record doesn't represent the same enote.");
 
     update_contextual_enote_record_contexts_v1(fresh_record.m_origin_context,
