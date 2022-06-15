@@ -68,13 +68,15 @@ namespace sp
 ///
 struct EnoteScanningChunkLedgerV1 final
 {
-    /// block range: prefix height, end height
+    /// block range: start height, end height
     std::pair<std::uint64_t, std::uint64_t> m_block_range;
-    /// block ids in range: [prefix height, end height]
+    /// block id at 'start height - 1'
+    rct::key m_prefix_block_id;
+    /// block ids in range: [start height, end height]
     std::vector<rct::key> m_block_ids;
-    /// view tag matches in range (prefix height, end height] (mapped to tx id)
+    /// view tag matches in range [start height, end height] (mapped to tx id)
     std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> m_basic_records_per_tx;
-    /// key images from txs with view tag matches in range (prefix height, end height]
+    /// key images from txs with view tag matches in range [start height, end height]
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_contextual_key_images;
 };
 

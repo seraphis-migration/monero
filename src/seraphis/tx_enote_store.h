@@ -65,7 +65,7 @@ public:
     virtual void update_with_records_from_ledger(const std::uint64_t first_new_block,
         std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> found_enote_records,
         std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> found_spent_key_images,
-        const std::vector<rct::key> &contiguous_block_ids) {}
+        const std::vector<rct::key> &new_block_ids) {}
 /*
     // WARNING: any offchain information (e.g. offchain spent contexts) cleared here will be lost, so it may be
     //          appropriate to do an offchain refresh after this ledger refresh operation
@@ -89,10 +89,8 @@ public:
     for (const auto &found_spent_key_image : found_spent_key_images)
         enote_store_inout.update_spent_context(found_spent_key_image.first, found_spent_key_image.second);
 
-    // f. set new block ids and accumulated output counts in range [initial_refresh_height - 1, end of chain)
-    enote_store_inout.set_block_ids_from_height(initial_refresh_height - 1, contiguous_block_ids);
-    enote_store_inout.set_accumulated_output_counts_from_height(initial_refresh_height - 1,
-        accumulated_output_counts);
+    // f. set new block ids in range [first_new_block, end of chain)
+    enote_store_inout.set_block_ids_from_height(first_new_block, new_block_ids);
 */
 
     /// update the store with enote records found off-chain, with associated context

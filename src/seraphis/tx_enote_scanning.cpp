@@ -178,7 +178,7 @@ static bool contiguity_check(const ChainContiguityMarker &marker_A, const ChainC
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void update_alignment_marker(const SpEnoteStoreV1 &enote_store,
-    const std::uint64_t chunk_prefix_height,
+    const std::uint64_t chunk_start_height,
     const std::vector<rct::key> &chunk_block_ids,
     ChainContiguityMarker &alignment_marker_inout)
 {
@@ -186,13 +186,13 @@ static void update_alignment_marker(const SpEnoteStoreV1 &enote_store,
     rct::key next_block_id;
     for (std::size_t block_index{0}; block_index < chunk_block_ids.size(); ++block_index)
     {
-        if (!enote_store.try_get_block_id(chunk_prefix_height + block_index, next_block_id))
+        if (!enote_store.try_get_block_id(chunk_start_height + block_index, next_block_id))
             return;
 
         if (!(next_block_id == chunk_block_ids[block_index]))
             return;
 
-        alignment_marker_inout.m_block_height = chunk_prefix_height + block_index;
+        alignment_marker_inout.m_block_height = chunk_start_height + block_index;
         alignment_marker_inout.m_block_id = next_block_id;
     }
 }
@@ -349,7 +349,7 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
     ChainContiguityMarker &alignment_marker_inout,
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_inout,
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout,
-    std::vector<rct::key> &contiguous_block_ids_inout)
+    std::vector<rct::key> &scanned_block_ids_inout)
 {
     EnoteScanningChunkLedgerV1 new_onchain_chunk;
 
@@ -360,13 +360,13 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
 
         // check if this chunk is contiguous with the contiguity marker
         if (contiguity_check(contiguity_marker_inout,
-            ChainContiguityMarker{std::get<0>(new_onchain_chunk.m_block_range), new_onchain_chunk.m_block_ids[0]}))
+            ChainContiguityMarker{std::get<0>(new_onchain_chunk.m_block_range) - 1, new_onchain_chunk.m_prefix_block_id}))
         {
             // update alignment marker if we are aligned with the end of the previous chunk
             if (contiguity_check(alignment_marker_inout, contiguity_marker_inout))
             {
                 update_alignment_marker(enote_store,
-                    contiguity_marker_inout.m_block_height,
+                    std::get<0>(new_onchain_chunk.m_block_range),
                     new_onchain_chunk.m_block_ids,
                     alignment_marker_inout);
             }
@@ -401,17 +401,8 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
             found_spent_key_images_inout);
 
         // add new block ids
-        contiguous_block_ids_inout.reserve(contiguous_block_ids_inout.size() + new_onchain_chunk.m_block_ids.size());
-
-        auto new_block_ids_start_it = new_onchain_chunk.m_block_ids.begin();
-
-        // note: the first block of a new chunk will overlap with the last block of the last chunk, so
-        //       only include the first element of the new vector if our existing set has no elements
-        if (contiguous_block_ids_inout.size() == 0 && new_onchain_chunk.m_block_ids.size() > 0)
-            ++new_block_ids_start_it;
-
-        contiguous_block_ids_inout.insert(contiguous_block_ids_inout.end(),
-            new_block_ids_start_it,
+        scanned_block_ids_inout.insert(scanned_block_ids_inout.end(),
+            new_onchain_chunk.m_block_ids.begin(),
             new_onchain_chunk.m_block_ids.end());
     }
 
@@ -430,11 +421,11 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
     ChainContiguityMarker &alignment_marker_inout,
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_out,
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_out,
-    std::vector<rct::key> &contiguous_block_ids_out)
+    std::vector<rct::key> &scanned_block_ids_out)
 {
     found_enote_records_out.clear();
     found_spent_key_images_out.clear();
-    contiguous_block_ids_out.clear();
+    scanned_block_ids_out.clear();
 
     // prepare for chunk processing
     crypto::secret_key k_find_received;
@@ -466,7 +457,7 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
             alignment_marker_inout,
             found_enote_records_out,
             found_spent_key_images_out,
-            contiguous_block_ids_out)
+            scanned_block_ids_out)
         };
 
     if (scan_status_first_onchain_pass != ScanStatus::DONE)
@@ -508,7 +499,7 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
         alignment_marker_inout,
         found_enote_records_out,
         found_spent_key_images_out,
-        contiguous_block_ids_out);
+        scanned_block_ids_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -516,14 +507,14 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
     const std::uint64_t expected_prefix_height)
 {
     // misc. checks
-    CHECK_AND_ASSERT_THROW_MES(std::get<0>(onchain_chunk.m_block_range) == expected_prefix_height,
+    CHECK_AND_ASSERT_THROW_MES(std::get<0>(onchain_chunk.m_block_range) - 1 == expected_prefix_height,
         "enote scan chunk semantics check (ledger): chunk range doesn't start at expected prefix height.");
 
     const std::uint64_t num_blocks_in_chunk{
             std::get<1>(onchain_chunk.m_block_range) - std::get<0>(onchain_chunk.m_block_range) + 1
         };
-    CHECK_AND_ASSERT_THROW_MES(num_blocks_in_chunk >= 2,
-        "enote scan chunk semantics check (ledger): chunk has no non-prefix blocks.");    
+    CHECK_AND_ASSERT_THROW_MES(num_blocks_in_chunk >= 1,
+        "enote scan chunk semantics check (ledger): chunk has no blocks.");    
     CHECK_AND_ASSERT_THROW_MES(onchain_chunk.m_block_ids.size() == num_blocks_in_chunk,
         "enote scan chunk semantics check (ledger): unexpected number of block ids.");
 
@@ -533,7 +524,7 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
         SpEnoteSpentContextV1::SpentStatus::SPENT_ONCHAIN);
 
     // start block = prefix block + 1
-    const std::uint64_t allowed_lowest_height{std::get<0>(onchain_chunk.m_block_range) + 1};
+    const std::uint64_t allowed_lowest_height{std::get<0>(onchain_chunk.m_block_range)};
     // end block
     const std::uint64_t allowed_heighest_height{std::get<1>(onchain_chunk.m_block_range)};
 
@@ -645,7 +636,7 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> found_enote_records;
         std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> found_spent_key_images;
 
-        std::vector<rct::key> contiguous_block_ids;
+        std::vector<rct::key> scanned_block_ids;
 
         scan_status = process_ledger_for_full_refresh(wallet_spend_pubkey,
             k_view_balance,
@@ -656,7 +647,7 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
             alignment_marker,
             found_enote_records,
             found_spent_key_images,
-            contiguous_block_ids);
+            scanned_block_ids);
 
         // update desired start height for if there needs to be another scan attempt
         desired_first_block = contiguity_marker.m_block_height + 1;
@@ -682,10 +673,25 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
 
 
         /// refresh the enote store with new ledger context
+
+        // sanity checks
+        CHECK_AND_ASSERT_THROW_MES(initial_refresh_height <= alignment_marker.m_block_height + 1,
+            "refresh ledger for enote store: initial refresh height exceeds the post-alignment block (bug).");
+        CHECK_AND_ASSERT_THROW_MES(alignment_marker.m_block_height + 1 - initial_refresh_height <=
+                scanned_block_ids.size(),
+            "refresh ledger for enote store: contiguous block ids have fewer blocks than the alignment range (bug).");
+
+        // crop block ids we don't care about
+        const std::vector<rct::key> scanned_block_ids_cropped{
+                scanned_block_ids.data() + alignment_marker.m_block_height + 1 - initial_refresh_height,
+                scanned_block_ids.data() + scanned_block_ids.size()
+            };
+
+        // update the enote store
         enote_store_inout.update_with_records_from_ledger(alignment_marker.m_block_height + 1,
             std::move(found_enote_records),
             std::move(found_spent_key_images),
-            contiguous_block_ids);
+            scanned_block_ids_cropped);
     }
 
     CHECK_AND_ASSERT_THROW_MES(scan_status == ScanStatus::DONE, "refresh ledger for enote store: refreshing failed!");

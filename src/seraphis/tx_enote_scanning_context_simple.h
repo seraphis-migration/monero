@@ -72,7 +72,7 @@ public:
         m_current_prefix_height = initial_prefix_height;
         m_max_chunk_size = max_chunk_size;
     }
-    /// try to get the next available onchain chunk (contiguous with the last chunk acquired since starting to scan)
+    /// try to get the next available onchain chunk (starting at the end of the last chunk acquired since starting to scan)
     bool try_get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out) override
     {
         if (!m_enote_finding_context.try_get_onchain_chunk(m_current_prefix_height, m_max_chunk_size, chunk_out))
