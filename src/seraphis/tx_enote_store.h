@@ -65,8 +65,7 @@ public:
     virtual void update_with_records_from_ledger(const std::uint64_t first_new_block,
         std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> found_enote_records,
         std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> found_spent_key_images,
-        const std::vector<rct::key> &contiguous_block_ids,
-        const std::vector<std::uint64_t> &accumulated_output_counts) {}
+        const std::vector<rct::key> &contiguous_block_ids) {}
 /*
     // WARNING: any offchain information (e.g. offchain spent contexts) cleared here will be lost, so it may be
     //          appropriate to do an offchain refresh after this ledger refresh operation

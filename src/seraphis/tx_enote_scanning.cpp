@@ -349,8 +349,7 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
     ChainContiguityMarker &alignment_marker_inout,
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_inout,
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout,
-    std::vector<rct::key> &contiguous_block_ids_inout,
-    std::vector<std::uint64_t> &accumulated_output_counts_inout)
+    std::vector<rct::key> &contiguous_block_ids_inout)
 {
     EnoteScanningChunkLedgerV1 new_onchain_chunk;
 
@@ -401,28 +400,19 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
             found_enote_records_inout,
             found_spent_key_images_inout);
 
-        // add new block ids and accumulated output counts
+        // add new block ids
         contiguous_block_ids_inout.reserve(contiguous_block_ids_inout.size() + new_onchain_chunk.m_block_ids.size());
-        accumulated_output_counts_inout.reserve(accumulated_output_counts_inout.size() +
-            new_onchain_chunk.m_accumulated_output_counts.size());
 
         auto new_block_ids_start_it = new_onchain_chunk.m_block_ids.begin();
-        auto new_accumulated_output_counts_start_it = new_onchain_chunk.m_accumulated_output_counts.begin();
 
         // note: the first block of a new chunk will overlap with the last block of the last chunk, so
-        //       only include the first element of the new vectors if our existing sets have no elements
-        if (contiguous_block_ids_inout.size() == 0)
-        {
+        //       only include the first element of the new vector if our existing set has no elements
+        if (contiguous_block_ids_inout.size() == 0 && new_onchain_chunk.m_block_ids.size() > 0)
             ++new_block_ids_start_it;
-            ++new_accumulated_output_counts_start_it;
-        }
 
         contiguous_block_ids_inout.insert(contiguous_block_ids_inout.end(),
             new_block_ids_start_it,
             new_onchain_chunk.m_block_ids.end());
-        accumulated_output_counts_inout.insert(accumulated_output_counts_inout.end(),
-            new_accumulated_output_counts_start_it,
-            new_onchain_chunk.m_accumulated_output_counts.end());
     }
 
     return ScanStatus::DONE;
@@ -440,13 +430,11 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
     ChainContiguityMarker &alignment_marker_inout,
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_out,
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_out,
-    std::vector<rct::key> &contiguous_block_ids_out,
-    std::vector<std::uint64_t> &accumulated_output_counts_out)
+    std::vector<rct::key> &contiguous_block_ids_out)
 {
     found_enote_records_out.clear();
     found_spent_key_images_out.clear();
     contiguous_block_ids_out.clear();
-    accumulated_output_counts_out.clear();
 
     // prepare for chunk processing
     crypto::secret_key k_find_received;
@@ -478,8 +466,7 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
             alignment_marker_inout,
             found_enote_records_out,
             found_spent_key_images_out,
-            contiguous_block_ids_out,
-            accumulated_output_counts_out)
+            contiguous_block_ids_out)
         };
 
     if (scan_status_first_onchain_pass != ScanStatus::DONE)
@@ -521,8 +508,7 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
         alignment_marker_inout,
         found_enote_records_out,
         found_spent_key_images_out,
-        contiguous_block_ids_out,
-        accumulated_output_counts_out);
+        contiguous_block_ids_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -539,11 +525,6 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
     CHECK_AND_ASSERT_THROW_MES(num_blocks_in_chunk >= 2,
         "enote scan chunk semantics check (ledger): chunk has no non-prefix blocks.");    
     CHECK_AND_ASSERT_THROW_MES(onchain_chunk.m_block_ids.size() == num_blocks_in_chunk,
-        "enote scan chunk semantics check (ledger): unexpected number of block ids.");
-    CHECK_AND_ASSERT_THROW_MES(onchain_chunk.m_accumulated_output_counts.size() == num_blocks_in_chunk,
-        "enote scan chunk semantics check (ledger): unexpected number of block ids.");
-    CHECK_AND_ASSERT_THROW_MES(std::is_sorted(onchain_chunk.m_accumulated_output_counts.begin(),
-            onchain_chunk.m_accumulated_output_counts.end()),
         "enote scan chunk semantics check (ledger): unexpected number of block ids.");
 
     check_enote_scan_chunk_map_semantics_v1(onchain_chunk.m_basic_records_per_tx,
@@ -564,7 +545,7 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
             "enote chunk semantics check (ledger): contextual key image block height is out of the expected range.");
     }
 
-    // contextual basic records: height and enote index checks
+    // contextual basic records: height checks
     for (const auto &tx_basic_records : onchain_chunk.m_basic_records_per_tx)
     {
         for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record : tx_basic_records.second)
@@ -578,24 +559,6 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
                     contextual_basic_record.m_origin_context.m_transaction_height >= allowed_lowest_height &&
                     contextual_basic_record.m_origin_context.m_transaction_height <= allowed_heighest_height,
                 "enote chunk semantics check (ledger): contextual key image block height is out of the expected range.");
-
-            // first enote index in tx's block (via cumulative enote count in prior block)
-            const std::uint64_t allowed_lowest_enote_index{
-                    onchain_chunk.m_accumulated_output_counts[
-                            contextual_basic_record.m_origin_context.m_transaction_height - allowed_lowest_height
-                        ]
-                };
-            // last enote index in tx's block
-            const std::uint64_t allowed_heighest_enote_index{
-                    onchain_chunk.m_accumulated_output_counts[
-                            contextual_basic_record.m_origin_context.m_transaction_height - allowed_lowest_height + 1
-                        ] - 1
-                };
-
-            CHECK_AND_ASSERT_THROW_MES(
-                    contextual_basic_record.m_origin_context.m_enote_ledger_index >= allowed_lowest_enote_index &&
-                    contextual_basic_record.m_origin_context.m_enote_ledger_index <= allowed_heighest_enote_index,
-                "enote chunk semantics check (ledger): contextual key image enote index is out of the expected range.");
         }
     }
 }
@@ -683,7 +646,6 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> found_spent_key_images;
 
         std::vector<rct::key> contiguous_block_ids;
-        std::vector<std::uint64_t> accumulated_output_counts;
 
         scan_status = process_ledger_for_full_refresh(wallet_spend_pubkey,
             k_view_balance,
@@ -694,8 +656,7 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
             alignment_marker,
             found_enote_records,
             found_spent_key_images,
-            contiguous_block_ids,
-            accumulated_output_counts);
+            contiguous_block_ids);
 
         // update desired start height for if there needs to be another scan attempt
         desired_first_block = contiguity_marker.m_block_height + 1;
@@ -724,8 +685,7 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         enote_store_inout.update_with_records_from_ledger(alignment_marker.m_block_height + 1,
             std::move(found_enote_records),
             std::move(found_spent_key_images),
-            contiguous_block_ids,
-            accumulated_output_counts);
+            contiguous_block_ids);
     }
 
     CHECK_AND_ASSERT_THROW_MES(scan_status == ScanStatus::DONE, "refresh ledger for enote store: refreshing failed!");

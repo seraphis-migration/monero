@@ -72,8 +72,6 @@ struct EnoteScanningChunkLedgerV1 final
     std::pair<std::uint64_t, std::uint64_t> m_block_range;
     /// block ids in range: [prefix height, end height]
     std::vector<rct::key> m_block_ids;
-    /// cumulative enote counts in range: [prefix height, end height]
-    std::vector<std::uint64_t> m_accumulated_output_counts;
     /// view tag matches in range (prefix height, end height] (mapped to tx id)
     std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> m_basic_records_per_tx;
     /// key images from txs with view tag matches in range (prefix height, end height]
