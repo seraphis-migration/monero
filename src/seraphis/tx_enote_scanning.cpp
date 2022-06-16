@@ -608,16 +608,16 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         // initial block to scan = max(desired first block - reorg depth, enote store's min scan height)
         std::uint64_t initial_refresh_height;
 
-        if (desired_first_block >= reorg_avoidance_depth + enote_store_inout.get_min_block_height())
+        if (desired_first_block >= reorg_avoidance_depth + enote_store_inout.get_refresh_height())
             initial_refresh_height = desired_first_block - reorg_avoidance_depth;
         else
-            initial_refresh_height = enote_store_inout.get_min_block_height();
+            initial_refresh_height = enote_store_inout.get_refresh_height();
 
         // set initial contiguity marker (highest block known to be contiguous with the prefix of the first block to scan)
         ChainContiguityMarker contiguity_marker;
         contiguity_marker.m_block_height = initial_refresh_height - 1;
 
-        if (contiguity_marker.m_block_height != enote_store_inout.get_min_block_height() - 1)
+        if (contiguity_marker.m_block_height != enote_store_inout.get_refresh_height() - 1)
         {
             // getting a block id should always succeed if we are starting past the prefix block of the enote store
             contiguity_marker.m_block_id = rct::zero();
@@ -665,7 +665,7 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
             // note: this is a bug because when starting at the min block height, the initial contiguity marker should be
             //       optional:false, which permits contiguity with any value of the first chunk's prefix block (so there
             //       should not be a full-scan-inducing contiguity failure)
-            CHECK_AND_ASSERT_THROW_MES(initial_refresh_height > enote_store_inout.get_min_block_height(),
+            CHECK_AND_ASSERT_THROW_MES(initial_refresh_height > enote_store_inout.get_refresh_height(),
                 "refresh ledger for enote store: need to fullscan but previous scan exceeded enote store's range (bug).");
 
             continue;
@@ -689,8 +689,9 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
 
         // update the enote store
         enote_store_inout.update_with_records_from_ledger(alignment_marker.m_block_height + 1,
-            std::move(found_enote_records),
-            std::move(found_spent_key_images),
+            alignment_marker.m_block_id ? *(alignment_marker.m_block_id) : rct::zero(),
+            found_enote_records,
+            found_spent_key_images,
             scanned_block_ids_cropped);
     }
 
@@ -738,7 +739,7 @@ void refresh_enote_store_offchain(const rct::key &wallet_spend_pubkey,
     }
 
     // 2. refresh the enote store with new offchain context
-    enote_store_inout.update_with_records_from_offchain(std::move(found_enote_records), std::move(found_spent_key_images));
+    enote_store_inout.update_with_records_from_offchain(found_enote_records, found_spent_key_images);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void refresh_enote_store_full(const RefreshLedgerEnoteStoreConfig &ledger_refresh_config,

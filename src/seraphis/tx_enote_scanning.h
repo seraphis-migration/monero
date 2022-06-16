@@ -62,17 +62,16 @@ namespace sp
 // EnoteScanningChunkLedgerV1
 // - contextual basic enote records for view tag matches in a chunk of blocks
 // - key images from all txs that have view tag matches in that chunk
-// - chunk range: (prefix height, end height]
-//   - prefix height: block that comes before the chunk range, used for contiguity checks
-//   - end height: last block of the chunk
+// - chunk range: [start height, end height]
+// - prefix block id: id of block that comes before the chunk range, used for contiguity checks
 ///
 struct EnoteScanningChunkLedgerV1 final
 {
     /// block range: start height, end height
     std::pair<std::uint64_t, std::uint64_t> m_block_range;
-    /// block id at 'start height - 1'
+    /// block id at 'start height - 1'  (implicitly ignored if start_height == 0)
     rct::key m_prefix_block_id;
-    /// block ids in range: [start height, end height]
+    /// block ids in range [start height, end height]
     std::vector<rct::key> m_block_ids;
     /// view tag matches in range [start height, end height] (mapped to tx id)
     std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> m_basic_records_per_tx;

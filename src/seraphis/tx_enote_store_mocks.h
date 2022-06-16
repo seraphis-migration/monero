@@ -60,10 +60,27 @@ class SpEnoteStoreMockSimpleV1 final : public SpEnoteStoreV1
 
 public:
     /// add a record
-    void add_record(const SpContextualEnoteRecordV1 &new_record) override
-    {
-        m_contextual_enote_records.emplace_back(new_record);
-    }
+    void add_record(const SpContextualEnoteRecordV1 &new_record) override;
+
+    /// DISABLED
+    void update_with_records_from_ledger(const std::uint64_t first_new_block,
+        const rct::key &alignment_block_id,
+        const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+        const std::vector<rct::key> &new_block_ids) override
+    { throw; }
+    void update_with_records_from_offchain(
+        const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images) override
+    { throw; }
+    bool has_enote_with_key_image(const crypto::key_image &key_image) const override
+    { throw; return false; }
+    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const override
+    { throw; return false; }
+    std::uint64_t get_refresh_height() const override
+    { throw; return 0; }
+    std::uint64_t get_top_block_height() const override
+    { throw; return 0; }
 
 //member variables
 protected:
@@ -79,27 +96,50 @@ class SpEnoteStoreMockV1 final : public SpEnoteStoreV1
     friend class InputSelectorMockV1;
 
 public:
-    /// add a record
-    void add_record(const SpContextualEnoteRecordV1 &new_record) override
-    {
-        crypto::key_image record_key_image;
-        new_record.get_key_image(record_key_image);
+//constructors
+    /// default constructor
+    SpEnoteStoreMockV1() = default;
 
-        // add the record or update an existing record's contexts
-        if (m_mapped_contextual_enote_records.find(record_key_image) == m_mapped_contextual_enote_records.end())
-        {
-            m_mapped_contextual_enote_records[record_key_image] = new_record;
-        }
-        else
-        {
-            update_contextual_enote_record_contexts_v1(new_record, m_mapped_contextual_enote_records[record_key_image]);
-        }
-    }
+    /// normal constructor
+    SpEnoteStoreMockV1(const std::uint64_t refresh_height) :
+        m_refresh_height{refresh_height}
+    {}
+
+//member functions
+    /// add a record
+    void add_record(const SpContextualEnoteRecordV1 &new_record) override;
+
+    /// update the store with enote records found in the ledger, with associated context
+    void update_with_records_from_ledger(const std::uint64_t first_new_block,
+        const rct::key &alignment_block_id,
+        const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+        const std::vector<rct::key> &new_block_ids) override;
+
+    /// update the store with enote records found off-chain, with associated context
+    void update_with_records_from_offchain(
+        const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images) override;
+
+    /// check if any stored enote has a given key image
+    bool has_enote_with_key_image(const crypto::key_image &key_image) const override;
+    /// try to get the recorded block id for a given height
+    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const override;
+
+    /// get height of first block the enote store cares about
+    std::uint64_t get_refresh_height() const override { return m_refresh_height; }
+    /// get height of heighest recorded block (refresh height - 1 if no recorded blocks)
+    std::uint64_t get_top_block_height() const override { return m_refresh_height + m_block_ids.size() - 1; }
 
 //member variables
 protected:
     /// the enotes
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> m_mapped_contextual_enote_records;
+
+    /// refresh height
+    std::uint64_t m_refresh_height{0};
+    /// stored block ids in range [refresh height, end of known chain]
+    std::vector<rct::key> m_block_ids;
 };
 
 } //namespace sp
