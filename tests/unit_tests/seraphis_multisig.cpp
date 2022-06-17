@@ -66,15 +66,6 @@
 #include <memory>
 #include <vector>
 
-struct multisig_jamtis_keys
-{
-    crypto::secret_key k_vb;  //view-balance
-    crypto::secret_key k_fr;  //find-received
-    crypto::secret_key s_ga;  //generate-address
-    crypto::secret_key s_ct;  //cipher-tag
-    rct::key K_1_base;        //wallet spend base
-    rct::key K_fr;            //find-received pubkey
-};
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -84,18 +75,20 @@ static crypto::secret_key make_secret_key()
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void make_multisig_jamtis_keys(const multisig::multisig_account &account, multisig_jamtis_keys &keys_out)
+static void make_multisig_jamtis_mock_keys(const multisig::multisig_account &account, sp::jamtis::jamtis_mock_keys &keys_out)
 {
     using namespace sp;
     using namespace jamtis;
 
     keys_out.k_vb = account.get_common_privkey();
+    make_jamtis_unlockamounts_key(keys_out.k_vb, keys_out.k_ua);
     make_jamtis_findreceived_key(keys_out.k_vb, keys_out.k_fr);
     make_jamtis_generateaddress_secret(keys_out.k_vb, keys_out.s_ga);
     make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
     keys_out.K_1_base = rct::pk2rct(account.get_multisig_pubkey());
     extend_seraphis_spendkey(keys_out.k_vb, keys_out.K_1_base);
-    rct::scalarmultBase(keys_out.K_fr, rct::sk2rct(keys_out.k_fr));
+    rct::scalarmultBase(keys_out.K_ua, rct::sk2rct(keys_out.k_ua));
+    rct::scalarmultKey(keys_out.K_fr, keys_out.K_ua, rct::sk2rct(keys_out.k_fr));
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -316,8 +309,8 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     ASSERT_TRUE(accounts.size() == num_signers);
 
     // b) get shared multisig wallet keys
-    multisig_jamtis_keys keys;
-    ASSERT_NO_THROW(make_multisig_jamtis_keys(accounts[0], keys));
+    jamtis_mock_keys keys;
+    ASSERT_NO_THROW(make_multisig_jamtis_mock_keys(accounts[0], keys));
 
 
     /// 2) fund the multisig address
@@ -328,6 +321,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     JamtisDestinationV1 user_address;
 
     ASSERT_NO_THROW(make_jamtis_destination_v1(keys.K_1_base,
+        keys.K_ua,
         keys.K_fr,
         keys.s_ga,
         j,

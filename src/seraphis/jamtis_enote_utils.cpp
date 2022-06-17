@@ -344,13 +344,17 @@ void make_jamtis_amount_baked_key_plain_sender(const crypto::secret_key &enote_p
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_amount_baked_key_plain_recipient(const crypto::secret_key &address_privkey,
+    const crypto::secret_key &k_unlock_amounts,
     const rct::key &enote_ephemeral_pubkey,
     crypto::key_derivation &baked_key_out)
 {
-    // 8 * (1/k^j_a) * K_e = 8 r G
+    // 8 * (1/(k^j_a * k_ua)) * K_e = 8 r G
     //TODO: does this create a temporary that isn't properly memwiped?
-    const crypto::secret_key address_privkey_inverted{rct::rct2sk(invert(rct::sk2rct(address_privkey)))};  //(1/k^j_a)
-    crypto::generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey), address_privkey_inverted, baked_key_out);
+    crypto::secret_key unlock_key_inverted;
+    sc_mul(to_bytes(unlock_key_inverted), to_bytes(address_privkey), to_bytes(k_unlock_amounts));  //k^j_a * k_ua
+    unlock_key_inverted = rct::rct2sk(invert(rct::sk2rct(unlock_key_inverted)));  //(1/(k^j_a * k_ua))
+
+    crypto::generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey), unlock_key_inverted, baked_key_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_secret,

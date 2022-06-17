@@ -73,43 +73,11 @@ extern "C"
 #include <vector>
 
 
-struct jamtis_keys
-{
-    crypto::secret_key k_m;   //master
-    crypto::secret_key k_vb;  //view-balance
-    crypto::secret_key k_fr;  //find-received
-    crypto::secret_key s_ga;  //generate-address
-    crypto::secret_key s_ct;  //cipher-tag
-    rct::key K_1_base;        //wallet spend base
-    rct::key K_fr;            //find-received pubkey
-};
-
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static crypto::secret_key make_secret_key()
 {
     return rct::rct2sk(rct::skGen());
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void make_secret_key(crypto::secret_key &skey_out)
-{
-    skey_out = make_secret_key();
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void make_jamtis_keys(jamtis_keys &keys_out)
-{
-    using namespace sp;
-    using namespace jamtis;
-
-    make_secret_key(keys_out.k_m);
-    make_secret_key(keys_out.k_vb);
-    make_jamtis_findreceived_key(keys_out.k_vb, keys_out.k_fr);
-    make_jamtis_generateaddress_secret(keys_out.k_vb, keys_out.s_ga);
-    make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
-    make_seraphis_spendkey(keys_out.k_vb, keys_out.k_m, keys_out.K_1_base);
-    rct::scalarmultBase(keys_out.K_fr, rct::sk2rct(keys_out.k_fr));
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -133,9 +101,9 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
 
     /// make two users
-    jamtis_keys keys_user_A, keys_user_B;
-    make_jamtis_keys(keys_user_A);
-    make_jamtis_keys(keys_user_B);
+    jamtis_mock_keys keys_user_A, keys_user_B;
+    make_jamtis_mock_keys(keys_user_A);
+    make_jamtis_mock_keys(keys_user_B);
 
 
     /// 1] send money to user A
@@ -145,6 +113,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
     JamtisDestinationV1 user_address_A;
 
     ASSERT_NO_THROW(make_jamtis_destination_v1(keys_user_A.K_1_base,
+        keys_user_A.K_ua,
         keys_user_A.K_fr,
         keys_user_A.s_ga,
         j_A,
@@ -197,6 +166,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
     JamtisDestinationV1 user_address_B;
 
     ASSERT_NO_THROW(make_jamtis_destination_v1(keys_user_B.K_1_base,
+        keys_user_B.K_ua,
         keys_user_B.K_fr,
         keys_user_B.s_ga,
         j_B,

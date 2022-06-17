@@ -83,12 +83,14 @@ struct JamtisDestinationV1 final
 /**
 * brief: make_jamtis_destination_v1 - make a destination address
 * param: wallet_spend_pubkey - K_s = k_vb X + k_m U
-* param: findreceived_pubkey - K_fr = k_fr G
+* param: unlockamounts_pubkey - K_ua = k_ua G
+* param: findreceived_pubkey - K_fr = k_fr k_ua G
 * param: s_generate_address - s_ga
 * param: j - address_index
 * outparam: destination_out - the full address, with address tag
 */
 void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
+    const rct::key &unlockamounts_pubkey,
     const rct::key &findreceived_pubkey,
     const crypto::secret_key &s_generate_address,
     const address_index_t j,
@@ -98,13 +100,15 @@ void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
 *    - note: partial-recreation of a destination will return FALSE
 * param: destination - destination address to recreate
 * param: wallet_spend_pubkey - K_s
-* param: findreceived_pubkey - K_fr = k_fr G
+* param: unlockamounts_pubkey - K_ua = k_ua G
+* param: findreceived_pubkey - K_fr = k_fr k_ua G
 * param: s_generate_address - s_ga
 * outparam: j_out - address index (if successful)
 * return: true if the destination can be recreated
 */
 bool try_get_jamtis_index_from_destination_v1(const JamtisDestinationV1 &destination,
     const rct::key &wallet_spend_pubkey,
+    const rct::key &unlockamounts_pubkey,
     const rct::key &findreceived_pubkey,
     const crypto::secret_key &s_generate_address,
     address_index_t &j_out);

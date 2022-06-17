@@ -61,6 +61,7 @@ void JamtisDestinationV1::gen()
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
+    const rct::key &unlockamounts_pubkey,
     const rct::key &findreceived_pubkey,
     const crypto::secret_key &s_generate_address,
     const address_index_t j,
@@ -75,8 +76,8 @@ void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
 
     rct::scalarmultKey(destination_out.m_addr_K2, findreceived_pubkey, rct::sk2rct(address_privkey));
 
-    // K_3 = k^j_a G
-    rct::scalarmultBase(destination_out.m_addr_K3, rct::sk2rct(address_privkey));
+    // K_3 = k^j_a K_ua
+    rct::scalarmultKey(destination_out.m_addr_K3, unlockamounts_pubkey, rct::sk2rct(address_privkey));
 
     // addr_tag = blowfish[s_ct](j, mac)
     crypto::secret_key ciphertag_secret;
@@ -87,6 +88,7 @@ void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_jamtis_index_from_destination_v1(const JamtisDestinationV1 &destination,
     const rct::key &wallet_spend_pubkey,
+    const rct::key &unlockamounts_pubkey,
     const rct::key &findreceived_pubkey,
     const crypto::secret_key &s_generate_address,
     address_index_t &j_out)
@@ -105,6 +107,7 @@ bool try_get_jamtis_index_from_destination_v1(const JamtisDestinationV1 &destina
     JamtisDestinationV1 test_destination;
 
     make_jamtis_destination_v1(wallet_spend_pubkey,
+        unlockamounts_pubkey,
         findreceived_pubkey,
         s_generate_address,
         nominal_address_index,

@@ -81,6 +81,7 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
 * param: enote_ephemeral_pubkey -
 * param: input_context -
 * param: wallet_spend_pubkey -
+* param: k_unlock_amounts -
 * param: k_find_received -
 * param: s_generate_address -
 * param: cipher_context -
@@ -91,6 +92,7 @@ bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_unlock_amounts,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
@@ -99,17 +101,20 @@ bool try_get_intermediate_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_unlock_amounts,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     SpIntermediateEnoteRecordV1 &record_out);
 bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_unlock_amounts,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     SpIntermediateEnoteRecordV1 &record_out);
 bool try_get_intermediate_enote_record_v1(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_unlock_amounts,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     SpIntermediateEnoteRecordV1 &record_out);
@@ -132,6 +137,7 @@ bool try_get_enote_record_v1_plain(const SpEnoteV1 &enote,
 bool try_get_enote_record_v1_plain(const SpBasicEnoteRecordV1 &basic_record,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
+    const crypto::secret_key &k_unlock_amounts,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,

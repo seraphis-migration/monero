@@ -34,7 +34,9 @@
 //local headers
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
+#include "ringct/rctOps.h"
 #include "seraphis_config_temp.h"
+#include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
 
@@ -50,6 +52,15 @@ namespace sp
 {
 namespace jamtis
 {
+//-------------------------------------------------------------------------------------------------------------------
+void make_jamtis_unlockamounts_key(const crypto::secret_key &k_view_balance,
+    crypto::secret_key &k_unlock_amounts_out)
+{
+    static const std::string domain_separator{config::HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY};
+
+    // k_ua = H_n[k_vb]()
+    sp_derive_key(domain_separator, to_bytes(k_view_balance), nullptr, 0, to_bytes(k_unlock_amounts_out));
+}
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_findreceived_key(const crypto::secret_key &k_view_balance,
     crypto::secret_key &k_find_received_out)
@@ -85,6 +96,19 @@ void make_jamtis_identifywallet_key(const crypto::secret_key &s_generate_address
 
     // k_id = H_n[s_ga]()
     sp_derive_key(domain_separator, to_bytes(s_generate_address), nullptr, 0, to_bytes(k_identify_wallet_out));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_jamtis_mock_keys(jamtis_mock_keys &keys_out)
+{
+    keys_out.k_m = rct::rct2sk(rct::skGen());
+    keys_out.k_vb = rct::rct2sk(rct::skGen());
+    make_jamtis_unlockamounts_key(keys_out.k_vb, keys_out.k_ua);
+    make_jamtis_findreceived_key(keys_out.k_vb, keys_out.k_fr);
+    make_jamtis_generateaddress_secret(keys_out.k_vb, keys_out.s_ga);
+    make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
+    make_seraphis_spendkey(keys_out.k_vb, keys_out.k_m, keys_out.K_1_base);
+    rct::scalarmultBase(keys_out.K_ua, rct::sk2rct(keys_out.k_ua));
+    rct::scalarmultKey(keys_out.K_fr, keys_out.K_ua, rct::sk2rct(keys_out.k_fr));
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

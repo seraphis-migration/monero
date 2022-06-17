@@ -180,12 +180,14 @@ void make_jamtis_amount_baked_key_plain_sender(const crypto::secret_key &enote_p
 /**
 * brief: make_jamtis_amount_baked_key_plain_recipient - key baked into amount encodings of plain enotes, to provide
 *    fine-tuned control over read rights to the amount
-*    [recipient] baked_key = 8 (1/k^j_a) K_e
+*    [recipient] baked_key = 8 * (1/(k^j_a * k_ua)) * K_e
 * param: address_privkey - k^j_a
+* param: k_unlock_amounts - k_ua
 * param: enote_ephemeral_pubkey - K_e
-* outparam: baked_key_out - 8 (1/k^j_a) K_e
+* outparam: baked_key_out - 8 * (1/(k^j_a * k_ua)) * K_e
 */
 void make_jamtis_amount_baked_key_plain_recipient(const crypto::secret_key &address_privkey,
+    const crypto::secret_key &k_unlock_amounts,
     const rct::key &enote_ephemeral_pubkey,
     crypto::key_derivation &baked_key_out);
 /**

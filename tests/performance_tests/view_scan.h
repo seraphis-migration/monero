@@ -157,31 +157,6 @@ struct ParamsShuttleViewScan final : public ParamsShuttle
     bool test_view_tag_check{false};
 };
 
-struct jamtis_keys
-{
-    crypto::secret_key k_m;   //master
-    crypto::secret_key k_vb;  //view-balance
-    crypto::secret_key k_fr;  //find-received
-    crypto::secret_key s_ga;  //generate-address
-    crypto::secret_key s_ct;  //cipher-tag
-    rct::key K_1_base;        //wallet spend base
-    rct::key K_fr;            //find-received pubkey
-};
-
-inline void make_jamtis_keys(jamtis_keys &keys_out)
-{
-    using namespace sp;
-    using namespace jamtis;
-
-    keys_out.k_m = rct::rct2sk(rct::skGen());
-    keys_out.k_vb = rct::rct2sk(rct::skGen());
-    sp::jamtis::make_jamtis_findreceived_key(keys_out.k_vb, keys_out.k_fr);
-    sp::jamtis::make_jamtis_generateaddress_secret(keys_out.k_vb, keys_out.s_ga);
-    sp::jamtis::make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
-    sp::make_seraphis_spendkey(keys_out.k_vb, keys_out.k_m, keys_out.K_1_base);
-    rct::scalarmultBase(keys_out.K_fr, rct::sk2rct(keys_out.k_fr));
-}
-
 class test_view_scan_sp
 {
 public:
@@ -192,13 +167,14 @@ public:
         m_test_view_tag_check = params.test_view_tag_check;
 
         // user wallet keys
-        make_jamtis_keys(m_keys);
+        make_jamtis_mock_keys(m_keys);
 
         // user address
         sp::jamtis::JamtisDestinationV1 user_address;
         sp::jamtis::address_index_t j{0}; //address 0
 
         sp::jamtis::make_jamtis_destination_v1(m_keys.K_1_base,
+            m_keys.K_ua,
             m_keys.K_fr,
             m_keys.s_ga,
             j,
@@ -237,7 +213,7 @@ public:
 
 private:
     hw::device &m_hwdev{hw::get_device("default")};
-    jamtis_keys m_keys;
+    sp::jamtis::jamtis_mock_keys m_keys;
     rct::key m_recipient_spend_key;
 
     sp::SpEnoteV1 m_enote;
@@ -334,7 +310,7 @@ inline bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_der
     return true;
 }
 
-// seraphis view-key scanning with siphash hsah function
+// seraphis view-key scanning with siphash hash function
 class test_view_scan_sp_siphash
 {
 public:
@@ -342,18 +318,16 @@ public:
 
     bool init()
     {
-        // user wallet keys (incomplete set)
-        const rct::key wallet_spend_pubkey{rct::pkGen()};
-        const crypto::secret_key s_generate_address{rct::rct2sk(rct::skGen())};
-        m_recipient_findreceived_key = rct::rct2sk(rct::skGen());
-        const rct::key findreceived_pubkey{rct::scalarmultBase(rct::sk2rct(m_recipient_findreceived_key))};
+        // prepare user wallet keys
+        make_jamtis_mock_keys(m_keys);
 
         // user address
         sp::jamtis::JamtisDestinationV1 user_address;
 
-        sp::jamtis::make_jamtis_destination_v1(wallet_spend_pubkey,
-            findreceived_pubkey,
-            s_generate_address,
+        sp::jamtis::make_jamtis_destination_v1(m_keys.K_1_base,
+            m_keys.K_ua,
+            m_keys.K_fr,
+            m_keys.s_ga,
             0, //address 0
             user_address);
 
@@ -383,7 +357,7 @@ public:
         crypto::key_derivation derivation;
 
         hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_ephemeral_pubkey),
-            m_recipient_findreceived_key,
+            m_keys.k_fr,
             derivation);
 
         rct::key nominal_recipient_spendkey;
@@ -407,7 +381,7 @@ public:
 
 private:
     rct::key m_recipient_spend_key;
-    crypto::secret_key m_recipient_findreceived_key;
+    sp::jamtis::jamtis_mock_keys m_keys;
 
     sp::SpEnoteV1 m_enote;
     rct::key m_enote_ephemeral_pubkey;
@@ -682,13 +656,14 @@ public:
         m_basic_records.reserve(num_records);
 
         // user wallet keys
-        make_jamtis_keys(m_keys);
+        make_jamtis_mock_keys(m_keys);
 
         // user address
         sp::jamtis::JamtisDestinationV1 user_address;
         m_real_address_index = sp::jamtis::address_index_t{0}; //address 0
 
         sp::jamtis::make_jamtis_destination_v1(m_keys.K_1_base,
+            m_keys.K_ua,
             m_keys.K_fr,
             m_keys.s_ga,
             m_real_address_index,
@@ -764,6 +739,7 @@ public:
                     try_get_enote_record_v1_plain(m_basic_records[record_index],
                         m_keys.K_1_base,
                         m_keys.k_vb,
+                        m_keys.k_ua,
                         m_keys.k_fr,
                         m_keys.s_ga,
                         *m_cipher_context,
@@ -787,7 +763,7 @@ public:
 private:
     ScannerClientModes m_mode;
 
-    jamtis_keys m_keys;
+    sp::jamtis::jamtis_mock_keys m_keys;
     std::shared_ptr<sp::jamtis::jamtis_address_tag_cipher_context> m_cipher_context;
 
     sp::jamtis::address_index_t m_real_address_index;

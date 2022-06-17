@@ -39,6 +39,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "ringct/rctTypes.h"
 
 //third party headers
 
@@ -53,6 +54,30 @@ namespace sp
 namespace jamtis
 {
 
+////
+// A set of jamtis keys for mock-ups/unit testing
+///
+struct jamtis_mock_keys
+{
+    crypto::secret_key k_m;   //master
+    crypto::secret_key k_vb;  //view-balance
+    crypto::secret_key k_ua;  //unlock-amounts
+    crypto::secret_key k_fr;  //find-received
+    crypto::secret_key s_ga;  //generate-address
+    crypto::secret_key s_ct;  //cipher-tag
+    rct::key K_1_base;        //wallet spend base
+    rct::key K_ua;            //unlock-amounts pubkey
+    rct::key K_fr;            //find-received pubkey
+};
+
+/**
+* brief: make_jamtis_unlockamounts_key - unlock-amounts key, for decrypting amounts and reconstructing amount commitments
+*   k_ua = H_n[k_vb]()
+* param: k_view_balance - k_vb
+* outparam: k_unlock_amounts_out - k_ua
+*/
+void make_jamtis_unlockamounts_key(const crypto::secret_key &k_view_balance,
+    crypto::secret_key &k_unlock_amounts_out);
 /**
 * brief: make_jamtis_findreceived_key - find-received key, for finding enotes received by the wallet
 *   - use to compute view tags and nominal spend keys
@@ -86,6 +111,13 @@ void make_jamtis_ciphertag_secret(const crypto::secret_key &s_generate_address,
 */
 void make_jamtis_identifywallet_key(const crypto::secret_key &s_generate_address,
     crypto::secret_key &k_identify_wallet_out);
+
+
+/**
+* brief: make_jamtis_mock_keys - make a set of mock jamtis keys (for mock-ups/unit testing)
+* outparam: jamtis_mock_keys -
+*/
+void make_jamtis_mock_keys(jamtis_mock_keys &keys_out);
 
 } //namespace jamtis
 } //namespace sp

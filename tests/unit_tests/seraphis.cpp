@@ -72,17 +72,6 @@ extern "C"
 #include <vector>
 
 
-struct jamtis_keys
-{
-    crypto::secret_key k_m;   //master
-    crypto::secret_key k_vb;  //view-balance
-    crypto::secret_key k_fr;  //find-received
-    crypto::secret_key s_ga;  //generate-address
-    crypto::secret_key s_ct;  //cipher-tag
-    rct::key K_1_base;        //wallet spend base
-    rct::key K_fr;            //find-received pubkey
-};
-
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static crypto::secret_key make_secret_key()
@@ -94,21 +83,6 @@ static crypto::secret_key make_secret_key()
 static void make_secret_key(crypto::secret_key &skey_out)
 {
     skey_out = make_secret_key();
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void make_jamtis_keys(jamtis_keys &keys_out)
-{
-    using namespace sp;
-    using namespace jamtis;
-
-    make_secret_key(keys_out.k_m);
-    make_secret_key(keys_out.k_vb);
-    make_jamtis_findreceived_key(keys_out.k_vb, keys_out.k_fr);
-    make_jamtis_generateaddress_secret(keys_out.k_vb, keys_out.s_ga);
-    make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
-    make_seraphis_spendkey(keys_out.k_vb, keys_out.k_m, keys_out.K_1_base);
-    rct::scalarmultBase(keys_out.K_fr, rct::sk2rct(keys_out.k_fr));
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -128,7 +102,7 @@ static void make_fake_sp_masked_address(crypto::secret_key &mask,
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void check_is_owned_with_intermediate_record(const sp::SpOutputProposalV1 &test_proposal,
-    const jamtis_keys &keys,
+    const sp::jamtis::jamtis_mock_keys &keys,
     const sp::jamtis::address_index_t j_expected,
     const rct::xmr_amount amount_expected)
 {
@@ -143,6 +117,7 @@ static void check_is_owned_with_intermediate_record(const sp::SpOutputProposalV1
         test_proposal.m_enote_ephemeral_pubkey,
         rct::zero(),
         keys.K_1_base,
+        keys.k_ua,
         keys.k_fr,
         keys.s_ga,
         intermediate_enote_record));
@@ -170,7 +145,7 @@ static void check_is_owned_with_intermediate_record(const sp::SpOutputProposalV1
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void check_is_owned(const sp::SpOutputProposalV1 &test_proposal,
-    const jamtis_keys &keys,
+    const sp::jamtis::jamtis_mock_keys &keys,
     const sp::jamtis::address_index_t j_expected,
     const rct::xmr_amount amount_expected,
     const sp::jamtis::JamtisEnoteType type_expected)
@@ -207,7 +182,7 @@ static void check_is_owned(const sp::SpOutputProposalV1 &test_proposal,
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void check_is_owned(const sp::jamtis::JamtisPaymentProposalSelfSendV1 &test_proposal,
-    const jamtis_keys &keys,
+    const sp::jamtis::jamtis_mock_keys &keys,
     const sp::jamtis::address_index_t j_expected,
     const rct::xmr_amount amount_expected,
     const sp::jamtis::JamtisEnoteType type_expected)
@@ -580,18 +555,19 @@ TEST(seraphis, information_recovery_jamtisdestination)
     using namespace jamtis;
 
     // user wallet keys
-    jamtis_keys keys;
-    make_jamtis_keys(keys);
+    jamtis_mock_keys keys;
+    make_jamtis_mock_keys(keys);
 
     // test making a jamtis destination then recovering the index
     JamtisDestinationV1 destination_known;
     address_index_t j;
     j.gen();
-    make_jamtis_destination_v1(keys.K_1_base, keys.K_fr, keys.s_ga, j, destination_known);
+    make_jamtis_destination_v1(keys.K_1_base, keys.K_ua, keys.K_fr, keys.s_ga, j, destination_known);
 
     address_index_t j_nominal;
     EXPECT_TRUE(try_get_jamtis_index_from_destination_v1(destination_known,
         keys.K_1_base,
+        keys.K_ua,
         keys.K_fr,
         keys.s_ga,
         j_nominal));
@@ -602,6 +578,7 @@ TEST(seraphis, information_recovery_jamtisdestination)
     destination_unknown.gen();
     EXPECT_FALSE(try_get_jamtis_index_from_destination_v1(destination_unknown,
         keys.K_1_base,
+        keys.K_ua,
         keys.K_fr,
         keys.s_ga,
         j_nominal));
@@ -613,8 +590,8 @@ TEST(seraphis, information_recovery_enote_v1_plain)
     using namespace jamtis;
 
     // user wallet keys
-    jamtis_keys keys;
-    make_jamtis_keys(keys);
+    jamtis_mock_keys keys;
+    make_jamtis_mock_keys(keys);
 
     // user address
     address_index_t j;
@@ -622,6 +599,7 @@ TEST(seraphis, information_recovery_enote_v1_plain)
     JamtisDestinationV1 user_address;
 
     make_jamtis_destination_v1(keys.K_1_base,
+        keys.K_ua,
         keys.K_fr,
         keys.s_ga,
         j,
@@ -645,8 +623,8 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     using namespace jamtis;
 
     // user wallet keys
-    jamtis_keys keys;
-    make_jamtis_keys(keys);
+    jamtis_mock_keys keys;
+    make_jamtis_mock_keys(keys);
 
     // user address
     address_index_t j;
@@ -654,6 +632,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     JamtisDestinationV1 user_address;
 
     make_jamtis_destination_v1(keys.K_1_base,
+        keys.K_ua,
         keys.K_fr,
         keys.s_ga,
         j,
@@ -694,8 +673,8 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     using namespace jamtis;
 
     // user wallet keys
-    jamtis_keys keys;
-    make_jamtis_keys(keys);
+    jamtis_mock_keys keys;
+    make_jamtis_mock_keys(keys);
 
     // user addresses
     address_index_t j_selfspend;
@@ -707,9 +686,9 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     JamtisDestinationV1 selfspend_dest;
     JamtisDestinationV1 change_dest;
     JamtisDestinationV1 dummy_dest;
-    make_jamtis_destination_v1(keys.K_1_base, keys.K_fr, keys.s_ga, j_selfspend, selfspend_dest);
-    make_jamtis_destination_v1(keys.K_1_base, keys.K_fr, keys.s_ga, j_change, change_dest);
-    make_jamtis_destination_v1(keys.K_1_base, keys.K_fr, keys.s_ga, j_dummy, dummy_dest);
+    make_jamtis_destination_v1(keys.K_1_base, keys.K_ua, keys.K_fr, keys.s_ga, j_selfspend, selfspend_dest);
+    make_jamtis_destination_v1(keys.K_1_base, keys.K_ua, keys.K_fr, keys.s_ga, j_change, change_dest);
+    make_jamtis_destination_v1(keys.K_1_base, keys.K_ua, keys.K_fr, keys.s_ga, j_dummy, dummy_dest);
 
     // prepare self-spend payment proposals
     JamtisPaymentProposalSelfSendV1 self_spend_payment_proposal1_amnt_1;
