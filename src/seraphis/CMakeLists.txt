@@ -53,6 +53,7 @@ set(seraphis_sources
   tx_builders_outputs.cpp
   tx_component_types.cpp
   tx_discretized_fee.cpp
+  tx_enote_finding_context_mocks.cpp
   tx_enote_record_utils.cpp
   tx_enote_scanning.cpp
   tx_enote_store_mocks.cpp

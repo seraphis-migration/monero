@@ -28,10 +28,8 @@
 
 // NOT FOR PRODUCTION
 
-// Dependency injector for managing the find-received step of enote scanning.
-
-
-#pragma once
+//paired header
+#include "tx_enote_finding_context_mocks.h"
 
 //local headers
 #include "tx_enote_scanning.h"
@@ -40,35 +38,30 @@
 
 //standard headers
 
-//forward declarations
-
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
 
 namespace sp
 {
-
-////
-// EnoteScanningContextLedger
-// - manages a source of ledger-based enote scanning chunks (i.e. finding potentially owned enotes)
-///
-class EnoteScanningContextLedger
+//-------------------------------------------------------------------------------------------------------------------
+bool EnoteFindingContextLedgerMock::try_get_onchain_chunk(const std::uint64_t chunk_start_height,
+    const std::uint64_t chunk_max_size,
+    EnoteScanningChunkLedgerV1 &chunk_out) const
 {
-public:
-//overloaded operators
-    /// disable copy/move (this is a virtual base class)
-    EnoteScanningContextLedger& operator=(EnoteScanningContextLedger&&) = delete;
-
-//member functions
-    /// tell the enote finder it can start scanning from a specified block height
-    virtual void begin_scanning_from_height(const std::uint64_t initial_start_height,
-        const std::uint64_t max_chunk_size) = 0;
-    /// try to get the next available onchain chunk (must be contiguous with the last chunk acquired since starting to scan)
-    virtual bool try_get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out) = 0;
-    /// try to get a scanning chunk for the unconfirmed txs in a ledger
-    virtual bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) = 0;
-    /// tell the enote finder to stop its scanning process (should be no-throw no-fail)
-    virtual void terminate_scanning() = 0;
-};
-
-//EnoteScanningContextLedgerTest: use mock ledger context, define test case that includes reorgs
-
+    return m_mock_ledger_context.try_get_onchain_chunk(chunk_start_height,
+        chunk_max_size,
+        m_k_find_received,
+        chunk_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool EnoteFindingContextLedgerMock::try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const
+{
+    return m_mock_ledger_context.try_get_unconfirmed_chunk(m_k_find_received, chunk_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool EnoteFindingContextOffchainMock::try_get_offchain_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const
+{
+    return m_mock_offchain_context.try_get_offchain_chunk(m_k_find_received, chunk_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

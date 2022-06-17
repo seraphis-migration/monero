@@ -35,6 +35,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "device/device.hpp"
 #include "sp_crypto_utils.h"
 #include "tx_enote_record_types.h"
 #include "tx_enote_store.h"
@@ -76,7 +77,8 @@ struct EnoteScanningChunkLedgerV1 final
     /// view tag matches in range [start height, end height] (mapped to tx id)
     std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> m_basic_records_per_tx;
     /// key images from txs with view tag matches in range [start height, end height]
-    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_contextual_key_images;
+    std::list<SpContextualKeyImageSetV1> m_contextual_key_images;
+    //std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_contextual_key_images;
 };
 
 //todo? EnoteScanningChunkLedgerVariantV1: to encapsulate scanning chunk types
@@ -91,7 +93,8 @@ struct EnoteScanningChunkNonLedgerV1 final
     /// view tag matches in a non-ledger context (mapped to tx id)
     std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> m_basic_records_per_tx;
     /// key images from txs with view tag matches in the non-ledger context
-    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_contextual_key_images;
+    std::list<SpContextualKeyImageSetV1> m_contextual_key_images;
+    //std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_contextual_key_images;
 };
 
 //todo? EnoteScanningChunkOffchainVariantV1: to encapsulate scanning chunk types
@@ -112,6 +115,23 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
 void check_v1_enote_scan_chunk_nonledger_semantics_v1(const EnoteScanningChunkNonLedgerV1 &nonledger_chunk,
     const SpEnoteOriginContextV1::OriginStatus expected_origin_status,
     const SpEnoteSpentContextV1::SpentStatus expected_spent_status);
+
+//todo
+bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
+    const std::uint64_t block_height,
+    const rct::key &transaction_id,
+    const std::uint64_t total_enotes_before_tx,
+    const rct::key &input_context,
+    const SpTxSupplementV1 &tx_supplement,
+    const std::vector<SpEnoteV1> &enotes_in_tx,
+    const SpEnoteOriginContextV1::OriginStatus origin_status,
+    hw::device &hwdev,
+    std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &basic_records_per_tx_inout);
+void collect_key_images_from_tx(const std::uint64_t block_height,
+    const rct::key &transaction_id,
+    const std::vector<crypto::key_image> &key_images_in_tx,
+    const SpEnoteSpentContextV1::SpentStatus spent_status,
+    std::list<SpContextualKeyImageSetV1> &contextual_key_images_inout);
 
 //todo: use a EnoteScanChunkProcessingContext to hide details of chunk processing and enote store updating?
 void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,

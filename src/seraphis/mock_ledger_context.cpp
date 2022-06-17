@@ -33,12 +33,14 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "device/device.hpp"
 #include "jamtis_enote_utils.h"
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_component_types.h"
+#include "tx_enote_scanning.h"
 #include "txtype_squashed_v1.h"
 
 //third party headers
@@ -46,6 +48,7 @@
 #include <boost/thread/shared_mutex.hpp>
 
 //standard headers
+#include <algorithm>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -97,6 +100,24 @@ std::uint64_t MockLedgerContext::min_enote_index() const
 std::uint64_t MockLedgerContext::max_enote_index() const
 {
     return m_sp_squashed_enotes.size() - 1;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool MockLedgerContext::try_get_onchain_chunk(const std::uint64_t chunk_start_height,
+    const std::uint64_t chunk_max_size,
+    const crypto::secret_key &k_find_received,
+    EnoteScanningChunkLedgerV1 &chunk_out) const
+{
+    boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
+
+    return try_get_onchain_chunk_impl(chunk_start_height, chunk_max_size, k_find_received, chunk_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool MockLedgerContext::try_get_unconfirmed_chunk(const crypto::secret_key &k_find_received,
+    EnoteScanningChunkNonLedgerV1 &chunk_out) const
+{
+    boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
+
+    return try_get_unconfirmed_chunk_impl(k_find_received, chunk_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::try_add_unconfirmed_tx_v1(const SpTxSquashedV1 &tx)
@@ -155,6 +176,135 @@ bool MockLedgerContext::key_image_exists_unconfirmed_v1_impl(const crypto::key_i
 bool MockLedgerContext::key_image_exists_onchain_v1_impl(const crypto::key_image &key_image) const
 {
     return m_sp_key_images.find(key_image) != m_sp_key_images.end();
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_start_height,
+    const std::uint64_t chunk_max_size,
+    const crypto::secret_key &k_find_received,
+    EnoteScanningChunkLedgerV1 &chunk_out) const
+{
+    if (chunk_start_height > get_chain_height() ||
+        chunk_max_size == 0)
+        return false;
+
+    // 1. set block information
+
+    // a. block range
+    chunk_out.m_block_range =
+        {
+            chunk_start_height,
+            std::min(get_chain_height(), chunk_start_height + chunk_max_size - 1)
+        };
+
+    CHECK_AND_ASSERT_THROW_MES(
+        m_block_ids.find(std::get<0>(chunk_out.m_block_range)) != m_block_ids.end() &&
+        m_block_ids.find(std::get<1>(chunk_out.m_block_range)) != m_block_ids.end(),
+        "onchain chunk find-received scanning (mock ledger context): block range outside of block ids map (bug).");
+
+    // b. prefix block id
+    chunk_out.m_prefix_block_id =
+        chunk_start_height > 0
+        ? m_block_ids.at(chunk_start_height - 1)
+        : rct::zero();
+
+    // c. block ids in the range
+    chunk_out.m_block_ids.clear();
+    chunk_out.m_block_ids.reserve(std::get<1>(chunk_out.m_block_range) + 1 - std::get<0>(chunk_out.m_block_range));
+
+    std::for_each(
+            m_block_ids.find(std::get<0>(chunk_out.m_block_range)),
+            m_block_ids.find(std::get<1>(chunk_out.m_block_range) + 1),
+            [&](const std::pair<std::uint64_t, rct::key> &mapped_block_id)
+            {
+                chunk_out.m_block_ids.emplace_back(mapped_block_id.second);
+            }
+        );
+
+    CHECK_AND_ASSERT_THROW_MES(chunk_out.m_block_ids.size() ==
+            std::get<1>(chunk_out.m_block_range) - std::get<0>(chunk_out.m_block_range) + 1,
+        "onchain chunk find-received scanning (mock ledger context): invalid number of block ids acquired (bug).");
+
+    // 2. scan blocks in the range
+    CHECK_AND_ASSERT_THROW_MES(
+        m_blocks_of_tx_output_contents.find(std::get<0>(chunk_out.m_block_range)) !=
+        m_blocks_of_tx_output_contents.end(),
+        "onchain chunk find-received scanning (mock ledger context): start of chunk not known in tx outputs map (bug).");
+    CHECK_AND_ASSERT_THROW_MES(
+        m_blocks_of_tx_output_contents.find(std::get<1>(chunk_out.m_block_range)) !=
+        m_blocks_of_tx_output_contents.end(),
+        "onchain chunk find-received scanning (mock ledger context): end of chunk not known in tx outputs map (bug).");
+    CHECK_AND_ASSERT_THROW_MES(
+        m_blocks_of_tx_key_images.find(std::get<0>(chunk_out.m_block_range)) !=
+        m_blocks_of_tx_key_images.end(),
+        "onchain chunk find-received scanning (mock ledger context): start of chunk not known in key images map (bug).");
+    CHECK_AND_ASSERT_THROW_MES(
+        m_blocks_of_tx_key_images.find(std::get<1>(chunk_out.m_block_range)) !=
+        m_blocks_of_tx_key_images.end(),
+        "onchain chunk find-received scanning (mock ledger context): end of chunk not known in key images map (bug).");
+
+    // a. initialize output count to the total number of enotes in the ledger before the first block to scan
+    std::uint64_t total_output_count_before_tx{0};
+
+    if (std::get<0>(chunk_out.m_block_range) > 0)
+    {
+        CHECK_AND_ASSERT_THROW_MES(
+            m_accumulated_output_counts.find(std::get<0>(chunk_out.m_block_range) - 1) !=
+            m_accumulated_output_counts.end(),
+            "onchain chunk find-received scanning (mock ledger context): output counts missing a block (bug).");
+
+        total_output_count_before_tx = m_accumulated_output_counts.at(std::get<0>(chunk_out.m_block_range) - 1);
+    }
+
+    // b. find-received scan each block in the range
+    std::for_each(
+            m_blocks_of_tx_output_contents.find(std::get<0>(chunk_out.m_block_range)),
+            m_blocks_of_tx_output_contents.find(std::get<1>(chunk_out.m_block_range) + 1),
+            [&](const auto &block_of_tx_output_contents)
+            {
+                for (const auto &tx_with_output_contents : block_of_tx_output_contents.second)
+                {
+                    // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
+                    if (try_find_enotes_in_tx(k_find_received,
+                        block_of_tx_output_contents.first,
+                        sortable2rct(tx_with_output_contents.first),
+                        total_output_count_before_tx,
+                        std::get<rct::key>(tx_with_output_contents.second),
+                        std::get<SpTxSupplementV1>(tx_with_output_contents.second),
+                        std::get<std::vector<SpEnoteV1>>(tx_with_output_contents.second),
+                        SpEnoteOriginContextV1::OriginStatus::ONCHAIN,
+                        hw::get_device("default"),
+                        chunk_out.m_basic_records_per_tx))
+                    {
+                        CHECK_AND_ASSERT_THROW_MES(
+                            m_blocks_of_tx_key_images
+                                .at(block_of_tx_output_contents.first).find(tx_with_output_contents.first) !=
+                            m_blocks_of_tx_key_images
+                                .at(block_of_tx_output_contents.first).end(),
+                            "onchain chunk find-received scanning (mock ledger context): key image map missing tx (bug).");
+
+                        collect_key_images_from_tx(block_of_tx_output_contents.first,
+                            sortable2rct(tx_with_output_contents.first),
+                            m_blocks_of_tx_key_images
+                                .at(block_of_tx_output_contents.first)
+                                .at(tx_with_output_contents.first),
+                            SpEnoteSpentContextV1::SpentStatus::SPENT_ONCHAIN,
+                            chunk_out.m_contextual_key_images);
+                    }
+
+                    // add this tx's number of outputs to the total output count
+                    total_output_count_before_tx += std::get<std::vector<SpEnoteV1>>(tx_with_output_contents.second).size();
+                }
+            }
+        );
+
+    return chunk_out.m_basic_records_per_tx.size() > 0;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool MockLedgerContext::try_get_unconfirmed_chunk_impl(const crypto::secret_key &k_find_received,
+    EnoteScanningChunkNonLedgerV1 &chunk_out) const
+{
+    //todo
+    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::try_add_unconfirmed_coinbase_v1_impl(const rct::key &tx_id,

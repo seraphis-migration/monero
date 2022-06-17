@@ -38,6 +38,7 @@
 #include "mock_ledger_context.h"
 #include "mock_offchain_context.h"
 #include "tx_enote_finding_context.h"
+#include "tx_enote_scanning.h"
 
 //third party headers
 
@@ -68,10 +69,11 @@ public:
 
 //member functions
     /// try to get an onchain chunk
-    void try_get_onchain_chunk(const std::uint64_t chunk_prefix_height,
+    bool try_get_onchain_chunk(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
         EnoteScanningChunkLedgerV1 &chunk_out) const override;
-    void try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const override;
+    /// try to get an unconfirmed chunk
+    bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const override;
 
 //member variables
 private:

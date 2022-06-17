@@ -59,10 +59,11 @@ public:
 
 //member functions
     /// try to get an onchain chunk
-    virtual void try_get_onchain_chunk(const std::uint64_t chunk_prefix_height,
+    virtual bool try_get_onchain_chunk(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
         EnoteScanningChunkLedgerV1 &chunk_out) const = 0;
-    virtual void try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const = 0;
+    /// try to get an unconfirmed chunk
+    virtual bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const = 0;
 };
 
 //EnoteFindingContextLedgerMock: take mock ledger context, find-received key as input
