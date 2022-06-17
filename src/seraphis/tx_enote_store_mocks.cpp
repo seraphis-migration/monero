@@ -109,8 +109,12 @@ void SpEnoteStoreMockV1::update_with_records_from_ledger(const std::uint64_t fir
                 -> bool
             {
                 // a. remove onchain enotes in range [first_new_block, end of chain]
-                if (mapped_contextual_enote_record.second.m_origin_context.m_transaction_height >= first_new_block)
+                if (mapped_contextual_enote_record.second.m_origin_context.m_origin_status ==
+                        SpEnoteOriginContextV1::OriginStatus::ONCHAIN &&
+                    mapped_contextual_enote_record.second.m_origin_context.m_block_height >= first_new_block)
+                {
                     return true;
+                }
 
                 // b. remove all unconfirmed enotes
                 if (mapped_contextual_enote_record.second.m_origin_context.m_origin_status ==
@@ -124,9 +128,13 @@ void SpEnoteStoreMockV1::update_with_records_from_ledger(const std::uint64_t fir
     // 3. clear spent contexts referencing removed enotes
     for (auto &mapped_contextual_enote_record : m_mapped_contextual_enote_records)
     {
-        // a. any enote spent in range [first_new_block, end of chain]
-        if (mapped_contextual_enote_record.second.m_spent_context.m_transaction_height >= first_new_block)
+        // a. any enote spent onchain in range [first_new_block, end of chain]
+        if (mapped_contextual_enote_record.second.m_spent_context.m_spent_status ==
+                SpEnoteSpentContextV1::SpentStatus::SPENT_ONCHAIN &&
+            mapped_contextual_enote_record.second.m_spent_context.m_block_height >= first_new_block)
+        {
             mapped_contextual_enote_record.second.m_spent_context = SpEnoteSpentContextV1{};
+        }
 
         // b. any enote spent in an unconfirmed tx
         if (mapped_contextual_enote_record.second.m_spent_context.m_spent_status ==

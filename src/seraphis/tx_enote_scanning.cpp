@@ -546,9 +546,9 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
     // contextual key images: height checks
     for (const SpContextualKeyImageSetV1 &contextual_key_image_set : onchain_chunk.m_contextual_key_images)
     {
-        CHECK_AND_ASSERT_THROW_MES(contextual_key_image_set.m_spent_context.m_transaction_height >=
+        CHECK_AND_ASSERT_THROW_MES(contextual_key_image_set.m_spent_context.m_block_height >=
                     allowed_lowest_height &&
-                contextual_key_image_set.m_spent_context.m_transaction_height <= allowed_heighest_height,
+                contextual_key_image_set.m_spent_context.m_block_height <= allowed_heighest_height,
             "enote chunk semantics check (ledger): contextual key image block height is out of the expected range.");
     }
 
@@ -558,13 +558,13 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
         for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record : tx_basic_records.second)
         {
             CHECK_AND_ASSERT_THROW_MES(
-                    contextual_basic_record.m_origin_context.m_transaction_height ==
-                        tx_basic_records.second.begin()->m_origin_context.m_transaction_height,
+                    contextual_basic_record.m_origin_context.m_block_height ==
+                        tx_basic_records.second.begin()->m_origin_context.m_block_height,
                 "enote chunk semantics check (ledger): contextual record tx height doesn't match other records in tx.");
 
             CHECK_AND_ASSERT_THROW_MES(
-                    contextual_basic_record.m_origin_context.m_transaction_height >= allowed_lowest_height &&
-                    contextual_basic_record.m_origin_context.m_transaction_height <= allowed_heighest_height,
+                    contextual_basic_record.m_origin_context.m_block_height >= allowed_lowest_height &&
+                    contextual_basic_record.m_origin_context.m_block_height <= allowed_heighest_height,
                 "enote chunk semantics check (ledger): contextual key image block height is out of the expected range.");
         }
     }
@@ -626,11 +626,11 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
         {
             temp_contextual_record.back().m_origin_context =
                 SpEnoteOriginContextV1{
-                        .m_memo = tx_supplement.m_tx_extra,
+                        .m_block_height = block_height,
                         .m_transaction_id = transaction_id,
-                        .m_transaction_height = block_height,
                         .m_enote_ledger_index = total_enotes_before_tx + enote_index,
-                        .m_origin_status = origin_status
+                        .m_origin_status = origin_status,
+                        .m_memo = tx_supplement.m_tx_extra
                     };
 
             // note: it is possible for enotes with duplicate onetime addresses to be added here; it is assumed the
@@ -657,8 +657,8 @@ void collect_key_images_from_tx(const std::uint64_t block_height,
                 .m_key_images = key_images_in_tx,
                 .m_spent_context =
                     SpEnoteSpentContextV1{
+                        .m_block_height = block_height,
                         .m_transaction_id = transaction_id,
-                        .m_transaction_height = block_height,
                         .m_spent_status = spent_status
                     }
             }

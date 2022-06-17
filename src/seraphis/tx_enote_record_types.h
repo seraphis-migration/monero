@@ -134,17 +134,17 @@ struct SpEnoteOriginContextV1 final
         ONCHAIN
     };
 
-    /// associated memo fields (none by default)
-    TxExtra m_memo{};
+    /// block height of transaction (-1 if height is unknown)
+    std::uint64_t m_block_height{static_cast<std::uint64_t>(-1)};
     /// tx id (0 if tx is unknown)
     rct::key m_transaction_id{rct::zero()};
-    /// block height of transaction (-1 if height is unknown)
-    std::uint64_t m_transaction_height{static_cast<std::uint64_t>(-1)};
     /// ledger index of the enote (-1 if index is unknown)
     std::uint64_t m_enote_ledger_index{static_cast<std::uint64_t>(-1)};
-
     /// origin status (off chain by default)
     OriginStatus m_origin_status{OriginStatus::OFFCHAIN};
+
+    /// associated memo fields (none by default)
+    TxExtra m_memo{};
 };
 
 ////
@@ -165,11 +165,10 @@ struct SpEnoteSpentContextV1 final
         SPENT_ONCHAIN
     };
 
+    /// block height of transaction where it was spent (-1 if unspent or height is unknown)
+    std::uint64_t m_block_height{static_cast<std::uint64_t>(-1)};
     /// tx id where it was spent (0 if unspent or tx is unknown)
     rct::key m_transaction_id{rct::zero()};
-    /// block height of transaction where it was spent (-1 if unspent or height is unknown)
-    std::uint64_t m_transaction_height{static_cast<std::uint64_t>(-1)};
-
     /// spent status (unspent by default)
     SpentStatus m_spent_status{SpentStatus::UNSPENT};
 };
