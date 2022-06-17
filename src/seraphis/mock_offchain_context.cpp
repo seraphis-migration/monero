@@ -38,6 +38,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
 #include "tx_component_types.h"
+#include "tx_enote_scanning.h"
 #include "txtype_squashed_v1.h"
 
 //third party headers
@@ -113,7 +114,35 @@ bool MockOffchainContext::key_image_exists_v1_impl(const crypto::key_image &key_
 bool MockOffchainContext::try_get_offchain_chunk_impl(const crypto::secret_key &k_find_received,
     EnoteScanningChunkNonLedgerV1 &chunk_out) const
 {
-    //todo
+    // find-received scan each tx in the unconfirmed chache
+    chunk_out.m_basic_records_per_tx.clear();
+    chunk_out.m_contextual_key_images.clear();
+
+    for (const auto &tx_with_output_contents : m_output_contents)
+    {
+        // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
+        if (try_find_enotes_in_tx(k_find_received,
+            -1,
+            tx_with_output_contents.first,  //use input context as proxy for tx id
+            0,
+            tx_with_output_contents.first,
+            std::get<SpTxSupplementV1>(tx_with_output_contents.second),
+            std::get<std::vector<SpEnoteV1>>(tx_with_output_contents.second),
+            SpEnoteOriginContextV1::OriginStatus::OFFCHAIN,
+            hw::get_device("default"),
+            chunk_out.m_basic_records_per_tx))
+        {
+            CHECK_AND_ASSERT_THROW_MES(m_tx_key_images.find(tx_with_output_contents.first) != m_tx_key_images.end(),
+                "offchain find-received scanning (mock offchain context): key image map missing input context (bug).");
+
+            collect_key_images_from_tx(-1,
+                sortable2rct(tx_with_output_contents.first),
+                m_tx_key_images.at(tx_with_output_contents.first),  //use input context as proxy for tx id
+                SpEnoteSpentContextV1::SpentStatus::SPENT_OFFCHAIN,
+                chunk_out.m_contextual_key_images);
+        }
+    }
+
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------

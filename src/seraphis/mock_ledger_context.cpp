@@ -303,7 +303,36 @@ bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_sta
 bool MockLedgerContext::try_get_unconfirmed_chunk_impl(const crypto::secret_key &k_find_received,
     EnoteScanningChunkNonLedgerV1 &chunk_out) const
 {
-    //todo
+    // find-received scan each tx in the unconfirmed chache
+    chunk_out.m_basic_records_per_tx.clear();
+    chunk_out.m_contextual_key_images.clear();
+
+    for (const auto &tx_with_output_contents : m_unconfirmed_tx_output_contents)
+    {
+        // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
+        if (try_find_enotes_in_tx(k_find_received,
+            -1,
+            sortable2rct(tx_with_output_contents.first),
+            0,
+            std::get<rct::key>(tx_with_output_contents.second),
+            std::get<SpTxSupplementV1>(tx_with_output_contents.second),
+            std::get<std::vector<SpEnoteV1>>(tx_with_output_contents.second),
+            SpEnoteOriginContextV1::OriginStatus::UNCONFIRMED,
+            hw::get_device("default"),
+            chunk_out.m_basic_records_per_tx))
+        {
+            CHECK_AND_ASSERT_THROW_MES(m_unconfirmed_tx_key_images.find(tx_with_output_contents.first) !=
+                    m_unconfirmed_tx_key_images.end(),
+                "unconfirmed chunk find-received scanning (mock ledger context): key image map missing tx (bug).");
+
+            collect_key_images_from_tx(-1,
+                sortable2rct(tx_with_output_contents.first),
+                m_unconfirmed_tx_key_images.at(tx_with_output_contents.first),
+                SpEnoteSpentContextV1::SpentStatus::SPENT_UNCONFIRMED,
+                chunk_out.m_contextual_key_images);
+        }
+    }
+
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------

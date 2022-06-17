@@ -65,9 +65,9 @@ struct jamtis_mock_keys
     crypto::secret_key k_fr;  //find-received
     crypto::secret_key s_ga;  //generate-address
     crypto::secret_key s_ct;  //cipher-tag
-    rct::key K_1_base;        //wallet spend base
-    rct::key K_ua;            //unlock-amounts pubkey
-    rct::key K_fr;            //find-received pubkey
+    rct::key K_1_base;        //wallet spend base = k_vb X + k_m U
+    rct::key K_ua;            //unlock-amounts pubkey = k_ua G
+    rct::key K_fr;            //find-received pubkey = k_fr k_ua G
 };
 
 /**
