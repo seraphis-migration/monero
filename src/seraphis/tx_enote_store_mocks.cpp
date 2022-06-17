@@ -212,7 +212,8 @@ bool SpEnoteStoreMockV1::has_enote_with_key_image(const crypto::key_image &key_i
 bool SpEnoteStoreMockV1::try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const
 {
     if (block_height < m_refresh_height ||
-        block_height > m_refresh_height + m_block_ids.size() - 1)
+        block_height > m_refresh_height + m_block_ids.size() - 1 ||
+        m_block_ids.size() == 0)
         return false;
 
     block_id_out = m_block_ids[block_height - m_refresh_height];

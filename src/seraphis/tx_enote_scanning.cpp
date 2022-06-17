@@ -644,7 +644,8 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
 
             // note: it is possible for enotes with duplicate onetime addresses to be added here; it is assumed the
             //       upstream caller will be able to handle that case without problems
-            basic_records_per_tx_inout[transaction_id].splice(basic_records_per_tx_inout[transaction_id].end(),
+            auto &basic_records_for_tx = basic_records_per_tx_inout[transaction_id];
+            basic_records_for_tx.splice(basic_records_for_tx.end(),
                 temp_contextual_record,
                 temp_contextual_record.begin());
 
@@ -712,7 +713,7 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         //       desired start height and the enote store's minimum height may be very large; if a fixed back-off were used,
         //       then it could take many fullscan attempts to find the point of divergence
         const std::uint64_t reorg_avoidance_depth{
-                static_cast<uint64_t>(std::pow(10, fullscan_attempts) * config.m_reorg_avoidance_depth)
+                static_cast<uint64_t>(std::pow(10, fullscan_attempts - 1) * config.m_reorg_avoidance_depth)
             };
 
         // initial block to scan = max(desired first block - reorg depth, enote store's min scan height)

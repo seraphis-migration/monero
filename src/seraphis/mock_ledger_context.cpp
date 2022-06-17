@@ -183,7 +183,8 @@ bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_sta
     const crypto::secret_key &k_find_received,
     EnoteScanningChunkLedgerV1 &chunk_out) const
 {
-    if (chunk_start_height > get_chain_height() ||
+    if (get_chain_height() + 1 == 0 ||
+        chunk_start_height > get_chain_height() ||
         chunk_max_size == 0)
         return false;
 
@@ -256,6 +257,9 @@ bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_sta
     }
 
     // b. find-received scan each block in the range
+    chunk_out.m_basic_records_per_tx.clear();
+    chunk_out.m_contextual_key_images.clear();
+
     std::for_each(
             m_blocks_of_tx_output_contents.find(std::get<0>(chunk_out.m_block_range)),
             m_blocks_of_tx_output_contents.find(std::get<1>(chunk_out.m_block_range) + 1),
