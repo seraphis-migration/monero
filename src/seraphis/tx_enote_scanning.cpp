@@ -694,29 +694,30 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
     {
         /// initialization based on scan status
 
-        // . update scan attempt
+        // 1. update scan attempt
         if (scan_status == ScanStatus::NEED_PARTIALSCAN)
             ++partialscan_attempts;
         else if (scan_status == ScanStatus::NEED_FULLSCAN)
             ++fullscan_attempts;
 
-        // . fail if we have exceeded the number of partial scanning attempts (i.e. for partial reorgs)
+        // 2. fail if we have exceeded the number of partial scanning attempts (i.e. for partial reorgs)
         if (partialscan_attempts > config.m_max_partialscan_attempts)
         {
             scan_status = ScanStatus::FAIL;
             break;
         }
 
-        // . set reorg avoidance
+        // 3. set reorg avoidance
         // note: we use an exponential back-off as a function of fullscan attempts because if a fullscan fails then
         //       the true location of alignment divergence is unknown; moreover, the distance between the first
         //       desired start height and the enote store's minimum height may be very large; if a fixed back-off were used,
         //       then it could take many fullscan attempts to find the point of divergence
-        const std::uint64_t reorg_avoidance_depth{
-                static_cast<uint64_t>(std::pow(10, fullscan_attempts - 1) * config.m_reorg_avoidance_depth)
-            };
+        const std::uint64_t reorg_avoidance_depth =
+            fullscan_attempts > 0
+            ? static_cast<uint64_t>(std::pow(10, fullscan_attempts - 1) * config.m_reorg_avoidance_depth)
+            : config.m_reorg_avoidance_depth;
 
-        // initial block to scan = max(desired first block - reorg depth, enote store's min scan height)
+        // 4. initial block to scan = max(desired first block - reorg depth, enote store's min scan height)
         std::uint64_t initial_refresh_height;
 
         if (desired_first_block >= reorg_avoidance_depth + enote_store_inout.get_refresh_height())
@@ -724,7 +725,7 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         else
             initial_refresh_height = enote_store_inout.get_refresh_height();
 
-        // set initial contiguity marker (highest block known to be contiguous with the prefix of the first block to scan)
+        // 5. set initial contiguity marker (highest block known to be contiguous with the prefix of the first block to scan)
         ChainContiguityMarker contiguity_marker;
         contiguity_marker.m_block_height = initial_refresh_height - 1;
 
@@ -738,12 +739,13 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
                 "expected (bug).");
         }
 
-        // set initial alignment marker (the heighest scanned block that matches with our current enote store's recorded
+        // 6. set initial alignment marker (the heighest scanned block that matches with our current enote store's recorded
         //   block ids)
         ChainContiguityMarker alignment_marker{contiguity_marker};
 
 
         /// scan
+        // 1. process the ledger
         std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> found_enote_records;
         std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> found_spent_key_images;
 
@@ -760,16 +762,16 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
             found_spent_key_images,
             scanned_block_ids);
 
-        // update desired start height for if there needs to be another scan attempt
+        // 2. update desired start height for if there needs to be another scan attempt
         desired_first_block = contiguity_marker.m_block_height + 1;
 
 
         /// check scan status
-        // give up if scanning failed
+        // 1. give up if scanning failed
         if (scan_status == ScanStatus::FAIL)
             break;
 
-        // if we need to do a full scan, go back to the top immediately
+        // 2. if we need to do a full scan, go back to the top immediately
         if (scan_status == ScanStatus::NEED_FULLSCAN)
         {
             // . bug: if we need to fullscan and the initial refresh height of this scan was at the enote store's min height
@@ -785,20 +787,20 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
 
         /// refresh the enote store with new ledger context
 
-        // sanity checks
+        // 1. sanity checks
         CHECK_AND_ASSERT_THROW_MES(initial_refresh_height <= alignment_marker.m_block_height + 1,
             "refresh ledger for enote store: initial refresh height exceeds the post-alignment block (bug).");
         CHECK_AND_ASSERT_THROW_MES(alignment_marker.m_block_height + 1 - initial_refresh_height <=
                 scanned_block_ids.size(),
             "refresh ledger for enote store: contiguous block ids have fewer blocks than the alignment range (bug).");
 
-        // crop block ids we don't care about
+        // 2. crop block ids we don't care about
         const std::vector<rct::key> scanned_block_ids_cropped{
                 scanned_block_ids.data() + alignment_marker.m_block_height + 1 - initial_refresh_height,
                 scanned_block_ids.data() + scanned_block_ids.size()
             };
 
-        // update the enote store
+        // 3. update the enote store
         enote_store_inout.update_with_records_from_ledger(alignment_marker.m_block_height + 1,
             alignment_marker.m_block_id ? *(alignment_marker.m_block_id) : rct::zero(),
             found_enote_records,

@@ -301,7 +301,7 @@ bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_sta
             }
         );
 
-    return chunk_out.m_basic_records_per_tx.size() > 0;
+    return true;  //note: always return true if we processed some blocks (even if no view tag matches)
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::try_get_unconfirmed_chunk_impl(const crypto::secret_key &k_find_received,

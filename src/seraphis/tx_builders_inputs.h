@@ -260,6 +260,14 @@ std::vector<SpInputProposalV1> gen_mock_sp_input_proposals_v1(const crypto::secr
 * inoutparam: ledger_context_inout -
 * return: a reference set that can be used to make a membership proof
 */
+SpMembershipProofPrepV1 gen_mock_sp_membership_proof_prep_for_enote_at_pos_v1(const SpEnote &real_reference_enote,
+    const std::uint64_t &real_reference_index_in_ledger,
+    const crypto::secret_key &address_mask,
+    const crypto::secret_key &commitment_mask,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
+    const MockLedgerContext &ledger_context);
 SpMembershipProofPrepV1 gen_mock_sp_membership_proof_prep_v1(
     const SpEnote &real_reference_enote,
     const crypto::secret_key &address_mask,

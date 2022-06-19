@@ -34,11 +34,16 @@
 #pragma once
 
 //local headers
+#include "crypto/crypto.h"
+#include "ringct/rctTypes.h"
 #include "tx_enote_record_types.h"
 
 //third party headers
+#include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
+#include <unordered_map>
+#include <unordered_set>
 
 //forward declarations
 
@@ -123,6 +128,11 @@ public:
     virtual std::uint64_t get_refresh_height() const = 0;
     /// get height of heighest recorded block (refresh height - 1 if no recorded blocks)
     virtual std::uint64_t get_top_block_height() const = 0;
+
+    /// get current balance using specified origin/spent statuses
+    virtual boost::multiprecision::uint128_t get_balance(
+        const std::unordered_set<SpEnoteOriginContextV1::OriginStatus> &origin_statuses,
+        const std::unordered_set<SpEnoteSpentContextV1::SpentStatus> &spent_statuses) const = 0;
 };
 
 } //namespace sp

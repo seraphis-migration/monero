@@ -40,6 +40,7 @@
 
 //standard headers
 #include <functional>
+#include <unordered_set>
 #include <utility>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -219,6 +220,30 @@ bool SpEnoteStoreMockV1::try_get_block_id(const std::uint64_t block_height, rct:
     block_id_out = m_block_ids[block_height - m_refresh_height];
 
     return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
+    const std::unordered_set<SpEnoteOriginContextV1::OriginStatus> &origin_statuses,
+    const std::unordered_set<SpEnoteSpentContextV1::SpentStatus> &spent_statuses) const
+{
+    boost::multiprecision::uint128_t inflow_sum{0};
+    boost::multiprecision::uint128_t outflow_sum{0};
+
+    for (const auto &mapped_contextual_record : m_mapped_contextual_enote_records)
+    {
+        const SpContextualEnoteRecordV1 &contextual_record{mapped_contextual_record.second};
+
+        if (origin_statuses.find(contextual_record.m_origin_context.m_origin_status) != origin_statuses.end())
+            inflow_sum += contextual_record.m_record.m_amount;
+
+        if (spent_statuses.find(contextual_record.m_spent_context.m_spent_status) != spent_statuses.end())
+            outflow_sum += contextual_record.m_record.m_amount;
+    }
+
+    if (inflow_sum >= outflow_sum)
+        return inflow_sum - outflow_sum;
+    else
+        return 0;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp
