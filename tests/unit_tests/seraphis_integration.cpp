@@ -289,10 +289,10 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
 
     /// config
-    const std::size_t max_inputs{10000};
+    const std::size_t max_inputs{1000};
     const std::size_t fee_per_tx_weight{1};
-    const std::size_t ref_set_decomp_m{2};
     const std::size_t ref_set_decomp_n{2};
+    const std::size_t ref_set_decomp_m{2};
 
     const RefreshLedgerEnoteStoreConfig refresh_config{
             .m_reorg_avoidance_depth = 1,
@@ -309,6 +309,20 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
     /// mock ledger context for this test
     MockLedgerContext ledger_context{};
+
+
+    /// add enough fake enotes to the ledger so we can reliably make membership proofs
+    std::vector<rct::xmr_amount> fake_enote_amounts(
+            std::max(
+                    ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m),
+                    static_cast<std::size_t>(2*bin_config.m_bin_radius + 1)
+                ),
+            0
+        );
+    JamtisDestinationV1 fake_destination;
+    fake_destination.gen();
+
+    send_coinbase_amounts_to_user(fake_enote_amounts, fake_destination, ledger_context);
 
 
     /// make two users
