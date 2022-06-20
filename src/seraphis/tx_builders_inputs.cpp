@@ -809,4 +809,38 @@ std::vector<SpMembershipProofPrepV1> gen_mock_sp_membership_proof_preps_v1(
         ledger_context_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_mock_sp_membership_proof_preps_for_inputs_v1(
+    const std::unordered_map<crypto::key_image, std::uint64_t> &input_ledger_mappings,
+    const std::vector<SpInputProposalV1> &input_proposals,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
+    const MockLedgerContext &ledger_context,
+    std::vector<SpMembershipProofPrepV1> &membership_proof_preps_out)
+{
+    CHECK_AND_ASSERT_THROW_MES(input_ledger_mappings.size() == input_proposals.size(),
+        "make mock membership proof preps: input proposals don't line up with their enotes' ledger indices.");
+
+    membership_proof_preps_out.clear();
+    membership_proof_preps_out.reserve(input_proposals.size());
+
+    for (const SpInputProposalV1 &input_proposal : input_proposals)
+    {
+        CHECK_AND_ASSERT_THROW_MES(
+                input_ledger_mappings.find(input_proposal.m_core.m_key_image) != input_ledger_mappings.end(),
+            "make mock membership proof preps: the enote ledger indices map is missing an expected key image.");
+
+        membership_proof_preps_out.emplace_back(
+                gen_mock_sp_membership_proof_prep_for_enote_at_pos_v1(input_proposal.m_core.m_enote_core,
+                        input_ledger_mappings.at(input_proposal.m_core.m_key_image),
+                        input_proposal.m_core.m_address_mask,
+                        input_proposal.m_core.m_commitment_mask,
+                        ref_set_decomp_n,
+                        ref_set_decomp_m,
+                        bin_config,
+                        ledger_context)
+            );
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

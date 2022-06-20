@@ -40,6 +40,7 @@
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_discretized_fee.h"
+#include "tx_input_selection.h"
 #include "txtype_squashed_v1.h"
 
 //third party headers
@@ -133,14 +134,39 @@ void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
 * param: tx_fee -
 * param: input_proposals -
 * param: additional_memo_elements -
-* outparam: proposal_out -
+* outparam: tx_proposal_out -
 */
 void make_v1_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
     std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     const DiscretizedFee &tx_fee,
     std::vector<SpInputProposalV1> input_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
-    SpTxProposalV1 &proposal_out);
+    SpTxProposalV1 &tx_proposal_out);
+/**
+* brief: try_make_v1_tx_proposal_for_transfer_v1 - try to select inputs then make a v1 tx proposal for specified outlays
+* param: k_view_balance -
+* param: change_address -
+* param: dummy_address -
+* param: local_user_input_selector -
+* param: tx_fee_calculator -
+* param: fee_per_tx_weight -
+* param: max_inputs -
+* param: normal_payment_proposals -
+* param: partial_memo_for_tx -
+* outparam: tx_proposal_out -
+* outparam: input_ledger_mappings_out -
+*/
+bool try_make_v1_tx_proposal_for_transfer_v1(const crypto::secret_key &k_view_balance,
+    const jamtis::JamtisDestinationV1 &change_address,
+    const jamtis::JamtisDestinationV1 &dummy_address,
+    const InputSelectorV1 &local_user_input_selector,
+    const FeeCalculator &tx_fee_calculator,
+    const rct::xmr_amount fee_per_tx_weight,
+    const std::size_t max_inputs,
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+    TxExtra partial_memo_for_tx,
+    SpTxProposalV1 &tx_proposal_out,
+    std::unordered_map<crypto::key_image, std::uint64_t> &input_ledger_mappings_out);
 /**
 * brief: make_v1_balance_proof_v1 - make v1 tx balance proof (BP+ for range proofs; balance check is sum-to-zero)
 *   - range proofs: for input image amount commitments and output commitments (squashed enote model)

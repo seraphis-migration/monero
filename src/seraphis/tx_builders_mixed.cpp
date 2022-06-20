@@ -50,11 +50,13 @@
 #include "tx_builders_inputs.h"
 #include "tx_builders_outputs.h"
 #include "tx_component_types.h"
+#include "tx_input_selection_output_context_v1.h"
 #include "tx_misc_utils.h"
 #include "tx_validation_context_mock.h"
 #include "txtype_squashed_v1.h"
 
 //third party headers
+#include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
 #include <string>
@@ -412,17 +414,108 @@ void make_v1_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_
     const DiscretizedFee &tx_fee,
     std::vector<SpInputProposalV1> input_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
-    SpTxProposalV1 &proposal_out)
+    SpTxProposalV1 &tx_proposal_out)
 {
     // inputs should be sorted by key image
     std::sort(input_proposals.begin(), input_proposals.end());
 
     // set fields
-    proposal_out.m_normal_payment_proposals = std::move(normal_payment_proposals);
-    proposal_out.m_selfsend_payment_proposals = std::move(selfsend_payment_proposals);
-    proposal_out.m_tx_fee = tx_fee;
-    proposal_out.m_input_proposals = std::move(input_proposals);
-    make_tx_extra(std::move(additional_memo_elements), proposal_out.m_partial_memo);
+    tx_proposal_out.m_normal_payment_proposals = std::move(normal_payment_proposals);
+    tx_proposal_out.m_selfsend_payment_proposals = std::move(selfsend_payment_proposals);
+    tx_proposal_out.m_tx_fee = tx_fee;
+    tx_proposal_out.m_input_proposals = std::move(input_proposals);
+    make_tx_extra(std::move(additional_memo_elements), tx_proposal_out.m_partial_memo);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_make_v1_tx_proposal_for_transfer_v1(const crypto::secret_key &k_view_balance,
+    const jamtis::JamtisDestinationV1 &change_address,
+    const jamtis::JamtisDestinationV1 &dummy_address,
+    const InputSelectorV1 &local_user_input_selector,
+    const FeeCalculator &tx_fee_calculator,
+    const rct::xmr_amount fee_per_tx_weight,
+    const std::size_t max_inputs,
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+    TxExtra partial_memo_for_tx,
+    SpTxProposalV1 &tx_proposal_out,
+    std::unordered_map<crypto::key_image, std::uint64_t> &input_ledger_mappings_out)
+{
+    // try to select inputs for the tx
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals;  //no predefined self-send payments
+
+    const OutputSetContextForInputSelectionV1 output_set_context{
+            normal_payment_proposals,
+            selfsend_payment_proposals
+        };
+
+    rct::xmr_amount reported_final_fee;
+    std::list<SpContextualEnoteRecordV1> contextual_inputs;
+    if (!try_get_input_set_v1(output_set_context,
+            max_inputs,
+            local_user_input_selector,
+            fee_per_tx_weight,
+            tx_fee_calculator,
+            reported_final_fee,
+            contextual_inputs))
+        return false;
+
+    // handle inputs
+    input_ledger_mappings_out.clear();
+
+    std::vector<SpInputProposalV1> input_proposals;
+    input_proposals.reserve(contextual_inputs.size());
+
+    for (const SpContextualEnoteRecordV1 &contextual_input : contextual_inputs)
+    {
+        // save input indices for making membership proofs
+        input_ledger_mappings_out[contextual_input.m_record.m_key_image] = 
+            contextual_input.m_origin_context.m_enote_ledger_index;
+
+        // convert inputs to input proposals
+        input_proposals.emplace_back();
+        make_v1_input_proposal_v1(contextual_input.m_record,
+            rct::rct2sk(rct::skGen()),
+            rct::rct2sk(rct::skGen()),
+            input_proposals.back());
+    }
+
+    // get total input amount
+    boost::multiprecision::uint128_t total_input_amount{0};
+    for (const SpInputProposalV1 &input_proposal : input_proposals)
+        total_input_amount += input_proposal.m_core.m_amount;
+
+    // finalize output set
+    const DiscretizedFee discretized_transaction_fee{reported_final_fee};
+    CHECK_AND_ASSERT_THROW_MES(discretized_transaction_fee == reported_final_fee,
+        "make tx proposal for transfer (v1): the input selector fee was not properly discretized (bug).");
+
+    finalize_v1_output_proposal_set_v1(total_input_amount,
+        reported_final_fee,
+        change_address,
+        dummy_address,
+        k_view_balance,
+        normal_payment_proposals,
+        selfsend_payment_proposals);
+
+    CHECK_AND_ASSERT_THROW_MES(tx_fee_calculator.get_fee(fee_per_tx_weight,
+                contextual_inputs.size(),
+                normal_payment_proposals.size() + selfsend_payment_proposals.size()) ==
+            reported_final_fee,
+        "make tx proposal for transfer (v1): final fee is not consistent with input selector fee (bug).");
+
+    // get memo elements
+    std::vector<ExtraFieldElement> extra_field_elements;
+    CHECK_AND_ASSERT_THROW_MES(try_get_extra_field_elements(partial_memo_for_tx, extra_field_elements),
+        "make tx proposal for transfer (v1): unable to extract memo field elements for tx proposal.");
+
+    // assemble into tx proposal
+    make_v1_tx_proposal_v1(std::move(normal_payment_proposals),
+        std::move(selfsend_payment_proposals),
+        discretized_transaction_fee,
+        std::move(input_proposals),
+        std::move(extra_field_elements),
+        tx_proposal_out);
+
+    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_balance_proof_v1(const std::vector<rct::xmr_amount> &input_amounts,
