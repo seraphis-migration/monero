@@ -113,8 +113,8 @@ struct RefreshLedgerEnoteStoreConfig final
 void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedgerV1 &onchain_chunk,
     const std::uint64_t expected_prefix_height);
 void check_v1_enote_scan_chunk_nonledger_semantics_v1(const EnoteScanningChunkNonLedgerV1 &nonledger_chunk,
-    const SpEnoteOriginContextV1::OriginStatus expected_origin_status,
-    const SpEnoteSpentContextV1::SpentStatus expected_spent_status);
+    const SpEnoteOriginStatus expected_origin_status,
+    const SpEnoteSpentStatus expected_spent_status);
 
 //todo
 bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
@@ -124,13 +124,13 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
     const rct::key &input_context,
     const SpTxSupplementV1 &tx_supplement,
     const std::vector<SpEnoteV1> &enotes_in_tx,
-    const SpEnoteOriginContextV1::OriginStatus origin_status,
+    const SpEnoteOriginStatus origin_status,
     hw::device &hwdev,
     std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &basic_records_per_tx_inout);
 void collect_key_images_from_tx(const std::uint64_t block_height,
     const rct::key &transaction_id,
     const std::vector<crypto::key_image> &key_images_in_tx,
-    const SpEnoteSpentContextV1::SpentStatus spent_status,
+    const SpEnoteSpentStatus spent_status,
     std::list<SpContextualKeyImageSetV1> &contextual_key_images_inout);
 
 //todo: use a EnoteScanChunkProcessingContext to hide details of chunk processing and enote store updating?

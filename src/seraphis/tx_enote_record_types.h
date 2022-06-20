@@ -119,21 +119,41 @@ struct SpEnoteRecordV1 final
 };
 
 ////
+// SpEnoteOriginStatus
+// - flag indicating where an enote is located
+///
+enum class SpEnoteOriginStatus
+{
+    // is only located off-chain
+    OFFCHAIN,
+    // is in the tx pool (but not the blockchain)
+    UNCONFIRMED,
+    // is in the blockchain
+    ONCHAIN
+};
+
+////
+// SpEnoteSpentStatus
+// - flag indicating where an enote was spent
+///
+enum class SpEnoteSpentStatus
+{
+    // has not been spent anywhere
+    UNSPENT,
+    // is spent in an off-chain tx
+    SPENT_OFFCHAIN,
+    // is spent in a tx in the mempool
+    SPENT_UNCONFIRMED,
+    // is spent in the ledger
+    SPENT_ONCHAIN
+};
+
+////
 // SpEnoteOriginContextV1
 // - info related to where an enote record was found
 ///
 struct SpEnoteOriginContextV1 final
 {
-    enum class OriginStatus
-    {
-        // is only located off-chain
-        OFFCHAIN,
-        // is in the tx pool (but not the blockchain)
-        UNCONFIRMED,
-        // is in the blockchain
-        ONCHAIN
-    };
-
     /// block height of transaction (-1 if height is unknown)
     std::uint64_t m_block_height{static_cast<std::uint64_t>(-1)};
     /// tx id (0 if tx is unknown)
@@ -141,7 +161,7 @@ struct SpEnoteOriginContextV1 final
     /// ledger index of the enote (-1 if index is unknown)
     std::uint64_t m_enote_ledger_index{static_cast<std::uint64_t>(-1)};
     /// origin status (off chain by default)
-    OriginStatus m_origin_status{OriginStatus::OFFCHAIN};
+    SpEnoteOriginStatus m_origin_status{SpEnoteOriginStatus::OFFCHAIN};
 
     /// associated memo fields (none by default)
     TxExtra m_memo{};
@@ -153,24 +173,12 @@ struct SpEnoteOriginContextV1 final
 ///
 struct SpEnoteSpentContextV1 final
 {
-    enum class SpentStatus
-    {
-        // has not been spent anywhere
-        UNSPENT,
-        // is spent in an off-chain tx
-        SPENT_OFFCHAIN,
-        // is spent in a tx in the mempool
-        SPENT_UNCONFIRMED,
-        // is spent in the ledger
-        SPENT_ONCHAIN
-    };
-
     /// block height of transaction where it was spent (-1 if unspent or height is unknown)
     std::uint64_t m_block_height{static_cast<std::uint64_t>(-1)};
     /// tx id where it was spent (0 if unspent or tx is unknown)
     rct::key m_transaction_id{rct::zero()};
     /// spent status (unspent by default)
-    SpentStatus m_spent_status{SpentStatus::UNSPENT};
+    SpEnoteSpentStatus m_spent_status{SpEnoteSpentStatus::UNSPENT};
 };
 
 ////
@@ -243,13 +251,13 @@ struct SpContextualEnoteRecordV1 final
     rct::xmr_amount get_amount() const { return m_record.m_amount; }
 
     /// check origin status
-    bool has_origin_status(const SpEnoteOriginContextV1::OriginStatus test_status) const
+    bool has_origin_status(const SpEnoteOriginStatus test_status) const
     {
         return m_origin_context.m_origin_status == test_status;
     }
 
     /// check spent status
-    bool has_spent_status(const SpEnoteSpentContextV1::SpentStatus test_status) const
+    bool has_spent_status(const SpEnoteSpentStatus test_status) const
     {
         return m_spent_context.m_spent_status == test_status;
     }

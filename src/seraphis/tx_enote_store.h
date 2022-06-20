@@ -83,10 +83,10 @@ public:
     clear_onchain_records_from_height(first_new_block);
 
     // b. remove all unconfirmed enotes
-    clear_records_with_origin_status(SpEnoteOriginContextV1::OriginStatus::UNCONFIRMED);
+    clear_records_with_origin_status(SpEnoteOriginStatus::UNCONFIRMED);
 
     // c. clear spent contexts referencing removed enotes
-    clear_spent_context_of_records_with_spent_status(SpEnoteSpentContextV1::SpentStatus::SPENT_UNCONFIRMED);
+    clear_spent_context_of_records_with_spent_status(SpEnoteSpentStatus::SPENT_UNCONFIRMED);
     clear_spent_context_of_records_from_spent_height(first_new_block);
 
     // d. add found enotes
@@ -107,8 +107,8 @@ public:
         const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images) = 0;
 /*
     // a. clear existing offchain enotes and erase any spent context referencing an offchain tx
-    clear_records_with_origin_status(SpEnoteOriginContextV1::OriginStatus::OFFCHAIN);
-    clear_spent_context_of_records_with_spent_status(SpEnoteSpentContextV1::SpentStatus::SPENT_OFFCHAIN);
+    clear_records_with_origin_status(SpEnoteOriginStatus::OFFCHAIN);
+    clear_spent_context_of_records_with_spent_status(SpEnoteSpentStatus::SPENT_OFFCHAIN);
 
     // b. add found enotes
     for (const auto &found_enote_record : found_enote_records)
@@ -131,8 +131,8 @@ public:
 
     /// get current balance using specified origin/spent statuses
     virtual boost::multiprecision::uint128_t get_balance(
-        const std::unordered_set<SpEnoteOriginContextV1::OriginStatus> &origin_statuses,
-        const std::unordered_set<SpEnoteSpentContextV1::SpentStatus> &spent_statuses) const = 0;
+        const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
+        const std::unordered_set<SpEnoteSpentStatus> &spent_statuses) const = 0;
 };
 
 } //namespace sp

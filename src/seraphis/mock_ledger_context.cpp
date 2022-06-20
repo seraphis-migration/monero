@@ -275,7 +275,7 @@ bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_sta
                         std::get<rct::key>(tx_with_output_contents.second),
                         std::get<SpTxSupplementV1>(tx_with_output_contents.second),
                         std::get<std::vector<SpEnoteV1>>(tx_with_output_contents.second),
-                        SpEnoteOriginContextV1::OriginStatus::ONCHAIN,
+                        SpEnoteOriginStatus::ONCHAIN,
                         hw::get_device("default"),
                         chunk_out.m_basic_records_per_tx))
                     {
@@ -291,7 +291,7 @@ bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_sta
                             m_blocks_of_tx_key_images
                                 .at(block_of_tx_output_contents.first)
                                 .at(tx_with_output_contents.first),
-                            SpEnoteSpentContextV1::SpentStatus::SPENT_ONCHAIN,
+                            SpEnoteSpentStatus::SPENT_ONCHAIN,
                             chunk_out.m_contextual_key_images);
                     }
 
@@ -321,7 +321,7 @@ bool MockLedgerContext::try_get_unconfirmed_chunk_impl(const crypto::secret_key 
             std::get<rct::key>(tx_with_output_contents.second),
             std::get<SpTxSupplementV1>(tx_with_output_contents.second),
             std::get<std::vector<SpEnoteV1>>(tx_with_output_contents.second),
-            SpEnoteOriginContextV1::OriginStatus::UNCONFIRMED,
+            SpEnoteOriginStatus::UNCONFIRMED,
             hw::get_device("default"),
             chunk_out.m_basic_records_per_tx))
         {
@@ -332,7 +332,7 @@ bool MockLedgerContext::try_get_unconfirmed_chunk_impl(const crypto::secret_key 
             collect_key_images_from_tx(-1,
                 sortable2rct(tx_with_output_contents.first),
                 m_unconfirmed_tx_key_images.at(tx_with_output_contents.first),
-                SpEnoteSpentContextV1::SpentStatus::SPENT_UNCONFIRMED,
+                SpEnoteSpentStatus::SPENT_UNCONFIRMED,
                 chunk_out.m_contextual_key_images);
         }
     }

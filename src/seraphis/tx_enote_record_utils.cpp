@@ -787,32 +787,31 @@ bool try_update_contextual_enote_record_spent_context_v1(const SpContextualKeyIm
         contextual_enote_record_inout.m_spent_context);
 }
 //-------------------------------------------------------------------------------------------------------------------
-SpEnoteOriginContextV1::OriginStatus origin_status_from_spent_status_v1(
-    const SpEnoteSpentContextV1::SpentStatus spent_status)
+SpEnoteOriginStatus origin_status_from_spent_status_v1(const SpEnoteSpentStatus spent_status)
 {
     switch (spent_status)
     {
-        case (SpEnoteSpentContextV1::SpentStatus::UNSPENT) :
-            return SpEnoteOriginContextV1::OriginStatus::OFFCHAIN;
+        case (SpEnoteSpentStatus::UNSPENT) :
+            return SpEnoteOriginStatus::OFFCHAIN;
 
-        case (SpEnoteSpentContextV1::SpentStatus::SPENT_OFFCHAIN) :
-            return SpEnoteOriginContextV1::OriginStatus::OFFCHAIN;
+        case (SpEnoteSpentStatus::SPENT_OFFCHAIN) :
+            return SpEnoteOriginStatus::OFFCHAIN;
 
-        case (SpEnoteSpentContextV1::SpentStatus::SPENT_UNCONFIRMED) :
-            return SpEnoteOriginContextV1::OriginStatus::UNCONFIRMED;
+        case (SpEnoteSpentStatus::SPENT_UNCONFIRMED) :
+            return SpEnoteOriginStatus::UNCONFIRMED;
 
-        case (SpEnoteSpentContextV1::SpentStatus::SPENT_ONCHAIN) :
-            return SpEnoteOriginContextV1::OriginStatus::ONCHAIN;
+        case (SpEnoteSpentStatus::SPENT_ONCHAIN) :
+            return SpEnoteOriginStatus::ONCHAIN;
 
         default :
-            return SpEnoteOriginContextV1::OriginStatus::OFFCHAIN;
+            return SpEnoteOriginStatus::OFFCHAIN;
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentContextV1::SpentStatus spent_status,
-    SpEnoteOriginContextV1::OriginStatus &origin_status_inout)
+bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentStatus spent_status,
+    SpEnoteOriginStatus &origin_status_inout)
 {
-    const SpEnoteOriginContextV1::OriginStatus implied_origin_status{origin_status_from_spent_status_v1(spent_status)};
+    const SpEnoteOriginStatus implied_origin_status{origin_status_from_spent_status_v1(spent_status)};
 
     if (origin_status_inout > implied_origin_status)
         return false;

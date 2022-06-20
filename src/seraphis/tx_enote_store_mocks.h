@@ -83,8 +83,8 @@ public:
     std::uint64_t get_top_block_height() const override
     { throw; return 0; }
     boost::multiprecision::uint128_t get_balance(
-        const std::unordered_set<SpEnoteOriginContextV1::OriginStatus> &origin_statuses,
-        const std::unordered_set<SpEnoteSpentContextV1::SpentStatus> &spent_statuses) const override
+        const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
+        const std::unordered_set<SpEnoteSpentStatus> &spent_statuses) const override
     { throw; return 0; }
 
 //member variables
@@ -137,8 +137,8 @@ public:
     std::uint64_t get_top_block_height() const override { return m_refresh_height + m_block_ids.size() - 1; }
     /// get current balance using specified origin/spent statuses
     boost::multiprecision::uint128_t get_balance(
-        const std::unordered_set<SpEnoteOriginContextV1::OriginStatus> &origin_statuses,
-        const std::unordered_set<SpEnoteSpentContextV1::SpentStatus> &spent_statuses) const override;
+        const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
+        const std::unordered_set<SpEnoteSpentStatus> &spent_statuses) const override;
 
 //member variables
 protected:

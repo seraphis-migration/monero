@@ -128,7 +128,7 @@ bool MockOffchainContext::try_get_offchain_chunk_impl(const crypto::secret_key &
             tx_with_output_contents.first,
             std::get<SpTxSupplementV1>(tx_with_output_contents.second),
             std::get<std::vector<SpEnoteV1>>(tx_with_output_contents.second),
-            SpEnoteOriginContextV1::OriginStatus::OFFCHAIN,
+            SpEnoteOriginStatus::OFFCHAIN,
             hw::get_device("default"),
             chunk_out.m_basic_records_per_tx))
         {
@@ -138,7 +138,7 @@ bool MockOffchainContext::try_get_offchain_chunk_impl(const crypto::secret_key &
             collect_key_images_from_tx(-1,
                 sortable2rct(tx_with_output_contents.first),
                 m_tx_key_images.at(tx_with_output_contents.first),  //use input context as proxy for tx id
-                SpEnoteSpentContextV1::SpentStatus::SPENT_OFFCHAIN,
+                SpEnoteSpentStatus::SPENT_OFFCHAIN,
                 chunk_out.m_contextual_key_images);
         }
     }

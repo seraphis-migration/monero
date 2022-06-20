@@ -55,7 +55,7 @@ bool InputSelectorMockSimpleV1::try_select_input_v1(const boost::multiprecision:
     for (const auto &contextual_enote_record : m_enote_store.m_contextual_enote_records)
     {
         // find the next unspent enote record that hasn't already been selected (via key image comparisons)
-        if (!contextual_enote_record.has_spent_status(SpEnoteSpentContextV1::SpentStatus::UNSPENT))
+        if (!contextual_enote_record.has_spent_status(SpEnoteSpentStatus::UNSPENT))
             continue;
 
         auto record_finder =
@@ -86,7 +86,7 @@ bool InputSelectorMockV1::try_select_input_v1(const boost::multiprecision::uint1
     for (const auto &mapped_enote_record : m_enote_store.m_mapped_contextual_enote_records)
     {
         // find the next unspent enote record that hasn't already been selected (via key image comparisons)
-        if (!mapped_enote_record.second.has_spent_status(SpEnoteSpentContextV1::SpentStatus::UNSPENT))
+        if (!mapped_enote_record.second.has_spent_status(SpEnoteSpentStatus::UNSPENT))
             continue;
 
         auto record_finder =

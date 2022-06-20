@@ -125,8 +125,8 @@ struct ChainContiguityMarker final
 static void check_enote_scan_chunk_map_semantics_v1(
     const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
-    const SpEnoteOriginContextV1::OriginStatus expected_origin_status,
-    const SpEnoteSpentContextV1::SpentStatus expected_spent_status)
+    const SpEnoteOriginStatus expected_origin_status,
+    const SpEnoteSpentStatus expected_spent_status)
 {
     // 1. contextual key images
     for (const auto &contextual_key_image_set : chunk_contextual_key_images)
@@ -544,8 +544,8 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
 
     check_enote_scan_chunk_map_semantics_v1(onchain_chunk.m_basic_records_per_tx,
         onchain_chunk.m_contextual_key_images,
-        SpEnoteOriginContextV1::OriginStatus::ONCHAIN,
-        SpEnoteSpentContextV1::SpentStatus::SPENT_ONCHAIN);
+        SpEnoteOriginStatus::ONCHAIN,
+        SpEnoteSpentStatus::SPENT_ONCHAIN);
 
     // start block = prefix block + 1
     const std::uint64_t allowed_lowest_height{std::get<0>(onchain_chunk.m_block_range)};
@@ -580,8 +580,8 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_enote_scan_chunk_nonledger_semantics_v1(const EnoteScanningChunkNonLedgerV1 &nonledger_chunk,
-    const SpEnoteOriginContextV1::OriginStatus expected_origin_status,
-    const SpEnoteSpentContextV1::SpentStatus expected_spent_status)
+    const SpEnoteOriginStatus expected_origin_status,
+    const SpEnoteSpentStatus expected_spent_status)
 {
     check_enote_scan_chunk_map_semantics_v1(nonledger_chunk.m_basic_records_per_tx,
         nonledger_chunk.m_contextual_key_images,
@@ -596,7 +596,7 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
     const rct::key &input_context,
     const SpTxSupplementV1 &tx_supplement,
     const std::vector<SpEnoteV1> &enotes_in_tx,
-    const SpEnoteOriginContextV1::OriginStatus origin_status,
+    const SpEnoteOriginStatus origin_status,
     hw::device &hwdev,
     std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &basic_records_per_tx_inout)
 {
@@ -659,7 +659,7 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
 void collect_key_images_from_tx(const std::uint64_t block_height,
     const rct::key &transaction_id,
     const std::vector<crypto::key_image> &key_images_in_tx,
-    const SpEnoteSpentContextV1::SpentStatus spent_status,
+    const SpEnoteSpentStatus spent_status,
     std::list<SpContextualKeyImageSetV1> &contextual_key_images_inout)
 {
     contextual_key_images_inout.emplace_back(
@@ -825,8 +825,8 @@ void refresh_enote_store_offchain(const rct::key &wallet_spend_pubkey,
     {
         // validate chunk semantics (consistent vector sizes, block heights in contexts are within range)
         check_v1_enote_scan_chunk_nonledger_semantics_v1(offchain_chunk,
-            SpEnoteOriginContextV1::OriginStatus::OFFCHAIN,
-            SpEnoteSpentContextV1::SpentStatus::SPENT_OFFCHAIN);
+            SpEnoteOriginStatus::OFFCHAIN,
+            SpEnoteSpentStatus::SPENT_OFFCHAIN);
 
         // prepare for chunk processing
         crypto::secret_key k_unlock_amounts;

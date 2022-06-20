@@ -111,7 +111,7 @@ void SpEnoteStoreMockV1::update_with_records_from_ledger(const std::uint64_t fir
             {
                 // a. remove onchain enotes in range [first_new_block, end of chain]
                 if (mapped_contextual_enote_record.second.m_origin_context.m_origin_status ==
-                        SpEnoteOriginContextV1::OriginStatus::ONCHAIN &&
+                        SpEnoteOriginStatus::ONCHAIN &&
                     mapped_contextual_enote_record.second.m_origin_context.m_block_height >= first_new_block)
                 {
                     return true;
@@ -119,7 +119,7 @@ void SpEnoteStoreMockV1::update_with_records_from_ledger(const std::uint64_t fir
 
                 // b. remove all unconfirmed enotes
                 if (mapped_contextual_enote_record.second.m_origin_context.m_origin_status ==
-                        SpEnoteOriginContextV1::OriginStatus::UNCONFIRMED)
+                        SpEnoteOriginStatus::UNCONFIRMED)
                     return true;
 
                 return false;
@@ -131,7 +131,7 @@ void SpEnoteStoreMockV1::update_with_records_from_ledger(const std::uint64_t fir
     {
         // a. any enote spent onchain in range [first_new_block, end of chain]
         if (mapped_contextual_enote_record.second.m_spent_context.m_spent_status ==
-                SpEnoteSpentContextV1::SpentStatus::SPENT_ONCHAIN &&
+                SpEnoteSpentStatus::SPENT_ONCHAIN &&
             mapped_contextual_enote_record.second.m_spent_context.m_block_height >= first_new_block)
         {
             mapped_contextual_enote_record.second.m_spent_context = SpEnoteSpentContextV1{};
@@ -139,7 +139,7 @@ void SpEnoteStoreMockV1::update_with_records_from_ledger(const std::uint64_t fir
 
         // b. any enote spent in an unconfirmed tx
         if (mapped_contextual_enote_record.second.m_spent_context.m_spent_status ==
-                SpEnoteSpentContextV1::SpentStatus::SPENT_UNCONFIRMED)
+                SpEnoteSpentStatus::SPENT_UNCONFIRMED)
             mapped_contextual_enote_record.second.m_spent_context = SpEnoteSpentContextV1{};
     }
 
@@ -171,7 +171,7 @@ void SpEnoteStoreMockV1::update_with_records_from_offchain(
             {
                 // remove all offchain enotes
                 if (mapped_contextual_enote_record.second.m_origin_context.m_origin_status ==
-                        SpEnoteOriginContextV1::OriginStatus::OFFCHAIN)
+                        SpEnoteOriginStatus::OFFCHAIN)
                     return true;
 
                 return false;
@@ -183,7 +183,7 @@ void SpEnoteStoreMockV1::update_with_records_from_offchain(
     {
         // any enote spent in an offchain tx
         if (mapped_contextual_enote_record.second.m_spent_context.m_spent_status ==
-                SpEnoteSpentContextV1::SpentStatus::SPENT_OFFCHAIN)
+                SpEnoteSpentStatus::SPENT_OFFCHAIN)
             mapped_contextual_enote_record.second.m_spent_context = SpEnoteSpentContextV1{};
     }
 
@@ -223,8 +223,8 @@ bool SpEnoteStoreMockV1::try_get_block_id(const std::uint64_t block_height, rct:
 }
 //-------------------------------------------------------------------------------------------------------------------
 boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
-    const std::unordered_set<SpEnoteOriginContextV1::OriginStatus> &origin_statuses,
-    const std::unordered_set<SpEnoteSpentContextV1::SpentStatus> &spent_statuses) const
+    const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
+    const std::unordered_set<SpEnoteSpentStatus> &spent_statuses) const
 {
     boost::multiprecision::uint128_t inflow_sum{0};
     boost::multiprecision::uint128_t outflow_sum{0};
