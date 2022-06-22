@@ -102,14 +102,14 @@ std::uint64_t MockLedgerContext::max_enote_index() const
     return m_sp_squashed_enotes.size() - 1;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::try_get_onchain_chunk(const std::uint64_t chunk_start_height,
+void MockLedgerContext::get_onchain_chunk(const std::uint64_t chunk_start_height,
     const std::uint64_t chunk_max_size,
     const crypto::secret_key &k_find_received,
     EnoteScanningChunkLedgerV1 &chunk_out) const
 {
     boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
 
-    return try_get_onchain_chunk_impl(chunk_start_height, chunk_max_size, k_find_received, chunk_out);
+    get_onchain_chunk_impl(chunk_start_height, chunk_max_size, k_find_received, chunk_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::try_get_unconfirmed_chunk(const crypto::secret_key &k_find_received,
@@ -178,17 +178,41 @@ bool MockLedgerContext::key_image_exists_onchain_v1_impl(const crypto::key_image
     return m_sp_key_images.find(key_image) != m_sp_key_images.end();
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_start_height,
+void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_height,
     const std::uint64_t chunk_max_size,
     const crypto::secret_key &k_find_received,
     EnoteScanningChunkLedgerV1 &chunk_out) const
 {
+    chunk_out.m_basic_records_per_tx.clear();
+    chunk_out.m_contextual_key_images.clear();
+    chunk_out.m_block_ids.clear();
+
+    // 1. failure cases
     if (get_chain_height() + 1 == 0 ||
         chunk_start_height > get_chain_height() ||
         chunk_max_size == 0)
-        return false;
+    {
+        // set empty chunk info: top of the chain
+        chunk_out.m_block_range =
+            {
+                get_chain_height() + 1,
+                get_chain_height()
+            };
 
-    // 1. set block information
+        if (m_block_ids.size())
+        {
+            CHECK_AND_ASSERT_THROW_MES(m_block_ids.find(m_block_ids.size() - 1) != m_block_ids.end(),
+                "onchain chunk find-received scanning (mock ledger context): block ids map incorrect indexing (bug).");
+
+            chunk_out.m_block_ids.emplace_back(m_block_ids.at(m_block_ids.size() - 1));
+        }
+        else
+            chunk_out.m_block_ids.emplace_back(rct::zero());
+
+        return;
+    }
+
+    // 2. set block information
 
     // a. block range
     chunk_out.m_block_range =
@@ -209,8 +233,7 @@ bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_sta
         : rct::zero();
 
     // c. block ids in the range
-    chunk_out.m_block_ids.clear();
-    chunk_out.m_block_ids.reserve(std::get<1>(chunk_out.m_block_range) + 1 - std::get<0>(chunk_out.m_block_range));
+    chunk_out.m_block_ids.reserve(std::get<1>(chunk_out.m_block_range) - std::get<0>(chunk_out.m_block_range) + 1);
 
     std::for_each(
             m_block_ids.find(std::get<0>(chunk_out.m_block_range)),
@@ -225,7 +248,7 @@ bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_sta
             std::get<1>(chunk_out.m_block_range) - std::get<0>(chunk_out.m_block_range) + 1,
         "onchain chunk find-received scanning (mock ledger context): invalid number of block ids acquired (bug).");
 
-    // 2. scan blocks in the range
+    // 3. scan blocks in the range
     CHECK_AND_ASSERT_THROW_MES(
         m_blocks_of_tx_output_contents.find(std::get<0>(chunk_out.m_block_range)) !=
         m_blocks_of_tx_output_contents.end(),
@@ -300,8 +323,6 @@ bool MockLedgerContext::try_get_onchain_chunk_impl(const std::uint64_t chunk_sta
                 }
             }
         );
-
-    return true;  //note: always return true if we processed some blocks (even if no view tag matches)
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::try_get_unconfirmed_chunk_impl(const crypto::secret_key &k_find_received,
@@ -550,9 +571,11 @@ std::uint64_t MockLedgerContext::pop_chain_at_height_impl(const std::uint64_t po
     {
         // sanity check
         if (pop_height > 0)
+        {
             CHECK_AND_ASSERT_THROW_MES(m_accumulated_output_counts.find(pop_height - 1) !=
                     m_accumulated_output_counts.end(),
                 "mock ledger context (popping chain): accumulated output counts has a hole (bug).");
+        }
 
         // remove all outputs starting in the pop_height block
         const std::uint64_t first_output_to_remove =

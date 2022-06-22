@@ -72,15 +72,12 @@ public:
         m_next_start_height = initial_start_height;
         m_max_chunk_size = max_chunk_size;
     }
-    /// try to get the next available onchain chunk
+    /// get the next available onchain chunk (or empty chunk representing top of current chain)
     /// - starting past the end of the last chunk acquired since starting to scan
-    bool try_get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out) override
+    void get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out) override
     {
-        if (!m_enote_finding_context.try_get_onchain_chunk(m_next_start_height, m_max_chunk_size, chunk_out))
-            return false;
-
+        m_enote_finding_context.get_onchain_chunk(m_next_start_height, m_max_chunk_size, chunk_out);
         m_next_start_height = std::get<1>(chunk_out.m_block_range) + 1;
-        return true;
     }
     /// try to get a scanning chunk for the unconfirmed txs in a ledger
     bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) override

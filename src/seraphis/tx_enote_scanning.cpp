@@ -87,10 +87,11 @@ public:
     }
 
 //member functions
-    /// try to get the next available onchain chunk (must be contiguous with the last chunk acquired since starting to scan)
-    bool try_get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out)
+    /// get the next available onchain chunk (must be contiguous with the last chunk acquired since starting to scan)
+    /// note: if chunk is empty, chunk represents top of current chain
+    void get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out)
     {
-        return m_enote_scan_context.try_get_onchain_chunk(chunk_out);
+        m_enote_scan_context.get_onchain_chunk(chunk_out);
     }
     /// try to get a scanning chunk for the unconfirmed txs in a ledger
     bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out)
@@ -174,7 +175,7 @@ static bool contiguity_check(const ChainContiguityMarker &marker_A, const ChainC
         marker_A.m_block_id != marker_B.m_block_id)
         return false;
 
-    // note: optional:false contiguitity block ids can match with any block id
+    // note: optional:false contiguity block ids can match with any block id
 
     return true;
 }
@@ -370,8 +371,9 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
     std::vector<rct::key> &scanned_block_ids_inout)
 {
     EnoteScanningChunkLedgerV1 new_onchain_chunk;
+    scan_process_inout.get_onchain_chunk(new_onchain_chunk);
 
-    while (scan_process_inout.try_get_onchain_chunk(new_onchain_chunk))
+    while (std::get<1>(new_onchain_chunk.m_block_range) - std::get<0>(new_onchain_chunk.m_block_range) + 1 > 0)
     {
         // validate chunk semantics (this should check all array bounds to prevent out-of-range accesses below)
         check_v1_enote_scan_chunk_ledger_semantics_v1(new_onchain_chunk, contiguity_marker_inout.m_block_height);
@@ -392,14 +394,16 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
         else
         {
             // if not contiguous, then there must have been a reorg, so we need to rescan
-            // note: check the contiguity marker here NOT alignment marker, because we could be aligned only
-            //       at the very first marker but contiguous to farther up the chain
             if (contiguity_marker_inout.m_block_height <= first_contiguity_height)
-                // a reorg deeper than our first expected point of contiguity
+            {
+                // a reorg that affects our first expected point of contiguity
                 return ScanStatus::NEED_FULLSCAN;
+            }
             else
+            {
                 // a reorg between chunks obtained in this loop
                 return ScanStatus::NEED_PARTIALSCAN;
+            }
         }
 
         // update contiguity marker (last block of chunk)
@@ -423,6 +427,30 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
         scanned_block_ids_inout.insert(scanned_block_ids_inout.end(),
             new_onchain_chunk.m_block_ids.begin(),
             new_onchain_chunk.m_block_ids.end());
+
+        // get next chunk
+        scan_process_inout.get_onchain_chunk(new_onchain_chunk);
+    }
+
+    // verify that the last chunk obtained, which represents the top of the current chain, matches our contiguity marker
+    CHECK_AND_ASSERT_THROW_MES(new_onchain_chunk.m_block_ids.size() == 1,
+        "process ledger for onchain pass: final chunk does not have expected number of block ids (one expected).");
+
+    if (!contiguity_check(contiguity_marker_inout,
+        ChainContiguityMarker{std::get<1>(new_onchain_chunk.m_block_range), new_onchain_chunk.m_block_ids.back()}))
+    {
+        // a reorg must have dropped below our contiguity marker without replacing the dropped blocks
+        // note: shift right by 1 in case ledger is empty (so top of chunk == -1)
+        if (std::get<1>(new_onchain_chunk.m_block_range) + 1 <= first_contiguity_height + 1)
+        {
+            // a reorg that affects our first expected point of contiguity
+            return ScanStatus::NEED_FULLSCAN;
+        }
+        else
+        {
+            // a reorg between chunks obtained in this loop
+            return ScanStatus::NEED_PARTIALSCAN;
+        }
     }
 
     return ScanStatus::DONE;
@@ -700,7 +728,7 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         else if (scan_status == ScanStatus::NEED_FULLSCAN)
             ++fullscan_attempts;
 
-        // 2. fail if we have exceeded the number of partial scanning attempts (i.e. for partial reorgs)
+        // 2. fail if we have exceeded the number of partial scanning attempts (i.e. for handling partial reorgs)
         if (partialscan_attempts > config.m_max_partialscan_attempts)
         {
             scan_status = ScanStatus::FAIL;
@@ -771,17 +799,20 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         if (scan_status == ScanStatus::FAIL)
             break;
 
-        // 2. if we need to do a full scan, go back to the top immediately
+        // 2. handle fullscan case
         if (scan_status == ScanStatus::NEED_FULLSCAN)
         {
-            // . bug: if we need to fullscan and the initial refresh height of this scan was at the enote store's min height
-            // note: this is a bug because when starting at the min block height, the initial contiguity marker should be
-            //       optional:false, which permits contiguity with any value of the first chunk's prefix block (so there
-            //       should not be a full-scan-inducing contiguity failure)
-            CHECK_AND_ASSERT_THROW_MES(initial_refresh_height > enote_store_inout.get_refresh_height(),
-                "refresh ledger for enote store: need to fullscan but previous scan exceeded enote store's range (bug).");
-
-            continue;
+            if (initial_refresh_height <= enote_store_inout.get_refresh_height())
+            {
+                // if the scan process thinks we need a full rescan even when starting at the enote store's refresh height,
+                //   then the top of the chain must be below the refresh height, so we are done
+                scan_status = ScanStatus::DONE;
+            }
+            else
+            {
+                // if we must do a full scan, go back to the top immediately
+                continue;
+            }
         }
 
 

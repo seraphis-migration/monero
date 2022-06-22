@@ -68,8 +68,8 @@ public:
     EnoteFindingContextLedgerMock& operator=(EnoteFindingContextLedgerMock&&) = delete;
 
 //member functions
-    /// try to get an onchain chunk
-    bool try_get_onchain_chunk(const std::uint64_t chunk_start_height,
+    /// get an onchain chunk (or empty chunk representing top of current chain)
+    void get_onchain_chunk(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
         EnoteScanningChunkLedgerV1 &chunk_out) const override;
     /// try to get an unconfirmed chunk

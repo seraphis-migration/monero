@@ -61,8 +61,9 @@ public:
     /// tell the enote finder it can start scanning from a specified block height
     virtual void begin_scanning_from_height(const std::uint64_t initial_start_height,
         const std::uint64_t max_chunk_size) = 0;
-    /// try to get the next available onchain chunk (must be contiguous with the last chunk acquired since starting to scan)
-    virtual bool try_get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out) = 0;
+    /// get the next available onchain chunk (must be contiguous with the last chunk acquired since starting to scan)
+    /// note: if chunk is empty, chunk represents top of current chain
+    virtual void get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out) = 0;
     /// try to get a scanning chunk for the unconfirmed txs in a ledger
     virtual bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) = 0;
     /// tell the enote finder to stop its scanning process (should be no-throw no-fail)

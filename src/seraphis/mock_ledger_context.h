@@ -107,14 +107,13 @@ public:
     */
     std::uint64_t num_enotes() const { return max_enote_index() - min_enote_index() + 1; }
     /**
-    * brief: try_get_onchain_chunk - try to find-received scan a chunk of blocks
+    * brief: get_onchain_chunk - find-received scan a chunk of blocks
     * param: chunk_start_height -
     * param: chunk_max_size -
     * param: k_find_received -
-    * outparam: chunk_out -
-    * return: true if chunk represents at least one block
+    * outparam: chunk_out - chunk of scanned blocks (or empty chunk representing top of current chain)
     */
-    bool try_get_onchain_chunk(const std::uint64_t chunk_start_height,
+    void get_onchain_chunk(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
         const crypto::secret_key &k_find_received,
         EnoteScanningChunkLedgerV1 &chunk_out) const;
@@ -137,6 +136,7 @@ public:
     /**
     * brief: commit_unconfirmed_cache_v1 - move all unconfirmed txs onto the chain in a new block, with new mock coinbase tx
     *   - clears the unconfirmed tx cache
+    *   - note: currently does NOT validate if coinbase enotes are sorted properly
     *   - todo: use a real coinbase tx instead, with height that is expected to match the next block height (try commit)
     * param: mock_coinbase_input_context -
     * param: mock_coinbase_tx_supplement -
@@ -172,7 +172,7 @@ private:
     /// implementations of the above, without internally locking the ledger mutex (all expected to be no-fail)
     bool key_image_exists_unconfirmed_v1_impl(const crypto::key_image &key_image) const;
     bool key_image_exists_onchain_v1_impl(const crypto::key_image &key_image) const;
-    bool try_get_onchain_chunk_impl(const std::uint64_t chunk_start_height,
+    void get_onchain_chunk_impl(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
         const crypto::secret_key &k_find_received,
         EnoteScanningChunkLedgerV1 &chunk_out) const;
