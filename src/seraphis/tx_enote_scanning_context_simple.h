@@ -77,7 +77,7 @@ public:
     void get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out) override
     {
         m_enote_finding_context.get_onchain_chunk(m_next_start_height, m_max_chunk_size, chunk_out);
-        m_next_start_height = std::get<1>(chunk_out.m_block_range);
+        m_next_start_height = chunk_out.m_end_height;
     }
     /// try to get a scanning chunk for the unconfirmed txs in a ledger
     bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) override

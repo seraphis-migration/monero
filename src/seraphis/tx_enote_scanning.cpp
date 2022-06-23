@@ -373,20 +373,20 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
     EnoteScanningChunkLedgerV1 new_onchain_chunk;
     scan_process_inout.get_onchain_chunk(new_onchain_chunk);
 
-    while (std::get<1>(new_onchain_chunk.m_block_range) - std::get<0>(new_onchain_chunk.m_block_range) > 0)
+    while (new_onchain_chunk.m_end_height - new_onchain_chunk.m_start_height > 0)
     {
         // validate chunk semantics (this should check all array bounds to prevent out-of-range accesses below)
         check_v1_enote_scan_chunk_ledger_semantics_v1(new_onchain_chunk, contiguity_marker_inout.m_block_height);
 
         // check if this chunk is contiguous with the contiguity marker
         if (contiguity_check(contiguity_marker_inout,
-            ChainContiguityMarker{std::get<0>(new_onchain_chunk.m_block_range) - 1, new_onchain_chunk.m_prefix_block_id}))
+            ChainContiguityMarker{new_onchain_chunk.m_start_height - 1, new_onchain_chunk.m_prefix_block_id}))
         {
             // update alignment marker if we are aligned with the end of the previous chunk
             if (contiguity_check(alignment_marker_inout, contiguity_marker_inout))
             {
                 update_alignment_marker(enote_store,
-                    std::get<0>(new_onchain_chunk.m_block_range),
+                    new_onchain_chunk.m_start_height,
                     new_onchain_chunk.m_block_ids,
                     alignment_marker_inout);
             }
@@ -411,7 +411,7 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
         }
 
         // update contiguity marker (last block of chunk)
-        contiguity_marker_inout.m_block_height = std::get<1>(new_onchain_chunk.m_block_range) - 1;
+        contiguity_marker_inout.m_block_height = new_onchain_chunk.m_end_height - 1;
         contiguity_marker_inout.m_block_id = new_onchain_chunk.m_block_ids.back();
 
         // process the chunk (update found enote records and spent key images)
@@ -441,11 +441,11 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
         "process ledger for onchain pass: final chunk does not have zero block ids as expected.");
 
     if (!contiguity_check(contiguity_marker_inout,
-        ChainContiguityMarker{std::get<1>(new_onchain_chunk.m_block_range) - 1, new_onchain_chunk.m_prefix_block_id}))
+        ChainContiguityMarker{new_onchain_chunk.m_end_height - 1, new_onchain_chunk.m_prefix_block_id}))
     {
         // a reorg must have dropped below our contiguity marker without replacing the dropped blocks
         // note: +1 in case first contiguity height == -1
-        if (std::get<1>(new_onchain_chunk.m_block_range) <= first_contiguity_height + 1)
+        if (new_onchain_chunk.m_end_height <= first_contiguity_height + 1)
         {
             // a reorg that affects our first expected point of contiguity
             return ScanStatus::NEED_FULLSCAN;
@@ -570,12 +570,10 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
     const std::uint64_t expected_prefix_height)
 {
     // misc. checks
-    CHECK_AND_ASSERT_THROW_MES(std::get<0>(onchain_chunk.m_block_range) - 1 == expected_prefix_height,
+    CHECK_AND_ASSERT_THROW_MES(onchain_chunk.m_start_height - 1 == expected_prefix_height,
         "enote scan chunk semantics check (ledger): chunk range doesn't start at expected prefix height.");
 
-    const std::uint64_t num_blocks_in_chunk{
-            std::get<1>(onchain_chunk.m_block_range) - std::get<0>(onchain_chunk.m_block_range)
-        };
+    const std::uint64_t num_blocks_in_chunk{onchain_chunk.m_end_height - onchain_chunk.m_start_height};
     CHECK_AND_ASSERT_THROW_MES(num_blocks_in_chunk >= 1,
         "enote scan chunk semantics check (ledger): chunk has no blocks.");    
     CHECK_AND_ASSERT_THROW_MES(onchain_chunk.m_block_ids.size() == num_blocks_in_chunk,
@@ -587,9 +585,9 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
         SpEnoteSpentStatus::SPENT_ONCHAIN);
 
     // start block = prefix block + 1
-    const std::uint64_t allowed_lowest_height{std::get<0>(onchain_chunk.m_block_range)};
+    const std::uint64_t allowed_lowest_height{onchain_chunk.m_start_height};
     // end block
-    const std::uint64_t allowed_heighest_height{std::get<1>(onchain_chunk.m_block_range) - 1};
+    const std::uint64_t allowed_heighest_height{onchain_chunk.m_end_height - 1};
 
     // contextual key images: height checks
     for (const SpContextualKeyImageSetV1 &contextual_key_image_set : onchain_chunk.m_contextual_key_images)

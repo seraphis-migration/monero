@@ -46,7 +46,6 @@
 //standard headers
 #include <list>
 #include <unordered_map>
-#include <utility>
 #include <vector>
 
 //forward declarations
@@ -69,7 +68,8 @@ namespace sp
 struct EnoteScanningChunkLedgerV1 final
 {
     /// block range: [start height, end height)
-    std::pair<std::uint64_t, std::uint64_t> m_block_range;
+    std::uint64_t m_start_height;
+    std::uint64_t m_end_height;
     /// block id at 'start height - 1'  (implicitly ignored if start_height == 0)
     rct::key m_prefix_block_id;
     /// block ids in range [start height, end height)

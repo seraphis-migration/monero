@@ -193,11 +193,8 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
         chunk_max_size == 0)
     {
         // set empty chunk info: top of the chain
-        chunk_out.m_block_range =
-            {
-                get_chain_height() + 1,
-                get_chain_height() + 1
-            };
+        chunk_out.m_start_height = get_chain_height() + 1;
+        chunk_out.m_end_height = get_chain_height() + 1;
 
         if (m_block_ids.size())
         {
@@ -216,15 +213,11 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
     // 2. set block information
 
     // a. block range
-    chunk_out.m_block_range =
-        {
-            chunk_start_height,
-            std::min(get_chain_height(), chunk_start_height + chunk_max_size - 1) + 1
-        };
+    chunk_out.m_start_height = chunk_start_height;
+    chunk_out.m_end_height = std::min(get_chain_height(), chunk_start_height + chunk_max_size - 1) + 1;
 
-    CHECK_AND_ASSERT_THROW_MES(
-        m_block_ids.find(std::get<0>(chunk_out.m_block_range)) != m_block_ids.end() &&
-        m_block_ids.find(std::get<1>(chunk_out.m_block_range) - 1) != m_block_ids.end(),
+    CHECK_AND_ASSERT_THROW_MES(m_block_ids.find(chunk_out.m_start_height) != m_block_ids.end() &&
+            m_block_ids.find(chunk_out.m_end_height - 1) != m_block_ids.end(),
         "onchain chunk find-received scanning (mock ledger context): block range outside of block ids map (bug).");
 
     // b. prefix block id
@@ -234,50 +227,44 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
         : rct::zero();
 
     // c. block ids in the range
-    chunk_out.m_block_ids.reserve(std::get<1>(chunk_out.m_block_range) - std::get<0>(chunk_out.m_block_range));
+    chunk_out.m_block_ids.reserve(chunk_out.m_end_height - chunk_out.m_start_height);
 
     std::for_each(
-            m_block_ids.find(std::get<0>(chunk_out.m_block_range)),
-            m_block_ids.find(std::get<1>(chunk_out.m_block_range)),
+            m_block_ids.find(chunk_out.m_start_height),
+            m_block_ids.find(chunk_out.m_end_height),
             [&](const std::pair<std::uint64_t, rct::key> &mapped_block_id)
             {
                 chunk_out.m_block_ids.emplace_back(mapped_block_id.second);
             }
         );
 
-    CHECK_AND_ASSERT_THROW_MES(chunk_out.m_block_ids.size() ==
-            std::get<1>(chunk_out.m_block_range) - std::get<0>(chunk_out.m_block_range),
+    CHECK_AND_ASSERT_THROW_MES(chunk_out.m_block_ids.size() == chunk_out.m_end_height - chunk_out.m_start_height,
         "onchain chunk find-received scanning (mock ledger context): invalid number of block ids acquired (bug).");
 
     // 3. scan blocks in the range
-    CHECK_AND_ASSERT_THROW_MES(
-        m_blocks_of_tx_output_contents.find(std::get<0>(chunk_out.m_block_range)) !=
-        m_blocks_of_tx_output_contents.end(),
+    CHECK_AND_ASSERT_THROW_MES(m_blocks_of_tx_output_contents.find(chunk_out.m_start_height) !=
+            m_blocks_of_tx_output_contents.end(),
         "onchain chunk find-received scanning (mock ledger context): start of chunk not known in tx outputs map (bug).");
-    CHECK_AND_ASSERT_THROW_MES(
-        m_blocks_of_tx_output_contents.find(std::get<1>(chunk_out.m_block_range) - 1) !=
-        m_blocks_of_tx_output_contents.end(),
+    CHECK_AND_ASSERT_THROW_MES(m_blocks_of_tx_output_contents.find(chunk_out.m_end_height - 1) !=
+            m_blocks_of_tx_output_contents.end(),
         "onchain chunk find-received scanning (mock ledger context): end of chunk not known in tx outputs map (bug).");
-    CHECK_AND_ASSERT_THROW_MES(
-        m_blocks_of_tx_key_images.find(std::get<0>(chunk_out.m_block_range)) !=
-        m_blocks_of_tx_key_images.end(),
+    CHECK_AND_ASSERT_THROW_MES(m_blocks_of_tx_key_images.find(chunk_out.m_start_height) !=
+            m_blocks_of_tx_key_images.end(),
         "onchain chunk find-received scanning (mock ledger context): start of chunk not known in key images map (bug).");
-    CHECK_AND_ASSERT_THROW_MES(
-        m_blocks_of_tx_key_images.find(std::get<1>(chunk_out.m_block_range) - 1) !=
-        m_blocks_of_tx_key_images.end(),
+    CHECK_AND_ASSERT_THROW_MES(m_blocks_of_tx_key_images.find(chunk_out.m_end_height - 1) !=
+            m_blocks_of_tx_key_images.end(),
         "onchain chunk find-received scanning (mock ledger context): end of chunk not known in key images map (bug).");
 
     // a. initialize output count to the total number of enotes in the ledger before the first block to scan
     std::uint64_t total_output_count_before_tx{0};
 
-    if (std::get<0>(chunk_out.m_block_range) > 0)
+    if (chunk_out.m_start_height > 0)
     {
-        CHECK_AND_ASSERT_THROW_MES(
-            m_accumulated_output_counts.find(std::get<0>(chunk_out.m_block_range) - 1) !=
-            m_accumulated_output_counts.end(),
+        CHECK_AND_ASSERT_THROW_MES(m_accumulated_output_counts.find(chunk_out.m_start_height - 1) !=
+                m_accumulated_output_counts.end(),
             "onchain chunk find-received scanning (mock ledger context): output counts missing a block (bug).");
 
-        total_output_count_before_tx = m_accumulated_output_counts.at(std::get<0>(chunk_out.m_block_range) - 1);
+        total_output_count_before_tx = m_accumulated_output_counts.at(chunk_out.m_start_height - 1);
     }
 
     // b. find-received scan each block in the range
@@ -285,8 +272,8 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
     chunk_out.m_contextual_key_images.clear();
 
     std::for_each(
-            m_blocks_of_tx_output_contents.find(std::get<0>(chunk_out.m_block_range)),
-            m_blocks_of_tx_output_contents.find(std::get<1>(chunk_out.m_block_range)),
+            m_blocks_of_tx_output_contents.find(chunk_out.m_start_height),
+            m_blocks_of_tx_output_contents.find(chunk_out.m_end_height),
             [&](const auto &block_of_tx_output_contents)
             {
                 for (const auto &tx_with_output_contents : block_of_tx_output_contents.second)
