@@ -353,10 +353,15 @@ TEST(seraphis_enote_scanning, simple_ledger)
     ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
 
-    // 5. search once, two coinbase to user, search once, pop 1, search again, 1 coinbase to user, search again
+    // 5. search once, three coinbase to user, search once, pop 2, search again, 1 coinbase to user, search again
+    const RefreshLedgerEnoteStoreConfig refresh_config_test5{
+            .m_reorg_avoidance_depth = 1,
+            .m_max_chunk_size = 1,
+            .m_max_partialscan_attempts = 0
+        };
     MockLedgerContext ledger_context_test5;
     SpEnoteStoreMockV1 enote_store_A_test5{0};
-    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    refresh_user_enote_store(user_keys_A, refresh_config_test5, ledger_context_test5, enote_store_A_test5);
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::OFFCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
@@ -364,34 +369,40 @@ TEST(seraphis_enote_scanning, simple_ledger)
 
     send_coinbase_amounts_to_users({{1}}, {destination_A}, ledger_context_test5);
     send_coinbase_amounts_to_users({{2}}, {destination_A}, ledger_context_test5);
-    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    send_coinbase_amounts_to_users({{4}}, {destination_A}, ledger_context_test5);
+    refresh_user_enote_store(user_keys_A, refresh_config_test5, ledger_context_test5, enote_store_A_test5);
 
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::OFFCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
-        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 7);
 
-    ledger_context_test5.pop_blocks(1);
-    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    ledger_context_test5.pop_blocks(2);
+    refresh_user_enote_store(user_keys_A, refresh_config_test5, ledger_context_test5, enote_store_A_test5);
 
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::OFFCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
 
-    send_coinbase_amounts_to_users({{4}}, {destination_A}, ledger_context_test5);
-    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    send_coinbase_amounts_to_users({{8}}, {destination_A}, ledger_context_test5);
+    refresh_user_enote_store(user_keys_A, refresh_config_test5, ledger_context_test5, enote_store_A_test5);
 
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::OFFCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
-        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 5);
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 9);
 
-    // 6. search once, two coinbase to user, search once, pop 1, search again, 1 coinbase to user, search again
+    // 6. search, three coinbase to user, search, pop 2, search, 1 coinbase to user, search, pop 3, search
     // - refresh height 1
+    const RefreshLedgerEnoteStoreConfig refresh_config_test6{
+            .m_reorg_avoidance_depth = 1,
+            .m_max_chunk_size = 1,
+            .m_max_partialscan_attempts = 0
+        };
     MockLedgerContext ledger_context_test6;
     SpEnoteStoreMockV1 enote_store_A_test6{1};
-    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test6, enote_store_A_test6);
+    refresh_user_enote_store(user_keys_A, refresh_config_test6, ledger_context_test6, enote_store_A_test6);
 
     ASSERT_TRUE(enote_store_A_test6.get_balance({SpEnoteOriginStatus::OFFCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
@@ -400,27 +411,36 @@ TEST(seraphis_enote_scanning, simple_ledger)
 
     send_coinbase_amounts_to_users({{1}}, {destination_A}, ledger_context_test6);
     send_coinbase_amounts_to_users({{2}}, {destination_A}, ledger_context_test6);
-    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test6, enote_store_A_test6);
+    send_coinbase_amounts_to_users({{4}}, {destination_A}, ledger_context_test6);
+    refresh_user_enote_store(user_keys_A, refresh_config_test6, ledger_context_test6, enote_store_A_test6);
 
     ASSERT_TRUE(enote_store_A_test6.get_balance({SpEnoteOriginStatus::OFFCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A_test6.get_balance({SpEnoteOriginStatus::ONCHAIN},
-        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 6);
 
-    ledger_context_test6.pop_blocks(1);
-    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test6, enote_store_A_test6);
+    ledger_context_test6.pop_blocks(2);
+    refresh_user_enote_store(user_keys_A, refresh_config_test6, ledger_context_test6, enote_store_A_test6);
 
     ASSERT_TRUE(enote_store_A_test6.get_balance({SpEnoteOriginStatus::OFFCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A_test6.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
 
-    send_coinbase_amounts_to_users({{4}}, {destination_A}, ledger_context_test6);
-    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test6, enote_store_A_test6);
+    send_coinbase_amounts_to_users({{8}}, {destination_A}, ledger_context_test6);
+    refresh_user_enote_store(user_keys_A, refresh_config_test6, ledger_context_test6, enote_store_A_test6);
 
     ASSERT_TRUE(enote_store_A_test6.get_balance({SpEnoteOriginStatus::OFFCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A_test6.get_balance({SpEnoteOriginStatus::ONCHAIN},
-        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 4);
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 8);
+
+    ledger_context_test6.pop_blocks(3);
+    refresh_user_enote_store(user_keys_A, refresh_config_test6, ledger_context_test6, enote_store_A_test6);
+
+    ASSERT_TRUE(enote_store_A_test6.get_balance({SpEnoteOriginStatus::OFFCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test6.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
 }
 //-------------------------------------------------------------------------------------------------------------------

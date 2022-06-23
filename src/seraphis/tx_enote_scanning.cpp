@@ -394,11 +394,10 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
         else
         {
             // if not contiguous, then there must have been a reorg, so we need to rescan
-/*
-todo: unit test that fails unless this is uncommented
+
+//todo: unit test that fails unless this is uncommented
             // note: +1 in case either height == -1
-            if (contiguity_marker_inout.m_block_height + 1 <= first_contiguity_height + 1)
-*/
+//          if (contiguity_marker_inout.m_block_height + 1 <= first_contiguity_height + 1)
             if (contiguity_marker_inout.m_block_height <= first_contiguity_height)
             {
                 // a reorg that affects our first expected point of contiguity
@@ -746,9 +745,18 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         //       desired start height and the enote store's minimum height may be very large; if a fixed back-off were used,
         //       then it could take many fullscan attempts to find the point of divergence
         const std::uint64_t reorg_avoidance_depth =
-            fullscan_attempts > 0
-            ? static_cast<uint64_t>(std::pow(10, fullscan_attempts - 1) * config.m_reorg_avoidance_depth)
-            : config.m_reorg_avoidance_depth;
+            [&]() -> std::uint64_t
+            {
+                // test '> 1' to support unit tests with reorg avoidance depth == 0 (e.g. for exercising partial scans)
+                if (fullscan_attempts > 1)
+                {
+                    CHECK_AND_ASSERT_THROW_MES(config.m_reorg_avoidance_depth > 0,
+                        "refresh ledger for enote store: tried more than one fullscan with zero reorg avoidance depth.");
+                    return static_cast<uint64_t>(std::pow(10, fullscan_attempts - 1) * config.m_reorg_avoidance_depth);
+                }
+
+                return config.m_reorg_avoidance_depth;
+            }();
 
         // 4. initial block to scan = max(desired first block - reorg depth, enote store's min scan height)
         std::uint64_t initial_refresh_height;
@@ -811,11 +819,11 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
             {
                 // if the scan process thinks we need a full rescan even when starting at the enote store's refresh height,
                 //   then the top of the chain must be below the refresh height, so we are done
-/*
-todo: unit test that fails unless this is uncommented
-                alignment_marker.m_block_height = enote_store_inout.get_refresh_height() + 1;
-                alignment_marker.m_block_id = rct::zero();
-*/
+
+//todo: unit test that fails unless this is uncommented
+//              alignment_marker.m_block_height = enote_store_inout.get_refresh_height() + 1;
+//              alignment_marker.m_block_id = rct::zero();
+
                 scan_status = ScanStatus::DONE;
             }
             else
