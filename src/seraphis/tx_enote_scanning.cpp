@@ -514,7 +514,10 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
             scanned_block_ids_out)
         };
 
-    if (scan_status_first_onchain_pass != ScanStatus::DONE)
+    // do not early return on NEED_FULLSCAN, because there are cases where NEED_FULLSCAN is reinterpreted as DONE,
+    //   and we want to scan the unconfirmed cache in those cases
+    if (scan_status_first_onchain_pass == ScanStatus::NEED_PARTIALSCAN ||
+        scan_status_first_onchain_pass == ScanStatus::FAIL)
         return scan_status_first_onchain_pass;
 
     // unconfirmed txs
@@ -535,6 +538,10 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
             found_enote_records_out,
             found_spent_key_images_out);
     }
+
+    // now we can early return on NEED_FULLSCAN
+    if (scan_status_first_onchain_pass == ScanStatus::NEED_FULLSCAN)
+        return scan_status_first_onchain_pass;
 
     // on-chain follow-up pass
     // rationale:

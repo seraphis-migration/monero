@@ -57,6 +57,7 @@
 #include "seraphis/tx_enote_scanning_context_simple.h"
 #include "seraphis/tx_enote_store_mocks.h"
 #include "seraphis/tx_extra.h"
+#include "seraphis/tx_fee_calculator_mocks.h"
 #include "seraphis/tx_fee_calculator_squashed_v1.h"
 #include "seraphis/tx_input_selection.h"
 #include "seraphis/tx_input_selection_output_context_v1.h"
@@ -190,6 +191,113 @@ static void refresh_user_enote_store(const sp::jamtis::jamtis_mock_keys &user_ke
         user_keys.k_vb,
         enote_scanning_context,
         user_enote_store_inout));
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void construct_tx_for_mock_ledger_v1(const sp::jamtis::jamtis_mock_keys &local_user_keys,
+    const sp::InputSelectorV1 &local_user_input_selector,
+    const sp::FeeCalculator &tx_fee_calculator,
+    const rct::xmr_amount fee_per_tx_weight,
+    const std::size_t max_inputs,
+    const std::vector<std::tuple<rct::xmr_amount, sp::jamtis::JamtisDestinationV1, sp::TxExtra>> &outlays,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    const sp::SpBinnedReferenceSetConfigV1 &bin_config,
+    sp::MockLedgerContext &ledger_context_inout,
+    sp::SpTxSquashedV1 &tx_out)
+{
+    using namespace sp;
+    using namespace jamtis;
+
+    /// build transaction
+
+    // 1. prepare dummy and change addresses
+    JamtisDestinationV1 change_address;
+    JamtisDestinationV1 dummy_address;
+    make_random_address_for_user(local_user_keys, change_address);
+    make_random_address_for_user(local_user_keys, dummy_address);
+
+    // 2. convert outlays to normal payment proposals
+    std::vector<JamtisPaymentProposalV1> normal_payment_proposals;
+    normal_payment_proposals.reserve(outlays.size());
+
+    for (const auto &outlay : outlays)
+    {
+        normal_payment_proposals.emplace_back();
+
+        convert_outlay_to_payment_proposal(std::get<rct::xmr_amount>(outlay),
+            std::get<JamtisDestinationV1>(outlay),
+            std::get<TxExtra>(outlay),
+            normal_payment_proposals.back());
+    }
+
+    // 2. tx proposal
+    SpTxProposalV1 tx_proposal;
+    std::unordered_map<crypto::key_image, std::uint64_t> input_ledger_mappings;
+    ASSERT_NO_THROW(ASSERT_TRUE(try_make_v1_tx_proposal_for_transfer_v1(local_user_keys.k_vb,
+        change_address,
+        dummy_address,
+        local_user_input_selector,
+        tx_fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        std::move(normal_payment_proposals),
+        TxExtra{},
+        tx_proposal,
+        input_ledger_mappings)));
+
+    // 3. prepare for membership proofs
+    std::vector<SpMembershipProofPrepV1> membership_proof_preps;
+    ASSERT_NO_THROW(make_mock_sp_membership_proof_preps_for_inputs_v1(input_ledger_mappings,
+        tx_proposal.m_input_proposals,
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_inout,
+        membership_proof_preps));
+
+    // 4. complete tx
+    ASSERT_NO_THROW(make_seraphis_tx_squashed_v1(tx_proposal,
+        std::move(membership_proof_preps),
+        SpTxSquashedV1::SemanticRulesVersion::MOCK,
+        local_user_keys.k_m,
+        local_user_keys.k_vb,
+        tx_out));
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void transfer_funds_single_mock_v1_unconfirmed(const sp::jamtis::jamtis_mock_keys &local_user_keys,
+    const sp::InputSelectorV1 &local_user_input_selector,
+    const sp::FeeCalculator &tx_fee_calculator,
+    const rct::xmr_amount fee_per_tx_weight,
+    const std::size_t max_inputs,
+    const std::vector<std::tuple<rct::xmr_amount, sp::jamtis::JamtisDestinationV1, sp::TxExtra>> &outlays,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    const sp::SpBinnedReferenceSetConfigV1 &bin_config,
+    sp::MockLedgerContext &ledger_context_inout)
+{
+    using namespace sp;
+    using namespace jamtis;
+
+    // make one tx
+    SpTxSquashedV1 single_tx;
+    construct_tx_for_mock_ledger_v1(local_user_keys,
+        local_user_input_selector,
+        tx_fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        outlays,
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_inout,
+        single_tx);
+
+    // validate and submit to the mock ledger
+    const sp::TxValidationContextMock tx_validation_context{ledger_context_inout};
+    ASSERT_TRUE(validate_tx(single_tx, tx_validation_context));
+    ASSERT_TRUE(ledger_context_inout.try_add_unconfirmed_tx_v1(single_tx));
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -442,5 +550,505 @@ TEST(seraphis_enote_scanning, simple_ledger)
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A_test6.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
+{
+    using namespace sp;
+    using namespace jamtis;
+
+    /// setup
+
+    // 1. config
+    const std::size_t max_inputs{1000};
+    const std::size_t fee_per_tx_weight{0};  // 0 fee here
+    const std::size_t ref_set_decomp_n{2};
+    const std::size_t ref_set_decomp_m{2};
+
+    const RefreshLedgerEnoteStoreConfig refresh_config{
+            .m_reorg_avoidance_depth = 1,
+            .m_max_chunk_size = 1,
+            .m_max_partialscan_attempts = 0
+        };
+
+    const FeeCalculatorMockTrivial fee_calculator;  //just do a trivial calculator here (fee = fee/weight * 1 weight)
+
+    const SpBinnedReferenceSetConfigV1 bin_config{
+            .m_bin_radius = 1,
+            .m_num_bin_members = 2
+        };
+
+    // 2. user keys
+    jamtis_mock_keys user_keys_A;
+    jamtis_mock_keys user_keys_B;
+    make_jamtis_mock_keys(user_keys_A);
+    make_jamtis_mock_keys(user_keys_B);
+
+    // 3. user addresses
+    JamtisDestinationV1 destination_A;
+    JamtisDestinationV1 destination_B;
+    make_random_address_for_user(user_keys_A, destination_A);
+    make_random_address_for_user(user_keys_B, destination_B);
+
+
+    /// tests
+
+    // 1. one unconfirmed tx (no change), then commit it
+    MockLedgerContext ledger_context_test1;
+    SpEnoteStoreMockV1 enote_store_A_test1{0};
+    SpEnoteStoreMockV1 enote_store_B_test1{0};
+    const sp::InputSelectorMockV1 input_selector_A_test1{enote_store_A_test1};
+    const sp::InputSelectorMockV1 input_selector_B_test1{enote_store_B_test1};
+    send_coinbase_amounts_to_users({{1, 1, 1, 1}}, {destination_A}, ledger_context_test1);
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test1, enote_store_A_test1);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test1,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{2, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test1);
+
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test1, enote_store_A_test1);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test1, enote_store_B_test1);
+
+    ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 4);
+    ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 2);
+    ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 2);
+    ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 2);
+
+    ledger_context_test1.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test1, enote_store_A_test1);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test1, enote_store_B_test1);
+
+    ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+    ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 2);
+    ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+    ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 2);
+
+    // 2. one unconfirmed tx (>0 change), then commit it
+    MockLedgerContext ledger_context_test2;
+    SpEnoteStoreMockV1 enote_store_A_test2{0};
+    SpEnoteStoreMockV1 enote_store_B_test2{0};
+    const sp::InputSelectorMockV1 input_selector_A_test2{enote_store_A_test2};
+    const sp::InputSelectorMockV1 input_selector_B_test2{enote_store_B_test2};
+    send_coinbase_amounts_to_users({{0, 0, 0, 8}}, {destination_A}, ledger_context_test2);
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test2, enote_store_A_test2);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test2,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{3, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test2);
+
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test2, enote_store_A_test2);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test2, enote_store_B_test2);
+
+    ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 8);
+    ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 5);
+    ASSERT_TRUE(enote_store_B_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 3);
+    ASSERT_TRUE(enote_store_B_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 3);
+
+    ledger_context_test2.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test2, enote_store_A_test2);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test2, enote_store_B_test2);
+
+    ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 5);
+    ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 5);
+    ASSERT_TRUE(enote_store_B_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
+    ASSERT_TRUE(enote_store_B_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 3);
+
+    // 3. one unconfirmed tx (>0 change), then commit it + coinbase to B
+    MockLedgerContext ledger_context_test3;
+    SpEnoteStoreMockV1 enote_store_A_test3{0};
+    SpEnoteStoreMockV1 enote_store_B_test3{0};
+    const sp::InputSelectorMockV1 input_selector_A_test3{enote_store_A_test3};
+    const sp::InputSelectorMockV1 input_selector_B_test3{enote_store_B_test3};
+    send_coinbase_amounts_to_users({{0, 0, 0, 8}}, {destination_A}, ledger_context_test3);
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test3, enote_store_A_test3);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test3,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{3, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test3);
+
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test3, enote_store_A_test3);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test3, enote_store_B_test3);
+
+    ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 8);
+    ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 5);
+    ASSERT_TRUE(enote_store_B_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test3.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 3);
+    ASSERT_TRUE(enote_store_B_test3.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 3);
+
+    send_coinbase_amounts_to_users({{8}}, {destination_B}, ledger_context_test3);
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test3, enote_store_A_test3);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test3, enote_store_B_test3);
+
+    ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 5);
+    ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 5);
+    ASSERT_TRUE(enote_store_B_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 11);
+    ASSERT_TRUE(enote_store_B_test3.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test3.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 11);
+
+    // 4. pass funds around with unconfirmed cache clear
+    MockLedgerContext ledger_context_test4;
+    SpEnoteStoreMockV1 enote_store_A_test4{0};
+    SpEnoteStoreMockV1 enote_store_B_test4{0};
+    const sp::InputSelectorMockV1 input_selector_A_test4{enote_store_A_test4};
+    const sp::InputSelectorMockV1 input_selector_B_test4{enote_store_B_test4};
+    send_coinbase_amounts_to_users({{10, 10, 10, 10}}, {destination_A}, ledger_context_test4);
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test4, enote_store_A_test4);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test4,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{20, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test4);
+
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test4, enote_store_A_test4);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test4, enote_store_B_test4);
+
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 40);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 20);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 20);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 20);
+
+    ledger_context_test4.clear_unconfirmed_cache();
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test4, enote_store_A_test4);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test4, enote_store_B_test4);
+
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 40);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 40);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test4,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{30, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test4);
+
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test4, enote_store_A_test4);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test4, enote_store_B_test4);
+
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 40);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 10);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 30);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 30);
+
+    ledger_context_test4.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test4, enote_store_A_test4);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test4, enote_store_B_test4);
+
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 10);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 10);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 30);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 30);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test4,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{3, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test4);
+
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test4, enote_store_A_test4);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test4, enote_store_B_test4);
+
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 10);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 7);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 30);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 3);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 33);
+
+    ledger_context_test4.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test4, enote_store_A_test4);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test4, enote_store_B_test4);
+
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 7);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 7);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 33);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 33);
+
+    // 5. pass funds around with non-zero refresh height and reorging
+    MockLedgerContext ledger_context_test5;
+    SpEnoteStoreMockV1 enote_store_A_test5{0};
+    SpEnoteStoreMockV1 enote_store_B_test5{2};
+    const sp::InputSelectorMockV1 input_selector_A_test5{enote_store_A_test5};
+    const sp::InputSelectorMockV1 input_selector_B_test5{enote_store_B_test5};
+    send_coinbase_amounts_to_users({{10, 10, 10, 10}}, {destination_A}, ledger_context_test5);
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test5,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{11, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test5);
+
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test5, enote_store_B_test5);
+
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 40);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 29);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 11);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 11);
+
+    ledger_context_test5.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test5, enote_store_B_test5);
+
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 29);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 29);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test5,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{12, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test5);
+
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test5, enote_store_B_test5);
+
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 29);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 17);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 12);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 12);
+
+    ledger_context_test5.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test5, enote_store_B_test5);
+
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 17);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 17);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 12);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 12);
+
+    ledger_context_test5.pop_blocks(1);
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test5, enote_store_B_test5);
+
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 29);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 29);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test5,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{13, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test5);
+
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test5, enote_store_B_test5);
+
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 29);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 16);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 13);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 13);
+
+    ledger_context_test5.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test5, enote_store_A_test5);
+    refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test5, enote_store_B_test5);
+
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 16);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 16);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 13);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 13);
 }
 //-------------------------------------------------------------------------------------------------------------------
