@@ -196,7 +196,7 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
         chunk_out.m_block_range =
             {
                 get_chain_height() + 1,
-                get_chain_height()
+                get_chain_height() + 1
             };
 
         if (m_block_ids.size())
@@ -204,10 +204,11 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
             CHECK_AND_ASSERT_THROW_MES(m_block_ids.find(m_block_ids.size() - 1) != m_block_ids.end(),
                 "onchain chunk find-received scanning (mock ledger context): block ids map incorrect indexing (bug).");
 
-            chunk_out.m_block_ids.emplace_back(m_block_ids.at(m_block_ids.size() - 1));
+            chunk_out.m_prefix_block_id = m_block_ids.at(m_block_ids.size() - 1);
         }
         else
-            chunk_out.m_block_ids.emplace_back(rct::zero());
+            chunk_out.m_prefix_block_id = rct::zero();
+            
 
         return;
     }
@@ -218,12 +219,12 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
     chunk_out.m_block_range =
         {
             chunk_start_height,
-            std::min(get_chain_height(), chunk_start_height + chunk_max_size - 1)
+            std::min(get_chain_height(), chunk_start_height + chunk_max_size - 1) + 1
         };
 
     CHECK_AND_ASSERT_THROW_MES(
         m_block_ids.find(std::get<0>(chunk_out.m_block_range)) != m_block_ids.end() &&
-        m_block_ids.find(std::get<1>(chunk_out.m_block_range)) != m_block_ids.end(),
+        m_block_ids.find(std::get<1>(chunk_out.m_block_range) - 1) != m_block_ids.end(),
         "onchain chunk find-received scanning (mock ledger context): block range outside of block ids map (bug).");
 
     // b. prefix block id
@@ -233,11 +234,11 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
         : rct::zero();
 
     // c. block ids in the range
-    chunk_out.m_block_ids.reserve(std::get<1>(chunk_out.m_block_range) - std::get<0>(chunk_out.m_block_range) + 1);
+    chunk_out.m_block_ids.reserve(std::get<1>(chunk_out.m_block_range) - std::get<0>(chunk_out.m_block_range));
 
     std::for_each(
             m_block_ids.find(std::get<0>(chunk_out.m_block_range)),
-            m_block_ids.find(std::get<1>(chunk_out.m_block_range) + 1),
+            m_block_ids.find(std::get<1>(chunk_out.m_block_range)),
             [&](const std::pair<std::uint64_t, rct::key> &mapped_block_id)
             {
                 chunk_out.m_block_ids.emplace_back(mapped_block_id.second);
@@ -245,7 +246,7 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
         );
 
     CHECK_AND_ASSERT_THROW_MES(chunk_out.m_block_ids.size() ==
-            std::get<1>(chunk_out.m_block_range) - std::get<0>(chunk_out.m_block_range) + 1,
+            std::get<1>(chunk_out.m_block_range) - std::get<0>(chunk_out.m_block_range),
         "onchain chunk find-received scanning (mock ledger context): invalid number of block ids acquired (bug).");
 
     // 3. scan blocks in the range
@@ -254,7 +255,7 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
         m_blocks_of_tx_output_contents.end(),
         "onchain chunk find-received scanning (mock ledger context): start of chunk not known in tx outputs map (bug).");
     CHECK_AND_ASSERT_THROW_MES(
-        m_blocks_of_tx_output_contents.find(std::get<1>(chunk_out.m_block_range)) !=
+        m_blocks_of_tx_output_contents.find(std::get<1>(chunk_out.m_block_range) - 1) !=
         m_blocks_of_tx_output_contents.end(),
         "onchain chunk find-received scanning (mock ledger context): end of chunk not known in tx outputs map (bug).");
     CHECK_AND_ASSERT_THROW_MES(
@@ -262,7 +263,7 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
         m_blocks_of_tx_key_images.end(),
         "onchain chunk find-received scanning (mock ledger context): start of chunk not known in key images map (bug).");
     CHECK_AND_ASSERT_THROW_MES(
-        m_blocks_of_tx_key_images.find(std::get<1>(chunk_out.m_block_range)) !=
+        m_blocks_of_tx_key_images.find(std::get<1>(chunk_out.m_block_range) - 1) !=
         m_blocks_of_tx_key_images.end(),
         "onchain chunk find-received scanning (mock ledger context): end of chunk not known in key images map (bug).");
 
@@ -285,7 +286,7 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
 
     std::for_each(
             m_blocks_of_tx_output_contents.find(std::get<0>(chunk_out.m_block_range)),
-            m_blocks_of_tx_output_contents.find(std::get<1>(chunk_out.m_block_range) + 1),
+            m_blocks_of_tx_output_contents.find(std::get<1>(chunk_out.m_block_range)),
             [&](const auto &block_of_tx_output_contents)
             {
                 for (const auto &tx_with_output_contents : block_of_tx_output_contents.second)
