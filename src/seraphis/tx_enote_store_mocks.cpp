@@ -51,12 +51,13 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 template <typename MapT>
-static void for_all_in_map_erase_if(MapT &map, std::function<bool(const typename MapT::value_type&)> predicate)
+static void for_all_in_map_erase_if(MapT &map_inout,
+    const std::function<bool(const typename MapT::value_type&)> &predicate)
 {
-    for (auto map_it = map.begin(); map_it != map.end();)
+    for (auto map_it = map_inout.begin(); map_it != map_inout.end();)
     {
         if (predicate(*map_it))
-            map_it = map.erase(map_it);
+            map_it = map_inout.erase(map_it);
         else
             ++map_it;
     }

@@ -1052,3 +1052,104 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 13);
 }
 //-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_enote_scanning, reorgs_while_scanning)
+{
+
+
+
+/*
+    1. full internal reorg
+    - normal scan once so alignment will be at block 0 in the test
+    - commit tx 1 A -> B
+
+    - A starts scan process on {blocks: {0, 1}, refresh height: 0, num scanned blocks: 1, chunk size: 1, avoid reorg depth: 1, max partial scans = 1}
+    - try get onchain chunk {0} (initial onchain loop)  (should update alignment marker so it equals block 0)
+        - get chunk: {0}
+    - try get onchain chunk {1}
+        - get chunk: {1}
+    - try get onchain chunk {2}  (INJECTED STEP)
+        - pop 2
+        - return false (on trying and failing to get chunk 2, and instead returning empty block representing first block)
+    - status: NEED_FULLSCAN  
+    - status: converted to DONE since reorg goes to refresh height (note: should incorrectly maintain balance from block 0 on post-process enote store update since alignment marker is on block 0)
+
+    - check onchain balances (standard balance update for B)
+        - A: {}
+        - B: {}
+
+    2. partial internal reorg
+    - commit tx 1 A -> B
+
+    - B starts scan process on {blocks: {0, 1}, refresh height: 0, num scanned blocks: 0, chunk size: 1, avoid reorg depth: 0, max partial scans = 1}
+    - try get onchain chunk {0}  (initial onchain loop)
+        - get chunk: {0}
+    - try get onchain chunk {1}  (INJECTED STEP)
+        - pop 1
+        - commit tx 2 A -> B
+        - get chunk: {1}
+    - status: NEED_PARTIALSCAN  (note: should be NEED_FULLSCAN incorrectly on internal first contiguity height check)
+    - B starts scan process on {blocks: {0, 1}, refresh height: 0, num scanned blocks: 1, chunk size: 1, avoid reorg depth: 0, max partial scans = 1}
+    - try get onchain chunk {1}  (initial onchain loop)
+        - get chunk: {1}
+    - try get onchain chunk {2}
+        - return false
+    - try get unconfirmed chunk {}  (unconfirmed chunk)
+        - return false
+    - try get onchain chunk {2}  (follow-up loop)
+        - return false
+    - status: DONE
+
+    - check onchain balances (standard balance update for A)
+        - A: {0, tx 2}
+        - B: {tx 2}
+
+    3. partial internal reorgs to failure
+    - commit tx 1 A -> B
+
+    - B starts scan process on {blocks: {0, 1}, refresh height: 0, num scanned blocks: 0, chunk size: 1, avoid reorg depth: 0, max partial scans = 4}
+    - try get onchain chunk {0}  (initial onchain loop)
+        - get chunk: {0}
+    - try get onchain chunk {1}  (INJECTED STEP)
+        - pop 1
+        - commit tx 2 A -> B
+        - commit tx 3 A -> B
+        - get chunk: {1}
+    - status: NEED_PARTIALSCAN
+    - B starts scan process on {blocks: {0, 1, 2}, refresh height: 0, num scanned blocks: 1, chunk size: 1, avoid reorg depth: 0, max partial scans = 4}
+    - try get onchain chunk {1}  (initial onchain loop)
+        - get chunk: {1}
+    - try get onchain chunk {2}  (INJECTED STEP)
+        - pop 1
+        - commit tx 4 A -> B
+        - commit tx 5 A -> B
+        - get chunk: {2}
+    - status: NEED_PARTIALSCAN
+    - etc.
+    - EXPECT_ANY_THROW()
+
+    4. sneaky tx found in follow-up loop
+    - commit tx 1 A -> B
+
+    - B starts scan process on {blocks: {0, 1}, refresh height: 0, num scanned blocks: 0, chunk size: 1, avoid reorg depth: 0}
+    - try get onchain chunk {0}  (initial onchain loop)
+        - get chunk: {0}
+    - try get onchain chunk {1}
+        - get chunk: {1}
+    - try get onchain chunk {2}
+        - return false
+    - try get unconfirmed chunk {}  (unconfirmed chunk)  (INJECTED STEP)
+        - submit tx 2 A -> B
+        - return true
+    - try get onchain chunk {2}  (follow-up loop)  (INJECTED STEP)
+        - commit unconfirmed cache
+        - get chunk: {2}
+    - try get onchain chunk {3}
+        - return false
+    - status: DONE
+
+    - check onchain balances (standard balance update for A)
+        - A: {0, tx 1, tx 2}
+        - B: {tx 1, tx 2}
+*/
+}
+//-------------------------------------------------------------------------------------------------------------------
