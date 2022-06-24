@@ -59,7 +59,7 @@ namespace sp
 
 ////
 // Seraphis tx in the squashed enote model
-// - membership: concise grootle proofs (one per input)
+// - membership: grootle proofs (one per input)
 // - ownership: seraphis composition proofs (one per input)
 // - key image validity: seraphis composition proofs (one per input)
 // - range proofs: Bulletproof+ (aggregated range proofs for all input masked commitments and new output commitments)
@@ -83,7 +83,7 @@ struct SpTxSquashedV1 final
     SpBalanceProofV1 m_balance_proof;
     /// composition proofs: ownership/key-image-legitimacy for each input
     std::vector<SpImageProofV1> m_image_proofs;
-    /// concise Grootle proofs on squashed enotes: membership for each input
+    /// Grootle proofs on squashed enotes: membership for each input
     std::vector<SpMembershipProofV1> m_membership_proofs;
     /// supplemental data for tx
     SpTxSupplementV1 m_tx_supplement;

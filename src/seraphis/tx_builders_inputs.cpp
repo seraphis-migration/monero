@@ -33,13 +33,13 @@
 
 //local headers
 #include "common/varint.h"
-#include "concise_grootle.h"
 #include "crypto/crypto.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
 #include "cryptonote_config.h"
+#include "grootle.h"
 #include "jamtis_enote_utils.h"
 #include "misc_language.h"
 #include "misc_log_ex.h"
@@ -442,29 +442,26 @@ void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
         "make membership proof: could not find enote for membership proof in reference set.");
 
     // public keys referenced by proof (Q_i)
-    rct::keyM reference_keys;
-    reference_keys.emplace_back(std::move(referenced_enotes_squashed));
+    const rct::keyV reference_keys{std::move(referenced_enotes_squashed)};
 
-    // proof offsets (only one in the squashed enote model)
-    rct::keyV image_offsets;
-    image_offsets.push_back(rct::addKeys(masked_address, masked_commitment));  //Q" = K" + C"
+    // proof offset (only one in the squashed enote model)
+    const rct::key image_offset{rct::addKeys(masked_address, masked_commitment)};  //Q" = K" + C"
 
     // secret key of: Q[l] - Q" = -(t_k + t_c) G
-    std::vector<crypto::secret_key> image_masks;
-    image_masks.emplace_back();
-    sc_add(to_bytes(image_masks[0]), to_bytes(address_mask), to_bytes(commitment_mask));  // t_k + t_c
-    sc_mul(to_bytes(image_masks[0]), to_bytes(image_masks[0]), MINUS_ONE.bytes);  // -(t_k + t_c)
+    crypto::secret_key image_mask;
+    sc_add(to_bytes(image_mask), to_bytes(address_mask), to_bytes(commitment_mask));  // t_k + t_c
+    sc_mul(to_bytes(image_mask), to_bytes(image_mask), MINUS_ONE.bytes);  // -(t_k + t_c)
 
     // proof message
     rct::key message;
     make_tx_membership_proof_message_v1(binned_reference_set, message);
 
 
-    /// make concise grootle proof
-    membership_proof_out.m_concise_grootle_proof = concise_grootle_prove(reference_keys,
+    /// make grootle proof
+    membership_proof_out.m_grootle_proof = grootle_prove(reference_keys,
         real_spend_index_in_set,
-        image_offsets,
-        image_masks,
+        image_offset,
+        image_mask,
         ref_set_decomp_n,
         ref_set_decomp_m,
         message);

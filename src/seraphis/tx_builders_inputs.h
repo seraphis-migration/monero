@@ -187,7 +187,7 @@ void make_v1_image_proofs_v1(const std::vector<SpInputProposalV1> &input_proposa
     const crypto::secret_key &spendbase_privkey,
     std::vector<SpImageProofV1> &image_proofs_out);
 /**
-* brief: make_v1_membership_proof_v1 - make a concise grootle membership proof in the squashed enote model
+* brief: make_v1_membership_proof_v1 - make a grootle membership proof in the squashed enote model
 * param: ref_set_decomp_n -
 * param: ref_set_decomp_m -
 * param: binned_reference_set -
@@ -211,7 +211,7 @@ void make_v1_membership_proof_v1(SpMembershipProofPrepV1 membership_proof_prep, 
 void make_v1_membership_proof_v1(SpMembershipProofPrepV1 membership_proof_prep,
     SpAlignableMembershipProofV1 &alignable_membership_proof_out);
 /**
-* brief: make_v1_membership_proofs_v1 - make a set of concise grootle membership proofs in the squashed enote model
+* brief: make_v1_membership_proofs_v1 - make a set of grootle membership proofs in the squashed enote model
 * param: membership_proof_preps -
 * outparam: membership_proofs_out -
 */

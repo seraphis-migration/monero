@@ -69,7 +69,7 @@
 #include "sig_mlsag.h"
 #include "sig_clsag.h"
 #include "seraphis_tx.h"
-#include "concise_grootle.h"
+#include "grootle.h"
 #include "view_scan.h"
 #include "blowfish.h"
 
@@ -420,22 +420,23 @@ std::cerr << "TEST #" << i;
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 16, 16);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 16, 16);
 
-
+*/
   // test groth/bootle proofs
 
-  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 3, 2, 1, 1);
-  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 6, 2, 1, 1);
-  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 4, 2, 2, 1);
-  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 5, 2, 2, 1);
-  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 6, 2, 2, 1);
-  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 7, 2, 2, 1);
-  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 2, 8, 2, 2, 1);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 3, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 3, 2, true);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 4, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 5, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 6, 2, true);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 6, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 7, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 2, 8, 2, false);
 
-  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 3, 3, 2, 2, 1);
-  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 3, 4, 2, 2, 1);
-  TEST_PERFORMANCE5(filter, p, test_concise_grootle, 3, 5, 2, 2, 1);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 3, 3, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 3, 4, 2, false);
+  TEST_PERFORMANCE4(filter, p, test_grootle, 3, 5, 2, false);
 
-
+/*
 
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 1, false);
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 2, false);

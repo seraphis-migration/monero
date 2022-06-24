@@ -35,7 +35,7 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "concise_grootle.h"
+#include "grootle.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
@@ -119,12 +119,12 @@ struct SpEnoteImageV1 final
 
 ////
 // SpMembershipProofV1
-// - Concise Grootle
+// - Grootle
 ///
 struct SpMembershipProofV1 final
 {
-    /// a concise grootle proof
-    sp::ConciseGrootleProof m_concise_grootle_proof;
+    /// a grootle proof
+    sp::GrootleProof m_grootle_proof;
     /// binned representation of ledger indices of enotes referenced by the proof
     SpBinnedReferenceSetV1 m_binned_reference_set;
     /// ref set size = n^m
@@ -133,7 +133,7 @@ struct SpMembershipProofV1 final
 
     /**
     * brief: append_to_string - convert membership proof to a string and append to existing string
-    *   str += concise grootle proof || binned reference set || n || m
+    *   str += grootle proof || binned reference set || n || m
     * inoutparam: str_inout - contents concatenated to a string
     */
     void append_to_string(std::string &str_inout) const;

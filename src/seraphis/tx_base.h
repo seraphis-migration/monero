@@ -89,7 +89,7 @@ enum class TxStructureVersionSp : unsigned char
 {
     /// mining transaction (TODO)
     TxTypeSpMiningV1 = 0,
-    /// concise grootle in the squashed enote model + seraphis composition proofs + BP+ range proofs with p > 0 balance proof
+    /// grootle in the squashed enote model + seraphis composition proofs + BP+ range proofs with p > 0 balance proof
     TxTypeSpSquashedV1 = 1
 };
 

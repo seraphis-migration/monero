@@ -29,8 +29,9 @@
 #pragma once
 
 #include "crypto/crypto.h"
-#include "seraphis/concise_grootle.h"
+#include "seraphis/grootle.h"
 #include "seraphis/sp_crypto_utils.h"
+#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 
 #include <vector>
@@ -41,17 +42,15 @@ using namespace rct;
 template<std::size_t a_n,
     std::size_t a_m,
     std::size_t num_proofsV,
-    std::size_t num_keysV,
-    std::size_t num_ident_offsetsV>
-class test_concise_grootle
+    bool with_ident_offset>
+class test_grootle
 {
     public:
         static const std::size_t loop_count = 1000;
         static const std::size_t n = a_n;
         static const std::size_t m = a_m;
         static const std::size_t N_proofs = num_proofsV;
-        static const std::size_t num_keys = num_keysV;
-        static const std::size_t num_ident_offsets = num_ident_offsetsV;
+        static const bool use_ident_offset = with_ident_offset;
 
         bool init()
         {
@@ -59,11 +58,11 @@ class test_concise_grootle
             const std::size_t N = std::pow(n, m);
 
             // Build key vectors
-            M.resize(N_proofs, keyM(N, keyV(num_keys)));
-            std::vector<std::vector<crypto::secret_key>> proof_privkeys;// privkey tuple per-proof (at secret indices in M)
-            proof_privkeys.resize(N_proofs, std::vector<crypto::secret_key>(num_keys));
+            M.resize(N_proofs, keyV(N));
+            std::vector<crypto::secret_key> proof_privkeys;// privkey per-proof (at secret indices in M)
+            proof_privkeys.resize(N_proofs);
             proof_messages = keyV(N_proofs);  // message per-proof
-            proof_offsets.resize(N_proofs, keyV(num_keys));
+            proof_offsets.resize(N_proofs);
 
             // Random keys
             key temp;
@@ -71,10 +70,7 @@ class test_concise_grootle
             {
                 for (std::size_t k = 0; k < N; k++)
                 {
-                    for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
-                    {
-                        skpkGen(temp, M[proof_i][k][alpha]);
-                    }
+                    skpkGen(temp, M[proof_i][k]);
                 }
             }
 
@@ -82,24 +78,19 @@ class test_concise_grootle
             key privkey, offset_privkey;
             for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
             {
-                for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
-                {
-                    // set real-signer index = proof index (kludge)
-                    skpkGen(privkey, M[proof_i][proof_i][alpha]);  //m_{l, alpha} * G
-                    proof_messages[proof_i] = skGen();
+                // set real-signer index = proof index (kludge)
+                skpkGen(privkey, M[proof_i][proof_i]);  //m_l * G
+                proof_messages[proof_i] = skGen();
 
-                    // set the first 'num_ident_offsets' commitment offsets equal to identity
-                    // - the proof will show DL on G for the main key directly (instead of commitment to zero with offset)
-                    if (alpha + 1 > num_ident_offsets)
-                    {
-                        skpkGen(offset_privkey, proof_offsets[proof_i][alpha]);  //c_{alpha} * G
-                        sc_sub(to_bytes(proof_privkeys[proof_i][alpha]), privkey.bytes, offset_privkey.bytes); //m - c [commitment to zero]
-                    }
-                    else
-                    {
-                        proof_offsets[proof_i][alpha] = identity();
-                        proof_privkeys[proof_i][alpha] = rct::rct2sk(privkey);
-                    }
+                if (use_ident_offset)
+                {
+                    proof_offsets[proof_i] = identity();
+                    proof_privkeys[proof_i] = rct::rct2sk(privkey);
+                }
+                else
+                {
+                    skpkGen(offset_privkey, proof_offsets[proof_i]);  //c * G
+                    sc_sub(to_bytes(proof_privkeys[proof_i]), privkey.bytes, offset_privkey.bytes); //m - c [commitment to zero]
                 }
             }
 
@@ -111,7 +102,7 @@ class test_concise_grootle
                 for (std::size_t proof_i = 0; proof_i < N_proofs; proof_i++)
                 {
                     proofs.push_back(
-                        sp::concise_grootle_prove(M[proof_i],
+                        sp::grootle_prove(M[proof_i],
                             proof_i,
                             proof_offsets[proof_i],
                             proof_privkeys[proof_i],
@@ -126,7 +117,7 @@ class test_concise_grootle
                 return false;
             }
 
-            for (sp::ConciseGrootleProof &proof: proofs)
+            for (sp::GrootleProof &proof: proofs)
             {
                 proof_ptrs.push_back(&proof);
             }
@@ -139,7 +130,7 @@ class test_concise_grootle
             // Verify batch
             try
             {
-                if (!sp::concise_grootle_verify(proof_ptrs, M, proof_offsets, n, m, proof_messages))
+                if (!sp::grootle_verify(proof_ptrs, M, proof_offsets, n, m, proof_messages))
                     return false;
             }
             catch (...)
@@ -151,9 +142,9 @@ class test_concise_grootle
         }
 
     private:
-        std::vector<keyM> M;               // reference set
-        keyM proof_offsets;   // commitment offset tuple per-proof
-        keyV proof_messages;  // message per-proof
-        std::vector<sp::ConciseGrootleProof> proofs;
-        std::vector<const sp::ConciseGrootleProof *> proof_ptrs;
+        std::vector<rct::keyV> M;   // reference set
+        keyV proof_offsets;         // commitment offset per-proof
+        keyV proof_messages;        // message per-proof
+        std::vector<sp::GrootleProof> proofs;
+        std::vector<const sp::GrootleProof *> proof_ptrs;
 };

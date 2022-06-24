@@ -89,7 +89,7 @@ void SpMembershipProofV1::append_to_string(std::string &str_inout) const
     // append all proof contents to the string
     str_inout.reserve(str_inout.size() + get_size_bytes());
 
-    m_concise_grootle_proof.append_to_string(str_inout);
+    m_grootle_proof.append_to_string(str_inout);
     m_binned_reference_set.append_to_string(str_inout);
     append_uint_to_string(m_ref_set_decomp_n, str_inout);
     append_uint_to_string(m_ref_set_decomp_m, str_inout);
@@ -99,8 +99,7 @@ std::size_t SpMembershipProofV1::get_size_bytes(const std::size_t n, const std::
 {
     const std::size_t ref_set_size{ref_set_size_from_decomp(n, m)};
 
-    return sp::ConciseGrootleProof::get_size_bytes(n, m) +
-        SpBinnedReferenceSetV1::get_size_bytes(ref_set_size / num_bin_members);
+    return sp::GrootleProof::get_size_bytes(n, m) + SpBinnedReferenceSetV1::get_size_bytes(ref_set_size / num_bin_members);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpMembershipProofV1::get_size_bytes() const

@@ -29,7 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
-#include "concise_grootle.h"
+#include "grootle.h"
 
 //local headers
 #include "common/varint.h"
@@ -56,7 +56,7 @@ extern "C"
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
-#define MONERO_DEFAULT_LOG_CATEGORY "concise_grootle"
+#define MONERO_DEFAULT_LOG_CATEGORY "grootle"
 
 namespace sp
 {
@@ -199,65 +199,35 @@ static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Base aggregation coefficient for concise structure
-// mu = H_n(message, n, m, {{M}}, {C_offsets}, A, B)
-//-------------------------------------------------------------------------------------------------------------------
-static rct::key compute_base_aggregation_coefficient(const rct::key &message,
-    const std::size_t n,
-    const std::size_t m,
-    const rct::keyM &M,
-    const rct::keyV &C_offsets,
-    const rct::key &A,
-    const rct::key &B)
-{
-    static const std::string domain_separator{config::HASH_KEY_CONCISE_GROOTLE_AGGREGATION_COEFFICIENT};
-
-    CHECK_AND_ASSERT_THROW_MES(M.size() == C_offsets.size(), "Transcript challenge inputs have incorrect size!");
-
-    const std::size_t N = std::pow(n, m);
-    for (const rct::keyV &column : M)
-        CHECK_AND_ASSERT_THROW_MES(column.size() == N, "Transcript challenge inputs have incorrect size!");
-
-    // collect challenge string
-    std::string data;
-    data.reserve(2*4 + ((M.size() + 1)*C_offsets.size() + 3)*sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    append_uint_to_string(n, data);
-    append_uint_to_string(m, data);
-    for (const rct::keyV &column : M)
-    {
-        for (const rct::key &key : column)
-            data.append(reinterpret_cast<const char*>(key.bytes), sizeof(key));
-    }
-    for (const rct::key &offset : C_offsets)
-    {
-        data.append(reinterpret_cast<const char*>(offset.bytes), sizeof(offset));
-    }
-    data.append(reinterpret_cast<const char*>(A.bytes), sizeof(A));
-    data.append(reinterpret_cast<const char*>(B.bytes), sizeof(B));
-    CHECK_AND_ASSERT_THROW_MES(data.size() > 1, "Bad hash input size!");
-
-    // challenge
-    rct::key mu;
-    sp_hash_to_scalar(domain_separator, data.data(), data.size(), mu.bytes);
-    CHECK_AND_ASSERT_THROW_MES(!(mu == ZERO), "Transcript mu must be nonzero!");
-
-    return mu;
-}
-//-------------------------------------------------------------------------------------------------------------------
-// Fiat-Shamir challenge by extending the concise structure's aggregation coefficient
-// c = H_n(mu, {X})
+// Fiat-Shamir challenge
+// c = H_n(message, n, m, {M}, C_offset, A, B, {X})
 //
 // note: in Triptych notation, c == xi
 //-------------------------------------------------------------------------------------------------------------------
-static rct::key compute_challenge_from_mu(const rct::key &mu, const rct::keyV &X)
+static rct::key compute_challenge(const rct::key &message,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::keyV &M,
+    const rct::key &C_offset,
+    const rct::key &A,
+    const rct::key &B,
+    const rct::keyV &X)
 {
-    static const std::string domain_separator{config::HASH_KEY_CONCISE_GROOTLE_CHALLENGE};
+    static const std::string domain_separator{config::HASH_KEY_GROOTLE_CHALLENGE};
 
     // hash data
     std::string data;
-    data.reserve((X.size() + 1)*sizeof(rct::key));
-    data = std::string(reinterpret_cast<const char*>(mu.bytes), sizeof(mu));
+    data.reserve(2*4 + (M.size() + X.size() + 4)*sizeof(rct::key));
+    data.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
+    append_uint_to_string(n, data);
+    append_uint_to_string(m, data);
+    for (const rct::key &commitment : M)
+    {
+        data.append(reinterpret_cast<const char*>(commitment.bytes), sizeof(commitment));
+    }
+    data.append(reinterpret_cast<const char*>(C_offset.bytes), sizeof(C_offset));
+    data.append(reinterpret_cast<const char*>(A.bytes), sizeof(A));
+    data.append(reinterpret_cast<const char*>(B.bytes), sizeof(B));
     for (const rct::key &x : X)
     {
         data.append(reinterpret_cast<const char*>(x.bytes), sizeof(x));
@@ -273,7 +243,7 @@ static rct::key compute_challenge_from_mu(const rct::key &mu, const rct::keyV &X
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-void ConciseGrootleProof::append_to_string(std::string &str_inout) const
+void GrootleProof::append_to_string(std::string &str_inout) const
 {
     // append proof contents to the string
     str_inout.reserve(str_inout.size() + get_size_bytes());
@@ -291,23 +261,23 @@ void ConciseGrootleProof::append_to_string(std::string &str_inout) const
     str_inout.append(reinterpret_cast<const char *>(z.bytes), sizeof(rct::key));
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t ConciseGrootleProof::get_size_bytes(const std::size_t n, const std::size_t m)
+std::size_t GrootleProof::get_size_bytes(const std::size_t n, const std::size_t m)
 {
     return 32 * (m + m*(n-1) + 4);  // X + f + {A, B, zA, z}
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t ConciseGrootleProof::get_size_bytes() const
+std::size_t GrootleProof::get_size_bytes() const
 {
     const std::size_t n{f.size() ? f[0].size() : 0};
     const std::size_t m{X.size()};
 
-    return ConciseGrootleProof::get_size_bytes(n, m);
+    return GrootleProof::get_size_bytes(n, m);
 }
 //-------------------------------------------------------------------------------------------------------------------
-ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of commitments>]
+GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
     const std::size_t l,        // secret index into {{M}}
-    const rct::keyV &C_offsets,  // offsets for commitment to zero at index l
-    const std::vector<crypto::secret_key> &privkeys,  // privkeys of commitments to zero in 'M[l] - C_offsets'
+    const rct::key &C_offset,   // offset for commitment to zero at index l
+    const crypto::secret_key &privkey,  // privkey of commitment to zero 'M[l] - C_offset'
     const std::size_t n,        // decomp input set: n^m
     const std::size_t m,
     const rct::key &message)    // message to insert in Fiat-Shamir transform hash
@@ -320,32 +290,22 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     // ref set size
     const std::size_t N = std::pow(n, m);
 
-    for (const rct::keyV &column : M)
-        CHECK_AND_ASSERT_THROW_MES(column.size() == N, "Commitment column is wrong size!");
-
-    // number of parallel commitments to zero
-    const std::size_t num_keys = C_offsets.size();
-
-    CHECK_AND_ASSERT_THROW_MES(privkeys.size() == num_keys, "Private key vector is wrong size!");
-    CHECK_AND_ASSERT_THROW_MES(M.size() == num_keys, "Ref set tuple is wrong size!");
+    CHECK_AND_ASSERT_THROW_MES(M.size() == N, "Commitment column is wrong size!");
 
     // commitment to zero signing keys
     CHECK_AND_ASSERT_THROW_MES(l < N, "Signing index out of bounds!");
 
-    for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
-    {
-        // verify: commitment to zero C_zero = M - C_offset = k*G
-        rct::key C_zero_temp;
-        rct::subKeys(C_zero_temp, M[alpha][l], C_offsets[alpha]);
-        CHECK_AND_ASSERT_THROW_MES(rct::scalarmultBase(rct::sk2rct(privkeys[alpha])) == C_zero_temp, "Bad commitment key!");
-    }
+    // verify: commitment to zero C_zero = M[l] - C_offset = k*G
+    rct::key C_zero_temp;
+    rct::subKeys(C_zero_temp, M[l], C_offset);
+    CHECK_AND_ASSERT_THROW_MES(rct::scalarmultBase(rct::sk2rct(privkey)) == C_zero_temp, "Bad commitment key!");
 
     // statically initialize Grootle proof generators
     init_gens();
 
 
-    /// Concise Grootle proof
-    ConciseGrootleProof proof;
+    /// Grootle proof
+    GrootleProof proof;
 
 
     /// Decomposition sub-proof commitments: A, B
@@ -439,7 +399,7 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     }
 
 
-    /// one-of-many sub-proof initial values: {rho}, mu, {X}
+    /// one-of-many sub-proof initial values: {rho}, {X}
 
     // {rho}: proof entropy
     rct::keyV rho;
@@ -449,30 +409,19 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
         rho.push_back(rct::skGen());
     }
 
-    // mu: base aggregation coefficient
-    const rct::key mu{compute_base_aggregation_coefficient(message, n, m, M, C_offsets, proof.A, proof.B)};
-
-    // mu^alpha: powers of the aggregation coefficient
-    const rct::keyV mu_pow{powers_of_scalar(mu, num_keys)};
-
     // {X}: 'encodings' of [p] (i.e. of the real signing index 'l' in the referenced tuple set)
     proof.X = rct::keyV(m);
-    rct::key c_zero_nominal_prefix_temp;
     rct::key C_zero_nominal_temp;
     for (std::size_t j = 0; j < m; ++j)
     {
         std::vector<rct::MultiexpData> data_X;
-        data_X.reserve(N*num_keys);
+        data_X.reserve(N);
 
         for (std::size_t k = 0; k < N; ++k)
         {
-            // X[j] += p[k][j] * sum_{alpha}( mu^alpha * (M[k][alpha] - C_offset[alpha]) )
-            for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
-            {
-                sc_mul(c_zero_nominal_prefix_temp.bytes, mu_pow[alpha].bytes, p[k][j].bytes);  // p[k][j] * mu^alpha
-                rct::subKeys(C_zero_nominal_temp, M[alpha][k], C_offsets[alpha]);  // M[k][alpha] - C_offset[alpha]
-                data_X.push_back({c_zero_nominal_prefix_temp, C_zero_nominal_temp});
-            }
+            // X[j] += p[k][j] * (M[k] - C_offset)
+            rct::subKeys(C_zero_nominal_temp, M[k], C_offset);  // M[k] - C_offset
+            data_X.push_back({p[k][j], C_zero_nominal_temp});
         }
 
         // X[j] += rho[j]*G
@@ -492,13 +441,13 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     /// one-of-many sub-proof challenges
 
     // xi: challenge
-    const rct::key xi{compute_challenge_from_mu(mu, proof.X)};
+    const rct::key xi{compute_challenge(message, n, m, M, C_offset, proof.A, proof.B, proof.X)};
 
     // xi^j: challenge powers
     const rct::keyV xi_pow{powers_of_scalar(xi, m + 1)};
 
 
-    /// concise grootle proof final components/responses
+    /// grootle proof final components/responses
 
     // f-matrix: encapsulate index 'l'
     proof.f = rct::keyMInit(n - 1, m);
@@ -516,14 +465,9 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     sc_muladd(proof.zA.bytes, rB.bytes, xi.bytes, rA.bytes);
     CHECK_AND_ASSERT_THROW_MES(!(proof.zA == ZERO), "Proof scalar element should not be zero!");
 
-    // z = (sum_{alpha}( mu^{alpha}*privkey[alpha] ))*xi^m -
-    //     rho[0]*xi^0 - ... - rho[m - 1]*xi^(m - 1)
+    // z = privkey*xi^m - rho[0]*xi^0 - ... - rho[m - 1]*xi^(m - 1)
     proof.z = ZERO;
-    for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
-    {
-        sc_muladd(proof.z.bytes, mu_pow[alpha].bytes, to_bytes(privkeys[alpha]), proof.z.bytes);  //z += mu^alpha*privkey[alpha]
-    }
-    sc_mul(proof.z.bytes, proof.z.bytes, xi_pow[m].bytes);  //z *= xi^m
+    sc_mul(proof.z.bytes, to_bytes(privkey), xi_pow[m].bytes);  //z = privkey*xi^m
 
     for (std::size_t j = 0; j < m; ++j)
     {
@@ -544,9 +488,9 @@ ConciseGrootleProof concise_grootle_prove(const rct::keyM &M, // [vec<tuple of c
     return proof;
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector<const ConciseGrootleProof*> &proofs,
-    const std::vector<rct::keyM> &M,
-    const rct::keyM &proof_offsets,
+rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
+    const std::vector<rct::keyV> &M,
+    const rct::keyV &proof_offsets,
     const std::size_t n,
     const std::size_t m,
     const rct::keyV &messages)
@@ -564,31 +508,21 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
     const std::size_t N = std::pow(n, m);
 
     CHECK_AND_ASSERT_THROW_MES(M.size() == N_proofs, "Public key vector is wrong size!");
-    for (const rct::keyM &proof_M : M)
+    for (const rct::keyV &proof_M : M)
     {
-        for (const rct::keyV &column : proof_M)
-            CHECK_AND_ASSERT_THROW_MES(column.size() == N, "Public key vector is wrong size!");
+        CHECK_AND_ASSERT_THROW_MES(proof_M.size() == N, "Public key vector is wrong size!");
     }
 
     // inputs line up with proofs
     CHECK_AND_ASSERT_THROW_MES(proof_offsets.size() == N_proofs, "Commitment offsets don't match with input proofs!");
     CHECK_AND_ASSERT_THROW_MES(messages.size() == N_proofs, "Incorrect number of messages!");
 
-    // commitment offsets must line up with input sets
-    const std::size_t num_keys = proof_offsets[0].size();
-
-    for (const rct::keyV &C_offsets : proof_offsets)
-        CHECK_AND_ASSERT_THROW_MES(C_offsets.size() == num_keys, "Incorrect number of commitment offsets!");
-
-    for (const rct::keyM &proof_M : M)
-        CHECK_AND_ASSERT_THROW_MES(proof_M.size() == num_keys, "Incorrect number of input keys!");
-
 
     /// Per-proof checks
-    for (const ConciseGrootleProof *p: proofs)
+    for (const GrootleProof *p: proofs)
     {
         CHECK_AND_ASSERT_THROW_MES(p, "Proof unexpectedly doesn't exist!");
-        const ConciseGrootleProof &proof = *p;
+        const GrootleProof &proof = *p;
 
         CHECK_AND_ASSERT_THROW_MES(proof.X.size() == m, "Bad proof vector size (X)!");
         CHECK_AND_ASSERT_THROW_MES(proof.f.size() == m, "Bad proof matrix size (f)!");
@@ -618,12 +552,12 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
     // 0                                  G                             (zA*G, z*G)
     // 1                  2*m*n           alternate(Hi_A[i], Hi_B[i])   {f, f*(xi - f)}
     //    <per-proof, start at 2*m*n + 1>
-    // 0                  num_keys-1      M[0][alpha]                   (f-coefficients)
+    // 0                                  M[0]                          (f-coefficients)
     // ...
-    // (N-1)*num_keys     N*num_keys-1    M[N-1][alpha]
-    // ... other proof data: A, B, {C_offsets}, {X}
+    // (N-1)                              M[N-1]
+    // ... other proof data: A, B, C_offset, {X}
     std::vector<rct::MultiexpData> data;
-    std::size_t max_size{(1 + 2*m*n) + N_proofs*(N*num_keys + 2 + num_keys + m)};
+    std::size_t max_size{(1 + 2*m*n) + N_proofs*(N + 3 + m)};
     data.reserve(max_size);
     data.resize(1 + 2*m*n); // start with common/batched elements
     std::size_t offset{0};
@@ -643,8 +577,8 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
 
     for (std::size_t proof_i = 0; proof_i < N_proofs; ++proof_i)
     {
-        const ConciseGrootleProof &proof = *(proofs[proof_i]);
-        const rct::keyM &proof_M = M[proof_i];
+        const GrootleProof &proof = *(proofs[proof_i]);
+        const rct::keyV &proof_M = M[proof_i];
 
         // random weights
         // - to allow verifiying batches of proofs, must weight each proof's components randomly so an adversary doesn't
@@ -654,20 +588,17 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
         CHECK_AND_ASSERT_THROW_MES(!(w1 == ZERO), "Invalid verifier weight (w1 must be non-zero) (bug).");
         CHECK_AND_ASSERT_THROW_MES(!(w2 == ZERO), "Invalid verifier weight (w2 must be non-zero) (bug).");
 
-        // Transcript challenges
-        const rct::key mu{
-                compute_base_aggregation_coefficient(messages[proof_i],
+        // Transcript challenge
+        const rct::key xi{
+                compute_challenge(messages[proof_i],
                     n,
                     m,
                     proof_M,
                     proof_offsets[proof_i],
                     proof.A,
-                    proof.B)
+                    proof.B,
+                    proof.X)
             };
-        const rct::key xi{compute_challenge_from_mu(mu, proof.X)};
-
-        // Aggregation coefficient powers
-        const rct::keyV mu_pow{powers_of_scalar(mu, num_keys)};
 
         // Challenge powers (negated)
         const rct::keyV minus_xi_pow{powers_of_scalar(xi, m, true)};
@@ -737,14 +668,14 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
         sc_mul(temp.bytes, temp.bytes, xi.bytes);
         data.emplace_back(temp, B_p3);  // -w1*xi * B
 
-        // {{M}}
+        // {M}
         //   t_k = mul_all_j(f[j][decomp_k[j]])
-        //   w2*[ sum_k( t_k * sum_{alpha}(mu^alpha * (M[k][alpha] - C_offsets[alpha])) ) - sum(...) - z G ] == 0
+        //   w2*[ sum_k( t_k*(M[k] - C_offset) ) - sum(...) - z G ] == 0
         //
-        //   sum_k( w2*t_k*sum_{alpha}(mu^alpha*M[k][alpha]) ) -
-        //      w2*sum_k( t_k )*sum_{alpha}(mu^alpha*C_offsets[alpha]) -
+        //   sum_k( w2*t_k*M[k] ) -
+        //      w2*sum_k( t_k )*C_offset -
         //      w2*[ sum(...) + z G ] == 0
-        // M[k][alpha]: w2*t_k*mu^alpha
+        // M[k]: w2*t_k
         rct::key sum_t = ZERO;
         rct::key t_k;
         for (std::size_t k = 0; k < N; ++k)
@@ -763,33 +694,24 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
 
             // borrow the t_k variable...
             sc_mul(t_k.bytes, w2.bytes, t_k.bytes);  // w2*t_k
-
-            for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
-            {
-                sc_mul(temp.bytes, t_k.bytes, mu_pow[alpha].bytes);  // w2*t_k*mu^alpha
-                data.emplace_back(temp, proof_M[alpha][k]);
-            }
+            data.emplace_back(t_k, proof_M[k]);
         }
 
-        // {C_offsets}
-        //   ... - w2*sum_k( t_k )*sum_{alpha}(mu^alpha*C_offsets[alpha]) ...
+        // C_offset
+        //   ... - w2*sum_k( t_k )*C_offset ...
         // 
-        // proof_offsets[proof_i][alpha]: -w2*sum_t*mu^alpha
-        sc_mul(temp.bytes, MINUS_ONE.bytes, w2.bytes);
-        sc_mul(temp.bytes, temp.bytes, sum_t.bytes);  //-w2*sum_t
-        rct::key shuttle;
+        // proof_offsets[proof_i]: -w2*sum_t
 
-        for (std::size_t alpha = 0; alpha < num_keys; ++alpha)
+        // optimization: skip if offset == identity
+        if (proof_offsets[proof_i] == rct::identity())
         {
-            // optimization: skip if offset == identity
-            if (proof_offsets[proof_i][alpha] == rct::identity())
-            {
-                ++skipped_offsets;
-                continue;
-            }
-
-            sc_mul(shuttle.bytes, temp.bytes, mu_pow[alpha].bytes);  //-w2*sum_t*mu^alpha
-            data.emplace_back(shuttle, proof_offsets[proof_i][alpha]);
+            ++skipped_offsets;
+        }
+        else
+        {
+            sc_mul(temp.bytes, MINUS_ONE.bytes, w2.bytes);
+            sc_mul(temp.bytes, temp.bytes, sum_t.bytes);  //-w2*sum_t
+            data.emplace_back(temp, proof_offsets[proof_i]);
         }
 
         // {X}
@@ -818,17 +740,17 @@ rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector
     return rct::pippenger_prep_data{std::move(data), generator_cache, 1 + 2*m*n};
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
-    const std::vector<rct::keyM> &M,
-    const rct::keyM &proof_offsets,
+bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
+    const std::vector<rct::keyV> &M,
+    const rct::keyV &proof_offsets,
     const std::size_t n,
     const std::size_t m,
     const rct::keyV &messages)
 {
     // build and verify multiexp
-    if (!multiexp_is_identity(get_concise_grootle_verification_data(proofs, M, proof_offsets, n, m, messages)))
+    if (!multiexp_is_identity(get_grootle_verification_data(proofs, M, proof_offsets, n, m, messages)))
     {
-        MERROR("Concise Grootle proof: verification failed!");
+        MERROR("Grootle proof: verification failed!");
         return false;
     }
 

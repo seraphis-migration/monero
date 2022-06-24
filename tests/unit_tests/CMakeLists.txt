@@ -41,7 +41,6 @@ set(unit_tests_sources
   chacha.cpp
   checkpoints.cpp
   command_line.cpp
-  concise_grootle.cpp
   crypto.cpp
   decompose_amount_into_digits.cpp
   device.cpp
@@ -53,6 +52,7 @@ set(unit_tests_sources
   epee_utils.cpp
   expect.cpp
   fee.cpp
+  grootle.cpp
   json_serialization.cpp
   get_xtype_from_string.cpp
   hashchain.cpp

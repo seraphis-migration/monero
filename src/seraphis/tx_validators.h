@@ -178,7 +178,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 * brief: try_get_sp_membership_proofs_v1_validation_data - get verification data to verify that tx inputs exist in the
 *     ledger
 *   - try to get referenced enotes from ledger in 'squashed enote' form (TODO: NOT txpool)
-*   - get verification data for concise grootle proofs (membership proofs)
+*   - get verification data for grootle proofs (membership proofs)
 * param: membership_proofs -
 * param: input_images -
 * param: tx_validation_context -

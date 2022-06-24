@@ -29,17 +29,16 @@
 // NOT FOR PRODUCTION
 
 ////
-// Concise Grootle proof: Groth/Bootle parallel one-of-many proof of commitments with a concise construction
-// - given a set of equal-sized tuples of EC points S
-// - given a same-sized tuple of EC points (offsets) O
-// - prove DL knowledge with respect to G of the commitment to zero tuple {S_pi - O} for an index \pi
+// Grootle proof: Groth/Bootle one-of-many proof of a commitment to zero
+// - given a set of EC points S
+// - given an EC point (the offset) O
+// - prove DL knowledge with respect to G of the commitment to zero {S_l - O} for an index l
 //   in the set that is unknown to verifiers
-// - uses 'aggregation coefficients', a size reduction technique used in CLSAG/Triptych/Lelantus-Spark-CP-proofs
 // - allows proof batching (around (2*n*m)/(n^m + 2*n*m) amortization speedup possible)
 //   - limitations: assumes each proof uses a different reference set (proofs with the same ref set could be MUCH
-//     faster), can only batch proofs with the same decomposition (n^m) and number of parallel commitments (tuple size)
+//     faster), can only batch proofs with the same decomposition (n^m)
 //
-// note: to prove DL of a point in S with respect to G directly, set its offset equal to the identity element I
+// note: to prove DL of a point in S with respect to G directly, set the offset equal to the identity element I
 //
 // References:
 // - One-out-of-Many Proofs: Or How to Leak a Secret and Spend a Coin (Groth): https://eprint.iacr.org/2014/764
@@ -76,9 +75,9 @@ constexpr std::size_t GROOTLE_MAX_MN{128};  //2^64, 3^42, etc.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////
-// concise Grootle proof (using the aggregation coefficients described in Triptych, A/B optimization from MatRiCT)
+// Grootle proof
 ///
-struct ConciseGrootleProof
+struct GrootleProof
 {
     rct::key A, B;
     rct::keyM f;
@@ -102,42 +101,42 @@ struct ConciseGrootleProof
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /**
-* brief: concise_grootle_prove - create a concise grootle proof
-* param: M - [tuple<vec of commitments>]  (commitments are columnar)
-* param: l - secret index into {{M}}
-* param: C_offsets - offsets for commitment to zero at index l
-* param: privkeys - privkeys of commitments to zero in 'M[l] - C_offsets'
+* brief: grootle_prove - create a grootle proof
+* param: M - <vec of commitments>  (one column)
+* param: l - secret index into {M}
+* param: C_offset - offset for commitment to zero at index l
+* param: privkey - privkey of commitment to zero 'M[l] - C_offset'
 * param: n - decomp input set: n^m
 * param: m - ...
 * param: message - message to insert in Fiat-Shamir transform hash
 * return: Grootle proof
 */
-ConciseGrootleProof concise_grootle_prove(const rct::keyM &M,
+GrootleProof grootle_prove(const rct::keyV &M,
     const std::size_t l,
-    const rct::keyV &C_offsets,
-    const std::vector<crypto::secret_key> &privkeys,
+    const rct::key &C_offset,
+    const crypto::secret_key &privkey,
     const std::size_t n,
     const std::size_t m,
     const rct::key &message);
 /**
-* brief: concise_grootle_verify - verify a batch of concise grootle proofs
+* brief: grootle_verify - verify a batch of grootle proofs
 * param: proofs - batch of proofs to verify
-* param: M - (per-proof) vec<[tuple<vec of commitments>]>  (commitments are columnar per proof)
-* param: proof_offsets - (per-proof) offsets for commitments to zero at unknown indices in each proof
+* param: M - (per-proof) vec<<vec of commitments>>
+* param: proof_offsets - (per-proof) offset for commitment to zero at unknown indices in each proof
 * param: n - decomp input set: n^m
 * param: m - ...
 * param: message - (per-proof) message to insert in Fiat-Shamir transform hash
 * return: true/false on verification result
 */
-rct::pippenger_prep_data get_concise_grootle_verification_data(const std::vector<const ConciseGrootleProof*> &proofs,
-    const std::vector<rct::keyM> &M,
-    const rct::keyM &proof_offsets,
+rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
+    const std::vector<rct::keyV> &M,
+    const rct::keyV &proof_offsets,
     const std::size_t n,
     const std::size_t m,
     const rct::keyV &messages);
-bool concise_grootle_verify(const std::vector<const ConciseGrootleProof*> &proofs,
-    const std::vector<rct::keyM> &M,
-    const rct::keyM &proof_offsets,
+bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
+    const std::vector<rct::keyV> &M,
+    const rct::keyV &proof_offsets,
     const std::size_t n,
     const std::size_t m,
     const rct::keyV &messages);

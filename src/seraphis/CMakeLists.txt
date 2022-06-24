@@ -27,7 +27,7 @@
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 set(seraphis_sources
-  concise_grootle.cpp
+  grootle.cpp
   jamtis_address_tag_utils.cpp
   jamtis_address_utils.cpp
   jamtis_core_utils.cpp

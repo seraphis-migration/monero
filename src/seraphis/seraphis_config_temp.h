@@ -54,8 +54,7 @@ namespace config
   const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1[] = "seraphis_transaction_proofs_prefix_v1";
   const constexpr char HASH_KEY_GROOTLE_Hi_A[] = "grootle_Hi_A";
   const constexpr char HASH_KEY_GROOTLE_Hi_B[] = "grootle_Hi_B";
-  const constexpr char HASH_KEY_CONCISE_GROOTLE_AGGREGATION_COEFFICIENT[] = "grootle_aggregation_coefficient";
-  const constexpr char HASH_KEY_CONCISE_GROOTLE_CHALLENGE[] = "grootle_challenge";
+  const constexpr char HASH_KEY_GROOTLE_CHALLENGE[] = "grootle_challenge";
   const constexpr char HASH_KEY_SERAPHIS_MEMBERSHIP_PROOF_MESSAGE[] = "seraphis_membership_proof_message";
   const constexpr char HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE[] = "seraphis_composition_proof_challenge_message";
   const constexpr char HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE[] = "seraphis_composition_proof_challenge";

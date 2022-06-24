@@ -32,8 +32,8 @@
 #include "tx_validators.h"
 
 //local headers
-#include "concise_grootle.h"
 #include "crypto/crypto.h"
+#include "grootle.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -322,7 +322,7 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
     const TxValidationContext &tx_validation_context,
     rct::pippenger_prep_data &validation_data_out)
 {
-    std::size_t num_proofs{membership_proofs.size()};
+    const std::size_t num_proofs{membership_proofs.size()};
 
     // sanity check
     if (num_proofs != input_images.size() ||
@@ -330,13 +330,13 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
         return false;
 
     // get batched validation data
-    std::vector<const sp::ConciseGrootleProof*> proofs;
-    std::vector<rct::keyM> membership_proof_keys;
-    rct::keyM offsets;
+    std::vector<const sp::GrootleProof*> proofs;
+    std::vector<rct::keyV> membership_proof_keys;
+    rct::keyV offsets;
     rct::keyV messages;
     proofs.reserve(num_proofs);
     membership_proof_keys.resize(num_proofs);
-    offsets.resize(num_proofs, rct::keyV(1));
+    offsets.resize(num_proofs);
     messages.reserve(num_proofs);
 
     rct::key generator_seed_reproduced;
@@ -363,11 +363,10 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
             return false;
 
         // get proof keys from enotes stored in the ledger
-        membership_proof_keys[proof_index].emplace_back();
-        tx_validation_context.get_reference_set_proof_elements_v1(reference_indices, membership_proof_keys[proof_index][0]);
+        tx_validation_context.get_reference_set_proof_elements_v1(reference_indices, membership_proof_keys[proof_index]);
 
         // offset (input image masked keys squashed: Q" = K" + C")
-        rct::addKeys(offsets[proof_index][0],
+        rct::addKeys(offsets[proof_index],
             input_images[proof_index]->m_masked_address,
             input_images[proof_index]->m_masked_commitment);
 
@@ -376,11 +375,11 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
         make_tx_membership_proof_message_v1(membership_proofs[proof_index]->m_binned_reference_set, messages.back());
 
         // save the proof
-        proofs.emplace_back(&(membership_proofs[proof_index]->m_concise_grootle_proof));
+        proofs.emplace_back(&(membership_proofs[proof_index]->m_grootle_proof));
     }
 
     // get verification data
-    validation_data_out = sp::get_concise_grootle_verification_data(proofs,
+    validation_data_out = sp::get_grootle_verification_data(proofs,
         membership_proof_keys,
         offsets,
         membership_proofs[0]->m_ref_set_decomp_n,
