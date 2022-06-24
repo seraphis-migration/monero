@@ -373,7 +373,7 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
     EnoteScanningChunkLedgerV1 new_onchain_chunk;
     scan_process_inout.get_onchain_chunk(new_onchain_chunk);
 
-    while (new_onchain_chunk.m_end_height - new_onchain_chunk.m_start_height > 0)
+    while (new_onchain_chunk.m_end_height > new_onchain_chunk.m_start_height)
     {
         // validate chunk semantics (this should check all array bounds to prevent out-of-range accesses below)
         check_v1_enote_scan_chunk_ledger_semantics_v1(new_onchain_chunk, contiguity_marker_inout.m_block_height);

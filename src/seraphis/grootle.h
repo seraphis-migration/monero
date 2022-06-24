@@ -75,7 +75,7 @@ constexpr std::size_t GROOTLE_MAX_MN{128};  //2^64, 3^42, etc.
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////
-// Grootle proof
+// Grootle proof (using the A/B optimization from MatRiCT)
 ///
 struct GrootleProof
 {

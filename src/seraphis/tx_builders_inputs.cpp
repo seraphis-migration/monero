@@ -382,7 +382,7 @@ void make_v1_image_proofs_v1(const std::vector<SpInputProposalV1> &input_proposa
 void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     SpBinnedReferenceSetV1 binned_reference_set,
-    std::vector<rct::key> referenced_enotes_squashed,
+    const std::vector<rct::key> &referenced_enotes_squashed,
     const SpEnote &real_reference_enote,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,
@@ -441,9 +441,6 @@ void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
     CHECK_AND_ASSERT_THROW_MES(found_real,
         "make membership proof: could not find enote for membership proof in reference set.");
 
-    // public keys referenced by proof (Q_i)
-    const rct::keyV reference_keys{std::move(referenced_enotes_squashed)};
-
     // proof offset (only one in the squashed enote model)
     const rct::key image_offset{rct::addKeys(masked_address, masked_commitment)};  //Q" = K" + C"
 
@@ -458,7 +455,7 @@ void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
 
 
     /// make grootle proof
-    membership_proof_out.m_grootle_proof = grootle_prove(reference_keys,
+    membership_proof_out.m_grootle_proof = grootle_prove(referenced_enotes_squashed,
         real_spend_index_in_set,
         image_offset,
         image_mask,
@@ -478,7 +475,7 @@ void make_v1_membership_proof_v1(SpMembershipProofPrepV1 membership_proof_prep, 
     make_v1_membership_proof_v1(membership_proof_prep.m_ref_set_decomp_n,
         membership_proof_prep.m_ref_set_decomp_m,
         std::move(membership_proof_prep.m_binned_reference_set),
-        std::move(membership_proof_prep.m_referenced_enotes_squashed),
+        membership_proof_prep.m_referenced_enotes_squashed,
         membership_proof_prep.m_real_reference_enote,
         membership_proof_prep.m_address_mask,
         membership_proof_prep.m_commitment_mask,

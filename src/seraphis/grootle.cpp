@@ -119,7 +119,7 @@ static void init_gens()
 // - Here: alternate Hi_A, Hi_B to allow variable m*n (the number of Hi_A gens used always equals number of Hi_B gens used).
 // cached: G, Hi_A[0], Hi_B[0], Hi_A[1], Hi_B[1], ..., Hi_A[GROOTLE_MAX_MN], Hi_B[GROOTLE_MAX_MN]
 //-------------------------------------------------------------------------------------------------------------------
-static std::shared_ptr<rct::pippenger_cached_data> get_pippinger_cache_init()
+static std::shared_ptr<rct::pippenger_cached_data> get_pippenger_cache_init()
 {
     init_gens();
 
@@ -135,7 +135,8 @@ static std::shared_ptr<rct::pippenger_cached_data> get_pippinger_cache_init()
         data.emplace_back(ZERO, Hi_A_p3[i]);
         data.emplace_back(ZERO, Hi_B_p3[i]);
     }
-    CHECK_AND_ASSERT_THROW_MES(data.size() == 1 + 2*GROOTLE_MAX_MN, "Bad generator vector size!");
+    CHECK_AND_ASSERT_THROW_MES(data.size() == 1 + 2*GROOTLE_MAX_MN,
+        "grootle proof pippenger init: bad generator vector size!");
 
     // initialize multiexponentiation cache
     return rct::pippenger_init_cache(data, 0, 0);
@@ -150,7 +151,7 @@ static void init_static()
         init_gens();
 
         // pippinger cache of stable generators
-        generator_cache = get_pippinger_cache_init();
+        generator_cache = get_pippenger_cache_init();
 
     });
 }
@@ -165,11 +166,11 @@ static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
     std::vector<rct::MultiexpData> &data_out)
 {
     const std::size_t m{M_priv_A.size()};
-    CHECK_AND_ASSERT_THROW_MES(m > 0, "Bad matrix size!");
-    CHECK_AND_ASSERT_THROW_MES(m == M_priv_B.size(), "Matrix size mismatch!");
+    CHECK_AND_ASSERT_THROW_MES(m > 0, "grootle proof matrix commitment: bad matrix size!");
+    CHECK_AND_ASSERT_THROW_MES(m == M_priv_B.size(), "grootle proof matrix commitment: matrix size mismatch (m)!");
     const std::size_t n{M_priv_A[0].size()};
-    CHECK_AND_ASSERT_THROW_MES(n == M_priv_B[0].size(), "Matrix size mismatch!");
-    CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "Bad matrix commitment parameters!");
+    CHECK_AND_ASSERT_THROW_MES(n == M_priv_B[0].size(), "grootle proof matrix commitment: matrix size mismatch (n)!");
+    CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "grootle proof matrix commitment: bad matrix commitment parameters!");
 
     data_out.resize(1 + 2*m*n);
     std::size_t offset;
@@ -232,12 +233,12 @@ static rct::key compute_challenge(const rct::key &message,
     {
         data.append(reinterpret_cast<const char*>(x.bytes), sizeof(x));
     }
-    CHECK_AND_ASSERT_THROW_MES(data.size() > 1, "Bad hash input size!");
+    CHECK_AND_ASSERT_THROW_MES(data.size() > 1, "grootle proof challenge: bad hash input size!");
 
     // challenge
     rct::key challenge;
     sp_hash_to_scalar(domain_separator, data.data(), data.size(), challenge.bytes);
-    CHECK_AND_ASSERT_THROW_MES(!(challenge == ZERO), "Transcript challenge must be nonzero!");
+    CHECK_AND_ASSERT_THROW_MES(!(challenge == ZERO), "grootle proof challenge: transcript challenge must be nonzero!");
 
     return challenge;
 }
@@ -283,22 +284,23 @@ GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
     const rct::key &message)    // message to insert in Fiat-Shamir transform hash
 {
     /// input checks and initialization
-    CHECK_AND_ASSERT_THROW_MES(n > 1, "Must have n > 1!");
-    CHECK_AND_ASSERT_THROW_MES(m > 1, "Must have m > 1!");
-    CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "Size parameters are too large!");
+    CHECK_AND_ASSERT_THROW_MES(n > 1, "grootle proof proving: must have n > 1!");
+    CHECK_AND_ASSERT_THROW_MES(m > 1, "grootle proof proving: must have m > 1!");
+    CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "grootle proof proving: size parameters are too large!");
 
     // ref set size
     const std::size_t N = std::pow(n, m);
 
-    CHECK_AND_ASSERT_THROW_MES(M.size() == N, "Commitment column is wrong size!");
+    CHECK_AND_ASSERT_THROW_MES(M.size() == N, "grootle proof proving: commitment column is wrong size!");
 
     // commitment to zero signing keys
-    CHECK_AND_ASSERT_THROW_MES(l < N, "Signing index out of bounds!");
+    CHECK_AND_ASSERT_THROW_MES(l < N, "grootle proof proving: signing index out of bounds!");
 
     // verify: commitment to zero C_zero = M[l] - C_offset = k*G
-    rct::key C_zero_temp;
-    rct::subKeys(C_zero_temp, M[l], C_offset);
-    CHECK_AND_ASSERT_THROW_MES(rct::scalarmultBase(rct::sk2rct(privkey)) == C_zero_temp, "Bad commitment key!");
+    rct::key C_zero_reproduced;
+    rct::subKeys(C_zero_reproduced, M[l], C_offset);
+    CHECK_AND_ASSERT_THROW_MES(rct::scalarmultBase(rct::sk2rct(privkey)) == C_zero_reproduced,
+        "grootle proof proving: bad commitment private key!");
 
     // statically initialize Grootle proof generators
     init_gens();
@@ -337,9 +339,11 @@ GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
         sc_mul(a_sq[j][0].bytes, MINUS_ONE.bytes, a_sq[j][0].bytes);
     }
     grootle_matrix_commitment(rA, a, a_sq, data);  //A = dual_matrix_commit(r_A, a, -a^2)
-    CHECK_AND_ASSERT_THROW_MES(data.size() == 1 + 2*m*n, "Matrix commitment returned unexpected size!");
+    CHECK_AND_ASSERT_THROW_MES(data.size() == 1 + 2*m*n,
+        "grootle proof proving: matrix commitment returned unexpected size (A data)!");
     proof.A = rct::straus(data);
-    CHECK_AND_ASSERT_THROW_MES(!(proof.A == IDENTITY), "Linear combination unexpectedly returned zero!");
+    CHECK_AND_ASSERT_THROW_MES(!(proof.A == IDENTITY),
+        "grootle proof proving: linear combination unexpectedly returned zero (A)!");
 
     // B: commit to decomposition bits: {sigma, a*(1-2*sigma)}
     std::vector<std::size_t> decomp_l;
@@ -361,9 +365,11 @@ GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
         }
     }
     grootle_matrix_commitment(rB, sigma, a_sigma, data);  //B = dual_matrix_commit(r_B, sigma, a*(1-2*sigma))
-    CHECK_AND_ASSERT_THROW_MES(data.size() == 1 + 2*m*n, "Matrix commitment returned unexpected size!");
+    CHECK_AND_ASSERT_THROW_MES(data.size() == 1 + 2*m*n,
+        "grootle proof proving: matrix commitment returned unexpected size (B data)!");
     proof.B = rct::straus(data);
-    CHECK_AND_ASSERT_THROW_MES(!(proof.B == IDENTITY), "Linear combination unexpectedly returned zero!");
+    CHECK_AND_ASSERT_THROW_MES(!(proof.B == IDENTITY),
+        "grootle proof proving: linear combination unexpectedly returned zero (B)!");
 
     // done: store (1/8)*commitment
     proof.A = rct::scalarmultKey(proof.A, rct::INV_EIGHT);
@@ -372,8 +378,8 @@ GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
 
     /// one-of-many sub-proof: polynomial 'p' coefficients
     rct::keyM p = rct::keyMInit(m + 1, N);
-    CHECK_AND_ASSERT_THROW_MES(p.size() == N, "Bad matrix size!");
-    CHECK_AND_ASSERT_THROW_MES(p[0].size() == m + 1, "Bad matrix size!");
+    CHECK_AND_ASSERT_THROW_MES(p.size() == N, "grootle proof proving: bad matrix size (p)!");
+    CHECK_AND_ASSERT_THROW_MES(p[0].size() == m + 1, "grootle proof proving: bad matrix size (p[])!");
     std::vector<std::size_t> decomp_k;
     rct::keyV pre_convolve_temp;
     decomp_k.resize(m);
@@ -427,7 +433,8 @@ GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
         // X[j] += rho[j]*G
         // note: addKeys1(X, rho, P) -> X = rho*G + P
         rct::addKeys1(proof.X[j], rho[j], rct::straus(data_X));
-        CHECK_AND_ASSERT_THROW_MES(!(proof.X[j] == IDENTITY), "Proof coefficient element should not be zero!");
+        CHECK_AND_ASSERT_THROW_MES(!(proof.X[j] == IDENTITY),
+            "grootle proof proving: proof coefficient element should not be zero!");
     }
 
     // done: store (1/8)*X
@@ -435,7 +442,7 @@ GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
     {
         rct::scalarmultKey(proof.X[j], proof.X[j], rct::INV_EIGHT);
     }
-    CHECK_AND_ASSERT_THROW_MES(proof.X.size() == m, "Proof coefficient vector is unexpected size!");
+    CHECK_AND_ASSERT_THROW_MES(proof.X.size() == m, "grootle proof proving: proof coefficient vector is unexpected size!");
 
 
     /// one-of-many sub-proof challenges
@@ -456,14 +463,15 @@ GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
         for (std::size_t i = 1; i < n; ++i)
         {
             sc_muladd(proof.f[j][i - 1].bytes, sigma[j][i].bytes, xi.bytes, a[j][i].bytes);
-            CHECK_AND_ASSERT_THROW_MES(!(proof.f[j][i - 1] == ZERO), "Proof matrix element should not be zero!");
+            CHECK_AND_ASSERT_THROW_MES(!(proof.f[j][i - 1] == ZERO),
+                "grootle proof proving: proof matrix element should not be zero!");
         }
     }
 
     // z-terms: responses
     // zA = rB*xi + rA
     sc_muladd(proof.zA.bytes, rB.bytes, xi.bytes, rA.bytes);
-    CHECK_AND_ASSERT_THROW_MES(!(proof.zA == ZERO), "Proof scalar element should not be zero!");
+    CHECK_AND_ASSERT_THROW_MES(!(proof.zA == ZERO), "grootle proof proving: proof scalar element should not be zero (zA)!");
 
     // z = privkey*xi^m - rho[0]*xi^0 - ... - rho[m - 1]*xi^(m - 1)
     proof.z = ZERO;
@@ -473,7 +481,7 @@ GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
     {
         sc_mulsub(proof.z.bytes, rho[j].bytes, xi_pow[j].bytes, proof.z.bytes);  //z -= rho[j]*xi^j
     }
-    CHECK_AND_ASSERT_THROW_MES(!(proof.z == ZERO), "Proof scalar element should not be zero!");
+    CHECK_AND_ASSERT_THROW_MES(!(proof.z == ZERO), "grootle proof proving: proof scalar element should not be zero (z)!");
 
 
     /// cleanup: clear secret prover data
@@ -498,47 +506,57 @@ rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const G
     /// Global checks
     const std::size_t N_proofs = proofs.size();
 
-    CHECK_AND_ASSERT_THROW_MES(N_proofs > 0, "Must have at least one proof to verify!");
+    CHECK_AND_ASSERT_THROW_MES(N_proofs > 0, "grootle proof verifying: must have at least one proof to verify!");
 
-    CHECK_AND_ASSERT_THROW_MES(n > 1, "Must have n > 1!");
-    CHECK_AND_ASSERT_THROW_MES(m > 1, "Must have m > 1!");
-    CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "Size parameters are too large!");
+    CHECK_AND_ASSERT_THROW_MES(n > 1, "grootle proof verifying: must have n > 1!");
+    CHECK_AND_ASSERT_THROW_MES(m > 1, "grootle proof verifying: must have m > 1!");
+    CHECK_AND_ASSERT_THROW_MES(m*n <= GROOTLE_MAX_MN, "grootle proof verifying: size parameters are too large!");
 
     // anonymity set size
     const std::size_t N = std::pow(n, m);
 
-    CHECK_AND_ASSERT_THROW_MES(M.size() == N_proofs, "Public key vector is wrong size!");
+    CHECK_AND_ASSERT_THROW_MES(M.size() == N_proofs,
+        "grootle proof verifying: public key vectors don't line up with proofs!");
     for (const rct::keyV &proof_M : M)
     {
-        CHECK_AND_ASSERT_THROW_MES(proof_M.size() == N, "Public key vector is wrong size!");
+        CHECK_AND_ASSERT_THROW_MES(proof_M.size() == N,
+            "grootle proof verifying: public key vector for a proof is wrong size!");
     }
 
     // inputs line up with proofs
-    CHECK_AND_ASSERT_THROW_MES(proof_offsets.size() == N_proofs, "Commitment offsets don't match with input proofs!");
-    CHECK_AND_ASSERT_THROW_MES(messages.size() == N_proofs, "Incorrect number of messages!");
+    CHECK_AND_ASSERT_THROW_MES(proof_offsets.size() == N_proofs,
+        "grootle proof verifying: commitment offsets don't line up with input proofs!");
+    CHECK_AND_ASSERT_THROW_MES(messages.size() == N_proofs, "grootle proof verifying: incorrect number of messages!");
 
 
     /// Per-proof checks
     for (const GrootleProof *p: proofs)
     {
-        CHECK_AND_ASSERT_THROW_MES(p, "Proof unexpectedly doesn't exist!");
+        CHECK_AND_ASSERT_THROW_MES(p, "grootle proof verifying: proof unexpectedly doesn't exist!");
         const GrootleProof &proof = *p;
 
-        CHECK_AND_ASSERT_THROW_MES(proof.X.size() == m, "Bad proof vector size (X)!");
-        CHECK_AND_ASSERT_THROW_MES(proof.f.size() == m, "Bad proof matrix size (f)!");
+        CHECK_AND_ASSERT_THROW_MES(proof.X.size() == m, "grootle proof verifying: bad proof vector size (X)!");
+        CHECK_AND_ASSERT_THROW_MES(proof.f.size() == m, "grootle proof verifying: bad proof matrix size (f)!");
         for (std::size_t j = 0; j < m; ++j)
         {
-            CHECK_AND_ASSERT_THROW_MES(proof.f[j].size() == n - 1, "Bad proof matrix size (f internal)!");
+            CHECK_AND_ASSERT_THROW_MES(proof.f[j].size() == n - 1,
+                "grootle proof verifying: bad proof matrix size (f internal)!");
             for (std::size_t i = 0; i < n - 1; ++i)
             {
-                CHECK_AND_ASSERT_THROW_MES(!(proof.f[j][i] == ZERO), "Proof matrix element should not be zero (f internal)!");
-                CHECK_AND_ASSERT_THROW_MES(sc_check(proof.f[j][i].bytes) == 0, "Bad scalar element in proof (f internal)!");
+                CHECK_AND_ASSERT_THROW_MES(!(proof.f[j][i] == ZERO),
+                    "grootle proof verifying: proof matrix element should not be zero (f internal)!");
+                CHECK_AND_ASSERT_THROW_MES(sc_check(proof.f[j][i].bytes) == 0,
+                    "grootle proof verifying: bad scalar element in proof (f internal)!");
             }
         }
-        CHECK_AND_ASSERT_THROW_MES(!(proof.zA == ZERO), "Proof scalar element should not be zero (zA)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.zA.bytes) == 0, "Bad scalar element in proof (zA)!");
-        CHECK_AND_ASSERT_THROW_MES(!(proof.z == ZERO), "Proof scalar element should not be zero (z)!");
-        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.z.bytes) == 0, "Bad scalar element in proof (z)!");
+        CHECK_AND_ASSERT_THROW_MES(!(proof.zA == ZERO),
+            "grootle proof verifying: proof scalar element should not be zero (zA)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.zA.bytes) == 0,
+            "grootle proof verifying: bad scalar element in proof (zA)!");
+        CHECK_AND_ASSERT_THROW_MES(!(proof.z == ZERO),
+            "grootle proof verifying: proof scalar element should not be zero (z)!");
+        CHECK_AND_ASSERT_THROW_MES(sc_check(proof.z.bytes) == 0,
+            "grootle proof verifying: bad scalar element in proof (z)!");
     }
 
     // prepare context
@@ -585,8 +603,10 @@ rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const G
         //   gain an advantage if >1 of their proofs are being validated in a batch
         const rct::key w1{rct::skGen()};  // decomp:        w1*[ A + xi*B == dual_matrix_commit(zA, f, f*(xi - f)) ]
         const rct::key w2{rct::skGen()};  // main stuff:    w2*[ ... - zG == 0 ]
-        CHECK_AND_ASSERT_THROW_MES(!(w1 == ZERO), "Invalid verifier weight (w1 must be non-zero) (bug).");
-        CHECK_AND_ASSERT_THROW_MES(!(w2 == ZERO), "Invalid verifier weight (w2 must be non-zero) (bug).");
+        CHECK_AND_ASSERT_THROW_MES(!(w1 == ZERO),
+            "grootle proof verifying: invalid verifier weight (w1 must be non-zero) (bug).");
+        CHECK_AND_ASSERT_THROW_MES(!(w2 == ZERO),
+            "grootle proof verifying: invalid verifier weight (w2 must be non-zero) (bug).");
 
         // Transcript challenge
         const rct::key xi{
@@ -630,7 +650,8 @@ rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const G
                 f[j][i] = proof.f[j][i - 1];
                 sc_sub(f[j][0].bytes, f[j][0].bytes, f[j][i].bytes);
             }
-            CHECK_AND_ASSERT_THROW_MES(!(f[j][0] == ZERO), "Proof matrix element should not be zero!");
+            CHECK_AND_ASSERT_THROW_MES(!(f[j][0] == ZERO),
+                "grootle proof verifying: proof matrix element should not be zero!");
         }
 
         // Matrix commitment
@@ -733,7 +754,8 @@ rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const G
 
 
     /// Final check
-    CHECK_AND_ASSERT_THROW_MES(data.size() == max_size - skipped_offsets, "Final proof data is incorrect size!");
+    CHECK_AND_ASSERT_THROW_MES(data.size() == max_size - skipped_offsets,
+        "grootle proof verifying: final proof data is incorrect size!");
 
 
     /// return multiexp data for caller to deal with

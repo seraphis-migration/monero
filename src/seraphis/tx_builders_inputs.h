@@ -201,7 +201,7 @@ void make_v1_image_proofs_v1(const std::vector<SpInputProposalV1> &input_proposa
 void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
     const std::size_t ref_set_decomp_m,
     SpBinnedReferenceSetV1 binned_reference_set,
-    std::vector<rct::key> referenced_enotes_squashed,
+    const std::vector<rct::key> &referenced_enotes_squashed,
     const std::size_t real_spend_index_in_set,
     const SpEnote &real_reference_enote,
     const crypto::secret_key &image_address_mask,
