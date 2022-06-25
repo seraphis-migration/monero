@@ -219,7 +219,8 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
 
             // compute the bin member: slice_8_bytes(generator) mod bin_width
             member_candidate = mod(generator_clip, bin_width);
-        } while (std::find(members_of_bin_out.begin(), members_of_bin_out.end(), member_candidate) != members_of_bin_out.end());
+        } while (std::find(members_of_bin_out.begin(), members_of_bin_out.end(), member_candidate) !=
+            members_of_bin_out.end());
 
         members_of_bin_out.emplace_back(member_candidate);
     }

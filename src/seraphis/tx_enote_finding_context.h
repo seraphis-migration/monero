@@ -58,7 +58,7 @@ public:
     EnoteFindingContextLedger& operator=(EnoteFindingContextLedger&&) = delete;
 
 //member functions
-    /// try to get an onchain chunk (or empty chunk representing top of current chain)
+    /// get an onchain chunk (or empty chunk representing top of current chain)
     virtual void get_onchain_chunk(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
         EnoteScanningChunkLedgerV1 &chunk_out) const = 0;
