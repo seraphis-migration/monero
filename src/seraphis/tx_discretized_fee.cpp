@@ -34,6 +34,7 @@
 //local headers
 #include "misc_log_ex.h"
 #include "seraphis_config_temp.h"
+#include "sp_transcript.h"
 
 //third party headers
 
@@ -165,6 +166,11 @@ bool DiscretizedFee::operator==(const rct::xmr_amount raw_fee_value) const
         "a raw fee failed: the discretized fee is invalid.");
 
     return this_fee_value == raw_fee_value;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void append_to_transcript(const DiscretizedFee &container, SpTranscript &transcript_inout)
+{
+    transcript_inout.append(container.m_fee_level);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool operator==(const discretized_fee_level_t fee_level, const DiscretizedFee &discretized_fee)

@@ -42,6 +42,7 @@
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
+#include "sp_transcript.h"
 
 //third party headers
 
@@ -62,11 +63,10 @@ void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_SPENDKEY_EXTENSION};
 
     // k^j_x = H_n[s_ga](j)
-    sp_derive_key(domain_separator,
-        to_bytes(s_generate_address),
-        j.bytes,
-        ADDRESS_INDEX_BYTES,
-        to_bytes(extension_out));
+    SpTranscript transcript{domain_separator, ADDRESS_INDEX_BYTES};
+    transcript.append(j.bytes);
+
+    sp_derive_key(to_bytes(s_generate_address), transcript, to_bytes(extension_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
@@ -76,11 +76,10 @@ void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_ADDRESS_PRIVKEY};
 
     // k^j_a = H_n[s_ga](j)
-    sp_derive_key(domain_separator,
-        to_bytes(s_generate_address),
-        j.bytes,
-        ADDRESS_INDEX_BYTES,
-        to_bytes(address_privkey_out));
+    SpTranscript transcript{domain_separator, ADDRESS_INDEX_BYTES};
+    transcript.append(j.bytes);
+
+    sp_derive_key(to_bytes(s_generate_address), transcript, to_bytes(address_privkey_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_address_spend_key(const rct::key &wallet_spend_pubkey,

@@ -33,8 +33,10 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "int-util.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
+#include "sp_transcript.h"
 #include "tx_binned_reference_set.h"
 #include "tx_misc_utils.h"
 
@@ -49,20 +51,6 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnoteV1::append_to_string(std::string &str_inout) const
-{
-    // append all enote contents to the string
-    str_inout.reserve(str_inout.size() + get_size_bytes());
-
-    m_core.append_to_string(str_inout);
-    for (int i{0}; i < 8; ++i)
-    {
-        str_inout += static_cast<char>(m_encoded_amount >> i*8);
-    }
-    str_inout.append(reinterpret_cast<const char*>(m_addr_tag_enc.bytes), sizeof(jamtis::encrypted_address_tag_t));
-    str_inout += static_cast<char>(m_view_tag);
-}
-//-------------------------------------------------------------------------------------------------------------------
 void SpEnoteV1::gen()
 {
     // generate a dummy enote: random pieces, completely unspendable
@@ -76,23 +64,20 @@ void SpEnoteV1::gen()
     crypto::rand(sizeof(jamtis::encrypted_address_tag_t), m_addr_tag_enc.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnoteImageV1::append_to_string(std::string &str_inout) const
+void append_to_transcript(const SpEnoteV1 &container, SpTranscript &transcript_inout)
 {
-    // append all enote image contents to the string
-    str_inout.reserve(str_inout.size() + get_size_bytes());
-
-    m_core.append_to_string(str_inout);
+    transcript_inout.append(container.m_core);
+    const std::uint64_t le_encoded_amount{SWAP64LE(container.m_encoded_amount)};
+    unsigned char encoded_amount[8];
+    memcpy(encoded_amount, &le_encoded_amount, 8);  //encoded amounts are semantically 8-byte buffers
+    transcript_inout.append(encoded_amount);
+    transcript_inout.append(container.m_addr_tag_enc.bytes);
+    transcript_inout.append(container.m_view_tag);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpMembershipProofV1::append_to_string(std::string &str_inout) const
+void append_to_transcript(const SpEnoteImageV1 &container, SpTranscript &transcript_inout)
 {
-    // append all proof contents to the string
-    str_inout.reserve(str_inout.size() + get_size_bytes());
-
-    m_grootle_proof.append_to_string(str_inout);
-    m_binned_reference_set.append_to_string(str_inout);
-    append_uint_to_string(m_ref_set_decomp_n, str_inout);
-    append_uint_to_string(m_ref_set_decomp_m, str_inout);
+    transcript_inout.append(container.m_core);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpMembershipProofV1::get_size_bytes(const std::size_t n, const std::size_t m, const std::size_t num_bin_members)
@@ -109,21 +94,17 @@ std::size_t SpMembershipProofV1::get_size_bytes() const
         m_binned_reference_set.m_bin_config.m_num_bin_members);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpImageProofV1::append_to_string(std::string &str_inout) const
+void append_to_transcript(const SpMembershipProofV1 &container, SpTranscript &transcript_inout)
 {
-    // append all proof contents to the string
-    str_inout.reserve(str_inout.size() + get_size_bytes());
-
-    m_composition_proof.append_to_string(str_inout);
+    transcript_inout.append(container.m_grootle_proof);
+    transcript_inout.append(container.m_binned_reference_set);
+    transcript_inout.append(container.m_ref_set_decomp_n);
+    transcript_inout.append(container.m_ref_set_decomp_m);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpBalanceProofV1::append_to_string(std::string &str_inout) const
+void append_to_transcript(const SpImageProofV1 &container, SpTranscript &transcript_inout)
 {
-    // append all proof contents to the string
-    str_inout.reserve(str_inout.size() + get_size_bytes());
-
-    append_bpp_to_string(m_bpp_proof, str_inout);
-    str_inout.append(reinterpret_cast<const char *>(m_remainder_blinding_factor.bytes), sizeof(rct::key));
+    transcript_inout.append(container.m_composition_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBalanceProofV1::get_size_bytes(const std::size_t num_inputs,
@@ -166,6 +147,12 @@ std::size_t SpBalanceProofV1::get_weight(const bool include_commitments /*=false
     return SpBalanceProofV1::get_weight(m_bpp_proof.V.size(), 0, include_commitments);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void append_to_transcript(const SpBalanceProofV1 &container, SpTranscript &transcript_inout)
+{
+    append_bpp_to_transcript(container.m_bpp_proof, transcript_inout);
+    transcript_inout.append(container.m_remainder_blinding_factor);
+}
+//-------------------------------------------------------------------------------------------------------------------
 std::size_t SpTxSupplementV1::get_size_bytes(const std::size_t num_outputs, const TxExtra &tx_extra)
 {
     std::size_t size{0};
@@ -185,6 +172,12 @@ std::size_t SpTxSupplementV1::get_size_bytes(const std::size_t num_outputs, cons
 std::size_t SpTxSupplementV1::get_size_bytes() const
 {
     return 32 * m_output_enote_ephemeral_pubkeys.size() + m_tx_extra.size();
+}
+//-------------------------------------------------------------------------------------------------------------------
+void append_to_transcript(const SpTxSupplementV1 &container, SpTranscript &transcript_inout)
+{
+    transcript_inout.append(container.m_output_enote_ephemeral_pubkeys);
+    transcript_inout.append(container.m_tx_extra);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

@@ -40,9 +40,11 @@
 
 //standard headers
 #include <cstdint>
+#include <string>
 #include <vector>
 
 //forward declarations
+namespace sp { class SpTranscript; }
 
 
 namespace sp
@@ -68,11 +70,10 @@ struct SpBinnedReferenceSetConfigV1 final
     }
     bool operator!=(const SpBinnedReferenceSetConfigV1 &other_config) const { return !(*this == other_config); }
 
-    /// convert to a string and append to existing string (for proof transcripts)
-    void append_to_string(std::string &str_inout) const;
-
     static std::size_t get_size_bytes() { return sizeof(m_bin_radius) + sizeof(m_num_bin_members); }
 };
+inline const std::string get_transcript_label(const SpBinnedReferenceSetConfigV1&) { return "SpBinnedReferenceSetConfigV1"; }
+void append_to_transcript(const SpBinnedReferenceSetConfigV1 &container, SpTranscript &transcript_inout);
 
 ////
 // SpBinnedReferenceSetV1
@@ -97,12 +98,11 @@ struct SpBinnedReferenceSetV1 final
     /// compute the reference set size
     std::uint64_t reference_set_size() const { return m_bin_config.m_num_bin_members * m_bin_loci.size(); }
 
-    /// convert to a string and append to existing string (for proof transcripts)
-    void append_to_string(std::string &str_inout) const;
-
     /// size of the binned reference set (does not include the config)
     static std::size_t get_size_bytes(const std::size_t num_bins, const bool include_seed = false);
     std::size_t get_size_bytes(const bool include_seed = false) const;
 };
+inline const std::string get_transcript_label(const SpBinnedReferenceSetV1&) { return "SpBinnedReferenceSetV1"; }
+void append_to_transcript(const SpBinnedReferenceSetV1 &container, SpTranscript &transcript_inout);
 
 } //namespace sp

@@ -43,6 +43,7 @@
 #include <vector>
 
 //forward declarations
+namespace sp { class SpTranscript; }
 
 
 namespace sp
@@ -70,13 +71,6 @@ struct SpEnote final
     */
     bool onetime_address_is_canonical() const;
 
-    /**
-    * brief: append_to_string - convert enote to a string and append to existing string (for proof transcripts)
-    *   str += Ko || C
-    * inoutparam: str_inout - contents concatenated to a string
-    */
-    void append_to_string(std::string &str_inout) const;
-
     static std::size_t get_size_bytes() { return 32*2; }
 
     /**
@@ -84,6 +78,8 @@ struct SpEnote final
     */
     void gen();
 };
+inline const std::string get_transcript_label(const SpEnote&) { return "SpEnote"; }
+void append_to_transcript(const SpEnote &container, SpTranscript &transcript_inout);
 
 ////
 // SpEnoteImage
@@ -103,15 +99,10 @@ struct SpEnoteImage final
         return m_key_image < other_image.m_key_image;
     }
 
-    /**
-    * brief: append_to_string - convert enote image to a string and append to existing string
-    *   str += K" || C" || KI
-    * inoutparam: str_inout - contents concatenated to a string
-    */
-    void append_to_string(std::string &str_inout) const;
-
     static std::size_t get_size_bytes() { return 32*3; }
 };
+inline const std::string get_transcript_label(const SpEnoteImage&) { return "SpEnoteImage"; }
+void append_to_transcript(const SpEnoteImage &container, SpTranscript &transcript_inout);
 
 ////
 // SpInputProposal

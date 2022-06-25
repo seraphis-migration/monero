@@ -48,6 +48,7 @@ extern "C"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
+#include "sp_transcript.h"
 
 //third party headers
 
@@ -87,13 +88,12 @@ static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG};
 
     // temp_encryption_secret = H_32(q, Ko)
-    std::string data;
-    data.reserve(2 * sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>(sender_receiver_secret.bytes), sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>(onetime_address.bytes), sizeof(rct::key));
+    SpTranscript transcript{domain_separator, 2 * sizeof(rct::key)};
+    transcript.append(sender_receiver_secret);
+    transcript.append(onetime_address);
 
     rct::key temp_encryption_secret;
-    sp_hash_to_32(domain_separator, data.data(), data.size(), temp_encryption_secret.bytes);
+    sp_hash_to_32(transcript, temp_encryption_secret.bytes);
 
     // truncate to desired size of the secret
     encrypted_address_tag_secret_t encryption_secret;

@@ -39,6 +39,7 @@
 #include "ringct/rctTypes.h"
 #include "seraphis_config_temp.h"
 #include "sp_hash_functions.h"
+#include "sp_transcript.h"
 #include "tx_binned_reference_set.h"
 #include "tx_misc_utils.h"
 #include "tx_ref_set_index_mapper.h"
@@ -163,16 +164,16 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
         "making normalized bin members: zero bin members were requested (at least one expected).");
 
     // make this bin's member generator
-    // g = H_32("..", bin_generator_seed, bin_locus, bin_index_in_set)
+    // g = H_32(bin_generator_seed, bin_locus, bin_index_in_set)
     static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_MEMBER};
 
-    std::string data;
-    data.reserve(sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set));
-    data.append(reinterpret_cast<const char*>(bin_generator_seed.bytes), sizeof(bin_generator_seed));
-    append_uint_to_string(bin_locus, data);
-    append_uint_to_string(bin_index_in_set, data);
+    SpTranscript transcript{domain_separator, sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set)};
+    transcript.append(bin_generator_seed);
+    transcript.append(bin_locus);
+    transcript.append(bin_index_in_set);
+
     rct::key member_generator;
-    sp_hash_to_32(domain_separator, data.data(), data.size(), member_generator.bytes);
+    sp_hash_to_32(transcript, member_generator.bytes);
 
     // set clip allowed max to be a large multiple of the bin width (minus 1 since we are zero-basis),
     //   to avoid bias in the bin members
@@ -209,10 +210,10 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
             // update the generator (find a generator that is within the allowed max)
             do
             {
-                sp_hash_to_32(domain_separator,
-                    member_generator.bytes,
-                    sizeof(member_generator),
-                    member_generator.bytes);
+                SpTranscript transcript_temp{domain_separator, sizeof(member_generator)};
+                transcript_temp.append(member_generator);
+
+                sp_hash_to_32(transcript_temp, member_generator.bytes);
                 memcpy(&generator_clip, member_generator.bytes, sizeof(generator_clip));
                 generator_clip = SWAP64LE(generator_clip);
             } while (generator_clip > clip_allowed_max);

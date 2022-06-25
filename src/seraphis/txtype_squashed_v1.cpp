@@ -43,6 +43,7 @@
 #include "sp_core_types.h"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
+#include "sp_transcript.h"
 #include "tx_binned_reference_set.h"
 #include "tx_builder_types.h"
 #include "tx_builders_inputs.h"
@@ -211,13 +212,12 @@ void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
 
     // 4. tx hash
     // tx_hash = H_32(image_proofs_message, input images, proofs)
-    std::string data;
-    data.reserve(3*sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>(image_proofs_message.bytes), sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>(input_images_prefix.bytes), sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>(tx_proofs_prefix.bytes), sizeof(rct::key));
+    SpTranscript transcript{domain_separator, 3*sizeof(rct::key)};
+    transcript.append(image_proofs_message);
+    transcript.append(input_images_prefix);
+    transcript.append(tx_proofs_prefix);
 
-    sp_hash_to_32(domain_separator, data.data(), data.size(), tx_hash_out.bytes);
+    sp_hash_to_32(transcript, tx_hash_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_squashed_v1(std::vector<SpEnoteImageV1> input_images,

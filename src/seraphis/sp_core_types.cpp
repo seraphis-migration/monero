@@ -38,6 +38,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
+#include "sp_transcript.h"
 
 //third party headers
 
@@ -55,13 +56,10 @@ bool SpEnote::onetime_address_is_canonical() const
     return key_domain_is_prime_subgroup(m_onetime_address);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnote::append_to_string(std::string &str_inout) const
+void append_to_transcript(const SpEnote &container, SpTranscript &transcript_inout)
 {
-    // append enote contents to the string
-    str_inout.reserve(str_inout.size() + get_size_bytes());
-
-    str_inout.append(reinterpret_cast<const char *>(m_onetime_address.bytes), sizeof(rct::key));
-    str_inout.append(reinterpret_cast<const char *>(m_amount_commitment.bytes), sizeof(rct::key));
+    transcript_inout.append(container.m_onetime_address);
+    transcript_inout.append(container.m_amount_commitment);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpEnote::gen()
@@ -71,14 +69,11 @@ void SpEnote::gen()
     m_amount_commitment = rct::pkGen();
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnoteImage::append_to_string(std::string &str_inout) const
+void append_to_transcript(const SpEnoteImage &container, SpTranscript &transcript_inout)
 {
-    // append all enote image contents to the string
-    str_inout.reserve(str_inout.size() + get_size_bytes());
-
-    str_inout.append(reinterpret_cast<const char *>(m_masked_address.bytes), sizeof(rct::key));
-    str_inout.append(reinterpret_cast<const char *>(m_masked_commitment.bytes), sizeof(rct::key));
-    str_inout.append(reinterpret_cast<const char *>(to_bytes(m_key_image)), sizeof(crypto::key_image));
+    transcript_inout.append(container.m_masked_address);
+    transcript_inout.append(container.m_masked_commitment);
+    transcript_inout.append(container.m_key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpInputProposal::get_enote_image_core(SpEnoteImage &image_out) const

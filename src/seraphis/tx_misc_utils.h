@@ -40,10 +40,12 @@
 //third party headers
 
 //standard headers
+#include <string>
 #include <utility>
 #include <vector>
 
 //forward declarations
+namespace sp { class SpTranscript; }
 
 
 namespace sp
@@ -125,12 +127,12 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
     rct::BulletproofPlus &range_proofs_out);
 /**
-* brief: append_bpp_to_string - convert BP+ proof to a string and append to existing string
-*   str += {V} || A || A1 || B || r1 || s1 || d1 || {L} || {R}
+* brief: append_bpp_to_transcript - append BP+ proof to a transcript
+*   transcript += {V} || A || A1 || B || r1 || s1 || d1 || {L} || {R}
 * param: bpp_proof -
-* inoutparam: str_inout - contents concatenated to a string
+* inoutparam: transcript_inout - contents appended to a transcript
 */
-void append_bpp_to_string(const rct::BulletproofPlus &bpp_proof, std::string &str_inout);
+void append_bpp_to_transcript(const rct::BulletproofPlus &bpp_proof, SpTranscript &transcript_inout);
 /**
 * brief: bpp_size_bytes - get the size of a BP+ proof in bytes
 *   - BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)

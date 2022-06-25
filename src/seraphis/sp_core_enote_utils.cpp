@@ -44,6 +44,7 @@ extern "C"
 #include "sp_core_types.h"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
+#include "sp_transcript.h"
 #include "wipeable_string.h"
 
 //third party headers
@@ -132,13 +133,12 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
     static const std::string domain_separator{config::HASH_KEY_SERAPHIS_SQUASHED_ENOTE};
 
     // H_n(Ko, C)
-    std::string data;
-    data.reserve(2*sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>(onetime_address.bytes), sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>(amount_commitment.bytes), sizeof(rct::key));
+    SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
+    transcript.append(onetime_address);
+    transcript.append(amount_commitment);
 
     // hash to the result
-    sp_hash_to_scalar(domain_separator, data.data(), data.size(), to_bytes(squash_prefix_out));
+    sp_hash_to_scalar(transcript, to_bytes(squash_prefix_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_squashed_address_key(const rct::key &onetime_address,

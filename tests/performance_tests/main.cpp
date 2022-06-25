@@ -420,7 +420,7 @@ std::cerr << "TEST #" << i;
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::MultiexpComp, 16, 16);
   TEST_PERFORMANCE3(filter, p, test_balance_check, BalanceCheckType::Rctops, 16, 16);
 
-*/
+
   // test groth/bootle proofs
 
   TEST_PERFORMANCE4(filter, p, test_grootle, 2, 3, 2, false);
@@ -436,7 +436,7 @@ std::cerr << "TEST #" << i;
   TEST_PERFORMANCE4(filter, p, test_grootle, 3, 4, 2, false);
   TEST_PERFORMANCE4(filter, p, test_grootle, 3, 5, 2, false);
 
-/*
+
 
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 1, false);
   TEST_PERFORMANCE3(filter, p, test_construct_tx, 1, 2, false);

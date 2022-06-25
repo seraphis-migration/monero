@@ -46,8 +46,10 @@
 //third party headers
 
 //standard headers
+#include <string>
 
 //forward declarations
+namespace sp { class SpTranscript; }
 
 
 namespace sp
@@ -74,13 +76,6 @@ struct SpEnoteV1 final
         return m_core < other_enote.m_core;
     }
 
-    /**
-    * brief: append_to_string - convert enote to a string and append to existing string
-    *   str += Ko || C || enc(a) || addr_tag_enc || view_tag
-    * inoutparam: str_inout - contents concatenated to a string
-    */
-    void append_to_string(std::string &str_inout) const;
-
     /// generate a dummy v1 enote (all random; completely unspendable)
     void gen();
 
@@ -92,6 +87,8 @@ struct SpEnoteV1 final
             sizeof(jamtis::view_tag_t);
     }
 };
+inline const std::string get_transcript_label(const SpEnoteV1&) { return "SpEnoteV1"; }
+void append_to_transcript(const SpEnoteV1 &container, SpTranscript &transcript_inout);
 
 ////
 // SpEnoteImageV1
@@ -107,15 +104,10 @@ struct SpEnoteImageV1 final
         return m_core < other_image.m_core;
     }
 
-    /**
-    * brief: append_to_string - convert enote image to a string and append to existing string
-    *   str += K" || C" || KI
-    * inoutparam: str_inout - contents concatenated to a string
-    */
-    void append_to_string(std::string &str_inout) const;
-
     static std::size_t get_size_bytes() { return SpEnoteImage::get_size_bytes(); }
 };
+inline const std::string get_transcript_label(const SpEnoteImageV1&) { return "SpEnoteImageV1"; }
+void append_to_transcript(const SpEnoteImageV1 &container, SpTranscript &transcript_inout);
 
 ////
 // SpMembershipProofV1
@@ -131,17 +123,12 @@ struct SpMembershipProofV1 final
     std::size_t m_ref_set_decomp_n;
     std::size_t m_ref_set_decomp_m;
 
-    /**
-    * brief: append_to_string - convert membership proof to a string and append to existing string
-    *   str += grootle proof || binned reference set || n || m
-    * inoutparam: str_inout - contents concatenated to a string
-    */
-    void append_to_string(std::string &str_inout) const;
-
     /// size of the membership proof (does not include the ref set decomp)
     static std::size_t get_size_bytes(const std::size_t n, const std::size_t m, const std::size_t num_bin_members);
     std::size_t get_size_bytes() const;
 };
+inline const std::string get_transcript_label(const SpMembershipProofV1&) { return "SpMembershipProofV1"; }
+void append_to_transcript(const SpMembershipProofV1 &container, SpTranscript &transcript_inout);
 
 ////
 // SpImageProofV1
@@ -153,15 +140,10 @@ struct SpImageProofV1 final
     /// a seraphis composition proof
     sp::SpCompositionProof m_composition_proof;
 
-    /**
-    * brief: append_to_string - convert image proof to a string and append to existing string
-    *   str += composition proof
-    * inoutparam: str_inout - contents concatenated to a string
-    */
-    void append_to_string(std::string &str_inout) const;
-
     static std::size_t get_size_bytes() { return sp::SpCompositionProof::get_size_bytes(); }
 };
+inline const std::string get_transcript_label(const SpImageProofV1&) { return "SpImageProofV1"; }
+void append_to_transcript(const SpImageProofV1 &container, SpTranscript &transcript_inout);
 
 ////
 // SpBalanceProofV1
@@ -175,13 +157,6 @@ struct SpBalanceProofV1 final
     /// the remainder blinding factor
     rct::key m_remainder_blinding_factor;
 
-    /**
-    * brief: append_to_string - convert balance proof to a string and append to existing string
-    *   str += bpp proof || remainder blinding factor
-    * inoutparam: str_inout - contents concatenated to a string
-    */
-    void append_to_string(std::string &str_inout) const;
-
     static std::size_t get_size_bytes(const std::size_t num_inputs,
         const std::size_t num_outputs,
         const bool include_commitments = false);
@@ -191,6 +166,8 @@ struct SpBalanceProofV1 final
         const bool include_commitments = false);
     std::size_t get_weight(const bool include_commitments = false) const;
 };
+inline const std::string get_transcript_label(const SpBalanceProofV1&) { return "SpBalanceProofV1"; }
+void append_to_transcript(const SpBalanceProofV1 &container, SpTranscript &transcript_inout);
 
 ////
 // SpTxSupplementV1
@@ -208,5 +185,7 @@ struct SpTxSupplementV1 final
     static std::size_t get_size_bytes(const std::size_t num_outputs, const TxExtra &tx_extra);
     std::size_t get_size_bytes() const;
 };
+inline const std::string get_transcript_label(const SpTxSupplementV1&) { return "SpTxSupplementV1"; }
+void append_to_transcript(const SpTxSupplementV1 &container, SpTranscript &transcript_inout);
 
 } //namespace sp

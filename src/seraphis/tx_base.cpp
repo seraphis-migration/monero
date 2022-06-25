@@ -46,8 +46,7 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_tx(const SpTxSquashedV1 &tx, const TxValidationContext &tx_validation_context)
 {
-    const std::vector<const SpTxSquashedV1*> tx_ptrs{&tx};
-    return validate_txs_impl<SpTxSquashedV1>(tx_ptrs, tx_validation_context);
+    return validate_txs_impl<SpTxSquashedV1>({&tx}, tx_validation_context);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool validate_txs(const std::vector<const SpTxSquashedV1*> &txs, const TxValidationContext &tx_validation_context)

@@ -46,6 +46,7 @@ extern "C"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
+#include "sp_transcript.h"
 #include "tx_misc_utils.h"  //for equals_from_less (todo: remove this dependency?)
 
 //third party headers
@@ -59,13 +60,13 @@ extern "C"
 
 namespace sp
 {
-struct multisig_binonce_factors
+struct sp_multisig_binonce_factors
 {
     rct::key nonce_1;
     rct::key nonce_2;
 
     /// overload operator< for sorting: compare nonce_1 then nonce_2
-    bool operator<(const multisig_binonce_factors &other) const
+    bool operator<(const sp_multisig_binonce_factors &other) const
     {
         const int nonce_1_comparison{memcmp(nonce_1.bytes, &other.nonce_1.bytes, sizeof(rct::key))};
     
@@ -76,8 +77,14 @@ struct multisig_binonce_factors
         else
             return false;
     }
-    bool operator==(const multisig_binonce_factors &other) const { return equals_from_less{}(*this, other); }
+    bool operator==(const sp_multisig_binonce_factors &other) const { return equals_from_less{}(*this, other); }
 };
+inline const std::string get_transcript_label(const sp_multisig_binonce_factors&) { return "sp_multisig_binonce_factors"; }
+void append_to_transcript(const sp_multisig_binonce_factors &container, SpTranscript &transcript_inout)
+{
+    transcript_inout.append(container.nonce_1);
+    transcript_inout.append(container.nonce_2);
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge message
@@ -92,19 +99,17 @@ static rct::key compute_challenge_message(const rct::key &message,
     static const std::string domain_separator{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE};
 
     // collect challenge message hash data
-    std::string data;
-    data.reserve(1 * sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>((get_X_gen()).bytes), sizeof(message));
-    data.append(reinterpret_cast<const char*>((get_U_gen()).bytes), sizeof(message));
-    data.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    data.append(reinterpret_cast<const char*>(K.bytes), sizeof(K));
-    data.append(reinterpret_cast<const char*>(&KI), sizeof(KI));
-    data.append(reinterpret_cast<const char*>(K_t1.bytes), sizeof(K_t1));
-    CHECK_AND_ASSERT_THROW_MES(data.size() > 1, "Bad hash input size!");
+    SpTranscript transcript{domain_separator, 6*sizeof(rct::key)};
+    transcript.append(get_X_gen());
+    transcript.append(get_U_gen());
+    transcript.append(message);
+    transcript.append(K);
+    transcript.append(KI);
+    transcript.append(K_t1);
 
     // challenge_message
     rct::key challenge_message;
-    sp_hash_to_32(domain_separator, data.data(), data.size(), challenge_message.bytes);
+    sp_hash_to_32(transcript, challenge_message.bytes);
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge_message.bytes), "Transcript challenge_message must be nonzero!");
 
     return challenge_message;
@@ -121,16 +126,14 @@ static rct::key compute_challenge(const rct::key &challenge_message,
     static const std::string domain_separator{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE};
 
     // collect challenge hash data
-    std::string data;
-    data.reserve(4 * sizeof(rct::key));
-    data = std::string(reinterpret_cast<const char*>(challenge_message.bytes), sizeof(challenge_message));
-    data.append(reinterpret_cast<const char*>(K_t1_proofkey.bytes), sizeof(K_t1_proofkey));
-    data.append(reinterpret_cast<const char*>(K_t2_proofkey.bytes), sizeof(K_t2_proofkey));
-    data.append(reinterpret_cast<const char*>(KI_proofkey.bytes), sizeof(KI_proofkey));
-    CHECK_AND_ASSERT_THROW_MES(data.size() > 1, "Bad hash input size!");
+    SpTranscript transcript{domain_separator, 4*sizeof(rct::key)};
+    transcript.append(challenge_message);
+    transcript.append(K_t1_proofkey);
+    transcript.append(K_t2_proofkey);
+    transcript.append(KI_proofkey);
 
     rct::key challenge;
-    sp_hash_to_scalar(domain_separator, data.data(), data.size(), challenge.bytes);
+    sp_hash_to_scalar(transcript, challenge.bytes);
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(challenge.bytes), "Transcript challenge must be nonzero!");
 
     return challenge;
@@ -185,38 +188,30 @@ static void compute_K_t1_for_proof(const crypto::secret_key &y,
 // rho_e = H_n(m, alpha_1_1, alpha_2_1, ..., alpha_1_N, alpha_2_N)
 //-------------------------------------------------------------------------------------------------------------------
 static rct::key multisig_binonce_merge_factor(const rct::key &message,
-    const std::vector<multisig_binonce_factors> &nonces)
+    const std::vector<sp_multisig_binonce_factors> &nonces)
 {
     static const std::string domain_separator{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE};
 
     // build hash
-    std::string data;
-    data.reserve(domain_separator.size() + 1 + 2 * nonces.size() * sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    for (const multisig_binonce_factors &nonce_pair : nonces)
-    {
-        data.append(reinterpret_cast<const char*>(nonce_pair.nonce_1.bytes), sizeof(rct::key));
-        data.append(reinterpret_cast<const char*>(nonce_pair.nonce_2.bytes), sizeof(rct::key));
-    }
+    SpTranscript transcript{domain_separator, (1 + 2 * nonces.size()) * sizeof(rct::key)};
+    transcript.append(message);
+    transcript.append(nonces);
 
     rct::key merge_factor;
-    sp_hash_to_scalar(domain_separator, data.data(), data.size(), merge_factor.bytes);
+    sp_hash_to_scalar(transcript, merge_factor.bytes);
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(merge_factor.bytes), "Binonce merge factor must be nonzero!");
 
     return merge_factor;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-void SpCompositionProof::append_to_string(std::string &str_inout) const
+void append_to_transcript(const SpCompositionProof &container, SpTranscript &transcript_inout)
 {
-    // append proof contents to the string
-    str_inout.reserve(str_inout.size() + get_size_bytes());
-
-    str_inout.append(reinterpret_cast<const char *>(c.bytes), sizeof(rct::key));
-    str_inout.append(reinterpret_cast<const char *>(r_t1.bytes), sizeof(rct::key));
-    str_inout.append(reinterpret_cast<const char *>(r_t2.bytes), sizeof(rct::key));
-    str_inout.append(reinterpret_cast<const char *>(r_ki.bytes), sizeof(rct::key));
-    str_inout.append(reinterpret_cast<const char *>(K_t1.bytes), sizeof(rct::key));
+    transcript_inout.append(container.c);
+    transcript_inout.append(container.r_t1);
+    transcript_inout.append(container.r_t2);
+    transcript_inout.append(container.r_ki);
+    transcript_inout.append(container.K_t1);
 }
 //-------------------------------------------------------------------------------------------------------------------
 SpCompositionProof sp_composition_prove(const rct::key &message,
@@ -516,7 +511,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(local_nonce_2_priv)), "Bad private key (local_nonce_2_priv zero)!");
 
     // prepare participant nonces
-    std::vector<multisig_binonce_factors> signer_nonces_pub_mul8;
+    std::vector<sp_multisig_binonce_factors> signer_nonces_pub_mul8;
     signer_nonces_pub_mul8.reserve(num_signers);
 
     for (const SpCompositionProofMultisigPubNonces &signer_pub_nonce_pair : signer_pub_nonces)
@@ -536,7 +531,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
     // check that the local signer's signature opening is in the input set of opening nonces
     const rct::key U_gen{get_U_gen()};
-    multisig_binonce_factors local_nonce_pubs;
+    sp_multisig_binonce_factors local_nonce_pubs;
     rct::scalarmultKey(local_nonce_pubs.nonce_1, U_gen, rct::sk2rct(local_nonce_1_priv));
     rct::scalarmultKey(local_nonce_pubs.nonce_2, U_gen, rct::sk2rct(local_nonce_2_priv));
 
@@ -584,7 +579,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     // rho = H_n(m, {alpha_ki_1_e * U}, {alpha_ki_2_e * U})   (binonce merge factor)
     rct::key alpha_ki_2_pub{rct::identity()};
 
-    for (const multisig_binonce_factors &nonce_pair : signer_nonces_pub_mul8)
+    for (const sp_multisig_binonce_factors &nonce_pair : signer_nonces_pub_mul8)
     {
         rct::addKeys(alpha_ki_pub, alpha_ki_pub, nonce_pair.nonce_1);
         rct::addKeys(alpha_ki_2_pub, alpha_ki_2_pub, nonce_pair.nonce_2);

@@ -41,6 +41,8 @@ namespace config
   const constexpr std::uint64_t DISCRETIZED_FEE_LEVEL_NUMERATOR_X100 = 150;  //fee level factor = 1.5
   const constexpr std::uint64_t DISCRETIZED_FEE_SIG_FIGS = 1;
 
+  const constexpr char SERAPHIS_TRANSCRIPT_PREFIX[] = "seraphis_transcript";
+
   const constexpr char HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY[] = "jamtis_unlock_amounts_key";
 
   const constexpr char HASH_KEY_JAMTIS_INPUT_CONTEXT_COINBASE[] = "jamtis_input_context_coinbase";

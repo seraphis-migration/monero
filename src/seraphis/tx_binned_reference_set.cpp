@@ -29,6 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
+#include "sp_transcript.h"
 #include "tx_binned_reference_set.h"
 
 //local headers
@@ -45,30 +46,10 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-void SpBinnedReferenceSetConfigV1::append_to_string(std::string &str_inout) const
+void append_to_transcript(const SpBinnedReferenceSetConfigV1 &container, SpTranscript &transcript_inout)
 {
-    // str || bin radius || number of bin members
-    append_uint_to_string(m_bin_radius, str_inout);
-    append_uint_to_string(m_num_bin_members, str_inout);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpBinnedReferenceSetV1::append_to_string(std::string &str_inout) const
-{
-    // str || bin config || bin generator seed || bin rotation factor || {bins}
-    str_inout.reserve(str_inout.size() + this->get_size_bytes(true) + SpBinnedReferenceSetConfigV1::get_size_bytes());
-
-    // bin config
-    m_bin_config.append_to_string(str_inout);
-
-    // bin generator seed
-    str_inout.append(reinterpret_cast<const char*>(m_bin_generator_seed.bytes), sizeof(m_bin_generator_seed));
-
-    // bin rotation factor
-    append_uint_to_string(m_bin_rotation_factor, str_inout);
-
-    // bin loci
-    for (const std::uint64_t &bin_locus : m_bin_loci)
-        append_uint_to_string(bin_locus, str_inout);
+    transcript_inout.append(container.m_bin_radius);
+    transcript_inout.append(container.m_num_bin_members);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBinnedReferenceSetV1::get_size_bytes(const std::size_t num_bins, const bool include_seed /*= false*/)
@@ -81,6 +62,14 @@ std::size_t SpBinnedReferenceSetV1::get_size_bytes(const std::size_t num_bins, c
 std::size_t SpBinnedReferenceSetV1::get_size_bytes(const bool include_seed /*= false*/) const
 {
     return SpBinnedReferenceSetV1::get_size_bytes(m_bin_loci.size(), include_seed);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void append_to_transcript(const SpBinnedReferenceSetV1 &container, SpTranscript &transcript_inout)
+{
+    transcript_inout.append(container.m_bin_config);
+    transcript_inout.append(container.m_bin_generator_seed);
+    transcript_inout.append(container.m_bin_rotation_factor);
+    transcript_inout.append(container.m_bin_loci);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

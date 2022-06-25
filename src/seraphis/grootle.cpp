@@ -46,6 +46,7 @@ extern "C"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
+#include "sp_transcript.h"
 #include "tx_misc_utils.h"
 
 //third party headers
@@ -93,17 +94,18 @@ static void init_gens()
         const std::string Hi_A_salt{config::HASH_KEY_GROOTLE_Hi_A};
         const std::string Hi_B_salt{config::HASH_KEY_GROOTLE_Hi_B};
 
-        std::string data;
         rct::key intermediate_hash;
         for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
         {
-            data.clear();
-            append_uint_to_string(i, data);
+            SpTranscript transcript_A{Hi_A_salt, 4};
+            SpTranscript transcript_B{Hi_B_salt, 4};
+            transcript_A.append(i);
+            transcript_B.append(i);
 
-            sp_hash_to_32(Hi_A_salt, data.data(), data.size(), intermediate_hash.bytes);
+            sp_hash_to_32(transcript_A, intermediate_hash.bytes);
             hash_to_p3(Hi_A_p3[i], intermediate_hash);
 
-            sp_hash_to_32(Hi_B_salt, data.data(), data.size(), intermediate_hash.bytes);
+            sp_hash_to_32(transcript_B, intermediate_hash.bytes);
             hash_to_p3(Hi_B_p3[i], intermediate_hash);
         }
 
@@ -217,50 +219,24 @@ static rct::key compute_challenge(const rct::key &message,
     static const std::string domain_separator{config::HASH_KEY_GROOTLE_CHALLENGE};
 
     // hash data
-    std::string data;
-    data.reserve(2*4 + (M.size() + X.size() + 4)*sizeof(rct::key));
-    data.append(reinterpret_cast<const char*>(message.bytes), sizeof(message));
-    append_uint_to_string(n, data);
-    append_uint_to_string(m, data);
-    for (const rct::key &commitment : M)
-    {
-        data.append(reinterpret_cast<const char*>(commitment.bytes), sizeof(commitment));
-    }
-    data.append(reinterpret_cast<const char*>(C_offset.bytes), sizeof(C_offset));
-    data.append(reinterpret_cast<const char*>(A.bytes), sizeof(A));
-    data.append(reinterpret_cast<const char*>(B.bytes), sizeof(B));
-    for (const rct::key &x : X)
-    {
-        data.append(reinterpret_cast<const char*>(x.bytes), sizeof(x));
-    }
-    CHECK_AND_ASSERT_THROW_MES(data.size() > 1, "grootle proof challenge: bad hash input size!");
+    SpTranscript transcript{domain_separator, 2*4 + (M.size() + X.size() + 4)*sizeof(rct::key)};
+    transcript.append(message);
+    transcript.append(n);
+    transcript.append(m);
+    transcript.append(M);
+    transcript.append(C_offset);
+    transcript.append(A);
+    transcript.append(B);
+    transcript.append(X);
 
     // challenge
     rct::key challenge;
-    sp_hash_to_scalar(domain_separator, data.data(), data.size(), challenge.bytes);
+    sp_hash_to_scalar(transcript, challenge.bytes);
     CHECK_AND_ASSERT_THROW_MES(!(challenge == ZERO), "grootle proof challenge: transcript challenge must be nonzero!");
 
     return challenge;
 }
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-void GrootleProof::append_to_string(std::string &str_inout) const
-{
-    // append proof contents to the string
-    str_inout.reserve(str_inout.size() + get_size_bytes());
-
-    str_inout.append(reinterpret_cast<const char *>(A.bytes), sizeof(rct::key));
-    str_inout.append(reinterpret_cast<const char *>(B.bytes), sizeof(rct::key));
-    for (const rct::keyV &f_layer : f)
-    {
-        for (const rct::key &f_single : f_layer)
-            str_inout.append(reinterpret_cast<const char *>(f_single.bytes), sizeof(rct::key));
-    }
-    for (const rct::key &X_single : X)
-        str_inout.append(reinterpret_cast<const char *>(X_single.bytes), sizeof(rct::key));
-    str_inout.append(reinterpret_cast<const char *>(zA.bytes), sizeof(rct::key));
-    str_inout.append(reinterpret_cast<const char *>(z.bytes), sizeof(rct::key));
-}
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t GrootleProof::get_size_bytes(const std::size_t n, const std::size_t m)
 {
@@ -273,6 +249,16 @@ std::size_t GrootleProof::get_size_bytes() const
     const std::size_t m{X.size()};
 
     return GrootleProof::get_size_bytes(n, m);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void append_to_transcript(const GrootleProof &container, SpTranscript &transcript_inout)
+{
+    transcript_inout.append(container.A);
+    transcript_inout.append(container.B);
+    transcript_inout.append(container.f);
+    transcript_inout.append(container.X);
+    transcript_inout.append(container.zA);
+    transcript_inout.append(container.z);
 }
 //-------------------------------------------------------------------------------------------------------------------
 GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]

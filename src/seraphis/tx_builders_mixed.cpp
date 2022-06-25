@@ -46,6 +46,7 @@
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
+#include "sp_transcript.h"
 #include "tx_builder_types.h"
 #include "tx_builders_inputs.h"
 #include "tx_builders_outputs.h"
@@ -105,30 +106,23 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
     static const std::string domain_separator{config::HASH_KEY_SERAPHIS_IMAGE_PROOF_MESSAGE};
     static const std::string project_name{CRYPTONOTE_NAME};
 
-    // H_32(crypto project name, version string, input key images, output enotes, enote ephemeral pubkeys, memos, fee)
-    std::string hash;
-    hash.reserve(project_name.size() +
-        version_string.size() +
-        output_enotes.size()*SpEnoteV1::get_size_bytes() +
-        tx_supplement.get_size_bytes());
-    hash = project_name;
-    hash += version_string;
-    for (const crypto::key_image &input_key_image : input_key_images)
-    {
-        hash.append(reinterpret_cast<const char*>(input_key_image.data), sizeof(input_key_image));
-    }
-    for (const SpEnoteV1 &output_enote : output_enotes)
-    {
-        output_enote.append_to_string(hash);
-    }
-    for (const rct::key &enote_pubkey : tx_supplement.m_output_enote_ephemeral_pubkeys)
-    {
-        hash.append(reinterpret_cast<const char*>(enote_pubkey.bytes), sizeof(enote_pubkey));
-    }
-    hash.append(reinterpret_cast<const char*>(tx_supplement.m_tx_extra.data()), tx_supplement.m_tx_extra.size());
-    append_uint_to_string(transaction_fee, hash);
+    // H_32(crypto project name, version string, input key images, output enotes, tx supplement, fee)
+    SpTranscript transcript{
+            domain_separator,
+            project_name.size() +
+                version_string.size() +
+                input_key_images.size()*sizeof(crypto::key_image) +
+                output_enotes.size()*SpEnoteV1::get_size_bytes() +
+                tx_supplement.get_size_bytes()
+        };
+    transcript.append(project_name);
+    transcript.append(version_string);
+    transcript.append(input_key_images);
+    transcript.append(output_enotes);
+    transcript.append(tx_supplement);
+    transcript.append(transaction_fee);
 
-    sp_hash_to_32(domain_separator, hash.data(), hash.size(), proof_message_out.bytes);
+    sp_hash_to_32(transcript, proof_message_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_tx_image_proof_message_v1(const std::string &version_string,
@@ -260,17 +254,17 @@ void make_tx_proofs_prefix_v1(const SpBalanceProofV1 &balance_proof,
     static const std::string domain_separator{config::HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1};
 
     // H_32(balance proof, image proofs, membership proofs)
-    std::string data;
-    data.reserve(balance_proof.get_size_bytes() +
-        image_proofs.size() * SpImageProofV1::get_size_bytes() +
-        membership_proofs.size() ? membership_proofs.size() * membership_proofs[0].get_size_bytes() : 0);
-    balance_proof.append_to_string(data);
-    for (const SpImageProofV1 &image_proof : image_proofs)
-        image_proof.append_to_string(data);
-    for (const SpMembershipProofV1 &membership_proof : membership_proofs)
-        membership_proof.append_to_string(data);
+    SpTranscript transcript{
+            domain_separator,
+            balance_proof.get_size_bytes() +
+                image_proofs.size() * SpImageProofV1::get_size_bytes() +
+                membership_proofs.size() ? membership_proofs.size() * membership_proofs[0].get_size_bytes() : 0
+        };
+    transcript.append(balance_proof);
+    transcript.append(image_proofs);
+    transcript.append(membership_proofs);
 
-    sp_hash_to_32(domain_separator, data.data(), data.size(), tx_proofs_prefix_out.bytes);
+    sp_hash_to_32(transcript, tx_proofs_prefix_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,

@@ -48,8 +48,8 @@ extern "C"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
+#include "sp_transcript.h"
 #include "tx_misc_utils.h"
-#include "wipeable_string.h"
 
 //third party headers
 
@@ -84,36 +84,6 @@ static auto make_derivation_with_wiper(const crypto::secret_key &privkey,
     return a_wiper;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// key1 || key2
-// - assumes keys are 32 bytes
-//-------------------------------------------------------------------------------------------------------------------
-static void get_doublekey_hash_data(const unsigned char *key1,
-    const unsigned char *key2,
-    epee::wipeable_string &data_out)
-{
-    data_out.clear();
-    data_out.reserve(2 * 32);
-
-    data_out.append(reinterpret_cast<const char *>(key1), 32);
-    data_out.append(reinterpret_cast<const char *>(key2), 32);
-}
-//-------------------------------------------------------------------------------------------------------------------
-// key1 || key2 || key3
-// - assumes keys are 32 bytes
-//-------------------------------------------------------------------------------------------------------------------
-static void get_trikey_hash_data(const unsigned char *key1,
-    const unsigned char *key2,
-    const unsigned char *key3,
-    epee::wipeable_string &data_out)
-{
-    data_out.clear();
-    data_out.reserve(3 * 32);
-
-    data_out.append(reinterpret_cast<const char *>(key1), 32);
-    data_out.append(reinterpret_cast<const char *>(key2), 32);
-    data_out.append(reinterpret_cast<const char *>(key3), 32);
-}
-//-------------------------------------------------------------------------------------------------------------------
 // a = a_enc XOR H_8(q, 8 r G)
 // a_enc = a XOR H_8(q, 8 r G)
 //-------------------------------------------------------------------------------------------------------------------
@@ -126,11 +96,12 @@ static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::xmr_amount origina
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN};
 
     // ret = H_8(q, 8 r G) XOR_64 original
-    epee::wipeable_string data;
-    get_doublekey_hash_data(sender_receiver_secret.bytes, to_bytes(baked_key), data);
+    SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
+    transcript.append(sender_receiver_secret);
+    transcript.append(baked_key);
 
     crypto::secret_key hash_result;
-    sp_hash_to_8(domain_separator, data.data(), data.size(), to_bytes(hash_result));
+    sp_hash_to_8(transcript, to_bytes(hash_result));
 
     rct::xmr_amount mask;
     memcpy(&mask, &hash_result, 8);
@@ -149,8 +120,11 @@ static rct::xmr_amount enc_dec_jamtis_amount_selfsend(const rct::xmr_amount orig
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF};
 
     // ret = H_8(q) XOR_64 original
+    SpTranscript transcript{domain_separator, sizeof(sender_receiver_secret)};
+    transcript.append(sender_receiver_secret);
+
     crypto::secret_key hash_result;
-    sp_hash_to_8(domain_separator, sender_receiver_secret.bytes, sizeof(crypto::secret_key), to_bytes(hash_result));
+    sp_hash_to_8(transcript, to_bytes(hash_result));
 
     rct::xmr_amount mask;
     memcpy(&mask, &hash_result, 8);
@@ -176,10 +150,11 @@ void make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_deriv
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_VIEW_TAG};
 
     // view_tag = H_1(K_d, Ko)
-    epee::wipeable_string data;
-    get_doublekey_hash_data(to_bytes(sender_receiver_DH_derivation), onetime_address.bytes, data);
+    SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
+    transcript.append(sender_receiver_DH_derivation);
+    transcript.append(onetime_address);
 
-    sp_hash_to_1(domain_separator, data.data(), data.size(), &view_tag_out);
+    sp_hash_to_1(transcript, &view_tag_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_view_tag(const crypto::secret_key &privkey,
@@ -202,11 +177,11 @@ void make_jamtis_input_context_coinbase(const std::uint64_t block_height, rct::k
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_INPUT_CONTEXT_COINBASE};
 
     // block height as varint
-    std::string data;
-    append_uint_to_string(block_height, data);
+    SpTranscript transcript{domain_separator, 4};
+    transcript.append(block_height);
 
     // input_context (coinbase) = H_32(block height)
-    sp_hash_to_32(domain_separator, data.data(), data.size(), input_context_out.bytes);
+    sp_hash_to_32(transcript, input_context_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &input_key_images,
@@ -218,14 +193,11 @@ void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &in
         "jamtis input context (standard): key images are not sorted.");
 
     // {KI}
-    std::string data;
-    data.reserve(input_key_images.size() * sizeof(crypto::key_image));
-
-    for (const crypto::key_image &key_image : input_key_images)
-        data.append(reinterpret_cast<const char*>(&key_image), sizeof(key_image));
+    SpTranscript transcript{domain_separator, input_key_images.size()*sizeof(crypto::key_image)};
+    transcript.append(input_key_images);
 
     // input_context (standard) = H_32({KI})
-    sp_hash_to_32(domain_separator, data.data(), data.size(), input_context_out.bytes);
+    sp_hash_to_32(transcript, input_context_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
@@ -236,13 +208,12 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &send
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN};
 
     // q = H_32(DH_derivation, K_e, input_context)
-    epee::wipeable_string data;
-    get_trikey_hash_data(to_bytes(sender_receiver_DH_derivation),
-        enote_ephemeral_pubkey.bytes,
-        input_context.bytes,
-        data);
+    SpTranscript transcript{domain_separator, 3*sizeof(rct::key)};
+    transcript.append(sender_receiver_DH_derivation);
+    transcript.append(enote_ephemeral_pubkey);
+    transcript.append(input_context);
 
-    sp_hash_to_32(domain_separator, data.data(), data.size(), sender_receiver_secret_out.bytes);
+    sp_hash_to_32(transcript, sender_receiver_secret_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
@@ -300,14 +271,11 @@ void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_vie
         };
 
     // q = H_32[k_vb](K_e, input_context)
-    epee::wipeable_string data;
-    get_doublekey_hash_data(enote_ephemeral_pubkey.bytes, input_context.bytes, data);
+    SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
+    transcript.append(enote_ephemeral_pubkey);
+    transcript.append(input_context);
 
-    sp_derive_secret(domain_separator,
-        to_bytes(k_view_balance),
-        data.data(), 
-        data.size(),
-        sender_receiver_secret_out.bytes);
+    sp_derive_secret(to_bytes(k_view_balance), transcript, sender_receiver_secret_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_onetime_address_extension(const rct::key &sender_receiver_secret,
@@ -317,10 +285,11 @@ void make_jamtis_onetime_address_extension(const rct::key &sender_receiver_secre
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION};
 
     // k_{a, sender} = H_n(q, C)
-    epee::wipeable_string data;
-    get_doublekey_hash_data(sender_receiver_secret.bytes, amount_commitment.bytes, data);
+    SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
+    transcript.append(sender_receiver_secret);
+    transcript.append(amount_commitment);
 
-    sp_hash_to_scalar(domain_separator, data.data(), data.size(), to_bytes(sender_extension_out));
+    sp_hash_to_scalar(transcript, to_bytes(sender_extension_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_onetime_address(const rct::key &sender_receiver_secret,
@@ -364,10 +333,11 @@ void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_se
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN};
 
     // x = H_n(q, 8 r G)
-    epee::wipeable_string data;
-    get_doublekey_hash_data(sender_receiver_secret.bytes, to_bytes(baked_key), data);  //q || 8 r G
+    SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
+    transcript.append(sender_receiver_secret);
+    transcript.append(baked_key);  //q || 8 r G
 
-    sp_hash_to_scalar(domain_separator, data.data(), data.size(), to_bytes(mask_out));
+    sp_hash_to_scalar(transcript, to_bytes(mask_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver_secret,
@@ -376,7 +346,10 @@ void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF};
 
     // x = H_n(q)
-    sp_hash_to_scalar(domain_separator, sender_receiver_secret.bytes, sizeof(rct::key), to_bytes(mask_out));
+    SpTranscript transcript{domain_separator, sizeof(rct::key)};
+    transcript.append(sender_receiver_secret);
+
+    sp_hash_to_scalar(transcript, to_bytes(mask_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::xmr_amount encode_jamtis_amount_plain(const rct::xmr_amount amount,
