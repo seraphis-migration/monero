@@ -134,11 +134,10 @@ public:
     /// normal constructor: start building a transcript with the domain separator
     SpTranscript(const boost::string_ref domain_separator, const std::size_t estimated_data_size)
     {
-        static const boost::string_ref transcript_prefix{config::SERAPHIS_TRANSCRIPT_PREFIX};
-        m_transcript.reserve(transcript_prefix.size() + domain_separator.size() + 5 * estimated_data_size);
+        m_transcript.reserve(domain_separator.size() + 4 * estimated_data_size + 30);
 
         // transcript = seraphis_transcript || domain_separator
-        append_label(transcript_prefix);
+        append_label(config::SERAPHIS_TRANSCRIPT_PREFIX);
         append_label(domain_separator);
     }
 
@@ -271,7 +270,7 @@ public:
 
 //member variables
 private:
-    /// the transcript itself
+    /// the transcript itself (wipeable in case it contains sensitive data)
     epee::wipeable_string m_transcript;
 };
 
