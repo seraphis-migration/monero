@@ -43,6 +43,7 @@
 #include <boost/utility/string_ref.hpp>
 
 //standard headers
+#include <functional>
 #include <list>
 #include <string>
 #include <type_traits>
@@ -58,14 +59,14 @@ namespace sp
 // SpTranscript
 // - build a transcript
 // - main format: transcript_prefix || domain_separator || object1_label || object1 || object2_label || object2 || ...
-// - data types
+// - data types: objects are always prefixed with a label
 //     - unsigned int: uint_flag || varint(uint_variable)
 //     - signed int: int_flag || uchar{int_variable < 0 ? 1 : 0} || varint(abs(int_variable))
 //     - byte buffer (assumed little-endian): buffer_flag || buffer_length || buffer
 //       - all labels are treated as byte buffers
 //     - named container: container_flag || container_name || data_member1 || ... || container_terminator_flag
 //     - list-type container (same-type elements only): list_flag || list_length || element1 || element2 || ...
-// - before hashing the transctipt, always call add_hash_checkpoint()
+// - the transcript can be used by passing a predicate to use_transcript()
 ///
 class SpTranscript final
 {
@@ -73,7 +74,7 @@ class SpTranscript final
     /// flags for separating items added to the transcript
     enum SpTranscriptFlag : unsigned char
     {
-        HASH_CHECKPOINT = 0,
+        EXTERNAL_PREDICATE_CALL = 0,
         UNSIGNED_INTEGER = 1,
         SIGNED_INTEGER = 2,
         BYTE_BUFFER = 3,
@@ -146,11 +147,6 @@ public:
     SpTranscript& operator=(SpTranscript&&) = delete;
 
 //member functions
-    /// return a pointer to the transcript buffer
-    const char* data() const { return m_transcript.data(); }
-    /// return the transcript buffer's size
-    std::size_t size() const { return m_transcript.size(); }
-
     /// transcript builders
     void append(const boost::string_ref label, const rct::key &key_buffer)
     {
@@ -210,7 +206,7 @@ public:
     }
     template<typename T,
         std::enable_if_t<std::is_unsigned<T>::value, bool> = true>
-    void append(const boost::string_ref label, const T &unsigned_integer)
+    void append(const boost::string_ref label, const T unsigned_integer)
     {
         static_assert(sizeof(T) <= sizeof(std::uint64_t), "SpTranscriptFlag: unsupported unsigned integer type.");
         append_label(label);
@@ -220,7 +216,7 @@ public:
     template<typename T,
         std::enable_if_t<std::is_integral<T>::value, bool> = true,
         std::enable_if_t<!std::is_unsigned<T>::value, bool> = true>
-    void append(const boost::string_ref label, const T &signed_integer)
+    void append(const boost::string_ref label, const T signed_integer)
     {
         static_assert(sizeof(T) <= sizeof(std::uint64_t), "SpTranscriptFlag: unsupported signed integer type.");
         append_label(label);
@@ -267,11 +263,13 @@ public:
             append("", element);
     }
 
-    /// insert a checkpoint before every hash of the transcript
-    void add_hash_checkpoint(const boost::string_ref hash_function_name)
+    /// use the transcript with a user-defined predicate
+    void use_transcript(const boost::string_ref label,
+        const std::function<void(const void*, const std::size_t)> &predicate)
     {
-        append_label(hash_function_name);
-        append_flag(SpTranscriptFlag::HASH_CHECKPOINT);
+        append_label(label);
+        append_flag(SpTranscriptFlag::EXTERNAL_PREDICATE_CALL);
+        predicate(m_transcript.data(), m_transcript.size());
     }
 
 //member variables

@@ -51,13 +51,17 @@ static void hash_base(const unsigned char *derivation_key,  //32 bytes
     unsigned char *hash_out,
     const std::size_t out_length)
 {
-    transcript_inout.add_hash_checkpoint("blake2b");
-    blake2b(hash_out,
-        out_length,
-        transcript_inout.data(),
-        transcript_inout.size(),
-        derivation_key,
-        derivation_key ? 32 : 0);
+    transcript_inout.use_transcript("blake2b",
+            [derivation_key, hash_out, out_length](const void *transcript_data, const std::size_t transcript_length)
+            {
+                blake2b(hash_out,
+                    out_length,
+                    transcript_data,
+                    transcript_length,
+                    derivation_key,
+                    derivation_key ? 32 : 0);
+            }
+        );
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

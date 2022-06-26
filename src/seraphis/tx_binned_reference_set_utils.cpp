@@ -167,7 +167,7 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
     // g = H_32(bin_generator_seed, bin_locus, bin_index_in_set)
     SpTranscript transcript{
             config::HASH_KEY_BINNED_REF_SET_MEMBER,
-            sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set) + 20 * bin_config.m_num_bin_members
+            sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set) + 200 * bin_config.m_num_bin_members
         };
     transcript.append("bin_generator_seed", bin_generator_seed);
     transcript.append("bin_locus", bin_locus);
@@ -199,15 +199,21 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
     std::uint64_t member_candidate{};
     members_of_bin_out.clear();
     members_of_bin_out.reserve(bin_config.m_num_bin_members);
+    std::uint64_t num_attempts{0};
 
     for (std::size_t bin_member_index{0}; bin_member_index < bin_config.m_num_bin_members; ++bin_member_index)
     {
+        transcript.append("bin_member_index", bin_member_index);
+        num_attempts = 0;
+
         // look for a unique bin member to add
         do
         {
             // update the generator (find a generator that is within the allowed max)
             do
             {
+                ++num_attempts;
+                transcript.append("num_attempts", num_attempts);
                 sp_hash_to_8(transcript, reinterpret_cast<unsigned char*>(&generator_clip));
                 generator_clip = SWAP64LE(generator_clip);
             } while (generator_clip > clip_allowed_max);
