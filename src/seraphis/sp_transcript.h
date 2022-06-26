@@ -40,7 +40,7 @@
 #include "wipeable_string.h"
 
 //third party headers
-#include <boost/utility/string_ref.hpp> 
+#include <boost/utility/string_ref.hpp>
 
 //standard headers
 #include <list>
@@ -187,6 +187,11 @@ public:
         append_label(label);
         append_buffer(string_buffer.data(), string_buffer.size());
     }
+    void append(const boost::string_ref label, const boost::string_ref string_buffer)
+    {
+        append_label(label);
+        append_buffer(string_buffer.data(), string_buffer.size());
+    }
     template<std::size_t Sz>
     void append(const boost::string_ref label, const unsigned char(&uchar_buffer)[Sz])
     {
@@ -238,7 +243,7 @@ public:
     void append(const boost::string_ref label, const T &named_container)
     {
         // named containers must satisfy two concepts:
-        //   const std::string get_container_name(const T &container);
+        //   const boost::string_ref get_container_name(const T &container);
         //   void append_to_transcript(const T &container, SpTranscript &transcript_inout);
         append_label(label);
         begin_named_container(get_container_name(named_container));

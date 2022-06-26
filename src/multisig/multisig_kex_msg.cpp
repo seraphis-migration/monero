@@ -41,7 +41,7 @@ extern "C"
 #include "serialization/binary_archive.h"
 #include "serialization/serialization.h"
 
-#include <boost/utility/string_ref.hpp> 
+#include <boost/utility/string_ref.hpp>
 
 #include <sstream>
 #include <string>

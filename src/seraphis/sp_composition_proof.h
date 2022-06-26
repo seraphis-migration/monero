@@ -95,6 +95,7 @@
 #include "ringct/rctTypes.h"
 
 //third party headers
+#include <boost/utility/string_ref.hpp>
 
 //standard headers
 #include <string>
@@ -129,7 +130,7 @@ struct SpCompositionProof final
 
     static std::size_t get_size_bytes() { return 32*5; }
 };
-inline const std::string get_container_name(const SpCompositionProof&) { return "SpCompositionProof"; }
+inline const boost::string_ref get_container_name(const SpCompositionProof&) { return "SpCompositionProof"; }
 void append_to_transcript(const SpCompositionProof &container, SpTranscript &transcript_inout);
 
 ////

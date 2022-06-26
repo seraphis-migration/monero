@@ -50,6 +50,7 @@ extern "C"
 #include "tx_misc_utils.h"  //for equals_from_less (todo: remove this dependency?)
 
 //third party headers
+#include <boost/utility/string_ref.hpp>
 
 //standard headers
 #include <algorithm>
@@ -79,7 +80,7 @@ struct sp_multisig_binonce_factors
     }
     bool operator==(const sp_multisig_binonce_factors &other) const { return equals_from_less{}(*this, other); }
 };
-inline const std::string get_container_name(const sp_multisig_binonce_factors&) { return "sp_multisig_binonce_factors"; }
+inline const boost::string_ref get_container_name(const sp_multisig_binonce_factors&) { return "sp_multisig_binonce_factors"; }
 void append_to_transcript(const sp_multisig_binonce_factors &container, SpTranscript &transcript_inout)
 {
     transcript_inout.append("nonce1", container.nonce_1);
