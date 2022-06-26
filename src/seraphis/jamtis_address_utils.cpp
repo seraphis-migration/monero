@@ -64,7 +64,7 @@ void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
 
     // k^j_x = H_n[s_ga](j)
     SpTranscript transcript{domain_separator, ADDRESS_INDEX_BYTES};
-    transcript.append(j.bytes);
+    transcript.append("j", j.bytes);
 
     sp_derive_key(to_bytes(s_generate_address), transcript, to_bytes(extension_out));
 }
@@ -77,7 +77,7 @@ void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
 
     // k^j_a = H_n[s_ga](j)
     SpTranscript transcript{domain_separator, ADDRESS_INDEX_BYTES};
-    transcript.append(j.bytes);
+    transcript.append("j", j.bytes);
 
     sp_derive_key(to_bytes(s_generate_address), transcript, to_bytes(address_privkey_out));
 }

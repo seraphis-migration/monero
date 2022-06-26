@@ -84,18 +84,6 @@ std::size_t highest_bit_position(std::size_t num)
     return bit_position;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_uint_to_string(const std::size_t value, std::string &str_inout)
-{
-    unsigned char v_variable[(sizeof(std::size_t) * 8 + 6) / 7];
-    unsigned char *v_variable_end = v_variable;
-
-    // append uint to string as a varint
-    v_variable_end = v_variable;
-    tools::write_varint(v_variable_end, value);
-    assert(v_variable_end <= v_variable + sizeof(v_variable));
-    str_inout.append(reinterpret_cast<const char*>(v_variable), v_variable_end - v_variable);
-}
-//-------------------------------------------------------------------------------------------------------------------
 bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &commitment_set2)
 {
     // balance check method chosen from perf test: tests/performance_tests/balance_check.h
@@ -117,15 +105,15 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
 //-------------------------------------------------------------------------------------------------------------------
 void append_bpp_to_transcript(const rct::BulletproofPlus &bpp_proof, SpTranscript &transcript_inout)
 {
-    transcript_inout.append(bpp_proof.V);
-    transcript_inout.append(bpp_proof.A);
-    transcript_inout.append(bpp_proof.A1);
-    transcript_inout.append(bpp_proof.B);
-    transcript_inout.append(bpp_proof.r1);
-    transcript_inout.append(bpp_proof.s1);
-    transcript_inout.append(bpp_proof.d1);
-    transcript_inout.append(bpp_proof.L);
-    transcript_inout.append(bpp_proof.R);
+    transcript_inout.append("V", bpp_proof.V);
+    transcript_inout.append("A", bpp_proof.A);
+    transcript_inout.append("A1", bpp_proof.A1);
+    transcript_inout.append("B", bpp_proof.B);
+    transcript_inout.append("r1", bpp_proof.r1);
+    transcript_inout.append("s1", bpp_proof.s1);
+    transcript_inout.append("d1", bpp_proof.d1);
+    transcript_inout.append("L", bpp_proof.L);
+    transcript_inout.append("R", bpp_proof.R);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t bpp_size_bytes(const std::size_t num_range_proofs, const bool include_commitments)

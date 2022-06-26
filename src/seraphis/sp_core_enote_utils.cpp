@@ -134,8 +134,8 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
 
     // H_n(Ko, C)
     SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
-    transcript.append(onetime_address);
-    transcript.append(amount_commitment);
+    transcript.append("Ko", onetime_address);
+    transcript.append("C", amount_commitment);
 
     // hash to the result
     sp_hash_to_scalar(transcript, to_bytes(squash_prefix_out));

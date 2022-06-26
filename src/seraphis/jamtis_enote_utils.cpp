@@ -97,8 +97,8 @@ static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::xmr_amount origina
 
     // ret = H_8(q, 8 r G) XOR_64 original
     SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
-    transcript.append(sender_receiver_secret);
-    transcript.append(baked_key);
+    transcript.append("q", sender_receiver_secret);
+    transcript.append("baked_key", baked_key);
 
     crypto::secret_key hash_result;
     sp_hash_to_8(transcript, to_bytes(hash_result));
@@ -121,7 +121,7 @@ static rct::xmr_amount enc_dec_jamtis_amount_selfsend(const rct::xmr_amount orig
 
     // ret = H_8(q) XOR_64 original
     SpTranscript transcript{domain_separator, sizeof(sender_receiver_secret)};
-    transcript.append(sender_receiver_secret);
+    transcript.append("q", sender_receiver_secret);
 
     crypto::secret_key hash_result;
     sp_hash_to_8(transcript, to_bytes(hash_result));
@@ -151,8 +151,8 @@ void make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_deriv
 
     // view_tag = H_1(K_d, Ko)
     SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
-    transcript.append(sender_receiver_DH_derivation);
-    transcript.append(onetime_address);
+    transcript.append("K_d", sender_receiver_DH_derivation);
+    transcript.append("Ko", onetime_address);
 
     sp_hash_to_1(transcript, &view_tag_out);
 }
@@ -178,7 +178,7 @@ void make_jamtis_input_context_coinbase(const std::uint64_t block_height, rct::k
 
     // block height as varint
     SpTranscript transcript{domain_separator, 4};
-    transcript.append(block_height);
+    transcript.append("height", block_height);
 
     // input_context (coinbase) = H_32(block height)
     sp_hash_to_32(transcript, input_context_out.bytes);
@@ -194,7 +194,7 @@ void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &in
 
     // {KI}
     SpTranscript transcript{domain_separator, input_key_images.size()*sizeof(crypto::key_image)};
-    transcript.append(input_key_images);
+    transcript.append("input_KI", input_key_images);
 
     // input_context (standard) = H_32({KI})
     sp_hash_to_32(transcript, input_context_out.bytes);
@@ -207,11 +207,11 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &send
 {
     static const std::string domain_separator{config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN};
 
-    // q = H_32(DH_derivation, K_e, input_context)
+    // q = H_32(K_d, K_e, input_context)
     SpTranscript transcript{domain_separator, 3*sizeof(rct::key)};
-    transcript.append(sender_receiver_DH_derivation);
-    transcript.append(enote_ephemeral_pubkey);
-    transcript.append(input_context);
+    transcript.append("K_d", sender_receiver_DH_derivation);
+    transcript.append("K_e", enote_ephemeral_pubkey);
+    transcript.append("input_context", input_context);
 
     sp_hash_to_32(transcript, sender_receiver_secret_out.bytes);
 }
@@ -227,7 +227,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
     crypto::key_derivation derivation;
     auto a_wiper = make_derivation_with_wiper(privkey, DH_key, hwdev, derivation);
 
-    // q = H_32(DH_derivation, K_e, input_context)
+    // q = H_32(K_d, K_e, input_context)
     make_jamtis_sender_receiver_secret_plain(derivation,
         enote_ephemeral_pubkey,
         input_context,
@@ -272,8 +272,8 @@ void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_vie
 
     // q = H_32[k_vb](K_e, input_context)
     SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
-    transcript.append(enote_ephemeral_pubkey);
-    transcript.append(input_context);
+    transcript.append("K_e", enote_ephemeral_pubkey);
+    transcript.append("input_context", input_context);
 
     sp_derive_secret(to_bytes(k_view_balance), transcript, sender_receiver_secret_out.bytes);
 }
@@ -286,8 +286,8 @@ void make_jamtis_onetime_address_extension(const rct::key &sender_receiver_secre
 
     // k_{a, sender} = H_n(q, C)
     SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
-    transcript.append(sender_receiver_secret);
-    transcript.append(amount_commitment);
+    transcript.append("q", sender_receiver_secret);
+    transcript.append("C", amount_commitment);
 
     sp_hash_to_scalar(transcript, to_bytes(sender_extension_out));
 }
@@ -334,8 +334,8 @@ void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_se
 
     // x = H_n(q, 8 r G)
     SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
-    transcript.append(sender_receiver_secret);
-    transcript.append(baked_key);  //q || 8 r G
+    transcript.append("q", sender_receiver_secret);
+    transcript.append("baked_key", baked_key);  //q || 8 r G
 
     sp_hash_to_scalar(transcript, to_bytes(mask_out));
 }
@@ -347,7 +347,7 @@ void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver
 
     // x = H_n(q)
     SpTranscript transcript{domain_separator, sizeof(rct::key)};
-    transcript.append(sender_receiver_secret);
+    transcript.append("q", sender_receiver_secret);
 
     sp_hash_to_scalar(transcript, to_bytes(mask_out));
 }

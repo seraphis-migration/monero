@@ -89,7 +89,7 @@ struct GrootleProof
     static std::size_t get_size_bytes(const std::size_t n, const std::size_t m);
     std::size_t get_size_bytes() const;
 };
-inline const std::string get_transcript_label(const GrootleProof&) { return "GrootleProof"; }
+inline const std::string get_container_name(const GrootleProof&) { return "GrootleProof"; }
 void append_to_transcript(const GrootleProof &container, SpTranscript &transcript_inout);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////

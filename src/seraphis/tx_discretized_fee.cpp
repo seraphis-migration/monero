@@ -170,7 +170,7 @@ bool DiscretizedFee::operator==(const rct::xmr_amount raw_fee_value) const
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const DiscretizedFee &container, SpTranscript &transcript_inout)
 {
-    transcript_inout.append(container.m_fee_level);
+    transcript_inout.append("fee_level", container.m_fee_level);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool operator==(const discretized_fee_level_t fee_level, const DiscretizedFee &discretized_fee)

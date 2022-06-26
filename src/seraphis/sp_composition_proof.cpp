@@ -79,11 +79,11 @@ struct sp_multisig_binonce_factors
     }
     bool operator==(const sp_multisig_binonce_factors &other) const { return equals_from_less{}(*this, other); }
 };
-inline const std::string get_transcript_label(const sp_multisig_binonce_factors&) { return "sp_multisig_binonce_factors"; }
+inline const std::string get_container_name(const sp_multisig_binonce_factors&) { return "sp_multisig_binonce_factors"; }
 void append_to_transcript(const sp_multisig_binonce_factors &container, SpTranscript &transcript_inout)
 {
-    transcript_inout.append(container.nonce_1);
-    transcript_inout.append(container.nonce_2);
+    transcript_inout.append("nonce1", container.nonce_1);
+    transcript_inout.append("nonce2", container.nonce_2);
 }
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -100,12 +100,12 @@ static rct::key compute_challenge_message(const rct::key &message,
 
     // collect challenge message hash data
     SpTranscript transcript{domain_separator, 6*sizeof(rct::key)};
-    transcript.append(get_X_gen());
-    transcript.append(get_U_gen());
-    transcript.append(message);
-    transcript.append(K);
-    transcript.append(KI);
-    transcript.append(K_t1);
+    transcript.append("X", get_X_gen());
+    transcript.append("U", get_U_gen());
+    transcript.append("message", message);
+    transcript.append("K", K);
+    transcript.append("KI", KI);
+    transcript.append("K_t1", K_t1);
 
     // challenge_message
     rct::key challenge_message;
@@ -127,10 +127,10 @@ static rct::key compute_challenge(const rct::key &challenge_message,
 
     // collect challenge hash data
     SpTranscript transcript{domain_separator, 4*sizeof(rct::key)};
-    transcript.append(challenge_message);
-    transcript.append(K_t1_proofkey);
-    transcript.append(K_t2_proofkey);
-    transcript.append(KI_proofkey);
+    transcript.append("challenge_message", challenge_message);
+    transcript.append("K_t1_proofkey", K_t1_proofkey);
+    transcript.append("K_t2_proofkey", K_t2_proofkey);
+    transcript.append("KI_proofkey", KI_proofkey);
 
     rct::key challenge;
     sp_hash_to_scalar(transcript, challenge.bytes);
@@ -194,8 +194,8 @@ static rct::key multisig_binonce_merge_factor(const rct::key &message,
 
     // build hash
     SpTranscript transcript{domain_separator, (1 + 2 * nonces.size()) * sizeof(rct::key)};
-    transcript.append(message);
-    transcript.append(nonces);
+    transcript.append("message", message);
+    transcript.append("nonces", nonces);
 
     rct::key merge_factor;
     sp_hash_to_scalar(transcript, merge_factor.bytes);
@@ -207,11 +207,11 @@ static rct::key multisig_binonce_merge_factor(const rct::key &message,
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const SpCompositionProof &container, SpTranscript &transcript_inout)
 {
-    transcript_inout.append(container.c);
-    transcript_inout.append(container.r_t1);
-    transcript_inout.append(container.r_t2);
-    transcript_inout.append(container.r_ki);
-    transcript_inout.append(container.K_t1);
+    transcript_inout.append("c", container.c);
+    transcript_inout.append("r_t1", container.r_t1);
+    transcript_inout.append("r_t2", container.r_t2);
+    transcript_inout.append("r_ki", container.r_ki);
+    transcript_inout.append("K_t1", container.K_t1);
 }
 //-------------------------------------------------------------------------------------------------------------------
 SpCompositionProof sp_composition_prove(const rct::key &message,

@@ -167,13 +167,13 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
     // g = H_32(bin_generator_seed, bin_locus, bin_index_in_set)
     static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_MEMBER};
 
-    SpTranscript transcript{domain_separator, sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set)};
-    transcript.append(bin_generator_seed);
-    transcript.append(bin_locus);
-    transcript.append(bin_index_in_set);
-
-    rct::key member_generator;
-    sp_hash_to_32(transcript, member_generator.bytes);
+    SpTranscript transcript{
+            domain_separator,
+            sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set) + 20 * bin_config.m_num_bin_members
+        };
+    transcript.append("bin_generator_seed", bin_generator_seed);
+    transcript.append("bin_locus", bin_locus);
+    transcript.append("bin_index_in_set", bin_index_in_set);
 
     // set clip allowed max to be a large multiple of the bin width (minus 1 since we are zero-basis),
     //   to avoid bias in the bin members
@@ -210,11 +210,7 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
             // update the generator (find a generator that is within the allowed max)
             do
             {
-                SpTranscript transcript_temp{domain_separator, sizeof(member_generator)};
-                transcript_temp.append(member_generator);
-
-                sp_hash_to_32(transcript_temp, member_generator.bytes);
-                memcpy(&generator_clip, member_generator.bytes, sizeof(generator_clip));
+                sp_hash_to_8(transcript, reinterpret_cast<unsigned char*>(&generator_clip));
                 generator_clip = SWAP64LE(generator_clip);
             } while (generator_clip > clip_allowed_max);
 

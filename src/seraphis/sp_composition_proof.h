@@ -129,7 +129,7 @@ struct SpCompositionProof final
 
     static std::size_t get_size_bytes() { return 32*5; }
 };
-inline const std::string get_transcript_label(const SpCompositionProof&) { return "SpCompositionProof"; }
+inline const std::string get_container_name(const SpCompositionProof&) { return "SpCompositionProof"; }
 void append_to_transcript(const SpCompositionProof &container, SpTranscript &transcript_inout);
 
 ////

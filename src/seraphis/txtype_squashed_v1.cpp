@@ -213,9 +213,9 @@ void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
     // 4. tx hash
     // tx_hash = H_32(image_proofs_message, input images, proofs)
     SpTranscript transcript{domain_separator, 3*sizeof(rct::key)};
-    transcript.append(image_proofs_message);
-    transcript.append(input_images_prefix);
-    transcript.append(tx_proofs_prefix);
+    transcript.append("image_proofs_message", image_proofs_message);
+    transcript.append("input_images_prefix", input_images_prefix);
+    transcript.append("tx_proofs_prefix", tx_proofs_prefix);
 
     sp_hash_to_32(transcript, tx_hash_out.bytes);
 }

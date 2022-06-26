@@ -89,8 +89,8 @@ static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct
 
     // temp_encryption_secret = H_32(q, Ko)
     SpTranscript transcript{domain_separator, 2 * sizeof(rct::key)};
-    transcript.append(sender_receiver_secret);
-    transcript.append(onetime_address);
+    transcript.append("q", sender_receiver_secret);
+    transcript.append("Ko", onetime_address);
 
     rct::key temp_encryption_secret;
     sp_hash_to_32(transcript, temp_encryption_secret.bytes);

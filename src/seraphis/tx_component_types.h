@@ -87,7 +87,7 @@ struct SpEnoteV1 final
             sizeof(jamtis::view_tag_t);
     }
 };
-inline const std::string get_transcript_label(const SpEnoteV1&) { return "SpEnoteV1"; }
+inline const std::string get_container_name(const SpEnoteV1&) { return "SpEnoteV1"; }
 void append_to_transcript(const SpEnoteV1 &container, SpTranscript &transcript_inout);
 
 ////
@@ -106,7 +106,7 @@ struct SpEnoteImageV1 final
 
     static std::size_t get_size_bytes() { return SpEnoteImage::get_size_bytes(); }
 };
-inline const std::string get_transcript_label(const SpEnoteImageV1&) { return "SpEnoteImageV1"; }
+inline const std::string get_container_name(const SpEnoteImageV1&) { return "SpEnoteImageV1"; }
 void append_to_transcript(const SpEnoteImageV1 &container, SpTranscript &transcript_inout);
 
 ////
@@ -127,7 +127,7 @@ struct SpMembershipProofV1 final
     static std::size_t get_size_bytes(const std::size_t n, const std::size_t m, const std::size_t num_bin_members);
     std::size_t get_size_bytes() const;
 };
-inline const std::string get_transcript_label(const SpMembershipProofV1&) { return "SpMembershipProofV1"; }
+inline const std::string get_container_name(const SpMembershipProofV1&) { return "SpMembershipProofV1"; }
 void append_to_transcript(const SpMembershipProofV1 &container, SpTranscript &transcript_inout);
 
 ////
@@ -142,7 +142,7 @@ struct SpImageProofV1 final
 
     static std::size_t get_size_bytes() { return sp::SpCompositionProof::get_size_bytes(); }
 };
-inline const std::string get_transcript_label(const SpImageProofV1&) { return "SpImageProofV1"; }
+inline const std::string get_container_name(const SpImageProofV1&) { return "SpImageProofV1"; }
 void append_to_transcript(const SpImageProofV1 &container, SpTranscript &transcript_inout);
 
 ////
@@ -166,7 +166,7 @@ struct SpBalanceProofV1 final
         const bool include_commitments = false);
     std::size_t get_weight(const bool include_commitments = false) const;
 };
-inline const std::string get_transcript_label(const SpBalanceProofV1&) { return "SpBalanceProofV1"; }
+inline const std::string get_container_name(const SpBalanceProofV1&) { return "SpBalanceProofV1"; }
 void append_to_transcript(const SpBalanceProofV1 &container, SpTranscript &transcript_inout);
 
 ////
@@ -185,7 +185,7 @@ struct SpTxSupplementV1 final
     static std::size_t get_size_bytes(const std::size_t num_outputs, const TxExtra &tx_extra);
     std::size_t get_size_bytes() const;
 };
-inline const std::string get_transcript_label(const SpTxSupplementV1&) { return "SpTxSupplementV1"; }
+inline const std::string get_container_name(const SpTxSupplementV1&) { return "SpTxSupplementV1"; }
 void append_to_transcript(const SpTxSupplementV1 &container, SpTranscript &transcript_inout);
 
 } //namespace sp

@@ -48,8 +48,8 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const SpBinnedReferenceSetConfigV1 &container, SpTranscript &transcript_inout)
 {
-    transcript_inout.append(container.m_bin_radius);
-    transcript_inout.append(container.m_num_bin_members);
+    transcript_inout.append("bin_radius", container.m_bin_radius);
+    transcript_inout.append("num_bin_members", container.m_num_bin_members);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBinnedReferenceSetV1::get_size_bytes(const std::size_t num_bins, const bool include_seed /*= false*/)
@@ -66,10 +66,10 @@ std::size_t SpBinnedReferenceSetV1::get_size_bytes(const bool include_seed /*= f
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const SpBinnedReferenceSetV1 &container, SpTranscript &transcript_inout)
 {
-    transcript_inout.append(container.m_bin_config);
-    transcript_inout.append(container.m_bin_generator_seed);
-    transcript_inout.append(container.m_bin_rotation_factor);
-    transcript_inout.append(container.m_bin_loci);
+    transcript_inout.append("bin_config", container.m_bin_config);
+    transcript_inout.append("bin_generator_seed", container.m_bin_generator_seed);
+    transcript_inout.append("bin_rotation_factor", container.m_bin_rotation_factor);
+    transcript_inout.append("bin_loci", container.m_bin_loci);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

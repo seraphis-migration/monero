@@ -72,7 +72,7 @@ struct SpBinnedReferenceSetConfigV1 final
 
     static std::size_t get_size_bytes() { return sizeof(m_bin_radius) + sizeof(m_num_bin_members); }
 };
-inline const std::string get_transcript_label(const SpBinnedReferenceSetConfigV1&) { return "SpBinnedReferenceSetConfigV1"; }
+inline const std::string get_container_name(const SpBinnedReferenceSetConfigV1&) { return "SpBinnedReferenceSetConfigV1"; }
 void append_to_transcript(const SpBinnedReferenceSetConfigV1 &container, SpTranscript &transcript_inout);
 
 ////
@@ -102,7 +102,7 @@ struct SpBinnedReferenceSetV1 final
     static std::size_t get_size_bytes(const std::size_t num_bins, const bool include_seed = false);
     std::size_t get_size_bytes(const bool include_seed = false) const;
 };
-inline const std::string get_transcript_label(const SpBinnedReferenceSetV1&) { return "SpBinnedReferenceSetV1"; }
+inline const std::string get_container_name(const SpBinnedReferenceSetV1&) { return "SpBinnedReferenceSetV1"; }
 void append_to_transcript(const SpBinnedReferenceSetV1 &container, SpTranscript &transcript_inout);
 
 } //namespace sp

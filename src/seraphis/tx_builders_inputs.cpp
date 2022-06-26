@@ -84,8 +84,8 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
 
     // seed = H_32(K", C")
     SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
-    transcript.append(masked_address);
-    transcript.append(masked_commitment);
+    transcript.append("K_masked", masked_address);
+    transcript.append("C_masked", masked_commitment);
 
     // hash to the result
     sp_hash_to_32(transcript, generator_seed_out.bytes);
@@ -152,8 +152,8 @@ void make_tx_membership_proof_message_v1(const SpBinnedReferenceSetV1 &binned_re
                 binned_reference_set.get_size_bytes(true) +
                 SpBinnedReferenceSetConfigV1::get_size_bytes()
         };
-    transcript.append(project_name);  //project name (i.e. referenced enotes are members of what project's ledger?)
-    transcript.append(binned_reference_set);
+    transcript.append("project_name", project_name);  //i.e. referenced enotes are members of what project's ledger?
+    transcript.append("binned_reference_set", binned_reference_set);
 
     sp_hash_to_32(transcript, message_out.bytes);
 }
@@ -214,7 +214,7 @@ void make_input_images_prefix_v1(const std::vector<SpEnoteImageV1> &enote_images
 
     // input images prefix = H_32({K", C", KI})
     SpTranscript transcript{domain_separator, enote_images.size()*SpEnoteImageV1::get_size_bytes()};
-    transcript.append(enote_images);
+    transcript.append("enote_images", enote_images);
 
     sp_hash_to_32(transcript, input_images_prefix_out.bytes);
 }

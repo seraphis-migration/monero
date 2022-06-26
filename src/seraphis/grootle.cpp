@@ -99,8 +99,8 @@ static void init_gens()
         {
             SpTranscript transcript_A{Hi_A_salt, 4};
             SpTranscript transcript_B{Hi_B_salt, 4};
-            transcript_A.append(i);
-            transcript_B.append(i);
+            transcript_A.append("i", i);
+            transcript_B.append("i", i);
 
             sp_hash_to_32(transcript_A, intermediate_hash.bytes);
             hash_to_p3(Hi_A_p3[i], intermediate_hash);
@@ -220,14 +220,14 @@ static rct::key compute_challenge(const rct::key &message,
 
     // hash data
     SpTranscript transcript{domain_separator, 2*4 + (M.size() + X.size() + 4)*sizeof(rct::key)};
-    transcript.append(message);
-    transcript.append(n);
-    transcript.append(m);
-    transcript.append(M);
-    transcript.append(C_offset);
-    transcript.append(A);
-    transcript.append(B);
-    transcript.append(X);
+    transcript.append("message", message);
+    transcript.append("n", n);
+    transcript.append("m", m);
+    transcript.append("M", M);
+    transcript.append("C_offset", C_offset);
+    transcript.append("A", A);
+    transcript.append("B", B);
+    transcript.append("X", X);
 
     // challenge
     rct::key challenge;
@@ -253,12 +253,12 @@ std::size_t GrootleProof::get_size_bytes() const
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const GrootleProof &container, SpTranscript &transcript_inout)
 {
-    transcript_inout.append(container.A);
-    transcript_inout.append(container.B);
-    transcript_inout.append(container.f);
-    transcript_inout.append(container.X);
-    transcript_inout.append(container.zA);
-    transcript_inout.append(container.z);
+    transcript_inout.append("A", container.A);
+    transcript_inout.append("B", container.B);
+    transcript_inout.append("f", container.f);
+    transcript_inout.append("X", container.X);
+    transcript_inout.append("zA", container.zA);
+    transcript_inout.append("z", container.z);
 }
 //-------------------------------------------------------------------------------------------------------------------
 GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]

@@ -58,8 +58,8 @@ bool SpEnote::onetime_address_is_canonical() const
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const SpEnote &container, SpTranscript &transcript_inout)
 {
-    transcript_inout.append(container.m_onetime_address);
-    transcript_inout.append(container.m_amount_commitment);
+    transcript_inout.append("Ko", container.m_onetime_address);
+    transcript_inout.append("C", container.m_amount_commitment);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpEnote::gen()
@@ -71,9 +71,9 @@ void SpEnote::gen()
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const SpEnoteImage &container, SpTranscript &transcript_inout)
 {
-    transcript_inout.append(container.m_masked_address);
-    transcript_inout.append(container.m_masked_commitment);
-    transcript_inout.append(container.m_key_image);
+    transcript_inout.append("K_masked", container.m_masked_address);
+    transcript_inout.append("C_masked", container.m_masked_commitment);
+    transcript_inout.append("KI", container.m_key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpInputProposal::get_enote_image_core(SpEnoteImage &image_out) const

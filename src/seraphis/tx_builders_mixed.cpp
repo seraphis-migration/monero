@@ -115,12 +115,12 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
                 output_enotes.size()*SpEnoteV1::get_size_bytes() +
                 tx_supplement.get_size_bytes()
         };
-    transcript.append(project_name);
-    transcript.append(version_string);
-    transcript.append(input_key_images);
-    transcript.append(output_enotes);
-    transcript.append(tx_supplement);
-    transcript.append(transaction_fee);
+    transcript.append("project_name", project_name);
+    transcript.append("version_string", version_string);
+    transcript.append("input_key_images", input_key_images);
+    transcript.append("output_enotes", output_enotes);
+    transcript.append("tx_supplement", tx_supplement);
+    transcript.append("transaction_fee", transaction_fee);
 
     sp_hash_to_32(transcript, proof_message_out.bytes);
 }
@@ -260,9 +260,9 @@ void make_tx_proofs_prefix_v1(const SpBalanceProofV1 &balance_proof,
                 image_proofs.size() * SpImageProofV1::get_size_bytes() +
                 membership_proofs.size() ? membership_proofs.size() * membership_proofs[0].get_size_bytes() : 0
         };
-    transcript.append(balance_proof);
-    transcript.append(image_proofs);
-    transcript.append(membership_proofs);
+    transcript.append("balance_proof", balance_proof);
+    transcript.append("image_proofs", image_proofs);
+    transcript.append("membership_proofs", membership_proofs);
 
     sp_hash_to_32(transcript, tx_proofs_prefix_out.bytes);
 }
