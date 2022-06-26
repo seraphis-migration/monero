@@ -85,10 +85,8 @@ static encrypted_address_tag_secret_t get_encrypted_address_tag_secret(const rct
 {
     static_assert(sizeof(encrypted_address_tag_secret_t) <= 32, "");
 
-    static const std::string domain_separator{config::HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG};
-
     // temp_encryption_secret = H_32(q, Ko)
-    SpTranscript transcript{domain_separator, 2 * sizeof(rct::key)};
+    SpTranscript transcript{config::HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG, 2 * sizeof(rct::key)};
     transcript.append("q", sender_receiver_secret);
     transcript.append("Ko", onetime_address);
 

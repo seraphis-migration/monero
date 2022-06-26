@@ -51,18 +51,16 @@ namespace config
   const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_CHANGE[] = "jamtis_self_send_enote_change";
   const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_SELF_SPEND[] = "jamtis_self_send_enote_self_spend";
 
-  const constexpr char HASH_KEY_SERAPHIS_TRANSACTION[] = "seraphis_transaction";
+  const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_TYPE_SQUASHED_V1[] = "seraphis_transaction_type_squashed_v1";
   const constexpr char HASH_KEY_SERAPHIS_INPUT_IMAGES_PREFIX_V1[] = "seraphis_input_images_prefix_v1";
   const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1[] = "seraphis_transaction_proofs_prefix_v1";
   const constexpr char HASH_KEY_GROOTLE_Hi_A[] = "grootle_Hi_A";
   const constexpr char HASH_KEY_GROOTLE_Hi_B[] = "grootle_Hi_B";
   const constexpr char HASH_KEY_GROOTLE_CHALLENGE[] = "grootle_challenge";
-  const constexpr char HASH_KEY_SERAPHIS_MEMBERSHIP_PROOF_MESSAGE[] = "seraphis_membership_proof_message";
+  const constexpr char HASH_KEY_SERAPHIS_MEMBERSHIP_PROOF_MESSAGE_V1[] = "seraphis_membership_proof_message_v1";
   const constexpr char HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE[] = "seraphis_composition_proof_challenge_message";
   const constexpr char HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE[] = "seraphis_composition_proof_challenge";
-  const constexpr char HASH_KEY_SERAPHIS_IMAGE_PROOF_MESSAGE[] = "seraphis_image_proof_message";
+  const constexpr char HASH_KEY_SERAPHIS_IMAGE_PROOF_MESSAGE_V1[] = "seraphis_image_proof_message_v1";
   const constexpr char HASH_KEY_BINNED_REF_SET_GENERATOR_SEED[] = "binned_ref_set_generator_seed";
   const constexpr char HASH_KEY_BINNED_REF_SET_MEMBER[] = "binned_ref_set_member";
-  const constexpr char HASH_KEY_MULTISIG_TX_PRIVKEYS_SEED[] = "multisig_tx_privkeys_seed";
-  const constexpr char HASH_KEY_MULTISIG_TX_PRIVKEYS[] = "multisig_tx_privkeys";
 }

@@ -57,50 +57,40 @@ namespace jamtis
 void make_jamtis_unlockamounts_key(const crypto::secret_key &k_view_balance,
     crypto::secret_key &k_unlock_amounts_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY};
-
     // k_ua = H_n[k_vb]()
-    SpTranscript transcript{domain_separator, 0};
+    SpTranscript transcript{config::HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY, 0};
     sp_derive_key(to_bytes(k_view_balance), transcript, to_bytes(k_unlock_amounts_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_findreceived_key(const crypto::secret_key &k_view_balance,
     crypto::secret_key &k_find_received_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_JAMTIS_FINDRECEIVED_KEY};
-
     // k_fr = H_n[k_vb]()
-    SpTranscript transcript{domain_separator, 0};
+    SpTranscript transcript{config::HASH_KEY_JAMTIS_FINDRECEIVED_KEY, 0};
     sp_derive_key(to_bytes(k_view_balance), transcript, to_bytes(k_find_received_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_generateaddress_secret(const crypto::secret_key &k_view_balance,
     crypto::secret_key &s_generate_address_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET};
-
     // s_ga = H_32[k_vb]()
-    SpTranscript transcript{domain_separator, 0};
+    SpTranscript transcript{config::HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET, 0};
     sp_derive_secret(to_bytes(k_view_balance), transcript, to_bytes(s_generate_address_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_ciphertag_secret(const crypto::secret_key &s_generate_address,
     crypto::secret_key &s_cipher_tag_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_JAMTIS_CIPHERTAG_SECRET};
-
     // s_ct = H_32[s_ga]()
-    SpTranscript transcript{domain_separator, 0};
+    SpTranscript transcript{config::HASH_KEY_JAMTIS_CIPHERTAG_SECRET, 0};
     sp_derive_secret(to_bytes(s_generate_address), transcript, to_bytes(s_cipher_tag_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_identifywallet_key(const crypto::secret_key &s_generate_address,
     crypto::secret_key &k_identify_wallet_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY};
-
     // k_id = H_n[s_ga]()
-    SpTranscript transcript{domain_separator, 0};
+    SpTranscript transcript{config::HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY, 0};
     sp_derive_key(to_bytes(s_generate_address), transcript, to_bytes(k_identify_wallet_out));
 }
 //-------------------------------------------------------------------------------------------------------------------

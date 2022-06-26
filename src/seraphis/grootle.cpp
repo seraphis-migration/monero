@@ -216,10 +216,8 @@ static rct::key compute_challenge(const rct::key &message,
     const rct::key &B,
     const rct::keyV &X)
 {
-    static const std::string domain_separator{config::HASH_KEY_GROOTLE_CHALLENGE};
-
     // hash data
-    SpTranscript transcript{domain_separator, 2*4 + (M.size() + X.size() + 4)*sizeof(rct::key)};
+    SpTranscript transcript{config::HASH_KEY_GROOTLE_CHALLENGE, 2*4 + (M.size() + X.size() + 4)*sizeof(rct::key)};
     transcript.append("message", message);
     transcript.append("n", n);
     transcript.append("m", m);

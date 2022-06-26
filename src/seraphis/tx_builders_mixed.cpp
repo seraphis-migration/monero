@@ -103,12 +103,11 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
     const rct::xmr_amount transaction_fee,
     rct::key &proof_message_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_IMAGE_PROOF_MESSAGE};
     static const std::string project_name{CRYPTONOTE_NAME};
 
     // H_32(crypto project name, version string, input key images, output enotes, tx supplement, fee)
     SpTranscript transcript{
-            domain_separator,
+            config::HASH_KEY_SERAPHIS_IMAGE_PROOF_MESSAGE_V1,
             project_name.size() +
                 version_string.size() +
                 input_key_images.size()*sizeof(crypto::key_image) +
@@ -251,11 +250,9 @@ void make_tx_proofs_prefix_v1(const SpBalanceProofV1 &balance_proof,
     const std::vector<SpMembershipProofV1> &membership_proofs,
     rct::key &tx_proofs_prefix_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1};
-
     // H_32(balance proof, image proofs, membership proofs)
     SpTranscript transcript{
-            domain_separator,
+            config::HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1,
             balance_proof.get_size_bytes() +
                 image_proofs.size() * SpImageProofV1::get_size_bytes() +
                 membership_proofs.size() ? membership_proofs.size() * membership_proofs[0].get_size_bytes() : 0

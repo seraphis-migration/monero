@@ -80,10 +80,9 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
     rct::key &generator_seed_out)
 {
     // make binned reference set generator seed
-    static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_GENERATOR_SEED};
 
     // seed = H_32(K", C")
-    SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
+    SpTranscript transcript{config::HASH_KEY_BINNED_REF_SET_GENERATOR_SEED, 2*sizeof(rct::key)};
     transcript.append("K_masked", masked_address);
     transcript.append("C_masked", masked_commitment);
 
@@ -142,12 +141,11 @@ void align_v1_membership_proofs_v1(const std::vector<SpEnoteImageV1> &input_imag
 //-------------------------------------------------------------------------------------------------------------------
 void make_tx_membership_proof_message_v1(const SpBinnedReferenceSetV1 &binned_reference_set, rct::key &message_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_MEMBERSHIP_PROOF_MESSAGE};
     static const std::string project_name{CRYPTONOTE_NAME};
 
     // m = H_32('project name', {binned reference set})
     SpTranscript transcript{
-            domain_separator,
+            config::HASH_KEY_SERAPHIS_MEMBERSHIP_PROOF_MESSAGE_V1,
             project_name.size() +
                 binned_reference_set.get_size_bytes(true) +
                 SpBinnedReferenceSetConfigV1::get_size_bytes()
@@ -210,10 +208,11 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
 //-------------------------------------------------------------------------------------------------------------------
 void make_input_images_prefix_v1(const std::vector<SpEnoteImageV1> &enote_images, rct::key &input_images_prefix_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_INPUT_IMAGES_PREFIX_V1};
-
     // input images prefix = H_32({K", C", KI})
-    SpTranscript transcript{domain_separator, enote_images.size()*SpEnoteImageV1::get_size_bytes()};
+    SpTranscript transcript{
+            config::HASH_KEY_SERAPHIS_INPUT_IMAGES_PREFIX_V1,
+            enote_images.size()*SpEnoteImageV1::get_size_bytes()
+        };
     transcript.append("enote_images", enote_images);
 
     sp_hash_to_32(transcript, input_images_prefix_out.bytes);

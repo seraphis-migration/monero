@@ -184,7 +184,6 @@ std::size_t SpTxSquashedV1::get_weight() const
 void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
 {
     // tx_hash = H_32(image_proofs_message, input images, proofs)
-    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_TRANSACTION};
 
     // 1. image proofs message
     // H_32(crypto project name, version string, input key images, output enotes, enote ephemeral pubkeys, memos, fee)
@@ -212,7 +211,7 @@ void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
 
     // 4. tx hash
     // tx_hash = H_32(image_proofs_message, input images, proofs)
-    SpTranscript transcript{domain_separator, 3*sizeof(rct::key)};
+    SpTranscript transcript{config::HASH_KEY_SERAPHIS_TRANSACTION_TYPE_SQUASHED_V1, 3*sizeof(rct::key)};
     transcript.append("image_proofs_message", image_proofs_message);
     transcript.append("input_images_prefix", input_images_prefix);
     transcript.append("tx_proofs_prefix", tx_proofs_prefix);

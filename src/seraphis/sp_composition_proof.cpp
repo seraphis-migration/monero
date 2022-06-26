@@ -96,10 +96,8 @@ static rct::key compute_challenge_message(const rct::key &message,
     const crypto::key_image &KI,
     const rct::key &K_t1)
 {
-    static const std::string domain_separator{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE};
-
     // collect challenge message hash data
-    SpTranscript transcript{domain_separator, 6*sizeof(rct::key)};
+    SpTranscript transcript{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE, 6*sizeof(rct::key)};
     transcript.append("X", get_X_gen());
     transcript.append("U", get_U_gen());
     transcript.append("message", message);
@@ -123,10 +121,8 @@ static rct::key compute_challenge(const rct::key &challenge_message,
     const rct::key &K_t2_proofkey,
     const rct::key &KI_proofkey)
 {
-    static const std::string domain_separator{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE};
-
     // collect challenge hash data
-    SpTranscript transcript{domain_separator, 4*sizeof(rct::key)};
+    SpTranscript transcript{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE, 4*sizeof(rct::key)};
     transcript.append("challenge_message", challenge_message);
     transcript.append("K_t1_proofkey", K_t1_proofkey);
     transcript.append("K_t2_proofkey", K_t2_proofkey);
@@ -190,10 +186,8 @@ static void compute_K_t1_for_proof(const crypto::secret_key &y,
 static rct::key multisig_binonce_merge_factor(const rct::key &message,
     const std::vector<sp_multisig_binonce_factors> &nonces)
 {
-    static const std::string domain_separator{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE};
-
     // build hash
-    SpTranscript transcript{domain_separator, (1 + 2 * nonces.size()) * sizeof(rct::key)};
+    SpTranscript transcript{config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR, (1 + 2 * nonces.size()) * sizeof(rct::key)};
     transcript.append("message", message);
     transcript.append("nonces", nonces);
 

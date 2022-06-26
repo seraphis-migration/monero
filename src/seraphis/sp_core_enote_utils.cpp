@@ -130,10 +130,8 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
     const rct::key &amount_commitment,
     crypto::secret_key &squash_prefix_out)
 {
-    static const std::string domain_separator{config::HASH_KEY_SERAPHIS_SQUASHED_ENOTE};
-
     // H_n(Ko, C)
-    SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
+    SpTranscript transcript{config::HASH_KEY_SERAPHIS_SQUASHED_ENOTE, 2*sizeof(rct::key)};
     transcript.append("Ko", onetime_address);
     transcript.append("C", amount_commitment);
 

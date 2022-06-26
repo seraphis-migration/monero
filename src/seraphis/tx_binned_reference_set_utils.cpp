@@ -165,10 +165,8 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
 
     // make this bin's member generator
     // g = H_32(bin_generator_seed, bin_locus, bin_index_in_set)
-    static const std::string domain_separator{config::HASH_KEY_BINNED_REF_SET_MEMBER};
-
     SpTranscript transcript{
-            domain_separator,
+            config::HASH_KEY_BINNED_REF_SET_MEMBER,
             sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set) + 20 * bin_config.m_num_bin_members
         };
     transcript.append("bin_generator_seed", bin_generator_seed);
