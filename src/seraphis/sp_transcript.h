@@ -67,15 +67,16 @@ namespace sp
 class SpTranscript
 {
 //member types
-    /// flags for separating data types
+    /// flags for separating items added to the transcript
     enum SpTranscriptFlag : unsigned char
     {
-        UNSIGNED_INTEGER = 0,
-        SIGNED_INTEGER = 1,
-        BYTE_BUFFER = 2,
-        NAMED_CONTAINER = 3,
-        NAMED_CONTAINER_TERMINATOR = 4,
-        LIST_TYPE_CONTAINER = 5,
+        HASH_CHECKPOINT = 0,
+        UNSIGNED_INTEGER = 1,
+        SIGNED_INTEGER = 2,
+        BYTE_BUFFER = 3,
+        NAMED_CONTAINER = 4,
+        NAMED_CONTAINER_TERMINATOR = 5,
+        LIST_TYPE_CONTAINER = 6
     };
 
 //core member functions
@@ -234,6 +235,12 @@ public:
         begin_list_type_container(list_container.size());
         for (const T &element : list_container)
             append(element);
+    }
+
+    /// insert a checkpoint before every hash of the transcript
+    void add_hash_checkpoint()
+    {
+        append_flag(SpTranscriptFlag::HASH_CHECKPOINT);
     }
 
 //member variables

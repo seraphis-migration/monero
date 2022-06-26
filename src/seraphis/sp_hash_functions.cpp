@@ -46,63 +46,69 @@ namespace sp
 // H_32[k](transcript)
 // - if derivation_key == nullptr, then the hash is NOT keyed
 //-------------------------------------------------------------------------------------------------------------------
-static void hash_base(const SpTranscript &transcript,
+static void hash_base(SpTranscript &transcript_inout,
     const unsigned char *derivation_key,  //32 bytes
     unsigned char *hash_out,
     const std::size_t out_length)
 {
-    blake2b(hash_out, out_length, transcript.data(), transcript.size(), derivation_key, derivation_key ? 32 : 0);
+    transcript_inout.add_hash_checkpoint();
+    blake2b(hash_out,
+        out_length,
+        transcript_inout.data(),
+        transcript_inout.size(),
+        derivation_key,
+        derivation_key ? 32 : 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-void sp_hash_to_1(const SpTranscript &transcript, unsigned char *hash_out)
+void sp_hash_to_1(SpTranscript &transcript_inout, unsigned char *hash_out)
 {
     // H_1(x): 1-byte output
-    hash_base(transcript, nullptr, hash_out, 1);
+    hash_base(transcript_inout, nullptr, hash_out, 1);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void sp_hash_to_8(const SpTranscript &transcript, unsigned char *hash_out)
+void sp_hash_to_8(SpTranscript &transcript_inout, unsigned char *hash_out)
 {
     // H_8(x): 8-byte output
-    hash_base(transcript, nullptr, hash_out, 8);
+    hash_base(transcript_inout, nullptr, hash_out, 8);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void sp_hash_to_16(const SpTranscript &transcript, unsigned char *hash_out)
+void sp_hash_to_16(SpTranscript &transcript_inout, unsigned char *hash_out)
 {
     // H_16(x): 16-byte output
-    hash_base(transcript, nullptr, hash_out, 16);
+    hash_base(transcript_inout, nullptr, hash_out, 16);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void sp_hash_to_32(const SpTranscript &transcript, unsigned char *hash_out)
+void sp_hash_to_32(SpTranscript &transcript_inout, unsigned char *hash_out)
 {
     // H_32(x): 32-byte output
-    hash_base(transcript, nullptr, hash_out, 32);
+    hash_base(transcript_inout, nullptr, hash_out, 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void sp_hash_to_scalar(const SpTranscript &transcript, unsigned char *hash_out)
+void sp_hash_to_scalar(SpTranscript &transcript_inout, unsigned char *hash_out)
 {
     // H_n(x): Ed25519 group scalar output (32 bytes)
     // note: hash to 64 bytes then mod l
     unsigned char temp[64];
-    hash_base(transcript, nullptr, temp, 64);
+    hash_base(transcript_inout, nullptr, temp, 64);
     sc_reduce(temp);  //mod l
     memcpy(hash_out, temp, 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void sp_derive_key(const unsigned char *derivation_key, const SpTranscript &transcript, unsigned char *hash_out)
+void sp_derive_key(const unsigned char *derivation_key, SpTranscript &transcript_inout, unsigned char *hash_out)
 {
     // H_n[k](x): Ed25519 group scalar output (32 bytes)
     // note: hash to 64 bytes then mod l
     unsigned char temp[64];
-    hash_base(transcript, derivation_key, temp, 64);
+    hash_base(transcript_inout, derivation_key, temp, 64);
     sc_reduce(temp);  //mod l
     memcpy(hash_out, temp, 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void sp_derive_secret(const unsigned char *derivation_key, const SpTranscript &transcript, unsigned char *hash_out)
+void sp_derive_secret(const unsigned char *derivation_key, SpTranscript &transcript_inout, unsigned char *hash_out)
 {
     // H_32[k](x): 32-byte output
-    hash_base(transcript, derivation_key, hash_out, 32);
+    hash_base(transcript_inout, derivation_key, hash_out, 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp
