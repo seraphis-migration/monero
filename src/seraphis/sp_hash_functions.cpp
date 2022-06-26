@@ -43,7 +43,7 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-// H_32[k](transcript)
+// H_x[k](transcript)
 // - if derivation_key == nullptr, then the hash is NOT keyed
 //-------------------------------------------------------------------------------------------------------------------
 static void hash_base(const unsigned char *derivation_key,  //32 bytes
@@ -51,7 +51,7 @@ static void hash_base(const unsigned char *derivation_key,  //32 bytes
     unsigned char *hash_out,
     const std::size_t out_length)
 {
-    transcript_inout.add_hash_checkpoint();
+    transcript_inout.add_hash_checkpoint("blake2b");
     blake2b(hash_out,
         out_length,
         transcript_inout.data(),

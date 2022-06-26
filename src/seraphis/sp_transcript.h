@@ -67,7 +67,7 @@ namespace sp
 //     - list-type container (same-type elements only): list_flag || list_length || element1 || element2 || ...
 // - before hashing the transctipt, always call add_hash_checkpoint()
 ///
-class SpTranscript
+class SpTranscript final
 {
 //member types
     /// flags for separating items added to the transcript
@@ -268,8 +268,9 @@ public:
     }
 
     /// insert a checkpoint before every hash of the transcript
-    void add_hash_checkpoint()
+    void add_hash_checkpoint(const boost::string_ref hash_function_name)
     {
+        append_label(hash_function_name);
         append_flag(SpTranscriptFlag::HASH_CHECKPOINT);
     }
 

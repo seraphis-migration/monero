@@ -73,8 +73,8 @@ struct Blowfish_LR_wrapper
 };
 
 /// block sizes
-constexpr std::size_t BLOWFISH_BLOCK_SIZE{8};
-constexpr std::size_t AES_BLOCK_SIZE{16};
+//constexpr std::size_t BLOWFISH_BLOCK_SIZE{8};
+//constexpr std::size_t AES_BLOCK_SIZE{16};
 constexpr std::size_t TWOFISH_BLOCK_SIZE{16};
 
 //-------------------------------------------------------------------------------------------------------------------
