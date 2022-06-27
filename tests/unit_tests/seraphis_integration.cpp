@@ -312,13 +312,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
 
 
     /// add enough fake enotes to the ledger so we can reliably make membership proofs
-    std::vector<rct::xmr_amount> fake_enote_amounts(
-            std::max(
-                    ref_set_size_from_decomp(ref_set_decomp_n, ref_set_decomp_m),
-                    static_cast<std::size_t>(2*bin_config.m_bin_radius + 1)
-                ),
-            0
-        );
+    std::vector<rct::xmr_amount> fake_enote_amounts(static_cast<std::size_t>(2*bin_config.m_bin_radius + 1), 0);
     JamtisDestinationV1 fake_destination;
     fake_destination.gen();
 
