@@ -253,21 +253,6 @@ namespace config
   const unsigned char HASH_KEY_MM_SLOT = 'm';
   const constexpr char HASH_KEY_SERAPHIS_U[] = "seraphis_U";
   const constexpr char HASH_KEY_SERAPHIS_X[] = "seraphis_X";
-  const constexpr char HASH_KEY_SERAPHIS_SQUASHED_ENOTE[] = "seraphis_squashed_enote";
-  const constexpr char HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR[] = "multisig_binonce_merge_factor";
-  const constexpr char HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET[] = "jamtis_generate_address_secret";
-  const constexpr char HASH_KEY_JAMTIS_CIPHERTAG_SECRET[] = "jamtis_cipher_tag_secret";
-  const constexpr char HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY[] = "jamtis_identify_wallet_key";
-  const constexpr char HASH_KEY_JAMTIS_FINDRECEIVED_KEY[] = "jamtis_find_received_key";
-  const constexpr char HASH_KEY_JAMTIS_ADDRESS_PRIVKEY[] = "jamtis_address_privkey";
-  const constexpr char HASH_KEY_JAMTIS_SPENDKEY_EXTENSION[] = "jamtis_spendkey_extension";
-  const constexpr char HASH_KEY_JAMTIS_ENCRYPTED_ADDRESS_TAG[] = "jamtis_encrypted_address_tag";
-  const constexpr char HASH_KEY_JAMTIS_VIEW_TAG[] = "jamtis_enote_view_tag";
-  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN[] = "jamtis_sender_receiver_secret_plain";
-  const constexpr char HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION[] = "jamtis_sender_onetime_address_extension";
-  const constexpr char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN[] = "jamtis_enote_amount_commitment_blinding_factor_plain";
-  const constexpr char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF[] = "jamtis_enote_amount_commitment_blinding_factor_self";
-  const constexpr char HASH_KEY_JAMTIS_AMOUNT_ENC[] = "jamtis_enote_amount_encoding";
 
   // Multisig
   const uint32_t MULTISIG_MAX_SIGNERS{16};

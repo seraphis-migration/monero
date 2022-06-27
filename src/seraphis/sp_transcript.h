@@ -80,7 +80,8 @@ class SpTranscript final
         BYTE_BUFFER = 3,
         NAMED_CONTAINER = 4,
         NAMED_CONTAINER_TERMINATOR = 5,
-        LIST_TYPE_CONTAINER = 6
+        LIST_TYPE_CONTAINER = 6,
+        TRANSCRIPT_CLONE = 7
     };
 
 //core member functions

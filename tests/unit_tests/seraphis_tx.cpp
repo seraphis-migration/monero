@@ -67,7 +67,7 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
     sp::MockLedgerContext ledger_context{};
     const sp::TxValidationContextMock tx_validation_context{ledger_context};
 
-    for (const auto &gen : gen_data)
+    for (const SpTxGenData &gen : gen_data)
     {
         try
         {
@@ -118,7 +118,7 @@ static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
     txs_to_verify_ptrs.reserve(gen_data.size());
     TestType expected_result = TestType::ExpectTrue;
 
-    for (const auto &gen : gen_data)
+    for (const SpTxGenData &gen : gen_data)
     {
         try
         {
@@ -372,12 +372,12 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_batching()
 ////////////////////////// Seraphis Squash //////////////////////////
 /////////////////////////////////////////////////////////////////////
 
-TEST(mock_tx, seraphis_squashed)
+TEST(seraphis_tx, seraphis_squashed)
 {
     run_mock_tx_test<sp::SpTxSquashedV1>(get_mock_tx_gen_data_misc(true));
 }
 
-TEST(mock_tx_batching, seraphis_squashed)
+TEST(seraphis_tx_batching, seraphis_squashed)
 {
     run_mock_tx_test_batch<sp::SpTxSquashedV1>(get_mock_tx_gen_data_batching());
 }

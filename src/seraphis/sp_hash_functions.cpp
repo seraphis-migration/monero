@@ -29,6 +29,7 @@
 // NOT FOR PRODUCTION
 
 //paired header
+#include "misc_log_ex.h"
 #include "sp_hash_functions.h"
 
 //local headers
@@ -51,15 +52,16 @@ static void hash_base(const unsigned char *derivation_key,  //32 bytes
     unsigned char *hash_out,
     const std::size_t out_length)
 {
-    transcript_inout.use_transcript("blake2b",
+    transcript_inout.use_transcript("b2b",
             [derivation_key, hash_out, out_length](const void *transcript_data, const std::size_t transcript_length)
             {
-                blake2b(hash_out,
-                    out_length,
-                    transcript_data,
-                    transcript_length,
-                    derivation_key,
-                    derivation_key ? 32 : 0);
+                CHECK_AND_ASSERT_THROW_MES(blake2b(hash_out,
+                        out_length,
+                        transcript_data,
+                        transcript_length,
+                        derivation_key,
+                        derivation_key ? 32 : 0) == 0,
+                    "seraphis hash base: blake2b failed.");
             }
         );
 }
@@ -87,6 +89,12 @@ void sp_hash_to_32(SpTranscript &transcript_inout, unsigned char *hash_out)
 {
     // H_32(x): 32-byte output
     hash_base(nullptr, transcript_inout, hash_out, 32);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void sp_hash_to_64(SpTranscript &transcript_inout, unsigned char *hash_out)
+{
+    // H_64(x): 64-byte output
+    hash_base(nullptr, transcript_inout, hash_out, 64);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void sp_hash_to_scalar(SpTranscript &transcript_inout, unsigned char *hash_out)

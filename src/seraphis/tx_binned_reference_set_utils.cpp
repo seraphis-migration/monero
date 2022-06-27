@@ -163,15 +163,15 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
     CHECK_AND_ASSERT_THROW_MES(bin_config.m_num_bin_members > 0,
         "making normalized bin members: zero bin members were requested (at least one expected).");
 
-    // make this bin's member generator
-    // g = H_32(bin_generator_seed, bin_locus, bin_index_in_set)
+    // prepare for making this bin's member generators
+    // g = H_64(bin_generator_seed, bin_locus, bin_index_in_set)
     SpTranscript transcript{
             config::HASH_KEY_BINNED_REF_SET_MEMBER,
             sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set) + 200 * bin_config.m_num_bin_members
         };
-    transcript.append("bin_generator_seed", bin_generator_seed);
-    transcript.append("bin_locus", bin_locus);
-    transcript.append("bin_index_in_set", bin_index_in_set);
+    transcript.append("seed", bin_generator_seed);
+    transcript.append("length", bin_locus);
+    transcript.append("bin_index", bin_index_in_set);
 
     // set clip allowed max to be a large multiple of the bin width (minus 1 since we are zero-basis),
     //   to avoid bias in the bin members
@@ -195,27 +195,32 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
         };
 
     // make each bin member (as unique indices within the bin)
+    // - make 64-byte blobs via hashing, then use each 8-byte block to try to generate a bin member
+    //   - this minimizes the amount of time spent in the hash function by calling it fewer times
+    unsigned char member_generator[64];
+    std::size_t member_generator_offset_blocks{0};
     std::uint64_t generator_clip{};
     std::uint64_t member_candidate{};
     members_of_bin_out.clear();
     members_of_bin_out.reserve(bin_config.m_num_bin_members);
-    std::uint64_t num_attempts{0};
 
     for (std::size_t bin_member_index{0}; bin_member_index < bin_config.m_num_bin_members; ++bin_member_index)
     {
-        transcript.append("bin_member_index", bin_member_index);
-        num_attempts = 0;
-
         // look for a unique bin member to add
         do
         {
             // update the generator (find a generator that is within the allowed max)
             do
             {
-                ++num_attempts;
-                transcript.append("num_attempts", num_attempts);
-                sp_hash_to_8(transcript, reinterpret_cast<unsigned char*>(&generator_clip));
+                if (member_generator_offset_blocks*8 >= sizeof(member_generator))
+                    member_generator_offset_blocks = 0;
+
+                if (member_generator_offset_blocks == 0)
+                    sp_hash_to_64(transcript, member_generator);
+
+                memcpy(&generator_clip, member_generator + 8*member_generator_offset_blocks, 8);
                 generator_clip = SWAP64LE(generator_clip);
+                ++member_generator_offset_blocks;
             } while (generator_clip > clip_allowed_max);
 
             // compute the bin member: slice_8_bytes(generator) mod bin_width

@@ -53,6 +53,8 @@ void sp_hash_to_8(SpTranscript &transcript_inout, unsigned char *hash_out);
 void sp_hash_to_16(SpTranscript &transcript_inout, unsigned char *hash_out);
 /// H_32(x): 32-byte output
 void sp_hash_to_32(SpTranscript &transcript_inout, unsigned char *hash_out);
+/// H_64(x): 64-byte output
+void sp_hash_to_64(SpTranscript &transcript_inout, unsigned char *hash_out);
 /// H_n(x): Ed25519 group scalar output (32 bytes)
 void sp_hash_to_scalar(SpTranscript &transcript_inout, unsigned char *hash_out);
 /// H_n[k](x): Ed25519 group scalar output (32 bytes); 32-byte key
