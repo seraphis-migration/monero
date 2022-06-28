@@ -131,7 +131,7 @@ void make_seraphis_squash_prefix(const rct::key &onetime_address,
     crypto::secret_key &squash_prefix_out)
 {
     // H_n(Ko, C)
-    SpTranscript transcript{config::HASH_KEY_SERAPHIS_SQUASHED_ENOTE, 2*sizeof(rct::key)};
+    SpKDFTranscript transcript{config::HASH_KEY_SERAPHIS_SQUASHED_ENOTE, 2*sizeof(rct::key)};
     transcript.append("Ko", onetime_address);
     transcript.append("C", amount_commitment);
 

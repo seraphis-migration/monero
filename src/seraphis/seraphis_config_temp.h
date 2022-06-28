@@ -41,7 +41,7 @@ namespace config
   const constexpr std::uint64_t DISCRETIZED_FEE_LEVEL_NUMERATOR_X100 = 150;  //fee level factor = 1.5
   const constexpr std::uint64_t DISCRETIZED_FEE_SIG_FIGS = 1;
 
-  const constexpr char SERAPHIS_TRANSCRIPT_PREFIX[] = "sp_tscrpt";
+  const constexpr char SERAPHIS_FS_TRANSCRIPT_PREFIX[] = "sp_FS_transcript";
 
   const constexpr char HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY[] = "jamtis_unlock_amounts_key";
 

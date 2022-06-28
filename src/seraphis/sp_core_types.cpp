@@ -56,7 +56,7 @@ bool SpEnote::onetime_address_is_canonical() const
     return key_domain_is_prime_subgroup(m_onetime_address);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const SpEnote &container, SpTranscript &transcript_inout)
+void append_to_transcript(const SpEnote &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("Ko", container.m_onetime_address);
     transcript_inout.append("C", container.m_amount_commitment);
@@ -69,7 +69,7 @@ void SpEnote::gen()
     m_amount_commitment = rct::pkGen();
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const SpEnoteImage &container, SpTranscript &transcript_inout)
+void append_to_transcript(const SpEnoteImage &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("K_masked", container.m_masked_address);
     transcript_inout.append("C_masked", container.m_masked_commitment);

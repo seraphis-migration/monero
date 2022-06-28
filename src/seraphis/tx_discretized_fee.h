@@ -43,7 +43,7 @@
 #include <string>
 
 //forward declarations
-namespace sp { class SpTranscript; }
+namespace sp { class SpTranscriptBuilder; }
 
 
 namespace sp
@@ -74,7 +74,7 @@ struct DiscretizedFee final
     static std::size_t get_size_bytes() { return sizeof(m_fee_level); }
 };
 inline const boost::string_ref get_container_name(const DiscretizedFee&) { return "DiscretizedFee"; }
-void append_to_transcript(const DiscretizedFee &container, SpTranscript &transcript_inout);
+void append_to_transcript(const DiscretizedFee &container, SpTranscriptBuilder &transcript_inout);
 
 bool operator==(const discretized_fee_level_t fee_level, const DiscretizedFee &discretized_fee);
 

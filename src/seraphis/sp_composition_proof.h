@@ -103,7 +103,7 @@
 #include <vector>
 
 //forward declarations
-namespace sp { class SpTranscript; }
+namespace sp { class SpTranscriptBuilder; }
 
 
 namespace sp
@@ -131,7 +131,7 @@ struct SpCompositionProof final
     static std::size_t get_size_bytes() { return 32*5; }
 };
 inline const boost::string_ref get_container_name(const SpCompositionProof&) { return "SpCompositionProof"; }
-void append_to_transcript(const SpCompositionProof &container, SpTranscript &transcript_inout);
+void append_to_transcript(const SpCompositionProof &container, SpTranscriptBuilder &transcript_inout);
 
 ////
 // Multisig signature proposal

@@ -64,7 +64,7 @@ void SpEnoteV1::gen()
     crypto::rand(sizeof(jamtis::encrypted_address_tag_t), m_addr_tag_enc.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const SpEnoteV1 &container, SpTranscript &transcript_inout)
+void append_to_transcript(const SpEnoteV1 &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("core", container.m_core);
     const std::uint64_t le_encoded_amount{SWAP64LE(container.m_encoded_amount)};
@@ -75,7 +75,7 @@ void append_to_transcript(const SpEnoteV1 &container, SpTranscript &transcript_i
     transcript_inout.append("view_tag", container.m_view_tag);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const SpEnoteImageV1 &container, SpTranscript &transcript_inout)
+void append_to_transcript(const SpEnoteImageV1 &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("core", container.m_core);
 }
@@ -94,7 +94,7 @@ std::size_t SpMembershipProofV1::get_size_bytes() const
         m_binned_reference_set.m_bin_config.m_num_bin_members);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const SpMembershipProofV1 &container, SpTranscript &transcript_inout)
+void append_to_transcript(const SpMembershipProofV1 &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("grootle_proof", container.m_grootle_proof);
     transcript_inout.append("binned_reference_set", container.m_binned_reference_set);
@@ -102,7 +102,7 @@ void append_to_transcript(const SpMembershipProofV1 &container, SpTranscript &tr
     transcript_inout.append("m", container.m_ref_set_decomp_m);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const SpImageProofV1 &container, SpTranscript &transcript_inout)
+void append_to_transcript(const SpImageProofV1 &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("composition_proof", container.m_composition_proof);
 }
@@ -147,7 +147,7 @@ std::size_t SpBalanceProofV1::get_weight(const bool include_commitments /*=false
     return SpBalanceProofV1::get_weight(m_bpp_proof.V.size(), 0, include_commitments);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const SpBalanceProofV1 &container, SpTranscript &transcript_inout)
+void append_to_transcript(const SpBalanceProofV1 &container, SpTranscriptBuilder &transcript_inout)
 {
     append_bpp_to_transcript(container.m_bpp_proof, transcript_inout);
     transcript_inout.append("remainder_blinding_factor", container.m_remainder_blinding_factor);
@@ -174,7 +174,7 @@ std::size_t SpTxSupplementV1::get_size_bytes() const
     return 32 * m_output_enote_ephemeral_pubkeys.size() + m_tx_extra.size();
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const SpTxSupplementV1 &container, SpTranscript &transcript_inout)
+void append_to_transcript(const SpTxSupplementV1 &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("output_K_e_keys", container.m_output_enote_ephemeral_pubkeys);
     transcript_inout.append("tx_extra", container.m_tx_extra);

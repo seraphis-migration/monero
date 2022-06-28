@@ -63,7 +63,7 @@
 
 //forward declarations
 namespace rct { struct pippenger_prep_data; }
-namespace sp { class SpTranscript; }
+namespace sp { class SpTranscriptBuilder; }
 
 
 namespace sp
@@ -91,7 +91,7 @@ struct GrootleProof
     std::size_t get_size_bytes() const;
 };
 inline const boost::string_ref get_container_name(const GrootleProof&) { return "GrootleProof"; }
-void append_to_transcript(const GrootleProof &container, SpTranscript &transcript_inout);
+void append_to_transcript(const GrootleProof &container, SpTranscriptBuilder &transcript_inout);
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////// Handle Proofs /////////////////////////////////////////////////

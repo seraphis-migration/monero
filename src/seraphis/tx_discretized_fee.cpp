@@ -168,7 +168,7 @@ bool DiscretizedFee::operator==(const rct::xmr_amount raw_fee_value) const
     return this_fee_value == raw_fee_value;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const DiscretizedFee &container, SpTranscript &transcript_inout)
+void append_to_transcript(const DiscretizedFee &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("fee_level", container.m_fee_level);
 }

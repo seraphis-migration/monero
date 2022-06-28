@@ -56,10 +56,9 @@ namespace sp
 {
 
 ////
-// SpTranscript
+// SpTranscriptBuilder
 // - build a transcript
-// - main format: transcript_prefix || domain_separator || object1_label || object1 || object2_label || object2 || ...
-// - data types: objects are always prefixed with a label
+// - data types: objects are prefixed with a label
 //     - unsigned int: uint_flag || varint(uint_variable)
 //     - signed int: int_flag || uchar{int_variable < 0 ? 1 : 0} || varint(abs(int_variable))
 //     - byte buffer (assumed little-endian): buffer_flag || buffer_length || buffer
@@ -67,12 +66,13 @@ namespace sp
 //     - named container: container_flag || container_name || data_member1 || ... || container_terminator_flag
 //     - list-type container (same-type elements only): list_flag || list_length || element1 || element2 || ...
 // - the transcript can be used by passing a predicate to use_transcript()
+// - simple mode: exclude all labels, flags, and lengths
 ///
-class SpTranscript final
+class SpTranscriptBuilder final
 {
 //member types
     /// flags for separating items added to the transcript
-    enum SpTranscriptFlag : unsigned char
+    enum SpTranscriptBuilderFlag : unsigned char
     {
         EXTERNAL_PREDICATE_CALL = 0,
         UNSIGNED_INTEGER = 1,
@@ -96,56 +96,63 @@ class SpTranscript final
         assert(v_variable_end <= v_variable + sizeof(v_variable));
         m_transcript.append(reinterpret_cast<const char*>(v_variable), v_variable_end - v_variable);
     }
-    void append_flag(const SpTranscriptFlag flag)
+    void append_flag(const SpTranscriptBuilderFlag flag)
     {
-        static_assert(sizeof(SpTranscriptFlag) <= sizeof(std::uint64_t), "SpTranscript: flag type greater than uint64_t.");
+        if (m_simple_mode)
+            return;
+
+        static_assert(sizeof(SpTranscriptBuilderFlag) <= sizeof(std::uint64_t),
+            "SpTranscriptBuilder: flag type greater than uint64_t.");
         append_uint(static_cast<std::uint64_t>(flag));
     }
     void append_length(const std::size_t length)
     {
-        static_assert(sizeof(std::size_t) <= sizeof(std::uint64_t), "SpTranscript: size_t greater than uint64_t.");
+        if (m_simple_mode)
+            return;
+
+        static_assert(sizeof(std::size_t) <= sizeof(std::uint64_t), "SpTranscriptBuilder: size_t greater than uint64_t.");
         append_uint(static_cast<std::uint64_t>(length));
     }
     void append_buffer(const void *data, const std::size_t length)
     {
-        append_flag(SpTranscriptFlag::BYTE_BUFFER);
+        append_flag(SpTranscriptBuilderFlag::BYTE_BUFFER);
         append_length(length);
         m_transcript.append(reinterpret_cast<const char*>(data), length);
     }
     void append_label(const boost::string_ref label)
     {
+        if (m_simple_mode)
+            return;
+
         append_buffer(label.data(), label.size());
     }
     void begin_named_container(const boost::string_ref container_name)
     {
-        append_flag(SpTranscriptFlag::NAMED_CONTAINER);
+        append_flag(SpTranscriptBuilderFlag::NAMED_CONTAINER);
         append_label(container_name);
     }
     void end_named_container()
     {
-        append_flag(SpTranscriptFlag::NAMED_CONTAINER_TERMINATOR);
+        append_flag(SpTranscriptBuilderFlag::NAMED_CONTAINER_TERMINATOR);
     }
     void begin_list_type_container(const std::size_t &list_length)
     {
-        append_flag(SpTranscriptFlag::LIST_TYPE_CONTAINER);
+        append_flag(SpTranscriptBuilderFlag::LIST_TYPE_CONTAINER);
         append_length(list_length);
     }
 
 public:
 //constructors
     /// normal constructor: start building a transcript with the domain separator
-    SpTranscript(const boost::string_ref domain_separator, const std::size_t estimated_data_size)
+    SpTranscriptBuilder(const std::size_t estimated_data_size, const bool mode) :
+        m_simple_mode{mode}
     {
-        m_transcript.reserve(domain_separator.size() + 4 * estimated_data_size + 30);
-
-        // transcript = seraphis_transcript || domain_separator
-        append_label(config::SERAPHIS_TRANSCRIPT_PREFIX);
-        append_label(domain_separator);
+        m_transcript.reserve(2 * estimated_data_size + 20);
     }
 
 //overloaded operators
     /// disable copy/move (this is a scoped manager [of the 'transcript' concept])
-    SpTranscript& operator=(SpTranscript&&) = delete;
+    SpTranscriptBuilder& operator=(SpTranscriptBuilder&&) = delete;
 
 //member functions
     /// transcript builders
@@ -195,6 +202,12 @@ public:
         append_label(label);
         append_buffer(uchar_buffer, Sz);
     }
+    template<std::size_t Sz>
+    void append(const boost::string_ref label, const char(&char_buffer)[Sz])
+    {
+        append_label(label);
+        append_buffer(char_buffer, Sz);
+    }
     void append(const boost::string_ref label, const std::vector<unsigned char> &vector_buffer)
     {
         append_label(label);
@@ -209,9 +222,9 @@ public:
         std::enable_if_t<std::is_unsigned<T>::value, bool> = true>
     void append(const boost::string_ref label, const T unsigned_integer)
     {
-        static_assert(sizeof(T) <= sizeof(std::uint64_t), "SpTranscriptFlag: unsupported unsigned integer type.");
+        static_assert(sizeof(T) <= sizeof(std::uint64_t), "SpTranscriptBuilderFlag: unsupported unsigned integer type.");
         append_label(label);
-        append_flag(SpTranscriptFlag::UNSIGNED_INTEGER);
+        append_flag(SpTranscriptBuilderFlag::UNSIGNED_INTEGER);
         append_uint(unsigned_integer);
     }
     template<typename T,
@@ -219,9 +232,9 @@ public:
         std::enable_if_t<!std::is_unsigned<T>::value, bool> = true>
     void append(const boost::string_ref label, const T signed_integer)
     {
-        static_assert(sizeof(T) <= sizeof(std::uint64_t), "SpTranscriptFlag: unsupported signed integer type.");
+        static_assert(sizeof(T) <= sizeof(std::uint64_t), "SpTranscriptBuilderFlag: unsupported signed integer type.");
         append_label(label);
-        append_flag(SpTranscriptFlag::SIGNED_INTEGER);
+        append_flag(SpTranscriptBuilderFlag::SIGNED_INTEGER);
         if (signed_integer > 0)
         {
             // positive integer: byte{0} || varint(uint(int_variable))
@@ -241,7 +254,7 @@ public:
     {
         // named containers must satisfy two concepts:
         //   const boost::string_ref get_container_name(const T &container);
-        //   void append_to_transcript(const T &container, SpTranscript &transcript_inout);
+        //   void append_to_transcript(const T &container, SpTranscriptBuilder &transcript_inout);
         append_label(label);
         begin_named_container(get_container_name(named_container));
         append_to_transcript(named_container, *this);
@@ -264,19 +277,96 @@ public:
             append("", element);
     }
 
-    /// use the transcript with a user-defined predicate
-    void use_transcript(const boost::string_ref label,
-        const std::function<void(const void*, const std::size_t)> &predicate)
-    {
-        append_label(label);
-        append_flag(SpTranscriptFlag::EXTERNAL_PREDICATE_CALL);
-        predicate(m_transcript.data(), m_transcript.size());
-    }
+    /// access the transcript data
+    const void* data() const { return m_transcript.data(); }
+    std::size_t size() const { return m_transcript.size(); }
 
 //member variables
 private:
+    /// if set, exclude: labels, flags, lengths
+    bool m_simple_mode;
     /// the transcript itself (wipeable in case it contains sensitive data)
     epee::wipeable_string m_transcript;
+};
+
+////
+// SpFSTranscript
+// - build a Fiat-Shamir transcript
+// - main format: transcript_prefix || domain_separator || object1_label || object1 || object2_label || object2 || ...
+///
+class SpFSTranscript final
+{
+public:
+//constructors
+    /// normal constructor: start building a transcript with the domain separator
+    SpFSTranscript(const boost::string_ref domain_separator, const std::size_t estimated_data_size) :
+        m_transcript_builder{15 + domain_separator.size() + estimated_data_size, true}
+    {
+        // transcript = sp_FS_transcript || domain_separator
+        m_transcript_builder.append("FS_transcript", config::SERAPHIS_FS_TRANSCRIPT_PREFIX);
+        m_transcript_builder.append("domain_separator", domain_separator);
+    }
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [of the 'transcript' concept])
+    SpFSTranscript& operator=(SpFSTranscript&&) = delete;
+
+//member functions
+    /// transcript builders
+    template<typename T>
+    void append(const boost::string_ref label, const T &value)
+    {
+        m_transcript_builder.append(label, value);
+    }
+
+    /// access the transcript data
+    const void* data() const { return m_transcript_builder.data(); }
+    std::size_t size() const { return m_transcript_builder.size(); }
+
+//member variables
+private:
+    /// underlying transcript builder
+    SpTranscriptBuilder m_transcript_builder;
+};
+
+////
+// SpFSTranscript
+// - build a data string for a key-derivation function
+// - main format: domain_separator || object1 || object2 || ...
+// - simple transcript mode: no labels, flags, or lengths
+///
+class SpKDFTranscript final
+{
+public:
+//constructors
+    /// normal constructor: start building a transcript with the domain separator
+    SpKDFTranscript(const boost::string_ref domain_separator, const std::size_t estimated_data_size) :
+        m_transcript_builder{domain_separator.size() + estimated_data_size, false}
+    {
+        // transcript = domain_separator
+        m_transcript_builder.append("", domain_separator);
+    }
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [of the 'transcript' concept])
+    SpKDFTranscript& operator=(SpKDFTranscript&&) = delete;
+
+//member functions
+    /// transcript builders
+    template<typename T>
+    void append(const boost::string_ref, const T &value)
+    {
+        m_transcript_builder.append("", value);
+    }
+
+    /// access the transcript data
+    const void* data() const { return m_transcript_builder.data(); }
+    std::size_t size() const { return m_transcript_builder.size(); }
+
+//member variables
+private:
+    /// underlying transcript builder
+    SpTranscriptBuilder m_transcript_builder;
 };
 
 } //namespace sp

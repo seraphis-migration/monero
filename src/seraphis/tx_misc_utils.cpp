@@ -103,7 +103,7 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     range_proofs_out = rct::bulletproof_plus_PROVE(amounts, amount_commitment_blinding_factors);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_bpp_to_transcript(const rct::BulletproofPlus &bpp_proof, SpTranscript &transcript_inout)
+void append_bpp_to_transcript(const rct::BulletproofPlus &bpp_proof, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("V", bpp_proof.V);
     transcript_inout.append("A", bpp_proof.A);

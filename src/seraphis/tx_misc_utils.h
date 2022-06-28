@@ -45,7 +45,7 @@
 #include <vector>
 
 //forward declarations
-namespace sp { class SpTranscript; }
+namespace sp { class SpTranscriptBuilder; }
 
 
 namespace sp
@@ -125,7 +125,7 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
 * param: bpp_proof -
 * inoutparam: transcript_inout - contents appended to a transcript
 */
-void append_bpp_to_transcript(const rct::BulletproofPlus &bpp_proof, SpTranscript &transcript_inout);
+void append_bpp_to_transcript(const rct::BulletproofPlus &bpp_proof, SpTranscriptBuilder &transcript_inout);
 /**
 * brief: bpp_size_bytes - get the size of a BP+ proof in bytes
 *   - BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)

@@ -82,7 +82,7 @@ void make_binned_ref_set_generator_seed_v1(const rct::key &masked_address,
     // make binned reference set generator seed
 
     // seed = H_32(K", C")
-    SpTranscript transcript{config::HASH_KEY_BINNED_REF_SET_GENERATOR_SEED, 2*sizeof(rct::key)};
+    SpKDFTranscript transcript{config::HASH_KEY_BINNED_REF_SET_GENERATOR_SEED, 2*sizeof(rct::key)};
     transcript.append("K_masked", masked_address);
     transcript.append("C_masked", masked_commitment);
 
@@ -144,7 +144,7 @@ void make_tx_membership_proof_message_v1(const SpBinnedReferenceSetV1 &binned_re
     static const std::string project_name{CRYPTONOTE_NAME};
 
     // m = H_32('project name', {binned reference set})
-    SpTranscript transcript{
+    SpFSTranscript transcript{
             config::HASH_KEY_SERAPHIS_MEMBERSHIP_PROOF_MESSAGE_V1,
             project_name.size() +
                 binned_reference_set.get_size_bytes(true) +
@@ -209,7 +209,7 @@ void prepare_input_commitment_factors_for_balance_proof_v1(
 void make_input_images_prefix_v1(const std::vector<SpEnoteImageV1> &enote_images, rct::key &input_images_prefix_out)
 {
     // input images prefix = H_32({K", C", KI})
-    SpTranscript transcript{
+    SpFSTranscript transcript{
             config::HASH_KEY_SERAPHIS_INPUT_IMAGES_PREFIX_V1,
             enote_images.size()*SpEnoteImageV1::get_size_bytes()
         };

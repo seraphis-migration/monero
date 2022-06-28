@@ -211,7 +211,7 @@ void SpTxSquashedV1::get_hash(rct::key &tx_hash_out) const
 
     // 4. tx hash
     // tx_hash = H_32(image_proofs_message, input images, proofs)
-    SpTranscript transcript{config::HASH_KEY_SERAPHIS_TRANSACTION_TYPE_SQUASHED_V1, 3*sizeof(rct::key)};
+    SpFSTranscript transcript{config::HASH_KEY_SERAPHIS_TRANSACTION_TYPE_SQUASHED_V1, 3*sizeof(rct::key)};
     transcript.append("image_proofs_message", image_proofs_message);
     transcript.append("input_images_prefix", input_images_prefix);
     transcript.append("tx_proofs_prefix", tx_proofs_prefix);

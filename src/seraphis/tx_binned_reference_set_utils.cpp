@@ -163,16 +163,6 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
     CHECK_AND_ASSERT_THROW_MES(bin_config.m_num_bin_members > 0,
         "making normalized bin members: zero bin members were requested (at least one expected).");
 
-    // prepare for making this bin's member generators
-    // g = H_64(bin_generator_seed, bin_locus, bin_index_in_set)
-    SpTranscript transcript{
-            config::HASH_KEY_BINNED_REF_SET_MEMBER,
-            sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set) + 200 * bin_config.m_num_bin_members
-        };
-    transcript.append("seed", bin_generator_seed);
-    transcript.append("length", bin_locus);
-    transcript.append("bin_index", bin_index_in_set);
-
     // set clip allowed max to be a large multiple of the bin width (minus 1 since we are zero-basis),
     //   to avoid bias in the bin members
     // example 1:
@@ -201,6 +191,7 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
     std::size_t member_generator_offset_blocks{0};
     std::uint64_t generator_clip{};
     std::uint64_t member_candidate{};
+    std::size_t num_generator_refreshes{0};
     members_of_bin_out.clear();
     members_of_bin_out.reserve(bin_config.m_num_bin_members);
 
@@ -216,7 +207,23 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
                     member_generator_offset_blocks = 0;
 
                 if (member_generator_offset_blocks == 0)
+                {
+                    // make a bin member generator
+                    // g = H_64(bin_generator_seed, bin_locus, bin_index_in_set, num_generator_refreshes)
+                    SpKDFTranscript transcript{
+                            config::HASH_KEY_BINNED_REF_SET_MEMBER,
+                            sizeof(bin_generator_seed) +
+                                sizeof(bin_locus) +
+                                sizeof(bin_index_in_set) +
+                                10 * bin_config.m_num_bin_members
+                        };
+                    transcript.append("seed", bin_generator_seed);
+                    transcript.append("length", bin_locus);
+                    transcript.append("bin_index", bin_index_in_set);
+                    transcript.append("num_generator_refreshes", num_generator_refreshes);
                     sp_hash_to_64(transcript, member_generator);
+                    ++num_generator_refreshes;
+                }
 
                 memcpy(&generator_clip, member_generator + 8*member_generator_offset_blocks, 8);
                 generator_clip = SWAP64LE(generator_clip);

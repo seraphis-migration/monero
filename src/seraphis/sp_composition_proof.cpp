@@ -81,7 +81,7 @@ struct sp_multisig_binonce_factors
     bool operator==(const sp_multisig_binonce_factors &other) const { return equals_from_less{}(*this, other); }
 };
 inline const boost::string_ref get_container_name(const sp_multisig_binonce_factors&) { return "sp_multisig_binonce_factors"; }
-void append_to_transcript(const sp_multisig_binonce_factors &container, SpTranscript &transcript_inout)
+void append_to_transcript(const sp_multisig_binonce_factors &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("nonce1", container.nonce_1);
     transcript_inout.append("nonce2", container.nonce_2);
@@ -98,7 +98,7 @@ static rct::key compute_challenge_message(const rct::key &message,
     const rct::key &K_t1)
 {
     // collect challenge message hash data
-    SpTranscript transcript{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE, 6*sizeof(rct::key)};
+    SpFSTranscript transcript{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE, 6*sizeof(rct::key)};
     transcript.append("X", get_X_gen());
     transcript.append("U", get_U_gen());
     transcript.append("message", message);
@@ -123,7 +123,7 @@ static rct::key compute_challenge(const rct::key &challenge_message,
     const rct::key &KI_proofkey)
 {
     // collect challenge hash data
-    SpTranscript transcript{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE, 4*sizeof(rct::key)};
+    SpFSTranscript transcript{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE, 4*sizeof(rct::key)};
     transcript.append("challenge_message", challenge_message);
     transcript.append("K_t1_proofkey", K_t1_proofkey);
     transcript.append("K_t2_proofkey", K_t2_proofkey);
@@ -188,7 +188,7 @@ static rct::key multisig_binonce_merge_factor(const rct::key &message,
     const std::vector<sp_multisig_binonce_factors> &nonces)
 {
     // build hash
-    SpTranscript transcript{config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR, (1 + 2 * nonces.size()) * sizeof(rct::key)};
+    SpKDFTranscript transcript{config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR, (1 + 2 * nonces.size()) * sizeof(rct::key)};
     transcript.append("message", message);
     transcript.append("nonces", nonces);
 
@@ -200,7 +200,7 @@ static rct::key multisig_binonce_merge_factor(const rct::key &message,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const SpCompositionProof &container, SpTranscript &transcript_inout)
+void append_to_transcript(const SpCompositionProof &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("c", container.c);
     transcript_inout.append("r_t1", container.r_t1);

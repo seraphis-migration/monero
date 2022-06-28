@@ -106,7 +106,7 @@ void make_tx_image_proof_message_v1(const std::string &version_string,
     static const std::string project_name{CRYPTONOTE_NAME};
 
     // H_32(crypto project name, version string, input key images, output enotes, tx supplement, fee)
-    SpTranscript transcript{
+    SpFSTranscript transcript{
             config::HASH_KEY_SERAPHIS_IMAGE_PROOF_MESSAGE_V1,
             project_name.size() +
                 version_string.size() +
@@ -251,7 +251,7 @@ void make_tx_proofs_prefix_v1(const SpBalanceProofV1 &balance_proof,
     rct::key &tx_proofs_prefix_out)
 {
     // H_32(balance proof, image proofs, membership proofs)
-    SpTranscript transcript{
+    SpFSTranscript transcript{
             config::HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1,
             balance_proof.get_size_bytes() +
                 image_proofs.size() * SpImageProofV1::get_size_bytes() +

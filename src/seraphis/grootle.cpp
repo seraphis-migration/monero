@@ -97,8 +97,8 @@ static void init_gens()
         rct::key intermediate_hash;
         for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
         {
-            SpTranscript transcript_A{Hi_A_salt, 4};
-            SpTranscript transcript_B{Hi_B_salt, 4};
+            SpKDFTranscript transcript_A{Hi_A_salt, 4};
+            SpKDFTranscript transcript_B{Hi_B_salt, 4};
             transcript_A.append("i", i);
             transcript_B.append("i", i);
 
@@ -217,7 +217,7 @@ static rct::key compute_challenge(const rct::key &message,
     const rct::keyV &X)
 {
     // hash data
-    SpTranscript transcript{config::HASH_KEY_GROOTLE_CHALLENGE, 2*4 + (M.size() + X.size() + 4)*sizeof(rct::key)};
+    SpFSTranscript transcript{config::HASH_KEY_GROOTLE_CHALLENGE, 2*4 + (M.size() + X.size() + 4)*sizeof(rct::key)};
     transcript.append("message", message);
     transcript.append("n", n);
     transcript.append("m", m);
@@ -249,7 +249,7 @@ std::size_t GrootleProof::get_size_bytes() const
     return GrootleProof::get_size_bytes(n, m);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_to_transcript(const GrootleProof &container, SpTranscript &transcript_inout)
+void append_to_transcript(const GrootleProof &container, SpTranscriptBuilder &transcript_inout)
 {
     transcript_inout.append("A", container.A);
     transcript_inout.append("B", container.B);

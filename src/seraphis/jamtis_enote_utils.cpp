@@ -94,7 +94,7 @@ static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::xmr_amount origina
     static_assert(sizeof(rct::xmr_amount) == 8, "");
 
     // ret = H_8(q, 8 r G) XOR_64 original
-    SpTranscript transcript{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN, 2*sizeof(rct::key)};
+    SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN, 2*sizeof(rct::key)};
     transcript.append("q", sender_receiver_secret);
     transcript.append("baked_key", baked_key);
 
@@ -116,7 +116,7 @@ static rct::xmr_amount enc_dec_jamtis_amount_selfsend(const rct::xmr_amount orig
     static_assert(sizeof(rct::xmr_amount) == 8, "");
 
     // ret = H_8(q) XOR_64 original
-    SpTranscript transcript{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF, sizeof(sender_receiver_secret)};
+    SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF, sizeof(sender_receiver_secret)};
     transcript.append("q", sender_receiver_secret);
 
     crypto::secret_key hash_result;
@@ -144,7 +144,7 @@ void make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_deriv
     static_assert(sizeof(view_tag_t) == 1, "");
 
     // view_tag = H_1(K_d, Ko)
-    SpTranscript transcript{config::HASH_KEY_JAMTIS_VIEW_TAG, 2*sizeof(rct::key)};
+    SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_VIEW_TAG, 2*sizeof(rct::key)};
     transcript.append("K_d", sender_receiver_DH_derivation);
     transcript.append("Ko", onetime_address);
 
@@ -169,7 +169,7 @@ void make_jamtis_view_tag(const crypto::secret_key &privkey,
 void make_jamtis_input_context_coinbase(const std::uint64_t block_height, rct::key &input_context_out)
 {
     // block height as varint
-    SpTranscript transcript{config::HASH_KEY_JAMTIS_INPUT_CONTEXT_COINBASE, 4};
+    SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_INPUT_CONTEXT_COINBASE, 4};
     transcript.append("height", block_height);
 
     // input_context (coinbase) = H_32(block height)
@@ -183,7 +183,7 @@ void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &in
         "jamtis input context (standard): key images are not sorted.");
 
     // {KI}
-    SpTranscript transcript{
+    SpKDFTranscript transcript{
             config::HASH_KEY_JAMTIS_INPUT_CONTEXT_STANDARD,
             input_key_images.size()*sizeof(crypto::key_image)
         };
@@ -199,7 +199,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &send
     rct::key &sender_receiver_secret_out)
 {
     // q = H_32(K_d, K_e, input_context)
-    SpTranscript transcript{config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN, 3*sizeof(rct::key)};
+    SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN, 3*sizeof(rct::key)};
     transcript.append("K_d", sender_receiver_DH_derivation);
     transcript.append("K_e", enote_ephemeral_pubkey);
     transcript.append("input_context", input_context);
@@ -262,7 +262,7 @@ void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_vie
         };
 
     // q = H_32[k_vb](K_e, input_context)
-    SpTranscript transcript{domain_separator, 2*sizeof(rct::key)};
+    SpKDFTranscript transcript{domain_separator, 2*sizeof(rct::key)};
     transcript.append("K_e", enote_ephemeral_pubkey);
     transcript.append("input_context", input_context);
 
@@ -274,7 +274,7 @@ void make_jamtis_onetime_address_extension(const rct::key &sender_receiver_secre
     crypto::secret_key &sender_extension_out)
 {
     // k_{a, sender} = H_n(q, C)
-    SpTranscript transcript{config::HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION, 2*sizeof(rct::key)};
+    SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_SENDER_ONETIME_ADDRESS_EXTENSION, 2*sizeof(rct::key)};
     transcript.append("q", sender_receiver_secret);
     transcript.append("C", amount_commitment);
 
@@ -320,7 +320,7 @@ void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_se
     crypto::secret_key &mask_out)
 {
     // x = H_n(q, 8 r G)
-    SpTranscript transcript{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN, 2*sizeof(rct::key)};
+    SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN, 2*sizeof(rct::key)};
     transcript.append("q", sender_receiver_secret);
     transcript.append("baked_key", baked_key);  //q || 8 r G
 
@@ -331,7 +331,7 @@ void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver
     crypto::secret_key &mask_out)
 {
     // x = H_n(q)
-    SpTranscript transcript{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF, sizeof(rct::key)};
+    SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF, sizeof(rct::key)};
     transcript.append("q", sender_receiver_secret);
 
     sp_hash_to_scalar(transcript, to_bytes(mask_out));

@@ -44,7 +44,7 @@
 #include <vector>
 
 //forward declarations
-namespace sp { class SpTranscript; }
+namespace sp { class SpTranscriptBuilder; }
 
 
 namespace sp
@@ -80,7 +80,7 @@ struct SpEnote final
     void gen();
 };
 inline const boost::string_ref get_container_name(const SpEnote&) { return "SpEnote"; }
-void append_to_transcript(const SpEnote &container, SpTranscript &transcript_inout);
+void append_to_transcript(const SpEnote &container, SpTranscriptBuilder &transcript_inout);
 
 ////
 // SpEnoteImage
@@ -103,7 +103,7 @@ struct SpEnoteImage final
     static std::size_t get_size_bytes() { return 32*3; }
 };
 inline const boost::string_ref get_container_name(const SpEnoteImage&) { return "SpEnoteImage"; }
-void append_to_transcript(const SpEnoteImage &container, SpTranscript &transcript_inout);
+void append_to_transcript(const SpEnoteImage &container, SpTranscriptBuilder &transcript_inout);
 
 ////
 // SpInputProposal

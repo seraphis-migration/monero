@@ -50,7 +50,7 @@
 #include <string>
 
 //forward declarations
-namespace sp { class SpTranscript; }
+namespace sp { class SpTranscriptBuilder; }
 
 
 namespace sp
@@ -89,7 +89,7 @@ struct SpEnoteV1 final
     }
 };
 inline const boost::string_ref get_container_name(const SpEnoteV1&) { return "SpEnoteV1"; }
-void append_to_transcript(const SpEnoteV1 &container, SpTranscript &transcript_inout);
+void append_to_transcript(const SpEnoteV1 &container, SpTranscriptBuilder &transcript_inout);
 
 ////
 // SpEnoteImageV1
@@ -108,7 +108,7 @@ struct SpEnoteImageV1 final
     static std::size_t get_size_bytes() { return SpEnoteImage::get_size_bytes(); }
 };
 inline const boost::string_ref get_container_name(const SpEnoteImageV1&) { return "SpEnoteImageV1"; }
-void append_to_transcript(const SpEnoteImageV1 &container, SpTranscript &transcript_inout);
+void append_to_transcript(const SpEnoteImageV1 &container, SpTranscriptBuilder &transcript_inout);
 
 ////
 // SpMembershipProofV1
@@ -129,7 +129,7 @@ struct SpMembershipProofV1 final
     std::size_t get_size_bytes() const;
 };
 inline const boost::string_ref get_container_name(const SpMembershipProofV1&) { return "SpMembershipProofV1"; }
-void append_to_transcript(const SpMembershipProofV1 &container, SpTranscript &transcript_inout);
+void append_to_transcript(const SpMembershipProofV1 &container, SpTranscriptBuilder &transcript_inout);
 
 ////
 // SpImageProofV1
@@ -144,7 +144,7 @@ struct SpImageProofV1 final
     static std::size_t get_size_bytes() { return sp::SpCompositionProof::get_size_bytes(); }
 };
 inline const boost::string_ref get_container_name(const SpImageProofV1&) { return "SpImageProofV1"; }
-void append_to_transcript(const SpImageProofV1 &container, SpTranscript &transcript_inout);
+void append_to_transcript(const SpImageProofV1 &container, SpTranscriptBuilder &transcript_inout);
 
 ////
 // SpBalanceProofV1
@@ -168,7 +168,7 @@ struct SpBalanceProofV1 final
     std::size_t get_weight(const bool include_commitments = false) const;
 };
 inline const boost::string_ref get_container_name(const SpBalanceProofV1&) { return "SpBalanceProofV1"; }
-void append_to_transcript(const SpBalanceProofV1 &container, SpTranscript &transcript_inout);
+void append_to_transcript(const SpBalanceProofV1 &container, SpTranscriptBuilder &transcript_inout);
 
 ////
 // SpTxSupplementV1
@@ -187,6 +187,6 @@ struct SpTxSupplementV1 final
     std::size_t get_size_bytes() const;
 };
 inline const boost::string_ref get_container_name(const SpTxSupplementV1&) { return "SpTxSupplementV1"; }
-void append_to_transcript(const SpTxSupplementV1 &container, SpTranscript &transcript_inout);
+void append_to_transcript(const SpTxSupplementV1 &container, SpTranscriptBuilder &transcript_inout);
 
 } //namespace sp
