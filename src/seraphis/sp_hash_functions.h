@@ -36,7 +36,6 @@
 //local headers
 
 //third party headers
-#include <boost/utility/string_ref.hpp>
 
 //standard headers
 #include <memory>

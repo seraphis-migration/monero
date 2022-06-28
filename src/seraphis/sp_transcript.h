@@ -43,7 +43,6 @@
 #include <boost/utility/string_ref.hpp>
 
 //standard headers
-#include <functional>
 #include <list>
 #include <string>
 #include <type_traits>

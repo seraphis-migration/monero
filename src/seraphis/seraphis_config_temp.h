@@ -43,29 +43,23 @@ namespace config
 
   const constexpr char SERAPHIS_FS_TRANSCRIPT_PREFIX[] = "sp_FS_transcript";
 
-  const constexpr char HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY[] = "jamtis_unlock_amounts_key";
-
-  const constexpr char HASH_KEY_JAMTIS_INPUT_CONTEXT_COINBASE[] = "jamtis_input_context_coinbase";
-  const constexpr char HASH_KEY_JAMTIS_INPUT_CONTEXT_STANDARD[] = "jamtis_input_context_standard";
-  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_DUMMY[] = "jamtis_self_send_enote_dummy";
-  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_CHANGE[] = "jamtis_self_send_enote_change";
-  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_SELF_SPEND[] = "jamtis_self_send_enote_self_spend";
-
-  const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_TYPE_SQUASHED_V1[] = "sp_transaction_type_squashed_v1";
+  const constexpr char HASH_KEY_SERAPHIS_SQUASHED_ENOTE[] = "sp_squashed_enote";
+  const constexpr char HASH_KEY_SERAPHIS_IMAGE_PROOF_MESSAGE_V1[] = "sp_image_proof_message_v1";
+  const constexpr char HASH_KEY_SERAPHIS_MEMBERSHIP_PROOF_MESSAGE_V1[] = "sp_membership_proof_message_v1";
   const constexpr char HASH_KEY_SERAPHIS_INPUT_IMAGES_PREFIX_V1[] = "sp_input_images_prefix_v1";
   const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1[] = "sp_transaction_proofs_prefix_v1";
+  const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_TYPE_SQUASHED_V1[] = "sp_transaction_type_squashed_v1";
+
   const constexpr char HASH_KEY_GROOTLE_Hi_A[] = "grootle_Hi_A";
   const constexpr char HASH_KEY_GROOTLE_Hi_B[] = "grootle_Hi_B";
   const constexpr char HASH_KEY_GROOTLE_CHALLENGE[] = "grootle_challenge";
-  const constexpr char HASH_KEY_SERAPHIS_MEMBERSHIP_PROOF_MESSAGE_V1[] = "sp_membership_proof_message_v1";
   const constexpr char HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE[] = "sp_composition_proof_challenge_message";
   const constexpr char HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE[] = "sp_composition_proof_challenge";
-  const constexpr char HASH_KEY_SERAPHIS_IMAGE_PROOF_MESSAGE_V1[] = "sp_image_proof_message_v1";
-  const constexpr char HASH_KEY_BINNED_REF_SET_GENERATOR_SEED[] = "binned_rset_generator_seed";
-  const constexpr char HASH_KEY_BINNED_REF_SET_MEMBER[] = "binned_rset_member";
-
-  const constexpr char HASH_KEY_SERAPHIS_SQUASHED_ENOTE[] = "sp_squashed_enote";
+  const constexpr char HASH_KEY_BINNED_REF_SET_GENERATOR_SEED[] = "binned_refset_generator_seed";
+  const constexpr char HASH_KEY_BINNED_REF_SET_MEMBER[] = "binned_refset_member";
   const constexpr char HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR[] = "multisig_binonce_merge_factor";
+
+  const constexpr char HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY[] = "jamtis_unlock_amounts_key";
   const constexpr char HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET[] = "jamtis_generate_address_secret";
   const constexpr char HASH_KEY_JAMTIS_CIPHERTAG_SECRET[] = "jamtis_cipher_tag_secret";
   const constexpr char HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY[] = "jamtis_identify_wallet_key";
@@ -79,4 +73,9 @@ namespace config
   const constexpr char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN[] = "jamtis_enote_amount_commitment_blinding_factor_plain";
   const constexpr char HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_SELF[] = "jamtis_enote_amount_commitment_blinding_factor_self";
   const constexpr char HASH_KEY_JAMTIS_AMOUNT_ENC[] = "jamtis_enote_amount_encoding";
+  const constexpr char HASH_KEY_JAMTIS_INPUT_CONTEXT_COINBASE[] = "jamtis_input_context_coinbase";
+  const constexpr char HASH_KEY_JAMTIS_INPUT_CONTEXT_STANDARD[] = "jamtis_input_context_standard";
+  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_DUMMY[] = "jamtis_self_send_enote_dummy";
+  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_CHANGE[] = "jamtis_self_send_enote_change";
+  const constexpr char HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_SELF_SEND_ENOTE_SELF_SPEND[] = "jamtis_self_send_enote_self_spend";
 }
