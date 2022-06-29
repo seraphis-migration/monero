@@ -405,10 +405,8 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
         {
             // if not contiguous, then there must have been a reorg, so we need to rescan
 
-//todo: unit test that fails unless this is uncommented
             // note: +1 in case either height == -1
-//          if (contiguity_marker_inout.m_block_height + 1 <= first_contiguity_height + 1)
-            if (contiguity_marker_inout.m_block_height <= first_contiguity_height)
+            if (contiguity_marker_inout.m_block_height + 1 <= first_contiguity_height + 1)
             {
                 // a reorg that affects our first expected point of contiguity
                 return ScanStatus::NEED_FULLSCAN;
@@ -827,23 +825,9 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         if (scan_status == ScanStatus::FAIL)
             break;
 
-        // 2. handle fullscan case
+        // 2. if we must do a full scan, go back to the top immediately (all enotes recovered here will be overwritten)
         if (scan_status == ScanStatus::NEED_FULLSCAN)
-        {
-            {
-                // if the scan process thinks we need a full rescan even when starting at the enote store's refresh height,
-                //   then the top of the chain must be below the refresh height, so we are done
-
-//todo: unit test that fails unless this is uncommented
-//                alignment_marker.m_block_height = enote_store_inout.get_refresh_height() - 1;
-//                alignment_marker.m_block_id = rct::zero();
-
-//                scan_status = ScanStatus::DONE;
-            }
-
-            // if we must do a full scan, go back to the top immediately
             continue;
-        }
 
 
         /// refresh the enote store with new ledger context
