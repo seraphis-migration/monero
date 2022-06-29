@@ -744,6 +744,9 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         else if (scan_status == ScanStatus::NEED_FULLSCAN)
             ++fullscan_attempts;
 
+        CHECK_AND_ASSERT_THROW_MES(fullscan_attempts < 50,
+            "refresh ledger for enote store: fullscan attempts exceeded 50 (sanity check fail).");
+
         // 2. fail if we have exceeded the number of partial scanning attempts (i.e. for handling partial reorgs)
         if (partialscan_attempts > config.m_max_partialscan_attempts)
         {

@@ -1158,6 +1158,37 @@ private:
     std::size_t m_num_calls{0};
 };
 //-------------------------------------------------------------------------------------------------------------------
+class InvokableTest2 final : public Invokable
+{
+public:
+    InvokableTest2(const sp::jamtis::JamtisDestinationV1 &user_address,
+        std::vector<rct::xmr_amount> amounts_per_new_coinbase,
+        sp::MockLedgerContext &ledger_context) :
+            m_user_address{user_address},
+            m_amounts_per_new_coinbase{std::move(amounts_per_new_coinbase)},
+            m_ledger_contex{ledger_context}
+    {}
+    InvokableTest2& operator=(InvokableTest2&&) = delete;
+
+    /// invoke: on the first call, pop 2 blocks then push back N new blocks with one coinbase amount each
+    void invoke() override
+    {
+        ++m_num_calls;
+
+        if (m_num_calls == 1)
+        {
+            m_ledger_contex.pop_blocks(2);
+            for (const rct::xmr_amount new_coinbase_amount : m_amounts_per_new_coinbase)
+                send_coinbase_amounts_to_users({{new_coinbase_amount}}, {m_user_address}, m_ledger_contex);
+        }
+    }
+private:
+    const sp::jamtis::JamtisDestinationV1 &m_user_address;
+    const std::vector<rct::xmr_amount> m_amounts_per_new_coinbase;
+    sp::MockLedgerContext &m_ledger_contex;
+    std::size_t m_num_calls{0};
+};
+//-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, reorgs_while_scanning)
 {
     using namespace sp;
@@ -1223,7 +1254,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
         ledger_context_test1);
     ledger_context_test1.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
 
-    // c. refresh with injected invokable
+    // c. refresh user A with injected invokable
     // current chain state: {block0[{1, 1, 1, 1} -> A], block1[A -> {2} -> B]}
     // current enote context A: [enotes: block0{1, 1, 1, 1}], [blocks: 0{...}]
     // expected refresh sequence:
@@ -1233,11 +1264,12 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
     //   a. onchain loop
     //     i.   get onchain chunk: block 0  (success: chunk range [0, 1))
     //     ii.  get onchain chunk: block 1  (success: chunk range [1, 2))
-    //     iii. get onchain chunk: block 2  (injected: pop 2)  (fail: chunk range [0,0))
-    //   b. unconfirmed chunk: get nothing
-    //   c. skip follow-up onchain loop (NEED_FULLSCAN)
-    // 4. promote NEED_FULLSCAN -> DONE because reorg goes below enote store refresh height (it's 0)
-    // 4. refresh enote store of A: completely empty
+    //     iii. get onchain chunk: block 2  (injected: pop 2)  (fail: chunk range [0,0) -> NEED_FULLSCAN)
+    //   b. skip unconfirmed chunk: (NEED_FULLSCAN)
+    // 4. NEED_FULLSCAN: rescan from block 0
+    //   a. onchain loop
+    //     i.   get onchain chunk: block 0  (success: chunk range [0, 0) -> DONE)
+    // 5. DONE: refresh enote store of A
     const EnoteFindingContextLedgerMock enote_finding_context_A_test1{ledger_context_test1, user_keys_A.k_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context_A_test1{enote_finding_context_A_test1};
     InvokableTest1 invokable_get_onchain_test1{ledger_context_test1};
@@ -1268,27 +1300,194 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
     ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
 
+    // 2. full internal reorg with replacement
+    //coinbase
+    //tx
+    //tx
+    //scan A
+    //scan A with injected: on first onchain chunk scan (will rescan block 2 with contiguity marker on 1), pop 2 then add 2
+    const RefreshLedgerEnoteStoreConfig refresh_config_test2{
+            .m_reorg_avoidance_depth = 1,
+            .m_max_chunk_size = 1,
+            .m_max_partialscan_attempts = 0
+        };
+    MockLedgerContext ledger_context_test2;
+    SpEnoteStoreMockV1 enote_store_A_test2{0};
+    SpEnoteStoreMockV1 enote_store_B_test2{0};
+    const sp::InputSelectorMockV1 input_selector_A_test2{enote_store_A_test2};
+    const sp::InputSelectorMockV1 input_selector_B_test2{enote_store_B_test2};
+    send_coinbase_amounts_to_users({{1, 1, 1, 1}}, {destination_A}, ledger_context_test2);
+
+    // a. refresh A so coinbase funds are available
+    refresh_user_enote_store(user_keys_A, refresh_config_test2, ledger_context_test2, enote_store_A_test2);
+
+    // b. send two tx A -> B in two blocks
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test2,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{1, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test2);
+    ledger_context_test2.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+    refresh_user_enote_store(user_keys_A, refresh_config_test2, ledger_context_test2, enote_store_A_test2);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test2,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{2, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test2);
+    ledger_context_test2.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+
+    // c. refresh A so top block is block 2
+    refresh_user_enote_store(user_keys_A, refresh_config_test2, ledger_context_test2, enote_store_A_test2);
+
+    // d. refresh user A with injected invokable
+    // current chain state: {block0[{1, 1, 1, 1} -> A], block1[A -> {1} -> B], block2[A -> {2} -> B]}
+    // current enote context A: [enotes: block0{1, 1, 1, 1}, block1{0}, block2{0}], [blocks: 0{...}, 1{...}, 2{...}]
+    // expected refresh sequence:
+    // 1. desired start height = block 3
+    // 2. actual start height = block 2 = ([desired start] 3 - [reorg depth] 1)
+    // 3. scan process
+    //   a. onchain loop
+    //     i.   get onchain chunk: block 2  (injected: pop 2, +2 blocks)  (fail: chunk range [2, 3) -> NEED_FULLSCAN)
+    //   b. skip unconfirmed chunk: (NEED_FULLSCAN)
+    // 4. NEED_FULLSCAN: rescan from block 1
+    //   a. onchain loop
+    //     i.   get onchain chunk: block 1  (success: chunk range [1, 2))
+    //     ii.  get onchain chunk: block 2  (success: chunk range [2, 3))
+    //     iii. get onchain chunk: block 3  (success: chunk range [3, 3) -> DONE)
+    // 5. DONE: refresh enote store of A
+    const EnoteFindingContextLedgerMock enote_finding_context_A_test2{ledger_context_test2, user_keys_A.k_fr};
+    EnoteScanningContextLedgerSimple enote_scanning_context_A_test2{enote_finding_context_A_test2};
+    InvokableTest2 invokable_get_onchain_test2{destination_A, {3, 5}, ledger_context_test2};
+    EnoteScanningContextLedgerTEST test_scanning_context_A_test2(enote_scanning_context_A_test2,
+        dummy_invokable,
+        invokable_get_onchain_test2,
+        dummy_invokable,
+        dummy_invokable);
+    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config_test2,
+        user_keys_A.K_1_base,
+        user_keys_A.k_vb,
+        test_scanning_context_A_test2,
+        enote_store_A_test2));
+
+    // d. check balances after refreshing
+    refresh_user_enote_store(user_keys_B, refresh_config_test2, ledger_context_test2, enote_store_B_test2);
+
+    ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 12);
+    ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 12);
+    ASSERT_TRUE(enote_store_B_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+
+    // 3. partial internal reorg
+/*
+    const RefreshLedgerEnoteStoreConfig refresh_config_test3{
+            .m_reorg_avoidance_depth = 1,
+            .m_max_chunk_size = 1,
+            .m_max_partialscan_attempts = 0
+        };
+    MockLedgerContext ledger_context_test3;
+    SpEnoteStoreMockV1 enote_store_A_test3{0};
+    SpEnoteStoreMockV1 enote_store_B_test3{0};
+    const sp::InputSelectorMockV1 input_selector_A_test3{enote_store_A_test3};
+    const sp::InputSelectorMockV1 input_selector_B_test3{enote_store_B_test3};
+    send_coinbase_amounts_to_users({{2, 2, 2, 2}}, {destination_A}, ledger_context_test3);
+
+    // a. refresh once so user A can make a tx
+    refresh_user_enote_store(user_keys_A, refresh_config_test3, ledger_context_test3, enote_store_A_test3);
+
+    // b. send two txs A -> B (in two blocks)
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test3,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{1, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test3);
+    ledger_context_test3.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+    refresh_user_enote_store(user_keys_A, refresh_config_test3, ledger_context_test3, enote_store_A_test3);
+
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test3,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{2, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test3);
+    ledger_context_test3.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+
+    // c. refresh user B with injected invokable
+    // current chain state: {block0[{2, 2, 2, 2} -> A], block1[A -> {1} -> B], block2[A -> {2} -> B]}
+    // current enote context B: [enotes: none, [blocks: none]
+    // expected refresh sequence:
+    // 1. desired start height = block 0
+    // 2. actual start height = block 0 = round_to_0([desired start] 0 - [reorg depth] 1)
+    // 3. scan process
+    //   a. onchain loop
+    //     i.   get onchain chunk: block 0  (success: chunk range [0, 1))
+    //     ii.  get onchain chunk: block 1  (success: chunk range [1, 2))
+    //     ii.  get onchain chunk: block 2  (injected: pop 2, tx A -> B)  (fail: chunk range [1, 2) -> NEED_PARTIALSCAN)
+    //   b. skip unconfirmed chunk: (NEED_PARTIALSCAN)
+    // 4. NEED_FULLSCAN: rescan from block 0
+    //   a. onchain loop
+    //     i.   get onchain chunk: block 0  (success: chunk range [0,0) -> DONE)
+    // 5. DONE: refresh enote store of A
+    //   a. should be completely empty
+    const EnoteFindingContextLedgerMock enote_finding_context_A_test3{ledger_context_test3, user_keys_B.k_fr};
+    EnoteScanningContextLedgerSimple enote_scanning_context_B_test3{enote_finding_context_B_test3};
+    InvokableTest1 invokable_get_onchain_test3{ledger_context_test3};
+    EnoteScanningContextLedgerTEST test_scanning_context_B_test3(enote_scanning_context_B_test3,
+        dummy_invokable,
+        invokable_get_onchain_test3,
+        dummy_invokable,
+        dummy_invokable);
+    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config_test3,
+        user_keys_B.K_1_base,
+        user_keys_B.k_vb,
+        test_scanning_context_B_test3,
+        enote_store_B_test3));
+
+    // d. after refreshing, both users should have no balance
+    refresh_user_enote_store(user_keys_A, refresh_config_test3, ledger_context_test3, enote_store_A_test3);
+
+    ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test3.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test3.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+*/
 
 /*
-    1. full internal reorg
-    - normal scan once so alignment will be at block 0 in the test
-    - commit tx 1 A -> B
-
-    - A starts scan process on {blocks: {0, 1}, refresh height: 0, num scanned blocks: 1, chunk size: 1, avoid reorg depth: 1, max partial scans = 1}
-    - try get onchain chunk {0} (initial onchain loop)  (should update alignment marker so it equals block 0)
-        - get chunk: {0}
-    - try get onchain chunk {1}
-        - get chunk: {1}
-    - try get onchain chunk {2}  (INJECTED STEP)
-        - pop 2
-        - return false (on trying and failing to get chunk 2, and instead returning empty block representing first block)
-    - status: NEED_FULLSCAN  
-    - status: converted to DONE since reorg goes to refresh height (note: should incorrectly maintain balance from block 0 on post-process enote store update since alignment marker is on block 0)
-
-    - check onchain balances (standard balance update for B)
-        - A: {}
-        - B: {}
-
     2. partial internal reorg
     - commit tx 1 A -> B
 
