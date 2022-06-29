@@ -167,16 +167,26 @@ static void check_enote_scan_chunk_map_semantics_v1(
 //-------------------------------------------------------------------------------------------------------------------
 static bool contiguity_check(const ChainContiguityMarker &marker_A, const ChainContiguityMarker &marker_B)
 {
+    // 1. optional:false markers are contiguous with all blocks <= its height
+    if (!marker_A.m_block_id &&
+        marker_A.m_block_height + 1 >= marker_B.m_block_height + 1)
+        return true;
+
+    if (!marker_B.m_block_id &&
+        marker_B.m_block_height + 1 >= marker_A.m_block_height + 1)
+        return true;
+
+    // 2. if both markers are optional:true, then heights must match
     if (marker_A.m_block_height != marker_B.m_block_height)
         return false;
 
+    // 3. if both markers are optional:true, then block ids must match
     if (marker_A.m_block_id &&
         marker_B.m_block_id &&
         marker_A.m_block_id != marker_B.m_block_id)
         return false;
 
-    // note: optional:false contiguity block ids can match with any block id
-
+    // 4. if either marker is optional:false, its block id can match with any block id in the other marker
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -440,10 +450,13 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
     CHECK_AND_ASSERT_THROW_MES(new_onchain_chunk.m_block_ids.size() == 0,
         "process ledger for onchain pass: final chunk does not have zero block ids as expected.");
 
+    // check if a reorg dropped below our contiguity marker without replacing the dropped blocks
+    // note: this branch won't execute if the chain height is below our contiguity marker when our contiguity marker is
+    //       optional:false, because we don't care if the chain height is lower than our scanning 'backstop' (i.e.
+    //       lowest point in our enote store)
     if (!contiguity_check(contiguity_marker_inout,
         ChainContiguityMarker{new_onchain_chunk.m_end_height - 1, new_onchain_chunk.m_prefix_block_id}))
     {
-        // a reorg must have dropped below our contiguity marker without replacing the dropped blocks
         // note: +1 in case first contiguity height == -1
         if (new_onchain_chunk.m_end_height <= first_contiguity_height + 1)
         {
@@ -514,10 +527,8 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
             scanned_block_ids_out)
         };
 
-    // do not early return on NEED_FULLSCAN, because there are cases where NEED_FULLSCAN is reinterpreted as DONE,
-    //   and we want to scan the unconfirmed cache in those cases
-    if (scan_status_first_onchain_pass == ScanStatus::NEED_PARTIALSCAN ||
-        scan_status_first_onchain_pass == ScanStatus::FAIL)
+    // leave early if first onchain loop didn't succeed
+    if (scan_status_first_onchain_pass != ScanStatus::DONE)
         return scan_status_first_onchain_pass;
 
     // unconfirmed txs
@@ -538,10 +549,6 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
             found_enote_records_out,
             found_spent_key_images_out);
     }
-
-    // now we can early return on NEED_FULLSCAN
-    if (scan_status_first_onchain_pass == ScanStatus::NEED_FULLSCAN)
-        return scan_status_first_onchain_pass;
 
     // on-chain follow-up pass
     // rationale:
@@ -820,22 +827,19 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         // 2. handle fullscan case
         if (scan_status == ScanStatus::NEED_FULLSCAN)
         {
-            if (initial_refresh_height <= enote_store_inout.get_refresh_height())
             {
                 // if the scan process thinks we need a full rescan even when starting at the enote store's refresh height,
                 //   then the top of the chain must be below the refresh height, so we are done
 
 //todo: unit test that fails unless this is uncommented
-//              alignment_marker.m_block_height = enote_store_inout.get_refresh_height() + 1;
-//              alignment_marker.m_block_id = rct::zero();
+//                alignment_marker.m_block_height = enote_store_inout.get_refresh_height() - 1;
+//                alignment_marker.m_block_id = rct::zero();
 
-                scan_status = ScanStatus::DONE;
+//                scan_status = ScanStatus::DONE;
             }
-            else
-            {
-                // if we must do a full scan, go back to the top immediately
-                continue;
-            }
+
+            // if we must do a full scan, go back to the top immediately
+            continue;
         }
 
 

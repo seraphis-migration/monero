@@ -70,6 +70,90 @@
 #include "gtest/gtest.h"
 
 
+class Invokable
+{
+public:
+    virtual ~Invokable() = default;
+    Invokable& operator=(Invokable&&) = delete;
+    virtual void invoke() = 0;
+};
+
+class DummyInvokable final : public Invokable
+{
+public:
+    void invoke() override {}
+};
+
+namespace sp
+{
+
+////
+// EnoteScanningContextLedgerTEST
+// - enote scanning context for injecting behavior into a scanning process
+///
+class EnoteScanningContextLedgerTEST final : public EnoteScanningContextLedger
+{
+public:
+//constructors
+    /// normal constructor
+    EnoteScanningContextLedgerTEST(EnoteScanningContextLedgerSimple &core_scanning_context,
+        Invokable &invokable_begin_scanning,
+        Invokable &invokable_get_onchain_chunk,
+        Invokable &invokable_get_unconfirmed_chunk,
+        Invokable &invokable_terminate) :
+            m_core_scanning_context{core_scanning_context},
+            m_invokable_begin_scanning{invokable_begin_scanning},
+            m_invokable_get_onchain_chunk{invokable_get_onchain_chunk},
+            m_invokable_get_unconfirmed_chunk{invokable_get_unconfirmed_chunk},
+            m_invokable_terminate{invokable_terminate}
+    {}
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [reference werapper])
+    EnoteScanningContextLedgerTEST& operator=(EnoteScanningContextLedgerTEST&&) = delete;
+
+//member functions
+    /// tell the enote finder it can start scanning from a specified block height
+    void begin_scanning_from_height(const std::uint64_t initial_start_height,
+        const std::uint64_t max_chunk_size) override
+    {
+        m_invokable_begin_scanning.invoke();
+        m_core_scanning_context.begin_scanning_from_height(initial_start_height, max_chunk_size);
+    }
+    /// get the next available onchain chunk (must be contiguous with the last chunk acquired since starting to scan)
+    /// note: if chunk is empty, chunk represents top of current chain
+    void get_onchain_chunk(EnoteScanningChunkLedgerV1 &chunk_out) override
+    {
+        m_invokable_get_onchain_chunk.invoke();
+        m_core_scanning_context.get_onchain_chunk(chunk_out);
+    }
+    /// try to get a scanning chunk for the unconfirmed txs in a ledger
+    bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) override
+    {
+        m_invokable_get_unconfirmed_chunk.invoke();
+        return m_core_scanning_context.try_get_unconfirmed_chunk(chunk_out);
+    }
+    /// tell the enote finder to stop its scanning process (should be no-throw no-fail)
+    void terminate_scanning() override
+    {
+        m_invokable_terminate.invoke();
+        m_core_scanning_context.terminate_scanning();
+    }
+
+private:
+    /// enote scanning context that this test context wraps
+    EnoteScanningContextLedgerSimple &m_core_scanning_context;
+
+    /// injected invokable objects
+    Invokable &m_invokable_begin_scanning;
+    Invokable &m_invokable_get_onchain_chunk;
+    Invokable &m_invokable_get_unconfirmed_chunk;
+    Invokable &m_invokable_terminate;
+};
+
+} //namespace sp
+
+
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static crypto::secret_key make_secret_key()
@@ -1052,9 +1136,137 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 13);
 }
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+class InvokableTest1 final : public Invokable
+{
+public:
+    InvokableTest1(sp::MockLedgerContext &ledger_context) : m_ledger_contex{ledger_context} {}
+    InvokableTest1& operator=(InvokableTest1&&) = delete;
+
+    /// invoke: on the third call, pop 2 blocks from the ledger context
+    void invoke() override
+    {
+        ++m_num_calls;
+
+        if (m_num_calls == 3)
+            m_ledger_contex.pop_blocks(2);
+    }
+private:
+    sp::MockLedgerContext &m_ledger_contex;
+    std::size_t m_num_calls{0};
+};
+//-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, reorgs_while_scanning)
 {
+    using namespace sp;
+    using namespace jamtis;
 
+    /// setup
+    DummyInvokable dummy_invokable;
+
+    // 1. config
+    const std::size_t max_inputs{1000};
+    const std::size_t fee_per_tx_weight{0};  // 0 fee here
+    const std::size_t ref_set_decomp_n{2};
+    const std::size_t ref_set_decomp_m{2};
+
+    const FeeCalculatorMockTrivial fee_calculator;  //just do a trivial calculator here (fee = fee/weight * 1 weight)
+
+    const SpBinnedReferenceSetConfigV1 bin_config{
+            .m_bin_radius = 1,
+            .m_num_bin_members = 2
+        };
+
+    // 2. user keys
+    jamtis_mock_keys user_keys_A;
+    jamtis_mock_keys user_keys_B;
+    make_jamtis_mock_keys(user_keys_A);
+    make_jamtis_mock_keys(user_keys_B);
+
+    // 3. user addresses
+    JamtisDestinationV1 destination_A;
+    JamtisDestinationV1 destination_B;
+    make_random_address_for_user(user_keys_A, destination_A);
+    make_random_address_for_user(user_keys_B, destination_B);
+
+
+    /// tests
+
+    // 1. full internal reorg
+    const RefreshLedgerEnoteStoreConfig refresh_config_test1{
+            .m_reorg_avoidance_depth = 1,
+            .m_max_chunk_size = 1,
+            .m_max_partialscan_attempts = 0
+        };
+    MockLedgerContext ledger_context_test1;
+    SpEnoteStoreMockV1 enote_store_A_test1{0};
+    SpEnoteStoreMockV1 enote_store_B_test1{0};
+    const sp::InputSelectorMockV1 input_selector_A_test1{enote_store_A_test1};
+    const sp::InputSelectorMockV1 input_selector_B_test1{enote_store_B_test1};
+    send_coinbase_amounts_to_users({{1, 1, 1, 1}}, {destination_A}, ledger_context_test1);
+
+    // a. refresh once so alignment will begin on block 0 in the test
+    refresh_user_enote_store(user_keys_A, refresh_config_test1, ledger_context_test1, enote_store_A_test1);
+
+    // b. send tx A -> B
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test1,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{2, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test1);
+    ledger_context_test1.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+
+    // c. refresh with injected invokable
+    // current chain state: {block0[{1, 1, 1, 1} -> A], block1[A -> {2} -> B]}
+    // current enote context A: [enotes: block0{1, 1, 1, 1}], [blocks: 0{...}]
+    // expected refresh sequence:
+    // 1. desired start height = block 1
+    // 2. actual start height = block 0 = ([desired start] 1 - [reorg depth] 1)
+    // 3. scan process
+    //   a. onchain loop
+    //     i.   get onchain chunk: block 0  (success: chunk range [0, 1))
+    //     ii.  get onchain chunk: block 1  (success: chunk range [1, 2))
+    //     iii. get onchain chunk: block 2  (injected: pop 2)  (fail: chunk range [0,0))
+    //   b. unconfirmed chunk: get nothing
+    //   c. skip follow-up onchain loop (NEED_FULLSCAN)
+    // 4. promote NEED_FULLSCAN -> DONE because reorg goes below enote store refresh height (it's 0)
+    // 4. refresh enote store of A: completely empty
+    const EnoteFindingContextLedgerMock enote_finding_context_A_test1{ledger_context_test1, user_keys_A.k_fr};
+    EnoteScanningContextLedgerSimple enote_scanning_context_A_test1{enote_finding_context_A_test1};
+    InvokableTest1 invokable_get_onchain_test1{ledger_context_test1};
+    EnoteScanningContextLedgerTEST test_scanning_context_A_test1(enote_scanning_context_A_test1,
+        dummy_invokable,
+        invokable_get_onchain_test1,
+        dummy_invokable,
+        dummy_invokable);
+    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config_test1,
+        user_keys_A.K_1_base,
+        user_keys_A.k_vb,
+        test_scanning_context_A_test1,
+        enote_store_A_test1));
+
+    // d. after refreshing, both users should have no balance
+    refresh_user_enote_store(user_keys_B, refresh_config_test1, ledger_context_test1, enote_store_B_test1);
+
+    ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
 
 
 /*

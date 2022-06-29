@@ -90,9 +90,9 @@ class EnoteFindingContextOffchainMock final : public EnoteFindingContextOffchain
 public:
 //constructors
     EnoteFindingContextOffchainMock(const MockOffchainContext &mock_offchain_context,
-            const crypto::secret_key &k_find_received) :
-        m_mock_offchain_context{mock_offchain_context},
-        m_k_find_received{k_find_received}
+        const crypto::secret_key &k_find_received) :
+            m_mock_offchain_context{mock_offchain_context},
+            m_k_find_received{k_find_received}
     {}
 
 //overloaded operators

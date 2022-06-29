@@ -545,12 +545,15 @@ std::uint64_t MockLedgerContext::pop_chain_at_height_impl(const std::uint64_t po
     const std::uint64_t num_blocks_to_pop{get_chain_height() - pop_height + 1};
 
     // 1. remove key images
-    if (m_blocks_of_tx_key_images.find(pop_height) != m_blocks_of_tx_key_images.end())
+    for (std::uint64_t height_to_pop{pop_height}; height_to_pop < pop_height + num_blocks_to_pop; ++height_to_pop)
     {
-        for (const auto &tx_key_images : m_blocks_of_tx_key_images[pop_height])
+        if (m_blocks_of_tx_key_images.find(height_to_pop) != m_blocks_of_tx_key_images.end())
         {
-            for (const crypto::key_image &key_image : tx_key_images.second)
-                m_sp_key_images.erase(key_image);
+            for (const auto &tx_key_images : m_blocks_of_tx_key_images[height_to_pop])
+            {
+                for (const crypto::key_image &key_image : tx_key_images.second)
+                    m_sp_key_images.erase(key_image);
+            }
         }
     }
 
