@@ -120,7 +120,8 @@ class SpTranscriptBuilder final
     }
     void append_label(const boost::string_ref label)
     {
-        if (m_simple_mode)
+        if (m_simple_mode ||
+            label.size() == 0)
             return;
 
         append_buffer(label.data(), label.size());
