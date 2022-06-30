@@ -212,10 +212,7 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
                     // g = H_64(bin_generator_seed, bin_locus, bin_index_in_set, num_generator_refreshes)
                     SpKDFTranscript transcript{
                             config::HASH_KEY_BINNED_REF_SET_MEMBER,
-                            sizeof(bin_generator_seed) +
-                                sizeof(bin_locus) +
-                                sizeof(bin_index_in_set) +
-                                10 * bin_config.m_num_bin_members
+                            sizeof(bin_generator_seed) + sizeof(bin_locus) + sizeof(bin_index_in_set) + 4
                         };
                     transcript.append("seed", bin_generator_seed);
                     transcript.append("length", bin_locus);
