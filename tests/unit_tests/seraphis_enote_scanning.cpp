@@ -1246,14 +1246,55 @@ public:
             send_coinbase_amounts_to_users({{m_amount_new_coinbase}}, {m_user_address}, m_ledger_contex);
         }
     }
-
-    /// return number of invocations
-    std::size_t num_invocations() const { return m_num_calls; }
 private:
     const sp::jamtis::JamtisDestinationV1 &m_user_address;
     const rct::xmr_amount m_amount_new_coinbase;
     sp::MockLedgerContext &m_ledger_contex;
     std::size_t m_num_calls{0};
+};
+//-------------------------------------------------------------------------------------------------------------------
+class InvocableTest5Submit final : public Invocable
+{
+public:
+    InvocableTest5Submit(sp::SpTxSquashedV1 tx_to_submit,
+        sp::MockLedgerContext &ledger_context) :
+            m_tx_to_submit{std::move(tx_to_submit)},
+            m_ledger_contex{ledger_context}
+    {}
+    InvocableTest5Submit& operator=(InvocableTest5Submit&&) = delete;
+
+    /// invoke: on the first call, submit prepared tx to the unconfirmed cache of the ledger
+    void invoke() override
+    {
+        ++m_num_calls;
+
+        if (m_num_calls == 1)
+        {
+            // validate and submit to the mock ledger
+            const sp::TxValidationContextMock tx_validation_context{m_ledger_contex};
+            ASSERT_TRUE(validate_tx(m_tx_to_submit, tx_validation_context));
+            ASSERT_TRUE(m_ledger_contex.try_add_unconfirmed_tx_v1(m_tx_to_submit));
+        }
+    }
+private:
+    const sp::SpTxSquashedV1 m_tx_to_submit;
+    sp::MockLedgerContext &m_ledger_contex;
+    std::size_t m_num_calls{0};
+};
+//-------------------------------------------------------------------------------------------------------------------
+class InvocableTest5Commit final : public Invocable
+{
+public:
+    InvocableTest5Commit(sp::MockLedgerContext &ledger_context) : m_ledger_contex{ledger_context} {}
+    InvocableTest5Commit& operator=(InvocableTest5Commit&&) = delete;
+
+    /// invoke: commit any unconfirmed txs in the ledger's unconfirmed chache
+    void invoke() override
+    {
+        m_ledger_contex.commit_unconfirmed_txs_v1(rct::key{}, sp::SpTxSupplementV1{}, std::vector<sp::SpEnoteV1>{});
+    }
+private:
+    sp::MockLedgerContext &m_ledger_contex;
 };
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, reorgs_while_scanning)
@@ -1604,7 +1645,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
     //     ii.  get onchain chunk: block 1  (success: chunk range [1, 2))
     //     iii. get onchain chunk: block 2  (inject: pop 1, +1 blocks) (fail: chunk range [2, 2) -> NEED_PARTIALSCAN)
     //   b. skip unconfirmed chunk: (NEED_PARTIALSCAN)
-    // 5. ... etc.
+    // 5. ... etc. until partialscan attempts runs out (then throw)
     const EnoteFindingContextLedgerMock enote_finding_context_B_test4{ledger_context_test4, user_keys_B.k_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context_B_test4{enote_finding_context_B_test4};
     InvocableTest4 invocable_get_onchain_test4{destination_B, 1, ledger_context_test4};
@@ -1619,30 +1660,95 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
         test_scanning_context_B_test4,
         enote_store_B_test4));
 
-/*
-    4. sneaky tx found in follow-up loop
-    - commit tx 1 A -> B
+    // 5. sneaky tx found in follow-up loop
+    const RefreshLedgerEnoteStoreConfig refresh_config_test5{
+            .m_reorg_avoidance_depth = 1,
+            .m_max_chunk_size = 1,
+            .m_max_partialscan_attempts = 4
+        };
+    MockLedgerContext ledger_context_test5;
+    SpEnoteStoreMockV1 enote_store_A_test5{0};
+    SpEnoteStoreMockV1 enote_store_B_test5{0};
+    const sp::InputSelectorMockV1 input_selector_A_test5{enote_store_A_test5};
+    const sp::InputSelectorMockV1 input_selector_B_test5{enote_store_B_test5};
+    send_coinbase_amounts_to_users({{1, 1, 1, 1}}, {destination_A}, ledger_context_test5);
 
-    - B starts scan process on {blocks: {0, 1}, refresh height: 0, num scanned blocks: 0, chunk size: 1, avoid reorg depth: 0}
-    - try get onchain chunk {0}  (initial onchain loop)
-        - get chunk: {0}
-    - try get onchain chunk {1}
-        - get chunk: {1}
-    - try get onchain chunk {2}
-        - return false
-    - try get unconfirmed chunk {}  (unconfirmed chunk)  (INJECTED STEP)
-        - submit tx 2 A -> B
-        - return true
-    - try get onchain chunk {2}  (follow-up loop)  (INJECTED STEP)
-        - commit unconfirmed cache
-        - get chunk: {2}
-    - try get onchain chunk {3}
-        - return false
-    - status: DONE
+    // a. refresh once so user A can make a tx
+    refresh_user_enote_store(user_keys_A, refresh_config_test5, ledger_context_test5, enote_store_A_test5);
 
-    - check onchain balances (standard balance update for A)
-        - A: {0, tx 1, tx 2}
-        - B: {tx 1, tx 2}
-*/
+    // b. send tx A -> B
+    transfer_funds_single_mock_v1_unconfirmed(user_keys_A,
+        input_selector_A_test5,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{1, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test5);
+    ledger_context_test5.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
+    refresh_user_enote_store(user_keys_A, refresh_config_test5, ledger_context_test5, enote_store_A_test5);
+
+    // c. prepare sneaky tx to insert while scanning
+    SpTxSquashedV1 sneaky_tx_test5;
+    construct_tx_for_mock_ledger_v1(user_keys_A,
+        input_selector_A_test5,
+        fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        {{2, destination_B, TxExtra{}}},
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context_test5,
+        sneaky_tx_test5);
+
+    // c. refresh user B with injected invocable
+    // current chain state: {block0[{1, 1, 1, 1} -> A], block1[A -> {1} -> B]}
+    // current enote context B: [enotes: none], [blocks: none]
+    // expected refresh sequence:
+    // 1. desired start height = block 0
+    // 2. actual start height = block 0 = ([desired start] 0 - [reorg depth] 0)
+    // 3. scan process
+    //   a. onchain loop
+    //     i.   get onchain chunk: block 0  (success: chunk range [0, 1))
+    //     ii.  get onchain chunk: block 1  (success: chunk range [1, 2))
+    //     iii. get onchain chunk: block 2  (success: chunk range [2, 2) -> DONE)
+    //   b. unconfirmed chunk: (inject: submit A -> {2} -> B)  (success: found {2})
+    //   c. follow-up onchain loop
+    //     i.   get onchain chunk: block 2  (inject: commit unconfirmed)  (success: chunk range [2, 3])
+    //     ii.  get onchain chunk: block 3  (success: chunk range [3, 3) -> DONE)
+    // 4. DONE: refresh enote store of B
+    const EnoteFindingContextLedgerMock enote_finding_context_B_test5{ledger_context_test5, user_keys_B.k_fr};
+    EnoteScanningContextLedgerSimple enote_scanning_context_B_test5{enote_finding_context_B_test5};
+    InvocableTest5Submit invocable_get_onchain_test5{std::move(sneaky_tx_test5), ledger_context_test5};
+    InvocableTest5Commit invocable_get_unconfirmed_test5{ledger_context_test5};
+    EnoteScanningContextLedgerTEST test_scanning_context_B_test5(enote_scanning_context_B_test5,
+        dummy_invocable,
+        invocable_get_onchain_test5,
+        invocable_get_unconfirmed_test5,
+        dummy_invocable);
+    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config_test5,
+        user_keys_B.K_1_base,
+        user_keys_B.k_vb,
+        test_scanning_context_B_test5,
+        enote_store_B_test5));
+
+    // d. check users' balances
+    refresh_user_enote_store(user_keys_A, refresh_config_test5, ledger_context_test5, enote_store_A_test5);
+
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 1);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 3);
 }
 //-------------------------------------------------------------------------------------------------------------------
