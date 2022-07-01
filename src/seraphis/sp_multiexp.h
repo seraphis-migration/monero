@@ -85,6 +85,7 @@ public:
     void add_element_at_generator_index(rct::key scalar, const std::size_t predef_generator_index);
     void add_element(rct::key scalar, const ge_p3 &base_point);
     void add_element(const rct::key &scalar, const rct::key &base_point);
+    void add_element(const rct::key &scalar, const crypto::public_key &base_point);
 
 //member variables
 protected:

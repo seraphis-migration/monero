@@ -86,21 +86,6 @@ static void make_secret_key(crypto::secret_key &skey_out)
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void make_fake_sp_masked_address(crypto::secret_key &mask,
-    crypto::secret_key &view_stuff,
-    crypto::secret_key &spendkey,
-    rct::key &masked_address)
-{
-    make_secret_key(mask);
-    make_secret_key(view_stuff);
-    make_secret_key(spendkey);
-
-    // K" = x G + kv_stuff X + ks U
-    sp::make_seraphis_spendkey(view_stuff, spendkey, masked_address);
-    sp::mask_key(mask, masked_address, masked_address);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 static void check_is_owned_with_intermediate_record(const sp::SpOutputProposalV1 &test_proposal,
     const sp::jamtis::jamtis_mock_keys &keys,
     const sp::jamtis::address_index_t j_expected,
@@ -426,48 +411,6 @@ static bool test_info_recovery_addressindex(const sp::jamtis::address_index_t j)
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-TEST(seraphis, composition_proof)
-{
-    rct::key K;
-    crypto::key_image KI;
-    crypto::secret_key x, y, z;
-    const rct::key message{rct::zero()};
-    sp::SpCompositionProof proof;
-
-    try
-    {
-        make_fake_sp_masked_address(x, y, z, K);
-        proof = sp::sp_composition_prove(message, K, x, y, z);
-
-        sp::make_seraphis_key_image(y, z, KI);
-        EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
-    }
-    catch (...)
-    {
-        EXPECT_TRUE(false);
-    }
-
-    // check: works even if x = 0
-    try
-    {
-        make_fake_sp_masked_address(x, y, z, K);
-
-        rct::key xG;
-        rct::scalarmultBase(xG, rct::sk2rct(x));
-        rct::subKeys(K, K, xG);   // kludge: remove x part manually
-        x = rct::rct2sk(rct::zero());
-
-        proof = sp::sp_composition_prove(message, K, x, y, z);
-
-        sp::make_seraphis_key_image(y, z, KI);
-        EXPECT_TRUE(sp::sp_composition_verify(proof, message, K, KI));
-    }
-    catch (...)
-    {
-        EXPECT_TRUE(false);
-    }
-}
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis, information_recovery_keyimage)
 {

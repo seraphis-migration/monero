@@ -81,30 +81,30 @@ void SpMultiexpBuilder::add_H_element(rct::key scalar)
 {
     sc_mul(scalar.bytes, m_weight.bytes, scalar.bytes);
 
-    if (m_G_scalar == rct::zero())
-        m_G_scalar = scalar;
+    if (m_H_scalar == rct::zero())
+        m_H_scalar = scalar;
     else
-        sc_add(m_G_scalar.bytes, m_G_scalar.bytes, scalar.bytes);
+        sc_add(m_H_scalar.bytes, m_H_scalar.bytes, scalar.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultiexpBuilder::add_U_element(rct::key scalar)
 {
     sc_mul(scalar.bytes, m_weight.bytes, scalar.bytes);
 
-    if (m_G_scalar == rct::zero())
-        m_G_scalar = scalar;
+    if (m_U_scalar == rct::zero())
+        m_U_scalar = scalar;
     else
-        sc_add(m_G_scalar.bytes, m_G_scalar.bytes, scalar.bytes);
+        sc_add(m_U_scalar.bytes, m_U_scalar.bytes, scalar.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultiexpBuilder::add_X_element(rct::key scalar)
 {
     sc_mul(scalar.bytes, m_weight.bytes, scalar.bytes);
 
-    if (m_G_scalar == rct::zero())
-        m_G_scalar = scalar;
+    if (m_X_scalar == rct::zero())
+        m_X_scalar = scalar;
     else
-        sc_add(m_G_scalar.bytes, m_G_scalar.bytes, scalar.bytes);
+        sc_add(m_X_scalar.bytes, m_X_scalar.bytes, scalar.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultiexpBuilder::add_element_at_generator_index(rct::key scalar, const std::size_t predef_generator_index)
@@ -144,6 +144,11 @@ void SpMultiexpBuilder::add_element(const rct::key &scalar, const rct::key &base
     CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&base_point_p3, base_point.bytes) == 0,
         "ge_frombytes_vartime failed!");
     this->add_element(scalar, base_point_p3);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpMultiexpBuilder::add_element(const rct::key &scalar, const crypto::public_key &base_point)
+{
+    this->add_element(scalar, rct::pk2rct(base_point));
 }
 //-------------------------------------------------------------------------------------------------------------------
 SpMultiexp::SpMultiexp(const std::list<SpMultiexpBuilder> &multiexp_builders)
