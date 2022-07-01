@@ -27,29 +27,36 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
+// NOT FOR PRODUCTION
+
+// A generator factory.
+
+
 #pragma once
 
+//local headers
 extern "C"
 {
-#include "crypto-ops.h"
+#include "crypto/crypto-ops.h"
 }
 
-namespace crypto
+//third party headers
+
+//standard headers
+#include <cstddef>
+
+//forward declarations
+namespace crypto { struct public_key; }
+
+namespace sp
+{
+namespace generator_factory
 {
 
-struct public_key;
+crypto::public_key get_generator_at_index(const std::size_t generator_index);
+ge_p3 get_generator_at_index_p3(const std::size_t generator_index);
+ge_cached get_generator_at_index_cached(const std::size_t generator_index);
 
-public_key get_G();
-public_key get_H();
-public_key get_U();
-public_key get_X();
-ge_p3 get_G_p3();
-ge_p3 get_H_p3();
-ge_p3 get_U_p3();
-ge_p3 get_X_p3();
-ge_cached get_G_cached();
-ge_cached get_H_cached();
-ge_cached get_U_cached();
-ge_cached get_X_cached();
+} //namespace generator_factory
 
-} //namespace crypto
+} //namespace sp

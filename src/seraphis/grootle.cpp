@@ -91,14 +91,11 @@ static void init_gens()
 
         // Build Hi generators
         // H_i = keccak_to_pt(H_32("grootle Hi", i))
-        const std::string Hi_A_salt{config::HASH_KEY_GROOTLE_Hi_A};
-        const std::string Hi_B_salt{config::HASH_KEY_GROOTLE_Hi_B};
-
         rct::key intermediate_hash;
         for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
         {
-            SpKDFTranscript transcript_A{Hi_A_salt, 4};
-            SpKDFTranscript transcript_B{Hi_B_salt, 4};
+            SpKDFTranscript transcript_A{config::HASH_KEY_GROOTLE_Hi_A, 4};
+            SpKDFTranscript transcript_B{config::HASH_KEY_GROOTLE_Hi_B, 4};
             transcript_A.append("i", i);
             transcript_B.append("i", i);
 

@@ -69,6 +69,10 @@ static ge_p3 G_p3;
 static ge_p3 H_p3;
 static ge_p3 U_p3;
 static ge_p3 X_p3;
+static ge_cached G_cached;
+static ge_cached H_cached;
+static ge_cached U_cached;
+static ge_cached X_cached;
 
 // misc
 static std::once_flag init_gens_once_flag;
@@ -175,6 +179,12 @@ static void init_gens()
         assert(U_deserialize == 0);
         assert(X_deserialize == 0);
 
+        // get cached versions
+        ge_p3_to_cached(&G_cached, &G_p3);
+        ge_p3_to_cached(&H_cached, &H_p3);
+        ge_p3_to_cached(&U_cached, &U_p3);
+        ge_p3_to_cached(&X_cached, &X_p3);
+
         // in debug mode, check that generators are reproducible
         assert(reproduce_generator_G() == G);
         assert(reproduce_generator_H() == H);
@@ -183,52 +193,76 @@ static void init_gens()
     });
 }
 //-------------------------------------------------------------------------------------------------------------------
-const public_key get_G()
+public_key get_G()
 {
     init_gens();
     return G;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const public_key get_H()
+public_key get_H()
 {
     init_gens();
     return H;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const public_key get_U()
+public_key get_U()
 {
     init_gens();
     return U;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const public_key get_X()
+public_key get_X()
 {
     init_gens();
     return X;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ge_p3 get_G_p3()
+ge_p3 get_G_p3()
 {
     init_gens();
     return G_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ge_p3 get_H_p3()
+ge_p3 get_H_p3()
 {
     init_gens();
     return H_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ge_p3 get_U_p3()
+ge_p3 get_U_p3()
 {
     init_gens();
     return U_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ge_p3 get_X_p3()
+ge_p3 get_X_p3()
 {
     init_gens();
     return X_p3;
+}
+//-------------------------------------------------------------------------------------------------------------------
+ge_cached get_G_cached()
+{
+    init_gens();
+    return G_cached;
+}
+//-------------------------------------------------------------------------------------------------------------------
+ge_cached get_H_cached()
+{
+    init_gens();
+    return H_cached;
+}
+//-------------------------------------------------------------------------------------------------------------------
+ge_cached get_U_cached()
+{
+    init_gens();
+    return U_cached;
+}
+//-------------------------------------------------------------------------------------------------------------------
+ge_cached get_X_cached()
+{
+    init_gens();
+    return X_cached;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace crypto
