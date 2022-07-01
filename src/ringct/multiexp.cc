@@ -577,14 +577,6 @@ size_t get_pippenger_c(size_t N)
   return 9;
 }
 
-struct pippenger_cached_data
-{
-  size_t size;
-  ge_cached *cached;
-  pippenger_cached_data(): size(0), cached(NULL) {}
-  ~pippenger_cached_data() { aligned_free(cached); }
-};
-
 std::shared_ptr<pippenger_cached_data> pippenger_init_cache(const std::vector<MultiexpData> &data, size_t start_offset, size_t N)
 {
   MULTIEXP_PERF(PERF_TIMER_START_UNIT(pippenger_init_cache, 1000000));
@@ -592,13 +584,11 @@ std::shared_ptr<pippenger_cached_data> pippenger_init_cache(const std::vector<Mu
   if (N == 0)
     N = data.size() - start_offset;
   CHECK_AND_ASSERT_THROW_MES(N <= data.size() - start_offset, "Bad cache base data");
-  std::shared_ptr<pippenger_cached_data> cache(new pippenger_cached_data());
+  std::shared_ptr<pippenger_cached_data> cache = std::make_shared<pippenger_cached_data>();
 
-  cache->size = N;
-  cache->cached = (ge_cached*)aligned_realloc(cache->cached, N * sizeof(ge_cached), 4096);
-  CHECK_AND_ASSERT_THROW_MES(cache->cached, "Out of memory");
+  cache->resize(N);
   for (size_t i = 0; i < N; ++i)
-    ge_p3_to_cached(&cache->cached[i], &data[i+start_offset].point);
+    ge_p3_to_cached(&(*cache)[i], &data[i+start_offset].point);
 
   MULTIEXP_PERF(PERF_TIMER_STOP(pippenger_init_cache));
   return cache;
@@ -606,7 +596,7 @@ std::shared_ptr<pippenger_cached_data> pippenger_init_cache(const std::vector<Mu
 
 size_t pippenger_get_cache_size(const std::shared_ptr<pippenger_cached_data> &cache)
 {
-  return cache->size * sizeof(*cache->cached);
+  return cache->size() * sizeof(ge_cached);
 }
 
 ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data, size_t c)
@@ -650,8 +640,8 @@ ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data, size_t c)
     // prepare cache for this set of prepared data
     cache_sizes.push_back(prep.cache_size);
     if (prep.cache != NULL && prep.cache_size == 0)
-      cache_sizes.back() = prep.cache->size;
-    CHECK_AND_ASSERT_THROW_MES(prep.cache == NULL || cache_sizes.back() <= prep.cache->size, "Cache is too small");
+      cache_sizes.back() = prep.cache->size();
+    CHECK_AND_ASSERT_THROW_MES(prep.cache == NULL || cache_sizes.back() <= prep.cache->size(), "Cache is too small");
     local_caches.emplace_back(prep.cache == NULL ? pippenger_init_cache(prep.data) : prep.cache);
     local_caches_2.emplace_back(prep.data.size() > cache_sizes.back() ? pippenger_init_cache(prep.data, cache_sizes.back()) : NULL);
   }
@@ -697,9 +687,9 @@ ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data, size_t c)
         if (buckets_init[bucket])
         {
           if (i < cache_sizes[prep_index])
-            add(buckets[bucket], local_caches[prep_index]->cached[i]);
+            add(buckets[bucket], (*local_caches[prep_index])[i]);
           else
-            add(buckets[bucket], local_caches_2[prep_index]->cached[i - cache_sizes[prep_index]]);
+            add(buckets[bucket], (*local_caches_2[prep_index])[i - cache_sizes[prep_index]]);
         }
         else
         {

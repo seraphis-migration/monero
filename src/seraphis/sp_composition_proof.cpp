@@ -99,8 +99,8 @@ static rct::key compute_challenge_message(const rct::key &message,
 {
     // collect challenge message hash data
     SpFSTranscript transcript{config::HASH_KEY_SP_COMPOSITION_PROOF_CHALLENGE_MESSAGE, 6*sizeof(rct::key)};
-    transcript.append("X", get_X_gen());
-    transcript.append("U", get_U_gen());
+    transcript.append("X", get_X());
+    transcript.append("U", get_U());
     transcript.append("message", message);
     transcript.append("K", K);
     transcript.append("KI", KI);
@@ -233,7 +233,7 @@ SpCompositionProof sp_composition_prove(const rct::key &message,
 
     CHECK_AND_ASSERT_THROW_MES(K == temp_K, "Bad proof key (K doesn't match privkeys)!");
 
-    const rct::key &U_gen{get_U_gen()};
+    const rct::key &U_gen{get_U()};
 
     SpCompositionProof proof;
 
@@ -327,7 +327,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
     CHECK_AND_ASSERT_THROW_MES(ge_frombytes_vartime(&KI_p3, rct::ki2rct(KI).bytes) == 0, "ge_frombytes_vartime failed!");
 
     // K_t2 = K_t1 - X - KI
-    ge_p3_to_cached(&temp_cache, &get_X_p3_gen());
+    ge_p3_to_cached(&temp_cache, &get_X_p3());
     ge_sub(&temp_p1p1, &K_t1_p3, &temp_cache);  //K_t1 - X
     ge_p1p1_to_p3(&K_t2_p3, &temp_p1p1);
     ge_p3_to_cached(&temp_cache, &KI_p3);
@@ -345,7 +345,7 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 
     // KI part:   [r_ki * U + c * KI  ]
     ge_dsm_precomp(temp_dsmp, &KI_p3);
-    ge_double_scalarmult_precomp_vartime(&temp_p2, proof.r_ki.bytes, &(get_U_p3_gen()), proof.c.bytes, temp_dsmp);
+    ge_double_scalarmult_precomp_vartime(&temp_p2, proof.r_ki.bytes, &(get_U_p3()), proof.c.bytes, temp_dsmp);
     ge_tobytes(part_ki.bytes, &temp_p2);
 
 
@@ -455,7 +455,7 @@ SpCompositionProofMultisigPrep sp_composition_multisig_init()
 
     // alpha_{ki,1,e}*U
     // store with (1/8)
-    const rct::key &U{get_U_gen()};
+    const rct::key &U{get_U()};
     generate_proof_nonce(U, prep.signature_nonce_1_KI_priv, prep.signature_nonces_KI_pub.signature_nonce_1_KI_pub);
     rct::scalarmultKey(prep.signature_nonces_KI_pub.signature_nonce_1_KI_pub,
         prep.signature_nonces_KI_pub.signature_nonce_1_KI_pub,
@@ -525,7 +525,7 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     std::sort(signer_nonces_pub_mul8.begin(), signer_nonces_pub_mul8.end());
 
     // check that the local signer's signature opening is in the input set of opening nonces
-    const rct::key U_gen{get_U_gen()};
+    const rct::key U_gen{get_U()};
     sp_multisig_binonce_factors local_nonce_pubs;
     rct::scalarmultKey(local_nonce_pubs.nonce_1, U_gen, rct::sk2rct(local_nonce_1_priv));
     rct::scalarmultKey(local_nonce_pubs.nonce_2, U_gen, rct::sk2rct(local_nonce_2_priv));

@@ -35,9 +35,15 @@
 #define MULTIEXP_H
 
 #include <vector>
+extern "C"
+{
+#include "crypto/crypto-ops.h"
+}
 #include "crypto/crypto.h"
 #include "rctTypes.h"
 #include "misc_log_ex.h"
+
+#include <boost/align/aligned_allocator.hpp>
 
 namespace rct
 {
@@ -55,7 +61,7 @@ struct MultiexpData {
 };
 
 struct straus_cached_data;
-struct pippenger_cached_data;
+using pippenger_cached_data = std::vector<ge_cached, boost::alignment::aligned_allocator<ge_cached, 4096>>;
 
 struct pippenger_prep_data final
 {

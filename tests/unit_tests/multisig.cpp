@@ -571,16 +571,16 @@ TEST(multisig, dual_base_vector_proof)
   EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::G, rct::G));
 
   // G, U, 2 keys
-  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(rct::G, sp::get_U_gen(), make_keys(2), rct::zero()));
-  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::G, sp::get_U_gen()));
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(rct::G, sp::get_U(), make_keys(2), rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::G, sp::get_U()));
 
   // U, G, 3 keys
-  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(sp::get_U_gen(), rct::G, make_keys(3), rct::zero()));
-  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, sp::get_U_gen(), rct::G));
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(sp::get_U(), rct::G, make_keys(3), rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, sp::get_U(), rct::G));
 
   // U, U, 3 keys
-  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(sp::get_U_gen(), sp::get_U_gen(), make_keys(3), rct::zero()));
-  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, sp::get_U_gen(), sp::get_U_gen()));
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(sp::get_U(), sp::get_U(), make_keys(3), rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, sp::get_U(), sp::get_U()));
 }
 
 TEST(multisig, multisig_conversion_msg)

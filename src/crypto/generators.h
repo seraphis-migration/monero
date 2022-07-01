@@ -39,13 +39,13 @@ namespace crypto
 
 struct public_key;
 
-const public_key get_G_gen();
-const public_key get_H_gen();
-const public_key get_U_gen();
-const public_key get_X_gen();
-const ge_p3 get_G_p3_gen();
-const ge_p3 get_H_p3_gen();
-const ge_p3 get_U_p3_gen();
-const ge_p3 get_X_p3_gen();
+const public_key get_G();
+const public_key get_H();
+const public_key get_U();
+const public_key get_X();
+const ge_p3 get_G_p3();
+const ge_p3 get_H_p3();
+const ge_p3 get_U_p3();
+const ge_p3 get_X_p3();
 
 } //namespace crypto

@@ -52,9 +52,9 @@ struct account_generators
 inline const rct::key get_primary_generator(const account_generator_era era)
 {
   if (era == account_generator_era::cryptonote)
-    return rct::pk2rct(crypto::get_G_gen());
+    return rct::pk2rct(crypto::get_G());
   else if (era == account_generator_era::seraphis)
-    return rct::pk2rct(crypto::get_U_gen());
+    return rct::pk2rct(crypto::get_U());
   else
     return rct::Z;  //error
 }
@@ -62,9 +62,9 @@ inline const rct::key get_primary_generator(const account_generator_era era)
 inline const rct::key get_secondary_generator(const account_generator_era era)
 {
   if (era == account_generator_era::cryptonote)
-    return rct::pk2rct(crypto::get_G_gen());
+    return rct::pk2rct(crypto::get_G());
   else if (era == account_generator_era::seraphis)
-    return rct::pk2rct(crypto::get_X_gen());
+    return rct::pk2rct(crypto::get_X());
   else
     return rct::Z;  //error
 }

@@ -131,10 +131,10 @@ for (const unsigned char byte : X.bytes)
     printf("0x%x, ", byte);
 printf("\n");
 */
-CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(rct::G) == crypto::get_G_gen(), "invalid G");
-CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(rct::H) == crypto::get_H_gen(), "invalid H");
-CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(U) == crypto::get_U_gen(), "invalid U");
-CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(X) == crypto::get_X_gen(), "invalid X");
+CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(rct::G) == crypto::get_G(), "invalid G");
+CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(rct::H) == crypto::get_H(), "invalid H");
+CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(U) == crypto::get_U(), "invalid U");
+CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(X) == crypto::get_X(), "invalid X");
 
 rct::key temp_minus_one;
 sc_sub(temp_minus_one.bytes, ZERO.bytes, ONE.bytes);
@@ -142,37 +142,37 @@ CHECK_AND_ASSERT_THROW_MES(temp_minus_one == MINUS_ONE, "invalid MINUS_ONE");
     });
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ge_p3& get_G_p3_gen()
+const ge_p3& get_G_p3()
 {
     init_sp_gens();
     return G_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ge_p3& get_H_p3_gen()
+const ge_p3& get_H_p3()
 {
     init_sp_gens();
     return H_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ge_p3& get_U_p3_gen()
+const ge_p3& get_U_p3()
 {
     init_sp_gens();
     return U_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const ge_p3& get_X_p3_gen()
+const ge_p3& get_X_p3()
 {
     init_sp_gens();
     return X_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const rct::key& get_U_gen()
+const rct::key& get_U()
 {
     init_sp_gens();
     return U;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const rct::key& get_X_gen()
+const rct::key& get_X()
 {
     init_sp_gens();
     return X;

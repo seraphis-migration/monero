@@ -81,12 +81,12 @@ static inline const rct::key& sortable2rct(const sortable_key &sortable)
 /**
 * brief: get generators
 */
-const ge_p3& get_G_p3_gen();
-const ge_p3& get_H_p3_gen();
-const ge_p3& get_U_p3_gen();
-const ge_p3& get_X_p3_gen();
-const rct::key& get_U_gen();
-const rct::key& get_X_gen();
+const ge_p3& get_G_p3();
+const ge_p3& get_H_p3();
+const ge_p3& get_U_p3();
+const ge_p3& get_X_p3();
+const rct::key& get_U();
+const rct::key& get_X();
 /**
 * brief: invert - invert a nonzero scalar
 * param: x - scalar to invert

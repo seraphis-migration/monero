@@ -110,7 +110,7 @@ static void init_gens()
         }
 
         // get G
-        G_p3 = get_G_p3_gen();
+        G_p3 = get_G_p3();
 
     });
 }
