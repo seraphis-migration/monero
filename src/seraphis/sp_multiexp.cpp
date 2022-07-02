@@ -46,6 +46,7 @@ extern "C"
 //third party headers
 
 //standard headers
+#include <iostream>
 #include <list>
 #include <vector>
 
@@ -56,13 +57,33 @@ extern "C"
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void weight_scalar(const boost::optional<rct::key> &weight, rct::key &scalar_inout)
+{
+    // s *= weight
+    if (weight)
+        sc_mul(scalar_inout.bytes, weight->bytes, scalar_inout.bytes);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void update_scalar(const boost::optional<rct::key> &new_scalar, rct::key &scalar_inout)
+{
+    // s += s_new
+    if (new_scalar)
+        sc_add(scalar_inout.bytes, scalar_inout.bytes, new_scalar->bytes);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 SpMultiexpBuilder::SpMultiexpBuilder(const rct::key &weight,
     const std::size_t estimated_num_predefined_generator_elements,
-    const std::size_t estimated_num_user_defined_elements) :
-        m_weight{weight}
+    const std::size_t estimated_num_user_defined_elements)
 {
     CHECK_AND_ASSERT_THROW_MES(!(weight == rct::zero()), "multiexp builder: element weight is zero.");
     CHECK_AND_ASSERT_THROW_MES(sc_check(weight.bytes) == 0, "multiexp builder: element weight is not canonical.");
+
+    // only initialize weight if not identity
+    if (!(weight == rct::identity()))
+        m_weight = weight;
 
     m_predef_scalars.resize(estimated_num_predefined_generator_elements, rct::zero());
     m_user_def_elements.reserve(estimated_num_user_defined_elements);
@@ -70,47 +91,47 @@ SpMultiexpBuilder::SpMultiexpBuilder(const rct::key &weight,
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultiexpBuilder::add_G_element(rct::key scalar)
 {
-    sc_mul(scalar.bytes, m_weight.bytes, scalar.bytes);
+    weight_scalar(m_weight, scalar);
 
-    if (m_G_scalar == rct::zero())
+    if (!m_G_scalar)
         m_G_scalar = scalar;
     else
-        sc_add(m_G_scalar.bytes, m_G_scalar.bytes, scalar.bytes);
+        sc_add(m_G_scalar->bytes, m_G_scalar->bytes, scalar.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultiexpBuilder::add_H_element(rct::key scalar)
 {
-    sc_mul(scalar.bytes, m_weight.bytes, scalar.bytes);
+    weight_scalar(m_weight, scalar);
 
-    if (m_H_scalar == rct::zero())
+    if (!m_H_scalar)
         m_H_scalar = scalar;
     else
-        sc_add(m_H_scalar.bytes, m_H_scalar.bytes, scalar.bytes);
+        sc_add(m_H_scalar->bytes, m_H_scalar->bytes, scalar.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultiexpBuilder::add_U_element(rct::key scalar)
 {
-    sc_mul(scalar.bytes, m_weight.bytes, scalar.bytes);
+    weight_scalar(m_weight, scalar);
 
-    if (m_U_scalar == rct::zero())
+    if (!m_U_scalar)
         m_U_scalar = scalar;
     else
-        sc_add(m_U_scalar.bytes, m_U_scalar.bytes, scalar.bytes);
+        sc_add(m_U_scalar->bytes, m_U_scalar->bytes, scalar.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultiexpBuilder::add_X_element(rct::key scalar)
 {
-    sc_mul(scalar.bytes, m_weight.bytes, scalar.bytes);
+    weight_scalar(m_weight, scalar);
 
-    if (m_X_scalar == rct::zero())
+    if (!m_X_scalar)
         m_X_scalar = scalar;
     else
-        sc_add(m_X_scalar.bytes, m_X_scalar.bytes, scalar.bytes);
+        sc_add(m_X_scalar->bytes, m_X_scalar->bytes, scalar.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpMultiexpBuilder::add_element_at_generator_index(rct::key scalar, const std::size_t predef_generator_index)
 {
-    sc_mul(scalar.bytes, m_weight.bytes, scalar.bytes);
+    weight_scalar(m_weight, scalar);
 
     if (m_predef_scalars.size() <= predef_generator_index)
         m_predef_scalars.resize(predef_generator_index + 1, rct::zero());
@@ -131,7 +152,8 @@ void SpMultiexpBuilder::add_element(rct::key scalar, const ge_p3 &base_point)
     if (scalar == rct::zero())
         return;
 
-    sc_mul(scalar.bytes, m_weight.bytes, scalar.bytes);
+    weight_scalar(m_weight, scalar);
+
     m_user_def_elements.emplace_back(scalar, base_point);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -199,49 +221,20 @@ SpMultiexp::SpMultiexp(const std::list<SpMultiexpBuilder> &multiexp_builders)
     // 2. collect scalars and expand cached points with user-defined elements
     for (const SpMultiexpBuilder &multiexp_builder : multiexp_builders)
     {
-        // G
-        if (!(multiexp_builder.m_G_scalar == rct::zero()))
-        {
-            sc_add(elements_collected[0].scalar.bytes,
-                elements_collected[0].scalar.bytes,
-                multiexp_builder.m_G_scalar.bytes);
-        }
-
-        // H
-        if (!(multiexp_builder.m_H_scalar == rct::zero()))
-        {
-            sc_add(elements_collected[1].scalar.bytes,
-                elements_collected[1].scalar.bytes,
-                multiexp_builder.m_H_scalar.bytes);
-        }
-
-        // U
-        if (!(multiexp_builder.m_U_scalar == rct::zero()))
-        {
-            sc_add(elements_collected[2].scalar.bytes,
-                elements_collected[2].scalar.bytes,
-                multiexp_builder.m_U_scalar.bytes);
-        }
-
-        // X
-        if (!(multiexp_builder.m_X_scalar == rct::zero()))
-        {
-            sc_add(elements_collected[3].scalar.bytes,
-                elements_collected[3].scalar.bytes,
-                multiexp_builder.m_X_scalar.bytes);
-        }
+        // main generators
+        update_scalar(multiexp_builder.m_G_scalar, elements_collected[0].scalar);
+        update_scalar(multiexp_builder.m_H_scalar, elements_collected[1].scalar);
+        update_scalar(multiexp_builder.m_U_scalar, elements_collected[2].scalar);
+        update_scalar(multiexp_builder.m_X_scalar, elements_collected[3].scalar);
 
         // pre-defined generators
         for (std::size_t predef_generator_index{0};
             predef_generator_index < multiexp_builder.m_predef_scalars.size();
             ++predef_generator_index)
         {
-            if (!(multiexp_builder.m_predef_scalars[predef_generator_index] == rct::zero()))
-            {
-                sc_add(elements_collected[4 + predef_generator_index].scalar.bytes,
-                    elements_collected[4 + predef_generator_index].scalar.bytes,
-                    multiexp_builder.m_predef_scalars[predef_generator_index].bytes);
-            }
+            sc_add(elements_collected[4 + predef_generator_index].scalar.bytes,
+                elements_collected[4 + predef_generator_index].scalar.bytes,
+                multiexp_builder.m_predef_scalars[predef_generator_index].bytes);
         }
 
         // user-defined elements
@@ -254,7 +247,7 @@ SpMultiexp::SpMultiexp(const std::list<SpMultiexpBuilder> &multiexp_builders)
     }
 
     // 3. evaluate the multiexponentiation
-    m_result = pippenger_p3(std::move(elements_collected), cached_base_points, cached_base_points->size());
+    m_result = pippenger_p3(elements_collected, cached_base_points, cached_base_points->size());
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpMultiexp::evaluates_to_point_at_infinity() const

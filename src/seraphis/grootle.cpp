@@ -157,9 +157,14 @@ static void build_verification_multiexps_for_proof(const GrootleProof &proof,
     const std::size_t n,
     const std::size_t m,
     const rct::key &message,
+    const rct::key &weight1,
+    const rct::key &weight2,
     SpMultiexpBuilder &builder1_inout,
     SpMultiexpBuilder &builder2_inout)
 {
+    CHECK_AND_ASSERT_THROW_MES(!(weight1 == rct::zero()), "grootle proof: invalid weigh1!");
+    CHECK_AND_ASSERT_THROW_MES(!(weight2 == rct::zero()), "grootle proof: invalid weigh2!");
+
     // builer 1: A + xi*B == dual_matrix_commit(zA, f, f*(xi - f))
     // per-index storage:
     // 0                                  G                             (zA*G)
@@ -214,80 +219,91 @@ static void build_verification_multiexps_for_proof(const GrootleProof &proof,
     }
 
     // Matrix commitment
-    //   A + xi*B == zA * G + ... f[j][i] * Hi_A[j][i] ... + ... f[j][i] * (xi - f[j][i]) * Hi_B[j][i] ...
-    //            == dual_matrix_commit(zA, f, f*(xi - f))
-    // G: zA
-    builder1_inout.add_G_element(proof.zA);
+    //   weight1 * [ A + xi*B == zA * G + ... f[j][i] * Hi_A[j][i] ... + ... f[j][i] * (xi - f[j][i]) * Hi_B[j][i] ... ]
+    //   weight1 * [          == dual_matrix_commit(zA, f, f*(xi - f))                                                 ]
+    // G: weight1 * zA
+    sc_mul(temp.bytes, weight1.bytes, proof.zA.bytes);
+    builder1_inout.add_G_element(temp);
+
+    // weight1 * [ ... f[j][i] * Hi_A[j][i] ... + ... f[j][i] * (xi - f[j][i]) * Hi_B[j][i] ... ]
+    rct::key w1_f_temp;
 
     for (std::size_t j = 0; j < m; ++j)
     {
         for (std::size_t i = 0; i < n; ++i)
         {
-            // Hi_A: f[j][i]
-            builder1_inout.add_element_at_generator_index(f[j][i], 2*(j*n + i));
+            // weight1 * f[j][i]
+            sc_mul(w1_f_temp.bytes, weight1.bytes, f[j][i].bytes);
 
-            // Hi_B: f[j][i]*(xi - f[j][i])
-            sc_sub(temp.bytes, xi.bytes, f[j][i].bytes);    //xi - f[j][i]
-            sc_mul(temp.bytes, f[j][i].bytes, temp.bytes);  //f[j][i]*(xi - f[j][i])
+            // Hi_A: weight1 * f[j][i]
+            builder1_inout.add_element_at_generator_index(w1_f_temp, 2*(j*n + i));
+
+            // Hi_B: weight1 * f[j][i]*(xi - f[j][i])
+            sc_sub(temp.bytes, xi.bytes, f[j][i].bytes);      //xi - f[j][i]
+            sc_mul(temp.bytes, w1_f_temp.bytes, temp.bytes);  //weight1 * f[j][i]*(xi - f[j][i])
             builder1_inout.add_element_at_generator_index(temp, 2*(j*n + i) + 1);
         }
     }
 
     // A, B
     // equality test:
-    //   dual_matrix_commit(zA, f, f*(xi - f)) - (A + xi*B) == 0
-    // A: -A
-    // B: -xi * B
-    builder1_inout.add_element(MINUS_ONE, A_p3);  // -A
+    //   weight1 * [ dual_matrix_commit(zA, f, f*(xi - f)) - (A + xi*B) == 0 ]
+    // A: weight1 * -A
+    // B: weight1 * -xi * B
+    rct::key w1_MINUS_ONE;
+    sc_mul(w1_MINUS_ONE.bytes, weight1.bytes, MINUS_ONE.bytes);
+    builder1_inout.add_element(w1_MINUS_ONE, A_p3);  //weight1 * -A
 
-    sc_mul(temp.bytes, MINUS_ONE.bytes, xi.bytes);
-    builder1_inout.add_element(temp, B_p3);  // -xi * B
+    sc_mul(temp.bytes, w1_MINUS_ONE.bytes, xi.bytes);
+    builder1_inout.add_element(temp, B_p3);  //weight1 * -xi * B
 
     // {M}
     //   t_k = mul_all_j(f[j][decomp_k[j]])
-    //   sum_k( t_k*(M[k] - C_offset) ) - sum(...) - z G == 0
+    //   weight2 * [ sum_k( t_k*(M[k] - C_offset) ) - sum(...) - z G == 0  ]
     //
-    //   sum_k( t_k*M[k] ) -
-    //      sum_k( t_k )*C_offset -
-    //      [ sum(...) + z G ] == 0
-    // M[k]: t_k
-    rct::key sum_t = ZERO;
-    rct::key t_k;
+    //   weight2 * [ sum_k( t_k*M[k] ) - sum_k( t_k )*C_offset - [ sum(...) + z G ] == 0 ]
+    // M[k]: weight2 * t_k
+    rct::key w2_sum_t = ZERO;
+    rct::key w2_t_k;
     for (std::size_t k = 0; k < N; ++k)
     {
-        t_k = ONE;
+        w2_t_k = weight2;
         std::vector<std::size_t> decomp_k;
         decomp_k.resize(m);
         decompose(k, n, m, decomp_k);
 
         for (std::size_t j = 0; j < m; ++j)
         {
-            sc_mul(t_k.bytes, t_k.bytes, f[j][decomp_k[j]].bytes);  // mul_all_j(f[j][decomp_k[j]])
+            sc_mul(w2_t_k.bytes, w2_t_k.bytes, f[j][decomp_k[j]].bytes);  //weight2 * mul_all_j(f[j][decomp_k[j]])
         }
 
-        sc_add(sum_t.bytes, sum_t.bytes, t_k.bytes);  // sum_k( t_k )
-        builder2_inout.add_element(t_k, M[k]);
+        sc_add(w2_sum_t.bytes, w2_sum_t.bytes, w2_t_k.bytes);  //weight2 * sum_k( t_k )
+        builder2_inout.add_element(w2_t_k, M[k]);
     }
 
     // C_offset
-    //   ... - sum_k( t_k )*C_offset ...
+    //   weight2 * [ ... - sum_k( t_k )*C_offset ... ]
     // 
-    // proof_offset: -sum_t
-    sc_mul(temp.bytes, MINUS_ONE.bytes, sum_t.bytes);  //-sum_t
+    // proof_offset: weight2 * -sum_t
+    sc_mul(temp.bytes, MINUS_ONE.bytes, w2_sum_t.bytes);  //weight2 * -sum_t
     builder2_inout.add_element(temp, proof_offset);
 
     // {X}
-    //   ... - sum_j( xi^j*X[j] ) - z G == 0
+    //   weight2 * [ ... - sum_j( xi^j*X[j] ) - z G == 0 ]
     for (std::size_t j = 0; j < m; ++j)
     {
-        // X[j]: -xi^j
-        builder2_inout.add_element(minus_xi_pow[j], X_p3[j]);
+        // weight2 * -xi^j
+        sc_mul(temp.bytes, weight2.bytes, minus_xi_pow[j].bytes);
+
+        // X[j]: weight2 * -xi^j
+        builder2_inout.add_element(temp, X_p3[j]);
     }
 
     // G
-    //   ... - z G == 0
-    // G: -z
-    sc_mul(temp.bytes, MINUS_ONE.bytes, proof.z.bytes);
+    //   weight2 * [ ... - z G == 0 ]
+    // G: weight2 * -z
+    sc_mul(temp.bytes, weight2.bytes, MINUS_ONE.bytes);
+    sc_mul(temp.bytes, temp.bytes, proof.z.bytes);
     builder2_inout.add_G_element(temp);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -603,9 +619,10 @@ std::list<SpMultiexpBuilder> get_grootle_verification_data(const std::vector<con
     for (std::size_t proof_i{0}; proof_i < proofs.size(); ++proof_i)
     {
         // prepare two builders for this proof (for the index-encoding proof and the membership proof)
-        builders.emplace_back(rct::skGen(), 2*m*n, 2);
+        // note: manually specify the weights for efficiency
+        builders.emplace_back(rct::identity(), 2*m*n, 2);
         SpMultiexpBuilder &builder1 = builders.back();
-        builders.emplace_back(rct::skGen(), 0, N + m + 1);
+        builders.emplace_back(rct::identity(), 0, N + m + 1);
         SpMultiexpBuilder &builder2 = builders.back();
 
         build_verification_multiexps_for_proof(*(proofs[proof_i]),
@@ -614,6 +631,8 @@ std::list<SpMultiexpBuilder> get_grootle_verification_data(const std::vector<con
             n,
             m,
             messages[proof_i],
+            rct::skGen(),
+            rct::skGen(),
             builder1,
             builder2);
     }

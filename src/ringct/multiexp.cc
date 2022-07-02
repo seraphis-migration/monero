@@ -599,58 +599,32 @@ size_t pippenger_get_cache_size(const std::shared_ptr<pippenger_cached_data> &ca
   return cache->size() * sizeof(ge_cached);
 }
 
-ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data, size_t c)
+ge_p3 pippenger_p3(const std::vector<MultiexpData> &data, const std::shared_ptr<pippenger_cached_data> &cache, size_t cache_size, size_t c)
 {
-  // set c if undefined
+  if (cache != NULL && cache_size == 0)
+    cache_size = cache->size();
+  CHECK_AND_ASSERT_THROW_MES(cache == NULL || cache_size <= cache->size(), "Cache is too small");
   if (c == 0)
-  {
-    size_t total_data_size{0};
-    for (const auto &prep : prep_data)
-      total_data_size += prep.data.size();
-    c = get_pippenger_c(total_data_size);
-  }
+    c = get_pippenger_c(data.size());
   CHECK_AND_ASSERT_THROW_MES(c <= 9, "c is too large");
 
-  // misc.
-  rct::key maxscalar = rct::zero();
-  for (const auto &prep : prep_data)
-  {
-    for (size_t i = 0; i < prep.data.size(); ++i)
-    {
-      if (maxscalar < prep.data[i].scalar)
-        maxscalar = prep.data[i].scalar;
-    }
-  }
-
-  size_t groups = 0;
-  while (groups < 256 && !(maxscalar < pow2(groups)))
-    ++groups;
-  groups = (groups + c - 1) / c;
-
-  // prepare caches
-  std::vector<size_t> cache_sizes;
-  std::vector<std::shared_ptr<pippenger_cached_data>> local_caches;
-  std::vector<std::shared_ptr<pippenger_cached_data>> local_caches_2;
-  cache_sizes.reserve(prep_data.size());
-  local_caches.reserve(prep_data.size());
-  local_caches_2.reserve(prep_data.size());
-
-  for (const auto &prep : prep_data)
-  {
-    // prepare cache for this set of prepared data
-    cache_sizes.push_back(prep.cache_size);
-    if (prep.cache != NULL && prep.cache_size == 0)
-      cache_sizes.back() = prep.cache->size();
-    CHECK_AND_ASSERT_THROW_MES(prep.cache == NULL || cache_sizes.back() <= prep.cache->size(), "Cache is too small");
-    local_caches.emplace_back(prep.cache == NULL ? pippenger_init_cache(prep.data) : prep.cache);
-    local_caches_2.emplace_back(prep.data.size() > cache_sizes.back() ? pippenger_init_cache(prep.data, cache_sizes.back()) : NULL);
-  }
-
-  // multiexp: combine multiexp data from multiple prepared sets
   ge_p3 result = ge_p3_identity;
   bool result_init = false;
   std::unique_ptr<ge_p3[]> buckets{new ge_p3[1<<c]};
   bool buckets_init[1<<9];
+  std::shared_ptr<pippenger_cached_data> local_cache = cache == NULL ? pippenger_init_cache(data) : cache;
+  std::shared_ptr<pippenger_cached_data> local_cache_2 = data.size() > cache_size ? pippenger_init_cache(data, cache_size) : NULL;
+
+  rct::key maxscalar = rct::zero();
+  for (size_t i = 0; i < data.size(); ++i)
+  {
+    if (maxscalar < data[i].scalar)
+      maxscalar = data[i].scalar;
+  }
+  size_t groups = 0;
+  while (groups < 256 && !(maxscalar < pow2(groups)))
+    ++groups;
+  groups = (groups + c - 1) / c;
 
   for (size_t k = groups; k-- > 0; )
   {
@@ -671,31 +645,26 @@ ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data, size_t c)
     memset(buckets_init, 0, 1u<<c);
 
     // partition scalars into buckets
-    for (size_t prep_index = 0; prep_index < prep_data.size(); ++prep_index)
+    for (size_t i = 0; i < data.size(); ++i)
     {
-      const auto &prep = prep_data[prep_index];
-
-      for (size_t i = 0; i < prep.data.size(); ++i)
+      unsigned int bucket = 0;
+      for (size_t j = 0; j < c; ++j)
+        if (test(data[i].scalar, k*c+j))
+          bucket |= 1<<j;
+      if (bucket == 0)
+        continue;
+      CHECK_AND_ASSERT_THROW_MES(bucket < (1u<<c), "bucket overflow");
+      if (buckets_init[bucket])
       {
-        unsigned int bucket = 0;
-        for (size_t j = 0; j < c; ++j)
-          if (test(prep.data[i].scalar, k*c+j))
-            bucket |= 1<<j;
-        if (bucket == 0)
-          continue;
-        CHECK_AND_ASSERT_THROW_MES(bucket < (1u<<c), "bucket overflow");
-        if (buckets_init[bucket])
-        {
-          if (i < cache_sizes[prep_index])
-            add(buckets[bucket], (*local_caches[prep_index])[i]);
-          else
-            add(buckets[bucket], (*local_caches_2[prep_index])[i - cache_sizes[prep_index]]);
-        }
+        if (i < cache_size)
+          add(buckets[bucket], (*local_cache)[i]);
         else
-        {
-          buckets[bucket] = prep.data[i].point;
-          buckets_init[bucket] = true;
-        }
+          add(buckets[bucket], (*local_cache_2)[i - cache_size]);
+      }
+      else
+      {
+        buckets[bucket] = data[i].point;
+        buckets_init[bucket] = true;
       }
     }
 
@@ -730,35 +699,10 @@ ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data, size_t c)
   return result;
 }
 
-ge_p3 pippenger_p3(std::vector<MultiexpData> data, const std::shared_ptr<pippenger_cached_data> &cache, const size_t cache_size, const size_t c)
-{
-  std::vector<pippenger_prep_data> prep_data;
-  prep_data.push_back({std::move(data), cache, cache_size});
-
-  return pippenger_p3(prep_data, c);
-}
-
-ge_p3 pippenger_p3(const std::vector<pippenger_prep_data> &prep_data)
-{
-  size_t total_data_size{0};
-  for (const auto &prep : prep_data)
-    total_data_size += prep.data.size();
-
-  return pippenger_p3(prep_data, get_pippenger_c(total_data_size));
-}
-
-rct::key pippenger(std::vector<MultiexpData> data, const std::shared_ptr<pippenger_cached_data> &cache, const size_t cache_size, const size_t c)
+rct::key pippenger(const std::vector<MultiexpData> &data, const std::shared_ptr<pippenger_cached_data> &cache, const size_t cache_size, const size_t c)
 {
   rct::key res;
   ge_p3 result_p3 = pippenger_p3(std::move(data), cache, cache_size, c);
-  ge_p3_tobytes(res.bytes, &result_p3);
-  return res;
-}
-
-rct::key pippenger(const std::vector<pippenger_prep_data> &prep_data)
-{
-  rct::key res;
-  ge_p3 result_p3 = pippenger_p3(prep_data);
   ge_p3_tobytes(res.bytes, &result_p3);
   return res;
 }

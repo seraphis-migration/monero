@@ -43,6 +43,7 @@ extern "C"
 #include "ringct/rctTypes.h"
 
 //third party headers
+#include <boost/optional/optional.hpp>
 
 //standard headers
 #include <list>
@@ -90,13 +91,13 @@ public:
 //member variables
 protected:
     /// ed25519 generator scalar
-    rct::key m_G_scalar{rct::zero()};
+    boost::optional<rct::key> m_G_scalar;
     /// Pedersen commitment generator scalar
-    rct::key m_H_scalar{rct::zero()};
+    boost::optional<rct::key> m_H_scalar;
     /// seraphis spend key generator scalar
-    rct::key m_U_scalar{rct::zero()};
+    boost::optional<rct::key> m_U_scalar;
     /// seraphis spend key extension generator scalar
-    rct::key m_X_scalar{rct::zero()};
+    boost::optional<rct::key> m_X_scalar;
     /// pre-defined generators scalars
     std::vector<rct::key> m_predef_scalars;
     /// user-defined [scalar, base point] pairs
@@ -104,7 +105,7 @@ protected:
 
 private:
     /// element weight
-    rct::key m_weight;
+    boost::optional<rct::key> m_weight;
 };
 
 ////

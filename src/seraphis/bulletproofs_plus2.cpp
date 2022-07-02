@@ -899,6 +899,7 @@ try_again:
         rct::keyV challenges_cache;
         std::vector<ge_p3> proof8_V, proof8_L, proof8_R;
 
+
         // Process each proof and add to the weighted batch
         for (const BulletproofPlus2 *p: proofs)
         {
@@ -909,7 +910,15 @@ try_again:
             const size_t M = 1 << pd.logM;
             const size_t MN = M*N;
 
-            prep_data_out.emplace_back(rct::skGen(), 2 * MN, proof.V.size() + 2 * (pd.logM + logN) + 3);
+            // Random weighting factor must be nonzero, which is exceptionally unlikely!
+            rct::key weight = ZERO;
+            while (weight == ZERO)
+            {
+                weight = rct::skGen();
+            }
+
+            // note: set the multiexp builder's weight to 1 and manually weight proof elements for efficiency
+            prep_data_out.emplace_back(rct::identity(), 2 * MN, proof.V.size() + 2 * (pd.logM + logN) + 3);
             SpMultiexpBuilder &data_builder = prep_data_out.back();
 
             // Rescale previously offset proof elements
@@ -936,7 +945,7 @@ try_again:
             }
             sc_mul(y_MN_1.bytes, y_MN.bytes, pd.y.bytes);
 
-            // V_j: -e**2 * z**(2*j+1) * y**(MN+1)
+            // V_j: -e**2 * z**(2*j+1) * y**(MN+1) * weight
             rct::key e_squared;
             sc_mul(e_squared.bytes, pd.e.bytes, pd.e.bytes);
 
@@ -945,26 +954,29 @@ try_again:
 
             sc_sub(temp.bytes, ZERO.bytes, e_squared.bytes);
             sc_mul(temp.bytes, temp.bytes, y_MN_1.bytes);
+            sc_mul(temp.bytes, temp.bytes, weight.bytes);
             for (size_t j = 0; j < proof8_V.size(); j++)
             {
                 sc_mul(temp.bytes, temp.bytes, z_squared.bytes);
                 data_builder.add_element(temp, proof8_V[j]);
             }
 
-            // B: -1
-            data_builder.add_element(MINUS_ONE, proof8_B);
+            // B: -weight
+            sc_mul(temp.bytes, MINUS_ONE.bytes, weight.bytes);
+            data_builder.add_element(temp, proof8_B);
 
-            // A1: -e
-            sc_mul(temp.bytes, MINUS_ONE.bytes, pd.e.bytes);
+            // A1: -weight*e
+            sc_mul(temp.bytes, temp.bytes, pd.e.bytes);
             data_builder.add_element(temp, proof8_A1);
 
-            // A: -e*e
-            rct::key minus_e_squared;
-            sc_mul(minus_e_squared.bytes, temp.bytes, pd.e.bytes);
-            data_builder.add_element(minus_e_squared, proof8_A);
+            // A: -weight*e*e
+            rct::key minus_weight_e_squared;
+            sc_mul(minus_weight_e_squared.bytes, temp.bytes, pd.e.bytes);
+            data_builder.add_element(minus_weight_e_squared, proof8_A);
 
-            // G: d1
-            data_builder.add_G_element(proof.d1);
+            // G: weight*d1
+            sc_mul(temp.bytes, weight.bytes, proof.d1.bytes);
+            data_builder.add_G_element(temp);
 
             // Windowed vector
             // d[j*N+i] = z**(2*(j+1)) * 2**i
@@ -987,7 +999,7 @@ try_again:
             rct::key sum_d;
             sc_mul(sum_d.bytes, TWO_SIXTY_FOUR_MINUS_ONE.bytes, sum_of_even_powers(pd.z, 2*M).bytes);
 
-            // H: r1*y*s1 + e**2*( y**(MN+1)*z*sum(d) + (z**2-z)*sum(y) )
+            // H: weight*( r1*y*s1 + e**2*( y**(MN+1)*z*sum(d) + (z**2-z)*sum(y) ) )
             rct::key sum_y = sum_of_scalar_powers(pd.y, MN);
             sc_sub(temp.bytes, z_squared.bytes, pd.z.bytes);
             sc_mul(temp.bytes, temp.bytes, sum_y.bytes);
@@ -999,6 +1011,7 @@ try_again:
             sc_mul(temp2.bytes, proof.r1.bytes, pd.y.bytes);
             sc_mul(temp2.bytes, temp2.bytes, proof.s1.bytes);
             sc_add(temp.bytes, temp.bytes, temp2.bytes);
+            sc_mul(temp.bytes, temp.bytes, weight.bytes);
             data_builder.add_H_element(temp);
 
             // Compute the number of rounds for the inner-product argument
@@ -1023,46 +1036,50 @@ try_again:
             }
 
             // Gi and Hi
-            rct::key e_r1_y;
-            sc_mul(e_r1_y.bytes, pd.e.bytes, proof.r1.bytes);
-            rct::key e_s1;
-            sc_mul(e_s1.bytes, pd.e.bytes, proof.s1.bytes);
-            rct::key e_squared_z;
-            sc_mul(e_squared_z.bytes, e_squared.bytes, pd.z.bytes);
-            rct::key minus_e_squared_z;
-            sc_sub(minus_e_squared_z.bytes, ZERO.bytes, e_squared_z.bytes);
-            rct::key minus_e_squared_y;
-            sc_sub(minus_e_squared_y.bytes, ZERO.bytes, e_squared.bytes);
-            sc_mul(minus_e_squared_y.bytes, minus_e_squared_y.bytes, y_MN.bytes);
+            rct::key e_r1_w_y;
+            sc_mul(e_r1_w_y.bytes, pd.e.bytes, proof.r1.bytes);
+            sc_mul(e_r1_w_y.bytes, e_r1_w_y.bytes, weight.bytes);
+            rct::key e_s1_w;
+            sc_mul(e_s1_w.bytes, pd.e.bytes, proof.s1.bytes);
+            sc_mul(e_s1_w.bytes, e_s1_w.bytes, weight.bytes);
+            rct::key e_squared_z_w;
+            sc_mul(e_squared_z_w.bytes, e_squared.bytes, pd.z.bytes);
+            sc_mul(e_squared_z_w.bytes, e_squared_z_w.bytes, weight.bytes);
+            rct::key minus_e_squared_z_w;
+            sc_sub(minus_e_squared_z_w.bytes, ZERO.bytes, e_squared_z_w.bytes);
+            rct::key minus_e_squared_w_y;
+            sc_sub(minus_e_squared_w_y.bytes, ZERO.bytes, e_squared.bytes);
+            sc_mul(minus_e_squared_w_y.bytes, minus_e_squared_w_y.bytes, weight.bytes);
+            sc_mul(minus_e_squared_w_y.bytes, minus_e_squared_w_y.bytes, y_MN.bytes);
             for (size_t i = 0; i < MN; ++i)
             {
-                rct::key g_scalar = copy(e_r1_y);
+                rct::key g_scalar = copy(e_r1_w_y);
                 rct::key h_scalar;
 
                 // Use the binary decomposition of the index
-                sc_muladd(g_scalar.bytes, g_scalar.bytes, challenges_cache[i].bytes, e_squared_z.bytes);
-                sc_muladd(h_scalar.bytes, e_s1.bytes, challenges_cache[(~i) & (MN-1)].bytes, minus_e_squared_z.bytes);
+                sc_muladd(g_scalar.bytes, g_scalar.bytes, challenges_cache[i].bytes, e_squared_z_w.bytes);
+                sc_muladd(h_scalar.bytes, e_s1_w.bytes, challenges_cache[(~i) & (MN-1)].bytes, minus_e_squared_z_w.bytes);
 
                 // Complete the scalar derivation
                 data_builder.add_element_at_generator_index(g_scalar, i * 2);
-                sc_muladd(h_scalar.bytes, minus_e_squared_y.bytes, d[i].bytes, h_scalar.bytes);
+                sc_muladd(h_scalar.bytes, minus_e_squared_w_y.bytes, d[i].bytes, h_scalar.bytes);
                 data_builder.add_element_at_generator_index(h_scalar, i * 2 + 1);
 
                 // Update iterated values
-                sc_mul(e_r1_y.bytes, e_r1_y.bytes, yinv.bytes);
-                sc_mul(minus_e_squared_y.bytes, minus_e_squared_y.bytes, yinv.bytes);
+                sc_mul(e_r1_w_y.bytes, e_r1_w_y.bytes, yinv.bytes);
+                sc_mul(minus_e_squared_w_y.bytes, minus_e_squared_w_y.bytes, yinv.bytes);
             }
 
-            // L_j: -e*e*challenges[j]**2
-            // R_j: -e*e*challenges[j]**(-2)
+            // L_j: -weight*e*e*challenges[j]**2
+            // R_j: -weight*e*e*challenges[j]**(-2)
             for (size_t j = 0; j < rounds; ++j)
             {
                 sc_mul(temp.bytes, pd.challenges[j].bytes, pd.challenges[j].bytes);
-                sc_mul(temp.bytes, temp.bytes, minus_e_squared.bytes);
+                sc_mul(temp.bytes, temp.bytes, minus_weight_e_squared.bytes);
                 data_builder.add_element(temp, proof8_L[j]);
 
                 sc_mul(temp.bytes, challenges_inv[j].bytes, challenges_inv[j].bytes);
-                sc_mul(temp.bytes, temp.bytes, minus_e_squared.bytes);
+                sc_mul(temp.bytes, temp.bytes, minus_weight_e_squared.bytes);
                 data_builder.add_element(temp, proof8_R[j]);
             }
         }

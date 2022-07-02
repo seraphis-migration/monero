@@ -37,8 +37,9 @@
 //  The result is that the roles of `g` and `h` in the preprint are effectively swapped
 //      in this code, taking on the roles of `H` and `G`, respectively. Read carefully!
 
-#include <mutex>
 #include <stdlib.h>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/lock_guard.hpp>
 #include "misc_log_ex.h"
 #include "span.h"
 #include "cryptonote_config.h"
@@ -64,7 +65,7 @@ namespace rct
 
     // Proof bounds
     static constexpr size_t maxN = 64; // maximum number of bits in range
-    static constexpr size_t maxM = BULLETPROOF_PLUS_MAX_OUTPUTS*8; // maximum number of outputs to aggregate into a single proof
+    static constexpr size_t maxM = BULLETPROOF_PLUS_MAX_OUTPUTS; // maximum number of outputs to aggregate into a single proof
 
     // Cached public generators
     static ge_p3 Hi_p3[maxN*maxM], Gi_p3[maxN*maxM];
@@ -82,7 +83,7 @@ namespace rct
     // Initial transcript hash
     static rct::key initial_transcript;
 
-    static std::once_flag init_once_flag;
+    static boost::mutex init_mutex;
 
     // Use the generator caches to compute a multiscalar multiplication
     static inline rct::key multiexp(const std::vector<MultiexpData> &data, size_t HiGi_size)
@@ -119,38 +120,42 @@ namespace rct
     // Construct public generators
     static void init_exponents()
     {
+        boost::lock_guard<boost::mutex> lock(init_mutex);
+
         // Only needs to be done once
-        std::call_once(init_once_flag, [&](){
+        static bool init_done = false;
+        if (init_done)
+            return;
 
-            std::vector<MultiexpData> data;
-            data.reserve(maxN*maxM*2);
-            for (size_t i = 0; i < maxN*maxM; ++i)
-            {
-                Hi_p3[i] = get_exponent(rct::H, i * 2);
-                Gi_p3[i] = get_exponent(rct::H, i * 2 + 1);
+        std::vector<MultiexpData> data;
+        data.reserve(maxN*maxM*2);
+        for (size_t i = 0; i < maxN*maxM; ++i)
+        {
+            Hi_p3[i] = get_exponent(rct::H, i * 2);
+            Gi_p3[i] = get_exponent(rct::H, i * 2 + 1);
 
-                data.push_back({rct::zero(), Gi_p3[i]});
-                data.push_back({rct::zero(), Hi_p3[i]});
-            }
+            data.push_back({rct::zero(), Gi_p3[i]});
+            data.push_back({rct::zero(), Hi_p3[i]});
+        }
 
-            straus_HiGi_cache = straus_init_cache(data, STRAUS_SIZE_LIMIT);
-            pippenger_HiGi_cache = pippenger_init_cache(data, 0, PIPPENGER_SIZE_LIMIT);
+        straus_HiGi_cache = straus_init_cache(data, STRAUS_SIZE_LIMIT);
+        pippenger_HiGi_cache = pippenger_init_cache(data, 0, PIPPENGER_SIZE_LIMIT);
 
-            // Compute 2**64 - 1 for later use in simplifying verification
-            TWO_SIXTY_FOUR_MINUS_ONE = TWO;
-            for (size_t i = 0; i < 6; i++)
-            {
-                sc_mul(TWO_SIXTY_FOUR_MINUS_ONE.bytes, TWO_SIXTY_FOUR_MINUS_ONE.bytes, TWO_SIXTY_FOUR_MINUS_ONE.bytes);
-            }
-            sc_sub(TWO_SIXTY_FOUR_MINUS_ONE.bytes, TWO_SIXTY_FOUR_MINUS_ONE.bytes, ONE.bytes);
+        // Compute 2**64 - 1 for later use in simplifying verification
+        TWO_SIXTY_FOUR_MINUS_ONE = TWO;
+        for (size_t i = 0; i < 6; i++)
+        {
+            sc_mul(TWO_SIXTY_FOUR_MINUS_ONE.bytes, TWO_SIXTY_FOUR_MINUS_ONE.bytes, TWO_SIXTY_FOUR_MINUS_ONE.bytes);
+        }
+        sc_sub(TWO_SIXTY_FOUR_MINUS_ONE.bytes, TWO_SIXTY_FOUR_MINUS_ONE.bytes, ONE.bytes);
 
-            // Generate the initial Fiat-Shamir transcript hash, which is constant across all proofs
-            static const std::string domain_separator(config::HASH_KEY_BULLETPROOF_PLUS_TRANSCRIPT);
-            ge_p3 initial_transcript_p3;
-            rct::hash_to_p3(initial_transcript_p3, rct::hash2rct(crypto::cn_fast_hash(domain_separator.data(), domain_separator.size())));
-            ge_p3_tobytes(initial_transcript.bytes, &initial_transcript_p3);
+        // Generate the initial Fiat-Shamir transcript hash, which is constant across all proofs
+        const std::string domain_separator(config::HASH_KEY_BULLETPROOF_PLUS_TRANSCRIPT);
+        ge_p3 initial_transcript_p3;
+        rct::hash_to_p3(initial_transcript_p3, rct::hash2rct(crypto::cn_fast_hash(domain_separator.data(), domain_separator.size())));
+        ge_p3_tobytes(initial_transcript.bytes, &initial_transcript_p3);
 
-        });
+        init_done = true;
     }
 
     // Given two scalar arrays, construct a vector pre-commitment:
@@ -791,7 +796,7 @@ try_again:
     };
 
     // Given a batch of range proofs, determine if they are all valid
-    bool try_get_bulletproof_plus_verification_data(const std::vector<const BulletproofPlus*> &proofs, pippenger_prep_data &prep_data_out)
+    bool bulletproof_plus_VERIFY(const std::vector<const BulletproofPlus*> &proofs)
     {
         init_exponents();
 
@@ -1089,22 +1094,7 @@ try_again:
             multiexp_data[i * 2] = {Gi_scalars[i], Gi_p3[i]};
             multiexp_data[i * 2 + 1] = {Hi_scalars[i], Hi_p3[i]};
         }
-
-        // return multiexp data for caller to deal with
-        prep_data_out = rct::pippenger_prep_data{std::move(multiexp_data), pippenger_HiGi_cache, 2 * maxMN};
-
-        return true;
-    }
-
-    bool bulletproof_plus_VERIFY(const std::vector<const BulletproofPlus*> &proofs)
-    {
-        // build multiexp
-        rct::pippenger_prep_data prep_data;
-        if (!try_get_bulletproof_plus_verification_data(proofs, prep_data))
-            return false;;
-
-        // verify all elements sum to zero (use optimized multiexp function)
-        if (!(multiexp(prep_data.data, prep_data.cache_size) == rct::identity()))
+        if (!(multiexp(multiexp_data, 2 * maxMN) == rct::identity()))
         {
             MERROR("Verification failure");
             return false;
