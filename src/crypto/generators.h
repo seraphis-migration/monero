@@ -39,17 +39,17 @@ namespace crypto
 
 struct public_key;
 
-public_key get_G();
-public_key get_H();
-public_key get_U();
-public_key get_X();
-ge_p3 get_G_p3();
-ge_p3 get_H_p3();
-ge_p3 get_U_p3();
-ge_p3 get_X_p3();
-ge_cached get_G_cached();
-ge_cached get_H_cached();
-ge_cached get_U_cached();
-ge_cached get_X_cached();
+const public_key& get_G();
+const public_key& get_H();
+const public_key& get_U();
+const public_key& get_X();
+const ge_p3& get_G_p3();
+const ge_p3& get_H_p3();
+const ge_p3& get_U_p3();
+const ge_p3& get_X_p3();
+const ge_cached& get_G_cached();
+const ge_cached& get_H_cached();
+const ge_cached& get_U_cached();
+const ge_cached& get_X_cached();
 
 } //namespace crypto

@@ -77,10 +77,10 @@ static bool validate_sp_amount_balance_equality_check_v1(const std::vector<SpEno
     input_image_amount_commitments.reserve(input_images.size());
     output_commitments.reserve(outputs.size() + 1 + (remainder_blinding_factor == rct::zero() ? 0 : 1));
 
-    for (const auto &input_image : input_images)
+    for (const SpEnoteImageV1 &input_image : input_images)
         input_image_amount_commitments.emplace_back(input_image.m_core.m_masked_commitment);
 
-    for (const auto &output : outputs)
+    for (const SpEnoteV1 &output : outputs)
         output_commitments.emplace_back(output.m_core.m_amount_commitment);
 
     output_commitments.emplace_back(rct::commit(transaction_fee, rct::zero()));
@@ -167,7 +167,7 @@ bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetV1 &confi
         return false;
 
     // check membership proofs
-    for (const auto &proof : membership_proofs)
+    for (const SpMembershipProofV1 &proof : membership_proofs)
     {
         // proof ref set decomposition (n^m) should match number of referenced enotes
         const std::size_t ref_set_size{ref_set_size_from_decomp(proof.m_ref_set_decomp_n, proof.m_ref_set_decomp_m)};
@@ -189,9 +189,31 @@ bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetV1 &confi
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool validate_sp_semantics_output_serialization_v1(const std::vector<SpEnoteV1> &output_enotes,
+    const SpTxSupplementV1 &tx_supplement)
+{
+    ge_p3 temp_deserialized;
+
+    // onetime addresses must be deserializable
+    for (const SpEnoteV1 &output_enote : output_enotes)
+    {
+        if (ge_frombytes_vartime(&temp_deserialized, output_enote.m_core.m_onetime_address.bytes) != 0)
+            return false;
+    }
+
+    // enote ephemeral pubkeys must be deserializable
+    for (const rct::key &enote_ephemeral_pubkey : tx_supplement.m_output_enote_ephemeral_pubkeys)
+    {
+        if (ge_frombytes_vartime(&temp_deserialized, enote_ephemeral_pubkey.bytes) != 0)
+            return false;
+    }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &input_images)
 {
-    for (const auto &image : input_images)
+    for (const SpEnoteImageV1 &image : input_images)
     {
         // input linking tags must be in the prime subgroup: l*KI = identity
         if (!sp::key_domain_is_prime_subgroup(rct::ki2rct(image.m_core.m_key_image)))
@@ -217,7 +239,7 @@ bool validate_sp_semantics_layout_v1(const std::vector<SpMembershipProofV1> &mem
 {
     // membership proof binned reference set bins should be sorted (ascending)
     // note: duplicate bin locations are allowed
-    for (const auto &proof : membership_proofs)
+    for (const SpMembershipProofV1 &proof : membership_proofs)
     {
         if (!std::is_sorted(proof.m_binned_reference_set.m_bin_loci.begin(), proof.m_binned_reference_set.m_bin_loci.end()))
             return false;

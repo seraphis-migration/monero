@@ -117,6 +117,15 @@ bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCoun
 bool validate_sp_semantics_reference_sets_v1(const SemanticConfigRefSetV1 &config,
     const std::vector<SpMembershipProofV1> &membership_proofs);
 /**
+* brief: validate_sp_semantics_output_serialization_v1 - check output enotes and tx supplement are properly serialized
+*   - onetime addresses are deserializable (note: amount commitment serialization is checked in the balance proof)
+*   - output enote ephemeral pubkeys are deserializable
+* param: output_enotes -
+* return: true/false on validation result
+*/
+bool validate_sp_semantics_output_serialization_v1(const std::vector<SpEnoteV1> &output_enotes,
+    const SpTxSupplementV1 &tx_supplement);
+/**
 * brief: validate_sp_semantics_input_images_v1 - check key images are well-formed
 *   - key images are in the prime-order EC subgroup: l*KI == identity
 *   - key image, masked address, and masked commitment are not identity

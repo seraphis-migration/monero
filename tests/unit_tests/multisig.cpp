@@ -27,13 +27,13 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "crypto/crypto.h"
+#include "crypto/generators.h"
 #include "multisig/account_generator_era.h"
 #include "multisig/dual_base_vector_proof.h"
 #include "multisig/multisig_account.h"
 #include "multisig/multisig_kex_msg.h"
 #include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctOps.h"
-#include "seraphis/sp_crypto_utils.h"
 #include "wallet/wallet2.h"
 
 #include "gtest/gtest.h"
@@ -571,16 +571,19 @@ TEST(multisig, dual_base_vector_proof)
   EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::G, rct::G));
 
   // G, U, 2 keys
-  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(rct::G, sp::get_U(), make_keys(2), rct::zero()));
-  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::G, sp::get_U()));
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(rct::G, rct::pk2rct(crypto::get_U()), make_keys(2), rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::G, rct::pk2rct(crypto::get_U())));
 
   // U, G, 3 keys
-  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(sp::get_U(), rct::G, make_keys(3), rct::zero()));
-  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, sp::get_U(), rct::G));
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(rct::pk2rct(crypto::get_U()), rct::G, make_keys(3), rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::pk2rct(crypto::get_U()), rct::G));
 
   // U, U, 3 keys
-  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(sp::get_U(), sp::get_U(), make_keys(3), rct::zero()));
-  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, sp::get_U(), sp::get_U()));
+  EXPECT_NO_THROW(proof = crypto::dual_base_vector_prove(rct::pk2rct(crypto::get_U()),
+    rct::pk2rct(crypto::get_U()),
+    make_keys(3),
+    rct::zero()));
+  EXPECT_TRUE(crypto::dual_base_vector_verify(proof, rct::pk2rct(crypto::get_U()), rct::pk2rct(crypto::get_U())));
 }
 
 TEST(multisig, multisig_conversion_msg)

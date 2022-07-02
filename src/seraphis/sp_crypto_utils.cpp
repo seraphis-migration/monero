@@ -32,29 +32,18 @@
 #include "sp_crypto_utils.h"
 
 //local headers
-#include "common/varint.h"
 #include "crypto/crypto.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
-#include "crypto/generators.h"
-#include "cryptonote_config.h"
-#include "grootle.h"
-#include "seraphis_config_temp.h"
 #include "misc_log_ex.h"
-#include "ringct/multiexp.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
-#include "wipeable_string.h"
 
 //third party headers
 
 //standard headers
-#include <array>
-#include <cmath>
-#include <mutex>
-#include <string>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -62,23 +51,12 @@ extern "C"
 
 namespace sp
 {
-/// File-scope data
 
-// generators
-static ge_p3 G_p3;
-static ge_p3 H_p3;
-static ge_p3 U_p3;
-static ge_p3 X_p3;
-static rct::key U;
-static rct::key X;
+/// File-scope data
 
 // Useful scalar and group constants
 static const rct::key ZERO = rct::zero();
 static const rct::key ONE = rct::identity();
-static const rct::key IDENTITY = rct::identity();
-
-// misc
-static std::once_flag init_gens_once_flag;
 
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -93,88 +71,6 @@ static rct::key sm(rct::key y, int n, const rct::key &x)
     return y;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// Make generators, but only once
-//-------------------------------------------------------------------------------------------------------------------
-static void init_sp_gens()
-{
-    std::call_once(init_gens_once_flag,
-        [&](){
-
-        // Build G
-        ge_frombytes_vartime(&G_p3, rct::G.bytes);
-
-        // Build H
-        ge_frombytes_vartime(&H_p3, rct::H.bytes);
-
-        // Build U
-        // U = keccak_to_pt("seraphis U")
-        const std::string U_salt(config::HASH_KEY_SERAPHIS_U);
-        hash_to_p3(U_p3, rct::hash2rct(crypto::cn_fast_hash(U_salt.data(), U_salt.size())));
-        ge_p3_tobytes(U.bytes, &U_p3);
-
-        // Build X
-        // X = keccak_to_pt("seraphis X")
-        const std::string X_salt(config::HASH_KEY_SERAPHIS_X);
-        hash_to_p3(X_p3, rct::hash2rct(crypto::cn_fast_hash(X_salt.data(), X_salt.size())));
-        ge_p3_tobytes(X.bytes, &X_p3);
-
-/*
-printf("U: ");
-for (const unsigned char byte : U.bytes)
-    printf("0x%x, ", byte);
-printf("\n");
-
-printf("X: ");
-for (const unsigned char byte : X.bytes)
-    printf("0x%x, ", byte);
-printf("\n");
-*/
-CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(rct::G) == crypto::get_G(), "invalid G");
-CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(rct::H) == crypto::get_H(), "invalid H");
-CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(U) == crypto::get_U(), "invalid U");
-CHECK_AND_ASSERT_THROW_MES(rct::rct2pk(X) == crypto::get_X(), "invalid X");
-
-rct::key temp_minus_one;
-sc_sub(temp_minus_one.bytes, ZERO.bytes, ONE.bytes);
-CHECK_AND_ASSERT_THROW_MES(temp_minus_one == MINUS_ONE, "invalid MINUS_ONE");
-    });
-}
-//-------------------------------------------------------------------------------------------------------------------
-const ge_p3& get_G_p3()
-{
-    init_sp_gens();
-    return G_p3;
-}
-//-------------------------------------------------------------------------------------------------------------------
-const ge_p3& get_H_p3()
-{
-    init_sp_gens();
-    return H_p3;
-}
-//-------------------------------------------------------------------------------------------------------------------
-const ge_p3& get_U_p3()
-{
-    init_sp_gens();
-    return U_p3;
-}
-//-------------------------------------------------------------------------------------------------------------------
-const ge_p3& get_X_p3()
-{
-    init_sp_gens();
-    return X_p3;
-}
-//-------------------------------------------------------------------------------------------------------------------
-const rct::key& get_U()
-{
-    init_sp_gens();
-    return U;
-}
-//-------------------------------------------------------------------------------------------------------------------
-const rct::key& get_X()
-{
-    init_sp_gens();
-    return X;
-}
 //-------------------------------------------------------------------------------------------------------------------
 rct::key invert(const rct::key &x)
 {

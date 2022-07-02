@@ -38,13 +38,11 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
-#include "ringct/multiexp.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
 
 //standard headers
-#include <string>
 #include <vector>
 
 //forward declarations
@@ -78,15 +76,6 @@ static inline const rct::key& sortable2rct(const sortable_key &sortable)
     return reinterpret_cast<const rct::key&>(sortable);
 }
 
-/**
-* brief: get generators
-*/
-const ge_p3& get_G_p3();
-const ge_p3& get_H_p3();
-const ge_p3& get_U_p3();
-const ge_p3& get_X_p3();
-const rct::key& get_U();
-const rct::key& get_X();
 /**
 * brief: invert - invert a nonzero scalar
 * param: x - scalar to invert

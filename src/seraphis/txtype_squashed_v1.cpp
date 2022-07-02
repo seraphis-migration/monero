@@ -459,11 +459,15 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
             tx.m_membership_proofs))
         return false;
 
-    // validate linking tag semantics
+    // validate output serialization semantics
+    if (!validate_sp_semantics_output_serialization_v1(tx.m_outputs, tx.m_tx_supplement))
+        return false;
+
+    // validate input image semantics
     if (!validate_sp_semantics_input_images_v1(tx.m_input_images))
         return false;
 
-    // validate layout (sorting, uniqueness) of input images, membershio proof ref sets, outputs, and tx supplement
+    // validate layout (sorting, uniqueness) of input images, membership proof ref sets, outputs, and tx supplement
     if (!validate_sp_semantics_layout_v1(tx.m_membership_proofs,
             tx.m_input_images,
             tx.m_outputs,

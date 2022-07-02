@@ -36,6 +36,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "crypto/generators.h"
 #include "cryptonote_config.h"
 #include "seraphis_config_temp.h"
 #include "misc_log_ex.h"
@@ -77,7 +78,7 @@ void make_seraphis_key_image(const crypto::secret_key &y, const crypto::secret_k
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(z)), "z must be nonzero for making a key image!");
 
     // KI = (z/y)*U
-    rct::key zU{rct::scalarmultKey(sp::get_U(), rct::sk2rct(z))}; // z U
+    rct::key zU{rct::scalarmultKey(rct::pk2rct(crypto::get_U()), rct::sk2rct(z))}; // z U
     make_seraphis_key_image(y, rct::rct2pk(zU), key_image_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -96,7 +97,7 @@ void make_seraphis_key_image(const crypto::secret_key &k_a_sender,
 void make_seraphis_spendbase(const crypto::secret_key &spendbase_privkey, rct::key &spendbase_pubkey_out)
 {
     // spendbase = k_{b, recipient} U
-    rct::scalarmultKey(spendbase_pubkey_out, sp::get_U(), rct::sk2rct(spendbase_privkey));
+    rct::scalarmultKey(spendbase_pubkey_out, rct::pk2rct(crypto::get_U()), rct::sk2rct(spendbase_privkey));
 }
 //-------------------------------------------------------------------------------------------------------------------
 void extend_seraphis_spendkey(const crypto::secret_key &k_a_extender, rct::key &spendkey_inout)
@@ -104,7 +105,7 @@ void extend_seraphis_spendkey(const crypto::secret_key &k_a_extender, rct::key &
     // K = k_a_extender X + K_original
     rct::key extender_key;
 
-    rct::scalarmultKey(extender_key, sp::get_X(), rct::sk2rct(k_a_extender));
+    rct::scalarmultKey(extender_key, rct::pk2rct(crypto::get_X()), rct::sk2rct(k_a_extender));
     rct::addKeys(spendkey_inout, extender_key, spendkey_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
