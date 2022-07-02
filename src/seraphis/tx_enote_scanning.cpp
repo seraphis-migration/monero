@@ -304,22 +304,25 @@ static void process_chunk(const rct::key &wallet_spend_pubkey,
     {
         for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record : tx_basic_records.second)
         {
-            if (try_get_enote_record_v1_plain(contextual_basic_record.m_record,
-                wallet_spend_pubkey,
-                k_view_balance,
-                k_unlock_amounts,
-                k_find_received,
-                s_generate_address,
-                cipher_context,
-                new_enote_record))
+            try
             {
-                process_chunk_new_record_update(new_enote_record,
-                    contextual_basic_record.m_origin_context,
-                    chunk_contextual_key_images,
-                    found_enote_records_inout,
-                    found_spent_key_images_inout,
-                    txs_have_spent_enotes);
-            }
+                if (try_get_enote_record_v1_plain(contextual_basic_record.m_record,
+                    wallet_spend_pubkey,
+                    k_view_balance,
+                    k_unlock_amounts,
+                    k_find_received,
+                    s_generate_address,
+                    cipher_context,
+                    new_enote_record))
+                {
+                    process_chunk_new_record_update(new_enote_record,
+                        contextual_basic_record.m_origin_context,
+                        chunk_contextual_key_images,
+                        found_enote_records_inout,
+                        found_spent_key_images_inout,
+                        txs_have_spent_enotes);
+                }
+            } catch (...) {}
         }
     }
 
@@ -341,21 +344,24 @@ static void process_chunk(const rct::key &wallet_spend_pubkey,
             for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record :
                 chunk_basic_records_per_tx.at(tx_with_spent_enotes))
             {
-                if (try_get_enote_record_v1_selfsend(contextual_basic_record.m_record.m_enote,
-                    contextual_basic_record.m_record.m_enote_ephemeral_pubkey,
-                    contextual_basic_record.m_record.m_input_context,
-                    wallet_spend_pubkey,
-                    k_view_balance,
-                    s_generate_address,
-                    new_enote_record))
+                try
                 {
-                    process_chunk_new_record_update(new_enote_record,
-                        contextual_basic_record.m_origin_context,
-                        chunk_contextual_key_images,
-                        found_enote_records_inout,
-                        found_spent_key_images_inout,
-                        txs_have_spent_enotes_selfsend_passthrough);
-                }
+                    if (try_get_enote_record_v1_selfsend(contextual_basic_record.m_record.m_enote,
+                        contextual_basic_record.m_record.m_enote_ephemeral_pubkey,
+                        contextual_basic_record.m_record.m_input_context,
+                        wallet_spend_pubkey,
+                        k_view_balance,
+                        s_generate_address,
+                        new_enote_record))
+                    {
+                        process_chunk_new_record_update(new_enote_record,
+                            contextual_basic_record.m_origin_context,
+                            chunk_contextual_key_images,
+                            found_enote_records_inout,
+                            found_spent_key_images_inout,
+                            txs_have_spent_enotes_selfsend_passthrough);
+                    }
+                } catch (...) {}
             }
         }
 
@@ -668,31 +674,34 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
         if (temp_contextual_record.size() == 0)
             temp_contextual_record.emplace_back();
 
-        // find-receive scan the enote
-        if (try_get_basic_enote_record_v1(enotes_in_tx[enote_index],
-            tx_supplement.m_output_enote_ephemeral_pubkeys[ephemeral_pubkey_index],
-            input_context,
-            temp_DH_derivation,
-            temp_contextual_record.back().m_record))
+        // find-receive scan the enote (in try block in case enote is malformed)
+        try
         {
-            temp_contextual_record.back().m_origin_context =
-                SpEnoteOriginContextV1{
-                        .m_block_height = block_height,
-                        .m_transaction_id = transaction_id,
-                        .m_enote_ledger_index = total_enotes_before_tx + enote_index,
-                        .m_origin_status = origin_status,
-                        .m_memo = tx_supplement.m_tx_extra
-                    };
+            if (try_get_basic_enote_record_v1(enotes_in_tx[enote_index],
+                tx_supplement.m_output_enote_ephemeral_pubkeys[ephemeral_pubkey_index],
+                input_context,
+                temp_DH_derivation,
+                temp_contextual_record.back().m_record))
+            {
+                temp_contextual_record.back().m_origin_context =
+                    SpEnoteOriginContextV1{
+                            .m_block_height = block_height,
+                            .m_transaction_id = transaction_id,
+                            .m_enote_ledger_index = total_enotes_before_tx + enote_index,
+                            .m_origin_status = origin_status,
+                            .m_memo = tx_supplement.m_tx_extra
+                        };
 
-            // note: it is possible for enotes with duplicate onetime addresses to be added here; it is assumed the
-            //       upstream caller will be able to handle that case without problems
-            auto &basic_records_for_tx = basic_records_per_tx_inout[transaction_id];
-            basic_records_for_tx.splice(basic_records_for_tx.end(),
-                temp_contextual_record,
-                temp_contextual_record.begin());
+                // note: it is possible for enotes with duplicate onetime addresses to be added here; it is assumed the
+                //       upstream caller will be able to handle that case without problems
+                auto &basic_records_for_tx = basic_records_per_tx_inout[transaction_id];
+                basic_records_for_tx.splice(basic_records_for_tx.end(),
+                    temp_contextual_record,
+                    temp_contextual_record.begin());
 
-            found_an_enote = true;
-        }
+                found_an_enote = true;
+            }
+        } catch (...) {}
     }
 
     return found_an_enote;
