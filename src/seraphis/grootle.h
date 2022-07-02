@@ -58,13 +58,16 @@
 #include <boost/utility/string_ref.hpp>
 
 //standard headers
-#include <string>
+#include <list>
 #include <vector>
 
 //forward declarations
 namespace rct { struct pippenger_prep_data; }
-namespace sp { class SpTranscriptBuilder; }
-
+namespace sp
+{
+    class SpTranscriptBuilder;
+    class SpMultiexpBuilder;
+}
 
 namespace sp
 {
@@ -125,7 +128,7 @@ GrootleProof grootle_prove(const rct::keyV &M,
 * param: message - (per-proof) message to insert in Fiat-Shamir transform hash
 * return: true/false on verification result
 */
-rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
+std::list<SpMultiexpBuilder> get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
     const std::vector<rct::keyV> &M,
     const rct::keyV &proof_offsets,
     const std::size_t n,

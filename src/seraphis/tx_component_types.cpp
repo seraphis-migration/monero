@@ -124,7 +124,7 @@ std::size_t SpBalanceProofV1::get_size_bytes(const std::size_t num_inputs,
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBalanceProofV1::get_size_bytes(const bool include_commitments /*=false*/) const
 {
-    return SpBalanceProofV1::get_size_bytes(m_bpp_proof.V.size(), 0, include_commitments);
+    return SpBalanceProofV1::get_size_bytes(m_bpp2_proof.V.size(), 0, include_commitments);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBalanceProofV1::get_weight(const std::size_t num_inputs,
@@ -144,12 +144,12 @@ std::size_t SpBalanceProofV1::get_weight(const std::size_t num_inputs,
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t SpBalanceProofV1::get_weight(const bool include_commitments /*=false*/) const
 {
-    return SpBalanceProofV1::get_weight(m_bpp_proof.V.size(), 0, include_commitments);
+    return SpBalanceProofV1::get_weight(m_bpp2_proof.V.size(), 0, include_commitments);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const SpBalanceProofV1 &container, SpTranscriptBuilder &transcript_inout)
 {
-    append_bpp_to_transcript(container.m_bpp_proof, transcript_inout);
+    append_bpp2_to_transcript(container.m_bpp2_proof, transcript_inout);
     transcript_inout.append("remainder_blinding_factor", container.m_remainder_blinding_factor);
 }
 //-------------------------------------------------------------------------------------------------------------------

@@ -42,12 +42,16 @@
 //third party headers
 
 //standard headers
+#include <list>
 #include <memory>
 #include <vector>
 
 //forward declarations
-namespace sp { class TxValidationContext; }
-namespace rct { struct pippenger_prep_data; }
+namespace sp
+{
+    class SpMultiexpBuilder;
+    class TxValidationContext;
+}
 
 
 namespace sp
@@ -187,7 +191,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
     const TxValidationContext &tx_validation_context,
-    rct::pippenger_prep_data &validation_data_out);
+    std::list<SpMultiexpBuilder> &validation_data_out);
 /**
 * brief: validate_sp_composition_proofs_v1 - check that spending tx inputs is authorized by their owners,
 *        and key images are properly constructed

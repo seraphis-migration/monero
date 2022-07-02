@@ -34,6 +34,7 @@
 #pragma once
 
 //local headers
+#include "bulletproofs_plus2.h"
 #include "crypto/crypto.h"
 #include "grootle.h"
 #include "jamtis_support_types.h"
@@ -149,12 +150,12 @@ void append_to_transcript(const SpImageProofV1 &container, SpTranscriptBuilder &
 ////
 // SpBalanceProofV1
 // - balance proof: implicit with a remainder blinding factor: [sum(inputs) == sum(outputs) + remainder_blinding_factor*G]
-// - range proof: Bulletproofs+
+// - range proof: Bulletproofs+ v2
 ///
 struct SpBalanceProofV1 final
 {
     /// an aggregate set of BP+ proofs
-    rct::BulletproofPlus m_bpp_proof;
+    BulletproofPlus2 m_bpp2_proof;
     /// the remainder blinding factor
     rct::key m_remainder_blinding_factor;
 

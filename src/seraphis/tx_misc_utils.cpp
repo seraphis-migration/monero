@@ -32,8 +32,8 @@
 #include "tx_misc_utils.h"
 
 //local headers
+#include "bulletproofs_plus2.h"
 #include "misc_log_ex.h"
-#include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_transcript.h"
@@ -90,9 +90,9 @@ bool balance_check_equality(const rct::keyV &commitment_set1, const rct::keyV &c
     return rct::equalKeys(rct::addKeys(commitment_set1), rct::addKeys(commitment_set2));
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
+void make_bpp2_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
-    rct::BulletproofPlus &range_proofs_out)
+    BulletproofPlus2 &range_proofs_out)
 {
     /// range proofs
     // - for output amount commitments
@@ -100,20 +100,20 @@ void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
         "Mismatching amounts and blinding factors.");
 
     // make the range proofs
-    range_proofs_out = rct::bulletproof_plus_PROVE(amounts, amount_commitment_blinding_factors);
+    range_proofs_out = bulletproof_plus2_PROVE(amounts, amount_commitment_blinding_factors);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_bpp_to_transcript(const rct::BulletproofPlus &bpp_proof, SpTranscriptBuilder &transcript_inout)
+void append_bpp2_to_transcript(const BulletproofPlus2 &bpp2_proof, SpTranscriptBuilder &transcript_inout)
 {
-    transcript_inout.append("V", bpp_proof.V);
-    transcript_inout.append("A", bpp_proof.A);
-    transcript_inout.append("A1", bpp_proof.A1);
-    transcript_inout.append("B", bpp_proof.B);
-    transcript_inout.append("r1", bpp_proof.r1);
-    transcript_inout.append("s1", bpp_proof.s1);
-    transcript_inout.append("d1", bpp_proof.d1);
-    transcript_inout.append("L", bpp_proof.L);
-    transcript_inout.append("R", bpp_proof.R);
+    transcript_inout.append("V", bpp2_proof.V);
+    transcript_inout.append("A", bpp2_proof.A);
+    transcript_inout.append("A1", bpp2_proof.A1);
+    transcript_inout.append("B", bpp2_proof.B);
+    transcript_inout.append("r1", bpp2_proof.r1);
+    transcript_inout.append("s1", bpp2_proof.s1);
+    transcript_inout.append("d1", bpp2_proof.d1);
+    transcript_inout.append("L", bpp2_proof.L);
+    transcript_inout.append("R", bpp2_proof.R);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t bpp_size_bytes(const std::size_t num_range_proofs, const bool include_commitments)

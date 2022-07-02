@@ -37,6 +37,7 @@ set(unit_tests_sources
   bootstrap_node_selector.cpp
   bulletproofs.cpp
   bulletproofs_plus.cpp
+  bulletproofs_plus2.cpp
   canonical_amounts.cpp
   chacha.cpp
   checkpoints.cpp

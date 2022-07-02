@@ -32,6 +32,7 @@
 #include "tx_builders_mixed.h"
 
 //local headers
+#include "bulletproofs_plus2.h"
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
 #include "jamtis_core_utils.h"
@@ -39,7 +40,6 @@
 #include "misc_language.h"
 #include "misc_log_ex.h"
 #include "mock_ledger_context.h"
-#include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_config_temp.h"
@@ -536,13 +536,13 @@ void make_v1_balance_proof_v1(const std::vector<rct::xmr_amount> &input_amounts,
         output_amount_commitment_blinding_factors.end());
 
     // make range proofs
-    rct::BulletproofPlus range_proofs;
+    BulletproofPlus2 range_proofs;
 
     rct::keyV amount_commitment_blinding_factors;
     auto vec_wiper = convert_skv_to_rctv(blinding_factors, amount_commitment_blinding_factors);
-    make_bpp_rangeproofs(amounts, amount_commitment_blinding_factors, range_proofs);
+    make_bpp2_rangeproofs(amounts, amount_commitment_blinding_factors, range_proofs);
 
-    balance_proof_out.m_bpp_proof = std::move(range_proofs);
+    balance_proof_out.m_bpp2_proof = std::move(range_proofs);
 
     // set the remainder blinding factor
     crypto::secret_key remainder_blinding_factor;

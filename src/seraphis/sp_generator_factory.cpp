@@ -73,7 +73,7 @@ static void prepare_generators(const std::size_t min_generator_index)
         return;
 
     // prepare to extend the generators
-    CHECK_AND_ASSERT_THROW_MES(min_generator_index < 10000,
+    CHECK_AND_ASSERT_THROW_MES(min_generator_index < 50000,
         "sp generator factory sanity check: requested generator index is too high.");
 
     const std::size_t new_generator_count{

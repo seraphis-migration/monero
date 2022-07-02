@@ -34,6 +34,7 @@
 #pragma once
 
 //local headers
+#include "bulletproofs_plus2.h"
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
 
@@ -111,21 +112,21 @@ std::size_t round_up_to_power_of_2(const std::size_t num);
 */
 std::size_t highest_bit_position(const std::size_t num);
 /**
-* brief: make_bpp_rangeproofs - make a BP+ proof that aggregates several range proofs
+* brief: make_bpp2_rangeproofs - make a BP+ v2 proof that aggregates several range proofs
 * param: amounts -
 * param: amount_commitment_blinding_factors -
 * outparam: range_proofs_out - aggregate set of amount commitments with range proofs
 */
-void make_bpp_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
+void make_bpp2_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     const std::vector<rct::key> &amount_commitment_blinding_factors,
-    rct::BulletproofPlus &range_proofs_out);
+    BulletproofPlus2 &range_proofs_out);
 /**
-* brief: append_bpp_to_transcript - append BP+ proof to a transcript
+* brief: append_bpp2_to_transcript - append BP+ v2 proof to a transcript
 *   transcript += {V} || A || A1 || B || r1 || s1 || d1 || {L} || {R}
 * param: bpp_proof -
 * inoutparam: transcript_inout - contents appended to a transcript
 */
-void append_bpp_to_transcript(const rct::BulletproofPlus &bpp_proof, SpTranscriptBuilder &transcript_inout);
+void append_bpp2_to_transcript(const BulletproofPlus2 &bpp_proof, SpTranscriptBuilder &transcript_inout);
 /**
 * brief: bpp_size_bytes - get the size of a BP+ proof in bytes
 *   - BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)

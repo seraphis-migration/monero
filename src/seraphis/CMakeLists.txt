@@ -27,6 +27,7 @@
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 set(seraphis_sources
+  bulletproofs_plus2.cpp
   grootle.cpp
   jamtis_address_tag_utils.cpp
   jamtis_address_utils.cpp

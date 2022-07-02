@@ -40,6 +40,7 @@ namespace config
   const constexpr std::uint64_t SP_REF_SET_NUM_BIN_MEMBERS_V1 = 8;
   const constexpr std::uint64_t DISCRETIZED_FEE_LEVEL_NUMERATOR_X100 = 150;  //fee level factor = 1.5
   const constexpr std::uint64_t DISCRETIZED_FEE_SIG_FIGS = 1;
+  const constexpr std::uint64_t BULLETPROOF_PLUS2_MAX_COMMITMENTS = 128;
 
   const constexpr char SERAPHIS_FS_TRANSCRIPT_PREFIX[] = "sp_FS_transcript";
 
@@ -51,6 +52,8 @@ namespace config
   const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_PROOFS_PREFIX_V1[] = "sp_transaction_proofs_prefix_v1";
   const constexpr char HASH_KEY_SERAPHIS_TRANSACTION_TYPE_SQUASHED_V1[] = "sp_transaction_type_squashed_v1";
 
+  const constexpr char HASH_KEY_BULLETPROOF_PLUS2_TRANSCRIPT[] = "bpp2_transcript";
+  const constexpr char HASH_KEY_BULLETPROOF_PLUS2_TRANSCRIPT_UPDATE[] = "bpp2_tupdate";
   const constexpr char HASH_KEY_GROOTLE_Hi_A[] = "grootle_Hi_A";
   const constexpr char HASH_KEY_GROOTLE_Hi_B[] = "grootle_Hi_B";
   const constexpr char HASH_KEY_GROOTLE_CHALLENGE[] = "grootle_challenge";

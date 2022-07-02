@@ -160,17 +160,21 @@ TEST(seraphis_crypto, multiexp_utility)
     sp::SpMultiexp{{builder4}}.get_result(result);
     ASSERT_TRUE(result == rct::pippenger(rct_builder4));
 
-    // {1 G + 1 H + 1 U + 1 X} == G + H + U + X
+    // {1 G + 2 H + 3 U + 4 X} == G + H + U + X
     sp::SpMultiexpBuilder builder5{rct::identity(), 0, 0};
     std::vector<rct::MultiexpData> rct_builder5;
-    builder5.add_G_element(rct::identity());
-    rct_builder5.emplace_back(rct::identity(), crypto::get_G_p3());
-    builder5.add_H_element(rct::identity());
-    rct_builder5.emplace_back(rct::identity(), crypto::get_H_p3());
-    builder5.add_U_element(rct::identity());
-    rct_builder5.emplace_back(rct::identity(), crypto::get_U_p3());
-    builder5.add_X_element(rct::identity());
-    rct_builder5.emplace_back(rct::identity(), crypto::get_X_p3());
+    rct::key temp_int_5{rct::identity()};
+    builder5.add_G_element(temp_int_5);
+    rct_builder5.emplace_back(temp_int_5, crypto::get_G_p3());
+    sc_add(temp_int_5.bytes, temp_int_5.bytes, rct::identity().bytes);
+    builder5.add_H_element(temp_int_5);
+    rct_builder5.emplace_back(temp_int_5, crypto::get_H_p3());
+    sc_add(temp_int_5.bytes, temp_int_5.bytes, rct::identity().bytes);
+    builder5.add_U_element(temp_int_5);
+    rct_builder5.emplace_back(temp_int_5, crypto::get_U_p3());
+    sc_add(temp_int_5.bytes, temp_int_5.bytes, rct::identity().bytes);
+    builder5.add_X_element(temp_int_5);
+    rct_builder5.emplace_back(temp_int_5, crypto::get_X_p3());
 
     sp::SpMultiexp{{builder5}}.get_result(result);
     ASSERT_TRUE(result == rct::pippenger(rct_builder5));

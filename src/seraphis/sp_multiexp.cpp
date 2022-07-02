@@ -62,6 +62,7 @@ SpMultiexpBuilder::SpMultiexpBuilder(const rct::key &weight,
         m_weight{weight}
 {
     CHECK_AND_ASSERT_THROW_MES(!(weight == rct::zero()), "multiexp builder: element weight is zero.");
+    CHECK_AND_ASSERT_THROW_MES(sc_check(weight.bytes) == 0, "multiexp builder: element weight is not canonical.");
 
     m_predef_scalars.resize(estimated_num_predefined_generator_elements, rct::zero());
     m_user_def_elements.reserve(estimated_num_user_defined_elements);
@@ -168,7 +169,9 @@ SpMultiexp::SpMultiexp(const std::list<SpMultiexpBuilder> &multiexp_builders)
     // 1. prepare generators
     std::shared_ptr<rct::pippenger_cached_data> cached_base_points = std::make_shared<rct::pippenger_cached_data>();
     cached_base_points->reserve(4 + num_predef_gen_elements + num_user_def_elements);
-    cached_base_points->resize(4 + num_predef_gen_elements);
+    ge_cached ge_cached_identity;
+    ge_p3_to_cached(&ge_cached_identity, &ge_p3_identity);
+    cached_base_points->resize(4 + num_predef_gen_elements, ge_cached_identity);
 
     std::vector<rct::MultiexpData> elements_collected;
     elements_collected.reserve(4 + num_predef_gen_elements + num_user_def_elements);
@@ -209,7 +212,7 @@ SpMultiexp::SpMultiexp(const std::list<SpMultiexpBuilder> &multiexp_builders)
         {
             sc_add(elements_collected[1].scalar.bytes,
                 elements_collected[1].scalar.bytes,
-                multiexp_builder.m_G_scalar.bytes);
+                multiexp_builder.m_H_scalar.bytes);
         }
 
         // U
@@ -217,7 +220,7 @@ SpMultiexp::SpMultiexp(const std::list<SpMultiexpBuilder> &multiexp_builders)
         {
             sc_add(elements_collected[2].scalar.bytes,
                 elements_collected[2].scalar.bytes,
-                multiexp_builder.m_G_scalar.bytes);
+                multiexp_builder.m_U_scalar.bytes);
         }
 
         // X
@@ -225,7 +228,7 @@ SpMultiexp::SpMultiexp(const std::list<SpMultiexpBuilder> &multiexp_builders)
         {
             sc_add(elements_collected[3].scalar.bytes,
                 elements_collected[3].scalar.bytes,
-                multiexp_builder.m_G_scalar.bytes);
+                multiexp_builder.m_X_scalar.bytes);
         }
 
         // pre-defined generators

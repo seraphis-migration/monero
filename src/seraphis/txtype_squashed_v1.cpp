@@ -43,6 +43,7 @@
 #include "sp_core_types.h"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
+#include "sp_multiexp.h"
 #include "sp_transcript.h"
 #include "tx_binned_reference_set.h"
 #include "tx_builder_types.h"
@@ -449,7 +450,7 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
             tx.m_image_proofs.size(),
             tx.m_outputs.size(),
             tx.m_tx_supplement.m_output_enote_ephemeral_pubkeys.size(),
-            tx.m_balance_proof.m_bpp_proof.V.size()))
+            tx.m_balance_proof.m_bpp2_proof.V.size()))
         return false;
 
     // validate input proof reference set sizes
@@ -529,7 +530,7 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
 {
     std::vector<const SpMembershipProofV1*> membership_proof_ptrs;
     std::vector<const SpEnoteImage*> input_image_ptrs;
-    std::vector<const rct::BulletproofPlus*> range_proof_ptrs;
+    std::vector<const BulletproofPlus2*> range_proof_ptrs;
     membership_proof_ptrs.reserve(txs.size()*20);  //heuristic... (most tx have 1-2 inputs)
     input_image_ptrs.reserve(txs.size()*20);
     range_proof_ptrs.reserve(txs.size());
@@ -548,26 +549,29 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
             input_image_ptrs.push_back(&(input_image.m_core));
 
         // gather range proofs
-        range_proof_ptrs.push_back(&(tx->m_balance_proof.m_bpp_proof));
+        range_proof_ptrs.push_back(&(tx->m_balance_proof.m_bpp2_proof));
     }
 
     // batch verification: collect pippenger data sets for an aggregated multiexponentiation
-    std::vector<rct::pippenger_prep_data> validation_data;
-    validation_data.resize(2);
 
     // membership proofs
+    std::list<SpMultiexpBuilder> validation_data_membership_proofs;
     if (!try_get_sp_membership_proofs_v1_validation_data(membership_proof_ptrs,
             input_image_ptrs,
             tx_validation_context,
-            validation_data[0]))
+            validation_data_membership_proofs))
         return false;
 
     // range proofs
-    if (!rct::try_get_bulletproof_plus_verification_data(range_proof_ptrs, validation_data[1]))
+    std::list<SpMultiexpBuilder> validation_data_range_proofs;
+    if (!try_get_bulletproof_plus2_verification_data(range_proof_ptrs, validation_data_range_proofs))
         return false;
 
     // batch verify
-    if (!multiexp_is_identity(validation_data))
+    std::list<SpMultiexpBuilder> validation_data{std::move(validation_data_membership_proofs)};
+    validation_data.splice(validation_data.end(), validation_data_range_proofs);
+
+    if (!SpMultiexp{validation_data}.evaluates_to_point_at_infinity())
         return false;
 
     return true;

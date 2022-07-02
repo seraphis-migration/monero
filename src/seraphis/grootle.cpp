@@ -38,6 +38,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "crypto/generators.h"
 #include "cryptonote_config.h"
 #include "seraphis_config_temp.h"
 #include "misc_log_ex.h"
@@ -45,6 +46,8 @@ extern "C"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
+#include "sp_multiexp.h"
+#include "sp_generator_factory.h"
 #include "sp_hash_functions.h"
 #include "sp_transcript.h"
 #include "tx_misc_utils.h"
@@ -53,7 +56,6 @@ extern "C"
 
 //standard headers
 #include <cmath>
-#include <mutex>
 #include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
@@ -62,13 +64,6 @@ extern "C"
 namespace sp
 {
 
-/// File-scope data
-
-// generators
-static ge_p3 Hi_A_p3[GROOTLE_MAX_MN];
-static ge_p3 Hi_B_p3[GROOTLE_MAX_MN];
-static ge_p3 G_p3;
-
 // Useful scalar and group constants
 static const rct::key ZERO = rct::zero();
 static const rct::key ONE = rct::identity();
@@ -76,88 +71,11 @@ static const rct::key IDENTITY = rct::identity();
 static const rct::key TWO = { {0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00} };
 
-// misc
-static std::shared_ptr<rct::pippenger_cached_data> generator_cache;
-static std::once_flag init_gens_once_flag, init_static_once_flag;
-
-
-//-------------------------------------------------------------------------------------------------------------------
-// Make generators, but only once
-//-------------------------------------------------------------------------------------------------------------------
-static void init_gens()
-{
-    std::call_once(init_gens_once_flag,
-        [&](){
-
-        // Build Hi generators
-        // H_i = keccak_to_pt(H_32("grootle Hi", i))
-        rct::key intermediate_hash;
-        for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
-        {
-            SpKDFTranscript transcript_A{config::HASH_KEY_GROOTLE_Hi_A, 4};
-            SpKDFTranscript transcript_B{config::HASH_KEY_GROOTLE_Hi_B, 4};
-            transcript_A.append("i", i);
-            transcript_B.append("i", i);
-
-            sp_hash_to_32(transcript_A, intermediate_hash.bytes);
-            hash_to_p3(Hi_A_p3[i], intermediate_hash);
-
-            sp_hash_to_32(transcript_B, intermediate_hash.bytes);
-            hash_to_p3(Hi_B_p3[i], intermediate_hash);
-        }
-
-        // get G
-        G_p3 = get_G_p3();
-
-    });
-}
-//-------------------------------------------------------------------------------------------------------------------
-// Initialize cache for fixed generators: Hi_A, Hi_B, G
-// - The cache pre-converts ge_p3 points to ge_cached, for the first N terms in a pippinger multiexponentiation.
-// - When doing the multiexp, you specify how many of those N terms are actually used (i.e. 'cache_size').
-// - Here: alternate Hi_A, Hi_B to allow variable m*n (the number of Hi_A gens used always equals number of Hi_B gens used).
-// cached: G, Hi_A[0], Hi_B[0], Hi_A[1], Hi_B[1], ..., Hi_A[GROOTLE_MAX_MN], Hi_B[GROOTLE_MAX_MN]
-//-------------------------------------------------------------------------------------------------------------------
-static std::shared_ptr<rct::pippenger_cached_data> get_pippenger_cache_init()
-{
-    init_gens();
-
-    std::vector<rct::MultiexpData> data;
-    data.reserve(1 + 2*GROOTLE_MAX_MN);
-
-    // G
-    data.emplace_back(ZERO, G_p3);
-
-    // alternate Hi_A, Hi_B
-    for (std::size_t i = 0; i < GROOTLE_MAX_MN; ++i)
-    {
-        data.emplace_back(ZERO, Hi_A_p3[i]);
-        data.emplace_back(ZERO, Hi_B_p3[i]);
-    }
-    CHECK_AND_ASSERT_THROW_MES(data.size() == 1 + 2*GROOTLE_MAX_MN,
-        "grootle proof pippenger init: bad generator vector size!");
-
-    // initialize multiexponentiation cache
-    return rct::pippenger_init_cache(data, 0, 0);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void init_static()
-{
-    std::call_once(init_static_once_flag,
-        [&](){
-
-        init_gens();
-
-        // pippinger cache of stable generators
-        generator_cache = get_pippenger_cache_init();
-
-    });
-}
 //-------------------------------------------------------------------------------------------------------------------
 // commit to 2 matrices of equal size
 // C = x G + {M_A}->Hi_A + {M_B}->Hi_B
 // - mapping strategy: concatenate each 'row', e.g. {{1,2}, {3,4}} -> {1,2,3,4}; there are 'm' rows each of size 'n'
+// - the generator vectors 'Hi_A' and 'Hi_B' are selected alternating from the generator factory
 //-------------------------------------------------------------------------------------------------------------------
 static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
     const rct::keyM &M_priv_A,  //matrix A
@@ -176,7 +94,7 @@ static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
 
     // mask: x G
     offset = 0;
-    data_out[offset + 0] = {x, G_p3};
+    data_out[offset + 0] = {x, crypto::get_G_p3()};
 
     // map M_A onto Hi_A
     offset += 1;
@@ -184,7 +102,7 @@ static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
     {
         for (std::size_t i = 0; i < n; ++i)
         {
-            data_out[offset + j*n + i] = {M_priv_A[j][i], Hi_A_p3[j*n + i]};
+            data_out[offset + j*n + i] = {M_priv_A[j][i], generator_factory::get_generator_at_index_p3(2*(j*n + i))};
         }
     }
 
@@ -194,7 +112,7 @@ static void grootle_matrix_commitment(const rct::key &x,  //blinding factor
     {
         for (std::size_t i = 0; i < n; ++i)
         {
-            data_out[offset + j*n + i] = {M_priv_B[j][i], Hi_B_p3[j*n + i]};
+            data_out[offset + j*n + i] = {M_priv_B[j][i], generator_factory::get_generator_at_index_p3(2*(j*n + i) + 1)};
         }
     }
 }
@@ -230,6 +148,147 @@ static rct::key compute_challenge(const rct::key &message,
     CHECK_AND_ASSERT_THROW_MES(!(challenge == ZERO), "grootle proof challenge: transcript challenge must be nonzero!");
 
     return challenge;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void build_verification_multiexps_for_proof(const GrootleProof &proof,
+    const rct::keyV &M,
+    const rct::key &proof_offset,
+    const std::size_t n,
+    const std::size_t m,
+    const rct::key &message,
+    SpMultiexpBuilder &builder1_inout,
+    SpMultiexpBuilder &builder2_inout)
+{
+    // builer 1: A + xi*B == dual_matrix_commit(zA, f, f*(xi - f))
+    // per-index storage:
+    // 0                                  G                             (zA*G)
+    // 1                  2*m*n           alternate(Hi_A[i], Hi_B[i])   {f, f*(xi - f)}
+    // ... other proof data: A, B
+
+    // builer 2: sum_k( t_k*(M[k] - C_offset) ) - sum_j( xi^j*X[j] ) - z G == 0
+    // per-index storage (builder 2):
+    // 0                                  G                             (z*G)
+    // 1                                  M[0]   + 1                    (f-coefficients)
+    // ...
+    // (N-1) + 1                          M[N-1] + 1
+    // ... other proof data: C_offset, {X}
+    const std::size_t N = std::pow(n, m);
+    rct::key temp;
+
+    // Transcript challenge
+    const rct::key xi{compute_challenge(message, n, m, M, proof_offset, proof.A, proof.B, proof.X)};
+
+    // Challenge powers (negated)
+    const rct::keyV minus_xi_pow{powers_of_scalar(xi, m, true)};
+
+    // Recover proof elements
+    ge_p3 A_p3;
+    ge_p3 B_p3;
+    std::vector<ge_p3> X_p3;
+    X_p3.resize(m);
+
+    scalarmult8(A_p3, proof.A);
+    scalarmult8(B_p3, proof.B);
+    for (std::size_t j = 0; j < m; ++j)
+    {
+        scalarmult8(X_p3[j], proof.X[j]);
+    }
+
+    // Reconstruct the f-matrix
+    rct::keyM f = rct::keyMInit(n, m);
+    for (std::size_t j = 0; j < m; ++j)
+    {
+        // f[j][0] = xi - sum(f[j][i]) [from i = [1, n)]
+        f[j][0] = xi;
+
+        for (std::size_t i = 1; i < n; ++i)
+        {
+            // note: indexing between f-matrix and proof.f is off by 1 because
+            //       'f[j][0] = xi - sum(f_{j,i})' is only implied by the proof, not recorded in it
+            f[j][i] = proof.f[j][i - 1];
+            sc_sub(f[j][0].bytes, f[j][0].bytes, f[j][i].bytes);
+        }
+        CHECK_AND_ASSERT_THROW_MES(!(f[j][0] == ZERO),
+            "grootle proof verifying: proof matrix element should not be zero!");
+    }
+
+    // Matrix commitment
+    //   A + xi*B == zA * G + ... f[j][i] * Hi_A[j][i] ... + ... f[j][i] * (xi - f[j][i]) * Hi_B[j][i] ...
+    //            == dual_matrix_commit(zA, f, f*(xi - f))
+    // G: zA
+    builder1_inout.add_G_element(proof.zA);
+
+    for (std::size_t j = 0; j < m; ++j)
+    {
+        for (std::size_t i = 0; i < n; ++i)
+        {
+            // Hi_A: f[j][i]
+            builder1_inout.add_element_at_generator_index(f[j][i], 2*(j*n + i));
+
+            // Hi_B: f[j][i]*(xi - f[j][i])
+            sc_sub(temp.bytes, xi.bytes, f[j][i].bytes);    //xi - f[j][i]
+            sc_mul(temp.bytes, f[j][i].bytes, temp.bytes);  //f[j][i]*(xi - f[j][i])
+            builder1_inout.add_element_at_generator_index(temp, 2*(j*n + i) + 1);
+        }
+    }
+
+    // A, B
+    // equality test:
+    //   dual_matrix_commit(zA, f, f*(xi - f)) - (A + xi*B) == 0
+    // A: -A
+    // B: -xi * B
+    builder1_inout.add_element(MINUS_ONE, A_p3);  // -A
+
+    sc_mul(temp.bytes, MINUS_ONE.bytes, xi.bytes);
+    builder1_inout.add_element(temp, B_p3);  // -xi * B
+
+    // {M}
+    //   t_k = mul_all_j(f[j][decomp_k[j]])
+    //   sum_k( t_k*(M[k] - C_offset) ) - sum(...) - z G == 0
+    //
+    //   sum_k( t_k*M[k] ) -
+    //      sum_k( t_k )*C_offset -
+    //      [ sum(...) + z G ] == 0
+    // M[k]: t_k
+    rct::key sum_t = ZERO;
+    rct::key t_k;
+    for (std::size_t k = 0; k < N; ++k)
+    {
+        t_k = ONE;
+        std::vector<std::size_t> decomp_k;
+        decomp_k.resize(m);
+        decompose(k, n, m, decomp_k);
+
+        for (std::size_t j = 0; j < m; ++j)
+        {
+            sc_mul(t_k.bytes, t_k.bytes, f[j][decomp_k[j]].bytes);  // mul_all_j(f[j][decomp_k[j]])
+        }
+
+        sc_add(sum_t.bytes, sum_t.bytes, t_k.bytes);  // sum_k( t_k )
+        builder2_inout.add_element(t_k, M[k]);
+    }
+
+    // C_offset
+    //   ... - sum_k( t_k )*C_offset ...
+    // 
+    // proof_offset: -sum_t
+    sc_mul(temp.bytes, MINUS_ONE.bytes, sum_t.bytes);  //-sum_t
+    builder2_inout.add_element(temp, proof_offset);
+
+    // {X}
+    //   ... - sum_j( xi^j*X[j] ) - z G == 0
+    for (std::size_t j = 0; j < m; ++j)
+    {
+        // X[j]: -xi^j
+        builder2_inout.add_element(minus_xi_pow[j], X_p3[j]);
+    }
+
+    // G
+    //   ... - z G == 0
+    // G: -z
+    sc_mul(temp.bytes, MINUS_ONE.bytes, proof.z.bytes);
+    builder2_inout.add_G_element(temp);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -282,9 +341,6 @@ GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
     rct::subKeys(C_zero_reproduced, M[l], C_offset);
     CHECK_AND_ASSERT_THROW_MES(rct::scalarmultBase(rct::sk2rct(privkey)) == C_zero_reproduced,
         "grootle proof proving: bad commitment private key!");
-
-    // statically initialize Grootle proof generators
-    init_gens();
 
 
     /// Grootle proof
@@ -477,7 +533,7 @@ GrootleProof grootle_prove(const rct::keyV &M, // [vec<commitments>]
     return proof;
 }
 //-------------------------------------------------------------------------------------------------------------------
-rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
+std::list<SpMultiexpBuilder> get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
     const std::vector<rct::keyV> &M,
     const rct::keyV &proof_offsets,
     const std::size_t n,
@@ -540,207 +596,31 @@ rct::pippenger_prep_data get_grootle_verification_data(const std::vector<const G
             "grootle proof verifying: bad scalar element in proof (z)!");
     }
 
-    // prepare context
-    init_static();
-    rct::key temp;  //common variable shuttle so only one needs to be allocated
-
-
-    /// setup 'data': for aggregate multi-exponentiation computation across all proofs
-
-    // per-index storage:
-    // 0                                  G                             (zA*G, z*G)
-    // 1                  2*m*n           alternate(Hi_A[i], Hi_B[i])   {f, f*(xi - f)}
-    //    <per-proof, start at 2*m*n + 1>
-    // 0                                  M[0]                          (f-coefficients)
-    // ...
-    // (N-1)                              M[N-1]
-    // ... other proof data: A, B, C_offset, {X}
-    std::vector<rct::MultiexpData> data;
-    std::size_t max_size{(1 + 2*m*n) + N_proofs*(N + 3 + m)};
-    data.reserve(max_size);
-    data.resize(1 + 2*m*n); // start with common/batched elements
-    std::size_t offset{0};
-
-    // prep terms: G, {Hi_A, Hi_B}
-    data[0] = {ZERO, G_p3};
-    offset = 1;
-    for (std::size_t i = 0; i < m*n; ++i)
-    {
-        data[offset + 2*i    ] = {ZERO, Hi_A_p3[i]};
-        data[offset + 2*i + 1] = {ZERO, Hi_B_p3[i]};
-    }
-
 
     /// per-proof data assembly
-    std::size_t skipped_offsets{0};
+    std::list<SpMultiexpBuilder> builders;
 
-    for (std::size_t proof_i = 0; proof_i < N_proofs; ++proof_i)
+    for (std::size_t proof_i{0}; proof_i < proofs.size(); ++proof_i)
     {
-        const GrootleProof &proof = *(proofs[proof_i]);
-        const rct::keyV &proof_M = M[proof_i];
+        // prepare two builders for this proof (for the index-encoding proof and the membership proof)
+        builders.emplace_back(rct::skGen(), 2*m*n, 2);
+        SpMultiexpBuilder &builder1 = builders.back();
+        builders.emplace_back(rct::skGen(), 0, N + m + 1);
+        SpMultiexpBuilder &builder2 = builders.back();
 
-        // random weights
-        // - to allow verifiying batches of proofs, must weight each proof's components randomly so an adversary doesn't
-        //   gain an advantage if >1 of their proofs are being validated in a batch
-        const rct::key w1{rct::skGen()};  // decomp:        w1*[ A + xi*B == dual_matrix_commit(zA, f, f*(xi - f)) ]
-        const rct::key w2{rct::skGen()};  // main stuff:    w2*[ ... - zG == 0 ]
-        CHECK_AND_ASSERT_THROW_MES(!(w1 == ZERO),
-            "grootle proof verifying: invalid verifier weight (w1 must be non-zero) (bug).");
-        CHECK_AND_ASSERT_THROW_MES(!(w2 == ZERO),
-            "grootle proof verifying: invalid verifier weight (w2 must be non-zero) (bug).");
-
-        // Transcript challenge
-        const rct::key xi{
-                compute_challenge(messages[proof_i],
-                    n,
-                    m,
-                    proof_M,
-                    proof_offsets[proof_i],
-                    proof.A,
-                    proof.B,
-                    proof.X)
-            };
-
-        // Challenge powers (negated)
-        const rct::keyV minus_xi_pow{powers_of_scalar(xi, m, true)};
-
-        // Recover proof elements
-        ge_p3 A_p3;
-        ge_p3 B_p3;
-        std::vector<ge_p3> X_p3;
-        X_p3.resize(m);
-
-        scalarmult8(A_p3, proof.A);
-        scalarmult8(B_p3, proof.B);
-        for (std::size_t j = 0; j < m; ++j)
-        {
-            scalarmult8(X_p3[j], proof.X[j]);
-        }
-
-        // Reconstruct the f-matrix
-        rct::keyM f = rct::keyMInit(n, m);
-        for (std::size_t j = 0; j < m; ++j)
-        {
-            // f[j][0] = xi - sum(f[j][i]) [from i = [1, n)]
-            f[j][0] = xi;
-
-            for (std::size_t i = 1; i < n; ++i)
-            {
-                // note: indexing between f-matrix and proof.f is off by 1 because
-                //       'f[j][0] = xi - sum(f_{j,i})' is only implied by the proof, not recorded in it
-                f[j][i] = proof.f[j][i - 1];
-                sc_sub(f[j][0].bytes, f[j][0].bytes, f[j][i].bytes);
-            }
-            CHECK_AND_ASSERT_THROW_MES(!(f[j][0] == ZERO),
-                "grootle proof verifying: proof matrix element should not be zero!");
-        }
-
-        // Matrix commitment
-        //   w1* [ A + xi*B == zA * G + ... f[j][i] * Hi_A[j][i] ... + ... f[j][i] * (xi - f[j][i]) * Hi_B[j][i] ... ]
-        //       [          == dual_matrix_commit(zA, f, f*(xi - f))                                                 ]
-        // G: w1*zA
-        sc_muladd(data[0].scalar.bytes, w1.bytes, proof.zA.bytes, data[0].scalar.bytes);  // w1*zA
-        offset = 1;
-
-        rct::key Hi_temp;
-        for (std::size_t j = 0; j < m; ++j)
-        {
-            for (std::size_t i = 0; i < n; ++i)
-            {
-                // Hi_A: w1*f[j][i]
-                sc_mul(Hi_temp.bytes, w1.bytes, f[j][i].bytes);  // w1*f[j][i]
-                sc_add(data[offset + 2*(j*n + i)].scalar.bytes, data[offset + 2*(j*n + i)].scalar.bytes, Hi_temp.bytes);
-
-                // Hi_B: w1*f[j][i]*(xi - f[j][i]) -> w1*xi*f[j][i] - w1*f[j][i]*f[j][i]
-                sc_mul(temp.bytes, xi.bytes, Hi_temp.bytes);  //w1*xi*f[j][i]
-                sc_mul(Hi_temp.bytes, f[j][i].bytes, Hi_temp.bytes);  //w1*f[j][i]*f[j][i]
-                sc_sub(temp.bytes, temp.bytes, Hi_temp.bytes);  //[] - []
-                sc_add(data[offset + 2*(j*n + i) + 1].scalar.bytes, data[offset + 2*(j*n + i) + 1].scalar.bytes, temp.bytes);
-            }
-        }
-
-        // A, B
-        // equality test:
-        //   w1*[ dual_matrix_commit(zA, f, f*(xi - f)) - (A + xi*B) ] == 0
-        // A: -w1    * A
-        // B: -w1*xi * B
-        sc_mul(temp.bytes, MINUS_ONE.bytes, w1.bytes);
-        data.emplace_back(temp, A_p3);  // -w1 * A
-
-        sc_mul(temp.bytes, temp.bytes, xi.bytes);
-        data.emplace_back(temp, B_p3);  // -w1*xi * B
-
-        // {M}
-        //   t_k = mul_all_j(f[j][decomp_k[j]])
-        //   w2*[ sum_k( t_k*(M[k] - C_offset) ) - sum(...) - z G ] == 0
-        //
-        //   sum_k( w2*t_k*M[k] ) -
-        //      w2*sum_k( t_k )*C_offset -
-        //      w2*[ sum(...) + z G ] == 0
-        // M[k]: w2*t_k
-        rct::key sum_t = ZERO;
-        rct::key t_k;
-        for (std::size_t k = 0; k < N; ++k)
-        {
-            t_k = ONE;
-            std::vector<std::size_t> decomp_k;
-            decomp_k.resize(m);
-            decompose(k, n, m, decomp_k);
-
-            for (std::size_t j = 0; j < m; ++j)
-            {
-                sc_mul(t_k.bytes, t_k.bytes, f[j][decomp_k[j]].bytes);  // mul_all_j(f[j][decomp_k[j]])
-            }
-
-            sc_add(sum_t.bytes, sum_t.bytes, t_k.bytes);  // sum_k( t_k )
-
-            // borrow the t_k variable...
-            sc_mul(t_k.bytes, w2.bytes, t_k.bytes);  // w2*t_k
-            data.emplace_back(t_k, proof_M[k]);
-        }
-
-        // C_offset
-        //   ... - w2*sum_k( t_k )*C_offset ...
-        // 
-        // proof_offsets[proof_i]: -w2*sum_t
-
-        // optimization: skip if offset == identity
-        if (proof_offsets[proof_i] == rct::identity())
-        {
-            ++skipped_offsets;
-        }
-        else
-        {
-            sc_mul(temp.bytes, MINUS_ONE.bytes, w2.bytes);
-            sc_mul(temp.bytes, temp.bytes, sum_t.bytes);  //-w2*sum_t
-            data.emplace_back(temp, proof_offsets[proof_i]);
-        }
-
-        // {X}
-        //   w2*[ ... - sum_j( xi^j*X[j] ) - z G ] == 0
-        for (std::size_t j = 0; j < m; ++j)
-        {
-            // X[j]: -w2*xi^j
-            sc_mul(temp.bytes, w2.bytes, minus_xi_pow[j].bytes);
-            data.emplace_back(temp, X_p3[j]);
-        }
-
-        // G
-        //   w2*[ ... - z G ] == 0
-        // G: -w2*z
-        sc_mul(temp.bytes, MINUS_ONE.bytes, proof.z.bytes);
-        sc_mul(temp.bytes, temp.bytes, w2.bytes);
-        sc_add(data[0].scalar.bytes, data[0].scalar.bytes, temp.bytes);
+        build_verification_multiexps_for_proof(*(proofs[proof_i]),
+            M[proof_i],
+            proof_offsets[proof_i],
+            n,
+            m,
+            messages[proof_i],
+            builder1,
+            builder2);
     }
-
-
-    /// Final check
-    CHECK_AND_ASSERT_THROW_MES(data.size() == max_size - skipped_offsets,
-        "grootle proof verifying: final proof data is incorrect size!");
 
 
     /// return multiexp data for caller to deal with
-    return rct::pippenger_prep_data{std::move(data), generator_cache, 1 + 2*m*n};
+    return builders;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
@@ -751,7 +631,9 @@ bool grootle_verify(const std::vector<const GrootleProof*> &proofs,
     const rct::keyV &messages)
 {
     // build and verify multiexp
-    if (!multiexp_is_identity(get_grootle_verification_data(proofs, M, proof_offsets, n, m, messages)))
+    if (!SpMultiexp{
+            get_grootle_verification_data(proofs, M, proof_offsets, n, m, messages)
+        }.evaluates_to_point_at_infinity())
     {
         MERROR("Grootle proof: verification failed!");
         return false;

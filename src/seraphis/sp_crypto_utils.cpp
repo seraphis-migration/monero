@@ -350,22 +350,4 @@ bool key_domain_is_prime_subgroup(const rct::key &check_key)
     return (ge_p3_is_point_at_infinity_vartime(&check_key_p3) != 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool multiexp_is_identity(const std::vector<rct::pippenger_prep_data> &multiexp_data_sets)
-{
-    // verify the multiexponentiation resolves to the identity element
-    ge_p3 result = rct::pippenger_p3(multiexp_data_sets);
-    if (ge_p3_is_point_at_infinity_vartime(&result) == 0)
-        return false;
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool multiexp_is_identity(rct::pippenger_prep_data multiexp_data_set)
-{
-    std::vector<rct::pippenger_prep_data> multiexp_data_sets;
-    multiexp_data_sets.emplace_back(std::move(multiexp_data_set));
-
-    return multiexp_is_identity(multiexp_data_sets);
-}
-//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

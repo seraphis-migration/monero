@@ -161,13 +161,5 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
 * result: true if input key is in prime order EC subgroup
 */
 bool key_domain_is_prime_subgroup(const rct::key &check_key);
-/**
-* brief: multiexp_is_identity - check that a set/sets of pippenger multiexponentiation data points resolve to identity
-*    a A + b B + ... ?= 0
-* param: multiexp_data_set(s) - multiexp data to resolve with pippenger
-* result: true if multiexponentiating the data results in the identity element
-*/
-bool multiexp_is_identity(const std::vector<rct::pippenger_prep_data> &multiexp_data_sets);
-bool multiexp_is_identity(rct::pippenger_prep_data multiexp_data_set);
 
 } //namespace sp

@@ -32,9 +32,9 @@
 #include "tx_validators.h"
 
 //local headers
+#include "bulletproofs_plus2.h"
 #include "crypto/crypto.h"
 #include "grootle.h"
-#include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
@@ -274,7 +274,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
     const DiscretizedFee &discretized_transaction_fee,
     const SpBalanceProofV1 &balance_proof)
 {
-    const rct::BulletproofPlus &range_proofs = balance_proof.m_bpp_proof;
+    const BulletproofPlus2 &range_proofs = balance_proof.m_bpp2_proof;
 
     // sanity check
     if (range_proofs.V.size() == 0)
@@ -320,7 +320,7 @@ bool validate_sp_amount_balance_v1(const std::vector<SpEnoteImageV1> &input_imag
 bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpMembershipProofV1*> &membership_proofs,
     const std::vector<const SpEnoteImage*> &input_images,
     const TxValidationContext &tx_validation_context,
-    rct::pippenger_prep_data &validation_data_out)
+    std::list<SpMultiexpBuilder> &validation_data_out)
 {
     const std::size_t num_proofs{membership_proofs.size()};
 
