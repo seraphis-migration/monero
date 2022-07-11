@@ -192,7 +192,19 @@ struct SpCompositionProofMultisigPrep final
 class SpCompositionProofMultisigNonceRecord final
 {
 public:
-//constructors: default
+//constructors
+    /// default constructor
+    SpCompositionProofMultisigNonceRecord() = default;
+    /// copy constructor: disabled
+    SpCompositionProofMultisigNonceRecord(const SpCompositionProofMultisigNonceRecord&) = delete;
+    /// move constructor: defaulted
+    SpCompositionProofMultisigNonceRecord(SpCompositionProofMultisigNonceRecord&&) = default;
+//overloaded operators
+    /// copy assignment: disabled
+    SpCompositionProofMultisigNonceRecord& operator=(const SpCompositionProofMultisigNonceRecord&) = delete;
+    /// move assignment: defaulted
+    SpCompositionProofMultisigNonceRecord& operator=(SpCompositionProofMultisigNonceRecord&&) = default;
+
 //member functions
     /// true if there is a record
     bool has_record(const rct::key &message,
@@ -223,9 +235,9 @@ public:
 private:
     // [message : [filter, nonces]]
     std::unordered_map<
-        rct::key,                                    //message
+        rct::key,                                //message
         std::unordered_map<
-            rct::key,                                //proof key
+            rct::key,                            //proof key
             std::unordered_map<
                 multisig::signer_set_filter,     //filter representing a signer group
                 SpCompositionProofMultisigPrep   //nonces

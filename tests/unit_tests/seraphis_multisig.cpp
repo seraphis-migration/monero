@@ -504,7 +504,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     std::vector<SpCompositionProofMultisigNonceRecord> signer_nonce_records;
     std::vector<SpMultisigInputInitSetV1> input_inits;
     input_inits.reserve(accounts.size());
-    signer_nonce_records.reserve(accounts.size());
+    //signer_nonce_records.reserve(accounts.size());
 
     for (std::size_t signer_index{0}; signer_index < accounts.size(); ++signer_index)
     {
