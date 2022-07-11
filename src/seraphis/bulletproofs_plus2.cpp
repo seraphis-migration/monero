@@ -481,6 +481,14 @@ namespace sp
     }
 
     // Update the transcript
+    static rct::key transcript_update(rct::key &transcript)
+    {
+        SpFSTranscript transcript_update{config::HASH_KEY_BULLETPROOF_PLUS2_TRANSCRIPT_UPDATE, sizeof(rct::key)};
+        transcript_update.append("prev", transcript);
+        sp_hash_to_scalar(transcript_update, transcript.bytes);
+        return transcript;
+    }
+
     static rct::key transcript_update(rct::key &transcript, const rct::key &update_0)
     {
         SpFSTranscript transcript_update{config::HASH_KEY_BULLETPROOF_PLUS2_TRANSCRIPT_UPDATE, 2*sizeof(rct::key)};
@@ -496,6 +504,18 @@ namespace sp
         transcript_update.append("prev", transcript);
         transcript_update.append("0", update_0);
         transcript_update.append("1", update_1);
+        sp_hash_to_scalar(transcript_update, transcript.bytes);
+        return transcript;
+    }
+
+    static rct::key transcript_update(rct::key &transcript, const rct::keyV &update_vec)
+    {
+        SpFSTranscript transcript_update{
+                config::HASH_KEY_BULLETPROOF_PLUS2_TRANSCRIPT_UPDATE,
+                update_vec.size()*sizeof(rct::key)
+            };
+        transcript_update.append("prev", transcript);
+        transcript_update.append("v", update_vec);
         sp_hash_to_scalar(transcript_update, transcript.bytes);
         return transcript;
     }
@@ -583,7 +603,7 @@ namespace sp
 try_again:
         // This is a Fiat-Shamir transcript
         rct::key transcript = copy(initial_transcript);
-        transcript = transcript_update(transcript, rct::hash_to_scalar(V));
+        transcript_update(transcript, V);
 
         // A
         rct::key alpha = rct::skGen();
@@ -599,7 +619,7 @@ try_again:
             MINFO("y is 0, trying again");
             goto try_again;
         }
-        rct::key z = transcript = rct::hash_to_scalar(y);
+        rct::key z = transcript_update(transcript);
         if (z == rct::zero())
         {
             MINFO("z is 0, trying again");
@@ -838,10 +858,10 @@ try_again:
 
             // Reconstruct the challenges
             rct::key transcript = copy(initial_transcript);
-            transcript = transcript_update(transcript, rct::hash_to_scalar(proof.V));
+            transcript_update(transcript, proof.V);
             pd.y = transcript_update(transcript, proof.A);
             CHECK_AND_ASSERT_MES(!(pd.y == rct::zero()), false, "y == 0");
-            pd.z = transcript = rct::hash_to_scalar(pd.y);
+            pd.z = transcript_update(transcript);
             CHECK_AND_ASSERT_MES(!(pd.z == rct::zero()), false, "z == 0");
 
             // Determine the number of inner-product rounds based on proof size
