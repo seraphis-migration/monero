@@ -255,7 +255,7 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const std::uint64
         contiguity_marker_inout.m_block_height = new_onchain_chunk.m_end_height - 1;
         contiguity_marker_inout.m_block_id = new_onchain_chunk.m_block_ids.back();
 
-        // process the chunk (update found enote records and spent key images)
+        // process the chunk
         enote_store_updater_inout.process_chunk(new_onchain_chunk.m_basic_records_per_tx,
             new_onchain_chunk.m_contextual_key_images);
 
@@ -512,7 +512,7 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         if (scan_status == ScanStatus::FAIL)
             break;
 
-        // 2. if we must do a full scan, go back to the top immediately (all enotes recovered here will be overwritten)
+        // 2. if we must do a full scan, go back to the top immediately (all data from this loop will be overwritten)
         if (scan_status == ScanStatus::NEED_FULLSCAN)
             continue;
 

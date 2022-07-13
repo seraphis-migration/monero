@@ -37,9 +37,9 @@
 #include "crypto/crypto.h"
 #include "tx_enote_record_types.h"
 #include "tx_enote_record_utils.h"
-#include "tx_enote_store.h"
 
 //third party headers
+#include "boost/multiprecision/cpp_int.hpp"
 
 //standard headers
 #include <list>
@@ -55,37 +55,13 @@ namespace sp
 ////
 // SpEnoteStoreMockSimpleV1
 ///
-class SpEnoteStoreMockSimpleV1 final : public SpEnoteStoreV1
+class SpEnoteStoreMockSimpleV1 final
 {
     friend class InputSelectorMockSimpleV1;
 
 public:
     /// add a record
-    void add_record(const SpContextualEnoteRecordV1 &new_record) override;
-
-    /// DISABLED
-    void update_with_records_from_ledger(const std::uint64_t first_new_block,
-        const rct::key &alignment_block_id,
-        const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
-        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
-        const std::vector<rct::key> &new_block_ids) override
-    { throw; }
-    void update_with_records_from_offchain(
-        const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
-        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images) override
-    { throw; }
-    bool has_enote_with_key_image(const crypto::key_image &key_image) const override
-    { throw; return false; }
-    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const override
-    { throw; return false; }
-    std::uint64_t get_refresh_height() const override
-    { throw; return 0; }
-    std::uint64_t get_top_block_height() const override
-    { throw; return 0; }
-    boost::multiprecision::uint128_t get_balance(
-        const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
-        const std::unordered_set<SpEnoteSpentStatus> &spent_statuses) const override
-    { throw; return 0; }
+    void add_record(const SpContextualEnoteRecordV1 &new_record);
 
 //member variables
 protected:
@@ -96,7 +72,7 @@ protected:
 ////
 // SpEnoteStoreMockV1
 ///
-class SpEnoteStoreMockV1 final : public SpEnoteStoreV1
+class SpEnoteStoreMockV1 final
 {
     friend class InputSelectorMockV1;
 
@@ -112,33 +88,33 @@ public:
 
 //member functions
     /// add a record
-    void add_record(const SpContextualEnoteRecordV1 &new_record) override;
+    void add_record(const SpContextualEnoteRecordV1 &new_record);
 
     /// update the store with enote records found in the ledger, with associated context
     void update_with_records_from_ledger(const std::uint64_t first_new_block,
         const rct::key &alignment_block_id,
         const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
         const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
-        const std::vector<rct::key> &new_block_ids) override;
+        const std::vector<rct::key> &new_block_ids);
 
     /// update the store with enote records found off-chain, with associated context
     void update_with_records_from_offchain(
         const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
-        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images) override;
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images);
 
     /// check if any stored enote has a given key image
-    bool has_enote_with_key_image(const crypto::key_image &key_image) const override;
+    bool has_enote_with_key_image(const crypto::key_image &key_image) const;
     /// try to get the recorded block id for a given height
-    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const override;
+    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const;
 
     /// get height of first block the enote store cares about
-    std::uint64_t get_refresh_height() const override { return m_refresh_height; }
+    std::uint64_t get_refresh_height() const { return m_refresh_height; }
     /// get height of heighest recorded block (refresh height - 1 if no recorded blocks)
-    std::uint64_t get_top_block_height() const override { return m_refresh_height + m_block_ids.size() - 1; }
+    std::uint64_t get_top_block_height() const { return m_refresh_height + m_block_ids.size() - 1; }
     /// get current balance using specified origin/spent statuses
     boost::multiprecision::uint128_t get_balance(
         const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
-        const std::unordered_set<SpEnoteSpentStatus> &spent_statuses) const override;
+        const std::unordered_set<SpEnoteSpentStatus> &spent_statuses) const;
 
 //member variables
 protected:

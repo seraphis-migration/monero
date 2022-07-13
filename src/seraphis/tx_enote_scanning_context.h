@@ -70,6 +70,4 @@ public:
     virtual void terminate_scanning() = 0;
 };
 
-//EnoteScanningContextLedgerTest: use mock ledger context, define test case that includes reorgs
-
 } //namespace sp

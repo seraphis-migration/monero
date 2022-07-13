@@ -30,7 +30,6 @@
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
 #include "seraphis/tx_enote_record_types.h"
-#include "seraphis/tx_enote_store.h"
 #include "seraphis/tx_enote_store_mocks.h"
 #include "seraphis/tx_fee_calculator.h"
 #include "seraphis/tx_fee_calculator_mocks.h"
@@ -46,7 +45,8 @@
 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void prepare_enote_store(const std::vector<rct::xmr_amount> &amounts, sp::SpEnoteStoreV1 &enote_store_inout)
+static void prepare_enote_store(const std::vector<rct::xmr_amount> &amounts,
+    sp::SpEnoteStoreMockSimpleV1 &enote_store_inout)
 {
     for (const rct::xmr_amount amount : amounts)
     {

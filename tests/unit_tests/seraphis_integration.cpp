@@ -55,7 +55,6 @@
 #include "seraphis/tx_enote_record_utils.h"
 #include "seraphis/tx_enote_scanning.h"
 #include "seraphis/tx_enote_scanning_context_simple.h"
-#include "seraphis/tx_enote_store.h"
 #include "seraphis/tx_enote_store_mocks.h"
 #include "seraphis/tx_enote_store_updater_mocks.h"
 #include "seraphis/tx_extra.h"
