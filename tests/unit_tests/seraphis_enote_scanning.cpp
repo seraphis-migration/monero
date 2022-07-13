@@ -56,6 +56,7 @@
 #include "seraphis/tx_enote_scanning.h"
 #include "seraphis/tx_enote_scanning_context_simple.h"
 #include "seraphis/tx_enote_store_mocks.h"
+#include "seraphis/tx_enote_store_updater_mocks.h"
 #include "seraphis/tx_extra.h"
 #include "seraphis/tx_fee_calculator_mocks.h"
 #include "seraphis/tx_fee_calculator_squashed_v1.h"
@@ -262,19 +263,16 @@ static void send_coinbase_amounts_to_users(const std::vector<std::vector<rct::xm
 static void refresh_user_enote_store(const sp::jamtis::jamtis_mock_keys &user_keys,
     const sp::RefreshLedgerEnoteStoreConfig &refresh_config,
     const sp::MockLedgerContext &ledger_context,
-    sp::SpEnoteStoreV1 &user_enote_store_inout)
+    sp::SpEnoteStoreMockV1 &user_enote_store_inout)
 {
     using namespace sp;
     using namespace jamtis;
 
     const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.k_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
+    EnoteStoreUpdaterLedgerMock enote_store_updater{user_keys.K_1_base, user_keys.k_vb, user_enote_store_inout};
 
-    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config,
-        user_keys.K_1_base,
-        user_keys.k_vb,
-        enote_scanning_context,
-        user_enote_store_inout));
+    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config, enote_scanning_context, enote_store_updater));
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -437,12 +435,9 @@ TEST(seraphis_enote_scanning, trivial_ledger)
         };
     const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.k_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
+    EnoteStoreUpdaterLedgerMock enote_store_updater{user_keys.K_1_base, user_keys.k_vb, user_enote_store};
 
-    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config,
-        user_keys.K_1_base,
-        user_keys.k_vb,
-        enote_scanning_context,
-        user_enote_store));
+    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config, enote_scanning_context, enote_store_updater));
 
     // make a copy of the expected enote record
     SpEnoteRecordV1 single_enote_record;
@@ -1388,11 +1383,10 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
         invocable_get_onchain_test1,
         dummy_invocable,
         dummy_invocable);
+    EnoteStoreUpdaterLedgerMock enote_store_updater_test1{user_keys_A.K_1_base, user_keys_A.k_vb, enote_store_A_test1};
     ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config_test1,
-        user_keys_A.K_1_base,
-        user_keys_A.k_vb,
         test_scanning_context_A_test1,
-        enote_store_A_test1));
+        enote_store_updater_test1));
 
     // d. after refreshing, both users should have no balance
     refresh_user_enote_store(user_keys_B, refresh_config_test1, ledger_context_test1, enote_store_B_test1);
@@ -1481,11 +1475,10 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
         invocable_get_onchain_test2,
         dummy_invocable,
         dummy_invocable);
+    EnoteStoreUpdaterLedgerMock enote_store_updater_test2{user_keys_A.K_1_base, user_keys_A.k_vb, enote_store_A_test2};
     ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config_test2,
-        user_keys_A.K_1_base,
-        user_keys_A.k_vb,
         test_scanning_context_A_test2,
-        enote_store_A_test2));
+        enote_store_updater_test2));
 
     // d. check balances after refreshing
     refresh_user_enote_store(user_keys_B, refresh_config_test2, ledger_context_test2, enote_store_B_test2);
@@ -1573,11 +1566,10 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
         invocable_get_onchain_test3,
         dummy_invocable,
         dummy_invocable);
+    EnoteStoreUpdaterLedgerMock enote_store_updater_test3{user_keys_B.K_1_base, user_keys_B.k_vb, enote_store_B_test3};
     ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config_test3,
-        user_keys_B.K_1_base,
-        user_keys_B.k_vb,
         test_scanning_context_B_test3,
-        enote_store_B_test3));
+        enote_store_updater_test3));
 
     // d. make sure NEED_FULLSCAN was not triggered on the reorg (would be == 8 here because fullscan will rescan block 0)
     ASSERT_TRUE(invocable_get_onchain_test3.num_invocations() == 7);
@@ -1654,11 +1646,10 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
         invocable_get_onchain_test4,
         dummy_invocable,
         dummy_invocable);
+    EnoteStoreUpdaterLedgerMock enote_store_updater_test4{user_keys_B.K_1_base, user_keys_B.k_vb, enote_store_B_test4};
     ASSERT_ANY_THROW(refresh_enote_store_ledger(refresh_config_test4,
-        user_keys_B.K_1_base,
-        user_keys_B.k_vb,
         test_scanning_context_B_test4,
-        enote_store_B_test4));
+        enote_store_updater_test4));
 
     // 5. sneaky tx found in follow-up loop
     const RefreshLedgerEnoteStoreConfig refresh_config_test5{
@@ -1729,11 +1720,10 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
         invocable_get_onchain_test5,
         invocable_get_unconfirmed_test5,
         dummy_invocable);
+    EnoteStoreUpdaterLedgerMock enote_store_updater_test5{user_keys_B.K_1_base, user_keys_B.k_vb, enote_store_B_test5};
     ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config_test5,
-        user_keys_B.K_1_base,
-        user_keys_B.k_vb,
         test_scanning_context_B_test5,
-        enote_store_B_test5));
+        enote_store_updater_test5));
 
     // d. check users' balances
     refresh_user_enote_store(user_keys_A, refresh_config_test5, ledger_context_test5, enote_store_A_test5);

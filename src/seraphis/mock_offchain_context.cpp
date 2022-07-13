@@ -39,6 +39,7 @@
 #include "sp_core_enote_utils.h"
 #include "tx_component_types.h"
 #include "tx_enote_scanning.h"
+#include "tx_enote_scanning_utils.h"
 #include "txtype_squashed_v1.h"
 
 //third party headers

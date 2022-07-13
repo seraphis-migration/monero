@@ -1,0 +1,146 @@
+// Copyright (c) 2021, The Monero Project
+//
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without modification, are
+// permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this list of
+//    conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice, this list
+//    of conditions and the following disclaimer in the documentation and/or other
+//    materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its contributors may be
+//    used to endorse or promote products derived from this software without specific
+//    prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+// THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+// THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+// NOT FOR PRODUCTION
+
+//paired header
+#include "tx_enote_store_updater_mocks.h"
+
+//local headers
+#include "crypto/crypto.h"
+#include "jamtis_core_utils.h"
+#include "ringct/rctTypes.h"
+#include "tx_enote_record_types.h"
+#include "tx_enote_scanning_utils.h"
+#include "tx_enote_store_mocks.h"
+
+//third party headers
+
+//standard headers
+#include <list>
+#include <memory>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
+
+namespace sp
+{
+//-------------------------------------------------------------------------------------------------------------------
+EnoteStoreUpdaterLedgerMock::EnoteStoreUpdaterLedgerMock(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    SpEnoteStoreMockV1 &enote_store) :
+        m_wallet_spend_pubkey{wallet_spend_pubkey},
+        m_k_view_balance{k_view_balance},
+        m_enote_store{enote_store}
+{
+    jamtis::make_jamtis_unlockamounts_key(m_k_view_balance, m_k_unlock_amounts);
+    jamtis::make_jamtis_findreceived_key(m_k_view_balance, m_k_find_received);
+    jamtis::make_jamtis_generateaddress_secret(m_k_view_balance, m_s_generate_address);
+    jamtis::make_jamtis_ciphertag_secret(m_s_generate_address, m_s_cipher_tag);
+
+    m_cipher_context = std::make_unique<jamtis::jamtis_address_tag_cipher_context>(rct::sk2rct(m_s_cipher_tag));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMock::process_chunk(
+    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images)
+{
+    process_chunk_full(m_wallet_spend_pubkey,
+        m_k_view_balance,
+        m_k_unlock_amounts,
+        m_k_find_received,
+        m_s_generate_address,
+        *m_cipher_context,
+        [this](const crypto::key_image &key_image) -> bool
+        {
+            return this->m_enote_store.has_enote_with_key_image(key_image);
+        },
+        chunk_basic_records_per_tx,
+        chunk_contextual_key_images,
+        m_found_enote_records,
+        m_found_spent_key_images);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMock::end_chunk_handling_session(const std::uint64_t first_new_block,
+    const rct::key &alignment_block_id,
+    const std::vector<rct::key> &new_block_ids)
+{
+    m_enote_store.update_with_records_from_ledger(first_new_block,
+        alignment_block_id,
+        m_found_enote_records,
+        m_found_spent_key_images,
+        new_block_ids);
+
+    m_found_enote_records.clear();
+    m_found_spent_key_images.clear();
+}
+//-------------------------------------------------------------------------------------------------------------------
+EnoteStoreUpdaterNonLedgerMock::EnoteStoreUpdaterNonLedgerMock(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_view_balance,
+    SpEnoteStoreMockV1 &enote_store) :
+        m_wallet_spend_pubkey{wallet_spend_pubkey},
+        m_k_view_balance{k_view_balance},
+        m_enote_store{enote_store}
+{
+    jamtis::make_jamtis_unlockamounts_key(m_k_view_balance, m_k_unlock_amounts);
+    jamtis::make_jamtis_findreceived_key(m_k_view_balance, m_k_find_received);
+    jamtis::make_jamtis_generateaddress_secret(m_k_view_balance, m_s_generate_address);
+    jamtis::make_jamtis_ciphertag_secret(m_s_generate_address, m_s_cipher_tag);
+
+    m_cipher_context = std::make_unique<jamtis::jamtis_address_tag_cipher_context>(rct::sk2rct(m_s_cipher_tag));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterNonLedgerMock::process_and_handle_chunk(
+    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images)
+{
+    std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> found_enote_records;
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> found_spent_key_images;
+
+    process_chunk_full(m_wallet_spend_pubkey,
+        m_k_view_balance,
+        m_k_unlock_amounts,
+        m_k_find_received,
+        m_s_generate_address,
+        *m_cipher_context,
+        [this](const crypto::key_image &key_image) -> bool
+        {
+            return this->m_enote_store.has_enote_with_key_image(key_image);
+        },
+        chunk_basic_records_per_tx,
+        chunk_contextual_key_images,
+        found_enote_records,
+        found_spent_key_images);
+
+    m_enote_store.update_with_records_from_offchain(found_enote_records, found_spent_key_images);
+}
+//-------------------------------------------------------------------------------------------------------------------
+} //namespace sp

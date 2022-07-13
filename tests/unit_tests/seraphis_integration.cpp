@@ -57,6 +57,7 @@
 #include "seraphis/tx_enote_scanning_context_simple.h"
 #include "seraphis/tx_enote_store.h"
 #include "seraphis/tx_enote_store_mocks.h"
+#include "seraphis/tx_enote_store_updater_mocks.h"
 #include "seraphis/tx_extra.h"
 #include "seraphis/tx_fee_calculator_mocks.h"
 #include "seraphis/tx_fee_calculator_squashed_v1.h"
@@ -158,19 +159,16 @@ static void send_coinbase_amounts_to_user(const std::vector<rct::xmr_amount> &co
 static void refresh_user_enote_store(const sp::jamtis::jamtis_mock_keys &user_keys,
     const sp::RefreshLedgerEnoteStoreConfig &refresh_config,
     const sp::MockLedgerContext &ledger_context,
-    sp::SpEnoteStoreV1 &user_enote_store_inout)
+    sp::SpEnoteStoreMockV1 &user_enote_store_inout)
 {
     using namespace sp;
     using namespace jamtis;
 
     const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.k_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
+    EnoteStoreUpdaterLedgerMock enote_store_updater{user_keys.K_1_base, user_keys.k_vb, user_enote_store_inout};
 
-    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config,
-        user_keys.K_1_base,
-        user_keys.k_vb,
-        enote_scanning_context,
-        user_enote_store_inout));
+    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config, enote_scanning_context, enote_store_updater));
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

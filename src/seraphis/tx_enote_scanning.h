@@ -34,11 +34,8 @@
 #pragma once
 
 //local headers
-#include "crypto/crypto.h"
-#include "device/device.hpp"
-#include "sp_crypto_utils.h"
+#include "ringct/rctTypes.h"
 #include "tx_enote_record_types.h"
-#include "tx_enote_store.h"
 
 //third party headers
 #include <boost/optional/optional.hpp>
@@ -53,6 +50,8 @@ namespace sp
 {
     class EnoteScanningContextLedger;
     class EnoteFindingContextOffchain;
+    class EnoteStoreUpdaterLedger;
+    class EnoteStoreUpdaterNonLedger;
 }
 
 namespace sp
@@ -116,40 +115,18 @@ void check_v1_enote_scan_chunk_nonledger_semantics_v1(const EnoteScanningChunkNo
     const SpEnoteOriginStatus expected_origin_status,
     const SpEnoteSpentStatus expected_spent_status);
 
-//todo
-bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
-    const std::uint64_t block_height,
-    const rct::key &transaction_id,
-    const std::uint64_t total_enotes_before_tx,
-    const rct::key &input_context,
-    const SpTxSupplementV1 &tx_supplement,
-    const std::vector<SpEnoteV1> &enotes_in_tx,
-    const SpEnoteOriginStatus origin_status,
-    hw::device &hwdev,
-    std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &basic_records_per_tx_inout);
-void collect_key_images_from_tx(const std::uint64_t block_height,
-    const rct::key &transaction_id,
-    const std::vector<crypto::key_image> &key_images_in_tx,
-    const SpEnoteSpentStatus spent_status,
-    std::list<SpContextualKeyImageSetV1> &contextual_key_images_inout);
-
 //todo: use a EnoteScanChunkProcessingContext to hide details of chunk processing and enote store updating?
 void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
     EnoteScanningContextLedger &scanning_context_inout,
-    SpEnoteStoreV1 &enote_store_inout);
+    EnoteStoreUpdaterLedger &enote_store_updater_inout);
 
-void refresh_enote_store_offchain(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const EnoteFindingContextOffchain &enote_finding_context,
-    SpEnoteStoreV1 &enote_store_inout);
+void refresh_enote_store_offchain(const EnoteFindingContextOffchain &enote_finding_context,
+    EnoteStoreUpdaterNonLedger &enote_store_updater_inout);
 
 void refresh_enote_store_full(const RefreshLedgerEnoteStoreConfig &ledger_refresh_config,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
     const EnoteFindingContextOffchain &enote_finding_context,
     EnoteScanningContextLedger &scanning_context_inout,
-    SpEnoteStoreV1 &enote_store_inout);
+    EnoteStoreUpdaterLedger &enote_store_updater_ledger_inout,
+    EnoteStoreUpdaterNonLedger &enote_store_updater_nonledger_inout);
 
 } //namespace sp

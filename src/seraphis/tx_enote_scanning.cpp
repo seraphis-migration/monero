@@ -32,25 +32,19 @@
 #include "tx_enote_scanning.h"
 
 //local headers
-#include "crypto/crypto.h"
-#include "device/device.hpp"
-#include "jamtis_core_utils.h"
 #include "ringct/rctTypes.h"
-#include "sp_crypto_utils.h"
-#include "tx_component_types.h"
 #include "tx_enote_finding_context.h"
 #include "tx_enote_record_types.h"
-#include "tx_enote_record_utils.h"
 #include "tx_enote_scanning_context.h"
-#include "tx_enote_store.h"
+#include "tx_enote_store_updater.h"
 
 //third party headers
+#include <boost/optional/optional.hpp>
 
 //standard headers
-#include <algorithm>
 #include <list>
 #include <unordered_map>
-#include <unordered_set>
+#include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
@@ -191,7 +185,7 @@ static bool contiguity_check(const ChainContiguityMarker &marker_A, const ChainC
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void update_alignment_marker(const SpEnoteStoreV1 &enote_store,
+static void update_alignment_marker(const EnoteStoreUpdaterLedger &enote_store_updater,
     const std::uint64_t chunk_start_height,
     const std::vector<rct::key> &chunk_block_ids,
     ChainContiguityMarker &alignment_marker_inout)
@@ -200,7 +194,7 @@ static void update_alignment_marker(const SpEnoteStoreV1 &enote_store,
     rct::key next_block_id;
     for (std::size_t block_index{0}; block_index < chunk_block_ids.size(); ++block_index)
     {
-        if (!enote_store.try_get_block_id(chunk_start_height + block_index, next_block_id))
+        if (!enote_store_updater.try_get_block_id(chunk_start_height + block_index, next_block_id))
             return;
 
         if (!(next_block_id == chunk_block_ids[block_index]))
@@ -212,178 +206,11 @@ static void update_alignment_marker(const SpEnoteStoreV1 &enote_store,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void process_chunk_new_record_update(const SpEnoteRecordV1 &new_enote_record,
-    const SpEnoteOriginContextV1 &new_record_origin_context,
-    const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
-    std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_inout,
-    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout,
-    std::unordered_set<rct::key> &txs_have_spent_enotes_inout)
-{
-    // 1. add new record to found enotes (or refresh if already there)
-    const crypto::key_image new_record_key_image{new_enote_record.m_key_image};
-
-    found_enote_records_inout[new_record_key_image].m_record = new_enote_record;
-
-    // 2. handle if this enote record is spent in this chunk
-    SpEnoteSpentContextV1 spent_context_update{};
-
-    auto record_is_spent_in_this_chunk =
-        std::find_if(
-            chunk_contextual_key_images.begin(),
-            chunk_contextual_key_images.end(),
-            [&](const SpContextualKeyImageSetV1 &contextual_key_image_set) -> bool
-            {
-                return contextual_key_image_set.has_key_image(new_record_key_image);
-            }
-        );
-
-    if (record_is_spent_in_this_chunk != chunk_contextual_key_images.end())
-    {
-        // a. record that the enote is spent in this chunk
-        found_spent_key_images_inout[new_record_key_image];
-
-        // b. update its spent context (update instead of assignment in case of duplicates)
-        try_update_enote_spent_context_v1(record_is_spent_in_this_chunk->m_spent_context,
-            found_spent_key_images_inout[new_record_key_image]);
-
-        // c. get the record's current spent context
-        spent_context_update = found_spent_key_images_inout[new_record_key_image];
-
-        // d. save the tx id of the tx where this enote was spent
-        txs_have_spent_enotes_inout.insert(spent_context_update.m_transaction_id);
-    }
-
-    // 3. update the contextual enote record's contexts
-    update_contextual_enote_record_contexts_v1(new_record_origin_context,
-        spent_context_update,
-        found_enote_records_inout[new_record_key_image]);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void process_chunk(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const crypto::secret_key &k_unlock_amounts,
-    const crypto::secret_key &k_find_received,
-    const crypto::secret_key &s_generate_address,
-    const jamtis::jamtis_address_tag_cipher_context &cipher_context,
-    const SpEnoteStoreV1 &enote_store,
-    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
-    const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
-    std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_inout,
-    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout)
-{
-    std::unordered_set<rct::key> txs_have_spent_enotes;
-
-    // 1. check if any owned enotes have been spent in this chunk (key image matches)
-    for (const SpContextualKeyImageSetV1 &contextual_key_image_set : chunk_contextual_key_images)
-    {
-        for (const crypto::key_image &key_image : contextual_key_image_set.m_key_images)
-        {
-            // a. check enote store
-            // b. check enote records found before this chunk (but not updated in enote store)
-            if (enote_store.has_enote_with_key_image(key_image) ||
-                found_enote_records_inout.find(key_image) != found_enote_records_inout.end())
-            {
-                // record the found spent key image
-                found_spent_key_images_inout[key_image];
-
-                // update its spent context (use update instead of assignment in case of duplicates)
-                try_update_enote_spent_context_v1(contextual_key_image_set.m_spent_context,
-                    found_spent_key_images_inout[key_image]);
-
-                // record tx id of tx that contains one of our key images (i.e. the tx spent one of our known enotes)
-                txs_have_spent_enotes.insert(contextual_key_image_set.m_spent_context.m_transaction_id);
-            }
-        }
-    }
-
-    // 2. check for owned enotes in this chunk (non-self-send pass)
-    SpEnoteRecordV1 new_enote_record;
-
-    for (const auto &tx_basic_records : chunk_basic_records_per_tx)
-    {
-        for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record : tx_basic_records.second)
-        {
-            try
-            {
-                if (try_get_enote_record_v1_plain(contextual_basic_record.m_record,
-                    wallet_spend_pubkey,
-                    k_view_balance,
-                    k_unlock_amounts,
-                    k_find_received,
-                    s_generate_address,
-                    cipher_context,
-                    new_enote_record))
-                {
-                    process_chunk_new_record_update(new_enote_record,
-                        contextual_basic_record.m_origin_context,
-                        chunk_contextual_key_images,
-                        found_enote_records_inout,
-                        found_spent_key_images_inout,
-                        txs_have_spent_enotes);
-                }
-            } catch (...) {}
-        }
-    }
-
-    // 3. check for owned enotes in this chunk (self-send passes)
-    // - for each tx in this chunk that spends one of our enotes, check if any of the basic records attached to that
-    //   tx contains a self-send enote owned by us
-    // - loop in case any self-send enotes acquired in this chunk are also spent in this chunk
-    std::unordered_set<rct::key> txs_have_spent_enotes_selfsend_passthrough;
-
-    while (txs_have_spent_enotes.size() > 0)
-    {
-        for (const rct::key &tx_with_spent_enotes : txs_have_spent_enotes)
-        {
-            // note: this should never throw since it should be caught in the chunk semantics check
-            CHECK_AND_ASSERT_THROW_MES(chunk_basic_records_per_tx.find(tx_with_spent_enotes) !=
-                    chunk_basic_records_per_tx.end(),
-                "enote scan process chunk (self-send passthroughs): tx with spent enotes not found in records map (bug).");
-
-            for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record :
-                chunk_basic_records_per_tx.at(tx_with_spent_enotes))
-            {
-                try
-                {
-                    if (try_get_enote_record_v1_selfsend(contextual_basic_record.m_record.m_enote,
-                        contextual_basic_record.m_record.m_enote_ephemeral_pubkey,
-                        contextual_basic_record.m_record.m_input_context,
-                        wallet_spend_pubkey,
-                        k_view_balance,
-                        s_generate_address,
-                        new_enote_record))
-                    {
-                        process_chunk_new_record_update(new_enote_record,
-                            contextual_basic_record.m_origin_context,
-                            chunk_contextual_key_images,
-                            found_enote_records_inout,
-                            found_spent_key_images_inout,
-                            txs_have_spent_enotes_selfsend_passthrough);
-                    }
-                } catch (...) {}
-            }
-        }
-
-        txs_have_spent_enotes = std::move(txs_have_spent_enotes_selfsend_passthrough);
-        txs_have_spent_enotes_selfsend_passthrough.clear();
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const crypto::secret_key &k_unlock_amounts,
-    const crypto::secret_key &k_find_received,
-    const crypto::secret_key &s_generate_address,
-    const jamtis::jamtis_address_tag_cipher_context &cipher_context,
-    const SpEnoteStoreV1 &enote_store,
-    const std::uint64_t first_contiguity_height,
+static ScanStatus process_ledger_for_full_refresh_onchain_pass(const std::uint64_t first_contiguity_height,
     EnoteScanProcessLedger &scan_process_inout,
+    EnoteStoreUpdaterLedger &enote_store_updater_inout,
     ChainContiguityMarker &contiguity_marker_inout,
     ChainContiguityMarker &alignment_marker_inout,
-    std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_inout,
-    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout,
     std::vector<rct::key> &scanned_block_ids_inout)
 {
     EnoteScanningChunkLedgerV1 new_onchain_chunk;
@@ -401,7 +228,7 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
             // update alignment marker if we are aligned with the end of the previous chunk
             if (contiguity_check(alignment_marker_inout, contiguity_marker_inout))
             {
-                update_alignment_marker(enote_store,
+                update_alignment_marker(enote_store_updater_inout,
                     new_onchain_chunk.m_start_height,
                     new_onchain_chunk.m_block_ids,
                     alignment_marker_inout);
@@ -429,17 +256,8 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
         contiguity_marker_inout.m_block_id = new_onchain_chunk.m_block_ids.back();
 
         // process the chunk (update found enote records and spent key images)
-        process_chunk(wallet_spend_pubkey,
-            k_view_balance,
-            k_unlock_amounts,
-            k_find_received,
-            s_generate_address,
-            cipher_context,
-            enote_store,
-            new_onchain_chunk.m_basic_records_per_tx,
-            new_onchain_chunk.m_contextual_key_images,
-            found_enote_records_inout,
-            found_spent_key_images_inout);
+        enote_store_updater_inout.process_chunk(new_onchain_chunk.m_basic_records_per_tx,
+            new_onchain_chunk.m_contextual_key_images);
 
         // add new block ids
         scanned_block_ids_inout.insert(scanned_block_ids_inout.end(),
@@ -480,32 +298,14 @@ static ScanStatus process_ledger_for_full_refresh_onchain_pass(const rct::key &w
 // IMPORTANT: chunk processing can't be parallelized since key image checks are sequential/cumulative
 // - the scan_process can internally collect chunks in parallel
 //-------------------------------------------------------------------------------------------------------------------
-static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const std::uint64_t max_chunk_size,
-    const SpEnoteStoreV1 &enote_store,
+static ScanStatus process_ledger_for_full_refresh(const std::uint64_t max_chunk_size,
     EnoteScanningContextLedger &scanning_context_inout,
+    EnoteStoreUpdaterLedger &enote_store_updater_inout,
     ChainContiguityMarker &contiguity_marker_inout,
     ChainContiguityMarker &alignment_marker_inout,
-    std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_out,
-    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_out,
     std::vector<rct::key> &scanned_block_ids_out)
 {
-    found_enote_records_out.clear();
-    found_spent_key_images_out.clear();
     scanned_block_ids_out.clear();
-
-    // prepare for chunk processing
-    crypto::secret_key k_unlock_amounts;
-    crypto::secret_key k_find_received;
-    crypto::secret_key s_generate_address;
-    crypto::secret_key s_cipher_tag;
-    jamtis::make_jamtis_unlockamounts_key(k_view_balance, k_unlock_amounts);
-    jamtis::make_jamtis_findreceived_key(k_view_balance, k_find_received);
-    jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
-    jamtis::make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
-
-    const jamtis::jamtis_address_tag_cipher_context cipher_context{rct::sk2rct(s_cipher_tag)};
 
     // set
     const std::uint64_t first_contiguity_height{contiguity_marker_inout.m_block_height};
@@ -515,19 +315,11 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
 
     // on-chain main loop
     const ScanStatus scan_status_first_onchain_pass{
-        process_ledger_for_full_refresh_onchain_pass(wallet_spend_pubkey,
-            k_view_balance,
-            k_unlock_amounts,
-            k_find_received,
-            s_generate_address,
-            cipher_context,
-            enote_store,
-            first_contiguity_height,
+        process_ledger_for_full_refresh_onchain_pass(first_contiguity_height,
             scan_process,
+            enote_store_updater_inout,
             contiguity_marker_inout,
             alignment_marker_inout,
-            found_enote_records_out,
-            found_spent_key_images_out,
             scanned_block_ids_out)
         };
 
@@ -540,18 +332,9 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
 
     if (scan_process.try_get_unconfirmed_chunk(unconfirmed_chunk))
     {
-        // process the chunk (update found enote records and spent key images)
-        process_chunk(wallet_spend_pubkey,
-            k_view_balance,
-            k_unlock_amounts,
-            k_find_received,
-            s_generate_address,
-            cipher_context,
-            enote_store,
-            unconfirmed_chunk.m_basic_records_per_tx,
-            unconfirmed_chunk.m_contextual_key_images,
-            found_enote_records_out,
-            found_spent_key_images_out);
+        // process the chunk
+        enote_store_updater_inout.process_chunk(unconfirmed_chunk.m_basic_records_per_tx,
+            unconfirmed_chunk.m_contextual_key_images);
     }
 
     // on-chain follow-up pass
@@ -560,19 +343,11 @@ static ScanStatus process_ledger_for_full_refresh(const rct::key &wallet_spend_p
     //   txs not seen when scanning unconfirmed txs (sneaky txs)
     // - want scanned enotes to be chronologically contiguous (better for the unconfirmed enotes to be stale
     //   than on-chain enotes)
-    return process_ledger_for_full_refresh_onchain_pass(wallet_spend_pubkey,
-        k_view_balance,
-        k_unlock_amounts,
-        k_find_received,
-        s_generate_address,
-        cipher_context,
-        enote_store,
-        first_contiguity_height,
+    return process_ledger_for_full_refresh_onchain_pass(first_contiguity_height,
         scan_process,
+        enote_store_updater_inout,
         contiguity_marker_inout,
         alignment_marker_inout,
-        found_enote_records_out,
-        found_spent_key_images_out,
         scanned_block_ids_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -637,103 +412,12 @@ void check_v1_enote_scan_chunk_nonledger_semantics_v1(const EnoteScanningChunkNo
         expected_spent_status);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
-    const std::uint64_t block_height,
-    const rct::key &transaction_id,
-    const std::uint64_t total_enotes_before_tx,
-    const rct::key &input_context,
-    const SpTxSupplementV1 &tx_supplement,
-    const std::vector<SpEnoteV1> &enotes_in_tx,
-    const SpEnoteOriginStatus origin_status,
-    hw::device &hwdev,
-    std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &basic_records_per_tx_inout)
-{
-    if (tx_supplement.m_output_enote_ephemeral_pubkeys.size() == 0)
-        return false;
-
-    // scan each enote in the tx
-    std::size_t ephemeral_pubkey_index{0};
-    crypto::key_derivation temp_DH_derivation;
-    std::list<SpContextualBasicEnoteRecordV1> temp_contextual_record;
-    bool found_an_enote{false};
-
-    for (std::size_t enote_index{0}; enote_index < enotes_in_tx.size(); ++enote_index)
-    {
-        // there can be fewer ephemeral pubkeys than enotes
-        // - when we get to the end, keep using the last one
-        if (enote_index < tx_supplement.m_output_enote_ephemeral_pubkeys.size())
-        {
-            ephemeral_pubkey_index = enote_index;
-            hwdev.generate_key_derivation(
-                rct::rct2pk(tx_supplement.m_output_enote_ephemeral_pubkeys[ephemeral_pubkey_index]),
-                k_find_received,
-                temp_DH_derivation);
-        }
-
-        // prepare record shuttle
-        if (temp_contextual_record.size() == 0)
-            temp_contextual_record.emplace_back();
-
-        // find-receive scan the enote (in try block in case enote is malformed)
-        try
-        {
-            if (try_get_basic_enote_record_v1(enotes_in_tx[enote_index],
-                tx_supplement.m_output_enote_ephemeral_pubkeys[ephemeral_pubkey_index],
-                input_context,
-                temp_DH_derivation,
-                temp_contextual_record.back().m_record))
-            {
-                temp_contextual_record.back().m_origin_context =
-                    SpEnoteOriginContextV1{
-                            .m_block_height = block_height,
-                            .m_transaction_id = transaction_id,
-                            .m_enote_ledger_index = total_enotes_before_tx + enote_index,
-                            .m_origin_status = origin_status,
-                            .m_memo = tx_supplement.m_tx_extra
-                        };
-
-                // note: it is possible for enotes with duplicate onetime addresses to be added here; it is assumed the
-                //       upstream caller will be able to handle that case without problems
-                auto &basic_records_for_tx = basic_records_per_tx_inout[transaction_id];
-                basic_records_for_tx.splice(basic_records_for_tx.end(),
-                    temp_contextual_record,
-                    temp_contextual_record.begin());
-
-                found_an_enote = true;
-            }
-        } catch (...) {}
-    }
-
-    return found_an_enote;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void collect_key_images_from_tx(const std::uint64_t block_height,
-    const rct::key &transaction_id,
-    const std::vector<crypto::key_image> &key_images_in_tx,
-    const SpEnoteSpentStatus spent_status,
-    std::list<SpContextualKeyImageSetV1> &contextual_key_images_inout)
-{
-    contextual_key_images_inout.emplace_back(
-            SpContextualKeyImageSetV1{
-                .m_key_images = key_images_in_tx,
-                .m_spent_context =
-                    SpEnoteSpentContextV1{
-                        .m_block_height = block_height,
-                        .m_transaction_id = transaction_id,
-                        .m_spent_status = spent_status
-                    }
-            }
-        );
-}
-//-------------------------------------------------------------------------------------------------------------------
 void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
     EnoteScanningContextLedger &scanning_context_inout,
-    SpEnoteStoreV1 &enote_store_inout)
+    EnoteStoreUpdaterLedger &enote_store_updater_inout)
 {
     // we want to scan the first block after the last block that we scanned
-    std::uint64_t desired_first_block{enote_store_inout.get_top_block_height() + 1};
+    std::uint64_t desired_first_block{enote_store_updater_inout.get_top_block_height() + 1};
 
     // scan attempts
     ScanStatus scan_status{ScanStatus::NEED_FULLSCAN};
@@ -783,20 +467,20 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
         // 4. initial block to scan = max(desired first block - reorg depth, enote store's min scan height)
         std::uint64_t initial_refresh_height;
 
-        if (desired_first_block >= reorg_avoidance_depth + enote_store_inout.get_refresh_height())
+        if (desired_first_block >= reorg_avoidance_depth + enote_store_updater_inout.get_refresh_height())
             initial_refresh_height = desired_first_block - reorg_avoidance_depth;
         else
-            initial_refresh_height = enote_store_inout.get_refresh_height();
+            initial_refresh_height = enote_store_updater_inout.get_refresh_height();
 
         // 5. set initial contiguity marker (highest block known to be contiguous with the prefix of the first block to scan)
         ChainContiguityMarker contiguity_marker;
         contiguity_marker.m_block_height = initial_refresh_height - 1;
 
-        if (contiguity_marker.m_block_height != enote_store_inout.get_refresh_height() - 1)
+        if (contiguity_marker.m_block_height != enote_store_updater_inout.get_refresh_height() - 1)
         {
             // getting a block id should always succeed if we are starting past the prefix block of the enote store
             contiguity_marker.m_block_id = rct::zero();
-            CHECK_AND_ASSERT_THROW_MES(enote_store_inout.try_get_block_id(initial_refresh_height - 1,
+            CHECK_AND_ASSERT_THROW_MES(enote_store_updater_inout.try_get_block_id(initial_refresh_height - 1,
                     *(contiguity_marker.m_block_id)),
                 "refresh ledger for enote store: could not get block id for start of scanning but a block id was "
                 "expected (bug).");
@@ -809,20 +493,14 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
 
         /// scan
         // 1. process the ledger
-        std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> found_enote_records;
-        std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> found_spent_key_images;
-
+        enote_store_updater_inout.start_chunk_handling_session();
         std::vector<rct::key> scanned_block_ids;
 
-        scan_status = process_ledger_for_full_refresh(wallet_spend_pubkey,
-            k_view_balance,
-            config.m_max_chunk_size,
-            enote_store_inout,
+        scan_status = process_ledger_for_full_refresh(config.m_max_chunk_size,
             scanning_context_inout,
+            enote_store_updater_inout,
             contiguity_marker,
             alignment_marker,
-            found_enote_records,
-            found_spent_key_images,
             scanned_block_ids);
 
         // 2. update desired start height for if there needs to be another scan attempt
@@ -855,25 +533,19 @@ void refresh_enote_store_ledger(const RefreshLedgerEnoteStoreConfig &config,
             };
 
         // 3. update the enote store
-        enote_store_inout.update_with_records_from_ledger(alignment_marker.m_block_height + 1,
+        enote_store_updater_inout.end_chunk_handling_session(alignment_marker.m_block_height + 1,
             alignment_marker.m_block_id ? *(alignment_marker.m_block_id) : rct::zero(),
-            found_enote_records,
-            found_spent_key_images,
             scanned_block_ids_cropped);
     }
 
     CHECK_AND_ASSERT_THROW_MES(scan_status == ScanStatus::DONE, "refresh ledger for enote store: refreshing failed!");
 }
 //-------------------------------------------------------------------------------------------------------------------
-void refresh_enote_store_offchain(const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
-    const EnoteFindingContextOffchain &enote_finding_context,
-    SpEnoteStoreV1 &enote_store_inout)
+void refresh_enote_store_offchain(const EnoteFindingContextOffchain &enote_finding_context,
+    EnoteStoreUpdaterNonLedger &enote_store_updater_inout)
 {
-    // 1. get a scan chunk and process it
+    // get a scan chunk and process it
     EnoteScanningChunkNonLedgerV1 offchain_chunk;
-    std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> found_enote_records;
-    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> found_spent_key_images;
 
     if (enote_finding_context.try_get_offchain_chunk(offchain_chunk))
     {
@@ -882,56 +554,22 @@ void refresh_enote_store_offchain(const rct::key &wallet_spend_pubkey,
             SpEnoteOriginStatus::OFFCHAIN,
             SpEnoteSpentStatus::SPENT_OFFCHAIN);
 
-        // prepare for chunk processing
-        crypto::secret_key k_unlock_amounts;
-        crypto::secret_key k_find_received;
-        crypto::secret_key s_generate_address;
-        crypto::secret_key s_cipher_tag;
-        jamtis::make_jamtis_unlockamounts_key(k_view_balance, k_unlock_amounts);
-        jamtis::make_jamtis_findreceived_key(k_view_balance, k_find_received);
-        jamtis::make_jamtis_generateaddress_secret(k_view_balance, s_generate_address);
-        jamtis::make_jamtis_ciphertag_secret(s_generate_address, s_cipher_tag);
-
-        const jamtis::jamtis_address_tag_cipher_context cipher_context{rct::sk2rct(s_cipher_tag)};
-
-        // process the chunk
-        process_chunk(wallet_spend_pubkey,
-            k_view_balance,
-            k_unlock_amounts,
-            k_find_received,
-            s_generate_address,
-            cipher_context,
-            enote_store_inout,
-            offchain_chunk.m_basic_records_per_tx,
-            offchain_chunk.m_contextual_key_images,
-            found_enote_records,
-            found_spent_key_images);
+        // process and handle the chunk
+        enote_store_updater_inout.process_and_handle_chunk(offchain_chunk.m_basic_records_per_tx,
+            offchain_chunk.m_contextual_key_images);
     }
-
-    // 2. refresh the enote store with new offchain context
-    enote_store_inout.update_with_records_from_offchain(found_enote_records, found_spent_key_images);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void refresh_enote_store_full(const RefreshLedgerEnoteStoreConfig &ledger_refresh_config,
-    const rct::key &wallet_spend_pubkey,
-    const crypto::secret_key &k_view_balance,
     const EnoteFindingContextOffchain &enote_finding_context,
     EnoteScanningContextLedger &scanning_context_inout,
-    SpEnoteStoreV1 &enote_store_inout)
+    EnoteStoreUpdaterLedger &enote_store_updater_ledger_inout,
+    EnoteStoreUpdaterNonLedger &enote_store_updater_nonledger_inout)
 {
     refresh_enote_store_ledger(ledger_refresh_config,
-        wallet_spend_pubkey,
-        k_view_balance,
         scanning_context_inout,
-        enote_store_inout);
-    refresh_enote_store_offchain(wallet_spend_pubkey, k_view_balance, enote_finding_context, enote_store_inout);
+        enote_store_updater_ledger_inout);
+    refresh_enote_store_offchain(enote_finding_context, enote_store_updater_nonledger_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
-
-/*
-- scanning
-    - EnoteScanChunkProcessingContext: manages user keys + enote store context + processed chunks
-        - encapsulate processing to facilitate full-view wallet vs payment validator distinction
-*/
-
 } //namespace sp
