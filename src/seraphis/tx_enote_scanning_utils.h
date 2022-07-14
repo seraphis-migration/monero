@@ -71,6 +71,13 @@ void collect_key_images_from_tx(const std::uint64_t block_height,
     std::list<SpContextualKeyImageSetV1> &contextual_key_images_inout);
 
 //todo
+void process_chunk_intermediate(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_unlock_amounts,
+    const crypto::secret_key &k_find_received,
+    const crypto::secret_key &s_generate_address,
+    const jamtis::jamtis_address_tag_cipher_context &cipher_context,
+    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records_inout);
 void process_chunk_full(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &k_unlock_amounts,

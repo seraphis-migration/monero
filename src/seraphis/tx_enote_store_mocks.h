@@ -127,4 +127,54 @@ protected:
     std::vector<rct::key> m_block_ids;
 };
 
+////
+// SpEnoteStoreMockPaymentValidatorV1
+///
+class SpEnoteStoreMockPaymentValidatorV1 final
+{
+public:
+//constructors
+    /// default constructor
+    SpEnoteStoreMockPaymentValidatorV1() = default;
+
+    /// normal constructor
+    SpEnoteStoreMockPaymentValidatorV1(const std::uint64_t refresh_height) :
+        m_refresh_height{refresh_height}
+    {}
+
+//member functions
+    /// add a record
+    void add_record(const SpContextualIntermediateEnoteRecordV1 &new_record);
+
+    /// update the store with enote records found in the ledger, with associated context
+    void update_with_records_from_ledger(const std::uint64_t first_new_block,
+        const rct::key &alignment_block_id,
+        const std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records,
+        const std::vector<rct::key> &new_block_ids);
+
+    /// update the store with enote records found off-chain, with associated context
+    void update_with_records_from_offchain(
+        const std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records);
+
+    /// try to get the recorded block id for a given height
+    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const;
+
+    /// get height of first block the enote store cares about
+    std::uint64_t get_refresh_height() const { return m_refresh_height; }
+    /// get height of heighest recorded block (refresh height - 1 if no recorded blocks)
+    std::uint64_t get_top_block_height() const { return m_refresh_height + m_block_ids.size() - 1; }
+    /// get current total amount received using specified origin statuses
+    boost::multiprecision::uint128_t get_received_sum(const std::unordered_set<SpEnoteOriginStatus> &origin_statuses) const;
+
+//member variables
+protected:
+    /// the enotes
+    std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> m_mapped_contextual_enote_records;
+
+    /// refresh height
+    std::uint64_t m_refresh_height{0};
+    /// stored block ids in range [refresh height, end of known chain]
+    std::vector<rct::key> m_block_ids;
+};
+
 } //namespace sp

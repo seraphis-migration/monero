@@ -69,7 +69,7 @@ public:
     virtual void process_chunk(
         const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
         const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images) = 0;
-    /// end the current chunk-handling session (no-op if no session in progress)
+    /// end the current chunk-handling session
     virtual void end_chunk_handling_session(const std::uint64_t first_new_block,
         const rct::key &alignment_block_id,
         const std::vector<rct::key> &new_block_ids) = 0;

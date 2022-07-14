@@ -60,6 +60,21 @@ namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void process_chunk_new_intermediate_record_update(const SpIntermediateEnoteRecordV1 &new_enote_record,
+    const SpEnoteOriginContextV1 &new_record_origin_context,
+    std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records_inout)
+{
+    // 1. add new record to found enotes (or refresh if already there)
+    const rct::key new_record_onetime_address{new_enote_record.m_enote.m_core.m_onetime_address};
+
+    found_enote_records_inout[new_record_onetime_address].m_record = new_enote_record;
+
+    // 2. update the contextual enote record's origin context
+    try_update_enote_origin_context_v1(new_record_origin_context,
+        found_enote_records_inout[new_record_onetime_address].m_origin_context);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void process_chunk_new_record_update(const SpEnoteRecordV1 &new_enote_record,
     const SpEnoteOriginContextV1 &new_record_origin_context,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
@@ -195,6 +210,40 @@ void collect_key_images_from_tx(const std::uint64_t block_height,
                     }
             }
         );
+}
+//-------------------------------------------------------------------------------------------------------------------
+void process_chunk_intermediate(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_unlock_amounts,
+    const crypto::secret_key &k_find_received,
+    const crypto::secret_key &s_generate_address,
+    const jamtis::jamtis_address_tag_cipher_context &cipher_context,
+    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records_inout)
+{
+    // check for owned enotes in this chunk (non-self-send intermediate scanning pass)
+    SpIntermediateEnoteRecordV1 new_enote_record;
+
+    for (const auto &tx_basic_records : chunk_basic_records_per_tx)
+    {
+        for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record : tx_basic_records.second)
+        {
+            try
+            {
+                if (try_get_intermediate_enote_record_v1(contextual_basic_record.m_record,
+                    wallet_spend_pubkey,
+                    k_unlock_amounts,
+                    k_find_received,
+                    s_generate_address,
+                    cipher_context,
+                    new_enote_record))
+                {
+                    process_chunk_new_intermediate_record_update(new_enote_record,
+                        contextual_basic_record.m_origin_context,
+                        found_enote_records_inout);
+                }
+            } catch (...) {}
+        }
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 void process_chunk_full(const rct::key &wallet_spend_pubkey,

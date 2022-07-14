@@ -71,37 +71,22 @@ public:
 
 //member functions
     /// start a chunk-handling session (if previous session wasn't ended, discard it)
-    void start_chunk_handling_session() override
-    {
-        m_found_enote_records.clear();
-        m_found_spent_key_images.clear();
-    }
-
+    void start_chunk_handling_session() override;
     /// process a chunk of basic enote records and save the results
     void process_chunk(
         const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
         const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images) override;
-
-    /// end the current chunk-handling session (no-op if no session in progress)
+    /// end the current chunk-handling session
     void end_chunk_handling_session(const std::uint64_t first_new_block,
         const rct::key &alignment_block_id,
         const std::vector<rct::key> &new_block_ids) override;
 
     /// try to get the recorded block id for a given height
-    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const override
-    {
-        return m_enote_store.try_get_block_id(block_height, block_id_out);
-    }
+    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const override;
     /// get height of first block the enote store cares about
-    std::uint64_t get_refresh_height() const override
-    {
-        return m_enote_store.get_refresh_height();
-    }
+    std::uint64_t get_refresh_height() const override;
     /// get height of heighest recorded block (refresh height - 1 if no recorded blocks)
-    std::uint64_t get_top_block_height() const override
-    {
-        return m_enote_store.get_top_block_height();
-    }
+    std::uint64_t get_top_block_height() const override;
 
 //member variables
 private:
@@ -152,6 +137,56 @@ private:
     crypto::secret_key m_s_generate_address;
     crypto::secret_key m_s_cipher_tag;
     std::unique_ptr<jamtis::jamtis_address_tag_cipher_context> m_cipher_context;
+};
+
+class EnoteStoreUpdaterLedgerMockIntermediate final : public EnoteStoreUpdaterLedger
+{
+public:
+//constructors
+    /// normal constructor
+    EnoteStoreUpdaterLedgerMockIntermediate(const rct::key &wallet_spend_pubkey,
+        const crypto::secret_key &k_unlock_amounts,
+        const crypto::secret_key &k_find_received,
+        const crypto::secret_key &s_generate_address,
+        SpEnoteStoreMockPaymentValidatorV1 &enote_store);
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [reference wrapper])
+    EnoteStoreUpdaterLedgerMockIntermediate& operator=(EnoteStoreUpdaterLedgerMockIntermediate&&) = delete;
+
+//member functions
+    /// start a chunk-handling session (if previous session wasn't ended, discard it)
+    void start_chunk_handling_session() override;
+    /// process a chunk of basic enote records and save the results (note: ignore contextual key images)
+    void process_chunk(
+        const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+        const std::list<SpContextualKeyImageSetV1>&) override;
+    /// end the current chunk-handling session
+    void end_chunk_handling_session(const std::uint64_t first_new_block,
+        const rct::key &alignment_block_id,
+        const std::vector<rct::key> &new_block_ids) override;
+
+    /// try to get the recorded block id for a given height
+    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const override;
+    /// get height of first block the enote store cares about
+    std::uint64_t get_refresh_height() const override;
+    /// get height of heighest recorded block (refresh height - 1 if no recorded blocks)
+    std::uint64_t get_top_block_height() const override;
+
+//member variables
+private:
+    /// static data
+    const rct::key &m_wallet_spend_pubkey;
+    const crypto::secret_key &m_k_unlock_amounts;
+    const crypto::secret_key &m_k_find_received;
+    const crypto::secret_key &m_s_generate_address;
+    SpEnoteStoreMockPaymentValidatorV1 &m_enote_store;
+
+    crypto::secret_key m_s_cipher_tag;
+    std::unique_ptr<jamtis::jamtis_address_tag_cipher_context> m_cipher_context;
+
+    /// session data
+    std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> m_found_enote_records;
 };
 
 } //namespace sp

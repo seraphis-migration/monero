@@ -76,12 +76,14 @@ rct::xmr_amount FeeCalculatorSpTxSquashedV1::get_fee(const std::size_t fee_per_w
     const std::size_t num_inputs,
     const std::size_t num_outputs) const
 {
-    const std::size_t weight{SpTxSquashedV1::get_weight(num_inputs,
-        num_outputs,
-        m_ref_set_decomp_m,
-        m_ref_set_decomp_n,
-        m_num_bin_members,
-        m_tx_extra)};
+    const std::size_t weight{
+            SpTxSquashedV1::get_weight(num_inputs,
+                num_outputs,
+                m_ref_set_decomp_m,
+                m_ref_set_decomp_n,
+                m_num_bin_members,
+                m_tx_extra)
+        };
 
     return get_fee(fee_per_weight, weight);
 }

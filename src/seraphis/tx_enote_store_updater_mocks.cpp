@@ -69,6 +69,12 @@ EnoteStoreUpdaterLedgerMock::EnoteStoreUpdaterLedgerMock(const rct::key &wallet_
     m_cipher_context = std::make_unique<jamtis::jamtis_address_tag_cipher_context>(rct::sk2rct(m_s_cipher_tag));
 }
 //-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMock::start_chunk_handling_session()
+{
+    m_found_enote_records.clear();
+    m_found_spent_key_images.clear();
+}
+//-------------------------------------------------------------------------------------------------------------------
 void EnoteStoreUpdaterLedgerMock::process_chunk(
     const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images)
@@ -101,6 +107,21 @@ void EnoteStoreUpdaterLedgerMock::end_chunk_handling_session(const std::uint64_t
 
     m_found_enote_records.clear();
     m_found_spent_key_images.clear();
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool EnoteStoreUpdaterLedgerMock::try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const
+{
+    return m_enote_store.try_get_block_id(block_height, block_id_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t EnoteStoreUpdaterLedgerMock::get_refresh_height() const
+{
+    return m_enote_store.get_refresh_height();
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t EnoteStoreUpdaterLedgerMock::get_top_block_height() const
+{
+    return m_enote_store.get_top_block_height();
 }
 //-------------------------------------------------------------------------------------------------------------------
 EnoteStoreUpdaterNonLedgerMock::EnoteStoreUpdaterNonLedgerMock(const rct::key &wallet_spend_pubkey,
@@ -141,6 +162,68 @@ void EnoteStoreUpdaterNonLedgerMock::process_and_handle_chunk(
         found_spent_key_images);
 
     m_enote_store.update_with_records_from_offchain(found_enote_records, found_spent_key_images);
+}
+//-------------------------------------------------------------------------------------------------------------------
+EnoteStoreUpdaterLedgerMockIntermediate::EnoteStoreUpdaterLedgerMockIntermediate(const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_unlock_amounts,
+    const crypto::secret_key &k_find_received,
+    const crypto::secret_key &s_generate_address,
+    SpEnoteStoreMockPaymentValidatorV1 &enote_store) :
+        m_wallet_spend_pubkey{wallet_spend_pubkey},
+        m_k_unlock_amounts{k_unlock_amounts},
+        m_k_find_received{k_find_received},
+        m_s_generate_address{s_generate_address},
+        m_enote_store{enote_store}
+{
+    jamtis::make_jamtis_ciphertag_secret(m_s_generate_address, m_s_cipher_tag);
+
+    m_cipher_context = std::make_unique<jamtis::jamtis_address_tag_cipher_context>(rct::sk2rct(m_s_cipher_tag));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMockIntermediate::start_chunk_handling_session()
+{
+    m_found_enote_records.clear();
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMockIntermediate::process_chunk(
+    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::list<SpContextualKeyImageSetV1>&)
+{
+    process_chunk_intermediate(m_wallet_spend_pubkey,
+        m_k_unlock_amounts,
+        m_k_find_received,
+        m_s_generate_address,
+        *m_cipher_context,
+        chunk_basic_records_per_tx,
+        m_found_enote_records);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMockIntermediate::end_chunk_handling_session(const std::uint64_t first_new_block,
+    const rct::key &alignment_block_id,
+    const std::vector<rct::key> &new_block_ids)
+{
+    m_enote_store.update_with_records_from_ledger(first_new_block,
+        alignment_block_id,
+        m_found_enote_records,
+        new_block_ids);
+
+    m_found_enote_records.clear();
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool EnoteStoreUpdaterLedgerMockIntermediate::try_get_block_id(const std::uint64_t block_height,
+    rct::key &block_id_out) const
+{
+    return m_enote_store.try_get_block_id(block_height, block_id_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t EnoteStoreUpdaterLedgerMockIntermediate::get_refresh_height() const
+{
+    return m_enote_store.get_refresh_height();
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t EnoteStoreUpdaterLedgerMockIntermediate::get_top_block_height() const
+{
+    return m_enote_store.get_top_block_height();
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

@@ -211,11 +211,22 @@ struct SpContextualIntermediateEnoteRecordV1 final
     /// info about where the enote was found
     SpEnoteOriginContextV1 m_origin_context;
 
+    /// get this record's onetime address
+    void get_onetime_address(rct::key &onetime_address_out) const
+    {
+        onetime_address_out = m_record.m_enote.m_core.m_onetime_address;
+    }
+
     /// onetime address equivalence
     static bool same_destination(const SpContextualIntermediateEnoteRecordV1 &record1,
         const SpContextualIntermediateEnoteRecordV1 &record2)
     {
-        return record1.m_record.m_enote.m_core.m_onetime_address == record2.m_record.m_enote.m_core.m_onetime_address;
+        rct::key onetime_address_1;
+        rct::key onetime_address_2;
+        record1.get_onetime_address(onetime_address_1);
+        record2.get_onetime_address(onetime_address_2);
+
+        return onetime_address_1 == onetime_address_2;
     }
 
     /// get this enote's amount
