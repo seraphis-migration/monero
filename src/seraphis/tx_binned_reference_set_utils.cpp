@@ -163,6 +163,14 @@ static void make_normalized_bin_members(const SpBinnedReferenceSetConfigV1 &bin_
     CHECK_AND_ASSERT_THROW_MES(bin_config.m_num_bin_members > 0,
         "making normalized bin members: zero bin members were requested (at least one expected).");
 
+    // early return case
+    if (bin_width == 1)
+    {
+        members_of_bin_out.clear();
+        members_of_bin_out.resize(bin_config.m_num_bin_members, 0);
+        return;
+    }
+
     // set clip allowed max to be a large multiple of the bin width (minus 1 since we are zero-basis),
     //   to avoid bias in the bin members
     // example 1:
