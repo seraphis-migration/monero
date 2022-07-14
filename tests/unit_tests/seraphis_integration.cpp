@@ -219,6 +219,7 @@ static void construct_tx_for_mock_ledger_v1(const sp::jamtis::jamtis_mock_keys &
         fee_per_tx_weight,
         max_inputs,
         std::move(normal_payment_proposals),
+        std::vector<JamtisPaymentProposalSelfSendV1>{},
         TxExtra{},
         tx_proposal,
         input_ledger_mappings)));

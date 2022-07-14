@@ -426,13 +426,12 @@ bool try_make_v1_tx_proposal_for_transfer_v1(const crypto::secret_key &k_view_ba
     const rct::xmr_amount fee_per_tx_weight,
     const std::size_t max_inputs,
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     TxExtra partial_memo_for_tx,
     SpTxProposalV1 &tx_proposal_out,
     std::unordered_map<crypto::key_image, std::uint64_t> &input_ledger_mappings_out)
 {
     // try to select inputs for the tx
-    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals;  //no predefined self-send payments
-
     const OutputSetContextForInputSelectionV1 output_set_context{
             normal_payment_proposals,
             selfsend_payment_proposals

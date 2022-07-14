@@ -152,6 +152,7 @@ void make_v1_tx_proposal_v1(std::vector<jamtis::JamtisPaymentProposalV1> normal_
 * param: fee_per_tx_weight -
 * param: max_inputs -
 * param: normal_payment_proposals -
+* param: selfsend_payment_proposals -
 * param: partial_memo_for_tx -
 * outparam: tx_proposal_out -
 * outparam: input_ledger_mappings_out -
@@ -164,6 +165,7 @@ bool try_make_v1_tx_proposal_for_transfer_v1(const crypto::secret_key &k_view_ba
     const rct::xmr_amount fee_per_tx_weight,
     const std::size_t max_inputs,
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payment_proposals,
     TxExtra partial_memo_for_tx,
     SpTxProposalV1 &tx_proposal_out,
     std::unordered_map<crypto::key_image, std::uint64_t> &input_ledger_mappings_out);
