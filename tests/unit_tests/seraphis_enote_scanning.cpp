@@ -276,6 +276,28 @@ static void refresh_user_enote_store(const sp::jamtis::jamtis_mock_keys &user_ke
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void refresh_user_enote_store_PV(const sp::jamtis::jamtis_mock_keys &user_keys,
+    const sp::RefreshLedgerEnoteStoreConfig &refresh_config,
+    const sp::MockLedgerContext &ledger_context,
+    sp::SpEnoteStoreMockPaymentValidatorV1 &user_enote_store_inout)
+{
+    using namespace sp;
+    using namespace jamtis;
+
+    const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.k_fr};
+    EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
+    EnoteStoreUpdaterLedgerMockIntermediate enote_store_updater{
+            user_keys.K_1_base,
+            user_keys.k_ua,
+            user_keys.k_fr,
+            user_keys.s_ga,
+            user_enote_store_inout
+        };
+
+    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config, enote_scanning_context, enote_store_updater));
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void construct_tx_for_mock_ledger_v1(const sp::jamtis::jamtis_mock_keys &local_user_keys,
     const sp::InputSelectorV1 &local_user_input_selector,
     const sp::FeeCalculator &tx_fee_calculator,
@@ -673,9 +695,10 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
 
     /// tests
 
-    // 1. one unconfirmed tx (no change), then commit it
+    // 1. one unconfirmed tx (no change), then commit it (include payment validator checks)
     MockLedgerContext ledger_context_test1;
     SpEnoteStoreMockV1 enote_store_A_test1{0};
+    SpEnoteStoreMockPaymentValidatorV1 enote_store_PV_A_test1{0};
     SpEnoteStoreMockV1 enote_store_B_test1{0};
     const sp::InputSelectorMockV1 input_selector_A_test1{enote_store_A_test1};
     const sp::InputSelectorMockV1 input_selector_B_test1{enote_store_B_test1};
@@ -694,6 +717,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
         ledger_context_test1);
 
     refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test1, enote_store_A_test1);
+    refresh_user_enote_store_PV(user_keys_A, refresh_config, ledger_context_test1, enote_store_PV_A_test1);
     refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test1, enote_store_B_test1);
 
     ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
@@ -702,6 +726,9 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
         {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 2);
+    ASSERT_TRUE(enote_store_PV_A_test1.get_received_sum({SpEnoteOriginStatus::OFFCHAIN,
+        SpEnoteOriginStatus::UNCONFIRMED}) == 0);  //can't find change
+    ASSERT_TRUE(enote_store_PV_A_test1.get_received_sum({SpEnoteOriginStatus::ONCHAIN}) == 4);
     ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
     ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
@@ -711,6 +738,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
 
     ledger_context_test1.commit_unconfirmed_txs_v1(rct::key{}, SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
     refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test1, enote_store_A_test1);
+    refresh_user_enote_store_PV(user_keys_A, refresh_config, ledger_context_test1, enote_store_PV_A_test1);
     refresh_user_enote_store(user_keys_B, refresh_config, ledger_context_test1, enote_store_B_test1);
 
     ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
@@ -719,6 +747,9 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
         {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 2);
+    ASSERT_TRUE(enote_store_PV_A_test1.get_received_sum({SpEnoteOriginStatus::OFFCHAIN,
+        SpEnoteOriginStatus::UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_PV_A_test1.get_received_sum({SpEnoteOriginStatus::ONCHAIN}) == 4); //coinbase + can't find change
     ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
     ASSERT_TRUE(enote_store_B_test1.get_balance({SpEnoteOriginStatus::UNCONFIRMED},

@@ -189,4 +189,38 @@ private:
     std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> m_found_enote_records;
 };
 
+class EnoteStoreUpdaterNonLedgerMockIntermediate final : public EnoteStoreUpdaterNonLedger
+{
+public:
+//constructors
+    /// normal constructor
+    EnoteStoreUpdaterNonLedgerMockIntermediate(const rct::key &wallet_spend_pubkey,
+        const crypto::secret_key &k_unlock_amounts,
+        const crypto::secret_key &k_find_received,
+        const crypto::secret_key &s_generate_address,
+        SpEnoteStoreMockPaymentValidatorV1 &enote_store);
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [reference wrapper])
+    EnoteStoreUpdaterNonLedgerMockIntermediate& operator=(EnoteStoreUpdaterNonLedgerMockIntermediate&&) = delete;
+
+//member functions
+    /// process a chunk of basic enote records and handle the results
+    void process_and_handle_chunk(
+        const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+        const std::list<SpContextualKeyImageSetV1>&) override;
+
+//member variables
+private:
+    /// static data
+    const rct::key &m_wallet_spend_pubkey;
+    const crypto::secret_key &m_k_unlock_amounts;
+    const crypto::secret_key &m_k_find_received;
+    const crypto::secret_key &m_s_generate_address;
+    SpEnoteStoreMockPaymentValidatorV1 &m_enote_store;
+
+    crypto::secret_key m_s_cipher_tag;
+    std::unique_ptr<jamtis::jamtis_address_tag_cipher_context> m_cipher_context;
+};
+
 } //namespace sp

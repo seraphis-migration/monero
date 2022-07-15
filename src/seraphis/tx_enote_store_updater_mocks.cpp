@@ -226,4 +226,38 @@ std::uint64_t EnoteStoreUpdaterLedgerMockIntermediate::get_top_block_height() co
     return m_enote_store.get_top_block_height();
 }
 //-------------------------------------------------------------------------------------------------------------------
+EnoteStoreUpdaterNonLedgerMockIntermediate::EnoteStoreUpdaterNonLedgerMockIntermediate(
+    const rct::key &wallet_spend_pubkey,
+    const crypto::secret_key &k_unlock_amounts,
+    const crypto::secret_key &k_find_received,
+    const crypto::secret_key &s_generate_address,
+    SpEnoteStoreMockPaymentValidatorV1 &enote_store) :
+        m_wallet_spend_pubkey{wallet_spend_pubkey},
+        m_k_unlock_amounts{k_unlock_amounts},
+        m_k_find_received{k_find_received},
+        m_s_generate_address{s_generate_address},
+        m_enote_store{enote_store}
+{
+    jamtis::make_jamtis_ciphertag_secret(m_s_generate_address, m_s_cipher_tag);
+
+    m_cipher_context = std::make_unique<jamtis::jamtis_address_tag_cipher_context>(rct::sk2rct(m_s_cipher_tag));
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterNonLedgerMockIntermediate::process_and_handle_chunk(
+    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::list<SpContextualKeyImageSetV1>&)
+{
+    std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> found_enote_records;
+
+    process_chunk_intermediate(m_wallet_spend_pubkey,
+        m_k_unlock_amounts,
+        m_k_find_received,
+        m_s_generate_address,
+        *m_cipher_context,
+        chunk_basic_records_per_tx,
+        found_enote_records);
+
+    m_enote_store.update_with_records_from_offchain(found_enote_records);
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp
