@@ -60,7 +60,7 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t MockLedgerContext::get_chain_height() const
 {
-    return m_block_ids.size() - 1;
+    return m_block_infos.size() - 1;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::key_image_exists_unconfirmed_v1(const crypto::key_image &key_image) const
@@ -197,12 +197,12 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
         chunk_out.m_start_height = get_chain_height() + 1;
         chunk_out.m_end_height = get_chain_height() + 1;
 
-        if (m_block_ids.size())
+        if (m_block_infos.size())
         {
-            CHECK_AND_ASSERT_THROW_MES(m_block_ids.find(m_block_ids.size() - 1) != m_block_ids.end(),
+            CHECK_AND_ASSERT_THROW_MES(m_block_infos.find(m_block_infos.size() - 1) != m_block_infos.end(),
                 "onchain chunk find-received scanning (mock ledger context): block ids map incorrect indexing (bug).");
 
-            chunk_out.m_prefix_block_id = m_block_ids.at(m_block_ids.size() - 1);
+            chunk_out.m_prefix_block_id = std::get<rct::key>(m_block_infos.at(m_block_infos.size() - 1));
         }
         else
             chunk_out.m_prefix_block_id = rct::zero();
@@ -217,25 +217,25 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
     chunk_out.m_start_height = chunk_start_height;
     chunk_out.m_end_height = std::min(get_chain_height(), chunk_start_height + chunk_max_size - 1) + 1;
 
-    CHECK_AND_ASSERT_THROW_MES(m_block_ids.find(chunk_out.m_start_height) != m_block_ids.end() &&
-            m_block_ids.find(chunk_out.m_end_height - 1) != m_block_ids.end(),
+    CHECK_AND_ASSERT_THROW_MES(m_block_infos.find(chunk_out.m_start_height) != m_block_infos.end() &&
+            m_block_infos.find(chunk_out.m_end_height - 1) != m_block_infos.end(),
         "onchain chunk find-received scanning (mock ledger context): block range outside of block ids map (bug).");
 
     // b. prefix block id
     chunk_out.m_prefix_block_id =
         chunk_start_height > 0
-        ? m_block_ids.at(chunk_start_height - 1)
+        ? std::get<rct::key>(m_block_infos.at(chunk_start_height - 1))
         : rct::zero();
 
     // c. block ids in the range
     chunk_out.m_block_ids.reserve(chunk_out.m_end_height - chunk_out.m_start_height);
 
     std::for_each(
-            m_block_ids.find(chunk_out.m_start_height),
-            m_block_ids.find(chunk_out.m_end_height),
-            [&](const std::pair<std::uint64_t, rct::key> &mapped_block_id)
+            m_block_infos.find(chunk_out.m_start_height),
+            m_block_infos.find(chunk_out.m_end_height),
+            [&](const auto &mapped_block_info)
             {
-                chunk_out.m_block_ids.emplace_back(mapped_block_id.second);
+                chunk_out.m_block_ids.emplace_back(std::get<rct::key>(mapped_block_info.second));
             }
         );
 
@@ -277,11 +277,16 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
             m_blocks_of_tx_output_contents.find(chunk_out.m_end_height),
             [&](const auto &block_of_tx_output_contents)
             {
+                CHECK_AND_ASSERT_THROW_MES(m_block_infos.find(block_of_tx_output_contents.first) !=
+                        m_block_infos.end(),
+                    "onchain chunk find-received scanning (mock ledger context): block infos map missing height (bug).");
+
                 for (const auto &tx_with_output_contents : block_of_tx_output_contents.second)
                 {
                     // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
                     if (try_find_enotes_in_tx(k_find_received,
                         block_of_tx_output_contents.first,
+                        std::get<std::uint64_t>(m_block_infos.at(block_of_tx_output_contents.first)),
                         sortable2rct(tx_with_output_contents.first),
                         total_output_count_before_tx,
                         std::get<rct::key>(tx_with_output_contents.second),
@@ -299,6 +304,7 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
                             "onchain chunk find-received scanning (mock ledger context): key image map missing tx (bug).");
 
                         collect_key_images_from_tx(block_of_tx_output_contents.first,
+                            std::get<std::uint64_t>(m_block_infos.at(block_of_tx_output_contents.first)),
                             sortable2rct(tx_with_output_contents.first),
                             m_blocks_of_tx_key_images
                                 .at(block_of_tx_output_contents.first)
@@ -326,6 +332,7 @@ bool MockLedgerContext::try_get_unconfirmed_chunk_impl(const crypto::secret_key 
         // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
         if (try_find_enotes_in_tx(k_find_received,
             -1,
+            -1,
             sortable2rct(tx_with_output_contents.first),
             0,
             std::get<rct::key>(tx_with_output_contents.second),
@@ -340,6 +347,7 @@ bool MockLedgerContext::try_get_unconfirmed_chunk_impl(const crypto::secret_key 
                 "unconfirmed chunk find-received scanning (mock ledger context): key image map missing tx (bug).");
 
             collect_key_images_from_tx(-1,
+                -1,
                 sortable2rct(tx_with_output_contents.first),
                 m_unconfirmed_tx_key_images.at(tx_with_output_contents.first),
                 SpEnoteSpentStatus::SPENT_UNCONFIRMED,
@@ -507,8 +515,8 @@ std::uint64_t MockLedgerContext::commit_unconfirmed_txs_v1_impl(const rct::key &
     // d. steal the unconfirmed cache's tx output contents
     m_blocks_of_tx_output_contents[new_height] = std::move(m_unconfirmed_tx_output_contents);
 
-    // 3. add block id (random in mockup)
-    m_block_ids[new_height] = rct::pkGen();
+    // 3. add block info (random ID and zero timestamp in mockup)
+    m_block_infos[new_height] = {rct::pkGen(), 0};
 
     // 4. clear unconfirmed chache
     clear_unconfirmed_cache_impl();
@@ -583,7 +591,7 @@ std::uint64_t MockLedgerContext::pop_chain_at_height_impl(const std::uint64_t po
     m_accumulated_output_counts.erase(m_accumulated_output_counts.find(pop_height), m_accumulated_output_counts.end());
     m_blocks_of_tx_output_contents.erase(m_blocks_of_tx_output_contents.find(pop_height),
         m_blocks_of_tx_output_contents.end());
-    m_block_ids.erase(m_block_ids.find(pop_height), m_block_ids.end());
+    m_block_infos.erase(m_block_infos.find(pop_height), m_block_infos.end());
 
     return num_blocks_to_pop;
 }

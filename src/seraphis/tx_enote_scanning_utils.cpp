@@ -125,6 +125,7 @@ static void process_chunk_new_record_update(const SpEnoteRecordV1 &new_enote_rec
 //-------------------------------------------------------------------------------------------------------------------
 bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
     const std::uint64_t block_height,
+    const std::uint64_t block_timestamp,
     const rct::key &transaction_id,
     const std::uint64_t total_enotes_before_tx,
     const rct::key &input_context,
@@ -172,6 +173,7 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
                 temp_contextual_record.back().m_origin_context =
                     SpEnoteOriginContextV1{
                             .m_block_height = block_height,
+                            .m_block_timestamp = block_timestamp,
                             .m_transaction_id = transaction_id,
                             .m_enote_ledger_index = total_enotes_before_tx + enote_index,
                             .m_origin_status = origin_status,
@@ -194,6 +196,7 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void collect_key_images_from_tx(const std::uint64_t block_height,
+    const std::uint64_t block_timestamp,
     const rct::key &transaction_id,
     const std::vector<crypto::key_image> &key_images_in_tx,
     const SpEnoteSpentStatus spent_status,
@@ -205,6 +208,7 @@ void collect_key_images_from_tx(const std::uint64_t block_height,
                 .m_spent_context =
                     SpEnoteSpentContextV1{
                         .m_block_height = block_height,
+                        .m_block_timestamp = block_timestamp,
                         .m_transaction_id = transaction_id,
                         .m_spent_status = spent_status
                     }
@@ -322,7 +326,6 @@ void process_chunk_full(const rct::key &wallet_spend_pubkey,
     {
         for (const rct::key &tx_with_spent_enotes : txs_have_spent_enotes)
         {
-            // note: this should never throw since it should be caught in the chunk semantics check
             CHECK_AND_ASSERT_THROW_MES(chunk_basic_records_per_tx.find(tx_with_spent_enotes) !=
                     chunk_basic_records_per_tx.end(),
                 "enote scan process chunk (self-send passthroughs): tx with spent enotes not found in records map (bug).");

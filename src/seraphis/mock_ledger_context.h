@@ -246,11 +246,14 @@ private:
             >
         >
     > m_blocks_of_tx_output_contents;
-    /// map of block IDs
+    /// map of block info
     std::map<
         std::uint64_t,  // block height
-        rct::key        // block ID
-    > m_block_ids;
+        std::tuple<
+            rct::key,       // block ID
+            std::uint64_t   // block timestamp
+        >
+    > m_block_infos;
 };
 
 bool try_add_tx_to_ledger(const SpTxSquashedV1 &tx_to_add, MockLedgerContext &ledger_context_inout);

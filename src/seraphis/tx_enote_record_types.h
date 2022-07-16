@@ -156,6 +156,8 @@ struct SpEnoteOriginContextV1 final
 {
     /// block height of transaction (-1 if height is unknown)
     std::uint64_t m_block_height{static_cast<std::uint64_t>(-1)};
+    /// timestamp of transaction's block (-1 if timestamp is unknown)
+    std::uint64_t m_block_timestamp{static_cast<std::uint64_t>(-1)};
     /// tx id (0 if tx is unknown)
     rct::key m_transaction_id{rct::zero()};
     /// ledger index of the enote (-1 if index is unknown)
@@ -175,6 +177,8 @@ struct SpEnoteSpentContextV1 final
 {
     /// block height of transaction where it was spent (-1 if unspent or height is unknown)
     std::uint64_t m_block_height{static_cast<std::uint64_t>(-1)};
+    /// timestamp of transaction's block (-1 if timestamp is unknown)
+    std::uint64_t m_block_timestamp{static_cast<std::uint64_t>(-1)};
     /// tx id where it was spent (0 if unspent or tx is unknown)
     rct::key m_transaction_id{rct::zero()};
     /// spent status (unspent by default)

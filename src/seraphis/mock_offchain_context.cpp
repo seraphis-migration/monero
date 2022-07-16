@@ -124,6 +124,7 @@ bool MockOffchainContext::try_get_offchain_chunk_impl(const crypto::secret_key &
         // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
         if (try_find_enotes_in_tx(k_find_received,
             -1,
+            -1,
             tx_with_output_contents.first,  //use input context as proxy for tx id
             0,
             tx_with_output_contents.first,
@@ -137,6 +138,7 @@ bool MockOffchainContext::try_get_offchain_chunk_impl(const crypto::secret_key &
                 "offchain find-received scanning (mock offchain context): key image map missing input context (bug).");
 
             collect_key_images_from_tx(-1,
+                -1,
                 sortable2rct(tx_with_output_contents.first),
                 m_tx_key_images.at(tx_with_output_contents.first),  //use input context as proxy for tx id
                 SpEnoteSpentStatus::SPENT_OFFCHAIN,

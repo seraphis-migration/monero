@@ -56,6 +56,7 @@ namespace sp
 //todo
 bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
     const std::uint64_t block_height,
+    const std::uint64_t block_timestamp,
     const rct::key &transaction_id,
     const std::uint64_t total_enotes_before_tx,
     const rct::key &input_context,
@@ -65,6 +66,7 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
     hw::device &hwdev,
     std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &basic_records_per_tx_inout);
 void collect_key_images_from_tx(const std::uint64_t block_height,
+    const std::uint64_t block_timestamp,
     const rct::key &transaction_id,
     const std::vector<crypto::key_image> &key_images_in_tx,
     const SpEnoteSpentStatus spent_status,
