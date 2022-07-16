@@ -381,6 +381,9 @@ bool SpCompositionProofMultisigNonceRecord::try_add_nonces(const rct::key &messa
     if (has_record(message, proof_key, filter))
         return false;
 
+    if (!key_domain_is_prime_subgroup(proof_key))
+        return false;
+
     // add record
     m_record[message][proof_key][filter] = prep;
 
