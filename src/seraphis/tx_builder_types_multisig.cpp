@@ -116,7 +116,7 @@ void SpMultisigTxProposalV1::get_proposal_prefix_v1(const rct::key &wallet_spend
 //-------------------------------------------------------------------------------------------------------------------
 bool SpMultisigInputInitSetV1::try_get_nonces(const rct::key &masked_address,
     const std::size_t nonces_index,
-    SpCompositionProofMultisigPubNonces &nonces_out) const
+    SpMultisigPubNonces &nonces_out) const
 {
     if (m_input_inits.find(masked_address) == m_input_inits.end())
         return false;

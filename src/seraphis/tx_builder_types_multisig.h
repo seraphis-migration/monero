@@ -147,12 +147,12 @@ struct SpMultisigInputInitSetV1 final
     // - key: masked addresses for enote images to sign
     // - value: signature nonce pubkeys for each signer set that includes the specified signer id (i.e. each tx attempt)
     //   - WARNING: ordering is dependent on the signer set filter permutation generator
-    std::unordered_map<rct::key, std::vector<SpCompositionProofMultisigPubNonces>> m_input_inits;
+    std::unordered_map<rct::key, std::vector<SpMultisigPubNonces>> m_input_inits;
 
     /// get nonces at a [masked address : nonce index] location (return false if the location doesn't exist)
     bool try_get_nonces(const rct::key &masked_address,
         const std::size_t nonces_index,
-        SpCompositionProofMultisigPubNonces &nonces_out) const;
+        SpMultisigPubNonces &nonces_out) const;
 };
 
 ////

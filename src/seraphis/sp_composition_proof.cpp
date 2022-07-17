@@ -46,6 +46,7 @@ extern "C"
 #include "seraphis_config_temp.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
+#include "sp_multisig_nonce_record.h"
 #include "sp_hash_functions.h"
 #include "sp_transcript.h"
 #include "tx_misc_utils.h"  //for equals_from_less (todo: remove this dependency?)
@@ -62,32 +63,6 @@ extern "C"
 
 namespace sp
 {
-struct sp_multisig_binonce_factors
-{
-    rct::key nonce_1;
-    rct::key nonce_2;
-
-    /// overload operator< for sorting: compare nonce_1 then nonce_2
-    bool operator<(const sp_multisig_binonce_factors &other) const
-    {
-        const int nonce_1_comparison{memcmp(nonce_1.bytes, &other.nonce_1.bytes, sizeof(rct::key))};
-    
-        if (nonce_1_comparison < 0)
-            return true;
-        else if (nonce_1_comparison == 0 && memcmp(nonce_2.bytes, &other.nonce_2.bytes, sizeof(rct::key)) < 0)
-            return true;
-        else
-            return false;
-    }
-    bool operator==(const sp_multisig_binonce_factors &other) const { return equals_from_less{}(*this, other); }
-};
-inline const boost::string_ref get_container_name(const sp_multisig_binonce_factors&) { return "sp_multisig_binonce_factors"; }
-void append_to_transcript(const sp_multisig_binonce_factors &container, SpTranscriptBuilder &transcript_inout)
-{
-    transcript_inout.append("nonce1", container.nonce_1);
-    transcript_inout.append("nonce2", container.nonce_2);
-}
-
 //-------------------------------------------------------------------------------------------------------------------
 // Fiat-Shamir challenge message
 //
@@ -185,11 +160,13 @@ static void compute_K_t1_for_proof(const crypto::secret_key &y,
 // MuSig2--style bi-nonce signing merge factor
 // rho_e = H_n(m, alpha_1_1, alpha_2_1, ..., alpha_1_N, alpha_2_N)
 //-------------------------------------------------------------------------------------------------------------------
-static rct::key multisig_binonce_merge_factor(const rct::key &message,
-    const std::vector<sp_multisig_binonce_factors> &nonces)
+static rct::key multisig_binonce_merge_factor(const rct::key &message, const std::vector<SpMultisigPubNonces> &nonces)
 {
     // build hash
-    SpKDFTranscript transcript{config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR, (1 + 2 * nonces.size()) * sizeof(rct::key)};
+    SpKDFTranscript transcript{
+            config::HASH_KEY_MULTISIG_BINONCE_MERGE_FACTOR,
+            sizeof(rct::key) + nonces.size() * SpMultisigPubNonces::get_size_bytes()
+        };
     transcript.append("message", message);
     transcript.append("nonces", nonces);
 
@@ -364,78 +341,6 @@ bool sp_composition_verify(const SpCompositionProof &proof,
 // multisig
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-bool SpCompositionProofMultisigNonceRecord::has_record(const rct::key &message,
-    const rct::key &proof_key,
-    const multisig::signer_set_filter &filter) const
-{
-    return m_record.find(message) != m_record.end() &&
-        m_record.at(message).find(proof_key) != m_record.at(message).end() &&
-        m_record.at(message).at(proof_key).find(filter) != m_record.at(message).at(proof_key).end();
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool SpCompositionProofMultisigNonceRecord::try_add_nonces(const rct::key &message,
-    const rct::key &proof_key,
-    const multisig::signer_set_filter &filter,
-    const SpCompositionProofMultisigPrep &prep)
-{
-    if (has_record(message, proof_key, filter))
-        return false;
-
-    if (!key_domain_is_prime_subgroup(proof_key))
-        return false;
-
-    // add record
-    m_record[message][proof_key][filter] = prep;
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool SpCompositionProofMultisigNonceRecord::try_get_recorded_nonce_privkeys(const rct::key &message,
-    const rct::key &proof_key,
-    const multisig::signer_set_filter &filter,
-    crypto::secret_key &nonce_privkey_1_out,
-    crypto::secret_key &nonce_privkey_2_out) const
-{
-    if (!has_record(message, proof_key, filter))
-        return false;
-
-    // privkeys
-    nonce_privkey_1_out = m_record.at(message).at(proof_key).at(filter).signature_nonce_1_KI_priv;
-    nonce_privkey_2_out = m_record.at(message).at(proof_key).at(filter).signature_nonce_2_KI_priv;
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool SpCompositionProofMultisigNonceRecord::try_get_recorded_nonce_pubkeys(const rct::key &message,
-    const rct::key &proof_key,
-    const multisig::signer_set_filter &filter,
-    SpCompositionProofMultisigPubNonces &nonce_pubkeys_out) const
-{
-    if (!has_record(message, proof_key, filter))
-        return false;
-
-    // pubkeys
-    nonce_pubkeys_out = m_record.at(message).at(proof_key).at(filter).signature_nonces_KI_pub;
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool SpCompositionProofMultisigNonceRecord::try_remove_record(const rct::key &message,
-    const rct::key &proof_key,
-    const multisig::signer_set_filter &filter)
-{
-    if (!has_record(message, proof_key, filter))
-        return false;
-
-    // cleanup
-    m_record[message][proof_key].erase(filter);
-    if (m_record[message][proof_key].empty())
-        m_record[message].erase(proof_key);
-    if (m_record[message].empty())
-        m_record.erase(message);
-
-    return true;
-}
 //-------------------------------------------------------------------------------------------------------------------
 SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::key &message,
     const rct::key &K,
@@ -455,33 +360,11 @@ SpCompositionProofMultisigProposal sp_composition_multisig_proposal(const rct::k
     return proposal;
 }
 //-------------------------------------------------------------------------------------------------------------------
-SpCompositionProofMultisigPrep sp_composition_multisig_init()
-{
-    SpCompositionProofMultisigPrep prep;
-
-    // alpha_{ki,1,e}*U
-    // store with (1/8)
-    const rct::key &U{rct::pk2rct(crypto::get_U())};
-    generate_proof_nonce(U, prep.signature_nonce_1_KI_priv, prep.signature_nonces_KI_pub.signature_nonce_1_KI_pub);
-    rct::scalarmultKey(prep.signature_nonces_KI_pub.signature_nonce_1_KI_pub,
-        prep.signature_nonces_KI_pub.signature_nonce_1_KI_pub,
-        rct::INV_EIGHT);
-
-    // alpha_{ki,2,e}*U
-    // store with (1/8)
-    generate_proof_nonce(U, prep.signature_nonce_2_KI_priv, prep.signature_nonces_KI_pub.signature_nonce_2_KI_pub);
-    rct::scalarmultKey(prep.signature_nonces_KI_pub.signature_nonce_2_KI_pub,
-        prep.signature_nonces_KI_pub.signature_nonce_2_KI_pub,
-        rct::INV_EIGHT);
-
-    return prep;
-}
-//-------------------------------------------------------------------------------------------------------------------
 SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCompositionProofMultisigProposal &proposal,
     const crypto::secret_key &x,
     const crypto::secret_key &y,
     const crypto::secret_key &z_e,
-    const std::vector<SpCompositionProofMultisigPubNonces> &signer_pub_nonces,
+    const std::vector<SpMultisigPubNonces> &signer_pub_nonces,
     const crypto::secret_key &local_nonce_1_priv,
     const crypto::secret_key &local_nonce_2_priv)
 {
@@ -512,18 +395,18 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(local_nonce_2_priv)), "Bad private key (local_nonce_2_priv zero)!");
 
     // prepare participant nonces
-    std::vector<sp_multisig_binonce_factors> signer_nonces_pub_mul8;
+    std::vector<SpMultisigPubNonces> signer_nonces_pub_mul8;
     signer_nonces_pub_mul8.reserve(num_signers);
 
-    for (const SpCompositionProofMultisigPubNonces &signer_pub_nonce_pair : signer_pub_nonces)
+    for (const SpMultisigPubNonces &signer_pub_nonce_pair : signer_pub_nonces)
     {
         signer_nonces_pub_mul8.emplace_back();
-        signer_nonces_pub_mul8.back().nonce_1 = rct::scalarmult8(signer_pub_nonce_pair.signature_nonce_1_KI_pub);
-        signer_nonces_pub_mul8.back().nonce_2 = rct::scalarmult8(signer_pub_nonce_pair.signature_nonce_2_KI_pub);
+        signer_nonces_pub_mul8.back().signature_nonce_1_pub = rct::scalarmult8(signer_pub_nonce_pair.signature_nonce_1_pub);
+        signer_nonces_pub_mul8.back().signature_nonce_2_pub = rct::scalarmult8(signer_pub_nonce_pair.signature_nonce_2_pub);
 
-        CHECK_AND_ASSERT_THROW_MES(!(signer_nonces_pub_mul8.back().nonce_1 == rct::identity()),
+        CHECK_AND_ASSERT_THROW_MES(!(signer_nonces_pub_mul8.back().signature_nonce_1_pub == rct::identity()),
             "Bad signer nonce (alpha_1 identity)!");
-        CHECK_AND_ASSERT_THROW_MES(!(signer_nonces_pub_mul8.back().nonce_2 == rct::identity()),
+        CHECK_AND_ASSERT_THROW_MES(!(signer_nonces_pub_mul8.back().signature_nonce_2_pub == rct::identity()),
             "Bad signer nonce (alpha_2 identity)!");
     }
 
@@ -532,9 +415,9 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
 
     // check that the local signer's signature opening is in the input set of opening nonces
     const rct::key U_gen{rct::pk2rct(crypto::get_U())};
-    sp_multisig_binonce_factors local_nonce_pubs;
-    rct::scalarmultKey(local_nonce_pubs.nonce_1, U_gen, rct::sk2rct(local_nonce_1_priv));
-    rct::scalarmultKey(local_nonce_pubs.nonce_2, U_gen, rct::sk2rct(local_nonce_2_priv));
+    SpMultisigPubNonces local_nonce_pubs;
+    rct::scalarmultKey(local_nonce_pubs.signature_nonce_1_pub, U_gen, rct::sk2rct(local_nonce_1_priv));
+    rct::scalarmultKey(local_nonce_pubs.signature_nonce_2_pub, U_gen, rct::sk2rct(local_nonce_2_priv));
 
     CHECK_AND_ASSERT_THROW_MES(std::find(signer_nonces_pub_mul8.begin(),
             signer_nonces_pub_mul8.end(),
@@ -580,10 +463,10 @@ SpCompositionProofMultisigPartial sp_composition_multisig_partial_sig(const SpCo
     // rho = H_n(m, {alpha_ki_1_e * U}, {alpha_ki_2_e * U})   (binonce merge factor)
     rct::key alpha_ki_2_pub{rct::identity()};
 
-    for (const sp_multisig_binonce_factors &nonce_pair : signer_nonces_pub_mul8)
+    for (const SpMultisigPubNonces &nonce_pair : signer_nonces_pub_mul8)
     {
-        rct::addKeys(alpha_ki_pub, alpha_ki_pub, nonce_pair.nonce_1);
-        rct::addKeys(alpha_ki_2_pub, alpha_ki_2_pub, nonce_pair.nonce_2);
+        rct::addKeys(alpha_ki_pub, alpha_ki_pub, nonce_pair.signature_nonce_1_pub);
+        rct::addKeys(alpha_ki_2_pub, alpha_ki_2_pub, nonce_pair.signature_nonce_2_pub);
     }
 
     rct::scalarmultKey(alpha_ki_2_pub, alpha_ki_2_pub, binonce_merge_factor);
@@ -625,9 +508,9 @@ bool try_make_sp_composition_multisig_partial_sig(
     const crypto::secret_key &x,
     const crypto::secret_key &y,
     const crypto::secret_key &z_e,
-    const std::vector<SpCompositionProofMultisigPubNonces> &signer_pub_nonces,
+    const std::vector<SpMultisigPubNonces> &signer_pub_nonces,
     const multisig::signer_set_filter filter,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpMultisigNonceRecord &nonce_record_inout,
     SpCompositionProofMultisigPartial &partial_sig_out)
 {
     // get the nonce privkeys to sign with
@@ -672,14 +555,14 @@ SpCompositionProof sp_composition_prove_multisig_final(const std::vector<SpCompo
     // common parts between partial signatures should match
     for (const SpCompositionProofMultisigPartial &partial_sig : partial_sigs)
     {
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].c == partial_sig.c, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t1 == partial_sig.r_t1, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t2 == partial_sig.r_t2, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K_t1 == partial_sig.K_t1, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].c == partial_sig.c, "Input partial sigs don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t1 == partial_sig.r_t1, "Input partial sigs don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].r_t2 == partial_sig.r_t2, "Input partial sigs don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K_t1 == partial_sig.K_t1, "Input partial sigs don't match!");
 
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K == partial_sig.K, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].KI == partial_sig.KI, "Input key sets don't match!");
-        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].message == partial_sig.message, "Input key sets don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].K == partial_sig.K, "Input partial sigs don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].KI == partial_sig.KI, "Input partial sigs don't match!");
+        CHECK_AND_ASSERT_THROW_MES(partial_sigs[0].message == partial_sig.message, "Input partial sigs don't match!");
     }
 
 

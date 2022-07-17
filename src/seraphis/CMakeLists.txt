@@ -42,6 +42,7 @@ set(seraphis_sources
   sp_core_enote_utils.cpp
   sp_core_types.cpp
   sp_crypto_utils.cpp
+  sp_multisig_nonce_record.cpp
   sp_generator_factory.cpp
   sp_hash_functions.cpp
   sp_multiexp.cpp

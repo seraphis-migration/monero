@@ -33,6 +33,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "crypto/generators.h"
 #include "jamtis_address_utils.h"
 #include "jamtis_core_utils.h"
 #include "jamtis_enote_utils.h"
@@ -44,6 +45,7 @@
 #include "seraphis_config_temp.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
+#include "sp_multisig_nonce_record.h"
 #include "tx_builder_types.h"
 #include "tx_builder_types_multisig.h"
 #include "tx_builders_mixed.h"
@@ -223,7 +225,7 @@ static void attempt_make_v1_multisig_input_partial_sig_set_v1(const multisig::mu
     const std::vector<std::size_t> &signer_nonce_trackers,
     const std::vector<crypto::secret_key> &squash_prefixes,
     const std::vector<crypto::secret_key> &enote_view_privkeys,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputPartialSigSetV1 &new_partial_sig_set_out)
 {
     /// make partial signatures for one group of signers of size threshold that is presumed to include the local signer
@@ -248,7 +250,7 @@ static void attempt_make_v1_multisig_input_partial_sig_set_v1(const multisig::mu
 
 
     /// try to make the partial sig set
-    std::vector<SpCompositionProofMultisigPubNonces> signer_pub_nonces_temp;
+    std::vector<SpMultisigPubNonces> signer_pub_nonces_temp;
     signer_pub_nonces_temp.reserve(signer_account.get_threshold());
 
     crypto::secret_key enote_view_privkey_with_squash_prefix;
@@ -330,7 +332,7 @@ static void make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_
     const std::vector<multisig::signer_set_filter> &available_signers_as_filters,
     const std::vector<crypto::secret_key> &squash_prefixes,
     const std::vector<crypto::secret_key> &enote_view_privkeys,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpMultisigNonceRecord &nonce_record_inout,
     std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sig_sets_out)
 {
     /// make partial signatures for every available group of signers of size threshold that includes the local signer
@@ -661,7 +663,7 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const rct::key &proposal_prefix,
     const rct::keyV &masked_addresses,
     const multisig::signer_set_filter aggregate_signer_set_filter,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputInitSetV1 &input_init_set_out)
 {
     // set components
@@ -706,7 +708,10 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
         for (const rct::key &masked_address : masked_addresses)
         {
             // note: ignore failures to add nonces (using existing nonces is allowed)
-            nonce_record_inout.try_add_nonces(proposal_prefix, masked_address, filter, sp_composition_multisig_init());
+            nonce_record_inout.try_add_nonces(proposal_prefix,
+                masked_address,
+                filter,
+                sp_multisig_init(rct::pk2rct(crypto::get_U())));
 
             // record the nonce pubkeys (should not fail)
             input_init_set_out.m_input_inits[masked_address].emplace_back();
@@ -729,7 +734,7 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const std::string &expected_version_string,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputInitSetV1 &input_init_set_out)
 {
     // validate multisig tx proposal
@@ -786,7 +791,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     const std::string &expected_version_string,
     const SpMultisigInputInitSetV1 &local_input_init_set,
     std::vector<SpMultisigInputInitSetV1> other_input_init_sets,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpMultisigNonceRecord &nonce_record_inout,
     std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sig_sets_out)
 {
     CHECK_AND_ASSERT_THROW_MES(signer_account.multisig_is_ready(),

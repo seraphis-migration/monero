@@ -34,7 +34,8 @@
 //          considered sanity checks that only a malicious implementation can/will circumvent. Note that multisig
 //          is only assumed to work when a threshold of honest players are interacting.
 //          - The semantic checks SHOULD detect unintended behavior that would allow a successful transaction. For example,
-//            the checks prevent a multisig tx proposer from burning the funds in explicit payments and self-sends.
+//            the checks prevent a multisig tx proposer from making a tx with no self-sends (which would make balance
+//            much more difficult).
 //          - If users encounter tx construction failures, it may be necessary to identify malicious player(s) and
 //            exclude them.
 //          - TODO: Provide better ways to track down malicious players (more informative exceptions?).
@@ -62,6 +63,7 @@
 #include <unordered_map>
 
 //forward declarations
+namespace sp { class SpMultisigNonceRecord; }
 
 
 namespace sp
@@ -182,7 +184,7 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const rct::key &proposal_prefix,
     const rct::keyV &masked_addresses,
     const multisig::signer_set_filter aggregate_signer_set_filter,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputInitSetV1 &input_init_set_out);
 void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const std::uint32_t threshold,
@@ -191,7 +193,7 @@ void make_v1_multisig_input_init_set_v1(const crypto::public_key &signer_id,
     const std::string &expected_version_string,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpMultisigNonceRecord &nonce_record_inout,
     SpMultisigInputInitSetV1 &input_init_set_out);
 /**
 * brief: check_v1_multisig_input_partial_sig_semantics_v1 - check semantics of a multisig input partial signature
@@ -220,7 +222,7 @@ bool try_make_v1_multisig_input_partial_sig_sets_v1(const multisig::multisig_acc
     const std::string &expected_version_string,
     const SpMultisigInputInitSetV1 &local_input_init_set,
     std::vector<SpMultisigInputInitSetV1> other_input_init_sets,
-    SpCompositionProofMultisigNonceRecord &nonce_record_inout,
+    SpMultisigNonceRecord &nonce_record_inout,
     std::vector<SpMultisigInputPartialSigSetV1> &input_partial_sig_sets_out);
 /**
 * brief: try_make_v1_partial_inputs_v1 - try to make partial inputs from a collection of multisig partial signatures

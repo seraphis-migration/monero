@@ -27,6 +27,7 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "crypto/crypto.h"
+#include "crypto/generators.h"
 #include "multisig/account_generator_era.h"
 #include "multisig/multisig_account.h"
 #include "multisig/multisig_account_era_conversion_msg.h"
@@ -194,7 +195,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
             filter_permutations);
 
         // each signer prepares for each signer group it is a member of
-        std::vector<sp::SpCompositionProofMultisigNonceRecord> signer_nonce_records(num_signers);
+        std::vector<sp::SpMultisigNonceRecord> signer_nonce_records(num_signers);
 
         for (std::size_t signer_index{0}; signer_index < num_signers; ++signer_index)
         {
@@ -205,7 +206,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
                         filter_permutations[filter_index]))
                     continue;
 
-                sp::SpCompositionProofMultisigPrep prep_temp{sp::sp_composition_multisig_init()};
+                sp::SpMultisigPrep prep_temp{sp::sp_multisig_init(rct::pk2rct(crypto::get_U()))};
                 EXPECT_TRUE(signer_nonce_records[signer_index].try_add_nonces(proposal.message,
                     proposal.K,
                     filter_permutations[filter_index],
@@ -215,7 +216,7 @@ static bool composition_proof_multisig_test(const std::uint32_t threshold,
 
         // complete and validate each signature attempt
         std::vector<sp::SpCompositionProofMultisigPartial> partial_sigs;
-        std::vector<sp::SpCompositionProofMultisigPubNonces> signer_nonces_pubs;
+        std::vector<sp::SpMultisigPubNonces> signer_nonces_pubs;
         crypto::secret_key z_temp;
         sp::SpCompositionProof proof;
 
@@ -501,7 +502,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
 
     /// 4) get inits from all requested signers
-    std::vector<SpCompositionProofMultisigNonceRecord> signer_nonce_records;
+    std::vector<SpMultisigNonceRecord> signer_nonce_records;
     std::vector<SpMultisigInputInitSetV1> input_inits;
     input_inits.reserve(accounts.size());
     //signer_nonce_records.reserve(accounts.size());
