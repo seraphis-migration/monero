@@ -34,10 +34,7 @@
 #pragma once
 
 //local headers
-extern "C"
-{
-#include "crypto/crypto-ops.h"
-}
+#include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
 
 //third party headers

@@ -50,7 +50,6 @@ namespace sp { class SpTranscriptBuilder; }
 namespace sp
 {
 
-
 ////
 // SpEnote
 ///
@@ -75,7 +74,7 @@ struct SpEnote final
     static std::size_t get_size_bytes() { return 32*2; }
 
     /**
-    * brief: gen_base - generate a Seraphis ENote (all random)
+    * brief: gen() - generate a Seraphis ENote (all random)
     */
     void gen();
 };

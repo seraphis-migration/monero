@@ -181,8 +181,6 @@ public:
             j,
             user_address);
 
-        m_recipient_spend_key = user_address.m_addr_K1;
-
         // make enote paying to address
         const crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
         sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, rct::xmr_amount{0}, enote_privkey};
@@ -215,7 +213,6 @@ public:
 private:
     hw::device &m_hwdev{hw::get_device("default")};
     sp::jamtis::jamtis_mock_keys m_keys;
-    rct::key m_recipient_spend_key;
 
     sp::SpEnoteV1 m_enote;
     rct::key m_enote_ephemeral_pubkey;

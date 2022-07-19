@@ -46,7 +46,6 @@ extern "C"
 #include "sp_crypto_utils.h"
 #include "sp_hash_functions.h"
 #include "sp_transcript.h"
-#include "wipeable_string.h"
 
 //third party headers
 

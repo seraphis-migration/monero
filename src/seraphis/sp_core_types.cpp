@@ -33,7 +33,6 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
