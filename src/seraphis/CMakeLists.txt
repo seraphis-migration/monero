@@ -36,6 +36,8 @@ set(seraphis_sources
   jamtis_enote_utils.cpp
   jamtis_payment_proposal.cpp
   jamtis_support_types.cpp
+  legacy_enote_types.cpp
+  legacy_enote_utils.cpp
   mock_ledger_context.cpp
   mock_offchain_context.cpp
   sp_composition_proof.cpp
