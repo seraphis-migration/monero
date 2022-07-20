@@ -84,6 +84,8 @@ private:
     //oaes_ctx *m_aes_context;
 
     //BLOWFISH_CTX m_blowfish_context;
+
+    //unsigned char m_siphash_key[16];
 };
 
 /// try to get j from an address tag representation (fails if MAC != 0)

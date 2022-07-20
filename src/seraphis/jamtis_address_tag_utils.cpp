@@ -39,6 +39,7 @@ extern "C"
 {
 //#include "crypto/blowfish.h"
 //#include "crypto/oaes_lib.h"
+//#include "crypto/siphash.h"
 //#include "crypto/tiny_aes.h"
 #include "crypto/twofish.h"
 }
@@ -119,6 +120,8 @@ jamtis_address_tag_cipher_context::jamtis_address_tag_cipher_context(const rct::
     */
 
     //Blowfish_Init(&m_blowfish_context, cipher_key.bytes, sizeof(rct::key));
+
+    //memcpy(m_siphash_key, cipher_key.bytes, sizeof(m_siphash_key));
 }
 //-------------------------------------------------------------------------------------------------------------------
 jamtis_address_tag_cipher_context::~jamtis_address_tag_cipher_context()
@@ -130,9 +133,11 @@ jamtis_address_tag_cipher_context::~jamtis_address_tag_cipher_context()
     //oaes_free(reinterpret_cast<void**>(&m_aes_context));  //Open AES
 
     //memwipe(&m_blowfish_context, sizeof(BLOWFISH_CTX));  //Blowfish
+
+    //memwipe(m_siphash_key, sizeof(m_siphash_key));  //MAC hash key
 }
 //-------------------------------------------------------------------------------------------------------------------
-// pseudo-CBC encryption
+// pseudo-CBC encryption (equivalent to CBC ciphertext stealing, but more intuitive)
 // - given a plaintext that isn't a multiple of the cipher block size, use an 'overlapping' chained block cipher
 // - example
 //     block size: 4 bits
@@ -160,9 +165,16 @@ address_tag_t jamtis_address_tag_cipher_context::cipher(const address_index_t &j
     Twofish_encrypt_block(&m_twofish_key, temp_cipher, temp_cipher);
     memcpy(addr_tag.bytes, temp_cipher, TWOFISH_BLOCK_SIZE);
 
-    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - TWOFISH_BLOCK_SIZE};
+    static constexpr std::size_t nonoverlapping_width{sizeof(address_tag_t) - TWOFISH_BLOCK_SIZE};
     if (nonoverlapping_width > 0)
     {
+        /*
+        // set the MAC: halfsiphash[k](first block)
+        unsigned char siphash_result[4];
+        halfsiphash(addr_tag.bytes, TWOFISH_BLOCK_SIZE, m_siphash_key, siphash_result, 4);
+        static_assert(nonoverlapping_width <= 4, "");
+        memcpy(addr_tag.bytes + TWOFISH_BLOCK_SIZE, siphash_result, nonoverlapping_width);
+        */
         // XOR the non-overlapping pieces
         for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
         {
@@ -254,7 +266,7 @@ bool jamtis_address_tag_cipher_context::try_decipher(address_tag_t addr_tag, add
         "");
 
     // decrypt the second block
-    const std::size_t nonoverlapping_width{sizeof(address_tag_t) - TWOFISH_BLOCK_SIZE};
+    static constexpr std::size_t nonoverlapping_width{sizeof(address_tag_t) - TWOFISH_BLOCK_SIZE};
 
     unsigned char temp_cipher[TWOFISH_BLOCK_SIZE];
     memcpy(temp_cipher, addr_tag.bytes + nonoverlapping_width, TWOFISH_BLOCK_SIZE);
@@ -266,6 +278,19 @@ bool jamtis_address_tag_cipher_context::try_decipher(address_tag_t addr_tag, add
     {
         addr_tag.bytes[offset_index + TWOFISH_BLOCK_SIZE] ^= addr_tag.bytes[offset_index];
     }
+
+    /*
+    // get the expected MAC: halfsiphash[k](first block)
+    unsigned char siphash_result[4];
+    halfsiphash(addr_tag.bytes, TWOFISH_BLOCK_SIZE, m_siphash_key, siphash_result, 4);
+    static_assert(nonoverlapping_width <= 4, "");
+
+    // XOR the expected MAC with the actual MAC
+    for (std::size_t offset_index{0}; offset_index < nonoverlapping_width; ++offset_index)
+    {
+        addr_tag.bytes[offset_index + TWOFISH_BLOCK_SIZE] ^= siphash_result[offset_index];
+    }
+    */
 
     // check the mac
     address_index_t j_temp;

@@ -119,6 +119,14 @@ int main(int argc, char** argv)
   timer.start();
 
 
+  // test deciphering address tags
+  ParamsShuttleAddressTagDecrypt p_address_tag_decrypt;
+  p_address_tag_decrypt.core_params = p.core_params;
+  p_address_tag_decrypt.mode = AddressTagDecryptModes::ALL_SUCCESSFUL_DECRYPT;
+  TEST_PERFORMANCE0(filter, p_address_tag_decrypt, test_jamtis_address_tag_decrypt_sp);
+  p_address_tag_decrypt.mode = AddressTagDecryptModes::NO_SUCCESSFUL_DECRYPT;
+  TEST_PERFORMANCE0(filter, p_address_tag_decrypt, test_jamtis_address_tag_decrypt_sp);
+
   // test client-side scanning in a seraphis remote-scanning workflow
   ParamsShuttleScannerClient p_client_scan;
   p_client_scan.core_params = p.core_params;

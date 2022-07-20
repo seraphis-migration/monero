@@ -772,3 +772,77 @@ private:
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
+
+enum class AddressTagDecryptModes
+{
+    ALL_SUCCESSFUL_DECRYPT,
+    NO_SUCCESSFUL_DECRYPT
+};
+
+struct ParamsShuttleAddressTagDecrypt final : public ParamsShuttle
+{
+    AddressTagDecryptModes mode;
+};
+
+class test_jamtis_address_tag_decrypt_sp
+{
+public:
+    static const size_t loop_count = 10000;
+
+    bool init(const ParamsShuttleAddressTagDecrypt &params)
+    {
+        // user ciphertag secret
+        rct::key ciphertag_secret = rct::skGen();
+
+        // prepare cipher context for the test
+        m_cipher_context = std::make_shared<sp::jamtis::jamtis_address_tag_cipher_context>(ciphertag_secret);
+
+        // make a pile of address tags
+        m_address_tags.resize(1000);
+        sp::jamtis::address_index_t address_index_temp;
+
+        for (sp::jamtis::address_tag_t &addr_tag : m_address_tags)
+        {
+            if (params.mode == AddressTagDecryptModes::NO_SUCCESSFUL_DECRYPT)
+            {
+                do
+                {
+                    address_index_temp.gen();
+                    addr_tag = sp::jamtis::address_tag_t{address_index_temp};
+                }
+                while (sp::jamtis::try_decipher_address_index(*m_cipher_context, addr_tag, address_index_temp));
+            }
+            else
+            {
+                address_index_temp.gen();
+
+                addr_tag = sp::jamtis::cipher_address_index(*m_cipher_context, address_index_temp);
+            }
+        }
+
+        return true;
+    }
+
+    bool test()
+    {
+        // sanity check
+        if (!m_cipher_context)
+            return false;
+
+        sp::jamtis::address_index_t address_index_temp;
+
+        for (const sp::jamtis::address_tag_t &addr_tag : m_address_tags)
+            sp::jamtis::try_decipher_address_index(*m_cipher_context, addr_tag, address_index_temp);
+
+        return true;
+    }
+
+private:
+    std::shared_ptr<sp::jamtis::jamtis_address_tag_cipher_context> m_cipher_context;
+
+    std::vector<sp::jamtis::address_tag_t> m_address_tags;
+};
+
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
+//---------------------------------------------------------------------------------------------------------------------
