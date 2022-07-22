@@ -38,6 +38,8 @@
 #include "ringct/rctTypes.h"
 
 //third party headers
+#include <boost/variant/get.hpp>
+#include <boost/variant/variant.hpp>
 
 //standard headers
 
@@ -140,6 +142,26 @@ struct LegacyEnoteV4 final
     * brief: gen() - generate a legacy v4 enote (all random)
     */
     void gen();
+};
+
+////
+// LegacyEnoteVariant
+// - variant of all legacy enote types
+///
+struct LegacyEnoteVariant final
+{
+    /// variant of all legacy enote types
+    boost::variant<LegacyEnoteV1, LegacyEnoteV2, LegacyEnoteV3, LegacyEnoteV4> m_enote;
+
+    /// get the enote's onetime address
+    const rct::key& onetime_address() const;
+
+    /// interact with the variant
+    template <typename T>
+    bool is_type() const { return boost::get<T>(&m_enote) != nullptr; }
+
+    template <typename T>
+    const T& get_enote() const { return is_type<T>() ? boost::get<T>(m_enote) : T{}; }
 };
 
 } //namespace sp

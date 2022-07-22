@@ -29,6 +29,7 @@
 #include "crypto/crypto.h"
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
+#include "seraphis/tx_contextual_enote_record_types.h"
 #include "seraphis/tx_enote_record_types.h"
 #include "seraphis/tx_enote_store_mocks.h"
 #include "seraphis/tx_fee_calculator.h"

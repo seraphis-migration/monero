@@ -75,4 +75,21 @@ void LegacyEnoteV4::gen()
     m_view_tag.data = static_cast<char>(crypto::rand_idx(static_cast<unsigned char>(-1)));
 }
 //-------------------------------------------------------------------------------------------------------------------
+const rct::key& LegacyEnoteVariant::onetime_address() const
+{
+    if (is_type<LegacyEnoteV1>())
+        return get_enote<LegacyEnoteV1>().m_onetime_address;
+    else if (is_type<LegacyEnoteV2>())
+        return get_enote<LegacyEnoteV2>().m_onetime_address;
+    else if (is_type<LegacyEnoteV3>())
+        return get_enote<LegacyEnoteV3>().m_onetime_address;
+    else if (is_type<LegacyEnoteV4>())
+        return get_enote<LegacyEnoteV4>().m_onetime_address;
+    else
+    {
+        static const rct::key temp{};
+        return temp;
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

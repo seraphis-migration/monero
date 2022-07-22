@@ -50,6 +50,7 @@
 #include "seraphis/tx_builders_multisig.h"
 #include "seraphis/tx_builders_outputs.h"
 #include "seraphis/tx_component_types.h"
+#include "seraphis/tx_contextual_enote_record_types.h"
 #include "seraphis/tx_discretized_fee.h"
 #include "seraphis/tx_enote_record_types.h"
 #include "seraphis/tx_enote_record_utils.h"

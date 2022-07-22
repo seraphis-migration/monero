@@ -38,6 +38,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
 #include "tx_component_types.h"
+#include "tx_contextual_enote_record_types.h"
 #include "tx_enote_finding_context.h"
 #include "tx_enote_record_types.h"
 #include "tx_enote_record_utils.h"
@@ -204,7 +205,8 @@ void collect_key_images_from_tx(const std::uint64_t block_height,
 {
     contextual_key_images_inout.emplace_back(
             SpContextualKeyImageSetV1{
-                .m_key_images = key_images_in_tx,
+                .m_sp_key_images = key_images_in_tx,
+                .m_legacy_key_images = std::vector<crypto::key_image>{},  //todo
                 .m_spent_context =
                     SpEnoteSpentContextV1{
                         .m_block_height = block_height,
@@ -265,12 +267,11 @@ void process_chunk_full(const rct::key &wallet_spend_pubkey,
     std::unordered_set<rct::key> txs_have_spent_enotes;
 
     // 1. check if any owned enotes have been spent in this chunk (key image matches)
-    for (const SpContextualKeyImageSetV1 &contextual_key_image_set : chunk_contextual_key_images)
-    {
-        for (const crypto::key_image &key_image : contextual_key_image_set.m_key_images)
+    auto key_image_handler =
+        [&](const SpContextualKeyImageSetV1 &contextual_key_image_set, const crypto::key_image &key_image)
         {
-            // a. check enote store
-            // b. check enote records found before this chunk (but not updated in enote store)
+            // a. check if key image was known before this scan
+            // b. check if key image matches with any enote records found before this chunk
             if (check_key_image_is_known_func(key_image) ||
                 found_enote_records_inout.find(key_image) != found_enote_records_inout.end())
             {
@@ -284,7 +285,20 @@ void process_chunk_full(const rct::key &wallet_spend_pubkey,
                 // record tx id of tx that contains one of our key images (i.e. the tx spent one of our known enotes)
                 txs_have_spent_enotes.insert(contextual_key_image_set.m_spent_context.m_transaction_id);
             }
-        }
+        };
+
+    for (const SpContextualKeyImageSetV1 &contextual_key_image_set : chunk_contextual_key_images)
+    {
+        for (const crypto::key_image &key_image : contextual_key_image_set.m_sp_key_images)
+            key_image_handler(contextual_key_image_set, key_image);
+
+        for (const crypto::key_image &key_image : contextual_key_image_set.m_legacy_key_images)
+            key_image_handler(contextual_key_image_set, key_image);
+
+        // always save tx id of txs that contain at least one legacy key image
+        // - checking key image is known may fail for legacy key images, which are not computable by the legacy view key
+        if (contextual_key_image_set.m_legacy_key_images.size() > 0)
+            txs_have_spent_enotes.insert(contextual_key_image_set.m_spent_context.m_transaction_id);
     }
 
     // 2. check for owned enotes in this chunk (non-self-send pass)

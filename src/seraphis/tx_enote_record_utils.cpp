@@ -48,6 +48,7 @@ extern "C"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_component_types.h"
+#include "tx_contextual_enote_record_types.h"
 #include "tx_enote_record_types.h"
 
 //third party headers

@@ -37,7 +37,7 @@
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
 #include "tx_builder_types.h"
-#include "tx_enote_record_types.h"
+#include "tx_contextual_enote_record_types.h"
 #include "tx_fee_calculator.h"
 #include "tx_input_selection_output_context.h"
 

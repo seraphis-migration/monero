@@ -38,6 +38,7 @@
 #include "device/device.hpp"
 #include "jamtis_address_tag_utils.h"
 #include "sp_crypto_utils.h"
+#include "tx_contextual_enote_record_types.h"
 #include "tx_enote_record_types.h"
 
 //third party headers
