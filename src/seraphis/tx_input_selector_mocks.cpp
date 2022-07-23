@@ -32,7 +32,7 @@
 #include "tx_input_selector_mocks.h"
 
 //local headers
-#include "tx_enote_record_types.h"
+#include "tx_contextual_enote_record_types.h"
 
 //third party headers
 #include "boost/multiprecision/cpp_int.hpp"

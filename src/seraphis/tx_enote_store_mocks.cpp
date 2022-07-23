@@ -33,8 +33,8 @@
 
 //local headers
 #include "misc_log_ex.h"
-#include "tx_enote_record_types.h"
-#include "tx_enote_record_utils.h"
+#include "tx_contextual_enote_record_types.h"
+#include "tx_contextual_enote_record_utils.h"
 
 //third party headers
 

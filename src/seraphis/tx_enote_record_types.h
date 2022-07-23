@@ -58,7 +58,7 @@ namespace sp
 
 ////
 // LegacyBasicEnoteRecord
-// - a cryptonote/ringct enote that has been identified as owned
+// - a cryptonote/ringct enote that has been identified as owned by view-key scanning
 ///
 struct LegacyBasicEnoteRecord final
 {

@@ -39,16 +39,12 @@
 #include "jamtis_address_tag_utils.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
-#include "sp_core_types.h"
 #include "tx_component_types.h"
-#include "tx_contextual_enote_record_types.h"
-#include "tx_extra.h"
 #include "tx_enote_record_types.h"
 
 //third party headers
 
 //standard headers
-#include <list>
 
 //forward declarations
 
@@ -199,22 +195,5 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteRecordV1 &record_out);
-//todo
-bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &origin_context,
-    SpEnoteOriginContextV1 &current_origin_context_inout);
-bool try_update_enote_spent_context_v1(const SpEnoteSpentContextV1 &spent_context,
-    SpEnoteSpentContextV1 &current_spent_context_inout);
-bool try_update_contextual_enote_record_spent_context_v1(const SpContextualKeyImageSetV1 &contextual_key_image_set,
-    SpContextualEnoteRecordV1 &contextual_enote_record_inout);
-//todo
-SpEnoteOriginStatus origin_status_from_spent_status_v1(const SpEnoteSpentStatus spent_status);
-bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentStatus spent_status,
-    SpEnoteOriginStatus &origin_status_inout);
-//todo
-void update_contextual_enote_record_contexts_v1(const SpEnoteOriginContextV1 &new_origin_context,
-    const SpEnoteSpentContextV1 &new_spent_context,
-    SpContextualEnoteRecordV1 &existing_record_inout);
-void update_contextual_enote_record_contexts_v1(const SpContextualEnoteRecordV1 &fresh_record,
-    SpContextualEnoteRecordV1 &existing_record_inout);
 
 } //namespace sp

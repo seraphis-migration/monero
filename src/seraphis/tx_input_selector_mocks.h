@@ -34,7 +34,7 @@
 #pragma once
 
 //local headers
-#include "tx_enote_record_types.h"
+#include "tx_contextual_enote_record_types.h"
 #include "tx_enote_store_mocks.h"
 #include "tx_input_selection.h"
 

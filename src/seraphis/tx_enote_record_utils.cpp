@@ -33,7 +33,6 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "seraphis/jamtis_support_types.h"
 extern "C"
 {
 #include "crypto/crypto-ops.h"
@@ -43,19 +42,17 @@ extern "C"
 #include "jamtis_address_utils.h"
 #include "jamtis_core_utils.h"
 #include "jamtis_enote_utils.h"
+#include "jamtis_support_types.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_component_types.h"
-#include "tx_contextual_enote_record_types.h"
 #include "tx_enote_record_types.h"
 
 //third party headers
 
 //standard headers
-#include <list>
-#include <vector>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "seraphis"
@@ -749,98 +746,6 @@ bool try_get_enote_record_v1(const SpEnoteV1 &enote,
             wallet_spend_pubkey,
             k_view_balance,
             record_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &origin_context,
-    SpEnoteOriginContextV1 &current_origin_context_inout)
-{
-    // note: overwrite the context if the status is equal (in case existing context is incomplete)
-    if (origin_context.m_origin_status < current_origin_context_inout.m_origin_status)
-        return false;
-
-    current_origin_context_inout = origin_context;
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool try_update_enote_spent_context_v1(const SpEnoteSpentContextV1 &spent_context,
-    SpEnoteSpentContextV1 &current_spent_context_inout)
-{
-    // note: overwrite the context if the status is equal (in case existing context is incomplete)
-    if (spent_context.m_spent_status < current_spent_context_inout.m_spent_status)
-        return false;
-
-    current_spent_context_inout = spent_context;
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool try_update_contextual_enote_record_spent_context_v1(const SpContextualKeyImageSetV1 &contextual_key_image_set,
-    SpContextualEnoteRecordV1 &contextual_enote_record_inout)
-{
-    crypto::key_image record_key_image;
-    contextual_enote_record_inout.get_key_image(record_key_image);
-
-    if (!contextual_key_image_set.has_key_image(record_key_image))
-        return false;
-
-    return try_update_enote_spent_context_v1(contextual_key_image_set.m_spent_context,
-        contextual_enote_record_inout.m_spent_context);
-}
-//-------------------------------------------------------------------------------------------------------------------
-SpEnoteOriginStatus origin_status_from_spent_status_v1(const SpEnoteSpentStatus spent_status)
-{
-    switch (spent_status)
-    {
-        case (SpEnoteSpentStatus::UNSPENT) :
-            return SpEnoteOriginStatus::OFFCHAIN;
-
-        case (SpEnoteSpentStatus::SPENT_OFFCHAIN) :
-            return SpEnoteOriginStatus::OFFCHAIN;
-
-        case (SpEnoteSpentStatus::SPENT_UNCONFIRMED) :
-            return SpEnoteOriginStatus::UNCONFIRMED;
-
-        case (SpEnoteSpentStatus::SPENT_ONCHAIN) :
-            return SpEnoteOriginStatus::ONCHAIN;
-
-        default :
-            return SpEnoteOriginStatus::OFFCHAIN;
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentStatus spent_status,
-    SpEnoteOriginStatus &origin_status_inout)
-{
-    const SpEnoteOriginStatus implied_origin_status{origin_status_from_spent_status_v1(spent_status)};
-
-    if (origin_status_inout > implied_origin_status)
-        return false;
-
-    origin_status_inout = implied_origin_status;
-
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void update_contextual_enote_record_contexts_v1(const SpEnoteOriginContextV1 &new_origin_context,
-    const SpEnoteSpentContextV1 &new_spent_context,
-    SpContextualEnoteRecordV1 &existing_record_inout)
-{
-    try_update_enote_spent_context_v1(new_spent_context, existing_record_inout.m_spent_context);
-    try_update_enote_origin_context_v1(new_origin_context, existing_record_inout.m_origin_context);
-    try_bump_enote_record_origin_status_v1(existing_record_inout.m_spent_context.m_spent_status,
-        existing_record_inout.m_origin_context.m_origin_status);
-}
-//-------------------------------------------------------------------------------------------------------------------
-void update_contextual_enote_record_contexts_v1(const SpContextualEnoteRecordV1 &fresh_record,
-    SpContextualEnoteRecordV1 &existing_record_inout)
-{
-    CHECK_AND_ASSERT_THROW_MES(fresh_record.m_record.m_key_image == existing_record_inout.m_record.m_key_image,
-        "updating a contextual enote record: the fresh record doesn't represent the same enote.");
-
-    update_contextual_enote_record_contexts_v1(fresh_record.m_origin_context,
-        fresh_record.m_spent_context,
-        existing_record_inout);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

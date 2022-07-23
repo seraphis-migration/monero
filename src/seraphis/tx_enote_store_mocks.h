@@ -35,8 +35,7 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "tx_enote_record_types.h"
-#include "tx_enote_record_utils.h"
+#include "tx_contextual_enote_record_types.h"
 
 //third party headers
 #include "boost/multiprecision/cpp_int.hpp"
