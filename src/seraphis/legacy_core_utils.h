@@ -28,18 +28,15 @@
 
 // NOT FOR PRODUCTION
 
-// Utilities for making legacy (cryptonote) enotes.
-// Note: these are for unit testing purposes, so are not fully-featured.
-// - does not support encrypted payment ids
-// - does not support nuanced output creation rules (w.r.t. change outputs and subaddresses in txs with normal addresses)
-// Note2: the legacy hash functions Hn(), Hx(), Hp() are built on the keccak hash function.
+// Miscellaneous legacy utilities.
+// Note: these are the bare minimum for unit testing and legacy enote recovery, so are not fully-featured.
 
 
 #pragma once
 
 //local headers
 #include "crypto/crypto.h"
-#include "legacy_enote_types.h"
+#include "cryptonote_basic/subaddress_index.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -60,59 +57,58 @@ namespace sp
 * param: output_index - t
 * param: enote_ephemeral_privkey - [address: r] [subaddres: r_t]
 * outparam: enote_out - [K^o, a]
+* outparam: enote_ephemeral_pubkey_out - [address: r G] [subaddres: r_t K^{s,i}]
 */
-void make_legacy_enote_v1(const rct::key &destination_spendkey,
-    const rct::key &destination_viewkey,
-    const rct::xmr_amount amount,
+void make_legacy_subaddress_spendkey(const rct::key &legacy_base_spend_pubkey,
+    const crypto::secret_key &legacy_view_privkey,
+    const cryptonote::subaddress_index &subaddress_index,
+    rct::key &subaddress_spendkey_out);
+void make_legacy_key_image(const crypto::secret_key &enote_view_privkey,
+    const crypto::secret_key &legacy_spend_privkey,
+    const rct::key &onetime_address,
+    crypto::key_image &key_image_out);
+void make_legacy_enote_view_privkey(const std::uint64_t tx_output_index,
+    const crypto::key_derivation &sender_receiver_DH_derivation,
+    const crypto::secret_key &legacy_view_privkey,
+    const boost::optional<cryptonote::subaddress_index> &subaddress_index,
+    crypto::secret_key &enote_view_privkey_out);
+void make_legacy_amount_mask_v2(const crypto::secret_key &sender_receiver_secret,
+    crypto::secret_key &amount_blinding_factor_out);
+void make_legacy_amount_encoding_factor_v2(const crypto::secret_key &sender_receiver_secret,
+    rct::key &amount_encoding_factor);
+void make_legacy_encoded_amount_factor(const crypto::secret_key &sender_receiver_secret,
+    rct::key &encoded_amount_factor_out);
+rct::xmr_amount legacy_xor_encoded_amount(const rct::xmr_amount encoded_amount, const rct::key &encoding_factor);
+rct::xmr_amount legacy_xor_amount(const rct::xmr_amount amount, const rct::key &encoding_factor);
+void make_legacy_sender_receiver_secret(const rct::key &destination_viewkey,
     const std::uint64_t output_index,
     const crypto::secret_key &enote_ephemeral_privkey,
-    LegacyEnoteV1 &enote_out);
-/**
-* brief: make_legacy_enote_v2 - make a v2 legacy enote sending to an address or subaddress
-...
-* outparam: enote_out - [K^o, C, enc(x), enc(a)]
-*/
-void make_legacy_enote_v2(const rct::key &destination_spendkey,
+    crypto::secret_key &legacy_sender_receiver_secret_out);
+void make_legacy_onetime_address(const rct::key &destination_spendkey,
     const rct::key &destination_viewkey,
-    const rct::xmr_amount amount,
     const std::uint64_t output_index,
     const crypto::secret_key &enote_ephemeral_privkey,
-    LegacyEnoteV2 &enote_out);
-/**
-* brief: make_legacy_enote_v3 - make a v3 legacy enote sending to an address or subaddress
-...
-* outparam: enote_out - [K^o, C, enc(a)]
-*/
-void make_legacy_enote_v3(const rct::key &destination_spendkey,
-    const rct::key &destination_viewkey,
-    const rct::xmr_amount amount,
+    rct::key &onetime_address_out);
+void make_legacy_encoded_amount_v1(const rct::key &destination_viewkey,
     const std::uint64_t output_index,
     const crypto::secret_key &enote_ephemeral_privkey,
-    LegacyEnoteV3 &enote_out);
-/**
-* brief: make_legacy_enote_v4 - make a v4 legacy enote sending to an address or subaddress
-...
-* outparam: enote_out - [K^o, C, enc(a), view_tag]
-*/
-void make_legacy_enote_v4(const rct::key &destination_spendkey,
-    const rct::key &destination_viewkey,
+    const crypto::secret_key &amount_mask,
     const rct::xmr_amount amount,
+    rct::key &encoded_amount_mask_out,
+    rct::key &encoded_amount_out);
+void make_legacy_encoded_amount_v2(const rct::key &destination_viewkey,
     const std::uint64_t output_index,
     const crypto::secret_key &enote_ephemeral_privkey,
-    LegacyEnoteV4 &enote_out);
-/**
-* brief: make_legacy_ephemeral_pubkey_shared - make an ephemeral pubkey for an enote (shared by all enotes in a tx)
-* param: enote_ephemeral_privkey - r
-* outparam: enote_ephemeral_pubkey_out - r G
-*/
-void make_legacy_ephemeral_pubkey_shared(const crypto::secret_key &enote_ephemeral_privkey);
-/**
-* brief: make_legacy_ephemeral_pubkey_subaddress - make an ephemeral pubkey for a single enote in a tx
-* param: destination_spendkey - [address: K^s = k^s G] [subaddress: K^{s,i} = (Hn(k^v, i) + k^s) G]
-* param: enote_ephemeral_privkey - r_t
-* outparam: enote_ephemeral_pubkey_out - r_t K^s
-*/
-void make_legacy_ephemeral_pubkey_single(const rct::key &destination_spendkey,
-    const crypto::secret_key &enote_ephemeral_privkey);
+    const rct::xmr_amount amount,
+    rct::xmr_amount &encoded_amount_out);
+void make_legacy_amount_mask_v2(const rct::key &destination_viewkey,
+    const std::uint64_t output_index,
+    const crypto::secret_key &enote_ephemeral_privkey,
+    rct::key &amount_mask_out);
+void make_legacy_view_tag(const rct::key &destination_viewkey,
+    const std::uint64_t output_index,
+    const crypto::secret_key &enote_ephemeral_privkey,
+    crypto::view_tag &view_tag_out);
+
 
 } //namespace sp

@@ -153,6 +153,11 @@ struct LegacyEnoteVariant final
     /// variant of all legacy enote types
     boost::variant<LegacyEnoteV1, LegacyEnoteV2, LegacyEnoteV3, LegacyEnoteV4> m_enote;
 
+    /// constructors
+    LegacyEnoteVariant() = default;
+    template <typename T>
+    LegacyEnoteVariant(const T &enote) : m_enote{enote} {}
+
     /// get the enote's onetime address
     const rct::key& onetime_address() const;
 
@@ -161,7 +166,7 @@ struct LegacyEnoteVariant final
     bool is_type() const { return boost::get<T>(&m_enote) != nullptr; }
 
     template <typename T>
-    const T& get_enote() const { return is_type<T>() ? boost::get<T>(m_enote) : T{}; }
+    const T& get_enote() const { static const T empty{}; return is_type<T>() ? boost::get<T>(m_enote) : empty; }
 };
 
 } //namespace sp

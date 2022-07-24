@@ -41,6 +41,7 @@ extern "C"
 #include "cryptonote_basic/subaddress_index.h"
 #include "device/device.hpp"
 #include "int-util.h"
+#include "legacy_core_utils.h"
 #include "legacy_enote_types.h"
 #include "legacy_enote_utils.h"
 #include "ringct/rctOps.h"
@@ -111,93 +112,6 @@ static bool try_check_legacy_nominal_spendkey(const rct::key &onetime_address,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void compute_subaddress_spendkey(const rct::key &legacy_base_spend_pubkey,
-    const crypto::secret_key &legacy_view_privkey,
-    const cryptonote::subaddress_index &subaddress_index,
-    rct::key &subaddress_spendkey_out)
-{
-    // Hn(k^v, i) = Hn(k^v || index_major || index_minor)
-    const crypto::secret_key subaddress_modifier{
-            hw::get_device("default").get_subaddress_secret_key(legacy_view_privkey, subaddress_index)
-        };
-
-    // Hn(k^v, i) G
-    rct::key subaddress_extension;
-    rct::scalarmultBase(subaddress_extension, rct::sk2rct(subaddress_modifier));
-
-    // K^{s,i} = Hn(k^v, i) G + k^s G
-    rct::addKeys(subaddress_spendkey_out, subaddress_extension, legacy_base_spend_pubkey);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void get_legacy_key_image(const crypto::secret_key &enote_view_privkey,
-    const crypto::secret_key &legacy_spend_privkey,
-    const rct::key &onetime_address,
-    crypto::key_image &key_image_out)
-{
-    // KI = (view_key_stuff + k^s) * Hp(Ko)
-    crypto::secret_key onetime_address_privkey;
-    sc_add(to_bytes(onetime_address_privkey), to_bytes(enote_view_privkey), to_bytes(legacy_spend_privkey));
-
-    crypto::generate_key_image(rct::rct2pk(onetime_address), onetime_address_privkey, key_image_out);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void compute_legacy_enote_view_privkey(const std::uint64_t tx_output_index,
-    const crypto::key_derivation &sender_receiver_DH_derivation,
-    const crypto::secret_key &legacy_view_privkey,
-    const boost::optional<cryptonote::subaddress_index> &subaddress_index,
-    crypto::secret_key &enote_view_privkey_out)
-{
-    // Hn(r K^v, t)
-    crypto::derivation_to_scalar(sender_receiver_DH_derivation, tx_output_index, enote_view_privkey_out);
-
-    // subaddress index modifier
-    if (subaddress_index)
-    {
-        // Hn(k^v, i) = Hn(k^v || index_major || index_minor)
-        const crypto::secret_key subaddress_modifier{
-                hw::get_device("default").get_subaddress_secret_key(legacy_view_privkey, *subaddress_index)
-            };
-
-        // Hn(r K^v, t) + Hn(k^v, i)
-        sc_add(to_bytes(enote_view_privkey_out), to_bytes(enote_view_privkey_out), to_bytes(subaddress_modifier));
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void get_legacy_amount_mask_v2(const crypto::secret_key &sender_receiver_secret,
-    crypto::secret_key &amount_blinding_factor_out)
-{
-    // Hn("commitment_mask", Hn(r K^v, t))
-    char data[15 + sizeof(rct::key)];
-    memcpy(data, "commitment_mask", 15);
-    memcpy(data + 15, to_bytes(sender_receiver_secret), sizeof(rct::key));
-    crypto::cn_fast_hash(data, sizeof(data), reinterpret_cast<char*>(&amount_blinding_factor_out));
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static void get_legacy_amount_encoding_factor_v2(const crypto::secret_key &sender_receiver_secret,
-    rct::key &amount_encoding_factor)
-{
-    // Hn("amount", Hn(r K^v, t))
-    char data[6 + sizeof(rct::key)];
-    memcpy(data, "amount", 6);
-    memcpy(data + 6, to_bytes(sender_receiver_secret), sizeof(rct::key));
-    rct::cn_fast_hash(amount_encoding_factor, data, sizeof(data));
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-static rct::xmr_amount xor_encoded_amount(const rct::xmr_amount encoded_amount, const rct::key &encoding_factor)
-{
-    // a XOR_8 factor
-    rct::xmr_amount factor;
-    memcpy(&factor, encoding_factor.bytes, 8);
-
-    return SWAP64LE(encoded_amount ^ factor);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 static bool try_get_amount_commitment_information_v1(const rct::xmr_amount &enote_amount,
     rct::xmr_amount &amount_out,
     crypto::secret_key &amount_blinding_factor_out)
@@ -250,12 +164,12 @@ const rct::xmr_amount &encoded_amount,
     crypto::derivation_to_scalar(sender_receiver_DH_derivation, tx_output_index, sender_receiver_secret);
 
     // b. recover amount mask: x = Hn("commitment_mask", Hn(r K^v, t))
-    get_legacy_amount_mask_v2(sender_receiver_secret, amount_blinding_factor_out);
+    make_legacy_amount_mask_v2(sender_receiver_secret, amount_blinding_factor_out);
 
     // c. decode amount: a = enc(a) XOR8 Hn("amount", Hn(r K^v, t)))
     rct::key amount_encoding_factor;
-    get_legacy_amount_encoding_factor_v2(sender_receiver_secret, amount_encoding_factor);
-    amount_out = xor_encoded_amount(encoded_amount, amount_encoding_factor);
+    make_legacy_amount_encoding_factor_v2(sender_receiver_secret, amount_encoding_factor);
+    amount_out = legacy_xor_encoded_amount(encoded_amount, amount_encoding_factor);
 
     // 2. try to reproduce amount commitment (sanity check)
     return rct::commit(amount_out, rct::sk2rct(amount_blinding_factor_out)) == amount_commitment;
@@ -342,7 +256,7 @@ static bool try_get_intermediate_legacy_enote_record_info(const LegacyEnoteVaria
         return false;
 
     // compute enote view privkey
-    compute_legacy_enote_view_privkey(tx_output_index,
+    make_legacy_enote_view_privkey(tx_output_index,
         sender_receiver_DH_derivation,
         legacy_view_privkey,
         subaddress_index_out,
@@ -464,7 +378,7 @@ bool try_get_legacy_intermediate_enote_record(const LegacyBasicEnoteRecord &basi
     if (basic_record.m_address_index)
     {
         rct::key subaddress_spendkey;
-        compute_subaddress_spendkey(legacy_base_spend_pubkey,
+        make_legacy_subaddress_spendkey(legacy_base_spend_pubkey,
             legacy_view_privkey,
             *(basic_record.m_address_index),
             subaddress_spendkey);
@@ -507,7 +421,7 @@ bool try_get_legacy_enote_record(const LegacyEnoteVariant &enote,
         return false;
 
     // compute the key image
-    get_legacy_key_image(record_out.m_enote_view_privkey,
+    make_legacy_key_image(record_out.m_enote_view_privkey,
         legacy_spend_privkey,
         enote.onetime_address(),
         record_out.m_key_image);
@@ -533,7 +447,7 @@ bool try_get_legacy_enote_record(const LegacyBasicEnoteRecord &basic_record,
     if (basic_record.m_address_index)
     {
         rct::key subaddress_spendkey;
-        compute_subaddress_spendkey(legacy_base_spend_pubkey,
+        make_legacy_subaddress_spendkey(legacy_base_spend_pubkey,
             legacy_view_privkey,
             *(basic_record.m_address_index),
             subaddress_spendkey);
@@ -574,7 +488,7 @@ void get_legacy_enote_record(const LegacyIntermediateEnoteRecord &intermediate_r
 {
     // make key image: ((view key stuff) + k^s) * Hp(Ko)
     crypto::key_image key_image;
-    get_legacy_key_image(intermediate_record.m_enote_view_privkey,
+    make_legacy_key_image(intermediate_record.m_enote_view_privkey,
         legacy_spend_privkey,
         intermediate_record.m_enote.onetime_address(),
         key_image);

@@ -86,6 +86,7 @@ set(unit_tests_sources
   seraphis_enote_scanning.cpp
   seraphis_input_selection.cpp
   seraphis_integration.cpp
+  seraphis_legacy.cpp
   seraphis_multisig.cpp
   seraphis_tx.cpp
   sha256.cpp
