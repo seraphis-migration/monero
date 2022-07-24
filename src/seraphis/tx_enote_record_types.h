@@ -35,6 +35,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "cryptonote_basic/subaddress_index.h"
 #include "jamtis_support_types.h"
 #include "legacy_enote_types.h"
 #include "ringct/rctOps.h"
@@ -67,9 +68,9 @@ struct LegacyBasicEnoteRecord final
     /// the enote's ephemeral pubkey
     rct::key m_enote_ephemeral_pubkey;
     /// i: legacy address index (if true, then it's owned by a subaddress)
-    boost::optional<std::uint64_t> m_address_index;
+    boost::optional<cryptonote::subaddress_index> m_address_index;
     /// t: the enote's index in its transaction
-    std::uint64_t m_tx_ouput_index;
+    std::uint64_t m_tx_output_index;
     /// u: the enote's unlock time
     std::uint64_t m_unlock_time;
 };
@@ -91,9 +92,9 @@ struct LegacyIntermediateEnoteRecord final
     /// x: amount blinding factor
     crypto::secret_key m_amount_blinding_factor;
     /// i: legacy address index (if true, then it's owned by a subaddress)
-    boost::optional<std::uint64_t> m_address_index;
+    boost::optional<cryptonote::subaddress_index> m_address_index;
     /// t: the enote's index in its transaction
-    std::uint64_t m_tx_ouput_index;
+    std::uint64_t m_tx_output_index;
     /// u: the enote's unlock time
     std::uint64_t m_unlock_time;
 };
@@ -117,9 +118,9 @@ struct LegacyEnoteRecord final
     /// KI: key image
     crypto::key_image m_key_image;
     /// i: legacy address index (if true, then it's owned by a subaddress)
-    boost::optional<std::uint64_t> m_address_index;
+    boost::optional<cryptonote::subaddress_index> m_address_index;
     /// t: the enote's index in its transaction
-    std::uint64_t m_tx_ouput_index;
+    std::uint64_t m_tx_output_index;
     /// u: the enote's unlock time
     std::uint64_t m_unlock_time;
 };

@@ -36,15 +36,11 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
-#include "crypto/generators.h"
-#include "cryptonote_config.h"
 #include "device/device.hpp"
 #include "int-util.h"
-#include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
-#include "wipeable_string.h"
 
 //third party headers
 
@@ -58,12 +54,13 @@ namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void make_encoded_amount_factor(const rct::key &sender_receiver_secret, rct::key &encoded_amount_factor_out)
+static void make_encoded_amount_factor(const crypto::secret_key &sender_receiver_secret,
+    rct::key &encoded_amount_factor_out)
 {
     // Hn("amount", Hn(r K^v, t))
     char data[6 + sizeof(rct::key)];
     memcpy(data, "amount", 6);
-    memcpy(data + 6, &sender_receiver_secret, sizeof(rct::key));
+    memcpy(data + 6, to_bytes(sender_receiver_secret), sizeof(rct::key));
     rct::cn_fast_hash(encoded_amount_factor_out, data, sizeof(data));
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -74,14 +71,14 @@ static rct::xmr_amount xor_amount(const rct::xmr_amount amount, const rct::key &
     rct::xmr_amount factor;
     memcpy(&factor, encoding_factor.bytes, 8);
 
-    return amount ^ factor;
+    return SWAP64LE(amount) ^ factor;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void compute_legacy_sender_receiver_secret(const rct::key &destination_viewkey,
     const std::uint64_t output_index,
     const crypto::secret_key &enote_ephemeral_privkey,
-    rct::key &legacy_sender_receiver_secret_out)
+    crypto::secret_key &legacy_sender_receiver_secret_out)
 {
     // r K^v
     crypto::key_derivation derivation;
@@ -90,9 +87,7 @@ static void compute_legacy_sender_receiver_secret(const rct::key &destination_vi
         derivation);
 
     // Hn(r K^v, t)
-    crypto::ec_scalar legacy_sender_receiver_secret_temp;
-    hw::get_device("default").derivation_to_scalar(derivation, output_index, legacy_sender_receiver_secret_temp);
-    memcpy(legacy_sender_receiver_secret_out.bytes, legacy_sender_receiver_secret_temp.data, 32);
+    hw::get_device("default").derivation_to_scalar(derivation, output_index, legacy_sender_receiver_secret_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -128,14 +123,14 @@ static void encode_legacy_amount_v1(const rct::key &destination_viewkey,
     rct::key &encoded_amount_out)
 {
     // Hn(r K^v, t)
-    rct::key sender_receiver_secret;
+    crypto::secret_key sender_receiver_secret;
     compute_legacy_sender_receiver_secret(destination_viewkey,
         output_index,
         enote_ephemeral_privkey,
         sender_receiver_secret);
 
     // encoded amount mask: enc(x) = x + Hn(Hn(r K^v, t))
-    const rct::key mask_factor{rct::hash_to_scalar(sender_receiver_secret)};  //Hn(Hn(r K^v, t))
+    const rct::key mask_factor{rct::hash_to_scalar(rct::sk2rct(sender_receiver_secret))};  //Hn(Hn(r K^v, t))
     sc_add(encoded_amount_mask_out.bytes, to_bytes(amount_mask), mask_factor.bytes);
 
     // encoded amount: enc(a) = to_key(a) + Hn(Hn(Hn(r K^v, t)))
@@ -152,7 +147,7 @@ static void encode_legacy_amount_v2(const rct::key &destination_viewkey,
     rct::xmr_amount &encoded_amount_out)
 {
     // Hn(r K^v, t)
-    rct::key sender_receiver_secret;
+    crypto::secret_key sender_receiver_secret;
     compute_legacy_sender_receiver_secret(destination_viewkey,
         output_index,
         enote_ephemeral_privkey,
@@ -162,7 +157,7 @@ static void encode_legacy_amount_v2(const rct::key &destination_viewkey,
     rct::key encoded_amount_factor;
     make_encoded_amount_factor(sender_receiver_secret, encoded_amount_factor);
 
-    encoded_amount_out = xor_amount(SWAP64LE(amount), encoded_amount_factor);
+    encoded_amount_out = xor_amount(amount, encoded_amount_factor);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -172,7 +167,7 @@ static void make_legacy_amount_mask_v2(const rct::key &destination_viewkey,
     rct::key &amount_mask_out)
 {
     // Hn(r K^v, t)
-    rct::key sender_receiver_secret;
+    crypto::secret_key sender_receiver_secret;
     compute_legacy_sender_receiver_secret(destination_viewkey,
         output_index,
         enote_ephemeral_privkey,
@@ -181,7 +176,7 @@ static void make_legacy_amount_mask_v2(const rct::key &destination_viewkey,
     // amount mask: Hn("commitment_mask", Hn(r K^v, t))
     char data[15 + sizeof(rct::key)];
     memcpy(data, "commitment_mask", 15);
-    memcpy(data + 15, &sender_receiver_secret, sizeof(rct::key));
+    memcpy(data + 15, to_bytes(sender_receiver_secret), sizeof(rct::key));
     rct::cn_fast_hash(amount_mask_out, data, sizeof(data));
 }
 //-------------------------------------------------------------------------------------------------------------------
