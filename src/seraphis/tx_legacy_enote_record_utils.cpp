@@ -164,7 +164,7 @@ const rct::xmr_amount &encoded_amount,
     crypto::derivation_to_scalar(sender_receiver_DH_derivation, tx_output_index, sender_receiver_secret);
 
     // b. recover amount mask: x = Hn("commitment_mask", Hn(r K^v, t))
-    make_legacy_amount_mask_v2(sender_receiver_secret, amount_blinding_factor_out);
+    make_legacy_amount_blinding_factor_v2(sender_receiver_secret, amount_blinding_factor_out);
 
     // c. decode amount: a = enc(a) XOR8 Hn("amount", Hn(r K^v, t)))
     rct::key amount_encoding_factor;
@@ -191,7 +191,7 @@ static bool try_get_amount_commitment_information(const LegacyEnoteVariant &enot
     else if (enote.is_type<LegacyEnoteV2>())
     {
         return try_get_amount_commitment_information_v2(enote.get_enote<LegacyEnoteV2>().m_amount_commitment,
-            enote.get_enote<LegacyEnoteV2>().m_encoded_amount_mask,
+            enote.get_enote<LegacyEnoteV2>().m_encoded_amount_blinding_factor,
             enote.get_enote<LegacyEnoteV2>().m_encoded_amount,
             tx_output_index,
             sender_receiver_DH_derivation,

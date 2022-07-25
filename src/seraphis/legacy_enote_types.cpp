@@ -56,7 +56,7 @@ void LegacyEnoteV2::gen()
 {
     m_onetime_address = rct::pkGen();
     m_amount_commitment = rct::pkGen();
-    m_encoded_amount_mask = rct::skGen();
+    m_encoded_amount_blinding_factor = rct::skGen();
     m_encoded_amount = rct::skGen();
 }
 //-------------------------------------------------------------------------------------------------------------------

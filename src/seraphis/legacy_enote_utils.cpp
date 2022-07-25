@@ -83,14 +83,14 @@ void make_legacy_enote_v2(const rct::key &destination_spendkey,
     const crypto::secret_key amount_mask{rct::rct2sk(rct::skGen())};
     enote_out.m_amount_commitment = rct::commit(amount, rct::sk2rct(amount_mask));
 
-    // encoded amount mask: enc(x) = x + Hn(Hn(r K^v, t))
+    // encoded amount blinding factor: enc(x) = x + Hn(Hn(r K^v, t))
     // encoded amount: enc(a) = to_key(a) + Hn(Hn(Hn(r K^v, t)))
     make_legacy_encoded_amount_v1(destination_viewkey,
         output_index,
         enote_ephemeral_privkey,
         amount_mask,
         amount,
-        enote_out.m_encoded_amount_mask,
+        enote_out.m_encoded_amount_blinding_factor,
         enote_out.m_encoded_amount);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -109,12 +109,12 @@ void make_legacy_enote_v3(const rct::key &destination_spendkey,
         enote_out.m_onetime_address);
 
     // amount commitment: Hn("commitment_mask", Hn(r K^v, t)) G + a H
-    rct::key amount_mask;
-    make_legacy_amount_mask_v2(destination_viewkey, output_index, enote_ephemeral_privkey, amount_mask);
+    crypto::secret_key amount_mask;
+    make_legacy_amount_blinding_factor_v2(destination_viewkey, output_index, enote_ephemeral_privkey, amount_mask);
 
-    enote_out.m_amount_commitment = rct::commit(amount, amount_mask);
+    enote_out.m_amount_commitment = rct::commit(amount, rct::sk2rct(amount_mask));
 
-    // encoded amount: enc(a) = a XOR_8 Hn("amount", Hn(r K^v, t))
+    // encoded amount: enc(a) = a XOR_8 H32("amount", Hn(r K^v, t))
     make_legacy_encoded_amount_v2(destination_viewkey,
         output_index,
         enote_ephemeral_privkey,
@@ -137,12 +137,12 @@ void make_legacy_enote_v4(const rct::key &destination_spendkey,
         enote_out.m_onetime_address);
 
     // amount commitment: Hn("commitment_mask", Hn(r K^v, t)) G + a H
-    rct::key amount_mask;
-    make_legacy_amount_mask_v2(destination_viewkey, output_index, enote_ephemeral_privkey, amount_mask);
+    crypto::secret_key amount_mask;
+    make_legacy_amount_blinding_factor_v2(destination_viewkey, output_index, enote_ephemeral_privkey, amount_mask);
 
-    enote_out.m_amount_commitment = rct::commit(amount, amount_mask);
+    enote_out.m_amount_commitment = rct::commit(amount, rct::sk2rct(amount_mask));
 
-    // encoded amount: enc(a) = a XOR_8 Hn("amount", Hn(r K^v, t))
+    // encoded amount: enc(a) = a XOR_8 H32("amount", Hn(r K^v, t))
     make_legacy_encoded_amount_v2(destination_viewkey,
         output_index,
         enote_ephemeral_privkey,

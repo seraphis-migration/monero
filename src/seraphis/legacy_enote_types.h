@@ -83,7 +83,7 @@ struct LegacyEnoteV2 final
     /// C
     rct::key m_amount_commitment;
     /// enc(x)
-    rct::key m_encoded_amount_mask;
+    rct::key m_encoded_amount_blinding_factor;
     /// enc(a)
     rct::key m_encoded_amount;
 
