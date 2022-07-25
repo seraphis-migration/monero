@@ -92,4 +92,18 @@ const rct::key& LegacyEnoteVariant::onetime_address() const
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+rct::key LegacyEnoteVariant::amount_commitment() const
+{
+    if (is_type<LegacyEnoteV1>())
+        return rct::zeroCommit(get_enote<LegacyEnoteV1>().m_amount);
+    else if (is_type<LegacyEnoteV2>())
+        return get_enote<LegacyEnoteV2>().m_amount_commitment;
+    else if (is_type<LegacyEnoteV3>())
+        return get_enote<LegacyEnoteV3>().m_amount_commitment;
+    else if (is_type<LegacyEnoteV4>())
+        return get_enote<LegacyEnoteV4>().m_amount_commitment;
+    else
+        return rct::key{};
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

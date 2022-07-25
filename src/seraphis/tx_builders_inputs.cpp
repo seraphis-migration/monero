@@ -646,8 +646,8 @@ SpMembershipProofPrepV1 gen_mock_sp_membership_proof_prep_for_enote_at_pos_v1(co
 
     // 1) flat index mapper for mock-up
     const SpRefSetIndexMapperFlat flat_index_mapper{
-            ledger_context.min_enote_index(),
-            ledger_context.max_enote_index()
+            0,
+            ledger_context.max_sp_enote_index()
         };
 
     // 2) generator seed
@@ -673,7 +673,7 @@ SpMembershipProofPrepV1 gen_mock_sp_membership_proof_prep_for_enote_at_pos_v1(co
             reference_indices),
         "gen mock membership proof prep: could not extract reference indices from binned representation (bug).");
 
-    ledger_context.get_reference_set_proof_elements_v1(reference_indices, proof_prep.m_referenced_enotes_squashed);
+    ledger_context.get_reference_set_proof_elements_v2(reference_indices, proof_prep.m_referenced_enotes_squashed);
 
 
     /// copy misc pieces
@@ -720,7 +720,7 @@ SpMembershipProofPrepV1 gen_mock_sp_membership_proof_prep_v1(
     ledger_context_inout.commit_unconfirmed_txs_v1(rct::pkGen(), SpTxSupplementV1{}, std::vector<SpEnoteV1>{});
 
     // 3. add mock enotes as the outputs of a mock coinbase tx
-    const std::uint64_t real_reference_index_in_ledger{ledger_context_inout.max_enote_index() + add_real_at_pos + 1};
+    const std::uint64_t real_reference_index_in_ledger{ledger_context_inout.max_sp_enote_index() + add_real_at_pos + 1};
     ledger_context_inout.commit_unconfirmed_txs_v1(rct::pkGen(), SpTxSupplementV1{}, std::move(mock_enotes));
 
 

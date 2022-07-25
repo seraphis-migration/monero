@@ -578,7 +578,7 @@ void check_v1_partial_tx_semantics_v1(const SpPartialTxV1 &partial_tx,
     const SpTxSquashedV1::SemanticRulesVersion semantic_rules_version)
 {
     // prepare a mock ledger
-    MockLedgerContext mock_ledger;
+    MockLedgerContext mock_ledger{0, 0};
 
     // get parameters for making mock ref sets (use minimum parameters for efficiency when possible)
     const SemanticConfigRefSetV1 ref_set_config{semantic_config_ref_sets_v1(semantic_rules_version)};

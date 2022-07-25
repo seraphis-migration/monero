@@ -230,7 +230,7 @@ public:
         m_tx_ptrs.reserve(params.batch_size);
 
         // fresh mock ledger context
-        m_ledger_contex = std::make_shared<sp::MockLedgerContext>();
+        m_ledger_contex = std::make_shared<sp::MockLedgerContext>(0, 0);
 
         // divide max amount into equal-size chunks to distribute among more numerous of inputs vs outputs
         if (params.in_count == 0 || params.out_count == 0)

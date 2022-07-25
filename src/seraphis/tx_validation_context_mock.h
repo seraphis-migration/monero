@@ -73,14 +73,14 @@ public:
         return m_mock_ledger_context.key_image_exists_onchain_v1(key_image);
     }
     /**
-    * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the mock ledger
+    * brief: get_reference_set_proof_elements_v2 - gets Seraphis squashed enotes stored in the mock ledger
     * param: indices -
     * outparam: proof_elements_out - {squashed enote}
     */
-    void get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
+    void get_reference_set_proof_elements_v2(const std::vector<std::uint64_t> &indices,
         rct::keyV &proof_elements_out) const override
     {
-        return m_mock_ledger_context.get_reference_set_proof_elements_v1(indices, proof_elements_out);
+        return m_mock_ledger_context.get_reference_set_proof_elements_v2(indices, proof_elements_out);
     }
 
 //member variables

@@ -36,6 +36,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "legacy_enote_types.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
@@ -66,6 +67,12 @@ namespace sp
 class MockLedgerContext final
 {
 public:
+//constructors
+    /// define tx era ranges (legacy: [0, first seraphis only); seraphis: [first seraphis allowed,) )
+    /// note: blocks with mock legacy coinbase txs are only allowed before the first seraphis-only block
+    MockLedgerContext(const std::uint64_t first_seraphis_allowed_block, const std::uint64_t first_seraphis_only_block);
+
+//member functions
     /**
     * brief: get_chain_height - get current chain height
     *   - returns uint64{-1} if there are no blocks
@@ -81,31 +88,41 @@ public:
     bool key_image_exists_unconfirmed_v1(const crypto::key_image &key_image) const;
     bool key_image_exists_onchain_v1(const crypto::key_image &key_image) const;
     /**
-    * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the ledger
+    * brief: get_reference_set_proof_elements_v1 - get legacy enotes stored in the ledger (for a membership proof)
+    * param: indices -
+    * outparam: proof_elements_out - {KI, C}
+    */
+    void get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
+        std::vector<std::pair<rct::key, rct::key>> &proof_elements_out) const;
+    /**
+    * brief: get_reference_set_proof_elements_v2 - get Seraphis squashed enotes stored in the ledger
     * param: indices -
     * outparam: proof_elements_out - {squashed enote}
     */
-    void get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
+    void get_reference_set_proof_elements_v2(const std::vector<std::uint64_t> &indices,
         rct::keyV &proof_elements_out) const;
     /**
-    * brief: min_enote_index - lowest index of an enote in the ledger
+    * brief: max_sp_enote_index - highest index of a seraphis enote in the ledger
     *   TODO: version this somehow?
-    * param: tx_to_add -
-    * return: lowest enote index (defaults to 0 if no enotes)
+    * return: highest seraphis enote index (defaults to std::uint64_t::max if no enotes)
     */
-    std::uint64_t min_enote_index() const;
+    std::uint64_t max_sp_enote_index() const;
     /**
-    * brief: max_enote_index - highest index of an enote in the ledger
+    * brief: max_legacy_enote_index - highest index of a legacy enote in the ledger
     *   TODO: version this somehow?
-    * return: highest enote index (defaults to std::uint64_t::max if no enotes)
+    * return: highest legacy enote index (defaults to std::uint64_t::max if no enotes)
     */
-    std::uint64_t max_enote_index() const;
+    std::uint64_t max_legacy_enote_index() const;
     /**
-    * brief: num_enotes - number of enotes in the ledger
-    *   TODO: version this somehow?
-    * return: number of enotes in the ledger
+    * brief: num_sp_enotes - number of seraphis enotes in the ledger
+    * return: number of seraphis enotes in the ledger
     */
-    std::uint64_t num_enotes() const { return max_enote_index() - min_enote_index() + 1; }
+    std::uint64_t num_sp_enotes() const { return max_sp_enote_index() + 1; }
+    /**
+    * brief: num_legacy_enotes - number of legacy enotes in the ledger
+    * return: number of legacy enotes in the ledger
+    */
+    std::uint64_t num_legacy_enotes() const { return max_legacy_enote_index() + 1; }
     /**
     * brief: get_onchain_chunk - find-received scan a chunk of blocks
     * param: chunk_start_height -
@@ -125,6 +142,18 @@ public:
     */
     bool try_get_unconfirmed_chunk(const crypto::secret_key &k_find_received,
         EnoteScanningChunkNonLedgerV1 &chunk_out) const;
+    /**
+    * brief: add_legacy_coinbase - make a block with a mock legacy coinbase tx
+    * param: tx_id -
+    * param: unlock_time -
+    * param: memo -
+    * param: output_enotes -
+    * return: block height of newly added block
+    */
+    std::uint64_t add_legacy_coinbase(const rct::key &tx_id,
+        const std::uint64_t unlock_time,
+        TxExtra memo,
+        std::vector<LegacyEnoteVariant> output_enotes);
     /**
     * brief: try_add_unconfirmed_tx_v1 - try to add a full transaction to the 'unconfirmed' tx cache
     *   - fails if there are key image duplicates with: unconfirmed, onchain
@@ -178,6 +207,10 @@ private:
         EnoteScanningChunkLedgerV1 &chunk_out) const;
     bool try_get_unconfirmed_chunk_impl(const crypto::secret_key &k_find_received,
         EnoteScanningChunkNonLedgerV1 &chunk_out) const;
+    std::uint64_t add_legacy_coinbase_impl(const rct::key &tx_id,
+        const std::uint64_t unlock_time,
+        TxExtra memo,
+        std::vector<LegacyEnoteVariant> output_enotes);
     bool try_add_unconfirmed_coinbase_v1_impl(const rct::key &tx_id,
         const rct::key &input_context,
         SpTxSupplementV1 tx_supplement,
@@ -194,17 +227,27 @@ private:
     /// context mutex (mutable for use in const member functions)
     mutable boost::shared_mutex m_context_mutex;
 
+    /// first block where a seraphis tx is allowed (this block and all following must have seraphis coinbase tx)
+    std::uint64_t m_first_seraphis_allowed_block;
+    /// first block where only seraphis txs are allowed
+    std::uint64_t m_first_seraphis_only_block;
+
 
     //// UNCONFIRMED TXs
 
     /// Seraphis key images
     std::unordered_set<crypto::key_image> m_unconfirmed_sp_key_images;
+    /// Cryptonote key images (legacy)
+    std::unordered_set<crypto::key_image> m_unconfirmed_legacy_key_images;
     /// map of tx key images
     std::map<
         sortable_key,     // tx id
-        std::vector<crypto::key_image>  // key images in tx
+        std::pair<
+            std::vector<crypto::key_image>,  // seraphis key images in tx
+            std::vector<crypto::key_image>   // legacy key images in tx
+        >
     > m_unconfirmed_tx_key_images;
-    /// map of tx outputs
+    /// map of Seraphis tx outputs
     std::map<
         sortable_key,     // tx id
         std::tuple<       // tx output contents
@@ -219,22 +262,34 @@ private:
 
     /// Seraphis key images
     std::unordered_set<crypto::key_image> m_sp_key_images;
+    /// Cryptonote key images (legacy)
+    std::unordered_set<crypto::key_image> m_legacy_key_images;
     /// map of tx key images
     std::map<
         std::uint64_t,      // block height
         std::map<
             sortable_key,   // tx id
-            std::vector<crypto::key_image>  // key images in tx
+            std::pair<
+                std::vector<crypto::key_image>,  // seraphis key images in tx
+                std::vector<crypto::key_image>   // legacy key images in tx
+            >
         >
     > m_blocks_of_tx_key_images;
     /// Seraphis squashed enotes (mapped to output index)
     std::map<std::uint64_t, rct::key> m_sp_squashed_enotes;
-    /// map of accumulated output counts
+    /// legacy enote references {KI, C} (mapped to output index)
+    std::map<std::uint64_t, std::pair<rct::key, rct::key>> m_legacy_enote_references;
+    /// map of accumulated output counts (Seraphis)
     std::map<
         std::uint64_t,  // block height
-        std::uint64_t   // total number of enotes including those in this block
-    > m_accumulated_output_counts;
-    /// map of tx outputs
+        std::uint64_t   // total number of seraphis enotes including those in this block
+    > m_accumulated_sp_output_counts;
+    /// map of accumulated output counts (legacy)
+    std::map<
+        std::uint64_t,  // block height
+        std::uint64_t   // total number of legacy enotes including those in this block
+    > m_accumulated_legacy_output_counts;
+    /// map of Seraphis tx outputs
     std::map<
         std::uint64_t,        // block height
         std::map<
@@ -245,7 +300,19 @@ private:
                 std::vector<SpEnoteV1>   // output enotes
             >
         >
-    > m_blocks_of_tx_output_contents;
+    > m_blocks_of_sp_tx_output_contents;
+    /// map of legacy tx outputs
+    std::map<
+        std::uint64_t,        // block height
+        std::map<
+            sortable_key,     // tx id
+            std::tuple<       // tx output contents
+                std::uint64_t,                    // unlock time (only height representation supported here)
+                TxExtra,                          // tx memo
+                std::vector<LegacyEnoteVariant>   // output enotes
+            >
+        >
+    > m_blocks_of_legacy_tx_output_contents;
     /// map of block info
     std::map<
         std::uint64_t,  // block height

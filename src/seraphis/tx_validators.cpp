@@ -385,7 +385,7 @@ bool try_get_sp_membership_proofs_v1_validation_data(const std::vector<const SpM
             return false;
 
         // get proof keys from enotes stored in the ledger
-        tx_validation_context.get_reference_set_proof_elements_v1(reference_indices, membership_proof_keys[proof_index]);
+        tx_validation_context.get_reference_set_proof_elements_v2(reference_indices, membership_proof_keys[proof_index]);
 
         // offset (input image masked keys squashed: Q" = K" + C")
         rct::addKeys(offsets[proof_index],

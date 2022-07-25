@@ -597,7 +597,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
 
     // c) add enotes owned by multisig address to the ledger and prepare membership ref sets (one step)
     // note: use ring size 2^2 = 4 for speed
-    MockLedgerContext ledger_context;
+    MockLedgerContext ledger_context{0, 0};
 
     std::vector<SpMembershipProofPrepV1> membership_proof_preps{
             gen_mock_sp_membership_proof_preps_v1(partial_tx.m_input_enotes,

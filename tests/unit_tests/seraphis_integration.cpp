@@ -306,7 +306,7 @@ TEST(seraphis_integration, txtype_squashed_v1)
         };
 
     /// mock ledger context for this test
-    MockLedgerContext ledger_context{};
+    MockLedgerContext ledger_context{0, 0};
 
 
     /// add enough fake enotes to the ledger so we can reliably make membership proofs

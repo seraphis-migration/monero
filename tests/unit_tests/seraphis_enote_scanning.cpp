@@ -446,7 +446,7 @@ TEST(seraphis_enote_scanning, trivial_ledger)
     mock_tx_supplement.m_output_enote_ephemeral_pubkeys.emplace_back(output_proposal.m_enote_ephemeral_pubkey);
 
     // add enote to mock ledger context as a coinbase enote
-    MockLedgerContext ledger_context;
+    MockLedgerContext ledger_context{0, 0};
     ASSERT_NO_THROW(ledger_context.commit_unconfirmed_txs_v1(mock_input_context, mock_tx_supplement, {single_enote}));
 
     // make and refresh enote store with mock ledger context
@@ -506,7 +506,7 @@ TEST(seraphis_enote_scanning, simple_ledger)
     /// tests
 
     // 1. one coinbase to user
-    MockLedgerContext ledger_context_test1;
+    MockLedgerContext ledger_context_test1{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test1{0};
     send_coinbase_amounts_to_users({{1}}, {destination_A}, ledger_context_test1);
     refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test1, enote_store_A_test1);
@@ -517,7 +517,7 @@ TEST(seraphis_enote_scanning, simple_ledger)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
 
     // 2. two coinbase to user (one coinbase tx)
-    MockLedgerContext ledger_context_test2;
+    MockLedgerContext ledger_context_test2{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test2{0};
     send_coinbase_amounts_to_users({{1, 1}}, {destination_A}, ledger_context_test2);
     refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test2, enote_store_A_test2);
@@ -528,7 +528,7 @@ TEST(seraphis_enote_scanning, simple_ledger)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
 
     // 3. two coinbase owned by different users (one coinbase tx)
-    MockLedgerContext ledger_context_test3;
+    MockLedgerContext ledger_context_test3{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test3{0};
     SpEnoteStoreMockV1 enote_store_B_test3{0};
     send_coinbase_amounts_to_users({{1}, {2}}, {destination_A, destination_B}, ledger_context_test3);
@@ -545,7 +545,7 @@ TEST(seraphis_enote_scanning, simple_ledger)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
 
     // 4. two coinbase to user, search between each send (two coinbase txs i.e. two blocks)
-    MockLedgerContext ledger_context_test4;
+    MockLedgerContext ledger_context_test4{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test4{0};
     send_coinbase_amounts_to_users({{1}}, {destination_A}, ledger_context_test4);
     refresh_user_enote_store(user_keys_A, refresh_config, ledger_context_test4, enote_store_A_test4);
@@ -569,7 +569,7 @@ TEST(seraphis_enote_scanning, simple_ledger)
             .m_max_chunk_size = 1,
             .m_max_partialscan_attempts = 0
         };
-    MockLedgerContext ledger_context_test5;
+    MockLedgerContext ledger_context_test5{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test5{0};
     refresh_user_enote_store(user_keys_A, refresh_config_test5, ledger_context_test5, enote_store_A_test5);
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::OFFCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
@@ -610,7 +610,7 @@ TEST(seraphis_enote_scanning, simple_ledger)
             .m_max_chunk_size = 1,
             .m_max_partialscan_attempts = 0
         };
-    MockLedgerContext ledger_context_test6;
+    MockLedgerContext ledger_context_test6{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test6{1};
     refresh_user_enote_store(user_keys_A, refresh_config_test6, ledger_context_test6, enote_store_A_test6);
 
@@ -696,7 +696,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
     /// tests
 
     // 1. one unconfirmed tx (no change), then commit it (include payment validator checks)
-    MockLedgerContext ledger_context_test1;
+    MockLedgerContext ledger_context_test1{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test1{0};
     SpEnoteStoreMockPaymentValidatorV1 enote_store_PV_A_test1{0};
     SpEnoteStoreMockV1 enote_store_B_test1{0};
@@ -758,7 +758,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 2);
 
     // 2. one unconfirmed tx (>0 change), then commit it
-    MockLedgerContext ledger_context_test2;
+    MockLedgerContext ledger_context_test2{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test2{0};
     SpEnoteStoreMockV1 enote_store_B_test2{0};
     const sp::InputSelectorMockV1 input_selector_A_test2{enote_store_A_test2};
@@ -811,7 +811,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 3);
 
     // 3. one unconfirmed tx (>0 change), then commit it + coinbase to B
-    MockLedgerContext ledger_context_test3;
+    MockLedgerContext ledger_context_test3{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test3{0};
     SpEnoteStoreMockV1 enote_store_B_test3{0};
     const sp::InputSelectorMockV1 input_selector_A_test3{enote_store_A_test3};
@@ -864,7 +864,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 11);
 
     // 4. pass funds around with unconfirmed cache clear
-    MockLedgerContext ledger_context_test4;
+    MockLedgerContext ledger_context_test4{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test4{0};
     SpEnoteStoreMockV1 enote_store_B_test4{0};
     const sp::InputSelectorMockV1 input_selector_A_test4{enote_store_A_test4};
@@ -1005,7 +1005,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 33);
 
     // 5. pass funds around with non-zero refresh height and reorging
-    MockLedgerContext ledger_context_test5;
+    MockLedgerContext ledger_context_test5{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test5{0};
     SpEnoteStoreMockV1 enote_store_B_test5{2};
     const sp::InputSelectorMockV1 input_selector_A_test5{enote_store_A_test5};
@@ -1366,7 +1366,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
             .m_max_chunk_size = 1,
             .m_max_partialscan_attempts = 0
         };
-    MockLedgerContext ledger_context_test1;
+    MockLedgerContext ledger_context_test1{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test1{0};
     SpEnoteStoreMockV1 enote_store_B_test1{0};
     const sp::InputSelectorMockV1 input_selector_A_test1{enote_store_A_test1};
@@ -1442,7 +1442,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
             .m_max_chunk_size = 1,
             .m_max_partialscan_attempts = 0
         };
-    MockLedgerContext ledger_context_test2;
+    MockLedgerContext ledger_context_test2{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test2{0};
     SpEnoteStoreMockV1 enote_store_B_test2{0};
     const sp::InputSelectorMockV1 input_selector_A_test2{enote_store_A_test2};
@@ -1534,7 +1534,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
             .m_max_chunk_size = 1,
             .m_max_partialscan_attempts = 1
         };
-    MockLedgerContext ledger_context_test3;
+    MockLedgerContext ledger_context_test3{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test3{0};
     SpEnoteStoreMockV1 enote_store_B_test3{0};
     const sp::InputSelectorMockV1 input_selector_A_test3{enote_store_A_test3};
@@ -1628,7 +1628,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
             .m_max_chunk_size = 1,
             .m_max_partialscan_attempts = 4
         };
-    MockLedgerContext ledger_context_test4;
+    MockLedgerContext ledger_context_test4{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test4{0};
     SpEnoteStoreMockV1 enote_store_B_test4{0};
     const sp::InputSelectorMockV1 input_selector_A_test4{enote_store_A_test4};
@@ -1689,7 +1689,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
             .m_max_chunk_size = 1,
             .m_max_partialscan_attempts = 4
         };
-    MockLedgerContext ledger_context_test5;
+    MockLedgerContext ledger_context_test5{0, 0};
     SpEnoteStoreMockV1 enote_store_A_test5{0};
     SpEnoteStoreMockV1 enote_store_B_test5{0};
     const sp::InputSelectorMockV1 input_selector_A_test5{enote_store_A_test5};

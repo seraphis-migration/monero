@@ -66,11 +66,11 @@ public:
     */
     virtual bool key_image_exists_v1(const crypto::key_image &key_image) const = 0;
     /**
-    * brief: get_reference_set_proof_elements_v1 - gets Seraphis squashed enotes stored in the validation context
+    * brief: get_reference_set_proof_elements_v2 - gets Seraphis squashed enotes stored in the validation context
     * param: indices -
     * outparam: proof_elements_out - {squashed enote}
     */
-    virtual void get_reference_set_proof_elements_v1(const std::vector<std::uint64_t> &indices,
+    virtual void get_reference_set_proof_elements_v2(const std::vector<std::uint64_t> &indices,
         rct::keyV &proof_elements_out) const = 0;
 };
 

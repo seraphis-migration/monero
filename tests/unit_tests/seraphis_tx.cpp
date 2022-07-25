@@ -64,7 +64,7 @@ struct SpTxGenData
 template <typename SpTxType>
 static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
 {
-    sp::MockLedgerContext ledger_context{};
+    sp::MockLedgerContext ledger_context{0, 0};
     const sp::TxValidationContextMock tx_validation_context{ledger_context};
 
     for (const SpTxGenData &gen : gen_data)
@@ -110,7 +110,7 @@ static void run_mock_tx_test(const std::vector<SpTxGenData> &gen_data)
 template <typename SpTxType>
 static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
 {
-    sp::MockLedgerContext ledger_context{};
+    sp::MockLedgerContext ledger_context{0, 0};
     const sp::TxValidationContextMock tx_validation_context{ledger_context};
     std::vector<SpTxType> txs_to_verify;
     std::vector<const SpTxType*> txs_to_verify_ptrs;

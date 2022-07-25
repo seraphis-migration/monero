@@ -160,6 +160,8 @@ struct LegacyEnoteVariant final
 
     /// get the enote's onetime address
     const rct::key& onetime_address() const;
+    /// get the enote's amount commitment
+    rct::key amount_commitment() const;
 
     /// interact with the variant
     template <typename T>

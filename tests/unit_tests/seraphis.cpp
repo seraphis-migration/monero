@@ -1084,7 +1084,7 @@ TEST(seraphis, txtype_squashed_v1)
     const std::size_t num_ins_outs{11};
 
     // fake ledger context for this test
-    sp::MockLedgerContext ledger_context{};
+    sp::MockLedgerContext ledger_context{0, 0};
 
     // prepare input/output amounts
     std::vector<rct::xmr_amount> in_amounts;
