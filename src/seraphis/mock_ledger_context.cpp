@@ -120,14 +120,14 @@ void MockLedgerContext::get_reference_set_proof_elements_v2(const std::vector<st
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::uint64_t MockLedgerContext::max_sp_enote_index() const
-{
-    return m_sp_squashed_enotes.size() - 1;
-}
-//-------------------------------------------------------------------------------------------------------------------
 std::uint64_t MockLedgerContext::max_legacy_enote_index() const
 {
     return m_legacy_enote_references.size() - 1;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t MockLedgerContext::max_sp_enote_index() const
+{
+    return m_sp_squashed_enotes.size() - 1;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::get_onchain_chunk(const std::uint64_t chunk_start_height,
@@ -208,14 +208,14 @@ std::uint64_t MockLedgerContext::pop_blocks(const std::size_t num_blocks)
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::key_image_exists_unconfirmed_v1_impl(const crypto::key_image &key_image) const
 {
-    return m_unconfirmed_sp_key_images.find(key_image) != m_unconfirmed_sp_key_images.end() ||
-        m_unconfirmed_legacy_key_images.find(key_image) != m_unconfirmed_legacy_key_images.end();
+    return m_unconfirmed_legacy_key_images.find(key_image) != m_unconfirmed_legacy_key_images.end() ||
+        m_unconfirmed_sp_key_images.find(key_image) != m_unconfirmed_sp_key_images.end();
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::key_image_exists_onchain_v1_impl(const crypto::key_image &key_image) const
 {
-    return m_sp_key_images.find(key_image) != m_sp_key_images.end() ||
-        m_legacy_key_images.find(key_image) != m_legacy_key_images.end();
+    return m_legacy_key_images.find(key_image) != m_legacy_key_images.end() ||
+        m_sp_key_images.find(key_image) != m_sp_key_images.end();
 }
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_height,
@@ -295,7 +295,7 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
             m_blocks_of_tx_key_images.end(),
         "onchain chunk find-received scanning (mock ledger context): end of chunk not known in key images map (bug).");
 
-    // a. initialize output count to the total number of enotes in the ledger before the first block to scan
+    // a. initialize output count to the total number of seraphis enotes in the ledger before the first block to scan
     std::uint64_t total_output_count_before_tx{0};
 
     if (chunk_out.m_start_height > 0)
@@ -483,7 +483,7 @@ bool MockLedgerContext::try_add_unconfirmed_tx_v1_impl(const SpTxSquashedV1 &tx)
     /// check failure modes
 
     // 1. fail if new tx overlaps with cached key images: unconfirmed, onchain
-    std::vector<crypto::key_image> key_images_collected;
+    std::vector<crypto::key_image> sp_key_images_collected;
 
     for (const SpEnoteImageV1 &enote_image : tx.m_input_images)
     {
@@ -491,11 +491,11 @@ bool MockLedgerContext::try_add_unconfirmed_tx_v1_impl(const SpTxSquashedV1 &tx)
             key_image_exists_onchain_v1_impl(enote_image.m_core.m_key_image))
             return false;
 
-        key_images_collected.emplace_back(enote_image.m_core.m_key_image);
+        sp_key_images_collected.emplace_back(enote_image.m_core.m_key_image);
     }
 
     rct::key input_context;
-    jamtis::make_jamtis_input_context_standard(key_images_collected, input_context);
+    jamtis::make_jamtis_input_context_standard(sp_key_images_collected, input_context);
 
     // 2. fail if tx id is duplicated (bug since key image check should prevent this)
     rct::key tx_id;
@@ -513,7 +513,7 @@ bool MockLedgerContext::try_add_unconfirmed_tx_v1_impl(const SpTxSquashedV1 &tx)
     for (const SpEnoteImageV1 &enote_image : tx.m_input_images)
         m_unconfirmed_sp_key_images.insert(enote_image.m_core.m_key_image);
 
-    m_unconfirmed_tx_key_images[tx_id] = {std::move(key_images_collected), std::vector<crypto::key_image>{}};
+    m_unconfirmed_tx_key_images[tx_id] = {std::vector<crypto::key_image>{}, std::move(sp_key_images_collected)};
 
     // 2. add tx outputs
     m_unconfirmed_tx_output_contents[tx_id] = {input_context, tx.m_tx_supplement, tx.m_outputs};
@@ -547,14 +547,14 @@ std::uint64_t MockLedgerContext::commit_unconfirmed_txs_v1_impl(const rct::key &
                 "mock tx ledger (committing unconfirmed txs): unconfirmed tx id found in ledger (bug).");
         }
 
-        // c. Seraphis key images are not present onchain
+        // c. legacy key images are not present onchain
         for (const crypto::key_image &key_image : std::get<0>(tx_key_images.second))
         {
             CHECK_AND_ASSERT_THROW_MES(!key_image_exists_onchain_v1_impl(key_image),
                 "mock tx ledger (committing unconfirmed txs): unconfirmed tx key image exists in ledger (bug).");
         }
 
-        // d. legacy key images are not present onchain
+        // d. Seraphis key images are not present onchain
         for (const crypto::key_image &key_image : std::get<1>(tx_key_images.second))
         {
             CHECK_AND_ASSERT_THROW_MES(!key_image_exists_onchain_v1_impl(key_image),
@@ -636,9 +636,9 @@ void MockLedgerContext::remove_tx_from_unconfirmed_cache_impl(const rct::key &tx
     if (m_unconfirmed_tx_key_images.find(tx_id) != m_unconfirmed_tx_key_images.end())
     {
         for (const crypto::key_image &key_image : std::get<0>(m_unconfirmed_tx_key_images[tx_id]))
-            m_unconfirmed_sp_key_images.erase(key_image);
-        for (const crypto::key_image &key_image : std::get<1>(m_unconfirmed_tx_key_images[tx_id]))
             m_unconfirmed_legacy_key_images.erase(key_image);
+        for (const crypto::key_image &key_image : std::get<1>(m_unconfirmed_tx_key_images[tx_id]))
+            m_unconfirmed_sp_key_images.erase(key_image);
 
         m_unconfirmed_tx_key_images.erase(tx_id);
     }
@@ -669,34 +669,14 @@ std::uint64_t MockLedgerContext::pop_chain_at_height_impl(const std::uint64_t po
             for (const auto &tx_key_images : m_blocks_of_tx_key_images[height_to_pop])
             {
                 for (const crypto::key_image &key_image : std::get<0>(tx_key_images.second))
-                    m_sp_key_images.erase(key_image);
-                for (const crypto::key_image &key_image : std::get<1>(tx_key_images.second))
                     m_legacy_key_images.erase(key_image);
+                for (const crypto::key_image &key_image : std::get<1>(tx_key_images.second))
+                    m_sp_key_images.erase(key_image);
             }
         }
     }
 
-    // 2. remove squashed enotes
-    if (m_accumulated_sp_output_counts.find(pop_height) != m_accumulated_sp_output_counts.end())
-    {
-        // sanity check
-        if (pop_height > 0)
-        {
-            CHECK_AND_ASSERT_THROW_MES(m_accumulated_sp_output_counts.find(pop_height - 1) !=
-                    m_accumulated_sp_output_counts.end(),
-                "mock ledger context (popping chain): accumulated seraphis output counts has a hole (bug).");
-        }
-
-        // remove all outputs starting in the pop_height block
-        const std::uint64_t first_output_to_remove =
-            pop_height > 0
-            ? m_accumulated_sp_output_counts[pop_height - 1]
-            : 0;
-
-        m_sp_squashed_enotes.erase(m_sp_squashed_enotes.find(first_output_to_remove), m_sp_squashed_enotes.end());
-    }
-
-    // 3. remove legacy enote references
+    // 2. remove legacy enote references
     if (m_accumulated_legacy_output_counts.find(pop_height) != m_accumulated_legacy_output_counts.end())
     {
         // sanity check
@@ -717,16 +697,36 @@ std::uint64_t MockLedgerContext::pop_chain_at_height_impl(const std::uint64_t po
             m_legacy_enote_references.end());
     }
 
+    // 3. remove squashed enotes
+    if (m_accumulated_sp_output_counts.find(pop_height) != m_accumulated_sp_output_counts.end())
+    {
+        // sanity check
+        if (pop_height > 0)
+        {
+            CHECK_AND_ASSERT_THROW_MES(m_accumulated_sp_output_counts.find(pop_height - 1) !=
+                    m_accumulated_sp_output_counts.end(),
+                "mock ledger context (popping chain): accumulated seraphis output counts has a hole (bug).");
+        }
+
+        // remove all outputs starting in the pop_height block
+        const std::uint64_t first_output_to_remove =
+            pop_height > 0
+            ? m_accumulated_sp_output_counts[pop_height - 1]
+            : 0;
+
+        m_sp_squashed_enotes.erase(m_sp_squashed_enotes.find(first_output_to_remove), m_sp_squashed_enotes.end());
+    }
+
     // 4. clean up block maps
     m_blocks_of_tx_key_images.erase(m_blocks_of_tx_key_images.find(pop_height), m_blocks_of_tx_key_images.end());
-    m_accumulated_sp_output_counts.erase(m_accumulated_sp_output_counts.find(pop_height),
-        m_accumulated_sp_output_counts.end());
     m_accumulated_legacy_output_counts.erase(m_accumulated_legacy_output_counts.find(pop_height),
         m_accumulated_legacy_output_counts.end());
-    m_blocks_of_sp_tx_output_contents.erase(m_blocks_of_sp_tx_output_contents.find(pop_height),
-        m_blocks_of_sp_tx_output_contents.end());
+    m_accumulated_sp_output_counts.erase(m_accumulated_sp_output_counts.find(pop_height),
+        m_accumulated_sp_output_counts.end());
     m_blocks_of_legacy_tx_output_contents.erase(m_blocks_of_legacy_tx_output_contents.find(pop_height),
         m_blocks_of_legacy_tx_output_contents.end());
+    m_blocks_of_sp_tx_output_contents.erase(m_blocks_of_sp_tx_output_contents.find(pop_height),
+        m_blocks_of_sp_tx_output_contents.end());
     m_block_infos.erase(m_block_infos.find(pop_height), m_block_infos.end());
 
     return num_blocks_to_pop;

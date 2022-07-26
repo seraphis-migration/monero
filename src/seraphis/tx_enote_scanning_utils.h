@@ -69,8 +69,8 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
 void collect_key_images_from_tx(const std::uint64_t block_height,
     const std::uint64_t block_timestamp,
     const rct::key &transaction_id,
-    const std::vector<crypto::key_image> &sp_key_images_in_tx,
     const std::vector<crypto::key_image> &legacy_key_images_in_tx,
+    const std::vector<crypto::key_image> &sp_key_images_in_tx,
     const SpEnoteSpentStatus spent_status,
     std::list<SpContextualKeyImageSetV1> &contextual_key_images_inout);
 

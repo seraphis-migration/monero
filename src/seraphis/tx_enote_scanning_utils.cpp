@@ -92,7 +92,7 @@ static void process_chunk_new_record_update(const SpEnoteRecordV1 &new_enote_rec
     // 2. handle if this enote record is spent in this chunk
     SpEnoteSpentContextV1 spent_context_update{};
 
-    auto record_is_spent_in_this_chunk =
+    auto contextual_key_images_of_record_spent_in_this_chunk =
         std::find_if(
             chunk_contextual_key_images.begin(),
             chunk_contextual_key_images.end(),
@@ -102,13 +102,13 @@ static void process_chunk_new_record_update(const SpEnoteRecordV1 &new_enote_rec
             }
         );
 
-    if (record_is_spent_in_this_chunk != chunk_contextual_key_images.end())
+    if (contextual_key_images_of_record_spent_in_this_chunk != chunk_contextual_key_images.end())
     {
         // a. record that the enote is spent in this chunk
         found_spent_key_images_inout[new_record_key_image];
 
         // b. update its spent context (update instead of assignment in case of duplicates)
-        try_update_enote_spent_context_v1(record_is_spent_in_this_chunk->m_spent_context,
+        try_update_enote_spent_context_v1(contextual_key_images_of_record_spent_in_this_chunk->m_spent_context,
             found_spent_key_images_inout[new_record_key_image]);
 
         // c. get the record's current spent context
@@ -200,15 +200,15 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
 void collect_key_images_from_tx(const std::uint64_t block_height,
     const std::uint64_t block_timestamp,
     const rct::key &transaction_id,
-    const std::vector<crypto::key_image> &sp_key_images_in_tx,
     const std::vector<crypto::key_image> &legacy_key_images_in_tx,
+    const std::vector<crypto::key_image> &sp_key_images_in_tx,
     const SpEnoteSpentStatus spent_status,
     std::list<SpContextualKeyImageSetV1> &contextual_key_images_inout)
 {
     contextual_key_images_inout.emplace_back(
             SpContextualKeyImageSetV1{
-                .m_sp_key_images = sp_key_images_in_tx,
                 .m_legacy_key_images = legacy_key_images_in_tx,
+                .m_sp_key_images = sp_key_images_in_tx,
                 .m_spent_context =
                     SpEnoteSpentContextV1{
                         .m_block_height = block_height,

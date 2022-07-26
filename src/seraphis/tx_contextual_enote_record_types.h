@@ -322,17 +322,18 @@ struct SpContextualEnoteRecordV1 final
 ///
 struct SpContextualKeyImageSetV1 final
 {
-    /// a set of seraphis key images found in a single tx
-    std::vector<crypto::key_image> m_sp_key_images;
     /// a set of legacy key images found in a single tx
     std::vector<crypto::key_image> m_legacy_key_images;
+    /// a set of seraphis key images found in a single tx
+    std::vector<crypto::key_image> m_sp_key_images;
     /// info about where the corresponding inputs were spent
     SpEnoteSpentContextV1 m_spent_context;
 
     bool has_key_image(const crypto::key_image &test_key_image) const
     {
-        return std::find(m_sp_key_images.begin(), m_sp_key_images.end(), test_key_image) != m_sp_key_images.end() ||
-            std::find(m_legacy_key_images.begin(), m_legacy_key_images.end(), test_key_image) != m_legacy_key_images.end();
+        return std::find(m_legacy_key_images.begin(), m_legacy_key_images.end(), test_key_image) !=
+                m_legacy_key_images.end() ||
+            std::find(m_sp_key_images.begin(), m_sp_key_images.end(), test_key_image) != m_sp_key_images.end();
     }
 };
 

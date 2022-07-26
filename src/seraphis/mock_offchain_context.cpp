@@ -140,8 +140,8 @@ bool MockOffchainContext::try_get_offchain_chunk_impl(const crypto::secret_key &
             collect_key_images_from_tx(-1,
                 -1,
                 sortable2rct(tx_with_output_contents.first),
-                m_tx_key_images.at(tx_with_output_contents.first),  //use input context as proxy for tx id
                 std::vector<crypto::key_image>{},  //legacy key images todo?
+                m_tx_key_images.at(tx_with_output_contents.first),  //use input context as proxy for tx id
                 SpEnoteSpentStatus::SPENT_OFFCHAIN,
                 chunk_out.m_contextual_key_images);
         }

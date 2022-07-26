@@ -102,27 +102,27 @@ public:
     void get_reference_set_proof_elements_v2(const std::vector<std::uint64_t> &indices,
         rct::keyV &proof_elements_out) const;
     /**
-    * brief: max_sp_enote_index - highest index of a seraphis enote in the ledger
-    *   TODO: version this somehow?
-    * return: highest seraphis enote index (defaults to std::uint64_t::max if no enotes)
-    */
-    std::uint64_t max_sp_enote_index() const;
-    /**
     * brief: max_legacy_enote_index - highest index of a legacy enote in the ledger
     *   TODO: version this somehow?
     * return: highest legacy enote index (defaults to std::uint64_t::max if no enotes)
     */
     std::uint64_t max_legacy_enote_index() const;
     /**
-    * brief: num_sp_enotes - number of seraphis enotes in the ledger
-    * return: number of seraphis enotes in the ledger
+    * brief: max_sp_enote_index - highest index of a seraphis enote in the ledger
+    *   TODO: version this somehow?
+    * return: highest seraphis enote index (defaults to std::uint64_t::max if no enotes)
     */
-    std::uint64_t num_sp_enotes() const { return max_sp_enote_index() + 1; }
+    std::uint64_t max_sp_enote_index() const;
     /**
     * brief: num_legacy_enotes - number of legacy enotes in the ledger
     * return: number of legacy enotes in the ledger
     */
     std::uint64_t num_legacy_enotes() const { return max_legacy_enote_index() + 1; }
+    /**
+    * brief: num_sp_enotes - number of seraphis enotes in the ledger
+    * return: number of seraphis enotes in the ledger
+    */
+    std::uint64_t num_sp_enotes() const { return max_sp_enote_index() + 1; }
     /**
     * brief: get_onchain_chunk - find-received scan a chunk of blocks
     * param: chunk_start_height -
@@ -235,16 +235,16 @@ private:
 
     //// UNCONFIRMED TXs
 
-    /// Seraphis key images
-    std::unordered_set<crypto::key_image> m_unconfirmed_sp_key_images;
     /// Cryptonote key images (legacy)
     std::unordered_set<crypto::key_image> m_unconfirmed_legacy_key_images;
+    /// Seraphis key images
+    std::unordered_set<crypto::key_image> m_unconfirmed_sp_key_images;
     /// map of tx key images
     std::map<
         sortable_key,     // tx id
         std::pair<
-            std::vector<crypto::key_image>,  // seraphis key images in tx
-            std::vector<crypto::key_image>   // legacy key images in tx
+            std::vector<crypto::key_image>,  // legacy key images in tx
+            std::vector<crypto::key_image>   // seraphis key images in tx
         >
     > m_unconfirmed_tx_key_images;
     /// map of Seraphis tx outputs
@@ -260,47 +260,35 @@ private:
 
     //// ON-CHAIN BLOCKS & TXs
 
-    /// Seraphis key images
-    std::unordered_set<crypto::key_image> m_sp_key_images;
     /// Cryptonote key images (legacy)
     std::unordered_set<crypto::key_image> m_legacy_key_images;
+    /// Seraphis key images
+    std::unordered_set<crypto::key_image> m_sp_key_images;
     /// map of tx key images
     std::map<
         std::uint64_t,      // block height
         std::map<
             sortable_key,   // tx id
             std::pair<
-                std::vector<crypto::key_image>,  // seraphis key images in tx
-                std::vector<crypto::key_image>   // legacy key images in tx
+                std::vector<crypto::key_image>,  // legacy key images in tx
+                std::vector<crypto::key_image>   // seraphis key images in tx
             >
         >
     > m_blocks_of_tx_key_images;
-    /// Seraphis squashed enotes (mapped to output index)
-    std::map<std::uint64_t, rct::key> m_sp_squashed_enotes;
     /// legacy enote references {KI, C} (mapped to output index)
     std::map<std::uint64_t, std::pair<rct::key, rct::key>> m_legacy_enote_references;
-    /// map of accumulated output counts (Seraphis)
-    std::map<
-        std::uint64_t,  // block height
-        std::uint64_t   // total number of seraphis enotes including those in this block
-    > m_accumulated_sp_output_counts;
+    /// Seraphis squashed enotes (mapped to output index)
+    std::map<std::uint64_t, rct::key> m_sp_squashed_enotes;
     /// map of accumulated output counts (legacy)
     std::map<
         std::uint64_t,  // block height
         std::uint64_t   // total number of legacy enotes including those in this block
     > m_accumulated_legacy_output_counts;
-    /// map of Seraphis tx outputs
+    /// map of accumulated output counts (Seraphis)
     std::map<
-        std::uint64_t,        // block height
-        std::map<
-            sortable_key,     // tx id
-            std::tuple<       // tx output contents
-                rct::key,                // input context
-                SpTxSupplementV1,        // tx supplement
-                std::vector<SpEnoteV1>   // output enotes
-            >
-        >
-    > m_blocks_of_sp_tx_output_contents;
+        std::uint64_t,  // block height
+        std::uint64_t   // total number of seraphis enotes including those in this block
+    > m_accumulated_sp_output_counts;
     /// map of legacy tx outputs
     std::map<
         std::uint64_t,        // block height
@@ -313,6 +301,18 @@ private:
             >
         >
     > m_blocks_of_legacy_tx_output_contents;
+    /// map of Seraphis tx outputs
+    std::map<
+        std::uint64_t,        // block height
+        std::map<
+            sortable_key,     // tx id
+            std::tuple<       // tx output contents
+                rct::key,                // input context
+                SpTxSupplementV1,        // tx supplement
+                std::vector<SpEnoteV1>   // output enotes
+            >
+        >
+    > m_blocks_of_sp_tx_output_contents;
     /// map of block info
     std::map<
         std::uint64_t,  // block height
