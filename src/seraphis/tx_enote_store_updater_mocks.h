@@ -74,7 +74,7 @@ public:
     void start_chunk_handling_session() override;
     /// process a chunk of basic enote records and save the results
     void process_chunk(
-        const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+        const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
         const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images) override;
     /// end the current chunk-handling session
     void end_chunk_handling_session(const std::uint64_t first_new_block,
@@ -122,7 +122,7 @@ public:
 //member functions
     /// process a chunk of basic enote records and handle the results
     void process_and_handle_chunk(
-        const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+        const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
         const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images) override;
 
 //member variables
@@ -159,7 +159,7 @@ public:
     void start_chunk_handling_session() override;
     /// process a chunk of basic enote records and save the results (note: ignore contextual key images)
     void process_chunk(
-        const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+        const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
         const std::list<SpContextualKeyImageSetV1>&) override;
     /// end the current chunk-handling session
     void end_chunk_handling_session(const std::uint64_t first_new_block,
@@ -207,7 +207,7 @@ public:
 //member functions
     /// process a chunk of basic enote records and handle the results
     void process_and_handle_chunk(
-        const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+        const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
         const std::list<SpContextualKeyImageSetV1>&) override;
 
 //member variables

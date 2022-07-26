@@ -122,7 +122,7 @@ bool MockOffchainContext::try_get_offchain_chunk_impl(const crypto::secret_key &
     for (const auto &tx_with_output_contents : m_output_contents)
     {
         // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
-        if (try_find_enotes_in_tx(k_find_received,
+        if (try_find_sp_enotes_in_tx(k_find_received,
             -1,
             -1,
             tx_with_output_contents.first,  //use input context as proxy for tx id

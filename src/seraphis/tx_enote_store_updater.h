@@ -67,7 +67,7 @@ public:
     virtual void start_chunk_handling_session() = 0;
     /// process a chunk of basic enote records and save the results
     virtual void process_chunk(
-        const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+        const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
         const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images) = 0;
     /// end the current chunk-handling session
     virtual void end_chunk_handling_session(const std::uint64_t first_new_block,
@@ -96,7 +96,7 @@ public:
 //member functions
     /// process a chunk of basic enote records and handle the results
     virtual void process_and_handle_chunk(
-        const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+        const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
         const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images) = 0;
 };
 

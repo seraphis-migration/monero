@@ -125,7 +125,7 @@ static void process_chunk_new_record_update(const SpEnoteRecordV1 &new_enote_rec
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
+bool try_find_sp_enotes_in_tx(const crypto::secret_key &k_find_received,
     const std::uint64_t block_height,
     const std::uint64_t block_timestamp,
     const rct::key &transaction_id,
@@ -135,7 +135,7 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
     const std::vector<SpEnoteV1> &enotes_in_tx,
     const SpEnoteOriginStatus origin_status,
     hw::device &hwdev,
-    std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &basic_records_per_tx_inout)
+    std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &basic_records_per_tx_inout)
 {
     if (tx_supplement.m_output_enote_ephemeral_pubkeys.size() == 0)
         return false;
@@ -143,7 +143,7 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
     // scan each enote in the tx
     std::size_t ephemeral_pubkey_index{0};
     crypto::key_derivation temp_DH_derivation;
-    std::list<SpContextualBasicEnoteRecordV1> temp_contextual_record;
+    SpContextualBasicEnoteRecordV1 temp_contextual_record{};
     bool found_an_enote{false};
 
     for (std::size_t enote_index{0}; enote_index < enotes_in_tx.size(); ++enote_index)
@@ -159,10 +159,6 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
                 temp_DH_derivation);
         }
 
-        // prepare record shuttle
-        if (temp_contextual_record.size() == 0)
-            temp_contextual_record.emplace_back();
-
         // find-receive scan the enote (in try block in case enote is malformed)
         try
         {
@@ -170,9 +166,9 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
                 tx_supplement.m_output_enote_ephemeral_pubkeys[ephemeral_pubkey_index],
                 input_context,
                 temp_DH_derivation,
-                temp_contextual_record.back().m_record))
+                temp_contextual_record.m_record))
             {
-                temp_contextual_record.back().m_origin_context =
+                temp_contextual_record.m_origin_context =
                     SpEnoteOriginContextV1{
                             .m_block_height = block_height,
                             .m_block_timestamp = block_timestamp,
@@ -184,10 +180,7 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
 
                 // note: it is possible for enotes with duplicate onetime addresses to be added here; it is assumed the
                 //       upstream caller will be able to handle that case without problems
-                auto &basic_records_for_tx = basic_records_per_tx_inout[transaction_id];
-                basic_records_for_tx.splice(basic_records_for_tx.end(),
-                    temp_contextual_record,
-                    temp_contextual_record.begin());
+                basic_records_per_tx_inout[transaction_id].emplace_back(temp_contextual_record);
 
                 found_an_enote = true;
             }
@@ -225,7 +218,7 @@ void process_chunk_intermediate(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
-    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records_inout)
 {
     // check for owned enotes in this chunk (non-self-send intermediate scanning pass)
@@ -233,11 +226,15 @@ void process_chunk_intermediate(const rct::key &wallet_spend_pubkey,
 
     for (const auto &tx_basic_records : chunk_basic_records_per_tx)
     {
-        for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record : tx_basic_records.second)
+        for (const ContextualBasicRecordVariant &contextual_basic_record : tx_basic_records.second)
         {
+            if (!contextual_basic_record.is_type<SpContextualBasicEnoteRecordV1>())
+                continue;
+
             try
             {
-                if (try_get_intermediate_enote_record_v1(contextual_basic_record.m_record,
+                if (try_get_intermediate_enote_record_v1(
+                    contextual_basic_record.get_contextual_record<SpContextualBasicEnoteRecordV1>().m_record,
                     wallet_spend_pubkey,
                     k_unlock_amounts,
                     k_find_received,
@@ -246,7 +243,7 @@ void process_chunk_intermediate(const rct::key &wallet_spend_pubkey,
                     new_enote_record))
                 {
                     process_chunk_new_intermediate_record_update(new_enote_record,
-                        contextual_basic_record.m_origin_context,
+                        contextual_basic_record.origin_context(),
                         found_enote_records_inout);
                 }
             } catch (...) {}
@@ -261,7 +258,7 @@ void process_chunk_full(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     const std::function<bool(const crypto::key_image&)> &check_key_image_is_known_func,
-    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_inout,
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout)
@@ -308,11 +305,15 @@ void process_chunk_full(const rct::key &wallet_spend_pubkey,
 
     for (const auto &tx_basic_records : chunk_basic_records_per_tx)
     {
-        for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record : tx_basic_records.second)
+        for (const ContextualBasicRecordVariant &contextual_basic_record : tx_basic_records.second)
         {
+            if (!contextual_basic_record.is_type<SpContextualBasicEnoteRecordV1>())
+                continue;
+
             try
             {
-                if (try_get_enote_record_v1_plain(contextual_basic_record.m_record,
+                if (try_get_enote_record_v1_plain(
+                    contextual_basic_record.get_contextual_record<SpContextualBasicEnoteRecordV1>().m_record,
                     wallet_spend_pubkey,
                     k_view_balance,
                     k_unlock_amounts,
@@ -322,7 +323,7 @@ void process_chunk_full(const rct::key &wallet_spend_pubkey,
                     new_enote_record))
                 {
                     process_chunk_new_record_update(new_enote_record,
-                        contextual_basic_record.m_origin_context,
+                        contextual_basic_record.origin_context(),
                         chunk_contextual_key_images,
                         found_enote_records_inout,
                         found_spent_key_images_inout,
@@ -346,21 +347,27 @@ void process_chunk_full(const rct::key &wallet_spend_pubkey,
                     chunk_basic_records_per_tx.end(),
                 "enote scan process chunk (self-send passthroughs): tx with spent enotes not found in records map (bug).");
 
-            for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record :
+            for (const ContextualBasicRecordVariant &contextual_basic_record :
                 chunk_basic_records_per_tx.at(tx_with_spent_enotes))
             {
+                if (!contextual_basic_record.is_type<SpContextualBasicEnoteRecordV1>())
+                    continue;
+
                 try
                 {
-                    if (try_get_enote_record_v1_selfsend(contextual_basic_record.m_record.m_enote,
-                        contextual_basic_record.m_record.m_enote_ephemeral_pubkey,
-                        contextual_basic_record.m_record.m_input_context,
+                    if (try_get_enote_record_v1_selfsend(
+                        contextual_basic_record.get_contextual_record<SpContextualBasicEnoteRecordV1>().m_record.m_enote,
+                        contextual_basic_record.get_contextual_record<SpContextualBasicEnoteRecordV1>().m_record
+                            .m_enote_ephemeral_pubkey,
+                        contextual_basic_record.get_contextual_record<SpContextualBasicEnoteRecordV1>().m_record
+                            .m_input_context,
                         wallet_spend_pubkey,
                         k_view_balance,
                         s_generate_address,
                         new_enote_record))
                     {
                         process_chunk_new_record_update(new_enote_record,
-                            contextual_basic_record.m_origin_context,
+                            contextual_basic_record.origin_context(),
                             chunk_contextual_key_images,
                             found_enote_records_inout,
                             found_spent_key_images_inout,

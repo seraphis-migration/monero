@@ -76,7 +76,7 @@ void EnoteStoreUpdaterLedgerMock::start_chunk_handling_session()
 }
 //-------------------------------------------------------------------------------------------------------------------
 void EnoteStoreUpdaterLedgerMock::process_chunk(
-    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images)
 {
     process_chunk_full(m_wallet_spend_pubkey,
@@ -140,7 +140,7 @@ EnoteStoreUpdaterNonLedgerMock::EnoteStoreUpdaterNonLedgerMock(const rct::key &w
 }
 //-------------------------------------------------------------------------------------------------------------------
 void EnoteStoreUpdaterNonLedgerMock::process_and_handle_chunk(
-    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images)
 {
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> found_enote_records;
@@ -186,7 +186,7 @@ void EnoteStoreUpdaterLedgerMockIntermediate::start_chunk_handling_session()
 }
 //-------------------------------------------------------------------------------------------------------------------
 void EnoteStoreUpdaterLedgerMockIntermediate::process_chunk(
-    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1>&)
 {
     process_chunk_intermediate(m_wallet_spend_pubkey,
@@ -244,7 +244,7 @@ EnoteStoreUpdaterNonLedgerMockIntermediate::EnoteStoreUpdaterNonLedgerMockInterm
 }
 //-------------------------------------------------------------------------------------------------------------------
 void EnoteStoreUpdaterNonLedgerMockIntermediate::process_and_handle_chunk(
-    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1>&)
 {
     std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> found_enote_records;

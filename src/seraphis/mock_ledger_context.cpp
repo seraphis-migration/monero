@@ -323,7 +323,7 @@ void MockLedgerContext::get_onchain_chunk_impl(const std::uint64_t chunk_start_h
                 for (const auto &tx_with_output_contents : block_of_tx_output_contents.second)
                 {
                     // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
-                    if (try_find_enotes_in_tx(k_find_received,
+                    if (try_find_sp_enotes_in_tx(k_find_received,
                         block_of_tx_output_contents.first,
                         std::get<std::uint64_t>(m_block_infos.at(block_of_tx_output_contents.first)),
                         sortable2rct(tx_with_output_contents.first),
@@ -372,7 +372,7 @@ bool MockLedgerContext::try_get_unconfirmed_chunk_impl(const crypto::secret_key 
     for (const auto &tx_with_output_contents : m_unconfirmed_tx_output_contents)
     {
         // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
-        if (try_find_enotes_in_tx(k_find_received,
+        if (try_find_sp_enotes_in_tx(k_find_received,
             -1,
             -1,
             sortable2rct(tx_with_output_contents.first),

@@ -59,8 +59,8 @@ namespace sp
 
 ////
 // EnoteScanningChunkLedgerV1
-// - contextual basic enote records for view tag matches in a chunk of blocks
-// - key images from all txs that have view tag matches in that chunk
+// - contextual basic enote records for owned enote candidates in a chunk of blocks
+// - key images from all txs that have owned enote candidates in that chunk
 // - chunk range: [start height, end height)
 // - prefix block id: id of block that comes before the chunk range, used for contiguity checks
 ///
@@ -73,9 +73,9 @@ struct EnoteScanningChunkLedgerV1 final
     rct::key m_prefix_block_id;
     /// block ids in range [start height, end height)
     std::vector<rct::key> m_block_ids;
-    /// view tag matches in range [start height, end height) (mapped to tx id)
-    std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> m_basic_records_per_tx;
-    /// key images from txs with view tag matches in range [start height, end height)
+    /// owned enote candidates in range [start height, end height) (mapped to tx id)
+    std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> m_basic_records_per_tx;
+    /// key images from txs with owned enote candidates in range [start height, end height)
     std::list<SpContextualKeyImageSetV1> m_contextual_key_images;
     //std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_contextual_key_images;
 };
@@ -84,13 +84,13 @@ struct EnoteScanningChunkLedgerV1 final
 
 ////
 // EnoteScanningChunkLedgerV1
-// - contextual basic enote records for view tag matches in a non-ledger context (at a single point in time)
-// - key images from all txs that have view tag matches
+// - contextual basic enote records for owned enote candidates in a non-ledger context (at a single point in time)
+// - key images from all txs with owned enote candidates
 ///
 struct EnoteScanningChunkNonLedgerV1 final
 {
     /// view tag matches in a non-ledger context (mapped to tx id)
-    std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> m_basic_records_per_tx;
+    std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> m_basic_records_per_tx;
     /// key images from txs with view tag matches in the non-ledger context
     std::list<SpContextualKeyImageSetV1> m_contextual_key_images;
     //std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_contextual_key_images;

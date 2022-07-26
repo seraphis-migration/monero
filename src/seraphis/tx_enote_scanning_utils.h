@@ -55,7 +55,7 @@ namespace sp
 {
 
 //todo
-bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
+bool try_find_sp_enotes_in_tx(const crypto::secret_key &k_find_received,
     const std::uint64_t block_height,
     const std::uint64_t block_timestamp,
     const rct::key &transaction_id,
@@ -65,7 +65,7 @@ bool try_find_enotes_in_tx(const crypto::secret_key &k_find_received,
     const std::vector<SpEnoteV1> &enotes_in_tx,
     const SpEnoteOriginStatus origin_status,
     hw::device &hwdev,
-    std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &basic_records_per_tx_inout);
+    std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &basic_records_per_tx_inout);
 void collect_key_images_from_tx(const std::uint64_t block_height,
     const std::uint64_t block_timestamp,
     const rct::key &transaction_id,
@@ -80,7 +80,7 @@ void process_chunk_intermediate(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
-    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records_inout);
 void process_chunk_full(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
@@ -89,7 +89,7 @@ void process_chunk_full(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     const std::function<bool(const crypto::key_image&)> &check_key_image_is_known_func,
-    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_inout,
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout);

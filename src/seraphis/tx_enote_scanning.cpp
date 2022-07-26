@@ -118,7 +118,7 @@ struct ChainContiguityMarker final
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void check_enote_scan_chunk_map_semantics_v1(
-    const std::unordered_map<rct::key, std::list<SpContextualBasicEnoteRecordV1>> &chunk_basic_records_per_tx,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
     const SpEnoteOriginStatus expected_origin_status,
     const SpEnoteSpentStatus expected_spent_status)
@@ -148,11 +148,11 @@ static void check_enote_scan_chunk_map_semantics_v1(
     // 2. contextual basic records
     for (const auto &tx_basic_records : chunk_basic_records_per_tx)
     {
-        for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record : tx_basic_records.second)
+        for (const ContextualBasicRecordVariant &contextual_basic_record : tx_basic_records.second)
         {
-            CHECK_AND_ASSERT_THROW_MES(contextual_basic_record.m_origin_context.m_origin_status == expected_origin_status,
+            CHECK_AND_ASSERT_THROW_MES(contextual_basic_record.origin_context().m_origin_status == expected_origin_status,
                 "enote chunk semantics check: contextual basic record doesn't have expected origin status.");
-            CHECK_AND_ASSERT_THROW_MES(contextual_basic_record.m_origin_context.m_transaction_id == tx_basic_records.first,
+            CHECK_AND_ASSERT_THROW_MES(contextual_basic_record.origin_context().m_transaction_id == tx_basic_records.first,
                 "enote chunk semantics check: contextual basic record doesn't have origin tx id matching mapped id.");
         }
     }
@@ -387,16 +387,16 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
     // contextual basic records: height checks
     for (const auto &tx_basic_records : onchain_chunk.m_basic_records_per_tx)
     {
-        for (const SpContextualBasicEnoteRecordV1 &contextual_basic_record : tx_basic_records.second)
+        for (const ContextualBasicRecordVariant &contextual_basic_record : tx_basic_records.second)
         {
             CHECK_AND_ASSERT_THROW_MES(
-                    contextual_basic_record.m_origin_context.m_block_height ==
-                        tx_basic_records.second.begin()->m_origin_context.m_block_height,
+                    contextual_basic_record.origin_context().m_block_height ==
+                        tx_basic_records.second.begin()->origin_context().m_block_height,
                 "enote chunk semantics check (ledger): contextual record tx height doesn't match other records in tx.");
 
             CHECK_AND_ASSERT_THROW_MES(
-                    contextual_basic_record.m_origin_context.m_block_height >= allowed_lowest_height &&
-                    contextual_basic_record.m_origin_context.m_block_height <= allowed_heighest_height,
+                    contextual_basic_record.origin_context().m_block_height >= allowed_lowest_height &&
+                    contextual_basic_record.origin_context().m_block_height <= allowed_heighest_height,
                 "enote chunk semantics check (ledger): contextual key image block height is out of the expected range.");
         }
     }

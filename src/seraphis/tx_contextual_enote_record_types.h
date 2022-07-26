@@ -44,9 +44,10 @@
 #include "tx_extra.h"
 
 //third party headers
+#include <boost/variant/get.hpp>
+#include <boost/variant/variant.hpp>
 
 //standard headers
-#include <algorithm>
 #include <vector>
 
 //forward declarations
@@ -143,10 +144,7 @@ struct LegacyContextualBasicEnoteRecordV1 final
 
     /// onetime address equivalence
     static bool same_destination(const LegacyContextualBasicEnoteRecordV1 &record1,
-        const LegacyContextualBasicEnoteRecordV1 &record2)
-    {
-        return record1.m_record.m_enote.onetime_address() == record2.m_record.m_enote.onetime_address();
-    }
+        const LegacyContextualBasicEnoteRecordV1 &record2);
 };
 
 ////
@@ -161,17 +159,11 @@ struct LegacyContextualIntermediateEnoteRecordV1 final
     SpEnoteOriginContextV1 m_origin_context;
 
     /// get this record's onetime address
-    void get_onetime_address(rct::key &onetime_address_out) const
-    {
-        onetime_address_out = m_record.m_enote.onetime_address();
-    }
+    void get_onetime_address(rct::key &onetime_address_out) const;
 
     /// onetime address equivalence
     static bool same_destination(const LegacyContextualIntermediateEnoteRecordV1 &record1,
-        const LegacyContextualIntermediateEnoteRecordV1 &record2)
-    {
-        return record1.m_record.m_enote.onetime_address() == record2.m_record.m_enote.onetime_address();
-    }
+        const LegacyContextualIntermediateEnoteRecordV1 &record2);
 
     /// get this enote's amount
     rct::xmr_amount get_amount() const { return m_record.m_amount; }
@@ -192,31 +184,19 @@ struct LegacyContextualEnoteRecordV1 final
 
     /// onetime address equivalence
     static bool same_destination(const LegacyContextualEnoteRecordV1 &record1,
-        const LegacyContextualEnoteRecordV1 &record2)
-    {
-        return record1.m_record.m_enote.onetime_address() == record2.m_record.m_enote.onetime_address();
-    }
+        const LegacyContextualEnoteRecordV1 &record2);
 
     /// get this enote's key image
-    void get_key_image(crypto::key_image &key_image_out) const
-    {
-        key_image_out = m_record.m_key_image;
-    }
+    void get_key_image(crypto::key_image &key_image_out) const;
 
     /// get this enote's amount
     rct::xmr_amount get_amount() const { return m_record.m_amount; }
 
     /// check origin status
-    bool has_origin_status(const SpEnoteOriginStatus test_status) const
-    {
-        return m_origin_context.m_origin_status == test_status;
-    }
+    bool has_origin_status(const SpEnoteOriginStatus test_status) const;
 
     /// check spent status
-    bool has_spent_status(const SpEnoteSpentStatus test_status) const
-    {
-        return m_spent_context.m_spent_status == test_status;
-    }
+    bool has_spent_status(const SpEnoteSpentStatus test_status) const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -236,10 +216,7 @@ struct SpContextualBasicEnoteRecordV1 final
 
     /// onetime address equivalence
     static bool same_destination(const SpContextualBasicEnoteRecordV1 &record1,
-        const SpContextualBasicEnoteRecordV1 &record2)
-    {
-        return record1.m_record.m_enote.m_core.m_onetime_address == record2.m_record.m_enote.m_core.m_onetime_address;
-    }
+        const SpContextualBasicEnoteRecordV1 &record2);
 };
 
 ////
@@ -254,22 +231,11 @@ struct SpContextualIntermediateEnoteRecordV1 final
     SpEnoteOriginContextV1 m_origin_context;
 
     /// get this record's onetime address
-    void get_onetime_address(rct::key &onetime_address_out) const
-    {
-        onetime_address_out = m_record.m_enote.m_core.m_onetime_address;
-    }
+    void get_onetime_address(rct::key &onetime_address_out) const;
 
     /// onetime address equivalence
     static bool same_destination(const SpContextualIntermediateEnoteRecordV1 &record1,
-        const SpContextualIntermediateEnoteRecordV1 &record2)
-    {
-        rct::key onetime_address_1;
-        rct::key onetime_address_2;
-        record1.get_onetime_address(onetime_address_1);
-        record2.get_onetime_address(onetime_address_2);
-
-        return onetime_address_1 == onetime_address_2;
-    }
+        const SpContextualIntermediateEnoteRecordV1 &record2);
 
     /// get this enote's amount
     rct::xmr_amount get_amount() const { return m_record.m_amount; }
@@ -289,30 +255,47 @@ struct SpContextualEnoteRecordV1 final
     SpEnoteSpentContextV1 m_spent_context;
 
     /// onetime address equivalence
-    static bool same_destination(const SpContextualEnoteRecordV1 &record1, const SpContextualEnoteRecordV1 &record2)
-    {
-        return record1.m_record.m_enote.m_core.m_onetime_address == record2.m_record.m_enote.m_core.m_onetime_address;
-    }
+    static bool same_destination(const SpContextualEnoteRecordV1 &record1, const SpContextualEnoteRecordV1 &record2);
 
     /// get this enote's key image
-    void get_key_image(crypto::key_image &key_image_out) const
-    {
-        key_image_out = m_record.m_key_image;
-    }
+    void get_key_image(crypto::key_image &key_image_out) const;
 
     /// get this enote's amount
     rct::xmr_amount get_amount() const { return m_record.m_amount; }
 
     /// check origin status
-    bool has_origin_status(const SpEnoteOriginStatus test_status) const
-    {
-        return m_origin_context.m_origin_status == test_status;
-    }
+    bool has_origin_status(const SpEnoteOriginStatus test_status) const;
 
     /// check spent status
-    bool has_spent_status(const SpEnoteSpentStatus test_status) const
+    bool has_spent_status(const SpEnoteSpentStatus test_status) const;
+};
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////// Joint /////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+struct ContextualBasicRecordVariant final
+{
+    /// variant of all contextual basic records
+    boost::variant<LegacyContextualBasicEnoteRecordV1, SpContextualBasicEnoteRecordV1> m_basic_record;
+
+    /// constructors
+    ContextualBasicRecordVariant() = default;
+    template <typename T>
+    ContextualBasicRecordVariant(const T &basic_record) : m_basic_record{basic_record} {}
+
+    /// get the record's origin context
+    const SpEnoteOriginContextV1& origin_context() const;
+
+    /// interact with the variant
+    template <typename T>
+    bool is_type() const { return boost::get<T>(&m_basic_record) != nullptr; }
+
+    template <typename T>
+    const T& get_contextual_record() const
     {
-        return m_spent_context.m_spent_status == test_status;
+        static const T empty{};
+        return is_type<T>() ? boost::get<T>(m_basic_record) : empty;
     }
 };
 
@@ -329,12 +312,7 @@ struct SpContextualKeyImageSetV1 final
     /// info about where the corresponding inputs were spent
     SpEnoteSpentContextV1 m_spent_context;
 
-    bool has_key_image(const crypto::key_image &test_key_image) const
-    {
-        return std::find(m_legacy_key_images.begin(), m_legacy_key_images.end(), test_key_image) !=
-                m_legacy_key_images.end() ||
-            std::find(m_sp_key_images.begin(), m_sp_key_images.end(), test_key_image) != m_sp_key_images.end();
-    }
+    bool has_key_image(const crypto::key_image &test_key_image) const;
 };
 
 } //namespace sp
