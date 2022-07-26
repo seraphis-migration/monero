@@ -35,11 +35,13 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "cryptonote_basic/subaddress_index.h"
 #include "device/device.hpp"
 #include "jamtis_address_tag_utils.h"
 #include "sp_crypto_utils.h"
 #include "tx_contextual_enote_record_types.h"
 #include "tx_enote_record_types.h"
+#include "tx_extra.h"
 
 //third party headers
 
@@ -55,6 +57,19 @@ namespace sp
 {
 
 //todo
+bool try_find_legacy_enotes_in_tx(const rct::key &legacy_base_spend_pubkey,
+    const crypto::secret_key &legacy_view_privkey,
+    const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+    const std::uint64_t block_height,
+    const std::uint64_t block_timestamp,
+    const rct::key &transaction_id,
+    const std::uint64_t total_enotes_before_tx,
+    const std::uint64_t unlock_time,
+    const TxExtra &tx_memo,
+    const std::vector<LegacyEnoteVariant> &enotes_in_tx,
+    const SpEnoteOriginStatus origin_status,
+    hw::device &hwdev,
+    std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &basic_records_per_tx_inout);
 bool try_find_sp_enotes_in_tx(const crypto::secret_key &k_find_received,
     const std::uint64_t block_height,
     const std::uint64_t block_timestamp,
@@ -75,14 +90,30 @@ void collect_key_images_from_tx(const std::uint64_t block_height,
     std::list<SpContextualKeyImageSetV1> &contextual_key_images_inout);
 
 //todo
-void process_chunk_intermediate(const rct::key &wallet_spend_pubkey,
+void process_chunk_intermediate_legacy(const rct::key &legacy_base_spend_pubkey,
+    const crypto::secret_key &legacy_view_privkey,
+    const std::function<bool(const crypto::key_image&)> &check_key_image_is_known_func,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
+    const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
+    // note: mapped to onetime address mul8 to mimic key image uniqueness
+    std::unordered_map<rct::key, LegacyContextualIntermediateEnoteRecordV1> &found_enote_records_inout,
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout);
+void process_chunk_intermediate_sp(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_unlock_amounts,
     const crypto::secret_key &k_find_received,
     const crypto::secret_key &s_generate_address,
     const jamtis::jamtis_address_tag_cipher_context &cipher_context,
     const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records_inout);
-void process_chunk_full(const rct::key &wallet_spend_pubkey,
+void process_chunk_full_legacy(const rct::key &legacy_base_spend_pubkey,
+    const crypto::secret_key &legacy_spend_privkey,
+    const crypto::secret_key &legacy_view_privkey,
+    const std::function<bool(const crypto::key_image&)> &check_key_image_is_known_func,
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
+    const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
+    std::unordered_map<crypto::key_image, LegacyContextualEnoteRecordV1> &found_enote_records_inout,
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout);
+void process_chunk_full_sp(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     const crypto::secret_key &k_unlock_amounts,
     const crypto::secret_key &k_find_received,

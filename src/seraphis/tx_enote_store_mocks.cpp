@@ -157,7 +157,8 @@ void SpEnoteStoreMockV1::update_with_records_from_ledger(const std::uint64_t fir
             update_contextual_enote_record_contexts_v1(
                 m_mapped_contextual_enote_records[found_spent_key_image.first].m_origin_context,
                 found_spent_key_image.second,
-                m_mapped_contextual_enote_records[found_spent_key_image.first]);
+                m_mapped_contextual_enote_records[found_spent_key_image.first].m_origin_context,
+                m_mapped_contextual_enote_records[found_spent_key_image.first].m_spent_context);
         }
     }
 }
@@ -201,7 +202,8 @@ void SpEnoteStoreMockV1::update_with_records_from_offchain(
             update_contextual_enote_record_contexts_v1(
                 m_mapped_contextual_enote_records[found_spent_key_image.first].m_origin_context,
                 found_spent_key_image.second,
-                m_mapped_contextual_enote_records[found_spent_key_image.first]);
+                m_mapped_contextual_enote_records[found_spent_key_image.first].m_origin_context,
+                m_mapped_contextual_enote_records[found_spent_key_image.first].m_spent_context);
         }
     }
 }

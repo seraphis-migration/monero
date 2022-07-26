@@ -37,11 +37,13 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/subaddress_index.h"
 #include "device/device.hpp"
 #include "int-util.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "tx_extra.h"
 
 //third party headers
 
@@ -253,6 +255,31 @@ void make_legacy_view_tag(const rct::key &destination_viewkey,
 
     // view_tag = H_1("view_tag", r K^v, t)
     crypto::derive_view_tag(derivation, tx_output_index, view_tag_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void extract_legacy_enote_ephemeral_pubkeys_from_tx_extra(const TxExtra &tx_extra,
+    std::vector<crypto::public_key> &legacy_enote_ephemeral_pubkeys_out)
+{
+    legacy_enote_ephemeral_pubkeys_out.clear();
+
+    // parse field
+    std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+    parse_tx_extra(tx_extra, tx_extra_fields);
+
+    // try to get solitary enote ephemeral pubkey: r G
+    cryptonote::tx_extra_pub_key pub_key_field;
+    if (cryptonote::find_tx_extra_field_by_type(tx_extra_fields, pub_key_field))
+    {
+        legacy_enote_ephemeral_pubkeys_out.emplace_back(pub_key_field.pub_key);
+        return;
+    }
+
+    // try to get 'additional' enote ephemeral pubkeys (one per output): r_t K^v_t
+    cryptonote::tx_extra_additional_pub_keys additional_pub_keys_field;
+    if (cryptonote::find_tx_extra_field_by_type(tx_extra_fields, additional_pub_keys_field))
+    {
+        legacy_enote_ephemeral_pubkeys_out = additional_pub_keys_field.data;
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

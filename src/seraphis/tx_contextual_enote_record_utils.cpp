@@ -118,12 +118,13 @@ bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentStatus spent_statu
 //-------------------------------------------------------------------------------------------------------------------
 void update_contextual_enote_record_contexts_v1(const SpEnoteOriginContextV1 &new_origin_context,
     const SpEnoteSpentContextV1 &new_spent_context,
-    SpContextualEnoteRecordV1 &existing_record_inout)
+    SpEnoteOriginContextV1 &origin_context_inout,
+    SpEnoteSpentContextV1 &spent_context_inout)
 {
-    try_update_enote_spent_context_v1(new_spent_context, existing_record_inout.m_spent_context);
-    try_update_enote_origin_context_v1(new_origin_context, existing_record_inout.m_origin_context);
-    try_bump_enote_record_origin_status_v1(existing_record_inout.m_spent_context.m_spent_status,
-        existing_record_inout.m_origin_context.m_origin_status);
+    try_update_enote_spent_context_v1(new_spent_context, spent_context_inout);
+    try_update_enote_origin_context_v1(new_origin_context,origin_context_inout);
+    try_bump_enote_record_origin_status_v1(spent_context_inout.m_spent_status,
+       origin_context_inout.m_origin_status);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void update_contextual_enote_record_contexts_v1(const SpContextualEnoteRecordV1 &fresh_record,
@@ -134,7 +135,8 @@ void update_contextual_enote_record_contexts_v1(const SpContextualEnoteRecordV1 
 
     update_contextual_enote_record_contexts_v1(fresh_record.m_origin_context,
         fresh_record.m_spent_context,
-        existing_record_inout);
+        existing_record_inout.m_origin_context,
+        existing_record_inout.m_spent_context);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp
