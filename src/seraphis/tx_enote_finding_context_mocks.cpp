@@ -48,17 +48,17 @@ void EnoteFindingContextLedgerMock::get_onchain_chunk(const std::uint64_t chunk_
     const std::uint64_t chunk_max_size,
     EnoteScanningChunkLedgerV1 &chunk_out) const
 {
-    m_mock_ledger_context.get_onchain_chunk(chunk_start_height, chunk_max_size, m_k_find_received, chunk_out);
+    m_mock_ledger_context.get_onchain_chunk_sp(chunk_start_height, chunk_max_size, m_k_find_received, chunk_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool EnoteFindingContextLedgerMock::try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const
 {
-    return m_mock_ledger_context.try_get_unconfirmed_chunk(m_k_find_received, chunk_out);
+    return m_mock_ledger_context.try_get_unconfirmed_chunk_sp(m_k_find_received, chunk_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool EnoteFindingContextOffchainMock::try_get_offchain_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const
 {
-    return m_mock_offchain_context.try_get_offchain_chunk(m_k_find_received, chunk_out);
+    return m_mock_offchain_context.try_get_offchain_chunk_sp(m_k_find_received, chunk_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

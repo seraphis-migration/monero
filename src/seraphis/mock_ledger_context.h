@@ -36,6 +36,7 @@
 
 //local headers
 #include "crypto/crypto.h"
+#include "cryptonote_basic/subaddress_index.h"
 #include "legacy_enote_types.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -43,6 +44,7 @@
 #include "tx_component_types.h"
 
 //third party headers
+#include <boost/optional/optional.hpp>
 #include <boost/thread/shared_mutex.hpp>
 
 //standard headers
@@ -124,23 +126,38 @@ public:
     */
     std::uint64_t num_sp_enotes() const { return max_sp_enote_index() + 1; }
     /**
-    * brief: get_onchain_chunk - find-received scan a chunk of blocks
+    * brief: get_onchain_chunk_legacy - legacy view scan a chunk of blocks
+    * param: chunk_start_height -
+    * param: chunk_max_size -
+    * param: legacy_view_privkey -
+    * param: legacy_base_spend_pubkey -
+    * param: legacy_subaddress_map -
+    * outparam: chunk_out - chunk of scanned blocks (or empty chunk representing top of current chain)
+    */
+    void get_onchain_chunk_legacy(const std::uint64_t chunk_start_height,
+        const std::uint64_t chunk_max_size,
+        const boost::optional<crypto::secret_key> &legacy_view_privkey,
+        const rct::key &legacy_base_spend_pubkey,
+        const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+        EnoteScanningChunkLedgerV1 &chunk_out) const;
+    /**
+    * brief: get_onchain_chunk_sp - find-received scan a chunk of blocks
     * param: chunk_start_height -
     * param: chunk_max_size -
     * param: k_find_received -
     * outparam: chunk_out - chunk of scanned blocks (or empty chunk representing top of current chain)
     */
-    void get_onchain_chunk(const std::uint64_t chunk_start_height,
+    void get_onchain_chunk_sp(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
         const crypto::secret_key &k_find_received,
         EnoteScanningChunkLedgerV1 &chunk_out) const;
     /**
-    * brief: try_get_unconfirmed_chunk - try to find-received scan the unconfirmed tx cache
+    * brief: try_get_unconfirmed_chunk_sp - try to find-received scan the unconfirmed tx cache
     * param: k_find_received -
     * outparam: chunk_out -
     * return: true if chunk is not empty
     */
-    bool try_get_unconfirmed_chunk(const crypto::secret_key &k_find_received,
+    bool try_get_unconfirmed_chunk_sp(const crypto::secret_key &k_find_received,
         EnoteScanningChunkNonLedgerV1 &chunk_out) const;
     /**
     * brief: add_legacy_coinbase - make a block with a mock legacy coinbase tx
@@ -201,11 +218,17 @@ private:
     /// implementations of the above, without internally locking the ledger mutex (all expected to be no-fail)
     bool key_image_exists_unconfirmed_v1_impl(const crypto::key_image &key_image) const;
     bool key_image_exists_onchain_v1_impl(const crypto::key_image &key_image) const;
-    void get_onchain_chunk_impl(const std::uint64_t chunk_start_height,
+    void get_onchain_chunk_legacy_impl(const std::uint64_t chunk_start_height,
+        const std::uint64_t chunk_max_size,
+        const boost::optional<crypto::secret_key> &legacy_view_privkey,
+        const rct::key &legacy_base_spend_pubkey,
+        const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+        EnoteScanningChunkLedgerV1 &chunk_out) const;
+    void get_onchain_chunk_sp_impl(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
         const crypto::secret_key &k_find_received,
         EnoteScanningChunkLedgerV1 &chunk_out) const;
-    bool try_get_unconfirmed_chunk_impl(const crypto::secret_key &k_find_received,
+    bool try_get_unconfirmed_chunk_sp_impl(const crypto::secret_key &k_find_received,
         EnoteScanningChunkNonLedgerV1 &chunk_out) const;
     std::uint64_t add_legacy_coinbase_impl(const rct::key &tx_id,
         const std::uint64_t unlock_time,

@@ -72,12 +72,12 @@ public:
     */
     bool key_image_exists_v1(const crypto::key_image &key_image) const;
     /**
-    * brief: try_get_offchain_chunk - try to find-received scan the offchain tx cache
+    * brief: try_get_offchain_chunk_sp - try to find-received scan the offchain tx cache
     * param: k_find_received -
     * outparam: chunk_out -
     * return: true if chunk is not empty
     */
-    bool try_get_offchain_chunk(const crypto::secret_key &k_find_received, EnoteScanningChunkNonLedgerV1 &chunk_out) const;
+    bool try_get_offchain_chunk_sp(const crypto::secret_key &k_find_received, EnoteScanningChunkNonLedgerV1 &chunk_out) const;
     /**
     * brief: try_add_partial_tx_v1 - try to add a partial transaction to the offchain tx cache
     *   - fails if there are key image duplicates with: offchain
@@ -110,7 +110,7 @@ public:
 private:
     /// implementations of the above, without internally locking the ledger mutex (all expected to be no-fail)
     bool key_image_exists_v1_impl(const crypto::key_image &key_image) const;
-    bool try_get_offchain_chunk_impl(const crypto::secret_key &k_find_received,
+    bool try_get_offchain_chunk_sp_impl(const crypto::secret_key &k_find_received,
         EnoteScanningChunkNonLedgerV1 &chunk_out) const;
     bool try_add_v1_impl(const std::vector<SpEnoteImageV1> &input_images,
         const SpTxSupplementV1 &tx_supplement,
