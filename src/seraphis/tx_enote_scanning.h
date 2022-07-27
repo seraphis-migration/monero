@@ -77,10 +77,7 @@ struct EnoteScanningChunkLedgerV1 final
     std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> m_basic_records_per_tx;
     /// key images from txs with owned enote candidates in range [start height, end height)
     std::list<SpContextualKeyImageSetV1> m_contextual_key_images;
-    //std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_contextual_key_images;
 };
-
-//todo? EnoteScanningChunkLedgerVariantV1: to encapsulate scanning chunk types
 
 ////
 // EnoteScanningChunkLedgerV1
@@ -89,14 +86,11 @@ struct EnoteScanningChunkLedgerV1 final
 ///
 struct EnoteScanningChunkNonLedgerV1 final
 {
-    /// view tag matches in a non-ledger context (mapped to tx id)
+    /// owned enote candidates in a non-ledger context (mapped to tx id)
     std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> m_basic_records_per_tx;
-    /// key images from txs with view tag matches in the non-ledger context
+    /// key images from txs with owned enote candidates in the non-ledger context
     std::list<SpContextualKeyImageSetV1> m_contextual_key_images;
-    //std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_contextual_key_images;
 };
-
-//todo? EnoteScanningChunkOffchainVariantV1: to encapsulate scanning chunk types
 
 struct RefreshLedgerEnoteStoreConfig final
 {

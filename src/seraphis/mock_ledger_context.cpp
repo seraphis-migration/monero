@@ -361,6 +361,9 @@ void MockLedgerContext::get_onchain_chunk_legacy_impl(const std::uint64_t chunk_
                             chunk_out.m_basic_records_per_tx);
                     }
 
+                    // always add an entry for this tx in the basic records map (since we save key images for every tx)
+                    chunk_out.m_basic_records_per_tx[sortable2rct(tx_with_output_contents.first)];
+
                     // collect key images from the tx (always do this for legacy txs)
                     CHECK_AND_ASSERT_THROW_MES(
                         m_blocks_of_tx_key_images

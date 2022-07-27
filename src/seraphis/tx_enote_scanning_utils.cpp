@@ -346,6 +346,10 @@ void collect_key_images_from_tx(const std::uint64_t block_height,
     const SpEnoteSpentStatus spent_status,
     std::list<SpContextualKeyImageSetV1> &contextual_key_images_inout)
 {
+    if (legacy_key_images_in_tx.size() == 0 &&
+        sp_key_images_in_tx.size() == 0)
+        return;
+
     contextual_key_images_inout.emplace_back(
             SpContextualKeyImageSetV1{
                 .m_legacy_key_images = legacy_key_images_in_tx,

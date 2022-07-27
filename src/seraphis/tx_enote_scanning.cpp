@@ -132,13 +132,17 @@ static void check_enote_scan_chunk_map_semantics_v1(
         // notes:
         // - a scan chunk is expected to contain basic enote records mapped to txs, along with all the key images for each
         //   of those txs
-        // - basic enote records are view tag matches, so only txs with view tag matches will normally be represented
-        // - the standard tx-building convention puts a self-send in all txs so the enote scanning process will pick up
-        //   all key images of the user in scan chunks (assuming chunks only have key images for txs with view tag matches)
+        // - basic enote records are view tag matches (in seraphis), so only txs with view tag matches will normally be
+        //   represented
+        // - the standard seraphis tx-building convention puts a self-send in all txs so the enote scanning process will pick
+        //   up all key images of the user in scan chunks (assuming chunks only have key images for txs with view tag
+        //   matches)
         // - if someone makes a tx with no self-sends, then chunk scanning won't reliably pick up that tx's key images
         //   unless the chunk builder returns an empty basic records list for any tx that has no view tag matches (i.e. so
-        //   the chunk builder will return key images from ALL txs)
+        //   the chunk builder can return key images from all txs and satisfy the following test)
         //   - this is not supported by default for efficiency and simplicity
+        //   - note that all legacy txs should do this so all legacy key images will be available (legacy enote construction
+        //     did not require all txs to have a self-send output)
         CHECK_AND_ASSERT_THROW_MES(
                 chunk_basic_records_per_tx.find(contextual_key_image_set.m_spent_context.m_transaction_id) !=
                 chunk_basic_records_per_tx.end(),
@@ -378,8 +382,7 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
     // contextual key images: height checks
     for (const SpContextualKeyImageSetV1 &contextual_key_image_set : onchain_chunk.m_contextual_key_images)
     {
-        CHECK_AND_ASSERT_THROW_MES(contextual_key_image_set.m_spent_context.m_block_height >=
-                    allowed_lowest_height &&
+        CHECK_AND_ASSERT_THROW_MES(contextual_key_image_set.m_spent_context.m_block_height >= allowed_lowest_height &&
                 contextual_key_image_set.m_spent_context.m_block_height <= allowed_heighest_height,
             "enote chunk semantics check (ledger): contextual key image block height is out of the expected range.");
     }
@@ -389,9 +392,8 @@ void check_v1_enote_scan_chunk_ledger_semantics_v1(const EnoteScanningChunkLedge
     {
         for (const ContextualBasicRecordVariant &contextual_basic_record : tx_basic_records.second)
         {
-            CHECK_AND_ASSERT_THROW_MES(
-                    contextual_basic_record.origin_context().m_block_height ==
-                        tx_basic_records.second.begin()->origin_context().m_block_height,
+            CHECK_AND_ASSERT_THROW_MES(contextual_basic_record.origin_context().m_block_height ==
+                    tx_basic_records.second.begin()->origin_context().m_block_height,
                 "enote chunk semantics check (ledger): contextual record tx height doesn't match other records in tx.");
 
             CHECK_AND_ASSERT_THROW_MES(
