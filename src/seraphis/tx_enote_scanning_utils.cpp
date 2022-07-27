@@ -37,6 +37,7 @@
 #include "device/device.hpp"
 #include "jamtis_core_utils.h"
 #include "legacy_core_utils.h"
+#include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_crypto_utils.h"
 #include "tx_component_types.h"
@@ -70,24 +71,16 @@ static void process_chunk_new_intermediate_record_update_legacy(const LegacyInte
     const SpEnoteOriginContextV1 &new_record_origin_context,
     std::unordered_map<rct::key, LegacyContextualIntermediateEnoteRecordV1> &found_enote_records_inout)
 {
-    SpEnoteOriginContextV1 origin_context_update{};
-
-    // 1. add new legacy record to found enotes (or refresh if already there and new amount is larger than old amount)
-    const rct::key new_record_mul8_onetime_address{
-            rct::scalarmult8(new_enote_record.m_enote.onetime_address())
+    // 1. add new legacy record to found enotes (or refresh if already there)
+    const rct::key new_record_identifier{
+            rct::cn_fast_hash({new_enote_record.m_enote.onetime_address(), new_enote_record.m_enote.amount_commitment()})
         };
 
-    if (found_enote_records_inout.find(new_record_mul8_onetime_address) == found_enote_records_inout.end() ||
-        found_enote_records_inout[new_record_mul8_onetime_address].m_record.m_amount < new_enote_record.m_amount)
-    {
-        found_enote_records_inout[new_record_mul8_onetime_address].m_record = new_enote_record;
-        origin_context_update = new_record_origin_context;
-    }
+    found_enote_records_inout[new_record_identifier].m_record = new_enote_record;
 
     // 2. update the contextual enote record's origin context
-    // note: we only update the origin context if the enote record was changed
-    try_update_enote_origin_context_v1(origin_context_update,
-        found_enote_records_inout[new_record_mul8_onetime_address].m_origin_context);
+    try_update_enote_origin_context_v1(new_record_origin_context,
+        found_enote_records_inout[new_record_identifier].m_origin_context);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -96,7 +89,7 @@ static void process_chunk_new_intermediate_record_update_sp(const SpIntermediate
     std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records_inout)
 {
     // 1. add new record to found enotes (or refresh if already there)
-    const rct::key new_record_onetime_address{new_enote_record.m_enote.m_core.m_onetime_address};
+    const rct::key &new_record_onetime_address{new_enote_record.m_enote.m_core.m_onetime_address};
 
     found_enote_records_inout[new_record_onetime_address].m_record = new_enote_record;
 
@@ -109,23 +102,20 @@ static void process_chunk_new_intermediate_record_update_sp(const SpIntermediate
 static void process_chunk_new_record_update_legacy(const LegacyEnoteRecord &new_enote_record,
     const SpEnoteOriginContextV1 &new_record_origin_context,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
-    std::unordered_map<crypto::key_image, LegacyContextualEnoteRecordV1> &found_enote_records_inout,
+    std::unordered_map<rct::key, LegacyContextualEnoteRecordV1> &found_enote_records_inout,
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout)
 {
-    SpEnoteOriginContextV1 origin_context_update{};
-    SpEnoteSpentContextV1 spent_context_update{};
+    // 1. add new legacy record to found enotes (or refresh if already there)
+    const rct::key new_record_identifier{
+            rct::cn_fast_hash({new_enote_record.m_enote.onetime_address(), new_enote_record.m_enote.amount_commitment()})
+        };
 
-    // 1. add new legacy record to found enotes (or refresh if already there and new amount is larger than old amount)
-    const crypto::key_image new_record_key_image{new_enote_record.m_key_image};
-
-    if (found_enote_records_inout.find(new_record_key_image) == found_enote_records_inout.end() ||
-        found_enote_records_inout[new_record_key_image].m_record.m_amount < new_enote_record.m_amount)
-    {
-        found_enote_records_inout[new_record_key_image].m_record = new_enote_record;
-        origin_context_update = new_record_origin_context;
-    }
+    found_enote_records_inout[new_record_identifier].m_record = new_enote_record;
 
     // 2. handle if this enote record is spent in this chunk
+    const crypto::key_image &new_record_key_image{new_enote_record.m_key_image};
+    SpEnoteSpentContextV1 spent_context_update{};
+
     auto contextual_key_images_of_record_spent_in_this_chunk =
         std::find_if(
             chunk_contextual_key_images.begin(),
@@ -150,11 +140,12 @@ static void process_chunk_new_record_update_legacy(const LegacyEnoteRecord &new_
     }
 
     // 3. update the contextual enote record's contexts
-    // note: we only update the origin context if the enote record was changed
-    update_contextual_enote_record_contexts_v1(origin_context_update,
+    // note: multiple legacy enotes can have the same key image but different amounts; only one of those can be spent,
+    //       so we should expect all of them to reference the same spent context
+    update_contextual_enote_record_contexts_v1(new_record_origin_context,
         spent_context_update,
-        found_enote_records_inout[new_record_key_image].m_origin_context,
-        found_enote_records_inout[new_record_key_image].m_spent_context);
+        found_enote_records_inout[new_record_identifier].m_origin_context,
+        found_enote_records_inout[new_record_identifier].m_spent_context);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -166,7 +157,7 @@ static void process_chunk_new_record_update_sp(const SpEnoteRecordV1 &new_enote_
     std::unordered_set<rct::key> &txs_have_spent_enotes_inout)
 {
     // 1. add new record to found enotes (or refresh if already there)
-    const crypto::key_image new_record_key_image{new_enote_record.m_key_image};
+    const crypto::key_image &new_record_key_image{new_enote_record.m_key_image};
 
     found_enote_records_inout[new_record_key_image].m_record = new_enote_record;
 
@@ -471,7 +462,7 @@ void process_chunk_full_legacy(const rct::key &legacy_base_spend_pubkey,
     const std::function<bool(const crypto::key_image&)> &check_key_image_is_known_func,
     const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
-    std::unordered_map<crypto::key_image, LegacyContextualEnoteRecordV1> &found_enote_records_inout,
+    std::unordered_map<rct::key, LegacyContextualEnoteRecordV1> &found_enote_records_inout,
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout)
 {
     // 1. check if any legacy owned enotes have been spent in this chunk (key image matches)
@@ -481,7 +472,12 @@ void process_chunk_full_legacy(const rct::key &legacy_base_spend_pubkey,
             // a. check if key image was known before this scan
             // b. check if key image matches with any enote records found before this chunk
             if (check_key_image_is_known_func(key_image) ||
-                found_enote_records_inout.find(key_image) != found_enote_records_inout.end())
+                std::find_if(found_enote_records_inout.begin(), found_enote_records_inout.end(),
+                    [&key_image](const std::pair<rct::key, LegacyContextualEnoteRecordV1> &mapped_legacy_record) -> bool
+                    {
+                        return mapped_legacy_record.second.m_record.m_key_image == key_image;
+                    }) != found_enote_records_inout.end()
+                )
             {
                 // record the found spent key image
                 found_spent_key_images_inout[key_image];
