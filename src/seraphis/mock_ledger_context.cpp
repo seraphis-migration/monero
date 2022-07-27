@@ -134,18 +134,18 @@ std::uint64_t MockLedgerContext::max_sp_enote_index() const
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::get_onchain_chunk_legacy(const std::uint64_t chunk_start_height,
     const std::uint64_t chunk_max_size,
-    const boost::optional<crypto::secret_key> &legacy_view_privkey,
     const rct::key &legacy_base_spend_pubkey,
     const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+    const boost::optional<crypto::secret_key> &legacy_view_privkey,
     EnoteScanningChunkLedgerV1 &chunk_out) const
 {
     boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
 
     get_onchain_chunk_legacy_impl(chunk_start_height,
         chunk_max_size,
-        legacy_view_privkey,
         legacy_base_spend_pubkey,
         legacy_subaddress_map,
+        legacy_view_privkey,
         chunk_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -239,9 +239,9 @@ bool MockLedgerContext::key_image_exists_onchain_v1_impl(const crypto::key_image
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::get_onchain_chunk_legacy_impl(const std::uint64_t chunk_start_height,
     const std::uint64_t chunk_max_size,
-    const boost::optional<crypto::secret_key> &legacy_view_privkey,
     const rct::key &legacy_base_spend_pubkey,
     const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+    const boost::optional<crypto::secret_key> &legacy_view_privkey,
     EnoteScanningChunkLedgerV1 &chunk_out) const
 {
     chunk_out.m_basic_records_per_tx.clear();
@@ -347,8 +347,8 @@ void MockLedgerContext::get_onchain_chunk_legacy_impl(const std::uint64_t chunk_
                     if (legacy_view_privkey)
                     {
                         try_find_legacy_enotes_in_tx(legacy_base_spend_pubkey,
-                            *legacy_view_privkey,
                             legacy_subaddress_map,
+                            *legacy_view_privkey,
                             block_of_tx_output_contents.first,
                             std::get<std::uint64_t>(m_block_infos.at(block_of_tx_output_contents.first)),
                             sortable2rct(tx_with_output_contents.first),

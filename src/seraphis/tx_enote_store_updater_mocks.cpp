@@ -54,6 +54,68 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
+EnoteStoreUpdaterLedgerMockLegacy::EnoteStoreUpdaterLedgerMockLegacy(const rct::key &legacy_base_spend_pubkey,
+    const crypto::secret_key &legacy_view_privkey,
+    const crypto::secret_key &legacy_spend_privkey,
+    SpEnoteStoreMockV1 &enote_store) :
+        m_legacy_base_spend_pubkey{legacy_base_spend_pubkey},
+        m_legacy_view_privkey{legacy_view_privkey},
+        m_legacy_spend_privkey{legacy_spend_privkey},
+        m_enote_store{enote_store}
+{}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMockLegacy::start_chunk_handling_session()
+{
+    m_found_enote_records.clear();
+    m_found_spent_key_images.clear();
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMockLegacy::process_chunk(
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
+    const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images)
+{
+    process_chunk_full_legacy(m_legacy_base_spend_pubkey,
+        m_legacy_spend_privkey,
+        m_legacy_view_privkey,
+        [this](const crypto::key_image &key_image) -> bool
+        {
+            return this->m_enote_store.has_enote_with_key_image(key_image);
+        },
+        chunk_basic_records_per_tx,
+        chunk_contextual_key_images,
+        m_found_enote_records,
+        m_found_spent_key_images);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMockLegacy::end_chunk_handling_session(const std::uint64_t first_new_block,
+    const rct::key &alignment_block_id,
+    const std::vector<rct::key> &new_block_ids)
+{
+    m_enote_store.update_with_legacy_records_from_ledger(first_new_block,
+        alignment_block_id,
+        m_found_enote_records,
+        m_found_spent_key_images,
+        new_block_ids);
+
+    m_found_enote_records.clear();
+    m_found_spent_key_images.clear();
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool EnoteStoreUpdaterLedgerMockLegacy::try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const
+{
+    return m_enote_store.try_get_block_id(block_height, block_id_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t EnoteStoreUpdaterLedgerMockLegacy::get_refresh_height() const
+{
+    return m_enote_store.get_refresh_height();
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t EnoteStoreUpdaterLedgerMockLegacy::get_top_block_height() const
+{
+    return m_enote_store.get_top_block_height();
+}
+//-------------------------------------------------------------------------------------------------------------------
 EnoteStoreUpdaterLedgerMock::EnoteStoreUpdaterLedgerMock(const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
     SpEnoteStoreMockV1 &enote_store) :
@@ -99,7 +161,7 @@ void EnoteStoreUpdaterLedgerMock::end_chunk_handling_session(const std::uint64_t
     const rct::key &alignment_block_id,
     const std::vector<rct::key> &new_block_ids)
 {
-    m_enote_store.update_with_records_from_ledger(first_new_block,
+    m_enote_store.update_with_sp_records_from_ledger(first_new_block,
         alignment_block_id,
         m_found_enote_records,
         m_found_spent_key_images,
@@ -161,7 +223,68 @@ void EnoteStoreUpdaterNonLedgerMock::process_and_handle_chunk(
         found_enote_records,
         found_spent_key_images);
 
-    m_enote_store.update_with_records_from_offchain(found_enote_records, found_spent_key_images);
+    m_enote_store.update_with_sp_records_from_offchain(found_enote_records, found_spent_key_images);
+}
+//-------------------------------------------------------------------------------------------------------------------
+EnoteStoreUpdaterLedgerMockLegacyIntermediate::EnoteStoreUpdaterLedgerMockLegacyIntermediate(
+        const rct::key &legacy_base_spend_pubkey,
+        const crypto::secret_key &legacy_view_privkey,
+        SpEnoteStoreMockV1 &enote_store) :
+        m_legacy_base_spend_pubkey{legacy_base_spend_pubkey},
+        m_legacy_view_privkey{legacy_view_privkey},
+        m_enote_store{enote_store}
+{}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMockLegacyIntermediate::start_chunk_handling_session()
+{
+    m_found_enote_records.clear();
+    m_found_spent_key_images.clear();
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMockLegacyIntermediate::process_chunk(
+    const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
+    const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images)
+{
+    process_chunk_intermediate_legacy(m_legacy_base_spend_pubkey,
+        m_legacy_view_privkey,
+        [this](const crypto::key_image &key_image) -> bool
+        {
+            return this->m_enote_store.has_enote_with_key_image(key_image);
+        },
+        chunk_basic_records_per_tx,
+        chunk_contextual_key_images,
+        m_found_enote_records,
+        m_found_spent_key_images);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void EnoteStoreUpdaterLedgerMockLegacyIntermediate::end_chunk_handling_session(const std::uint64_t first_new_block,
+    const rct::key &alignment_block_id,
+    const std::vector<rct::key> &new_block_ids)
+{
+    m_enote_store.update_with_intermediate_legacy_records_from_ledger(first_new_block,
+        alignment_block_id,
+        m_found_enote_records,
+        m_found_spent_key_images,
+        new_block_ids);
+
+    m_found_enote_records.clear();
+    m_found_spent_key_images.clear();
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool EnoteStoreUpdaterLedgerMockLegacyIntermediate::try_get_block_id(const std::uint64_t block_height,
+    rct::key &block_id_out) const
+{
+    return m_enote_store.try_get_block_id(block_height, block_id_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t EnoteStoreUpdaterLedgerMockLegacyIntermediate::get_refresh_height() const
+{
+    return m_enote_store.get_refresh_height();
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t EnoteStoreUpdaterLedgerMockLegacyIntermediate::get_top_block_height() const
+{
+    return m_enote_store.get_top_block_height();
 }
 //-------------------------------------------------------------------------------------------------------------------
 EnoteStoreUpdaterLedgerMockIntermediate::EnoteStoreUpdaterLedgerMockIntermediate(const rct::key &wallet_spend_pubkey,
@@ -202,7 +325,7 @@ void EnoteStoreUpdaterLedgerMockIntermediate::end_chunk_handling_session(const s
     const rct::key &alignment_block_id,
     const std::vector<rct::key> &new_block_ids)
 {
-    m_enote_store.update_with_records_from_ledger(first_new_block,
+    m_enote_store.update_with_sp_records_from_ledger(first_new_block,
         alignment_block_id,
         m_found_enote_records,
         new_block_ids);
@@ -257,7 +380,7 @@ void EnoteStoreUpdaterNonLedgerMockIntermediate::process_and_handle_chunk(
         chunk_basic_records_per_tx,
         found_enote_records);
 
-    m_enote_store.update_with_records_from_offchain(found_enote_records);
+    m_enote_store.update_with_sp_records_from_offchain(found_enote_records);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

@@ -70,6 +70,7 @@ protected:
 
 ////
 // SpEnoteStoreMockV1
+// - tracks legacy and seraphis enotes
 ///
 class SpEnoteStoreMockV1 final
 {
@@ -89,15 +90,30 @@ public:
     /// add a record
     void add_record(const SpContextualEnoteRecordV1 &new_record);
 
+    /// import a legacy key image (TODO)
+    void import_legacy_key_image(const crypto::key_image &legacy_key_image, const rct::key &onetime_address);
+
+    /// update the store with legacy enote records found in the ledger, with associated context (TODO)
+    void update_with_intermediate_legacy_records_from_ledger(const std::uint64_t first_new_block,
+        const rct::key &alignment_block_id,
+        const std::unordered_map<rct::key, LegacyContextualIntermediateEnoteRecordV1> &found_enote_records,
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+        const std::vector<rct::key> &new_block_ids);
+    void update_with_legacy_records_from_ledger(const std::uint64_t first_new_block,
+        const rct::key &alignment_block_id,
+        const std::unordered_map<rct::key, LegacyContextualEnoteRecordV1> &found_enote_records,
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+        const std::vector<rct::key> &new_block_ids);
+
     /// update the store with enote records found in the ledger, with associated context
-    void update_with_records_from_ledger(const std::uint64_t first_new_block,
+    void update_with_sp_records_from_ledger(const std::uint64_t first_new_block,
         const rct::key &alignment_block_id,
         const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
         const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
         const std::vector<rct::key> &new_block_ids);
 
     /// update the store with enote records found off-chain, with associated context
-    void update_with_records_from_offchain(
+    void update_with_sp_records_from_offchain(
         const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
         const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images);
 
@@ -128,6 +144,7 @@ protected:
 
 ////
 // SpEnoteStoreMockPaymentValidatorV1
+// - tracks non-self-send seraphis enotes
 ///
 class SpEnoteStoreMockPaymentValidatorV1 final
 {
@@ -146,13 +163,13 @@ public:
     void add_record(const SpContextualIntermediateEnoteRecordV1 &new_record);
 
     /// update the store with enote records found in the ledger, with associated context
-    void update_with_records_from_ledger(const std::uint64_t first_new_block,
+    void update_with_sp_records_from_ledger(const std::uint64_t first_new_block,
         const rct::key &alignment_block_id,
         const std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records,
         const std::vector<rct::key> &new_block_ids);
 
     /// update the store with enote records found off-chain, with associated context
-    void update_with_records_from_offchain(
+    void update_with_sp_records_from_offchain(
         const std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records);
 
     /// try to get the recorded block id for a given height

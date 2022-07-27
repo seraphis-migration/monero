@@ -56,6 +56,52 @@
 namespace sp
 {
 
+class EnoteStoreUpdaterLedgerMockLegacy final : public EnoteStoreUpdaterLedger
+{
+public:
+//constructors
+    /// normal constructor
+    EnoteStoreUpdaterLedgerMockLegacy(const rct::key &legacy_base_spend_pubkey,
+        const crypto::secret_key &legacy_view_privkey,
+        const crypto::secret_key &legacy_spend_privkey,
+        SpEnoteStoreMockV1 &enote_store);
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [reference wrapper])
+    EnoteStoreUpdaterLedgerMockLegacy& operator=(EnoteStoreUpdaterLedgerMockLegacy&&) = delete;
+
+//member functions
+    /// start a chunk-handling session (if previous session wasn't ended, discard it)
+    void start_chunk_handling_session() override;
+    /// process a chunk of basic enote records and save the results
+    void process_chunk(
+        const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
+        const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images) override;
+    /// end the current chunk-handling session
+    void end_chunk_handling_session(const std::uint64_t first_new_block,
+        const rct::key &alignment_block_id,
+        const std::vector<rct::key> &new_block_ids) override;
+
+    /// try to get the recorded block id for a given height
+    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const override;
+    /// get height of first block the enote store cares about
+    std::uint64_t get_refresh_height() const override;
+    /// get height of heighest recorded block (refresh height - 1 if no recorded blocks)
+    std::uint64_t get_top_block_height() const override;
+
+//member variables
+private:
+    /// static data
+    const rct::key &m_legacy_base_spend_pubkey;
+    const crypto::secret_key &m_legacy_view_privkey;
+    const crypto::secret_key &m_legacy_spend_privkey;
+    SpEnoteStoreMockV1 &m_enote_store;
+
+    /// session data
+    std::unordered_map<rct::key, LegacyContextualEnoteRecordV1> m_found_enote_records;
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_found_spent_key_images;
+};
+
 class EnoteStoreUpdaterLedgerMock final : public EnoteStoreUpdaterLedger
 {
 public:
@@ -137,6 +183,50 @@ private:
     crypto::secret_key m_s_generate_address;
     crypto::secret_key m_s_cipher_tag;
     std::unique_ptr<jamtis::jamtis_address_tag_cipher_context> m_cipher_context;
+};
+
+class EnoteStoreUpdaterLedgerMockLegacyIntermediate final : public EnoteStoreUpdaterLedger
+{
+public:
+//constructors
+    /// normal constructor
+    EnoteStoreUpdaterLedgerMockLegacyIntermediate(const rct::key &legacy_base_spend_pubkey,
+        const crypto::secret_key &legacy_view_privkey,
+        SpEnoteStoreMockV1 &enote_store);
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [reference wrapper])
+    EnoteStoreUpdaterLedgerMockLegacyIntermediate& operator=(EnoteStoreUpdaterLedgerMockLegacyIntermediate&&) = delete;
+
+//member functions
+    /// start a chunk-handling session (if previous session wasn't ended, discard it)
+    void start_chunk_handling_session() override;
+    /// process a chunk of basic enote records and save the results
+    void process_chunk(
+        const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
+        const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images) override;
+    /// end the current chunk-handling session
+    void end_chunk_handling_session(const std::uint64_t first_new_block,
+        const rct::key &alignment_block_id,
+        const std::vector<rct::key> &new_block_ids) override;
+
+    /// try to get the recorded block id for a given height
+    bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const override;
+    /// get height of first block the enote store cares about
+    std::uint64_t get_refresh_height() const override;
+    /// get height of heighest recorded block (refresh height - 1 if no recorded blocks)
+    std::uint64_t get_top_block_height() const override;
+
+//member variables
+private:
+    /// static data
+    const rct::key &m_legacy_base_spend_pubkey;
+    const crypto::secret_key &m_legacy_view_privkey;
+    SpEnoteStoreMockV1 &m_enote_store;
+
+    /// session data
+    std::unordered_map<rct::key, LegacyContextualIntermediateEnoteRecordV1> m_found_enote_records;
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_found_spent_key_images;
 };
 
 class EnoteStoreUpdaterLedgerMockIntermediate final : public EnoteStoreUpdaterLedger

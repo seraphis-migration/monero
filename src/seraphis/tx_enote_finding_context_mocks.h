@@ -37,18 +37,60 @@
 #include "crypto/crypto.h"
 #include "mock_ledger_context.h"
 #include "mock_offchain_context.h"
+#include "ringct/rctTypes.h"
 #include "tx_enote_finding_context.h"
 #include "tx_enote_scanning.h"
 
 //third party headers
+#include <boost/optional/optional.hpp>
 
 //standard headers
+#include <unordered_map>
 
 //forward declarations
 
 
 namespace sp
 {
+
+////
+// EnoteFindingContextLedgerMockLegacy
+// - wraps a mock ledger context, produces chunks of potentially owned enotes (from legacy view scanning)
+// - note: if the legacy view privkey is set to boost::none, then chunks found will contain only key images (kludge)
+///
+class EnoteFindingContextLedgerMockLegacy final : public EnoteFindingContextLedger
+{
+public:
+//constructors
+    EnoteFindingContextLedgerMockLegacy(const MockLedgerContext &mock_ledger_context,
+        const rct::key &legacy_base_spend_pubkey,
+        const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+        const boost::optional<crypto::secret_key> &legacy_view_privkey) :
+            m_mock_ledger_context{mock_ledger_context},
+            m_legacy_base_spend_pubkey{legacy_base_spend_pubkey},
+            m_legacy_subaddress_map{legacy_subaddress_map},
+            m_legacy_view_privkey{legacy_view_privkey}
+    {}
+
+//overloaded operators
+    /// disable copy/move (this is a scoped manager [reference wrapper])
+    EnoteFindingContextLedgerMockLegacy& operator=(EnoteFindingContextLedgerMockLegacy&&) = delete;
+
+//member functions
+    /// get an onchain chunk (or empty chunk representing top of current chain)
+    void get_onchain_chunk(const std::uint64_t chunk_start_height,
+        const std::uint64_t chunk_max_size,
+        EnoteScanningChunkLedgerV1 &chunk_out) const override;
+    /// try to get an unconfirmed chunk (no-op for legacy scanning)
+    bool try_get_unconfirmed_chunk(EnoteScanningChunkNonLedgerV1 &chunk_out) const override { return false; }
+
+//member variables
+private:
+    const MockLedgerContext &m_mock_ledger_context;
+    const rct::key &m_legacy_base_spend_pubkey;
+    const std::unordered_map<rct::key, cryptonote::subaddress_index> &m_legacy_subaddress_map;
+    const boost::optional<crypto::secret_key> &m_legacy_view_privkey;
+};
 
 ////
 // EnoteFindingContextLedgerMock

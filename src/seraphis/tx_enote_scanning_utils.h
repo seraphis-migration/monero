@@ -58,8 +58,8 @@ namespace sp
 
 //todo
 bool try_find_legacy_enotes_in_tx(const rct::key &legacy_base_spend_pubkey,
-    const crypto::secret_key &legacy_view_privkey,
     const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+    const crypto::secret_key &legacy_view_privkey,
     const std::uint64_t block_height,
     const std::uint64_t block_timestamp,
     const rct::key &transaction_id,

@@ -44,6 +44,18 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
+void EnoteFindingContextLedgerMockLegacy::get_onchain_chunk(const std::uint64_t chunk_start_height,
+    const std::uint64_t chunk_max_size,
+    EnoteScanningChunkLedgerV1 &chunk_out) const
+{
+    m_mock_ledger_context.get_onchain_chunk_legacy(chunk_start_height,
+        chunk_max_size,
+        m_legacy_base_spend_pubkey,
+        m_legacy_subaddress_map,
+        m_legacy_view_privkey,
+        chunk_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 void EnoteFindingContextLedgerMock::get_onchain_chunk(const std::uint64_t chunk_start_height,
     const std::uint64_t chunk_max_size,
     EnoteScanningChunkLedgerV1 &chunk_out) const

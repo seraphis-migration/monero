@@ -85,7 +85,30 @@ void SpEnoteStoreMockV1::add_record(const SpContextualEnoteRecordV1 &new_record)
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnoteStoreMockV1::update_with_records_from_ledger(const std::uint64_t first_new_block,
+void SpEnoteStoreMockV1::import_legacy_key_image(const crypto::key_image &legacy_key_image, const rct::key &onetime_address)
+{
+    //todo
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnoteStoreMockV1::update_with_intermediate_legacy_records_from_ledger(const std::uint64_t first_new_block,
+    const rct::key &alignment_block_id,
+    const std::unordered_map<rct::key, LegacyContextualIntermediateEnoteRecordV1> &found_enote_records,
+    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+    const std::vector<rct::key> &new_block_ids)
+{
+    //todo
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnoteStoreMockV1::update_with_legacy_records_from_ledger(const std::uint64_t first_new_block,
+    const rct::key &alignment_block_id,
+    const std::unordered_map<rct::key, LegacyContextualEnoteRecordV1> &found_enote_records,
+    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+    const std::vector<rct::key> &new_block_ids)
+{
+    //todo
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnoteStoreMockV1::update_with_sp_records_from_ledger(const std::uint64_t first_new_block,
     const rct::key &alignment_block_id,
     const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
     const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
@@ -163,7 +186,7 @@ void SpEnoteStoreMockV1::update_with_records_from_ledger(const std::uint64_t fir
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnoteStoreMockV1::update_with_records_from_offchain(
+void SpEnoteStoreMockV1::update_with_sp_records_from_offchain(
     const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
     const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images)
 {
@@ -266,7 +289,7 @@ void SpEnoteStoreMockPaymentValidatorV1::add_record(const SpContextualIntermedia
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnoteStoreMockPaymentValidatorV1::update_with_records_from_ledger(const std::uint64_t first_new_block,
+void SpEnoteStoreMockPaymentValidatorV1::update_with_sp_records_from_ledger(const std::uint64_t first_new_block,
     const rct::key &alignment_block_id,
     const std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records,
     const std::vector<rct::key> &new_block_ids)
@@ -312,7 +335,7 @@ void SpEnoteStoreMockPaymentValidatorV1::update_with_records_from_ledger(const s
         this->add_record(found_enote_record.second);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnoteStoreMockPaymentValidatorV1::update_with_records_from_offchain(
+void SpEnoteStoreMockPaymentValidatorV1::update_with_sp_records_from_offchain(
     const std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> &found_enote_records)
 {
     // 1. remove records that will be replaced

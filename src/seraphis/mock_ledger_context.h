@@ -129,16 +129,16 @@ public:
     * brief: get_onchain_chunk_legacy - legacy view scan a chunk of blocks
     * param: chunk_start_height -
     * param: chunk_max_size -
-    * param: legacy_view_privkey -
     * param: legacy_base_spend_pubkey -
     * param: legacy_subaddress_map -
+    * param: legacy_view_privkey -
     * outparam: chunk_out - chunk of scanned blocks (or empty chunk representing top of current chain)
     */
     void get_onchain_chunk_legacy(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
-        const boost::optional<crypto::secret_key> &legacy_view_privkey,
         const rct::key &legacy_base_spend_pubkey,
         const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+        const boost::optional<crypto::secret_key> &legacy_view_privkey,
         EnoteScanningChunkLedgerV1 &chunk_out) const;
     /**
     * brief: get_onchain_chunk_sp - find-received scan a chunk of blocks
@@ -220,9 +220,9 @@ private:
     bool key_image_exists_onchain_v1_impl(const crypto::key_image &key_image) const;
     void get_onchain_chunk_legacy_impl(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
-        const boost::optional<crypto::secret_key> &legacy_view_privkey,
         const rct::key &legacy_base_spend_pubkey,
         const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+        const boost::optional<crypto::secret_key> &legacy_view_privkey,
         EnoteScanningChunkLedgerV1 &chunk_out) const;
     void get_onchain_chunk_sp_impl(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
