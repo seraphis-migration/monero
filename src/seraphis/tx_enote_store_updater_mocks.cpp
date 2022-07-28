@@ -93,10 +93,9 @@ void EnoteStoreUpdaterLedgerMockLegacy::end_chunk_handling_session(const std::ui
 {
     m_enote_store.update_with_legacy_records_from_ledger(first_new_block,
         alignment_block_id,
+        new_block_ids,
         m_found_enote_records,
-        m_found_spent_key_images,
-        new_block_ids);
-    m_enote_store.set_last_legacy_fullscan_height(first_new_block + new_block_ids.size() - 1);
+        m_found_spent_key_images);
 
     m_found_enote_records.clear();
     m_found_spent_key_images.clear();
@@ -166,11 +165,10 @@ void EnoteStoreUpdaterLedgerMock::end_chunk_handling_session(const std::uint64_t
 {
     m_enote_store.update_with_sp_records_from_ledger(first_new_block,
         alignment_block_id,
+        new_block_ids,
         m_found_enote_records,
         m_found_spent_key_images,
-        m_legacy_key_images_in_sp_selfsends,
-        new_block_ids);
-    m_enote_store.set_last_sp_scanned_height(first_new_block + new_block_ids.size() - 1);
+        m_legacy_key_images_in_sp_selfsends);
 
     m_found_enote_records.clear();
     m_found_spent_key_images.clear();
@@ -275,10 +273,9 @@ void EnoteStoreUpdaterLedgerMockLegacyIntermediate::end_chunk_handling_session(c
 {
     m_enote_store.update_with_intermediate_legacy_records_from_ledger(first_new_block,
         alignment_block_id,
+        new_block_ids,
         m_found_enote_records,
-        m_found_spent_key_images,
-        new_block_ids);
-    m_enote_store.set_last_legacy_partialscan_height(first_new_block + new_block_ids.size() - 1);
+        m_found_spent_key_images);
 
     m_found_enote_records.clear();
     m_found_spent_key_images.clear();

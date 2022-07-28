@@ -153,29 +153,9 @@ void SpEnoteStoreMockV1::import_legacy_key_image(const crypto::key_image &legacy
     //todo
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpEnoteStoreMockV1::update_with_intermediate_legacy_records_from_ledger(const std::uint64_t first_new_block,
+void SpEnoteStoreMockV1::update_with_new_blocks_from_ledger(const ScanUpdateMode scan_update_mode,
+    const std::uint64_t first_new_block,
     const rct::key &alignment_block_id,
-    const std::unordered_map<rct::key, LegacyContextualIntermediateEnoteRecordV1> &found_enote_records,
-    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
-    const std::vector<rct::key> &new_block_ids)
-{
-    //todo
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpEnoteStoreMockV1::update_with_legacy_records_from_ledger(const std::uint64_t first_new_block,
-    const rct::key &alignment_block_id,
-    const std::unordered_map<rct::key, LegacyContextualEnoteRecordV1> &found_enote_records,
-    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
-    const std::vector<rct::key> &new_block_ids)
-{
-    //todo
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpEnoteStoreMockV1::update_with_sp_records_from_ledger(const std::uint64_t first_new_block,
-    const rct::key &alignment_block_id,
-    const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
-    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
-    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends, //todo: use this
     const std::vector<rct::key> &new_block_ids)
 {
     // 1. set new block ids in range [first_new_block, end of chain]
@@ -189,8 +169,84 @@ void SpEnoteStoreMockV1::update_with_sp_records_from_ledger(const std::uint64_t 
             "enote store ledger records update (mock): alignment block id doesn't align with recorded block ids.");
     }
 
-    m_block_ids.resize(first_new_block - m_refresh_height);  //crop old blocks
-    m_block_ids.insert(m_block_ids.end(), new_block_ids.begin(), new_block_ids.end());
+    // KLUDGE: assume if scan mode is legacy and there are no new block ids that there was not a reorg (in reality there
+    //         could be a reorg that pops blocks into the legacy-supporting chain)
+    // - reason: legacy scanning will terminate at the last legacy-supporting block, but seraphis scanning will continue
+    //           past that point; a legacy scan with no new blocks (blocks that don't match known blocks) will therefore
+    //           look like a reorg that pops blocks even if it just ran into the end of available legacy-supporting blocks,
+    //           and if the kludge isn't used then all seraphis-only block ids past that point will get popped by this code
+    // - general rule: always do a seraphis scan after any legacy scan to mitigate issues with the enote store caused by
+    //                 ledger reorgs of any kind (ideal reorg handling for the legacy/seraphis boundary is a hard
+    //                 design problem that's probably not worth the effort to solve)
+    if (m_block_ids.size() > 0 ||
+        scan_update_mode == ScanUpdateMode::SERAPHIS)
+    {
+        m_block_ids.resize(first_new_block - m_refresh_height);  //crop old blocks
+        m_block_ids.insert(m_block_ids.end(), new_block_ids.begin(), new_block_ids.end());
+    }
+
+    // 2. update scanning height for this scan mode
+    switch (scan_update_mode)
+    {
+        case (ScanUpdateMode::LEGACY_FULL) :
+            this->set_last_legacy_fullscan_height(first_new_block + new_block_ids.size() - 1);
+            break;
+
+        case (ScanUpdateMode::LEGACY_INTERMEDIATE) :
+            this->set_last_legacy_partialscan_height(first_new_block + new_block_ids.size() - 1);
+            break;
+
+        case (ScanUpdateMode::SERAPHIS) :
+            this->set_last_sp_scanned_height(first_new_block + new_block_ids.size() - 1);
+            break;
+
+        default :
+            CHECK_AND_ASSERT_THROW_MES(false, "enote store new blocks update (mock): unknown scan mode.");
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnoteStoreMockV1::update_with_intermediate_legacy_records_from_ledger(const std::uint64_t first_new_block,
+    const rct::key &alignment_block_id,
+    const std::vector<rct::key> &new_block_ids,
+    const std::unordered_map<rct::key, LegacyContextualIntermediateEnoteRecordV1> &found_enote_records,
+    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images)
+{
+    //todo
+
+    // 1. update block tracking info
+    this->update_with_new_blocks_from_ledger(ScanUpdateMode::LEGACY_INTERMEDIATE,
+        first_new_block,
+        alignment_block_id,
+        new_block_ids);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnoteStoreMockV1::update_with_legacy_records_from_ledger(const std::uint64_t first_new_block,
+    const rct::key &alignment_block_id,
+    const std::vector<rct::key> &new_block_ids,
+    const std::unordered_map<rct::key, LegacyContextualEnoteRecordV1> &found_enote_records,
+    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images)
+{
+    //todo
+
+    // 1. update block tracking info
+    this->update_with_new_blocks_from_ledger(ScanUpdateMode::LEGACY_FULL,
+        first_new_block,
+        alignment_block_id,
+        new_block_ids);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnoteStoreMockV1::update_with_sp_records_from_ledger(const std::uint64_t first_new_block,
+    const rct::key &alignment_block_id,
+    const std::vector<rct::key> &new_block_ids,
+    const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
+    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends) //todo: use this
+{
+    // 1. update block tracking info
+    this->update_with_new_blocks_from_ledger(ScanUpdateMode::SERAPHIS,
+        first_new_block,
+        alignment_block_id,
+        new_block_ids);
 
     // 2. remove records that will be replaced
     for_all_in_map_erase_if(m_mapped_contextual_enote_records,

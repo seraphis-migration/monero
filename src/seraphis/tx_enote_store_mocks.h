@@ -76,6 +76,13 @@ class SpEnoteStoreMockV1 final
 {
     friend class InputSelectorMockV1;
 
+    enum class ScanUpdateMode
+    {
+        LEGACY_FULL,
+        LEGACY_INTERMEDIATE,
+        SERAPHIS
+    };
+
 public:
 //constructors
     /// default constructor
@@ -98,25 +105,31 @@ public:
     /// PRECONDITION: the legacy key image was computed from/for the input onetime address
     void import_legacy_key_image(const crypto::key_image &legacy_key_image, const rct::key &onetime_address);
 
+    /// update the store with a set of new block ids from the ledger
+    void update_with_new_blocks_from_ledger(const ScanUpdateMode scan_update_mode,
+    const std::uint64_t first_new_block,
+        const rct::key &alignment_block_id,
+        const std::vector<rct::key> &new_block_ids);
+
     /// update the store with legacy enote records found in the ledger, with associated context (TODO)
     void update_with_intermediate_legacy_records_from_ledger(const std::uint64_t first_new_block,
         const rct::key &alignment_block_id,
+        const std::vector<rct::key> &new_block_ids,
         const std::unordered_map<rct::key, LegacyContextualIntermediateEnoteRecordV1> &found_enote_records,
-        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
-        const std::vector<rct::key> &new_block_ids);
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images);
     void update_with_legacy_records_from_ledger(const std::uint64_t first_new_block,
         const rct::key &alignment_block_id,
+        const std::vector<rct::key> &new_block_ids,
         const std::unordered_map<rct::key, LegacyContextualEnoteRecordV1> &found_enote_records,
-        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
-        const std::vector<rct::key> &new_block_ids);
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images);
 
     /// update the store with enote records found in the ledger, with associated context
     void update_with_sp_records_from_ledger(const std::uint64_t first_new_block,
         const rct::key &alignment_block_id,
+        const std::vector<rct::key> &new_block_ids,
         const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
         const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
-        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends,
-        const std::vector<rct::key> &new_block_ids);
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends);
 
     /// update the store with enote records found off-chain, with associated context
     void update_with_sp_records_from_offchain(
