@@ -111,6 +111,10 @@ public:
         const rct::key &alignment_block_id,
         const std::vector<rct::key> &new_block_ids);
 
+    /// cache legacy key images obtained from seraphis selfsends (i.e. ALL legacy key images spent by user in seraphis txs)
+    void handle_legacy_key_images_from_sp_selfsends(
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends);
+
     /// update the store with legacy enote records found in the ledger, with associated context (TODO)
     void update_with_intermediate_legacy_records_from_ledger(const std::uint64_t first_new_block,
         const rct::key &alignment_block_id,

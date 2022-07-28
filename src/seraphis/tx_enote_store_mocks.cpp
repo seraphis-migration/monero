@@ -176,7 +176,7 @@ void SpEnoteStoreMockV1::update_with_new_blocks_from_ledger(const ScanUpdateMode
     //           look like a reorg that pops blocks even if it just ran into the end of available legacy-supporting blocks,
     //           and if the kludge isn't used then all seraphis-only block ids past that point will get popped by this code
     // - general rule: always do a seraphis scan after any legacy scan to mitigate issues with the enote store caused by
-    //                 ledger reorgs of any kind (ideal reorg handling for the legacy/seraphis boundary is a hard
+    //                 ledger reorgs of any kind (ideal reorg handling for the legacy/seraphis boundary is an annoying
     //                 design problem that's probably not worth the effort to solve)
     if (m_block_ids.size() > 0 ||
         scan_update_mode == ScanUpdateMode::SERAPHIS)
@@ -205,6 +205,19 @@ void SpEnoteStoreMockV1::update_with_new_blocks_from_ledger(const ScanUpdateMode
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+void SpEnoteStoreMockV1::handle_legacy_key_images_from_sp_selfsends(
+    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends)
+{
+    // handle each key image
+    //for (const auto &legacy_key_image_with_spent_context : legacy_key_images_in_sp_selfsends)
+    {
+        // 1. try to use key image to update the spent context of a legacy enote with known key image
+
+        // 2. save the key image's spent context (or update an existing context)
+        // note: these are always saved to help with reorg handling
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
 void SpEnoteStoreMockV1::update_with_intermediate_legacy_records_from_ledger(const std::uint64_t first_new_block,
     const rct::key &alignment_block_id,
     const std::vector<rct::key> &new_block_ids,
@@ -228,6 +241,13 @@ void SpEnoteStoreMockV1::update_with_legacy_records_from_ledger(const std::uint6
 {
     //todo
 
+    //when removing old spent contexts of legacy key images, check that the legacy key image is not in the saved legacy
+    // key images found in seraphis selfsends
+    //when updating spent contexts of legacy key images, remove entries in the 'legacy key images saved from sp selfsends'
+    // that have the same key images (and clear the corresponding spent context in the enote store if it exists); this
+    // should be able to handle any reorgs that cause a legacy key image originally spent by a seraphis tx to be replaced
+    // by a legacy tx spending the same legacy key image (extremely unlikely, but possible)
+
     // 1. update block tracking info
     this->update_with_new_blocks_from_ledger(ScanUpdateMode::LEGACY_FULL,
         first_new_block,
@@ -249,42 +269,47 @@ void SpEnoteStoreMockV1::update_with_sp_records_from_ledger(const std::uint64_t 
         new_block_ids);
 
     // 2. remove records that will be replaced
+    std::unordered_set<rct::key> tx_ids_of_removed_enotes;  //note: only selfsends are needed in practice
+
     for_all_in_map_erase_if(m_mapped_contextual_enote_records,
-            [first_new_block](const std::pair<crypto::key_image, SpContextualEnoteRecordV1> &mapped_contextual_enote_record)
-                -> bool
+            [&](const std::pair<crypto::key_image, SpContextualEnoteRecordV1> &mapped_contextual_enote_record) -> bool
             {
                 // a. remove onchain enotes in range [first_new_block, end of chain]
                 if (mapped_contextual_enote_record.second.m_origin_context.m_origin_status ==
                         SpEnoteOriginStatus::ONCHAIN &&
                     mapped_contextual_enote_record.second.m_origin_context.m_block_height >= first_new_block)
                 {
+                    tx_ids_of_removed_enotes.insert(
+                            mapped_contextual_enote_record.second.m_origin_context.m_transaction_id
+                        );
                     return true;
                 }
 
                 // b. remove all unconfirmed enotes
                 if (mapped_contextual_enote_record.second.m_origin_context.m_origin_status ==
                         SpEnoteOriginStatus::UNCONFIRMED)
+                {
+                    tx_ids_of_removed_enotes.insert(
+                            mapped_contextual_enote_record.second.m_origin_context.m_transaction_id
+                        );
                     return true;
+                }
 
                 return false;
             }
         );
 
-    // 3. clear spent contexts referencing removed enotes
+    // 3. clear spent contexts referencing the txs of removed enotes (key images appear at the same time as selfsends)
     for (auto &mapped_contextual_enote_record : m_mapped_contextual_enote_records)
     {
-        // a. any enote spent onchain in range [first_new_block, end of chain]
-        if (mapped_contextual_enote_record.second.m_spent_context.m_spent_status ==
-                SpEnoteSpentStatus::SPENT_ONCHAIN &&
-            mapped_contextual_enote_record.second.m_spent_context.m_block_height >= first_new_block)
-        {
+        // a. seraphis enotes
+        if (tx_ids_of_removed_enotes.find(mapped_contextual_enote_record.second.m_spent_context.m_transaction_id) !=
+                tx_ids_of_removed_enotes.end())
             mapped_contextual_enote_record.second.m_spent_context = SpEnoteSpentContextV1{};
-        }
 
-        // b. any enote spent in an unconfirmed tx
-        if (mapped_contextual_enote_record.second.m_spent_context.m_spent_status ==
-                SpEnoteSpentStatus::SPENT_UNCONFIRMED)
-            mapped_contextual_enote_record.second.m_spent_context = SpEnoteSpentContextV1{};
+        // b. legacy enotes (TODO)
+
+        // c. legacy key images from seraphis selfsends (TODO)
     }
 
     // 4. add found enotes
@@ -304,6 +329,9 @@ void SpEnoteStoreMockV1::update_with_sp_records_from_ledger(const std::uint64_t 
                 m_mapped_contextual_enote_records[found_spent_key_image.first].m_spent_context);
         }
     }
+
+    // 6. handle legacy key images attached to self-spends
+    this->handle_legacy_key_images_from_sp_selfsends(legacy_key_images_in_sp_selfsends);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpEnoteStoreMockV1::update_with_sp_records_from_offchain(
@@ -312,25 +340,37 @@ void SpEnoteStoreMockV1::update_with_sp_records_from_offchain(
     const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends) //todo: use this
 {
     // 1. remove records that will be replaced
+    std::unordered_set<rct::key> tx_ids_of_removed_enotes;  //note: only selfsends are needed in practice
+
     for_all_in_map_erase_if(m_mapped_contextual_enote_records,
-            [](const std::pair<crypto::key_image, SpContextualEnoteRecordV1> &mapped_contextual_enote_record) -> bool
+            [&tx_ids_of_removed_enotes](const std::pair<crypto::key_image,
+                SpContextualEnoteRecordV1> &mapped_contextual_enote_record) -> bool
             {
                 // remove all offchain enotes
                 if (mapped_contextual_enote_record.second.m_origin_context.m_origin_status ==
                         SpEnoteOriginStatus::OFFCHAIN)
+                {
+                    tx_ids_of_removed_enotes.insert(
+                            mapped_contextual_enote_record.second.m_origin_context.m_transaction_id
+                        );
                     return true;
+                }
 
                 return false;
             }
         );
 
-    // 2. clear spent contexts referencing removed enotes
+    // 2. clear spent contexts referencing the txs of removed enotes (key images appear at the same time as selfsends)
     for (auto &mapped_contextual_enote_record : m_mapped_contextual_enote_records)
     {
-        // any enote spent in an offchain tx
-        if (mapped_contextual_enote_record.second.m_spent_context.m_spent_status ==
-                SpEnoteSpentStatus::SPENT_OFFCHAIN)
+        // a. seraphis enotes
+        if (tx_ids_of_removed_enotes.find(mapped_contextual_enote_record.second.m_spent_context.m_transaction_id) !=
+                tx_ids_of_removed_enotes.end())
             mapped_contextual_enote_record.second.m_spent_context = SpEnoteSpentContextV1{};
+
+        // b. legacy enotes (TODO)
+
+        // c. legacy key images from seraphis selfsends (TODO)
     }
 
     // 3. add found enotes
@@ -350,6 +390,9 @@ void SpEnoteStoreMockV1::update_with_sp_records_from_offchain(
                 m_mapped_contextual_enote_records[found_spent_key_image.first].m_spent_context);
         }
     }
+
+    // 5. handle legacy key images attached to self-spends
+    this->handle_legacy_key_images_from_sp_selfsends(legacy_key_images_in_sp_selfsends);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpEnoteStoreMockV1::has_enote_with_key_image(const crypto::key_image &key_image) const
