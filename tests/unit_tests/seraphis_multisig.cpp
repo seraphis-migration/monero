@@ -356,7 +356,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     // c) extract info from the enotes 'sent' to the multisig address
     std::vector<SpEnoteRecordV1> input_enote_records;
     input_enote_records.resize(input_enotes.size());
-    SpEnoteStoreMockV1 enote_store;
+    SpEnoteStoreMockV1 enote_store{0, 0};
 
     for (std::size_t input_index{0}; input_index < input_enotes.size(); ++input_index)
     {

@@ -85,6 +85,69 @@ void SpEnoteStoreMockV1::add_record(const SpContextualEnoteRecordV1 &new_record)
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
+SpEnoteStoreMockV1::SpEnoteStoreMockV1(const std::uint64_t refresh_height,
+    const std::uint64_t first_sp_enabled_block_in_chain) :
+        m_refresh_height{refresh_height},
+        m_legacy_fullscan_height{refresh_height - 1},
+        m_legacy_partialscan_height{refresh_height - 1},
+        m_sp_scanned_height{refresh_height - 1},
+        m_first_sp_enabled_block_in_chain{first_sp_enabled_block_in_chain}
+{}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnoteStoreMockV1::set_last_legacy_fullscan_height(const std::uint64_t new_height)
+{
+    /// set this scan height (+1 because initial scanned height is below refresh height)
+    CHECK_AND_ASSERT_THROW_MES(new_height + 1 >= m_refresh_height,
+        "mock enote store (set legacy fullscan height): new height is below refresh height.");
+    CHECK_AND_ASSERT_THROW_MES(new_height + 1 <= m_refresh_height + m_block_ids.size(),
+        "mock enote store (set legacy fullscan height): new height is above known block range.");
+
+    m_legacy_fullscan_height = new_height;
+
+    /// update other scan heights
+    // a. legacy partial scan height (fullscan qualifies as partialscan)
+    // note: this update won't fix inaccuracy in the m_legacy_partialscan_height caused by a reorg, although
+    //       in practice reorgs that reduce the chain height are extremely rare/nonexistent outside unit tests;
+    //       moreoever, the partialscan height is meaningless unless view-only scanning (in which case the fullscan
+    //       height will almost certainly only be updated using a manual workflow that can only repair reorgs by
+    //       re-running the workflow anyway)
+    m_legacy_partialscan_height = std::max(m_legacy_partialscan_height + 1, m_legacy_fullscan_height + 1) - 1;
+
+    // b. seraphis scan height (to avoid re-acquiring legacy-only block ids)
+    m_sp_scanned_height = std::max(m_sp_scanned_height + 1,
+        std::min(m_legacy_fullscan_height + 1, m_first_sp_enabled_block_in_chain)) - 1;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnoteStoreMockV1::set_last_legacy_partialscan_height(const std::uint64_t new_height)
+{
+    /// set this scan height
+    CHECK_AND_ASSERT_THROW_MES(new_height + 1 >= m_refresh_height,
+        "mock enote store (set legacy partialscan height): new height is below refresh height.");
+    CHECK_AND_ASSERT_THROW_MES(new_height + 1 <= m_refresh_height + m_block_ids.size(),
+        "mock enote store (set legacy partialscan height): new height is above known block range.");
+
+    m_legacy_partialscan_height = new_height;
+
+    /// update other scan heights
+    // a. legacy full scan height (if partialscan height is below fullscan height, assume this means there was a reorg)
+    m_legacy_fullscan_height = std::min(m_legacy_fullscan_height + 1, m_legacy_partialscan_height + 1) - 1;
+
+    // b. seraphis scan height (to avoid re-acquiring legacy-only block ids)
+    m_sp_scanned_height = std::max(m_sp_scanned_height + 1,
+        std::min(m_legacy_partialscan_height + 1, m_first_sp_enabled_block_in_chain)) - 1;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpEnoteStoreMockV1::set_last_sp_scanned_height(const std::uint64_t new_height)
+{
+    /// set this scan height
+    CHECK_AND_ASSERT_THROW_MES(new_height + 1 >= m_refresh_height,
+        "mock enote store (set seraphis scan height): new height is below refresh height.");
+    CHECK_AND_ASSERT_THROW_MES(new_height + 1 <= m_refresh_height + m_block_ids.size(),
+        "mock enote store (set seraphis scan height): new height is above known block range.");
+
+    m_sp_scanned_height = new_height;
+}
+//-------------------------------------------------------------------------------------------------------------------
 void SpEnoteStoreMockV1::import_legacy_key_image(const crypto::key_image &legacy_key_image, const rct::key &onetime_address)
 {
     //todo

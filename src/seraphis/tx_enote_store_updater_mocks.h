@@ -192,6 +192,7 @@ public:
     /// normal constructor
     EnoteStoreUpdaterLedgerMockLegacyIntermediate(const rct::key &legacy_base_spend_pubkey,
         const crypto::secret_key &legacy_view_privkey,
+        const bool legacy_key_image_recovery_mode,
         SpEnoteStoreMockV1 &enote_store);
 
 //overloaded operators
@@ -219,6 +220,12 @@ public:
 
 //member variables
 private:
+    /// If this is set, then get_top_block_height() will return the last block that was legacy view-scanned and where
+    /// legacy key images were fully handled. Otherwise, it will return the last block that was only legacy view-scanned.
+    /// - Goal: when set, expect the enote scanner to return key images for all blocks that were only legacy view-scanned
+    ///   but that didn't have key images handled (i.e. because key images weren't available during a previous scan).
+    bool m_legacy_key_image_recovery_mode;
+
     /// static data
     const rct::key &m_legacy_base_spend_pubkey;
     const crypto::secret_key &m_legacy_view_privkey;
