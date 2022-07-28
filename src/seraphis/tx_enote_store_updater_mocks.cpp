@@ -136,6 +136,7 @@ void EnoteStoreUpdaterLedgerMock::start_chunk_handling_session()
 {
     m_found_enote_records.clear();
     m_found_spent_key_images.clear();
+    m_legacy_key_images_in_sp_selfsends.clear();
 }
 //-------------------------------------------------------------------------------------------------------------------
 void EnoteStoreUpdaterLedgerMock::process_chunk(
@@ -155,7 +156,8 @@ void EnoteStoreUpdaterLedgerMock::process_chunk(
         chunk_basic_records_per_tx,
         chunk_contextual_key_images,
         m_found_enote_records,
-        m_found_spent_key_images);
+        m_found_spent_key_images,
+        m_legacy_key_images_in_sp_selfsends);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void EnoteStoreUpdaterLedgerMock::end_chunk_handling_session(const std::uint64_t first_new_block,
@@ -166,11 +168,13 @@ void EnoteStoreUpdaterLedgerMock::end_chunk_handling_session(const std::uint64_t
         alignment_block_id,
         m_found_enote_records,
         m_found_spent_key_images,
+        m_legacy_key_images_in_sp_selfsends,
         new_block_ids);
     m_enote_store.set_last_sp_scanned_height(first_new_block + new_block_ids.size() - 1);
 
     m_found_enote_records.clear();
     m_found_spent_key_images.clear();
+    m_legacy_key_images_in_sp_selfsends.clear();
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool EnoteStoreUpdaterLedgerMock::try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const
@@ -209,6 +213,7 @@ void EnoteStoreUpdaterNonLedgerMock::process_and_handle_chunk(
 {
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> found_enote_records;
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> found_spent_key_images;
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> legacy_key_images_in_sp_selfsends;
 
     process_chunk_full_sp(m_wallet_spend_pubkey,
         m_k_view_balance,
@@ -223,9 +228,12 @@ void EnoteStoreUpdaterNonLedgerMock::process_and_handle_chunk(
         chunk_basic_records_per_tx,
         chunk_contextual_key_images,
         found_enote_records,
-        found_spent_key_images);
+        found_spent_key_images,
+        legacy_key_images_in_sp_selfsends);
 
-    m_enote_store.update_with_sp_records_from_offchain(found_enote_records, found_spent_key_images);
+    m_enote_store.update_with_sp_records_from_offchain(found_enote_records,
+        found_spent_key_images,
+        legacy_key_images_in_sp_selfsends);
 }
 //-------------------------------------------------------------------------------------------------------------------
 EnoteStoreUpdaterLedgerMockLegacyIntermediate::EnoteStoreUpdaterLedgerMockLegacyIntermediate(

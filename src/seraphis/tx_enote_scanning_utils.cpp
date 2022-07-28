@@ -198,6 +198,33 @@ static void process_chunk_new_record_update_sp(const SpEnoteRecordV1 &new_enote_
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void collect_legacy_key_images_from_tx(const rct::key &requested_tx_id,
+    const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_tx_inout)
+{
+    // find key images of requested tx
+    auto contextual_key_images_of_requested_tx =
+        std::find_if(
+            chunk_contextual_key_images.begin(),
+            chunk_contextual_key_images.end(),
+            [&](const SpContextualKeyImageSetV1 &contextual_key_image_set) -> bool
+            {
+                return contextual_key_image_set.m_spent_context.m_transaction_id == requested_tx_id;
+            }
+        );
+
+    CHECK_AND_ASSERT_THROW_MES(contextual_key_images_of_requested_tx != chunk_contextual_key_images.end(),
+        "enote scanning (collect legacy key images from tx): could not find tx's key images.");
+
+    // record legacy key images
+    for (const crypto::key_image &legacy_key_image : contextual_key_images_of_requested_tx->m_legacy_key_images)
+    {
+        try_update_enote_spent_context_v1(contextual_key_images_of_requested_tx->m_spent_context,
+            legacy_key_images_in_tx_inout[legacy_key_image]);
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 bool try_find_legacy_enotes_in_tx(const rct::key &legacy_base_spend_pubkey,
     const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
     const crypto::secret_key &legacy_view_privkey,
@@ -537,7 +564,8 @@ void process_chunk_full_sp(const rct::key &wallet_spend_pubkey,
     const std::unordered_map<rct::key, std::list<ContextualBasicRecordVariant>> &chunk_basic_records_per_tx,
     const std::list<SpContextualKeyImageSetV1> &chunk_contextual_key_images,
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records_inout,
-    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout)
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images_inout,
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfspends_inout)
 {
     std::unordered_set<rct::key> txs_have_spent_enotes;
 
@@ -647,6 +675,11 @@ void process_chunk_full_sp(const rct::key &wallet_spend_pubkey,
                             found_enote_records_inout,
                             found_spent_key_images_inout,
                             txs_have_spent_enotes_selfsend_passthrough);
+
+                        // record all legacy key images attached to this self-spend for the caller to deal with
+                        collect_legacy_key_images_from_tx(contextual_basic_record.origin_context().m_transaction_id,
+                            chunk_contextual_key_images,
+                            legacy_key_images_in_sp_selfspends_inout);
                     }
                 } catch (...) {}
             }

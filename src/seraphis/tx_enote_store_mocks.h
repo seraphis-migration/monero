@@ -115,12 +115,14 @@ public:
         const rct::key &alignment_block_id,
         const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
         const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends,
         const std::vector<rct::key> &new_block_ids);
 
     /// update the store with enote records found off-chain, with associated context
     void update_with_sp_records_from_offchain(
         const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
-        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images);
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends);
 
     /// check if any stored enote has a given key image
     bool has_enote_with_key_image(const crypto::key_image &key_image) const;

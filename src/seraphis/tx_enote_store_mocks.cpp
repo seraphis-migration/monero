@@ -175,6 +175,7 @@ void SpEnoteStoreMockV1::update_with_sp_records_from_ledger(const std::uint64_t 
     const rct::key &alignment_block_id,
     const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
     const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends, //todo: use this
     const std::vector<rct::key> &new_block_ids)
 {
     // 1. set new block ids in range [first_new_block, end of chain]
@@ -251,7 +252,8 @@ void SpEnoteStoreMockV1::update_with_sp_records_from_ledger(const std::uint64_t 
 //-------------------------------------------------------------------------------------------------------------------
 void SpEnoteStoreMockV1::update_with_sp_records_from_offchain(
     const std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> &found_enote_records,
-    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images)
+    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images,
+    const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &legacy_key_images_in_sp_selfsends) //todo: use this
 {
     // 1. remove records that will be replaced
     for_all_in_map_erase_if(m_mapped_contextual_enote_records,

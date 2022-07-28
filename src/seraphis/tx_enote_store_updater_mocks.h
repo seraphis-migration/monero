@@ -150,6 +150,7 @@ private:
     /// session data
     std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> m_found_enote_records;
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_found_spent_key_images;
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_legacy_key_images_in_sp_selfsends;
 };
 
 class EnoteStoreUpdaterNonLedgerMock final : public EnoteStoreUpdaterNonLedger
