@@ -99,6 +99,8 @@ public:
     void set_last_sp_scanned_height(const std::uint64_t new_height);
 
     /// add a record
+    void add_record(const LegacyContextualIntermediateEnoteRecordV1 &new_record);
+    void add_record(const LegacyContextualEnoteRecordV1 &new_record);
     void add_record(const SpContextualEnoteRecordV1 &new_record);
 
     /// import a legacy key image (TODO)
@@ -151,6 +153,10 @@ public:
     /// get height of heighest recorded block (refresh height - 1 if no recorded blocks)
     std::uint64_t get_top_block_height() const { return m_refresh_height + m_block_ids.size() - 1; }
     /// get height of heighest block that was legacy fullscanned (view-scan + comprehensive key image checks)
+    /// WARNING: if this is used in combination with the height of the last legacy-enabled block to determine whether
+    //           legacy scanning is needed, then if a previous legacy scan reached that block height then legacy scanning
+    //           won't be executed to heal any reorgs that change the last legacy-enabled block (fix this by
+    //           forcing a legacy fullscan)
     std::uint64_t get_top_legacy_fullscanned_block_height() const { return m_legacy_fullscan_height; }
     /// get height of heighest block that was legacy partialscanned (view-scan only)
     std::uint64_t get_top_legacy_partialscanned_block_height() const { return m_legacy_partialscan_height; }
@@ -163,8 +169,20 @@ public:
 
 //member variables
 protected:
-    /// the enotes
-    std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> m_mapped_contextual_enote_records;
+    /// intermediate legacy enotes (unknown key images): mapped to H32(Ko, a)
+    std::unordered_map<rct::key, LegacyContextualIntermediateEnoteRecordV1>
+        m_mapped_legacy_intermediate_contextual_enote_records;
+    /// legacy enotes: mapped to H32(Ko, a)
+    std::unordered_map<rct::key, LegacyContextualEnoteRecordV1> m_mapped_legacy_contextual_enote_records;
+    /// seraphis enotes
+    std::unordered_map<crypto::key_image, SpContextualEnoteRecordV1> m_mapped_sp_contextual_enote_records;
+
+    /// saved legacy key images from txs with seraphis selfsends (i.e. txs we created)
+    std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_legacy_key_images_in_sp_selfsends;
+    /// legacy key images mapped to H32(Ko, a) identifiers, for dealing with enotes that have duplicated onetime addresses
+    /// note: the user can receive multiple legacy enotes with the same identifier, but those are treated as equivalent,
+    //        which should only cause problems for users if the associated tx memos are different (very unlikely scenario)
+    std::unordered_map<crypto::key_image, std::unordered_set<rct::key>> m_tracked_legacy_key_image_duplicates;
 
     /// refresh height
     std::uint64_t m_refresh_height{0};
@@ -172,14 +190,14 @@ protected:
     std::vector<rct::key> m_block_ids;
 
     /// heighest block that was legacy fullscanned (view-scan + comprehensive key image checks)
-    std::uint64_t m_legacy_fullscan_height{0};
+    std::uint64_t m_legacy_fullscan_height{static_cast<std::uint64_t>(-1)};
     /// heighest block that was legacy partialscanned (view-scan only)
-    std::uint64_t m_legacy_partialscan_height{0};
+    std::uint64_t m_legacy_partialscan_height{static_cast<std::uint64_t>(-1)};
     /// heighest block that was seraphis view-balance scanned
-    std::uint64_t m_sp_scanned_height{0};
+    std::uint64_t m_sp_scanned_height{static_cast<std::uint64_t>(-1)};
 
     /// configuration value: the first ledger block that can contain seraphis txs
-    std::uint64_t m_first_sp_enabled_block_in_chain{0};
+    std::uint64_t m_first_sp_enabled_block_in_chain{static_cast<std::uint64_t>(-1)};
 };
 
 ////
@@ -224,8 +242,8 @@ public:
 
 //member variables
 protected:
-    /// the enotes
-    std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> m_mapped_contextual_enote_records;
+    /// seraphis enotes
+    std::unordered_map<rct::key, SpContextualIntermediateEnoteRecordV1> m_mapped_sp_contextual_enote_records;
 
     /// refresh height
     std::uint64_t m_refresh_height{0};

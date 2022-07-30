@@ -73,7 +73,7 @@ static void process_chunk_new_intermediate_record_update_legacy(const LegacyInte
 {
     // 1. add new legacy record to found enotes (or refresh if already there)
     const rct::key new_record_identifier{
-            rct::cn_fast_hash({new_enote_record.m_enote.onetime_address(), new_enote_record.m_enote.amount_commitment()})
+            rct::cn_fast_hash({new_enote_record.m_enote.onetime_address(), rct::d2h(new_enote_record.m_amount)})
         };
 
     found_enote_records_inout[new_record_identifier].m_record = new_enote_record;
@@ -107,7 +107,7 @@ static void process_chunk_new_record_update_legacy(const LegacyEnoteRecord &new_
 {
     // 1. add new legacy record to found enotes (or refresh if already there)
     const rct::key new_record_identifier{
-            rct::cn_fast_hash({new_enote_record.m_enote.onetime_address(), new_enote_record.m_enote.amount_commitment()})
+            rct::cn_fast_hash({new_enote_record.m_enote.onetime_address(), rct::d2h(new_enote_record.m_amount)})
         };
 
     found_enote_records_inout[new_record_identifier].m_record = new_enote_record;

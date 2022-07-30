@@ -122,7 +122,7 @@ void update_contextual_enote_record_contexts_v1(const SpEnoteOriginContextV1 &ne
     SpEnoteSpentContextV1 &spent_context_inout)
 {
     try_update_enote_spent_context_v1(new_spent_context, spent_context_inout);
-    try_update_enote_origin_context_v1(new_origin_context,origin_context_inout);
+    try_update_enote_origin_context_v1(new_origin_context, origin_context_inout);
     try_bump_enote_record_origin_status_v1(spent_context_inout.m_spent_status,
        origin_context_inout.m_origin_status);
 }

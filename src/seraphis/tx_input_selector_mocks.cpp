@@ -83,7 +83,7 @@ bool InputSelectorMockV1::try_select_input_v1(const boost::multiprecision::uint1
     const std::list<SpContextualEnoteRecordV1> &already_excluded_inputs,
     SpContextualEnoteRecordV1 &selected_input_out) const
 {
-    for (const auto &mapped_enote_record : m_enote_store.m_mapped_contextual_enote_records)
+    for (const auto &mapped_enote_record : m_enote_store.m_mapped_sp_contextual_enote_records)
     {
         // find the next unspent enote record that hasn't already been selected (via key image comparisons)
         if (!mapped_enote_record.second.has_spent_status(SpEnoteSpentStatus::UNSPENT))
