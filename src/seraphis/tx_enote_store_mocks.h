@@ -84,6 +84,13 @@ class SpEnoteStoreMockV1 final
     };
 
 public:
+    enum class BalanceUpdateExclusions
+    {
+        LEGACY_FULL,
+        LEGACY_INTERMEDIATE,
+        SERAPHIS
+    };
+
 //constructors
     /// default constructor
     SpEnoteStoreMockV1() = default;
@@ -103,8 +110,9 @@ public:
     void add_record(const LegacyContextualEnoteRecordV1 &new_record);
     void add_record(const SpContextualEnoteRecordV1 &new_record);
 
-    /// import a legacy key image (TODO)
-    /// PRECONDITION: the legacy key image was computed from/for the input onetime address
+    /// import a legacy key image
+    /// PRECONDITION1: the legacy key image was computed from/for the input onetime address
+    /// PRECONDITION2: the onetime address is already known by the enote store (e.g. from intermediate legacy scanning)
     void import_legacy_key_image(const crypto::key_image &legacy_key_image, const rct::key &onetime_address);
 
     /// update the store with a set of new block ids from the ledger
@@ -162,10 +170,19 @@ public:
     std::uint64_t get_top_legacy_partialscanned_block_height() const { return m_legacy_partialscan_height; }
     /// get height of heighest block that was seraphis view-balance scanned
     std::uint64_t get_top_sp_scanned_block_height() const { return m_sp_scanned_height; }
-    /// get current balance using specified origin/spent statuses
+    /// get current balance using specified origin/spent statuses and exclusions
     boost::multiprecision::uint128_t get_balance(
         const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
-        const std::unordered_set<SpEnoteSpentStatus> &spent_statuses) const;
+        const std::unordered_set<SpEnoteSpentStatus> &spent_statuses,
+        const std::unordered_set<BalanceUpdateExclusions> &exclusions = {}) const;
+
+protected:
+    /// clean up legacy state to prepare for adding fresh legacy enotes and key images
+    void clean_legacy_maps_for_ledger_update(const std::uint64_t first_new_block,
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images);
+    /// update legacy state with fresh legacy key images that were found to be spent
+    void update_legacy_with_fresh_found_spent_key_images(
+        const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images);
 
 //member variables
 protected:
@@ -179,10 +196,13 @@ protected:
 
     /// saved legacy key images from txs with seraphis selfsends (i.e. txs we created)
     std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> m_legacy_key_images_in_sp_selfsends;
-    /// legacy key images mapped to H32(Ko, a) identifiers, for dealing with enotes that have duplicated onetime addresses
+    /// legacy H32(Ko, a) identifiers mapped to onetime addresses, for dealing with enotes that have duplicated key images
     /// note: the user can receive multiple legacy enotes with the same identifier, but those are treated as equivalent,
-    //        which should only cause problems for users if the associated tx memos are different (very unlikely scenario)
-    std::unordered_map<crypto::key_image, std::unordered_set<rct::key>> m_tracked_legacy_key_image_duplicates;
+    ///       which should only cause problems for users if the associated tx memos are different (very unlikely scenario)
+    std::unordered_map<rct::key, std::unordered_set<rct::key>> m_tracked_legacy_onetime_address_duplicates;
+    /// all legacy onetime addresses attached to known legacy enotes, mapped to key images
+    /// note: might not include all entries in 'legacy key images in sp selfsends' if some corresponding enotes are unknown
+    std::unordered_map<crypto::key_image, rct::key> m_legacy_key_images;
 
     /// refresh height
     std::uint64_t m_refresh_height{0};
