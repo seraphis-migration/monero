@@ -160,16 +160,18 @@ public:
     bool try_get_unconfirmed_chunk_sp(const crypto::secret_key &k_find_received,
         EnoteScanningChunkNonLedgerV1 &chunk_out) const;
     /**
-    * brief: add_legacy_coinbase - make a block with a mock legacy coinbase tx
+    * brief: add_legacy_coinbase - make a block with a mock legacy coinbase tx (containing legacy key images)
     * param: tx_id -
     * param: unlock_time -
     * param: memo -
+    * param: legacy_key_images_for_block -
     * param: output_enotes -
     * return: block height of newly added block
     */
     std::uint64_t add_legacy_coinbase(const rct::key &tx_id,
         const std::uint64_t unlock_time,
         TxExtra memo,
+        std::vector<crypto::key_image> legacy_key_images_for_block,
         std::vector<LegacyEnoteVariant> output_enotes);
     /**
     * brief: try_add_unconfirmed_tx_v1 - try to add a full transaction to the 'unconfirmed' tx cache
@@ -233,6 +235,7 @@ private:
     std::uint64_t add_legacy_coinbase_impl(const rct::key &tx_id,
         const std::uint64_t unlock_time,
         TxExtra memo,
+        std::vector<crypto::key_image> legacy_key_images_for_block,
         std::vector<LegacyEnoteVariant> output_enotes);
     bool try_add_unconfirmed_coinbase_v1_impl(const rct::key &tx_id,
         const rct::key &input_context,

@@ -337,7 +337,7 @@ void SpEnoteStoreMockV1::update_with_new_blocks_from_ledger(const ScanUpdateMode
     // - general rule: always do a seraphis scan after any legacy scan to mitigate issues with the enote store caused by
     //                 ledger reorgs of any kind (ideal reorg handling for the legacy/seraphis boundary is an annoying
     //                 design problem that's probably not worth the effort to solve)
-    if (m_block_ids.size() > 0 ||
+    if (new_block_ids.size() > 0 ||
         scan_update_mode == ScanUpdateMode::SERAPHIS)
     {
         m_block_ids.resize(first_new_block - m_refresh_height);  //crop old blocks
@@ -638,6 +638,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
         {
             const LegacyContextualIntermediateEnoteRecordV1 &current_contextual_record{mapped_contextual_record.second};
 
+            // inflows
             if (origin_statuses.find(current_contextual_record.m_origin_context.m_origin_status) != origin_statuses.end())
             {
                 // collect all amounts for enotes with the current mapped_contextual_record's onetime address
@@ -701,6 +702,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
         {
             const LegacyContextualEnoteRecordV1 &current_contextual_record{mapped_contextual_record.second};
 
+            // inflows
             if (origin_statuses.find(current_contextual_record.m_origin_context.m_origin_status) != origin_statuses.end())
             {
                 // collect all amounts for enotes with the current mapped_contextual_record's onetime address
@@ -755,6 +757,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
                     inflow_sum += current_contextual_record.m_record.m_amount;
             }
 
+            // outflows
             if (spent_statuses.find(current_contextual_record.m_spent_context.m_spent_status) != spent_statuses.end())
             {
                 // collect all amounts for enotes with the current mapped_contextual_record's onetime address
@@ -818,9 +821,11 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
         {
             const SpContextualEnoteRecordV1 &current_contextual_record{mapped_contextual_record.second};
 
+            // inflows
             if (origin_statuses.find(current_contextual_record.m_origin_context.m_origin_status) != origin_statuses.end())
                 inflow_sum += current_contextual_record.m_record.m_amount;
 
+            // outflows
             if (spent_statuses.find(current_contextual_record.m_spent_context.m_spent_status) != spent_statuses.end())
                 outflow_sum += current_contextual_record.m_record.m_amount;
         }

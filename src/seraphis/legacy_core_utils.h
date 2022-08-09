@@ -199,7 +199,7 @@ void make_legacy_view_tag(const rct::key &destination_viewkey,
     crypto::view_tag &view_tag_out);
 /**
 * brief: extract_legacy_enote_ephemeral_pubkeys_from_tx_extra - find enote ephemeral pubkeys in a tx extra field
-* param: tx_extra - memo field (byte vector)\
+* param: tx_extra - memo field (byte vector)
 * outparam: legacy_enote_ephemeral_pubkeys_out - [r G] or [r_0 K^v_0, ..., r_n K^v_n; for n+1 outputs]
 */
 void extract_legacy_enote_ephemeral_pubkeys_from_tx_extra(const TxExtra &tx_extra,

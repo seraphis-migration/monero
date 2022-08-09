@@ -55,12 +55,12 @@ namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
 EnoteStoreUpdaterLedgerMockLegacy::EnoteStoreUpdaterLedgerMockLegacy(const rct::key &legacy_base_spend_pubkey,
-    const crypto::secret_key &legacy_view_privkey,
     const crypto::secret_key &legacy_spend_privkey,
+    const crypto::secret_key &legacy_view_privkey,
     SpEnoteStoreMockV1 &enote_store) :
         m_legacy_base_spend_pubkey{legacy_base_spend_pubkey},
-        m_legacy_view_privkey{legacy_view_privkey},
         m_legacy_spend_privkey{legacy_spend_privkey},
+        m_legacy_view_privkey{legacy_view_privkey},
         m_enote_store{enote_store}
 {}
 //-------------------------------------------------------------------------------------------------------------------

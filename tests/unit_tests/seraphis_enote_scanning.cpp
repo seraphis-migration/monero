@@ -27,6 +27,8 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "crypto/crypto.h"
+#include "cryptonote_basic/cryptonote_format_utils.h"
+#include "cryptonote_basic/subaddress_index.h"
 #include "misc_language.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -37,6 +39,9 @@
 #include "seraphis/jamtis_enote_utils.h"
 #include "seraphis/jamtis_payment_proposal.h"
 #include "seraphis/jamtis_support_types.h"
+#include "seraphis/legacy_core_utils.h"
+#include "seraphis/legacy_enote_types.h"
+#include "seraphis/legacy_enote_utils.h"
 #include "seraphis/mock_ledger_context.h"
 #include "seraphis/sp_composition_proof.h"
 #include "seraphis/sp_core_enote_utils.h"
@@ -181,6 +186,39 @@ static void make_random_address_for_user(const sp::jamtis::jamtis_mock_keys &use
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void make_legacy_subaddress(const rct::key &legacy_base_spend_pubkey,
+    const crypto::secret_key &legacy_view_privkey,
+    rct::key &subaddr_spendkey_out,
+    rct::key &subaddr_viewkey_out,
+    cryptonote::subaddress_index &subaddr_index_out)
+{
+    // random subaddress index: i
+    crypto::rand(sizeof(subaddr_index_out.minor), reinterpret_cast<unsigned char*>(&subaddr_index_out.minor));
+    crypto::rand(sizeof(subaddr_index_out.major), reinterpret_cast<unsigned char*>(&subaddr_index_out.major));
+
+    // subaddress spendkey: (Hn(k^v, i) + k^s) G
+    sp::make_legacy_subaddress_spendkey(legacy_base_spend_pubkey,
+        legacy_view_privkey,
+        subaddr_index_out,
+        subaddr_spendkey_out);
+
+    // subaddress viewkey: k^v * K^{s,i}
+    rct::scalarmultKey(subaddr_viewkey_out, subaddr_spendkey_out, rct::sk2rct(legacy_view_privkey));
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void append_legacy_enote_ephemeral_pubkeys_to_tx_extra(const std::vector<rct::key> &enote_ephemeral_pubkeys,
+    sp::TxExtra &tx_extra_inout)
+{
+    std::vector<crypto::public_key> enote_ephemeral_pubkeys_typed;
+    enote_ephemeral_pubkeys_typed.reserve(enote_ephemeral_pubkeys.size());
+    for (const rct::key &enote_ephemeral_pubkey : enote_ephemeral_pubkeys)
+        enote_ephemeral_pubkeys_typed.emplace_back(rct::rct2pk(enote_ephemeral_pubkey));
+
+    ASSERT_TRUE(cryptonote::add_additional_tx_pub_keys_to_extra(tx_extra_inout, enote_ephemeral_pubkeys_typed));
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void convert_outlay_to_payment_proposal(const rct::xmr_amount outlay_amount,
     const sp::jamtis::JamtisDestinationV1 &destination,
     const sp::TxExtra &partial_memo_for_destination,
@@ -266,7 +304,6 @@ static void refresh_user_enote_store(const sp::jamtis::jamtis_mock_keys &user_ke
     sp::SpEnoteStoreMockV1 &user_enote_store_inout)
 {
     using namespace sp;
-    using namespace jamtis;
 
     const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.k_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
@@ -282,7 +319,6 @@ static void refresh_user_enote_store_PV(const sp::jamtis::jamtis_mock_keys &user
     sp::SpEnoteStoreMockPaymentValidatorV1 &user_enote_store_inout)
 {
     using namespace sp;
-    using namespace jamtis;
 
     const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.k_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
@@ -291,6 +327,34 @@ static void refresh_user_enote_store_PV(const sp::jamtis::jamtis_mock_keys &user
             user_keys.k_ua,
             user_keys.k_fr,
             user_keys.s_ga,
+            user_enote_store_inout
+        };
+
+    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config, enote_scanning_context, enote_store_updater));
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void refresh_user_enote_store_legacy_full(const rct::key &legacy_base_spend_pubkey,
+    const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+    const crypto::secret_key &legacy_spend_privkey,
+    const crypto::secret_key &legacy_view_privkey,
+    const sp::RefreshLedgerEnoteStoreConfig &refresh_config,
+    const sp::MockLedgerContext &ledger_context,
+    sp::SpEnoteStoreMockV1 &user_enote_store_inout)
+{
+    using namespace sp;
+
+    const EnoteFindingContextLedgerMockLegacy enote_finding_context{
+            ledger_context,
+            legacy_base_spend_pubkey,
+            legacy_subaddress_map,
+            legacy_view_privkey
+        };
+    EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
+    EnoteStoreUpdaterLedgerMockLegacy enote_store_updater{
+            legacy_base_spend_pubkey,
+            legacy_spend_privkey,
+            legacy_view_privkey,
             user_enote_store_inout
         };
 
@@ -1772,5 +1836,224 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning)
         {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 3);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_enote_scanning, legacy_pre_transition)
+{
+    using namespace sp;
+
+    /// setup
+
+    // 1. config
+    const RefreshLedgerEnoteStoreConfig refresh_config{
+            .m_reorg_avoidance_depth = 1,
+            .m_max_chunk_size = 1,
+            .m_max_partialscan_attempts = 0
+        };
+
+    // 2. user keys
+    const crypto::secret_key legacy_spend_privkey{make_secret_key()};
+    const crypto::secret_key legacy_view_privkey{make_secret_key()};
+    const rct::key legacy_base_spend_pubkey{rct::scalarmultBase(rct::sk2rct(legacy_spend_privkey))};
+
+    // 3. user normal address
+    const rct::key normal_addr_spendkey{legacy_base_spend_pubkey};
+    const rct::key normal_addr_viewkey{rct::scalarmultBase(rct::sk2rct(legacy_view_privkey))};
+
+    // 4. user subaddress
+    rct::key subaddr_spendkey;
+    rct::key subaddr_viewkey;
+    cryptonote::subaddress_index subaddr_index;
+
+    make_legacy_subaddress(legacy_base_spend_pubkey, legacy_view_privkey, subaddr_spendkey, subaddr_viewkey, subaddr_index);
+
+    std::unordered_map<rct::key, cryptonote::subaddress_index> legacy_subaddress_map;
+    legacy_subaddress_map[subaddr_spendkey] = subaddr_index;
+
+
+    /// tests
+
+    // 1. v1-v4 legacy enotes (both normal and subaddress destinations)
+    MockLedgerContext ledger_context_test1{10000, 10000};
+    SpEnoteStoreMockV1 enote_store_test1{0, 10000};
+
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test1,
+        enote_store_test1);
+
+    ASSERT_TRUE(enote_store_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_test1.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+
+    LegacyEnoteV1 enote_v1_1_test1;  //to normal destination
+    const crypto::secret_key enote_ephemeral_privkey_1_test1{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_1_test1{
+            rct::scalarmultBase(rct::sk2rct(enote_ephemeral_privkey_1_test1))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v1(normal_addr_spendkey,
+        normal_addr_viewkey,
+        1,  //amount
+        0,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_1_test1,
+        enote_v1_1_test1));
+
+    LegacyEnoteV1 enote_v1_2_test1;  //to subaddress destination
+    const crypto::secret_key enote_ephemeral_privkey_2_test1{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_2_test1{
+            rct::scalarmultKey(subaddr_spendkey, rct::sk2rct(enote_ephemeral_privkey_2_test1))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v1(subaddr_spendkey,
+        subaddr_viewkey,
+        1,  //amount
+        1,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_2_test1,
+        enote_v1_2_test1));
+
+    LegacyEnoteV2 enote_v2_1_test1;  //to normal destination
+    const crypto::secret_key enote_ephemeral_privkey_3_test1{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_3_test1{
+            rct::scalarmultBase(rct::sk2rct(enote_ephemeral_privkey_3_test1))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v2(normal_addr_spendkey,
+        normal_addr_viewkey,
+        1,  //amount
+        2,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_3_test1,
+        enote_v2_1_test1));
+
+    LegacyEnoteV2 enote_v2_2_test1;  //to subaddress destination
+    const crypto::secret_key enote_ephemeral_privkey_4_test1{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_4_test1{
+            rct::scalarmultKey(subaddr_spendkey, rct::sk2rct(enote_ephemeral_privkey_4_test1))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v2(subaddr_spendkey,
+        subaddr_viewkey,
+        1,  //amount
+        3,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_4_test1,
+        enote_v2_2_test1));
+
+    LegacyEnoteV3 enote_v3_1_test1;  //to normal destination
+    const crypto::secret_key enote_ephemeral_privkey_5_test1{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_5_test1{
+            rct::scalarmultBase(rct::sk2rct(enote_ephemeral_privkey_5_test1))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v3(normal_addr_spendkey,
+        normal_addr_viewkey,
+        1,  //amount
+        4,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_5_test1,
+        enote_v3_1_test1));
+
+    LegacyEnoteV3 enote_v3_2_test1;  //to subaddress destination
+    const crypto::secret_key enote_ephemeral_privkey_6_test1{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_6_test1{
+            rct::scalarmultKey(subaddr_spendkey, rct::sk2rct(enote_ephemeral_privkey_6_test1))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v3(subaddr_spendkey,
+        subaddr_viewkey,
+        1,  //amount
+        5,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_6_test1,
+        enote_v3_2_test1));
+
+    LegacyEnoteV4 enote_v4_1_test1;  //to normal destination
+    const crypto::secret_key enote_ephemeral_privkey_7_test1{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_7_test1{
+            rct::scalarmultBase(rct::sk2rct(enote_ephemeral_privkey_7_test1))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v4(normal_addr_spendkey,
+        normal_addr_viewkey,
+        1,  //amount
+        6,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_7_test1,
+        enote_v4_1_test1));
+
+    LegacyEnoteV4 enote_v4_2_test1;  //to subaddress destination
+    const crypto::secret_key enote_ephemeral_privkey_8_test1{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_8_test1{
+            rct::scalarmultKey(subaddr_spendkey, rct::sk2rct(enote_ephemeral_privkey_8_test1))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v4(subaddr_spendkey,
+        subaddr_viewkey,
+        1,  //amount
+        7,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_8_test1,
+        enote_v4_2_test1));
+
+    TxExtra tx_extra_1_test1;
+    append_legacy_enote_ephemeral_pubkeys_to_tx_extra(
+            {
+                enote_ephemeral_pubkey_1_test1,
+                enote_ephemeral_pubkey_2_test1,
+                enote_ephemeral_pubkey_3_test1,
+                enote_ephemeral_pubkey_4_test1,
+                enote_ephemeral_pubkey_5_test1,
+                enote_ephemeral_pubkey_6_test1,
+                enote_ephemeral_pubkey_7_test1,
+                enote_ephemeral_pubkey_8_test1
+            },
+            tx_extra_1_test1
+        );
+    ASSERT_NO_THROW(ledger_context_test1.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_1_test1,
+            {},
+            {
+                enote_v1_1_test1,
+                enote_v1_2_test1,
+                enote_v2_1_test1,
+                enote_v2_2_test1,
+                enote_v3_1_test1,
+                enote_v3_2_test1,
+                enote_v4_1_test1,
+                enote_v4_2_test1
+            }
+        ));
+
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test1,
+        enote_store_test1);
+
+    ASSERT_TRUE(enote_store_test1.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 8);
+    ASSERT_TRUE(enote_store_test1.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_test1.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 8);
+
+    // 2. manual scanning with key image imports (simple)
+
+    // 3. manual scanning with key image imports (advanced)
+
+    // 4. duplicate onetime addresses: same amounts
+    //go through manual scanning process
+
+    // 5. duplicate onetime addresses: different amounts
+    //go through manual scanning process
+
 }
 //-------------------------------------------------------------------------------------------------------------------

@@ -65,7 +65,7 @@ public:
     EnoteFindingContextLedgerMockLegacy(const MockLedgerContext &mock_ledger_context,
         const rct::key &legacy_base_spend_pubkey,
         const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
-        const boost::optional<crypto::secret_key> &legacy_view_privkey) :
+        const boost::optional<crypto::secret_key> legacy_view_privkey) :
             m_mock_ledger_context{mock_ledger_context},
             m_legacy_base_spend_pubkey{legacy_base_spend_pubkey},
             m_legacy_subaddress_map{legacy_subaddress_map},
@@ -89,7 +89,7 @@ private:
     const MockLedgerContext &m_mock_ledger_context;
     const rct::key &m_legacy_base_spend_pubkey;
     const std::unordered_map<rct::key, cryptonote::subaddress_index> &m_legacy_subaddress_map;
-    const boost::optional<crypto::secret_key> &m_legacy_view_privkey;
+    const boost::optional<crypto::secret_key> m_legacy_view_privkey;
 };
 
 ////

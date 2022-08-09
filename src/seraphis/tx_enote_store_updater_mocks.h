@@ -62,8 +62,8 @@ public:
 //constructors
     /// normal constructor
     EnoteStoreUpdaterLedgerMockLegacy(const rct::key &legacy_base_spend_pubkey,
-        const crypto::secret_key &legacy_view_privkey,
         const crypto::secret_key &legacy_spend_privkey,
+        const crypto::secret_key &legacy_view_privkey,
         SpEnoteStoreMockV1 &enote_store);
 
 //overloaded operators
@@ -93,8 +93,8 @@ public:
 private:
     /// static data
     const rct::key &m_legacy_base_spend_pubkey;
-    const crypto::secret_key &m_legacy_view_privkey;
     const crypto::secret_key &m_legacy_spend_privkey;
+    const crypto::secret_key &m_legacy_view_privkey;
     SpEnoteStoreMockV1 &m_enote_store;
 
     /// session data

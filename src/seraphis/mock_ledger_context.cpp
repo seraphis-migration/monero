@@ -170,11 +170,16 @@ bool MockLedgerContext::try_get_unconfirmed_chunk_sp(const crypto::secret_key &k
 std::uint64_t MockLedgerContext::add_legacy_coinbase(const rct::key &tx_id,
     const std::uint64_t unlock_time,
     TxExtra memo,
+    std::vector<crypto::key_image> legacy_key_images_for_block,
     std::vector<LegacyEnoteVariant> output_enotes)
 {
     boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
 
-    return add_legacy_coinbase_impl(tx_id, unlock_time, std::move(memo), std::move(output_enotes));
+    return add_legacy_coinbase_impl(tx_id,
+        unlock_time,
+        std::move(memo),
+        std::move(legacy_key_images_for_block),
+        std::move(output_enotes));
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockLedgerContext::try_add_unconfirmed_tx_v1(const SpTxSquashedV1 &tx)
@@ -599,12 +604,13 @@ bool MockLedgerContext::try_get_unconfirmed_chunk_sp_impl(const crypto::secret_k
 std::uint64_t MockLedgerContext::add_legacy_coinbase_impl(const rct::key &tx_id,
     const std::uint64_t unlock_time,
     TxExtra memo,
+    std::vector<crypto::key_image> legacy_key_images_for_block,
     std::vector<LegacyEnoteVariant> output_enotes)
 {
     /// checks
 
     // a. can only add blocks with a mock legacy coinbase tx prior to first seraphis-enabled block
-    CHECK_AND_ASSERT_THROW_MES(get_chain_height() < m_first_seraphis_allowed_block,
+    CHECK_AND_ASSERT_THROW_MES(get_chain_height() + 1 < m_first_seraphis_allowed_block,
         "mock tx ledger (adding legacy coinbase tx): chain height is above last block that can have a legacy coinbase tx.");
 
     // b. accumulated output count is consistent
@@ -620,7 +626,13 @@ std::uint64_t MockLedgerContext::add_legacy_coinbase_impl(const rct::key &tx_id,
     /// update state
     const std::uint64_t new_height{get_chain_height() + 1};
 
-    // 1. add tx outputs
+    // 1. add legacy key images (mockup: force key images into chain as part of coinbase tx)
+    for (const crypto::key_image &legacy_key_image : legacy_key_images_for_block)
+        m_legacy_key_images.insert(legacy_key_image);
+
+    m_blocks_of_tx_key_images[new_height][tx_id] = {std::move(legacy_key_images_for_block), {}};
+
+    // 2. add tx outputs
 
     // a. initialize with current total legacy output count
     std::uint64_t total_output_count{m_legacy_enote_references.size()};
@@ -633,16 +645,16 @@ std::uint64_t MockLedgerContext::add_legacy_coinbase_impl(const rct::key &tx_id,
         ++total_output_count;
     }
 
-    // c. add this block's accumulated output count
+    // 3. add this block's accumulated output count
     m_accumulated_legacy_output_counts[new_height] = total_output_count;
 
     // d. add this block's tx output contents
     m_blocks_of_legacy_tx_output_contents[new_height][tx_id] = {unlock_time, std::move(memo), std::move(output_enotes)};
 
-    // 2. add block info (random block ID and zero timestamp in mockup)
+    // 4. add block info (random block ID and zero timestamp in mockup)
     m_block_infos[new_height] = {rct::pkGen(), 0};
 
-    // 3. clear unconfirmed cache
+    // 5. clear unconfirmed cache
     clear_unconfirmed_cache_impl();
 
     return new_height;
@@ -770,8 +782,8 @@ std::uint64_t MockLedgerContext::commit_unconfirmed_txs_v1_impl(const rct::key &
     CHECK_AND_ASSERT_THROW_MES(accumulated_output_count == m_sp_squashed_enotes.size(),
         "mock tx ledger (committing unconfirmed txs): inconsistent number of accumulated outputs (bug).");
 
-    // f. can only add blocks with seraphis txs after first seraphis-enabled block
-    CHECK_AND_ASSERT_THROW_MES(get_chain_height() >= m_first_seraphis_allowed_block,
+    // f. can only add blocks with seraphis txs at first seraphis-enabled block
+    CHECK_AND_ASSERT_THROW_MES(get_chain_height() + 1 >= m_first_seraphis_allowed_block,
         "mock tx ledger (committing unconfirmed txs): cannot make seraphis block because block height is too low.");
 
 
