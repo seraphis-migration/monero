@@ -88,8 +88,13 @@ void SpEnoteStoreMockV1::add_record(const LegacyContextualIntermediateEnoteRecor
         const auto &identifiers_of_known_enotes =
             m_tracked_legacy_onetime_address_duplicates.at(new_record.m_record.m_enote.onetime_address());
 
+        CHECK_AND_ASSERT_THROW_MES(identifiers_of_known_enotes.size() > 0,
+            "add intermediate record (mock enote store): record's onetime address is known, but there are no identifiers "
+            "(bug).");
+
         for (const rct::key &identifier : identifiers_of_known_enotes)
         {
+            // key image is known if there is a full record associated with this intermediate record's onetime address
             if (m_mapped_legacy_contextual_enote_records.find(identifier) !=
                 m_mapped_legacy_contextual_enote_records.end())
             {
@@ -128,6 +133,10 @@ void SpEnoteStoreMockV1::add_record(const LegacyContextualIntermediateEnoteRecor
         try_update_enote_origin_context_v1(new_record.m_origin_context,
             m_mapped_legacy_intermediate_contextual_enote_records[new_record_identifier].m_origin_context);
     }
+
+    // 3. save to the legacy duplicate tracker
+    m_tracked_legacy_onetime_address_duplicates[new_record.m_record.m_enote.onetime_address()]
+        .insert(new_record_identifier);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpEnoteStoreMockV1::add_record(const LegacyContextualEnoteRecordV1 &new_record)

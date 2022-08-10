@@ -68,6 +68,7 @@
 #include "seraphis/tx_input_selection.h"
 #include "seraphis/tx_input_selection_output_context_v1.h"
 #include "seraphis/tx_input_selector_mocks.h"
+#include "seraphis/tx_legacy_enote_record_utils.h"
 #include "seraphis/tx_misc_utils.h"
 #include "seraphis/tx_validation_context_mock.h"
 #include "seraphis/txtype_squashed_v1.h"
@@ -362,6 +363,36 @@ static void refresh_user_enote_store_legacy_full(const rct::key &legacy_base_spe
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void refresh_user_enote_store_legacy_intermediate(const rct::key &legacy_base_spend_pubkey,
+    const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+    const crypto::secret_key &legacy_view_privkey,
+    const bool key_image_refresh_mode,
+    const sp::RefreshLedgerEnoteStoreConfig &refresh_config,
+    const sp::MockLedgerContext &ledger_context,
+    sp::SpEnoteStoreMockV1 &user_enote_store_inout)
+{
+    using namespace sp;
+
+    const EnoteFindingContextLedgerMockLegacy enote_finding_context{
+            ledger_context,
+            legacy_base_spend_pubkey,
+            legacy_subaddress_map,
+            key_image_refresh_mode
+                ? boost::optional<crypto::secret_key>{}
+                : legacy_view_privkey
+        };
+    EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
+    EnoteStoreUpdaterLedgerMockLegacyIntermediate enote_store_updater{
+            legacy_base_spend_pubkey,
+            legacy_view_privkey,
+            key_image_refresh_mode,
+            user_enote_store_inout
+        };
+
+    ASSERT_NO_THROW(refresh_enote_store_ledger(refresh_config, enote_scanning_context, enote_store_updater));
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void construct_tx_for_mock_ledger_v1(const sp::jamtis::jamtis_mock_keys &local_user_keys,
     const sp::InputSelectorV1 &local_user_input_selector,
     const sp::FeeCalculator &tx_fee_calculator,
@@ -467,6 +498,48 @@ static void transfer_funds_single_mock_v1_unconfirmed(const sp::jamtis::jamtis_m
     const sp::TxValidationContextMock tx_validation_context{ledger_context_inout};
     ASSERT_TRUE(validate_tx(single_tx, tx_validation_context));
     ASSERT_TRUE(ledger_context_inout.try_add_unconfirmed_tx_v1(single_tx));
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void prepare_legacy_enote_for_transfer(const rct::key &destination_subaddr_spendkey,
+    const rct::key &destination_subaddr_viewkey,
+    const rct::key &legacy_base_spend_pubkey,
+    const std::unordered_map<rct::key, cryptonote::subaddress_index> &legacy_subaddress_map,
+    const crypto::secret_key &legacy_spend_privkey,
+    const crypto::secret_key &legacy_view_privkey,
+    const rct::xmr_amount amount,
+    const std::uint64_t tx_output_index,
+    const crypto::secret_key &enote_ephemeral_privkey,
+    sp::LegacyEnoteV4 &legacy_enote_out,
+    rct::key &enote_ephemeral_pubkey_out,
+    crypto::key_image &key_image_out)
+{
+    using namespace sp;
+
+    // prepare enote
+    enote_ephemeral_pubkey_out = rct::scalarmultKey(destination_subaddr_spendkey, rct::sk2rct(enote_ephemeral_privkey));
+
+    ASSERT_NO_THROW(make_legacy_enote_v4(destination_subaddr_spendkey,
+        destination_subaddr_viewkey,
+        amount,
+        tx_output_index,
+        enote_ephemeral_privkey,
+        legacy_enote_out));
+
+    // recover key image of enote
+    LegacyEnoteRecord full_record_recovered;
+
+    ASSERT_TRUE(try_get_legacy_enote_record(legacy_enote_out,
+        enote_ephemeral_pubkey_out,
+        tx_output_index,
+        0,
+        legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        full_record_recovered));
+
+    key_image_out = full_record_recovered.m_key_image;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -2046,6 +2119,174 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 8);
 
     // 2. manual scanning with key image imports (simple)
+    MockLedgerContext ledger_context_test2{10000, 10000};
+    SpEnoteStoreMockV1 enote_store_test2{0, 10000};
+
+    LegacyEnoteV4 enote_1_test2;
+    rct::key enote_ephemeral_pubkey_1_test2;
+    crypto::key_image key_image_test2;
+
+    prepare_legacy_enote_for_transfer(subaddr_spendkey,
+        subaddr_viewkey,
+        legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        1,  //amount
+        0,  //index in planned mock coinbase tx
+        make_secret_key(),
+        enote_1_test2,
+        enote_ephemeral_pubkey_1_test2,
+        key_image_test2);
+
+    TxExtra tx_extra_1_test2;
+    append_legacy_enote_ephemeral_pubkeys_to_tx_extra(
+            {
+                enote_ephemeral_pubkey_1_test2
+            },
+            tx_extra_1_test2
+        );
+    ASSERT_NO_THROW(ledger_context_test2.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_1_test2,
+            {},
+            {
+                enote_1_test2
+            }
+        ));
+
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test2,
+        enote_store_test2);
+
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_partialscanned_block_height() == 0);
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_fullscanned_block_height() == -1);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 1);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+
+    ASSERT_NO_THROW(ledger_context_test2.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            TxExtra{},
+            {key_image_test2},
+            {}
+        ));
+
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test2,
+        enote_store_test2);
+
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_fullscanned_block_height() == -1);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 1);
+
+    //export intermediate onetime addresses that need key images (not done for this mock-up)
+    const std::uint64_t intermediate_height_pre_import_cycle_test2{
+            enote_store_test2.get_top_legacy_partialscanned_block_height()
+        };
+
+    ASSERT_NO_THROW(enote_store_test2.import_legacy_key_image(key_image_test2, enote_1_test2.m_onetime_address));
+
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_fullscanned_block_height() == -1);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 1);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);  //intermediate record promoted to full
+
+    ASSERT_NO_THROW(ledger_context_test2.add_legacy_coinbase(  //add empty coinbase to test ledger height trackers
+            rct::pkGen(),
+            0,
+            TxExtra{},
+            {},
+            {}
+        ));
+
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        true,  //only collect key images with spent contexts
+        refresh_config,
+        ledger_context_test2,
+        enote_store_test2);
+
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+    ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_partialscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_fullscanned_block_height() == -1);
+    ASSERT_TRUE(enote_store_test2.get_top_sp_scanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test2.get_top_block_height() == 1);  //key image recovery scan should not update block height
+    ASSERT_NO_THROW(enote_store_test2.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test2));
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_partialscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_fullscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test2.get_top_block_height() == 1);
+
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test2,
+        enote_store_test2);
+
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_partialscanned_block_height() == 2);
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_fullscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test2.get_top_sp_scanned_block_height() == 2);
+    ASSERT_TRUE(enote_store_test2.get_top_block_height() == 2);
+
+    ledger_context_test2.pop_blocks(1);
+
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        true,  //key image recovery mode to demonstrate it doesn't affect seraphis block height tracker or block ids
+        refresh_config,
+        ledger_context_test2,
+        enote_store_test2);
+
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_partialscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_fullscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test2.get_top_sp_scanned_block_height() == 2);
+    ASSERT_TRUE(enote_store_test2.get_top_block_height() == 2);
+
+    refresh_user_enote_store(jamtis::jamtis_mock_keys{},
+        refresh_config,
+        ledger_context_test2,
+        enote_store_test2);  //mock seraphis refresh to fix reorg
+
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_partialscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test2.get_top_legacy_fullscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test2.get_top_sp_scanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test2.get_top_block_height() == 1);
 
     // 3. manual scanning with key image imports (advanced)
 

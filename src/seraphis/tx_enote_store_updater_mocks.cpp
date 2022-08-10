@@ -235,10 +235,10 @@ void EnoteStoreUpdaterNonLedgerMock::process_and_handle_chunk(
 }
 //-------------------------------------------------------------------------------------------------------------------
 EnoteStoreUpdaterLedgerMockLegacyIntermediate::EnoteStoreUpdaterLedgerMockLegacyIntermediate(
-        const rct::key &legacy_base_spend_pubkey,
-        const crypto::secret_key &legacy_view_privkey,
-        const bool legacy_key_image_recovery_mode,
-        SpEnoteStoreMockV1 &enote_store) :
+    const rct::key &legacy_base_spend_pubkey,
+    const crypto::secret_key &legacy_view_privkey,
+    const bool legacy_key_image_recovery_mode,
+    SpEnoteStoreMockV1 &enote_store) :
         m_legacy_base_spend_pubkey{legacy_base_spend_pubkey},
         m_legacy_view_privkey{legacy_view_privkey},
         m_legacy_key_image_recovery_mode{legacy_key_image_recovery_mode},
@@ -273,7 +273,9 @@ void EnoteStoreUpdaterLedgerMockLegacyIntermediate::end_chunk_handling_session(c
 {
     m_enote_store.update_with_intermediate_legacy_records_from_ledger(first_new_block,
         alignment_block_id,
-        new_block_ids,
+        m_legacy_key_image_recovery_mode  //only add new block ids if not in recovery mode
+            ? std::vector<rct::key>{}
+            : new_block_ids,
         m_found_enote_records,
         m_found_spent_key_images);
 
