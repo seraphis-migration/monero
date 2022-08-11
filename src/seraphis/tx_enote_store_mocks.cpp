@@ -850,7 +850,6 @@ void SpEnoteStoreMockV1::clean_legacy_maps_for_ledger_update(const std::uint64_t
     const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images)
 {
     // 1. remove records that will be replaced
-    std::unordered_set<rct::key> tx_ids_of_removed_enotes;
     std::unordered_map<rct::key, std::unordered_set<rct::key>> mapped_identifiers_of_removed_enotes;
 
     auto legacy_contextual_record_cleaner =
@@ -861,9 +860,6 @@ void SpEnoteStoreMockV1::clean_legacy_maps_for_ledger_update(const std::uint64_t
                     SpEnoteOriginStatus::ONCHAIN &&
                 mapped_contextual_enote_record.second.m_origin_context.m_block_height >= first_new_block)
             {
-                tx_ids_of_removed_enotes.insert(
-                        mapped_contextual_enote_record.second.m_origin_context.m_transaction_id
-                    );
                 mapped_identifiers_of_removed_enotes[
                         mapped_contextual_enote_record.second.m_record.m_enote.onetime_address()
                     ].insert(mapped_contextual_enote_record.first);
@@ -875,9 +871,6 @@ void SpEnoteStoreMockV1::clean_legacy_maps_for_ledger_update(const std::uint64_t
             if (mapped_contextual_enote_record.second.m_origin_context.m_origin_status ==
                     SpEnoteOriginStatus::UNCONFIRMED)
             {
-                tx_ids_of_removed_enotes.insert(
-                        mapped_contextual_enote_record.second.m_origin_context.m_transaction_id
-                    );
                 mapped_identifiers_of_removed_enotes[
                         mapped_contextual_enote_record.second.m_record.m_enote.onetime_address()
                     ].insert(mapped_contextual_enote_record.first);
@@ -911,30 +904,28 @@ void SpEnoteStoreMockV1::clean_legacy_maps_for_ledger_update(const std::uint64_t
     // b. legacy intermediate records
     for_all_in_map_erase_if(m_mapped_legacy_intermediate_contextual_enote_records, legacy_contextual_record_cleaner);
 
-    // 2. if a found legacy key image is in the 'legacy key images from sp txs' map, remove it from that map and save
-    //    the corresponding tx ids in order to clear the spent contexts of the associated enotes
+    // 2. if a found legacy key image is in the 'legacy key images from sp txs' map, remove it from that map
     // - a fresh spent context for legacy key images implies seraphis txs were reorged; we want to guarantee that the
     //   fresh spent contexts are applied to our stored enotes, and doing this step achieves that
     for (const auto &found_spent_key_image : found_spent_key_images)
-    {
-        // a. save tx id of seraphis tx where this key image was found
-        if (m_legacy_key_images_in_sp_selfsends.find(found_spent_key_image.first) !=
-            m_legacy_key_images_in_sp_selfsends.end())
-        {
-            tx_ids_of_removed_enotes.insert(
-                    m_legacy_key_images_in_sp_selfsends.at(found_spent_key_image.first).m_transaction_id
-                );
-        }
-
-        // b. remove entry from the 'legacy key images from sp txs' map
         m_legacy_key_images_in_sp_selfsends.erase(found_spent_key_image.first);
-    }
 
-    // 3. clear spent contexts referencing the txs of removed enotes (and seraphis enotes that probably need to be removed)
+    // 3. clear spent contexts referencing removed blocks or the unconfirmed cache if the corresponding legacy key image
+    //    is not in the seraphis legacy key image tracker
     for (auto &mapped_contextual_enote_record : m_mapped_legacy_contextual_enote_records)
     {
-        if (tx_ids_of_removed_enotes.find(mapped_contextual_enote_record.second.m_spent_context.m_transaction_id) !=
-                tx_ids_of_removed_enotes.end())
+        // ignore legacy key images found in seraphis txs
+        if (m_legacy_key_images_in_sp_selfsends.find(mapped_contextual_enote_record.second.m_record.m_key_image) !=
+                m_legacy_key_images_in_sp_selfsends.end())
+            continue;
+
+        // clear spent contexts in removed legacy blocks
+        if (mapped_contextual_enote_record.second.m_spent_context.m_spent_status == SpEnoteSpentStatus::SPENT_ONCHAIN &&
+                mapped_contextual_enote_record.second.m_spent_context.m_block_height >= first_new_block)
+            mapped_contextual_enote_record.second.m_spent_context = SpEnoteSpentContextV1{};
+
+        // clear spent contexts in the unconfirmed cache
+        if (mapped_contextual_enote_record.second.m_spent_context.m_spent_status == SpEnoteSpentStatus::SPENT_UNCONFIRMED)
             mapped_contextual_enote_record.second.m_spent_context = SpEnoteSpentContextV1{};
     }
 

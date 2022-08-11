@@ -155,6 +155,8 @@ public:
     bool has_enote_with_key_image(const crypto::key_image &key_image) const;
     /// try to get the recorded block id for a given height
     bool try_get_block_id(const std::uint64_t block_height, rct::key &block_id_out) const;
+    const std::unordered_map<rct::key, LegacyContextualIntermediateEnoteRecordV1>& get_legacy_intermediate_records() const
+    { return m_mapped_legacy_intermediate_contextual_enote_records; }
 
     /// get height of first block the enote store cares about
     std::uint64_t get_refresh_height() const { return m_refresh_height; }
@@ -176,7 +178,7 @@ public:
         const std::unordered_set<SpEnoteSpentStatus> &spent_statuses,
         const std::unordered_set<BalanceUpdateExclusions> &exclusions = {}) const;
 
-protected:
+private:
     /// clean up legacy state to prepare for adding fresh legacy enotes and key images
     void clean_legacy_maps_for_ledger_update(const std::uint64_t first_new_block,
         const std::unordered_map<crypto::key_image, SpEnoteSpentContextV1> &found_spent_key_images);
