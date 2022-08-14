@@ -41,6 +41,8 @@
 
 //standard headers
 #include <functional>
+#include <map>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -652,7 +654,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
             {
                 // collect all amounts for enotes with the current mapped_contextual_record's onetime address
                 //   that are found in intermediate contextual records with one of the requested origin statuses
-                std::unordered_map<rct::xmr_amount, rct::key> eligible_amounts;
+                std::map<rct::xmr_amount, rct::key> eligible_amounts;
 
                 CHECK_AND_ASSERT_THROW_MES(m_tracked_legacy_onetime_address_duplicates
                             .find(current_contextual_record.m_record.m_enote.onetime_address()) !=
@@ -698,7 +700,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
 
                 // if the current mapped_contextual_record's amount is the highest amount in the collected eligible,
                 //   amounts and it's the first one with that amount, then add it to the amount total
-                if (eligible_amounts.at(current_contextual_record.m_record.m_amount) == mapped_contextual_record.first)
+                if (eligible_amounts.rbegin()->second == mapped_contextual_record.first)
                     inflow_sum += current_contextual_record.m_record.m_amount;
             }
         }
@@ -716,7 +718,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
             {
                 // collect all amounts for enotes with the current mapped_contextual_record's onetime address
                 //   that are found in full contextual records with one of the requested origin statuses
-                std::unordered_map<rct::xmr_amount, rct::key> eligible_amounts;
+                std::map<rct::xmr_amount, rct::key> eligible_amounts;
 
                 CHECK_AND_ASSERT_THROW_MES(m_tracked_legacy_onetime_address_duplicates
                             .find(current_contextual_record.m_record.m_enote.onetime_address()) !=
@@ -762,7 +764,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
 
                 // if the current mapped_contextual_record's amount is the highest amount in the collected eligible,
                 //   amounts and it's the first one with that amount, then add it to the amount total
-                if (eligible_amounts.at(current_contextual_record.m_record.m_amount) == mapped_contextual_record.first)
+                if (eligible_amounts.rbegin()->second == mapped_contextual_record.first)
                     inflow_sum += current_contextual_record.m_record.m_amount;
             }
 
@@ -771,7 +773,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
             {
                 // collect all amounts for enotes with the current mapped_contextual_record's onetime address
                 //   that are found in full contextual records with one of the requested spent statuses
-                std::unordered_map<rct::xmr_amount, rct::key> eligible_amounts;
+                std::map<rct::xmr_amount, rct::key> eligible_amounts;
 
                 CHECK_AND_ASSERT_THROW_MES(m_tracked_legacy_onetime_address_duplicates
                             .find(current_contextual_record.m_record.m_enote.onetime_address()) !=
@@ -817,7 +819,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
 
                 // if the current mapped_contextual_record's amount is the highest amount in the collected eligible,
                 //   amounts and it's the first one with that amount, then add it to the subtraction total
-                if (eligible_amounts.at(current_contextual_record.m_record.m_amount) == mapped_contextual_record.first)
+                if (eligible_amounts.rbegin()->second == mapped_contextual_record.first)
                     outflow_sum += current_contextual_record.m_record.m_amount;
             }
         }

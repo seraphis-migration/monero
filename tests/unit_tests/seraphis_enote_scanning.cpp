@@ -3172,31 +3172,422 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
 
     // 5. duplicate onetime addresses: different amounts
+    MockLedgerContext ledger_context_test5{10000, 10000};
+    SpEnoteStoreMockV1 enote_store_test5_int{0, 10000};  //for view-only scanning
+    SpEnoteStoreMockV1 enote_store_test5_full{0, 10000};  //for full scanning
+
+    //make enotes: 1-a (amount 3), 1-b (amount 5), 1-c (amount 1), 1-d (amount 4)
+    LegacyEnoteV4 enote_test5_1a;
+    LegacyEnoteV4 enote_test5_1b;
+    LegacyEnoteV4 enote_test5_1c;
+    LegacyEnoteV4 enote_test5_1d;
+    const crypto::secret_key enote_ephemeral_privkey_test5{make_secret_key()};
+    rct::key enote_ephemeral_pubkey_test5;
+    rct::key enote_ephemeral_pubkey_test5_temp;
+    crypto::key_image key_image_test5;
+    crypto::key_image key_image_test5_temp;
+
+    prepare_legacy_enote_for_transfer(subaddr_spendkey,
+        subaddr_viewkey,
+        legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        3,  //amount
+        0,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_test5,
+        enote_test5_1a,
+        enote_ephemeral_pubkey_test5,
+        key_image_test5);
+
+    prepare_legacy_enote_for_transfer(subaddr_spendkey,
+        subaddr_viewkey,
+        legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        5,  //amount
+        0,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_test5,
+        enote_test5_1b,
+        enote_ephemeral_pubkey_test5_temp,
+        key_image_test5_temp);
+    ASSERT_TRUE(enote_ephemeral_pubkey_test5_temp == enote_ephemeral_pubkey_test5);
+    ASSERT_TRUE(key_image_test5_temp == key_image_test5);
+
+    prepare_legacy_enote_for_transfer(subaddr_spendkey,
+        subaddr_viewkey,
+        legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        1,  //amount
+        0,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_test5,
+        enote_test5_1c,
+        enote_ephemeral_pubkey_test5_temp,
+        key_image_test5_temp);
+    ASSERT_TRUE(enote_ephemeral_pubkey_test5_temp == enote_ephemeral_pubkey_test5);
+    ASSERT_TRUE(key_image_test5_temp == key_image_test5);
+
+    prepare_legacy_enote_for_transfer(subaddr_spendkey,
+        subaddr_viewkey,
+        legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        4,  //amount
+        0,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_test5,
+        enote_test5_1d,
+        enote_ephemeral_pubkey_test5_temp,
+        key_image_test5_temp);
+    ASSERT_TRUE(enote_ephemeral_pubkey_test5_temp == enote_ephemeral_pubkey_test5);
+    ASSERT_TRUE(key_image_test5_temp == key_image_test5);
+
+    TxExtra tx_extra_test5;
+    append_legacy_enote_ephemeral_pubkeys_to_tx_extra(
+            {
+                enote_ephemeral_pubkey_test5
+            },
+            tx_extra_test5
+        );
 
     //block 0: enote 1-a (amount 3)
-    //intermediate scan (store 1)
-    //don't import key image yet
-    //full scan (store 2)
+    ASSERT_NO_THROW(ledger_context_test5.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_test5,
+            {},
+            {
+                enote_test5_1a
+            }
+        ));
+
+    //intermediate scan (don't import key image yet)
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_int);
+
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 1);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_full);
+
+    ASSERT_TRUE(enote_store_test5_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
+
     //block 1: enote 1-b (amount 5)
-    //intermediate scan (store 1)
+    ASSERT_NO_THROW(ledger_context_test5.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_test5,
+            {},
+            {
+                enote_test5_1b
+            }
+        ));
+
+    //intermediate scan (with key image import)
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_int);
+
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 2);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 5);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+
+    //get intermediate height
+    const std::uint64_t intermediate_height_pre_import_cycle_test5_1{
+            enote_store_test5_int.get_top_legacy_partialscanned_block_height()
+        };
+
     //import key image: enote 1
-    //full scan (store 2)
+    ASSERT_NO_THROW(enote_store_test5_int.import_legacy_key_image(key_image_test5, enote_test5_1a.m_onetime_address));
+
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_partialscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_fullscanned_block_height() == -1);
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 5);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 5);  //intermediate records promoted to full
+
+    //legacy key image scan
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        true,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_int);
+
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_partialscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_fullscanned_block_height() == -1);
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 5);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 5);
+
+    //set fullscan height to saved intermediate height
+    ASSERT_NO_THROW(enote_store_test5_int.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test5_1));
+
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_partialscanned_block_height() == 1);
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_fullscanned_block_height() == 1);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_full);
+
+    ASSERT_TRUE(enote_store_test5_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 5);
+
     //pop block 1
-    //intermediate scan (store 1)
-    //skip key image import
-    //full scan (store 2)
-    //block 1: enote 1-b (amount 1)
-    //block 2: enote 1-e (amount 4)
-    //intermediate scan (store 1)
-    //skip key image import
-    //full scan (store 2)
+    ledger_context_test5.pop_blocks(1);
+
+    //intermediate scan
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_int);
+
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 3);
+
+    //get intermediate height
+    const std::uint64_t intermediate_height_pre_import_cycle_test5_2{
+            enote_store_test5_int.get_top_legacy_partialscanned_block_height()
+        };
+
+    //skip key image import + legacy key image scan (no intermediate records)
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 0);
+
+    //set fullscan height to saved intermediate height
+    ASSERT_NO_THROW(enote_store_test5_int.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test5_2));
+
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_partialscanned_block_height() == 0);
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_fullscanned_block_height() == 0);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_full);
+
+    ASSERT_TRUE(enote_store_test5_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
+
+    //block 1: enote 1-c (amount 1)
+    ASSERT_NO_THROW(ledger_context_test5.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_test5,
+            {},
+            {
+                enote_test5_1c
+            }
+        ));
+
+    //block 2: enote 1-d (amount 4)
+    ASSERT_NO_THROW(ledger_context_test5.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_test5,
+            {},
+            {
+                enote_test5_1d
+            }
+        ));
+
+    //intermediate scan
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_int);
+
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 4);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 4);
+
+    //get intermediate height
+    const std::uint64_t intermediate_height_pre_import_cycle_test5_3{
+            enote_store_test5_int.get_top_legacy_partialscanned_block_height()
+        };
+
+    //skip key image import + legacy key image scan (no intermediate records)
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 0);
+
+    //set fullscan height to saved intermediate height
+    ASSERT_NO_THROW(enote_store_test5_int.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test5_3));
+
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_partialscanned_block_height() == 2);
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_fullscanned_block_height() == 2);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_full);
+
+    ASSERT_TRUE(enote_store_test5_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 4);
+
     //block 3: spend enote 1
-    //intermediate scan (store 1)
-    //skip key image import
-    //full scan (store 2)
+    ASSERT_NO_THROW(ledger_context_test5.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            TxExtra{},
+            {
+                key_image_test5
+            },
+            {}
+        ));
+
+    //intermediate scan
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_int);
+
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN}, {}) == 4);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+
+    //get intermediate height
+    const std::uint64_t intermediate_height_pre_import_cycle_test5_4{
+            enote_store_test5_int.get_top_legacy_partialscanned_block_height()
+        };
+
+    //skip key image import + legacy key image scan (no intermediate records)
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 0);
+
+    //set fullscan height to saved intermediate height
+    ASSERT_NO_THROW(enote_store_test5_int.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test5_4));
+
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_partialscanned_block_height() == 3);
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_fullscanned_block_height() == 3);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_full);
+
+    ASSERT_TRUE(enote_store_test5_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_full.get_balance({SpEnoteOriginStatus::ONCHAIN}, {}) == 4);
+    ASSERT_TRUE(enote_store_test5_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+
     //pop block 3
-    //intermediate scan (store 1)
-    //full scan (store 2)
+    ledger_context_test5.pop_blocks(1);
+
+    //intermediate scan
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_int);
+
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN}, {}) == 4);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 4);
+    ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 4);
+
+    //get intermediate height
+    const std::uint64_t intermediate_height_pre_import_cycle_test5_5{
+            enote_store_test5_int.get_top_legacy_partialscanned_block_height()
+        };
+
+    //skip key image import + legacy key image scan (no intermediate records)
+    ASSERT_TRUE(enote_store_test5_int.get_legacy_intermediate_records().size() == 0);
+
+    //set fullscan height to saved intermediate height
+    ASSERT_NO_THROW(enote_store_test5_int.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test5_5));
+
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_partialscanned_block_height() == 2);
+    ASSERT_TRUE(enote_store_test5_int.get_top_legacy_fullscanned_block_height() == 2);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test5,
+        enote_store_test5_full);
+
+    ASSERT_TRUE(enote_store_test5_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test5_full.get_balance({SpEnoteOriginStatus::ONCHAIN}, {}) == 4);
+    ASSERT_TRUE(enote_store_test5_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 4);
 
     // 6. locktime test 1: basic
     // (TODO: add default spendable time as constructor parameter to enote store,
