@@ -47,9 +47,9 @@ namespace sp
 {
 
 //todo
-bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &origin_context,
+bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &fresh_origin_context,
     SpEnoteOriginContextV1 &current_origin_context_inout);
-bool try_update_enote_spent_context_v1(const SpEnoteSpentContextV1 &spent_context,
+bool try_update_enote_spent_context_v1(const SpEnoteSpentContextV1 &fresh_spent_context,
     SpEnoteSpentContextV1 &current_spent_context_inout);
 bool try_update_contextual_enote_record_spent_context_v1(const SpContextualKeyImageSetV1 &contextual_key_image_set,
     SpContextualEnoteRecordV1 &contextual_enote_record_inout);

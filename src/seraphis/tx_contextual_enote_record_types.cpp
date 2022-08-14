@@ -46,6 +46,44 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
+bool SpEnoteOriginContextV1::is_older_than(const SpEnoteOriginContextV1 &other_context) const
+{
+    // 1. origin status (higher statuses are assumed to be 'older')
+    if (m_origin_status > other_context.m_origin_status)
+        return true;
+
+    // 2. block height
+    if (m_block_height < other_context.m_block_height)
+        return true;
+
+    // 3. enote ledger index
+    if (m_enote_ledger_index < other_context.m_enote_ledger_index)
+        return true;
+
+    // 4. block timestamp
+    if (m_block_timestamp < other_context.m_block_timestamp)
+        return true;
+
+    return false;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool SpEnoteSpentContextV1::is_older_than(const SpEnoteSpentContextV1 &other_context) const
+{
+    // 1. spent status (higher statuses are assumed to be 'older')
+    if (m_spent_status > other_context.m_spent_status)
+        return true;
+
+    // 2. block height
+    if (m_block_height < other_context.m_block_height)
+        return true;
+
+    // 3. block timestamp
+    if (m_block_timestamp < other_context.m_block_timestamp)
+        return true;
+
+    return false;
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool LegacyContextualBasicEnoteRecordV1::same_destination(const LegacyContextualBasicEnoteRecordV1 &record1,
     const LegacyContextualBasicEnoteRecordV1 &record2)
 {

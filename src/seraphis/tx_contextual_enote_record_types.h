@@ -109,6 +109,9 @@ struct SpEnoteOriginContextV1 final
 
     /// associated memo field (none by default)
     TxExtra m_memo{};
+
+    /// check if this context is older than another (returns false if apparently the same age, or younger)
+    bool is_older_than(const SpEnoteOriginContextV1 &other_context) const;
 };
 
 ////
@@ -125,6 +128,9 @@ struct SpEnoteSpentContextV1 final
     rct::key m_transaction_id{rct::zero()};
     /// spent status (unspent by default)
     SpEnoteSpentStatus m_spent_status{SpEnoteSpentStatus::UNSPENT};
+
+    /// check if this context is older than another
+    bool is_older_than(const SpEnoteSpentContextV1 &other_context) const;
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////

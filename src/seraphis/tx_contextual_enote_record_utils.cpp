@@ -45,26 +45,26 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &origin_context,
+bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &fresh_origin_context,
     SpEnoteOriginContextV1 &current_origin_context_inout)
 {
-    // note: overwrite the context if the status is equal (in case existing context is incomplete)
-    if (origin_context.m_origin_status < current_origin_context_inout.m_origin_status)
+    // use the oldest origin context available (overwrite if apparently the same age)
+    if (current_origin_context_inout.is_older_than(fresh_origin_context))
         return false;
 
-    current_origin_context_inout = origin_context;
+    current_origin_context_inout = fresh_origin_context;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_update_enote_spent_context_v1(const SpEnoteSpentContextV1 &spent_context,
+bool try_update_enote_spent_context_v1(const SpEnoteSpentContextV1 &fresh_spent_context,
     SpEnoteSpentContextV1 &current_spent_context_inout)
 {
-    // note: overwrite the context if the status is equal (in case existing context is incomplete)
-    if (spent_context.m_spent_status < current_spent_context_inout.m_spent_status)
+    // use the oldest origin context available (overwrite if apparently the same age)
+    if (current_spent_context_inout.is_older_than(fresh_spent_context))
         return false;
 
-    current_spent_context_inout = spent_context;
+    current_spent_context_inout = fresh_spent_context;
 
     return true;
 }
