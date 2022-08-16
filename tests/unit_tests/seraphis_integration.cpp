@@ -332,8 +332,8 @@ TEST(seraphis_integration, txtype_squashed_v1)
     make_random_address_for_user(user_keys_B, destination_B);
 
     // c. user enote stores (refresh height = 0; seraphis initial block = 0)
-    SpEnoteStoreMockV1 enote_store_A{0, 0};
-    SpEnoteStoreMockV1 enote_store_B{0, 0};
+    SpEnoteStoreMockV1 enote_store_A{0, 0, 0};
+    SpEnoteStoreMockV1 enote_store_B{0, 0, 0};
 
     // d. user input selectors
     const sp::InputSelectorMockV1 input_selector_A{enote_store_A};

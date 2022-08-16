@@ -32,6 +32,7 @@
 #include "tx_enote_store_mocks.h"
 
 //local headers
+#include "cryptonote_config.h"
 #include "misc_log_ex.h"
 #include "tx_contextual_enote_record_types.h"
 #include "tx_contextual_enote_record_utils.h"
@@ -41,6 +42,7 @@
 
 //standard headers
 #include <algorithm>
+#include <ctime>
 #include <functional>
 #include <map>
 #include <unordered_map>
@@ -68,11 +70,31 @@ static void for_all_in_map_erase_if(MapT &map_inout,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static bool onchain_enote_height_is_locked(const std::uint64_t enote_origin_height,
+static bool onchain_legacy_enote_is_locked(const std::uint64_t enote_origin_height,
+    const std::uint64_t enote_unlock_time,
+    const std::uint64_t chain_height,
+    const std::uint64_t default_spendable_age,
+    const std::uint64_t current_time)
+{
+    // check default spendable age
+    if (chain_height + 1 < enote_origin_height + std::max(std::uint64_t{1}, default_spendable_age))
+        return true;
+
+    // check unlock time: height encoding
+    if (enote_unlock_time < CRYPTONOTE_MAX_BLOCK_NUMBER &&
+        chain_height + 1 < enote_unlock_time)
+        return true;
+
+    // check unlock time: UNIX encoding
+    return current_time < enote_unlock_time;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool onchain_sp_enote_is_locked(const std::uint64_t enote_origin_height,
     const std::uint64_t chain_height,
     const std::uint64_t default_spendable_age)
 {
-    return chain_height + 1 >= enote_origin_height + std::max(std::uint64_t{1}, default_spendable_age);
+    return chain_height + 1 < enote_origin_height + std::max(std::uint64_t{1}, default_spendable_age);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -650,18 +672,29 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
     const std::unordered_set<SpEnoteSpentStatus> &spent_statuses,
     const std::unordered_set<EnoteStoreBalanceUpdateExclusions> &exclusions) const
 {
-    boost::multiprecision::uint128_t inflow_sum{0};
-    boost::multiprecision::uint128_t outflow_sum{0};
+    boost::multiprecision::uint128_t balance{0};
 
-    // 1. intermediate legacy enotes: inflows
+    // 1. intermediate legacy enotes (it is unknown if these enotes are spent)
     if (exclusions.find(EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE) == exclusions.end())
     {
         for (const auto &mapped_contextual_record : m_mapped_legacy_intermediate_contextual_enote_records)
         {
             const LegacyContextualIntermediateEnoteRecordV1 &current_contextual_record{mapped_contextual_record.second};
 
-            // check if origin status is requested
+            // only include this enote if its origin status is requested
             if (origin_statuses.find(current_contextual_record.m_origin_context.m_origin_status) == origin_statuses.end())
+                continue;
+
+            // ignore onchain enotes that are locked
+            if (exclusions.find(EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED) != exclusions.end() &&
+                current_contextual_record.m_origin_context.m_origin_status == SpEnoteOriginStatus::ONCHAIN &&
+                onchain_legacy_enote_is_locked(
+                        current_contextual_record.m_origin_context.m_block_height,
+                        current_contextual_record.m_record.m_unlock_time,
+                        get_top_block_height(),
+                        m_default_spendable_age,
+                        static_cast<std::uint64_t>(std::time(nullptr)))
+                    )
                 continue;
 
             // collect all amounts for enotes with the current mapped_contextual_record's onetime address
@@ -718,22 +751,36 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
             if (!(eligible_amounts.rbegin()->second == mapped_contextual_record.first))
                 continue;
 
-            // update inflows
-            inflow_sum += current_contextual_record.m_record.m_amount;
+            // update balance
+            balance += current_contextual_record.m_record.m_amount;
         }
     }
 
-    // 2. full legacy enotes: inflows and outflows
+    // 2. full legacy enotes
     if (exclusions.find(EnoteStoreBalanceUpdateExclusions::LEGACY_FULL) == exclusions.end())
     {
         for (const auto &mapped_contextual_record : m_mapped_legacy_contextual_enote_records)
         {
             const LegacyContextualEnoteRecordV1 &current_contextual_record{mapped_contextual_record.second};
 
-            /// 1. outflows
-
-            // check if origin status is requested
+            // only include this enote if its origin status is requested
             if (origin_statuses.find(current_contextual_record.m_origin_context.m_origin_status) == origin_statuses.end())
+                continue;
+
+            // if the enote's spent status is requested, then DON'T include this enote
+            if (spent_statuses.find(current_contextual_record.m_spent_context.m_spent_status) != spent_statuses.end())
+                continue;
+
+            // ignore onchain enotes that are locked
+            if (exclusions.find(EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED) != exclusions.end() &&
+                current_contextual_record.m_origin_context.m_origin_status == SpEnoteOriginStatus::ONCHAIN &&
+                onchain_legacy_enote_is_locked(
+                        current_contextual_record.m_origin_context.m_block_height,
+                        current_contextual_record.m_record.m_unlock_time,
+                        get_top_block_height(),
+                        m_default_spendable_age,
+                        static_cast<std::uint64_t>(std::time(nullptr)))
+                    )
                 continue;
 
             // collect all amounts for enotes with the current mapped_contextual_record's onetime address
@@ -775,7 +822,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
                     };
                 if (eligible_amounts.find(amount) != eligible_amounts.end())
                     continue;
-                
+
                 eligible_amounts[amount] = candidate_identifier;
             }
 
@@ -790,51 +837,42 @@ boost::multiprecision::uint128_t SpEnoteStoreMockV1::get_balance(
             if (!(eligible_amounts.rbegin()->second == mapped_contextual_record.first))
                 continue;
 
-            // update inflows
-            inflow_sum += current_contextual_record.m_record.m_amount;
-
-
-            /// 2. outflows (only include enotes that are recorded in inflows)
-
-            // check if spent status is requested
-            if (spent_statuses.find(current_contextual_record.m_spent_context.m_spent_status) == spent_statuses.end())
-                continue;
-
-            // update outflows
-            outflow_sum += current_contextual_record.m_record.m_amount;
+            // update balance
+            balance += current_contextual_record.m_record.m_amount;
         }
     }
 
-    // 3. seraphis enotes: inflows and outflows
+    // 3. seraphis enotes
     if (exclusions.find(EnoteStoreBalanceUpdateExclusions::SERAPHIS) == exclusions.end())
     {
         for (const auto &mapped_contextual_record : m_mapped_sp_contextual_enote_records)
         {
             const SpContextualEnoteRecordV1 &current_contextual_record{mapped_contextual_record.second};
 
-            /// 1. inflows
-
-            // check if origin status is requested
+            // only include this enote if its origin status is requested
             if (origin_statuses.find(current_contextual_record.m_origin_context.m_origin_status) == origin_statuses.end())
                 continue;
 
-            // update inflows
-            inflow_sum += current_contextual_record.m_record.m_amount;
-
-
-            /// 2. outflows (only include enotes that are recorded in inflows)
-
-            // check if spent status is requested
-            if (spent_statuses.find(current_contextual_record.m_spent_context.m_spent_status) == spent_statuses.end())
+            // if the enote's spent status is requested, then DON'T include this enote
+            if (spent_statuses.find(current_contextual_record.m_spent_context.m_spent_status) != spent_statuses.end())
                 continue;
 
-            // update outflows
-            outflow_sum += current_contextual_record.m_record.m_amount;
+            // ignore onchain enotes that are locked
+            if (exclusions.find(EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED) != exclusions.end() &&
+                current_contextual_record.m_origin_context.m_origin_status == SpEnoteOriginStatus::ONCHAIN &&
+                onchain_sp_enote_is_locked(
+                        current_contextual_record.m_origin_context.m_block_height,
+                        get_top_block_height(),
+                        m_default_spendable_age
+                    ))
+                continue;
+
+            // update balance
+            balance += current_contextual_record.m_record.m_amount;
         }
     }
 
-    CHECK_AND_ASSERT_THROW_MES(inflow_sum >= outflow_sum, "mock enote store balance: outflows exceed inflows (bug).");
-    return inflow_sum - outflow_sum;
+    return balance;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpEnoteStoreMockV1::clean_legacy_maps_for_ledger_update(const std::uint64_t first_new_block,
@@ -1086,7 +1124,7 @@ boost::multiprecision::uint128_t SpEnoteStoreMockPaymentValidatorV1::get_receive
     const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
     const std::unordered_set<EnoteStoreBalanceUpdateExclusions> &exclusions) const
 {
-    boost::multiprecision::uint128_t inflow_sum{0};
+    boost::multiprecision::uint128_t received_sum{0};
 
     for (const auto &mapped_contextual_record : m_mapped_sp_contextual_enote_records)
     {
@@ -1095,22 +1133,22 @@ boost::multiprecision::uint128_t SpEnoteStoreMockPaymentValidatorV1::get_receive
         // ignore enotes with unrequested origins
         if (origin_statuses.find(contextual_record.m_origin_context.m_origin_status) == origin_statuses.end())
             continue;
-/*
+
         // ignore onchain enotes that are locked
         if (exclusions.find(EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED) != exclusions.end() &&
             contextual_record.m_origin_context.m_origin_status == SpEnoteOriginStatus::ONCHAIN &&
-            onchain_enote_height_is_locked(
+            onchain_sp_enote_is_locked(
                     contextual_record.m_origin_context.m_block_height,
                     get_top_block_height(),
                     m_default_spendable_age
                 ))
             continue;
-*/
-        // update inflows
-        inflow_sum += contextual_record.m_record.m_amount;
+
+        // update received sum
+        received_sum += contextual_record.m_record.m_amount;
     }
 
-    return inflow_sum;
+    return received_sum;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

@@ -99,7 +99,7 @@ public:
     /// normal constructor
     SpEnoteStoreMockV1(const std::uint64_t refresh_height,
         const std::uint64_t first_sp_enabled_block_in_chain,
-        const std::uint64_t default_spendable_age = 0);
+        const std::uint64_t default_spendable_age);
 
 //member functions
     /// setters for scan heights
@@ -242,7 +242,7 @@ public:
 
     /// normal constructor
     SpEnoteStoreMockPaymentValidatorV1(const std::uint64_t refresh_height,
-        const std::uint64_t default_spendable_age = 0) :
+        const std::uint64_t default_spendable_age) :
         m_refresh_height{refresh_height},
         m_default_spendable_age{default_spendable_age}
     {}
