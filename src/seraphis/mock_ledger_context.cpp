@@ -173,7 +173,7 @@ std::uint64_t MockLedgerContext::add_legacy_coinbase(const rct::key &tx_id,
     std::vector<crypto::key_image> legacy_key_images_for_block,
     std::vector<LegacyEnoteVariant> output_enotes)
 {
-    boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
+    boost::unique_lock<boost::shared_mutex> lock{m_context_mutex};
 
     return add_legacy_coinbase_impl(tx_id,
         unlock_time,

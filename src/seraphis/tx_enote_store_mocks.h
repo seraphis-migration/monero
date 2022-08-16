@@ -51,6 +51,14 @@
 namespace sp
 {
 
+enum class EnoteStoreBalanceUpdateExclusions
+{
+    LEGACY_FULL,
+    LEGACY_INTERMEDIATE,
+    SERAPHIS,
+    ORIGIN_LEDGER_LOCKED
+};
+
 ////
 // SpEnoteStoreMockSimpleV1
 ///
@@ -84,19 +92,14 @@ class SpEnoteStoreMockV1 final
     };
 
 public:
-    enum class BalanceUpdateExclusions
-    {
-        LEGACY_FULL,
-        LEGACY_INTERMEDIATE,
-        SERAPHIS
-    };
-
 //constructors
     /// default constructor
     SpEnoteStoreMockV1() = default;
 
     /// normal constructor
-    SpEnoteStoreMockV1(const std::uint64_t refresh_height, const std::uint64_t first_sp_enabled_block_in_chain);
+    SpEnoteStoreMockV1(const std::uint64_t refresh_height,
+        const std::uint64_t first_sp_enabled_block_in_chain,
+        const std::uint64_t default_spendable_age = 0);
 
 //member functions
     /// setters for scan heights
@@ -176,7 +179,7 @@ public:
     boost::multiprecision::uint128_t get_balance(
         const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
         const std::unordered_set<SpEnoteSpentStatus> &spent_statuses,
-        const std::unordered_set<BalanceUpdateExclusions> &exclusions = {}) const;
+        const std::unordered_set<EnoteStoreBalanceUpdateExclusions> &exclusions = {}) const;
 
 private:
     /// clean up legacy state to prepare for adding fresh legacy enotes and key images
@@ -220,6 +223,10 @@ protected:
 
     /// configuration value: the first ledger block that can contain seraphis txs
     std::uint64_t m_first_sp_enabled_block_in_chain{static_cast<std::uint64_t>(-1)};
+    /// configuration value: default spendable age; an enote is considered 'spendable' in the next block if it's on-chain
+    //      and the hext height is >= 'origin height + max(1, default_spendable_age)'; legacy enotes also have an
+    //      unlock_time attribute on top of the default spendable age
+    std::uint64_t m_default_spendable_age{0};
 };
 
 ////
@@ -234,8 +241,10 @@ public:
     SpEnoteStoreMockPaymentValidatorV1() = default;
 
     /// normal constructor
-    SpEnoteStoreMockPaymentValidatorV1(const std::uint64_t refresh_height) :
-        m_refresh_height{refresh_height}
+    SpEnoteStoreMockPaymentValidatorV1(const std::uint64_t refresh_height,
+        const std::uint64_t default_spendable_age = 0) :
+        m_refresh_height{refresh_height},
+        m_default_spendable_age{default_spendable_age}
     {}
 
 //member functions
@@ -260,7 +269,8 @@ public:
     /// get height of heighest recorded block (refresh height - 1 if no recorded blocks) (heighest block PayVal-scanned)
     std::uint64_t get_top_block_height() const { return m_refresh_height + m_block_ids.size() - 1; }
     /// get current total amount received using specified origin statuses
-    boost::multiprecision::uint128_t get_received_sum(const std::unordered_set<SpEnoteOriginStatus> &origin_statuses) const;
+    boost::multiprecision::uint128_t get_received_sum(const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
+        const std::unordered_set<EnoteStoreBalanceUpdateExclusions> &exclusions = {}) const;
 
 //member variables
 protected:
@@ -271,6 +281,10 @@ protected:
     std::uint64_t m_refresh_height{0};
     /// stored block ids in range [refresh height, end of known chain]
     std::vector<rct::key> m_block_ids;
+
+    /// configuration value: default spendable age; an enote is considered 'spendable' in the next block if it's on-chain
+    //      and the hext height is >= 'origin height + max(1, default_spendable_age)'
+    std::uint64_t m_default_spendable_age{0};
 };
 
 } //namespace sp

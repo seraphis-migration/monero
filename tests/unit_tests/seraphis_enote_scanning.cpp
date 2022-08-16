@@ -920,7 +920,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
     ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 8);
     ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
-        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 5);
     ASSERT_TRUE(enote_store_A_test2.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 5);
     ASSERT_TRUE(enote_store_B_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
@@ -973,7 +973,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
     ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 8);
     ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
-        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 5);
     ASSERT_TRUE(enote_store_A_test3.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 5);
     ASSERT_TRUE(enote_store_B_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
@@ -1114,7 +1114,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
     ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 10);
     ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
-        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 7);
     ASSERT_TRUE(enote_store_A_test4.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 7);
     ASSERT_TRUE(enote_store_B_test4.get_balance({SpEnoteOriginStatus::ONCHAIN},
@@ -1167,7 +1167,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 40);
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
-        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 9);
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 29);
     ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
@@ -1211,7 +1211,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 29);
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
-        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) >= 7);  //can be (10 + 9) - 12 OR (10 + 10) - 12
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 17);
     ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
@@ -1272,7 +1272,7 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing)
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 29);
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::UNCONFIRMED},
-        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
+        {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) >= 6);  //can be (10 + 9) - 13 OR (10 + 10) - 13
     ASSERT_TRUE(enote_store_A_test5.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 16);
     ASSERT_TRUE(enote_store_B_test5.get_balance({SpEnoteOriginStatus::ONCHAIN},
@@ -2183,7 +2183,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 1);
     ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
 
     //spend enote in block 1
     ASSERT_NO_THROW(ledger_context_test2.add_legacy_coinbase(
@@ -2235,7 +2235,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 1);
     ASSERT_TRUE(enote_store_test2.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);  //intermediate record promoted to full
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);  //intermediate record promoted to full
 
     //add empty block 2 (inject to test ledger height trackers)
     ASSERT_NO_THROW(ledger_context_test2.add_legacy_coinbase(
@@ -2384,7 +2384,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
 
     //make enote: 2 -> user
     LegacyEnoteV4 enote_test3_2;
@@ -2438,7 +2438,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);  //intermediate record promoted to full
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);  //intermediate record promoted to full
 
     //legacy key image scan
     refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
@@ -2456,7 +2456,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
 
     //set fullscan height to saved intermediate height
     ASSERT_NO_THROW(enote_store_test3.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test3_1));
@@ -2480,7 +2480,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test3_2{
@@ -2497,7 +2497,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 3);  //intermediate record promoted to full
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 3);  //intermediate record promoted to full
 
     //legacy key image scan
     refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
@@ -2515,7 +2515,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 3);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 3);
 
     //set fullscan height to saved intermediate height
     ASSERT_NO_THROW(enote_store_test3.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test3_2));
@@ -2549,7 +2549,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test3_3{
@@ -2584,7 +2584,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);  //enote 2 is now unspent
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 3);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 3);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test3_4{
@@ -2655,7 +2655,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 6);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 6);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 6);
 
     //intermediate scan (this should have no effect right after a full scan)
     refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
@@ -2673,7 +2673,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 6);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 6);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 6);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test3_5{
@@ -2716,7 +2716,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 2);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 2);
 
     //pop block 3
     ledger_context_test3.pop_blocks(1);
@@ -2737,7 +2737,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 6);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 6);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 6);
 
     //intermediate scan to fix height trackers (these can get messed up if doing both intermediate and full scans,
     //which will never be done in practice)
@@ -2755,7 +2755,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 6);
     ASSERT_TRUE(enote_store_test3.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 6);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 6);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test3_6{
@@ -2827,7 +2827,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test4_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
 
     //full scan (separate enote store)
     refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
@@ -2870,7 +2870,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test4_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
 
     //full scan (separate enote store); balance should still be 1
     refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
@@ -2905,7 +2905,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test4_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test4_1{
@@ -2922,7 +2922,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test4_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);  //intermediate record promoted to full
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);  //intermediate record promoted to full
 
     //legacy key image scan
     refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
@@ -2940,7 +2940,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test4_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
 
     //set fullscan height to saved intermediate height
     ASSERT_NO_THROW(enote_store_test4_int.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test4_1));
@@ -2988,7 +2988,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test4_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test4_2{
@@ -3034,7 +3034,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test4_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test4_3{
@@ -3088,7 +3088,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
     ASSERT_TRUE(enote_store_test4_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 1);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test4_4{
@@ -3142,7 +3142,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
     ASSERT_TRUE(enote_store_test4_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test4_5{
@@ -3278,7 +3278,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
     ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
 
     //full scan (separate enote store)
     refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
@@ -3318,7 +3318,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 5);
     ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test5_1{
@@ -3335,7 +3335,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 5);
     ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 5);  //intermediate records promoted to full
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 5);  //intermediate records promoted to full
 
     //legacy key image scan
     refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
@@ -3353,7 +3353,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 5);
     ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 5);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 5);
 
     //set fullscan height to saved intermediate height
     ASSERT_NO_THROW(enote_store_test5_int.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test5_1));
@@ -3391,7 +3391,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
     ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 3);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 3);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test5_2{
@@ -3456,7 +3456,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 4);
     ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 4);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 4);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test5_3{
@@ -3511,7 +3511,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
     ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 0);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test5_4{
@@ -3559,7 +3559,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 4);
     ASSERT_TRUE(enote_store_test5_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
-        {SpEnoteStoreMockV1::BalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 4);
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE}) == 4);
 
     //get intermediate height
     const std::uint64_t intermediate_height_pre_import_cycle_test5_5{

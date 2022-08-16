@@ -30,6 +30,7 @@
 
 // Mock ledger context: for testing
 // note: txs added to the mock ledger aren't validated (aside from key image checks)
+// note2: reference set proof element getters do NOT check if the elements are spendable (i.e. if they are unlocked)
 
 
 #pragma once
@@ -56,7 +57,6 @@
 //forward declarations
 namespace sp
 {
-    struct SpEnoteV1;
     struct SpTxSquashedV1;
     struct EnoteScanningChunkLedgerV1;
     struct EnoteScanningChunkNonLedgerV1;
