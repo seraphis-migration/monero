@@ -652,7 +652,6 @@ TEST(seraphis_enote_scanning, simple_ledger_1)
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, simple_ledger_2)
@@ -694,7 +693,6 @@ TEST(seraphis_enote_scanning, simple_ledger_2)
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, simple_ledger_3)
@@ -742,7 +740,6 @@ TEST(seraphis_enote_scanning, simple_ledger_3)
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_B.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, simple_ledger_4)
@@ -792,7 +789,6 @@ TEST(seraphis_enote_scanning, simple_ledger_4)
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, simple_ledger_5)
@@ -858,7 +854,6 @@ TEST(seraphis_enote_scanning, simple_ledger_5)
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 9);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, simple_ledger_6)
@@ -934,6 +929,88 @@ TEST(seraphis_enote_scanning, simple_ledger_6)
         {SpEnoteSpentStatus::SPENT_OFFCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_enote_scanning, simple_ledger_locked)
+{
+    using namespace sp;
+    using namespace jamtis;
+
+    /// setup
+
+    // 1. config
+    const RefreshLedgerEnoteStoreConfig refresh_config{
+            .m_reorg_avoidance_depth = 0,
+            .m_max_chunk_size = 1,
+            .m_max_partialscan_attempts = 0
+        };
+
+    // 2. user keys
+    jamtis_mock_keys user_keys_A;
+    make_jamtis_mock_keys(user_keys_A);
+
+    // 3. user addresses
+    JamtisDestinationV1 destination_A;
+    make_random_address_for_user(user_keys_A, destination_A);
+
+
+    /// test
+
+    // test locked enotes
+    const std::uint64_t default_spendable_age{2};
+    MockLedgerContext ledger_context{0, 0};
+    SpEnoteStoreMockV1 enote_store_A{0, 0, default_spendable_age};
+    SpEnoteStoreMockPaymentValidatorV1 enote_store_PV_A{0, default_spendable_age};
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context, enote_store_A);
+    refresh_user_enote_store_PV(user_keys_A, refresh_config, ledger_context, enote_store_PV_A);
+
+    ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);
+    ASSERT_TRUE(enote_store_PV_A.get_received_sum({SpEnoteOriginStatus::ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_PV_A.get_received_sum({SpEnoteOriginStatus::ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);
+
+    send_coinbase_amounts_to_users({{1}}, {destination_A}, ledger_context);
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context, enote_store_A);
+    refresh_user_enote_store_PV(user_keys_A, refresh_config, ledger_context, enote_store_PV_A);
+
+    ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
+    ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);  //amount 1 locked
+    ASSERT_TRUE(enote_store_PV_A.get_received_sum({SpEnoteOriginStatus::ONCHAIN}) == 1);
+    ASSERT_TRUE(enote_store_PV_A.get_received_sum({SpEnoteOriginStatus::ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);  //amount 1 locked
+
+    send_coinbase_amounts_to_users({{2}}, {destination_A}, ledger_context);
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context, enote_store_A);
+    refresh_user_enote_store_PV(user_keys_A, refresh_config, ledger_context, enote_store_PV_A);
+
+    ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
+    ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 1);  //amount 2 locked
+    ASSERT_TRUE(enote_store_PV_A.get_received_sum({SpEnoteOriginStatus::ONCHAIN}) == 3);
+    ASSERT_TRUE(enote_store_PV_A.get_received_sum({SpEnoteOriginStatus::ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 1);  //amount 2 locked
+
+    send_coinbase_amounts_to_users({}, {}, ledger_context);
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context, enote_store_A);
+    refresh_user_enote_store_PV(user_keys_A, refresh_config, ledger_context, enote_store_PV_A);
+
+    ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 3);
+    ASSERT_TRUE(enote_store_A.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 3);  //none locked
+    ASSERT_TRUE(enote_store_PV_A.get_received_sum({SpEnoteOriginStatus::ONCHAIN}) == 3);
+    ASSERT_TRUE(enote_store_PV_A.get_received_sum({SpEnoteOriginStatus::ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 3);  //none
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, basic_ledger_tx_passing_1)
@@ -1132,7 +1209,6 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing_2)
         {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_B.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 3);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, basic_ledger_tx_passing_3)
@@ -1228,7 +1304,6 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing_3)
         {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_B.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 11);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, basic_ledger_tx_passing_4)
@@ -1412,7 +1487,6 @@ TEST(seraphis_enote_scanning, basic_ledger_tx_passing_4)
         {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_B.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 33);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, basic_ledger_tx_passing_5)
@@ -1887,7 +1961,6 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning_1)
         {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_B.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, reorgs_while_scanning_2)
@@ -2017,7 +2090,6 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning_2)
         {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_B.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, reorgs_while_scanning_3)
@@ -2149,7 +2221,6 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning_3)
         {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store_B.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 8);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, reorgs_while_scanning_4)
@@ -2248,7 +2319,6 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning_4)
     ASSERT_ANY_THROW(refresh_enote_store_ledger(refresh_config,
         test_scanning_context_B,
         enote_store_updater));
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, reorgs_while_scanning_5)
@@ -2584,7 +2654,6 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_1)
         {SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 0);
     ASSERT_TRUE(enote_store.get_balance({SpEnoteOriginStatus::ONCHAIN, SpEnoteOriginStatus::UNCONFIRMED},
         {SpEnoteSpentStatus::SPENT_ONCHAIN, SpEnoteSpentStatus::SPENT_UNCONFIRMED}) == 8);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_pre_transition_2)
@@ -2816,7 +2885,6 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_2)
     ASSERT_TRUE(enote_store.get_top_legacy_fullscanned_block_height() == 1);
     ASSERT_TRUE(enote_store.get_top_sp_scanned_block_height() == 1);
     ASSERT_TRUE(enote_store.get_top_block_height() == 1);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_pre_transition_3)
@@ -3311,7 +3379,6 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_3)
 
     ASSERT_TRUE(enote_store.get_top_legacy_partialscanned_block_height() == 2);
     ASSERT_TRUE(enote_store.get_top_legacy_fullscanned_block_height() == 2);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_pre_transition_4)
@@ -3748,7 +3815,6 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_4)
     ASSERT_TRUE(enote_store_full.get_legacy_intermediate_records().size() == 0);
     ASSERT_TRUE(enote_store_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_pre_transition_5)
@@ -4203,7 +4269,6 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_5)
     ASSERT_TRUE(enote_store_full.get_balance({SpEnoteOriginStatus::ONCHAIN}, {}) == 4);
     ASSERT_TRUE(enote_store_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 4);
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_pre_transition_6)
@@ -4599,7 +4664,6 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_6)
     ASSERT_TRUE(enote_store_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN},
         {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 3);  //enotes 1, 2, 3 are unlocked
-
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_pre_transition_7)
