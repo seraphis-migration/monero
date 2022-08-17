@@ -178,7 +178,7 @@ public:
     /// get current balance using specified origin/spent statuses and exclusions
     boost::multiprecision::uint128_t get_balance(
         const std::unordered_set<SpEnoteOriginStatus> &origin_statuses,
-        const std::unordered_set<SpEnoteSpentStatus> &spent_statuses,
+        const std::unordered_set<SpEnoteSpentStatus> &spent_statuses = {},
         const std::unordered_set<EnoteStoreBalanceUpdateExclusions> &exclusions = {}) const;
 
 private:

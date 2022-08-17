@@ -3961,25 +3961,373 @@ TEST(seraphis_enote_scanning, legacy_pre_transition)
         {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 3);  //enotes 1, 2, 3 are unlocked
 
     // 7. locktime test 2: duplicate onetime addresses
+    MockLedgerContext ledger_context_test7{10000, 10000};
+    SpEnoteStoreMockV1 enote_store_test7_int{0, 10000, 2};  //for view-only scanning
+    SpEnoteStoreMockV1 enote_store_test7_full{0, 10000, 2};  //for full scanning
+
+    //make enotes: 1-a (amount 1), 1-b (amount 2), 1-c (amount 3)
+    LegacyEnoteV4 enote_test7_1a;
+    LegacyEnoteV4 enote_test7_1b;
+    LegacyEnoteV4 enote_test7_1c;
+    const crypto::secret_key enote_ephemeral_privkey_test7{make_secret_key()};
+    rct::key enote_ephemeral_pubkey_test7;
+    rct::key enote_ephemeral_pubkey_test7_temp;
+    crypto::key_image key_image_test7;
+    crypto::key_image key_image_test7_temp;
+
+    prepare_legacy_enote_for_transfer(subaddr_spendkey,
+        subaddr_viewkey,
+        legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        1,  //amount
+        0,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_test7,
+        enote_test7_1a,
+        enote_ephemeral_pubkey_test7,
+        key_image_test7);
+
+    prepare_legacy_enote_for_transfer(subaddr_spendkey,
+        subaddr_viewkey,
+        legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        2,  //amount
+        0,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_test7,
+        enote_test7_1b,
+        enote_ephemeral_pubkey_test7_temp,
+        key_image_test7_temp);
+    ASSERT_TRUE(enote_ephemeral_pubkey_test7_temp == enote_ephemeral_pubkey_test7);
+    ASSERT_TRUE(key_image_test7_temp == key_image_test7);
+
+    prepare_legacy_enote_for_transfer(subaddr_spendkey,
+        subaddr_viewkey,
+        legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        3,  //amount
+        0,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_test7,
+        enote_test7_1c,
+        enote_ephemeral_pubkey_test7_temp,
+        key_image_test7_temp);
+    ASSERT_TRUE(enote_ephemeral_pubkey_test7_temp == enote_ephemeral_pubkey_test7);
+    ASSERT_TRUE(key_image_test7_temp == key_image_test7);
+
+    TxExtra tx_extra_test7;
+    append_legacy_enote_ephemeral_pubkeys_to_tx_extra(
+            {
+                enote_ephemeral_pubkey_test7
+            },
+            tx_extra_test7
+        );
+
     //block 0: enote 1-a (amount 1; unlock 0)
-    //intermediate scan (store 1)
-    //don't import key images yet
-    //full scan (store 2)
+    ASSERT_NO_THROW(ledger_context_test7.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_test7,
+            {},
+            {
+                enote_test7_1a
+            }
+        ));
+
+    //intermediate scan (don't import key image yet)
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_int);
+
+    ASSERT_TRUE(enote_store_test7_int.get_legacy_intermediate_records().size() == 1);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);  //enote 1a is locked
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE,
+        EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_full);
+
+    ASSERT_TRUE(enote_store_test7_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);  //enote 1a is locked
+
     //block 1: empty
-    //intermediate scan (store 1) spendable in next block: enote 1-a
-    //full scan (store 2)
-    //don't import key images yet
+    ASSERT_NO_THROW(ledger_context_test7.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            TxExtra{},
+            {},
+            {}
+        ));
+
+    //intermediate scan (don't import key image yet)
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_int);
+
+    ASSERT_TRUE(enote_store_test7_int.get_legacy_intermediate_records().size() == 1);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 1);  //enote 1a is unlocked
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE,
+        EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_full);
+
+    ASSERT_TRUE(enote_store_test7_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 1);  //enote 1a is unlocked
+
     //block 2: enote 1-b (amount 2; unlock 0)
-    //intermediate scan (store 1): enote 1-a/b amounts not available (enote 1-b hides enote 1-a)
-    //don't import key images yet
-    //full scan (store 2)
+    ASSERT_NO_THROW(ledger_context_test7.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_test7,
+            {},
+            {
+                enote_test7_1b
+            }
+        ));
+
+    //intermediate scan (don't import key image yet)
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_int);
+
+    ASSERT_TRUE(enote_store_test7_int.get_legacy_intermediate_records().size() == 2);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);  //enote 1a is unlocked, 1b is locked (hides 1a)
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE,
+        EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_full);
+
+    ASSERT_TRUE(enote_store_test7_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);  //enote 1a is unlocked, 1b is locked (hides 1a)
+
     //block 3: empty
-    //intermediate scan (store 1) spendable in next block: enote 1-b
-    //import key images (store 1): enote 1
-    //full scan (store 2)
+    ASSERT_NO_THROW(ledger_context_test7.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            TxExtra{},
+            {},
+            {}
+        ));
+
+    //intermediate scan
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_int);
+
+    ASSERT_TRUE(enote_store_test7_int.get_legacy_intermediate_records().size() == 2);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 2);  //enotes 1a, 1b are unlocked
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE,
+        EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);
+
+    //get intermediate height
+    const std::uint64_t intermediate_height_pre_import_cycle_test7_1{
+            enote_store_test7_int.get_top_legacy_partialscanned_block_height()
+        };
+
+    //import key image: enote 1
+    ASSERT_NO_THROW(enote_store_test7_int.import_legacy_key_image(key_image_test7, enote_test7_1a.m_onetime_address));
+
+    ASSERT_TRUE(enote_store_test7_int.get_top_legacy_partialscanned_block_height() == 3);
+    ASSERT_TRUE(enote_store_test7_int.get_top_legacy_fullscanned_block_height() == -1);
+    ASSERT_TRUE(enote_store_test7_int.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 2);  //enotes 1a, 1b are unlocked
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE,
+        EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 2);  //intermediate records promoted to full
+
+    //legacy key image scan
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        true,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_int);
+
+    ASSERT_TRUE(enote_store_test7_int.get_top_legacy_partialscanned_block_height() == 3);
+    ASSERT_TRUE(enote_store_test7_int.get_top_legacy_fullscanned_block_height() == -1);
+    ASSERT_TRUE(enote_store_test7_int.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 2);  //enotes 1a, 1b are unlocked
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE,
+        EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 2);
+
+    //set fullscan height to saved intermediate height
+    ASSERT_NO_THROW(enote_store_test7_int.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test7_1));
+
+    ASSERT_TRUE(enote_store_test7_int.get_top_legacy_partialscanned_block_height() == 3);
+    ASSERT_TRUE(enote_store_test7_int.get_top_legacy_fullscanned_block_height() == 3);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_full);
+
+    ASSERT_TRUE(enote_store_test7_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 2);  //enotes 1a, 1b are unlocked
+
     //block 4: enote 1-c (amount 3; unlock 0), spend enote 1   (check balance with a locked and spent enote [enote 1-c])
-    //intermediate scan (store 1)
-    //skip importing key images
-    //full scan (store 2)
+    ASSERT_NO_THROW(ledger_context_test7.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_test7,
+            {
+                key_image_test7
+            },
+            {
+                enote_test7_1c
+            }
+        ));
+
+    //intermediate scan
+    refresh_user_enote_store_legacy_intermediate(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_view_privkey,
+        false,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_int);
+
+    ASSERT_TRUE(enote_store_test7_int.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN}) == 3);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);  //enotes 1a, 1b, are unlocked, 1c is locked
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);
+    ASSERT_TRUE(enote_store_test7_int.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::LEGACY_INTERMEDIATE,
+        EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);
+
+    //get intermediate height
+    const std::uint64_t intermediate_height_pre_import_cycle_test7_2{
+            enote_store_test7_int.get_top_legacy_partialscanned_block_height()
+        };
+
+    //skip key image import + legacy key image scan (no intermediate records)
+    ASSERT_TRUE(enote_store_test7_int.get_legacy_intermediate_records().size() == 0);
+
+    //set fullscan height to saved intermediate height
+    ASSERT_NO_THROW(enote_store_test7_int.set_last_legacy_fullscan_height(intermediate_height_pre_import_cycle_test7_2));
+
+    ASSERT_TRUE(enote_store_test7_int.get_top_legacy_partialscanned_block_height() == 4);
+    ASSERT_TRUE(enote_store_test7_int.get_top_legacy_fullscanned_block_height() == 4);
+
+    //full scan (separate enote store)
+    refresh_user_enote_store_legacy_full(legacy_base_spend_pubkey,
+        legacy_subaddress_map,
+        legacy_spend_privkey,
+        legacy_view_privkey,
+        refresh_config,
+        ledger_context_test7,
+        enote_store_test7_full);
+
+    ASSERT_TRUE(enote_store_test7_full.get_legacy_intermediate_records().size() == 0);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN}) == 3);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 0);
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);  //enotes 1a, 1b are unlocked, 1c is locked
+    ASSERT_TRUE(enote_store_test7_full.get_balance({SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN},
+        {EnoteStoreBalanceUpdateExclusions::ORIGIN_LEDGER_LOCKED}) == 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
