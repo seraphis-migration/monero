@@ -118,7 +118,7 @@ namespace sp
 
             std::vector<rct::MultiexpData> data;
             data.reserve(maxN*maxM*2);
-            generator_factory::get_generator_at_index(2*maxN*maxM);  //initialize generators
+            generator_factory::get_generator_at_index(2*maxN*maxM - 1);  //initialize generators
 
             for (size_t i = 0; i < maxN*maxM; ++i)
             {
