@@ -44,7 +44,6 @@ extern "C"
 #include "sp_transcript.h"
 
 //third party headers
-#include <mutex>
 
 //standard headers
 #include <vector>
@@ -57,74 +56,76 @@ namespace sp
 namespace generator_factory
 {
 
+struct SpFactoryGenerator final
+{
+    crypto::public_key generator;
+    ge_p3 generator_p3;
+    ge_cached generator_cached;
+};
+
 // number of generators to generate (enough for a bulletproof with 128 aggregated range proofs)
 static const std::size_t MAX_GENERATOR_COUNT{128*128};
 
-// saved generators
-static std::vector<crypto::public_key> factory_generators;
-static std::vector<ge_p3> factory_generators_p3;
-static std::vector<ge_cached> factory_generators_cached;
-
-//misc
-static std::once_flag init_gens_once_flag;
-
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void prepare_generators()
+static std::vector<SpFactoryGenerator> prepare_generators()
 {
-    std::call_once(init_gens_once_flag,
-        [&](){
+    std::vector<SpFactoryGenerator> generators;
 
-            // make generators
-            factory_generators.resize(MAX_GENERATOR_COUNT);
-            factory_generators_p3.resize(MAX_GENERATOR_COUNT);
-            factory_generators_cached.resize(MAX_GENERATOR_COUNT);
+    // make generators
+    generators.resize(MAX_GENERATOR_COUNT);
 
-            rct::key intermediate_hash;
+    rct::key intermediate_hash;
 
-            for (std::size_t generator_index{0}; generator_index < MAX_GENERATOR_COUNT; ++generator_index)
-            {
-                SpKDFTranscript transcript{config::HASH_KEY_SERAPHIS_GENERATOR_FACTORY, 4};
-                transcript.append("generator_index", generator_index);
+    for (std::size_t generator_index{0}; generator_index < MAX_GENERATOR_COUNT; ++generator_index)
+    {
+        SpKDFTranscript transcript{config::HASH_KEY_SERAPHIS_GENERATOR_FACTORY, 4};
+        transcript.append("generator_index", generator_index);
 
-                // G[generator_index] = keccak_to_pt(H_32("sp_generator_factory", generator_index))
-                sp_hash_to_32(transcript, intermediate_hash.bytes);
-                rct::hash_to_p3(factory_generators_p3[generator_index], intermediate_hash);
+        // G[generator_index] = keccak_to_pt(H_32("sp_generator_factory", generator_index))
+        sp_hash_to_32(transcript, intermediate_hash.bytes);
+        rct::hash_to_p3(generators[generator_index].generator_p3, intermediate_hash);
 
-                // convert to other representations
-                ge_p3_tobytes(to_bytes(factory_generators[generator_index]), &factory_generators_p3[generator_index]);
-                ge_p3_to_cached(&factory_generators_cached[generator_index], &factory_generators_p3[generator_index]);
-            }
+        // convert to other representations
+        ge_p3_tobytes(to_bytes(generators[generator_index].generator),
+            &generators[generator_index].generator_p3);
+        ge_p3_to_cached(&generators[generator_index].generator_cached,
+            &generators[generator_index].generator_p3);
+    }
 
-    });
+    return generators;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-crypto::public_key get_generator_at_index(const std::size_t generator_index)
+static const SpFactoryGenerator& factory_generator_at_index(const std::size_t desired_index)
 {
-    CHECK_AND_ASSERT_THROW_MES(generator_index < MAX_GENERATOR_COUNT,
+    static const std::vector<SpFactoryGenerator> s_factory_gens{prepare_generators()};
+
+    CHECK_AND_ASSERT_THROW_MES(desired_index < MAX_GENERATOR_COUNT,
         "sp generator factory sanity check: requested generator index exceeds available generators.");
 
-    prepare_generators();
-    return factory_generators[generator_index];
+    return s_factory_gens[desired_index];
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t max_generator_count()
+{
+    return MAX_GENERATOR_COUNT;
+}
+//-------------------------------------------------------------------------------------------------------------------
+crypto::public_key get_generator_at_index(const std::size_t generator_index)
+{
+    return factory_generator_at_index(generator_index).generator;
 }
 //-------------------------------------------------------------------------------------------------------------------
 ge_p3 get_generator_at_index_p3(const std::size_t generator_index)
 {
-    CHECK_AND_ASSERT_THROW_MES(generator_index < MAX_GENERATOR_COUNT,
-        "sp generator factory sanity check: requested generator index exceeds available generators.");
-
-    prepare_generators();
-    return factory_generators_p3[generator_index];
+    return factory_generator_at_index(generator_index).generator_p3;
 }
 //-------------------------------------------------------------------------------------------------------------------
 ge_cached get_generator_at_index_cached(const std::size_t generator_index)
 {
-    CHECK_AND_ASSERT_THROW_MES(generator_index < MAX_GENERATOR_COUNT,
-        "sp generator factory sanity check: requested generator index exceeds available generators.");
-
-    prepare_generators();
-    return factory_generators_cached[generator_index];
+    return factory_generator_at_index(generator_index).generator_cached;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace generator_factory

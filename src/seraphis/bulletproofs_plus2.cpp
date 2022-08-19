@@ -73,7 +73,6 @@ namespace sp
     static constexpr size_t maxM = config::BULLETPROOF_PLUS2_MAX_COMMITMENTS; // maximum number of commitments to aggregate into a single proof
 
     // Cached public generators
-    static ge_p3 Hi_p3[maxN*maxM], Gi_p3[maxN*maxM];
     static std::shared_ptr<rct::straus_cached_data> straus_HiGi_cache;
     static std::shared_ptr<rct::pippenger_cached_data> pippenger_HiGi_cache;
 
@@ -118,15 +117,11 @@ namespace sp
 
             std::vector<rct::MultiexpData> data;
             data.reserve(maxN*maxM*2);
-            generator_factory::get_generator_at_index(2*maxN*maxM - 1);  //initialize generators
 
             for (size_t i = 0; i < maxN*maxM; ++i)
             {
-                Gi_p3[i] = generator_factory::get_generator_at_index_p3(i * 2);
-                Hi_p3[i] = generator_factory::get_generator_at_index_p3(i * 2 + 1);
-
-                data.push_back({rct::zero(), Gi_p3[i]});
-                data.push_back({rct::zero(), Hi_p3[i]});
+                data.push_back({rct::zero(), generator_factory::get_generator_at_index_p3(i * 2)});
+                data.push_back({rct::zero(), generator_factory::get_generator_at_index_p3(i * 2 + 1)});
             }
 
             straus_HiGi_cache = straus_init_cache(data, STRAUS_SIZE_LIMIT);
@@ -163,8 +158,8 @@ namespace sp
         multiexp_data.reserve(a.size()*2);
         for (size_t i = 0; i < a.size(); ++i)
         {
-            multiexp_data.emplace_back(a[i], Gi_p3[i]);
-            multiexp_data.emplace_back(b[i], Hi_p3[i]);
+            multiexp_data.emplace_back(a[i], generator_factory::get_generator_at_index_p3(i * 2));
+            multiexp_data.emplace_back(b[i], generator_factory::get_generator_at_index_p3(i * 2 + 1));
         }
         return multiexp(multiexp_data, 2 * a.size());
     }
@@ -681,8 +676,8 @@ try_again:
         yinvpow[0] = ONE;
         for (size_t i = 0; i < MN; ++i)
         {
-            Gprime[i] = Gi_p3[i];
-            Hprime[i] = Hi_p3[i];
+            Gprime[i] = generator_factory::get_generator_at_index_p3(i * 2);
+            Hprime[i] = generator_factory::get_generator_at_index_p3(i * 2 + 1);
             if (i > 0)
             {
                 sc_mul(yinvpow[i].bytes, yinvpow[i-1].bytes, yinv.bytes);

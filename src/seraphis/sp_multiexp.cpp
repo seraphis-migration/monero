@@ -74,6 +74,40 @@ static void update_scalar(const boost::optional<rct::key> &new_scalar, rct::key 
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void prepare_multiexp_cached_generators(const std::size_t num_predef_gen_elements,
+    rct::pippenger_cached_data &cached_base_points_inout,
+    std::vector<rct::MultiexpData> &elements_collected_inout)
+{
+    // make sure generators requested are available
+    CHECK_AND_ASSERT_THROW_MES(num_predef_gen_elements <= generator_factory::max_generator_count(),
+        "prepare sp multiexp cached generators: too many elements were requested.");
+
+    // default initialize caches
+    cached_base_points_inout.clear();
+    elements_collected_inout.clear();
+
+    cached_base_points_inout.resize(4 + num_predef_gen_elements);
+    elements_collected_inout.resize(4 + num_predef_gen_elements, {rct::zero(), ge_p3_identity});
+
+    // set generators
+    cached_base_points_inout[0] = crypto::get_G_cached();
+    cached_base_points_inout[1] = crypto::get_H_cached();
+    cached_base_points_inout[2] = crypto::get_U_cached();
+    cached_base_points_inout[3] = crypto::get_X_cached();
+
+    elements_collected_inout[0].point = crypto::get_G_p3();
+    elements_collected_inout[1].point = crypto::get_H_p3();
+    elements_collected_inout[2].point = crypto::get_U_p3();
+    elements_collected_inout[3].point = crypto::get_X_p3();
+
+    for (std::size_t gen_index{0}; gen_index < num_predef_gen_elements; ++gen_index)
+    {
+        cached_base_points_inout[4 + gen_index] = generator_factory::get_generator_at_index_cached(gen_index);
+        elements_collected_inout[4 + gen_index].point = generator_factory::get_generator_at_index_p3(gen_index);
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 SpMultiexpBuilder::SpMultiexpBuilder(const rct::key &weight,
     const std::size_t estimated_num_predefined_generator_elements,
     const std::size_t estimated_num_user_defined_elements)
@@ -191,32 +225,16 @@ SpMultiexp::SpMultiexp(const std::list<SpMultiexpBuilder> &multiexp_builders)
     // 1. prepare generators
     std::shared_ptr<rct::pippenger_cached_data> cached_base_points = std::make_shared<rct::pippenger_cached_data>();
     cached_base_points->reserve(4 + num_predef_gen_elements + num_user_def_elements);
-    ge_cached ge_cached_identity;
-    ge_p3_to_cached(&ge_cached_identity, &ge_p3_identity);
-    cached_base_points->resize(4 + num_predef_gen_elements, ge_cached_identity);
 
     std::vector<rct::MultiexpData> elements_collected;
     elements_collected.reserve(4 + num_predef_gen_elements + num_user_def_elements);
-    elements_collected.resize(4 + num_predef_gen_elements, {rct::zero(), ge_p3_identity});
 
-    (*cached_base_points)[0] = crypto::get_G_cached();
-    (*cached_base_points)[1] = crypto::get_H_cached();
-    (*cached_base_points)[2] = crypto::get_U_cached();
-    (*cached_base_points)[3] = crypto::get_X_cached();
+    prepare_multiexp_cached_generators(num_predef_gen_elements, *cached_base_points, elements_collected);
 
-    elements_collected[0].point = crypto::get_G_p3();
-    elements_collected[1].point = crypto::get_H_p3();
-    elements_collected[2].point = crypto::get_U_p3();
-    elements_collected[3].point = crypto::get_X_p3();
-
-    for (std::size_t predef_generator_index{0}; predef_generator_index < num_predef_gen_elements; ++predef_generator_index)
-    {
-        (*cached_base_points)[4 + predef_generator_index] =
-            generator_factory::get_generator_at_index_cached(predef_generator_index);
-
-        elements_collected[4 + predef_generator_index].point =
-            generator_factory::get_generator_at_index_p3(predef_generator_index);
-    }
+    CHECK_AND_ASSERT_THROW_MES(cached_base_points->size() == 4 + num_predef_gen_elements,
+        "sp multiexp sanity check: cached base points wrong size after prepared.");
+    CHECK_AND_ASSERT_THROW_MES(elements_collected.size() == 4 + num_predef_gen_elements,
+        "sp multiexp sanity check: elements collected wrong size after prepared.");
 
     // 2. collect scalars and expand cached points with user-defined elements
     for (const SpMultiexpBuilder &multiexp_builder : multiexp_builders)

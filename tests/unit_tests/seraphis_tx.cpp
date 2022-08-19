@@ -374,7 +374,8 @@ static std::vector<SpTxGenData> get_mock_tx_gen_data_batching()
 
 TEST(seraphis_tx, seraphis_squashed)
 {
-    run_mock_tx_test<sp::SpTxSquashedV1>(get_mock_tx_gen_data_misc(true));
+    for (int i{0}; i < 1; ++i)
+        run_mock_tx_test<sp::SpTxSquashedV1>(get_mock_tx_gen_data_misc(true));
 }
 
 TEST(seraphis_tx_batching, seraphis_squashed)

@@ -53,6 +53,7 @@ namespace sp
 namespace generator_factory
 {
 
+std::size_t max_generator_count();
 crypto::public_key get_generator_at_index(const std::size_t generator_index);
 ge_p3 get_generator_at_index_p3(const std::size_t generator_index);
 ge_cached get_generator_at_index_cached(const std::size_t generator_index);
