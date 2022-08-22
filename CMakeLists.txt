@@ -369,6 +369,7 @@ if(NOT MANUAL_SUBMODULES)
     check_submodule(external/trezor-common)
     check_submodule(external/randomx)
     check_submodule(external/supercop)
+    check_submodule(external/mx25519)
   endif()
 endif()
 

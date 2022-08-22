@@ -30,6 +30,7 @@
 extern "C"
 {
 #include "crypto/crypto-ops.h"
+#include "mx25519.h"
 }
 #include "crypto/generators.h"
 #include "device/device.hpp"
@@ -245,5 +246,13 @@ TEST(seraphis_crypto, multiexp_utility)
 
     sp::SpMultiexp{{builder10}}.get_result(result);
     ASSERT_TRUE(result == rct::pippenger(rct_builder10));
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_crypto, mx25519_sample_tests)
+{
+    mx25519_privkey test;
+    const rct::key testrct{rct::pkGen()};
+    memcpy(test.v, testrct.bytes, 32);
+    ASSERT_TRUE(memcmp(test.v, testrct.bytes, 32) == 0);
 }
 //-------------------------------------------------------------------------------------------------------------------

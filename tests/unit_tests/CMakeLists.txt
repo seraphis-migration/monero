@@ -126,6 +126,7 @@ target_link_libraries(unit_tests
     daemon_rpc_server
     blockchain_db
     lmdb_lib
+    mx25519
     rpc
     net
     serialization
@@ -142,6 +143,8 @@ target_link_libraries(unit_tests
 set_property(TARGET unit_tests
   PROPERTY
     FOLDER "tests")
+
+include_directories(${MX25519_INCLUDE})
 
 if (NOT MSVC)
   set_property(TARGET unit_tests
