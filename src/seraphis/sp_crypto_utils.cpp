@@ -36,6 +36,7 @@
 extern "C"
 {
 #include "crypto/crypto-ops.h"
+#include "mx25519.h"
 }
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
@@ -244,6 +245,13 @@ bool key_domain_is_prime_subgroup(const rct::key &check_key)
     ge_scalarmult_p3(&check_key_p3, rct::curveOrder().bytes, &check_key_p3);
 
     return (ge_p3_is_point_at_infinity_vartime(&check_key_p3) != 0);
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool mx25519_privkey_is_canonical(const mx25519_privkey &test_privkey)
+{
+    //todo: is this constant time?
+    return (test_privkey.v[0] & 7) == 0 &&
+        (test_privkey.v[31] & 128) == 0;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

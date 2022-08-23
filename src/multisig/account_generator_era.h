@@ -49,7 +49,7 @@ struct account_generators
   rct::key m_secondary;  //e.g. for view key
 };
 
-inline const rct::key get_primary_generator(const account_generator_era era)
+inline rct::key get_primary_generator(const account_generator_era era)
 {
   if (era == account_generator_era::cryptonote)
     return rct::pk2rct(crypto::get_G());
@@ -59,7 +59,7 @@ inline const rct::key get_primary_generator(const account_generator_era era)
     return rct::Z;  //error
 }
 
-inline const rct::key get_secondary_generator(const account_generator_era era)
+inline rct::key get_secondary_generator(const account_generator_era era)
 {
   if (era == account_generator_era::cryptonote)
     return rct::pk2rct(crypto::get_G());

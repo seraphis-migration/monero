@@ -42,6 +42,7 @@ extern "C"
 #include "seraphis/sp_core_types.h"
 #include "seraphis/sp_crypto_utils.h"
 #include "seraphis/sp_generator_factory.h"
+#include "seraphis/sp_hash_functions.h"
 #include "seraphis/sp_multiexp.h"
 #include "seraphis/tx_misc_utils.h"
 
@@ -250,9 +251,42 @@ TEST(seraphis_crypto, multiexp_utility)
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_crypto, mx25519_sample_tests)
 {
-    mx25519_privkey test;
-    const rct::key testrct{rct::pkGen()};
-    memcpy(test.v, testrct.bytes, 32);
-    ASSERT_TRUE(memcmp(test.v, testrct.bytes, 32) == 0);
+    // 1. mx25519 private keys are byte buffers like rct::key
+    mx25519_privkey test1;
+    const rct::key testrct{rct::skGen()};
+    memcpy(test1.v, testrct.bytes, 32);
+    ASSERT_TRUE(memcmp(test1.v, testrct.bytes, 32) == 0);
+
+    // 2. x * G == x * G
+    mx25519_privkey test2_privkey;
+    crypto::rand(32, test2_privkey.v);
+
+    mx25519_pubkey test2_key_port1;
+    mx25519_pubkey test2_key_port2;
+    mx25519_pubkey test2_key_auto1;
+    mx25519_pubkey test2_key_auto2;
+
+    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_PORTABLE), &test2_key_port1, &test2_privkey);
+    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &test2_key_auto1, &test2_privkey);
+
+    const mx25519_pubkey generator_G{crypto::get_x25519_G()};
+
+    mx25519_scmul(mx25519_select_impl(mx25519_type::MX25519_TYPE_PORTABLE), &test2_key_port2, &test2_privkey, &generator_G);
+    mx25519_scmul(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &test2_key_auto2, &test2_privkey, &generator_G);
+
+    ASSERT_TRUE(memcmp(&test2_key_port1, &test2_key_auto1, 32) == 0);
+    ASSERT_TRUE(memcmp(&test2_key_port1, &test2_key_port2, 32) == 0);
+    ASSERT_TRUE(memcmp(&test2_key_port1, &test2_key_auto2, 32) == 0);
+
+    // 3. derive canonical x25519 scalar: H_n_x25519[k](x)
+    for (int i{0}; i < 1000; ++i)
+    {
+        mx25519_privkey test3_privkey;
+        const rct::key test3_derivation_key{rct::skGen()};
+        std::string test3_data{};
+
+        sp::sp_derive_x25519_key(test3_derivation_key.bytes, test3_data, test3_privkey.v);
+        ASSERT_TRUE(sp::mx25519_privkey_is_canonical(test3_privkey));
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------

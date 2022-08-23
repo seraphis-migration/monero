@@ -34,6 +34,11 @@
 #pragma once
 
 //local headers
+extern "C"
+{
+#include "crypto/crypto-ops.h"
+#include "mx25519.h"
+}
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
 
@@ -147,5 +152,11 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
 * result: true if input key is in prime order EC subgroup
 */
 bool key_domain_is_prime_subgroup(const rct::key &check_key);
+/**
+* brief: mx25519_privkey_is_canonical - check that an X25519 privkey is canonical
+*   2^255 > xkey >= 8 (i.e. last bit and first three bits not set)
+* result: true if input key is canonical
+*/
+bool mx25519_privkey_is_canonical(const mx25519_privkey &test_privkey);
 
 } //namespace sp

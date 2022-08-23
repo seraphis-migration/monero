@@ -93,6 +93,7 @@ target_link_libraries(seraphis
     device
     epee
     multisig
+    mx25519
     ringct
   PRIVATE
     ${EXTRA_LIBRARIES})
@@ -101,4 +102,5 @@ target_include_directories(seraphis
   PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}"
   PRIVATE
-    ${Boost_INCLUDE_DIRS})
+    ${Boost_INCLUDE_DIRS}
+    ${MX25519_INCLUDE})

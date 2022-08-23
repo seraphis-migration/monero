@@ -123,4 +123,13 @@ void sp_derive_secret(const unsigned char *derivation_key, const DataSource &dat
     hash_base(derivation_key, data_source, hash_out, 32);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void sp_derive_x25519_key(const unsigned char *derivation_key, const DataSource &data_source, unsigned char *hash_out)
+{
+    // H_n_x25519[k](x): canonical X25519 group scalar output (32 bytes)
+    // - bits 0, 1, 2, 255 set to zero
+    hash_base(derivation_key, data_source, hash_out, 32);
+    hash_out[0] &= 255 - 7;
+    hash_out[31] &= 127;
+}
+//-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

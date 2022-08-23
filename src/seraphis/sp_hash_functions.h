@@ -119,5 +119,7 @@ void sp_hash_to_scalar(const DataSource &data_source, unsigned char *hash_out);
 void sp_derive_key(const unsigned char *derivation_key, const DataSource &data_source, unsigned char *hash_out);
 /// H_32[k](x): 32-byte output; 32-byte key
 void sp_derive_secret(const unsigned char *derivation_key, const DataSource &data_source, unsigned char *hash_out);
+/// H_n_x25519[k](x): canonical X25519 group scalar output (32 bytes); 32-byte key
+void sp_derive_x25519_key(const unsigned char *derivation_key, const DataSource &data_source, unsigned char *hash_out);
 
 } //namespace sp
