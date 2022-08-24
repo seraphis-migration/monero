@@ -250,8 +250,8 @@ bool key_domain_is_prime_subgroup(const rct::key &check_key)
 bool mx25519_privkey_is_canonical(const mx25519_privkey &test_privkey)
 {
     //todo: is this constant time?
-    return (test_privkey.v[0] & 7) == 0 &&
-        (test_privkey.v[31] & 128) == 0;
+    return (test_privkey.data[0] & 7) == 0 &&
+        (test_privkey.data[31] & 128) == 0;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

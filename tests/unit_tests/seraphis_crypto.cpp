@@ -254,12 +254,12 @@ TEST(seraphis_crypto, mx25519_sample_tests)
     // 1. mx25519 private keys are byte buffers like rct::key
     mx25519_privkey test1;
     const rct::key testrct{rct::skGen()};
-    memcpy(test1.v, testrct.bytes, 32);
-    ASSERT_TRUE(memcmp(test1.v, testrct.bytes, 32) == 0);
+    memcpy(test1.data, testrct.bytes, 32);
+    ASSERT_TRUE(memcmp(test1.data, testrct.bytes, 32) == 0);
 
     // 2. x * G == x * G
     mx25519_privkey test2_privkey;
-    crypto::rand(32, test2_privkey.v);
+    crypto::rand(32, test2_privkey.data);
 
     mx25519_pubkey test2_key_port1;
     mx25519_pubkey test2_key_port2;
@@ -271,8 +271,8 @@ TEST(seraphis_crypto, mx25519_sample_tests)
 
     const mx25519_pubkey generator_G{crypto::get_x25519_G()};
 
-    mx25519_scmul(mx25519_select_impl(mx25519_type::MX25519_TYPE_PORTABLE), &test2_key_port2, &test2_privkey, &generator_G);
-    mx25519_scmul(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &test2_key_auto2, &test2_privkey, &generator_G);
+    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_PORTABLE), &test2_key_port2, &test2_privkey, &generator_G);
+    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &test2_key_auto2, &test2_privkey, &generator_G);
 
     ASSERT_TRUE(memcmp(&test2_key_port1, &test2_key_auto1, 32) == 0);
     ASSERT_TRUE(memcmp(&test2_key_port1, &test2_key_port2, 32) == 0);
@@ -285,7 +285,7 @@ TEST(seraphis_crypto, mx25519_sample_tests)
         const rct::key test3_derivation_key{rct::skGen()};
         std::string test3_data{};
 
-        sp::sp_derive_x25519_key(test3_derivation_key.bytes, test3_data, test3_privkey.v);
+        sp::sp_derive_x25519_key(test3_derivation_key.bytes, test3_data, test3_privkey.data);
         ASSERT_TRUE(sp::mx25519_privkey_is_canonical(test3_privkey));
     }
 }
