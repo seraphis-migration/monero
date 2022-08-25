@@ -108,7 +108,7 @@ x25519_pubkey x25519_pubkey_gen()
 {
     const x25519_secret_key privkey{x25519_privkey_gen()};
     x25519_pubkey pubkey;
-    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &pubkey, &privkey);
+    x25519_scmul_base(privkey, pubkey);
 
     return pubkey;
 }
@@ -118,6 +118,18 @@ bool x25519_privkey_is_canonical(const x25519_privkey &test_privkey)
     //todo: is this constant time?
     return (test_privkey.data[0] & 7) == 0 &&
         (test_privkey.data[31] & 128) == 0;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void x25519_scmul_base(const x25519_privkey &privkey, x25519_pubkey &result_out)
+{
+    static const mx25519_impl* impl{mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO)};
+    mx25519_scmul_base(impl, &result_out, &privkey);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void x25519_scmul_key(const x25519_privkey &privkey, const x25519_pubkey &pubkey, x25519_pubkey &result_out)
+{
+    static const mx25519_impl* impl{mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO)};
+    mx25519_scmul_key(impl, &result_out, &privkey, &pubkey);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void x25519_invmul_key(std::vector<x25519_secret_key> privkeys_to_invert,
@@ -132,17 +144,11 @@ void x25519_invmul_key(std::vector<x25519_secret_key> privkeys_to_invert,
     while (mx25519_invkey(&inverted_xkey, privkeys_to_invert.data(), privkeys_to_invert.size()) != 0)
     {
         privkeys_to_invert.emplace_back(X25519_EIGHT);  //add 8 to keys to invert
-        mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-            &result_out,
-            &X25519_EIGHT,
-            &result_out);  //xK = 8 * xK
+        x25519_scmul_key(X25519_EIGHT, result_out, result_out);  //xK = 8 * xK
     }
 
     // 2. (1/([8*8*...*8] * {privkey1 * privkey2 * ...})) * [8*8*...*8] * xK
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &result_out,
-        &inverted_xkey,
-        &result_out);
+    x25519_scmul_key(inverted_xkey, result_out, result_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key invert(const rct::key &x)

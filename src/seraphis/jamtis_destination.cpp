@@ -32,10 +32,6 @@
 #include "jamtis_destination.h"
 
 //local headers
-extern "C"
-{
-#include "mx25519.h"
-}
 #include "crypto/crypto.h"
 #include "jamtis_address_tag_utils.h"
 #include "jamtis_address_utils.h"
@@ -79,16 +75,10 @@ void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
     x25519_secret_key address_privkey;
     make_jamtis_address_privkey(s_generate_address, j, address_privkey);  //xk^j_a
 
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &destination_out.m_addr_K2,
-        &address_privkey,
-        &findreceived_pubkey);
+    x25519_scmul_key(address_privkey, findreceived_pubkey, destination_out.m_addr_K2);
 
     // xK_3 = xk^j_a xK_ua
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &destination_out.m_addr_K3,
-        &address_privkey,
-        &unlockamounts_pubkey);
+    x25519_scmul_key(address_privkey, unlockamounts_pubkey, destination_out.m_addr_K3);
 
     // addr_tag = blowfish[s_ct](j, mac)
     crypto::secret_key ciphertag_secret;

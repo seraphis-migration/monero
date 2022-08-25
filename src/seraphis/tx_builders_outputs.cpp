@@ -32,10 +32,6 @@
 #include "tx_builders_outputs.h"
 
 //local headers
-extern "C"
-{
-#include "mx25519.h"
-}
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
 #include "seraphis/tx_extra.h"
@@ -154,10 +150,7 @@ static void make_additional_output_special_self_send_v1(const jamtis::JamtisSelf
     jamtis::make_jamtis_findreceived_key(k_view_balance, findreceived_xkey);
 
     x25519_pubkey special_addr_K2;
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &special_addr_K2,
-        &findreceived_xkey,
-        &enote_ephemeral_pubkey);  //xk_fr * xK_e_other
+    x25519_scmul_key(findreceived_xkey, enote_ephemeral_pubkey, special_addr_K2);  //xk_fr * xK_e_other
 
     selfsend_proposal_out.m_destination = destination;
     x25519_invmul_key({x25519_eight()},

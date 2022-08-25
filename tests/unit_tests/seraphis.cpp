@@ -30,7 +30,6 @@
 extern "C"
 {
 #include "crypto/crypto-ops.h"
-#include "mx25519.h"
 }
 #include "device/device.hpp"
 #include "misc_language.h"

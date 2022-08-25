@@ -32,10 +32,6 @@
 #include "jamtis_core_utils.h"
 
 //local headers
-extern "C"
-{
-#include "mx25519.h"
-}
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
 #include "ringct/rctOps.h"
@@ -99,11 +95,8 @@ void make_jamtis_mock_keys(jamtis_mock_keys &keys_out)
     make_jamtis_generateaddress_secret(keys_out.k_vb, keys_out.s_ga);
     make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
     make_seraphis_spendkey(keys_out.k_vb, keys_out.k_m, keys_out.K_1_base);
-    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &keys_out.xK_ua, &keys_out.xk_ua);
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &keys_out.xK_fr,
-        &keys_out.xk_fr,
-        &keys_out.xK_ua);
+    x25519_scmul_base(keys_out.xk_ua, keys_out.xK_ua);
+    x25519_scmul_key(keys_out.xk_fr, keys_out.xK_ua, keys_out.xK_fr);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

@@ -26,10 +26,6 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-extern "C"
-{
-#include "mx25519.h"
-}
 #include "crypto/crypto.h"
 #include "crypto/generators.h"
 #include "multisig/account_generator_era.h"
@@ -93,11 +89,8 @@ static void make_multisig_jamtis_mock_keys(const multisig::multisig_account &acc
     make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
     keys_out.K_1_base = rct::pk2rct(account.get_multisig_pubkey());
     extend_seraphis_spendkey(keys_out.k_vb, keys_out.K_1_base);
-    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &keys_out.xK_ua, &keys_out.xk_ua);
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &keys_out.xK_fr,
-        &keys_out.xk_fr,
-        &keys_out.xK_ua);
+    x25519_scmul_base(keys_out.xk_ua, keys_out.xK_ua);
+    x25519_scmul_key(keys_out.xk_fr, keys_out.xK_ua, keys_out.xK_fr);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------

@@ -36,7 +36,6 @@
 extern "C"
 {
 #include "crypto/crypto-ops.h"
-#include "mx25519.h"
 }
 #include "cryptonote_config.h"
 #include "seraphis_config_temp.h"
@@ -79,7 +78,7 @@ static auto make_derivation_with_wiper(const x25519_secret_key &privkey,
             }
         );
 
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &derivation_out, &privkey, &DH_key);
+    x25519_scmul_key(privkey, DH_key, derivation_out);
 
     return a_wiper;
 }
@@ -134,10 +133,7 @@ void make_jamtis_enote_ephemeral_pubkey(const x25519_secret_key &enote_ephemeral
     x25519_pubkey &enote_ephemeral_pubkey_out)
 {
     // xK_e = xr xK_3
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &enote_ephemeral_pubkey_out,
-        &enote_ephemeral_privkey,
-        &DH_base);
+    x25519_scmul_key(enote_ephemeral_privkey, DH_base, enote_ephemeral_pubkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_view_tag(const x25519_pubkey &sender_receiver_DH_derivation,
@@ -298,7 +294,7 @@ void make_jamtis_amount_baked_key_plain_sender(const x25519_secret_key &enote_ep
     x25519_pubkey &baked_key_out)
 {
     // xr xG
-    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &baked_key_out, &enote_ephemeral_privkey);
+    x25519_scmul_base(enote_ephemeral_privkey, baked_key_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_amount_baked_key_plain_recipient(const x25519_secret_key &address_privkey,

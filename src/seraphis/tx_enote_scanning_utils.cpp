@@ -32,10 +32,6 @@
 #include "tx_enote_scanning_utils.h"
 
 //local headers
-extern "C"
-{
-#include "mx25519.h"
-}
 #include "crypto/crypto.h"
 #include "cryptonote_basic/subaddress_index.h"
 #include "device/device.hpp"
@@ -331,10 +327,9 @@ bool try_find_sp_enotes_in_tx(const x25519_secret_key &xk_find_received,
         if (enote_index < tx_supplement.m_output_enote_ephemeral_pubkeys.size())
         {
             ephemeral_pubkey_index = enote_index;
-            mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-                &temp_DH_derivation,
-                &xk_find_received,
-                &(tx_supplement.m_output_enote_ephemeral_pubkeys[ephemeral_pubkey_index]));
+            x25519_scmul_key(xk_find_received,
+                tx_supplement.m_output_enote_ephemeral_pubkeys[ephemeral_pubkey_index],
+                temp_DH_derivation);
         }
 
         // find-receive scan the enote (in try block in case enote is malformed)

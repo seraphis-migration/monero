@@ -57,11 +57,22 @@ namespace sp
 {
 
 /// wrap x25519 implementation so MAKE_HASHABLE() macros work properly
-struct x25519_pubkey : public mx25519_pubkey {};
-struct x25519_privkey : public  mx25519_privkey {};
+struct x25519_pubkey : public mx25519_pubkey
+{
+    x25519_pubkey() = default;
+    x25519_pubkey(const mx25519_pubkey &other) { memcpy(data, other.data, 32); }
+    x25519_pubkey& operator=(const mx25519_pubkey &other) { *this = x25519_pubkey{other}; return *this; }
+};
+struct x25519_privkey : public  mx25519_privkey
+{
+    x25519_privkey() = default;
+    x25519_privkey(const mx25519_privkey &other) { memcpy(data, other.data, 32); }
+    x25519_privkey& operator=(const mx25519_privkey &other) { *this = x25519_privkey{other}; return *this; }
+};
 struct x25519_secret_key : public epee::mlocked<tools::scrubbed<x25519_privkey>> {};
 
 }
+
 /// upgrade x25519 keys
 CRYPTO_MAKE_HASHABLE(sp, x25519_pubkey)
 CRYPTO_MAKE_HASHABLE_CONSTANT_TIME(sp, x25519_privkey)
@@ -118,8 +129,20 @@ x25519_pubkey x25519_pubkey_gen();
 */
 bool x25519_privkey_is_canonical(const x25519_privkey &test_privkey);
 /**
+* brief: x25519_scmul_base - compute privkey * xG
+* param: privkey - scalar to multiply
+* result: privkey * xG
+*/
+void x25519_scmul_base(const x25519_privkey &privkey, x25519_pubkey &result_out);
+/**
+* brief: x25519_scmul_key - compute privkey * pubkey
+* param: privkey - scalar to multiply
+* param: pubkey - public key to multiple against
+* result: privkey * pubkey
+*/
+void x25519_scmul_key(const x25519_privkey &privkey, const x25519_pubkey &pubkey, x25519_pubkey &result_out);
+/**
 * brief: x25519_invmul_key - compute (1/({privkey1 * privkey2 * ...})) * initial_pubkey
-*   - this is a no-fail wrapper around mx25519_invkey()
 * param: privkeys_to_invert - {privkey1, privkey2, ...}
 * param: initial_pubkey - base key for inversion
 * result: (1/({privkey1 * privkey2 * ...})) * initial_pubkey

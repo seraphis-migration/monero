@@ -30,7 +30,6 @@
 extern "C"
 {
 #include "crypto/crypto-ops.h"
-#include "mx25519.h"
 }
 #include "crypto/generators.h"
 #include "device/device.hpp"
@@ -249,30 +248,30 @@ TEST(seraphis_crypto, multiexp_utility)
     ASSERT_TRUE(result == rct::pippenger(rct_builder10));
 }
 //-------------------------------------------------------------------------------------------------------------------
-TEST(seraphis_crypto, mx25519_sample_tests)
+TEST(seraphis_crypto, x25519_sample_tests)
 {
-    // 1. mx25519 private keys are byte buffers like rct::key
-    mx25519_privkey test1;
+    // 1. x25519 private keys are byte buffers like rct::key
+    sp::x25519_privkey test1;
     const rct::key testrct{rct::skGen()};
     memcpy(test1.data, testrct.bytes, 32);
     ASSERT_TRUE(memcmp(test1.data, testrct.bytes, 32) == 0);
 
     // 2. x * G == x * G
-    mx25519_privkey test2_privkey;
+    sp::x25519_privkey test2_privkey;
     crypto::rand(32, test2_privkey.data);
 
-    mx25519_pubkey test2_key_port1;
-    mx25519_pubkey test2_key_port2;
-    mx25519_pubkey test2_key_auto1;
-    mx25519_pubkey test2_key_auto2;
+    sp::x25519_pubkey test2_key_port1;
+    sp::x25519_pubkey test2_key_port2;
+    sp::x25519_pubkey test2_key_auto1;
+    sp::x25519_pubkey test2_key_auto2;
 
-    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_PORTABLE), &test2_key_port1, &test2_privkey);
-    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &test2_key_auto1, &test2_privkey);
+    sp::x25519_scmul_base(test2_privkey, test2_key_port1);
+    sp::x25519_scmul_base(test2_privkey, test2_key_auto1);
 
-    const mx25519_pubkey generator_G{crypto::get_x25519_G()};
+    const sp::x25519_pubkey generator_G{crypto::get_x25519_G()};
 
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_PORTABLE), &test2_key_port2, &test2_privkey, &generator_G);
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &test2_key_auto2, &test2_privkey, &generator_G);
+    sp::x25519_scmul_key(test2_privkey, generator_G, test2_key_port2);
+    sp::x25519_scmul_key(test2_privkey, generator_G, test2_key_auto2);
 
     ASSERT_TRUE(memcmp(&test2_key_port1, &test2_key_auto1, 32) == 0);
     ASSERT_TRUE(memcmp(&test2_key_port1, &test2_key_port2, 32) == 0);

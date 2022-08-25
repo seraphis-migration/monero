@@ -36,7 +36,6 @@
 extern "C"
 {
 #include "crypto/crypto-ops.h"
-#include "mx25519.h"
 }
 #include "device/device.hpp"
 #include "jamtis_address_tag_utils.h"
@@ -130,10 +129,7 @@ static bool try_get_basic_record_info_v1_helper(const SpEnoteV1 &enote,
 {
     // xK_d = xk_fr * xK_e
     x25519_pubkey derivation;
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &derivation,
-        &xk_find_received,
-        &enote_ephemeral_pubkey);
+    x25519_scmul_key(xk_find_received, enote_ephemeral_pubkey, derivation);
 
     return try_get_basic_record_info_v1_helper(enote,
         enote_ephemeral_pubkey,
@@ -159,10 +155,7 @@ static bool try_handle_basic_record_info_v1_helper(const SpEnoteV1 &enote,
 
     // xK_d = xk_fr * xK_e
     x25519_pubkey derivation;
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &derivation,
-        &xk_find_received,
-        &enote_ephemeral_pubkey);
+    x25519_scmul_key(xk_find_received, enote_ephemeral_pubkey, derivation);
 
     // q' (jamtis plain variants)
     return jamtis::try_get_jamtis_sender_receiver_secret_plain(derivation,
@@ -363,10 +356,7 @@ bool try_get_basic_enote_record_v1(const SpEnoteV1 &enote,
 
     // sender-receiver DH derivation
     x25519_pubkey derivation;
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &derivation,
-        &xk_find_received,
-        &enote_ephemeral_pubkey);
+    x25519_scmul_key(xk_find_received, enote_ephemeral_pubkey, derivation);
 
     return try_get_basic_enote_record_v1(enote, enote_ephemeral_pubkey, input_context, derivation, basic_record_out);
 }

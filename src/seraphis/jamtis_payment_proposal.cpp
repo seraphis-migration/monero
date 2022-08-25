@@ -32,10 +32,6 @@
 #include "jamtis_payment_proposal.h"
 
 //local headers
-extern "C"
-{
-#include "mx25519.h"
-}
 #include "crypto/crypto.h"
 #include "jamtis_address_tag_utils.h"
 #include "jamtis_address_utils.h"
@@ -93,10 +89,7 @@ void JamtisPaymentProposalV1::get_output_proposal_v1(const rct::key &input_conte
     x25519_pubkey xK_d;
     auto xKd_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&xK_d, sizeof(xK_d)); });
 
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &xK_d,
-        &m_enote_ephemeral_privkey,
-        &m_destination.m_addr_K2);
+    x25519_scmul_key(m_enote_ephemeral_privkey, m_destination.m_addr_K2, xK_d);
 
     // 4. sender-receiver shared secret: q = H_32(xK_d, xK_e, input_context)
     rct::key q;
@@ -232,10 +225,7 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
 
     // 10. derived key: xK_d = xr * xK_2
     x25519_pubkey xK_d;
-    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
-        &xK_d,
-        &m_enote_ephemeral_privkey,
-        &m_destination.m_addr_K2);
+    x25519_scmul_key(m_enote_ephemeral_privkey, m_destination.m_addr_K2, xK_d);
 
     // 11. view tag: view_tag = H_1(xK_d, Ko)
     make_jamtis_view_tag(xK_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
