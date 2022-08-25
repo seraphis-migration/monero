@@ -40,6 +40,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
 #include "sp_composition_proof.h"
+#include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_extra.h"
@@ -64,7 +65,7 @@ struct SpMultisigPublicInputProposalV1 final
     /// enote to spend
     SpEnoteV1 m_enote;
     /// the enote's ephemeral pubkey
-    rct::key m_enote_ephemeral_pubkey;
+    x25519_pubkey m_enote_ephemeral_pubkey;
     /// the enote's input context
     rct::key m_input_context;
 

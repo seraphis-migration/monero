@@ -59,5 +59,4 @@ ge_p3 get_generator_at_index_p3(const std::size_t generator_index);
 ge_cached get_generator_at_index_cached(const std::size_t generator_index);
 
 } //namespace generator_factory
-
 } //namespace sp

@@ -420,7 +420,7 @@ void check_v1_multisig_public_input_proposal_semantics_v1(const SpMultisigPublic
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,

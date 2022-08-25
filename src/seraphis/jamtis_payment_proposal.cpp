@@ -32,6 +32,10 @@
 #include "jamtis_payment_proposal.h"
 
 //local headers
+extern "C"
+{
+#include "mx25519.h"
+}
 #include "crypto/crypto.h"
 #include "jamtis_address_tag_utils.h"
 #include "jamtis_address_utils.h"
@@ -43,6 +47,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
 #include "tx_enote_record_types.h"
 #include "tx_enote_record_utils.h"
@@ -60,73 +65,77 @@ namespace sp
 namespace jamtis
 {
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisPaymentProposalV1::get_enote_ephemeral_pubkey(rct::key &enote_ephemeral_pubkey_out) const
+void JamtisPaymentProposalV1::get_enote_ephemeral_pubkey(x25519_pubkey &enote_ephemeral_pubkey_out) const
 {
     // sanity checks
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(m_enote_ephemeral_privkey)),
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(m_enote_ephemeral_privkey.data),
         "jamtis payment proposal: invalid enote ephemeral privkey (zero).");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(m_enote_ephemeral_privkey)) == 0,
+    CHECK_AND_ASSERT_THROW_MES(x25519_privkey_is_canonical(m_enote_ephemeral_privkey),
         "jamtis payment proposal: invalid enote ephemeral privkey (not canonical).");
 
-    // enote ephemeral pubkey: K_e = r K_3
+    // enote ephemeral pubkey: xK_e = xr xK_3
     make_jamtis_enote_ephemeral_pubkey(m_enote_ephemeral_privkey, m_destination.m_addr_K3, enote_ephemeral_pubkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void JamtisPaymentProposalV1::get_output_proposal_v1(const rct::key &input_context,
     SpOutputProposalV1 &output_proposal_out) const
 {
-    // sanity checks
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(m_enote_ephemeral_privkey)),
+    // 1. sanity checks
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(m_enote_ephemeral_privkey.data),
         "jamtis payment proposal: invalid enote ephemeral privkey (zero).");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(m_enote_ephemeral_privkey)) == 0,
+    CHECK_AND_ASSERT_THROW_MES(x25519_privkey_is_canonical(m_enote_ephemeral_privkey),
         "jamtis payment proposal: invalid enote ephemeral privkey (not canonical).");
 
-    // enote ephemeral pubkey: K_e = r K_3
+    // 2. enote ephemeral pubkey: xK_e = xr xK_3
     this->get_enote_ephemeral_pubkey(output_proposal_out.m_enote_ephemeral_pubkey);
 
-    // derived key: K_d = 8*r*K_2
-    crypto::key_derivation K_d;
-    auto Kd_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&K_d, sizeof(K_d)); });
-    crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
+    // 3. derived key: xK_d = xr * xK_2
+    x25519_pubkey xK_d;
+    auto xKd_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&xK_d, sizeof(xK_d)); });
 
-    // sender-receiver shared secret: q = H_32(K_d, K_e, input_context)
+    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
+        &xK_d,
+        &m_enote_ephemeral_privkey,
+        &m_destination.m_addr_K2);
+
+    // 4. sender-receiver shared secret: q = H_32(xK_d, xK_e, input_context)
     rct::key q;
     auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
-    make_jamtis_sender_receiver_secret_plain(K_d, output_proposal_out.m_enote_ephemeral_pubkey, input_context, q);
+    make_jamtis_sender_receiver_secret_plain(xK_d, output_proposal_out.m_enote_ephemeral_pubkey, input_context, q);
 
-    // enote amount baked key: 8 r G
-    crypto::key_derivation amount_baked_key;
-    auto bk_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&amount_baked_key, sizeof(rct::key)); });
+    // 5. enote amount baked key: xr xG
+    x25519_pubkey amount_baked_key;
+    auto bk_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&amount_baked_key, sizeof(x25519_pubkey)); });
     make_jamtis_amount_baked_key_plain_sender(m_enote_ephemeral_privkey, amount_baked_key);
 
-    // amount blinding factor: y = H_n(q, 8 r G)
+    // 6. amount blinding factor: y = H_n(q, xr xG)
     make_jamtis_amount_blinding_factor_plain(q, amount_baked_key, output_proposal_out.m_core.m_amount_blinding_factor);
 
-    // amount: a
+    // 7. amount: a
     output_proposal_out.m_core.m_amount = m_amount;
 
-    // encrypted amount: enc_amount = a ^ H_8(q, 8 r G)
+    // 8. encrypted amount: enc_amount = a ^ H_8(q, xr xG)
     output_proposal_out.m_encoded_amount = encode_jamtis_amount_plain(m_amount, q, amount_baked_key);
 
-    // amount commitment (temporary)
+    // 9. amount commitment (temporary)
     const rct::key temp_amount_commitment{
             rct::commit(m_amount, rct::sk2rct(output_proposal_out.m_core.m_amount_blinding_factor))
         };
 
-    // onetime address: Ko = H_n(q, C) X + K_1
+    // 10. onetime address: Ko = H_n(q, C) X + K_1
     make_jamtis_onetime_address(q,
         temp_amount_commitment,
         m_destination.m_addr_K1,
         output_proposal_out.m_core.m_onetime_address);
 
-    // encrypt address tag: addr_tag_enc = addr_tag(cipher(j || mac)) ^ H(q, Ko)
+    // 11. encrypt address tag: addr_tag_enc = addr_tag(cipher(j || mac)) ^ H(q, Ko)
     output_proposal_out.m_addr_tag_enc =
         encrypt_address_tag(q, output_proposal_out.m_core.m_onetime_address, m_destination.m_addr_tag);
 
-    // view tag: view_tag = H_1(K_d, Ko)
-    make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
+    // 12. view tag: view_tag = H_1(xK_d, Ko)
+    make_jamtis_view_tag(xK_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
 
-    // memo elements
+    // 13. memo elements
     output_proposal_out.m_partial_memo = m_partial_memo;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -134,7 +143,7 @@ void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount, const std::size_
 {
     m_destination.gen();
     m_amount = amount;
-    m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+    m_enote_ephemeral_privkey = x25519_privkey_gen();
 
     std::vector<ExtraFieldElement> memo_elements;
     memo_elements.resize(num_random_memo_elements);
@@ -143,15 +152,15 @@ void JamtisPaymentProposalV1::gen(const rct::xmr_amount amount, const std::size_
     make_tx_extra(std::move(memo_elements), m_partial_memo);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void JamtisPaymentProposalSelfSendV1::get_enote_ephemeral_pubkey(rct::key &enote_ephemeral_pubkey_out) const
+void JamtisPaymentProposalSelfSendV1::get_enote_ephemeral_pubkey(x25519_pubkey &enote_ephemeral_pubkey_out) const
 {
     // sanity checks
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(m_enote_ephemeral_privkey)),
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(m_enote_ephemeral_privkey.data),
         "jamtis payment proposal self-send: invalid enote ephemeral privkey (zero).");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(m_enote_ephemeral_privkey)) == 0,
+    CHECK_AND_ASSERT_THROW_MES(x25519_privkey_is_canonical(m_enote_ephemeral_privkey),
         "jamtis payment proposal self-send: invalid enote ephemeral privkey (not canonical).");
 
-    // enote ephemeral pubkey: K_e = r K_3
+    // enote ephemeral pubkey: xK_e = xr xK_3
     make_jamtis_enote_ephemeral_pubkey(m_enote_ephemeral_privkey, m_destination.m_addr_K3, enote_ephemeral_pubkey_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -159,10 +168,10 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
     const rct::key &input_context,
     SpOutputProposalV1 &output_proposal_out) const
 {
-    // sanity checks
-    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(m_enote_ephemeral_privkey)),
+    // 1. sanity checks
+    CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(m_enote_ephemeral_privkey.data),
         "jamtis payment proposal self-send: invalid enote ephemeral privkey (zero).");
-    CHECK_AND_ASSERT_THROW_MES(sc_check(to_bytes(m_enote_ephemeral_privkey)) == 0,
+    CHECK_AND_ASSERT_THROW_MES(x25519_privkey_is_canonical(m_enote_ephemeral_privkey),
         "jamtis payment proposal self-send: invalid enote ephemeral privkey (not canonical).");
     CHECK_AND_ASSERT_THROW_MES(sc_isnonzero(to_bytes(viewbalance_privkey)),
         "jamtis payment proposal self-send: invalid view-balance privkey (zero).");
@@ -171,10 +180,10 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
     CHECK_AND_ASSERT_THROW_MES(m_type <= JamtisSelfSendType::MAX,
         "jamtis payment proposal self-send: unknown self-send type.");
 
-    // enote ephemeral pubkey: K_e = r K_3
+    // 2. enote ephemeral pubkey: xK_e = xr xK_3
     this->get_enote_ephemeral_pubkey(output_proposal_out.m_enote_ephemeral_pubkey);
 
-    // sender-receiver shared secret: q = H_32[k_vb](K_e, input_context)  //note: K_e not K_d
+    // 3. sender-receiver shared secret: q = H_32[k_vb](xK_e, input_context)  //note: xK_e not xK_d
     rct::key q;
     auto q_wiper = epee::misc_utils::create_scope_leave_handler([&]{ memwipe(&q, sizeof(q)); });
     make_jamtis_sender_receiver_secret_selfsend(viewbalance_privkey,
@@ -183,29 +192,29 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
         m_type,
         q);
 
-    // amount blinding factor: y = H_n(q)  //note: no baked key
+    // 4. amount blinding factor: y = H_n(q)  //note: no baked key
     make_jamtis_amount_blinding_factor_selfsend(q, output_proposal_out.m_core.m_amount_blinding_factor);
 
-    // amount: a
+    // 5. amount: a
     output_proposal_out.m_core.m_amount = m_amount;
 
-    // encrypted amount: enc_amount = a ^ H_8(q)  //note: no baked key
+    // 6. encrypted amount: enc_amount = a ^ H_8(q)  //note: no baked key
     output_proposal_out.m_encoded_amount = encode_jamtis_amount_selfsend(m_amount, q);
 
-    // amount commitment (temporary)
+    // 7. amount commitment (temporary)
     const rct::key temp_amount_commitment{
             rct::commit(m_amount, rct::sk2rct(output_proposal_out.m_core.m_amount_blinding_factor))
         };
 
-    // onetime address: Ko = H_n(q, C) X + K_1
+    // 8. onetime address: Ko = H_n(q, C) X + K_1
     make_jamtis_onetime_address(q,
         temp_amount_commitment,
         m_destination.m_addr_K1,
         output_proposal_out.m_core.m_onetime_address);
 
-    // encrypt address index: addr_tag_enc = addr_tag(j, mac) ^ H(q, Ko)
+    // 9. encrypt address index: addr_tag_enc = addr_tag(j, mac) ^ H(q, Ko)
 
-    // 1. extract the address index from the destination address's address tag
+    // a. extract the address index from the destination address's address tag
     crypto::secret_key generateaddress_secret;
     crypto::secret_key ciphertag_secret;
     make_jamtis_generateaddress_secret(viewbalance_privkey, generateaddress_secret);
@@ -214,21 +223,24 @@ void JamtisPaymentProposalSelfSendV1::get_output_proposal_v1(const crypto::secre
     CHECK_AND_ASSERT_THROW_MES(try_decipher_address_index(rct::sk2rct(ciphertag_secret), m_destination.m_addr_tag, j),
         "Failed to create a self-send-type output proposal: could not decipher the destination's address tag.");
 
-    // 2. make a raw address tag (not ciphered)
+    // b. make a raw address tag (not ciphered)
     const address_tag_t raw_address_tag{j};
 
-    // 3. encrypt the raw address tag: addr_tag_enc = addr_tag(j || mac) ^ H(q, Ko)
+    // c. encrypt the raw address tag: addr_tag_enc = addr_tag(j || mac) ^ H(q, Ko)
     output_proposal_out.m_addr_tag_enc =
         encrypt_address_tag(q, output_proposal_out.m_core.m_onetime_address, raw_address_tag);
 
-    // derived key: K_d = 8*r*K_2
-    crypto::key_derivation K_d;
-    crypto::generate_key_derivation(rct::rct2pk(m_destination.m_addr_K2), m_enote_ephemeral_privkey, K_d);
+    // 10. derived key: xK_d = xr * xK_2
+    x25519_pubkey xK_d;
+    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
+        &xK_d,
+        &m_enote_ephemeral_privkey,
+        &m_destination.m_addr_K2);
 
-    // view tag: view_tag = H_1(K_d, Ko)
-    make_jamtis_view_tag(K_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
+    // 11. view tag: view_tag = H_1(xK_d, Ko)
+    make_jamtis_view_tag(xK_d, output_proposal_out.m_core.m_onetime_address, output_proposal_out.m_view_tag);
 
-    // memo elements
+    // 12. memo elements
     output_proposal_out.m_partial_memo = m_partial_memo;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -239,7 +251,7 @@ void JamtisPaymentProposalSelfSendV1::gen(const rct::xmr_amount amount,
     m_destination.gen();
     m_amount = amount;
     m_type = type;
-    m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+    m_enote_ephemeral_privkey = x25519_privkey_gen();
 
     std::vector<ExtraFieldElement> memo_elements;
     memo_elements.resize(num_random_memo_elements);
@@ -253,15 +265,15 @@ void check_jamtis_payment_proposal_selfsend_semantics_v1(const JamtisPaymentProp
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance)
 {
-    // convert to an output proposal
+    // 1. convert to an output proposal
     SpOutputProposalV1 output_proposal;
     selfsend_payment_proposal.get_output_proposal_v1(k_view_balance, input_context, output_proposal);
 
-    // extract enote from output proposal
+    // 2. extract enote from output proposal
     SpEnoteV1 temp_enote;
     output_proposal.get_enote_v1(temp_enote);
 
-    // try to get an enote record from the enote (via selfsend path)
+    // 3. try to get an enote record from the enote (via selfsend path)
     SpEnoteRecordV1 temp_enote_record;
 
     CHECK_AND_ASSERT_THROW_MES(try_get_enote_record_v1_selfsend(temp_enote,
@@ -272,7 +284,7 @@ void check_jamtis_payment_proposal_selfsend_semantics_v1(const JamtisPaymentProp
             temp_enote_record),
         "semantics check jamtis self-send payment proposal: failed to extract enote record from the proposal.");
 
-    // convert to a self-send type
+    // 4. convert to a self-send type
     JamtisSelfSendType dummy_type;
     CHECK_AND_ASSERT_THROW_MES(try_get_jamtis_self_send_type(temp_enote_record.m_type, dummy_type),
         "semantics check jamtis self-send payment proposal: failed to convert enote type to self-send type (bug).");

@@ -37,6 +37,7 @@
 #include "crypto/crypto.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 
 //third party headers
 
@@ -56,12 +57,12 @@ namespace jamtis
 ///
 struct JamtisDestinationV1 final
 {
-    /// K_1 = k^j_x X + K_s  (address spend key)
+    /// K_1 = k^j_x X + K_s    (address spend key)
     rct::key m_addr_K1;
-    /// K_2 = k^j_a K_fr     (address view key)
-    rct::key m_addr_K2;
-    /// K_3 = k^j_a G        (DH base key)
-    rct::key m_addr_K3;
+    /// xK_2 = xk^j_a xK_fr    (address view key)
+    x25519_pubkey m_addr_K2;
+    /// xK_3 = xk^j_a xG       (DH base key)
+    x25519_pubkey m_addr_K3;
     /// addr_tag
     address_tag_t m_addr_tag;
 
@@ -83,15 +84,15 @@ struct JamtisDestinationV1 final
 /**
 * brief: make_jamtis_destination_v1 - make a destination address
 * param: wallet_spend_pubkey - K_s = k_vb X + k_m U
-* param: unlockamounts_pubkey - K_ua = k_ua G
-* param: findreceived_pubkey - K_fr = k_fr k_ua G
+* param: unlockamounts_pubkey - xK_ua = xk_ua xG
+* param: findreceived_pubkey - xK_fr = xk_fr xk_ua xG
 * param: s_generate_address - s_ga
 * param: j - address_index
 * outparam: destination_out - the full address, with address tag
 */
 void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
-    const rct::key &unlockamounts_pubkey,
-    const rct::key &findreceived_pubkey,
+    const x25519_pubkey &unlockamounts_pubkey,
+    const x25519_pubkey &findreceived_pubkey,
     const crypto::secret_key &s_generate_address,
     const address_index_t j,
     JamtisDestinationV1 &destination_out);
@@ -100,16 +101,16 @@ void make_jamtis_destination_v1(const rct::key &wallet_spend_pubkey,
 *    - note: partial-recreation of a destination will return FALSE
 * param: destination - destination address to recreate
 * param: wallet_spend_pubkey - K_s
-* param: unlockamounts_pubkey - K_ua = k_ua G
-* param: findreceived_pubkey - K_fr = k_fr k_ua G
+* param: unlockamounts_pubkey - xK_ua = xk_ua xG
+* param: findreceived_pubkey - xK_fr = xk_fr xk_ua xG
 * param: s_generate_address - s_ga
 * outparam: j_out - address index (if successful)
 * return: true if the destination can be recreated
 */
 bool try_get_jamtis_index_from_destination_v1(const JamtisDestinationV1 &destination,
     const rct::key &wallet_spend_pubkey,
-    const rct::key &unlockamounts_pubkey,
-    const rct::key &findreceived_pubkey,
+    const x25519_pubkey &unlockamounts_pubkey,
+    const x25519_pubkey &findreceived_pubkey,
     const crypto::secret_key &s_generate_address,
     address_index_t &j_out);
 

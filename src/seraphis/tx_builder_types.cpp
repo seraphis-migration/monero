@@ -36,6 +36,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 #include "tx_builders_inputs.h"
 #include "tx_builders_mixed.h"
 #include "tx_builders_outputs.h"
@@ -69,7 +70,7 @@ void SpOutputProposalV1::gen(const rct::xmr_amount amount, const std::size_t num
     // gen base of destination
     m_core.gen(amount);
 
-    m_enote_ephemeral_pubkey = rct::pkGen();
+    m_enote_ephemeral_pubkey = x25519_pubkey_gen();
     m_encoded_amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));
     crypto::rand(sizeof(m_addr_tag_enc), m_addr_tag_enc.bytes);
     m_view_tag = crypto::rand_idx(static_cast<jamtis::view_tag_t>(-1));

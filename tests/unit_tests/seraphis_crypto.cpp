@@ -281,12 +281,12 @@ TEST(seraphis_crypto, mx25519_sample_tests)
     // 3. derive canonical x25519 scalar: H_n_x25519[k](x)
     for (int i{0}; i < 1000; ++i)
     {
-        mx25519_privkey test3_privkey;
+        sp::x25519_privkey test3_privkey;
         const rct::key test3_derivation_key{rct::skGen()};
         std::string test3_data{};
 
         sp::sp_derive_x25519_key(test3_derivation_key.bytes, test3_data, test3_privkey.data);
-        ASSERT_TRUE(sp::mx25519_privkey_is_canonical(test3_privkey));
+        ASSERT_TRUE(sp::x25519_privkey_is_canonical(test3_privkey));
     }
 }
 //-------------------------------------------------------------------------------------------------------------------

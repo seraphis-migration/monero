@@ -40,6 +40,9 @@ extern "C"
 #include "mx25519.h"
 }
 #include "crypto/crypto.h"
+#include "crypto/generic-ops.h"
+#include "memwipe.h"
+#include "mlocker.h"
 #include "ringct/rctTypes.h"
 
 //third party headers
@@ -53,9 +56,19 @@ extern "C"
 namespace sp
 {
 
-/// scalar: -1 mod q
-static const rct::key MINUS_ONE = { {0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9,
-    0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10} };
+/// wrap x25519 implementation so MAKE_HASHABLE() macros work properly
+struct x25519_pubkey : public mx25519_pubkey {};
+struct x25519_privkey : public  mx25519_privkey {};
+struct x25519_secret_key : public epee::mlocked<tools::scrubbed<x25519_privkey>> {};
+
+}
+/// upgrade x25519 keys
+CRYPTO_MAKE_HASHABLE(sp, x25519_pubkey)
+CRYPTO_MAKE_HASHABLE_CONSTANT_TIME(sp, x25519_privkey)
+CRYPTO_MAKE_HASHABLE_CONSTANT_TIME(sp, x25519_secret_key)
+
+namespace sp
+{
 
 /// sortable key (e.g. for hash maps)
 struct sortable_key
@@ -78,6 +91,42 @@ static inline const rct::key& sortable2rct(const sortable_key &sortable)
     return reinterpret_cast<const rct::key&>(sortable);
 }
 
+/**
+* brief: minus_one - -1 mod q
+* return: -1 mod q
+*/
+rct::key minus_one();
+/**
+* brief: x25519_eight - scalar 8
+* return: scalar 8
+*/
+x25519_secret_key x25519_eight();
+/**
+* brief: x25519_privkey_gen - generate a random x25519 privkey
+* return: random canonical x25519 privkey
+*/
+x25519_secret_key x25519_privkey_gen();
+/**
+* brief: x25519_pubkey_gen - generate a random x25519 pubkey
+* return: random x25519 pubkey
+*/
+x25519_pubkey x25519_pubkey_gen();
+/**
+* brief: x25519_privkey_is_canonical - check that an X25519 privkey is canonical
+*   2^255 > xkey >= 8 (i.e. last bit and first three bits not set)
+* result: true if input key is canonical
+*/
+bool x25519_privkey_is_canonical(const x25519_privkey &test_privkey);
+/**
+* brief: x25519_invmul_key - compute (1/({privkey1 * privkey2 * ...})) * initial_pubkey
+*   - this is a no-fail wrapper around mx25519_invkey()
+* param: privkeys_to_invert - {privkey1, privkey2, ...}
+* param: initial_pubkey - base key for inversion
+* result: (1/({privkey1 * privkey2 * ...})) * initial_pubkey
+*/
+void x25519_invmul_key(std::vector<x25519_secret_key> privkeys_to_invert,
+    const x25519_pubkey &initial_pubkey,
+    x25519_pubkey &result_out);
 /**
 * brief: invert - invert a nonzero scalar
 * param: x - scalar to invert
@@ -152,11 +201,5 @@ void mask_key(const crypto::secret_key &mask, const rct::key &key, rct::key &mas
 * result: true if input key is in prime order EC subgroup
 */
 bool key_domain_is_prime_subgroup(const rct::key &check_key);
-/**
-* brief: mx25519_privkey_is_canonical - check that an X25519 privkey is canonical
-*   2^255 > xkey >= 8 (i.e. last bit and first three bits not set)
-* result: true if input key is canonical
-*/
-bool mx25519_privkey_is_canonical(const mx25519_privkey &test_privkey);
 
 } //namespace sp

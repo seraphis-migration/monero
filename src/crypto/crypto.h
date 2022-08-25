@@ -345,9 +345,9 @@ inline const unsigned char* to_bytes(const crypto::ec_scalar &scalar) { return &
 inline unsigned char* to_bytes(crypto::ec_point &point) { return &reinterpret_cast<unsigned char &>(point); }
 inline const unsigned char* to_bytes(const crypto::ec_point &point) { return &reinterpret_cast<const unsigned char &>(point); }
 
-CRYPTO_MAKE_HASHABLE(public_key)
-CRYPTO_MAKE_HASHABLE_CONSTANT_TIME(secret_key)
-CRYPTO_MAKE_HASHABLE_CONSTANT_TIME(public_key_memsafe)
-CRYPTO_MAKE_HASHABLE(key_image)
-CRYPTO_MAKE_COMPARABLE(signature)
-CRYPTO_MAKE_COMPARABLE(view_tag)
+CRYPTO_MAKE_HASHABLE(crypto, public_key)
+CRYPTO_MAKE_HASHABLE_CONSTANT_TIME(crypto, secret_key)
+CRYPTO_MAKE_HASHABLE_CONSTANT_TIME(crypto, public_key_memsafe)
+CRYPTO_MAKE_HASHABLE(crypto, key_image)
+CRYPTO_MAKE_COMPARABLE(crypto, signature)
+CRYPTO_MAKE_COMPARABLE(crypto, view_tag)

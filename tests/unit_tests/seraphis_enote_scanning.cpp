@@ -179,8 +179,8 @@ static void make_random_address_for_user(const sp::jamtis::jamtis_mock_keys &use
     address_index.gen();
 
     ASSERT_NO_THROW(make_jamtis_destination_v1(user_keys.K_1_base,
-        user_keys.K_ua,
-        user_keys.K_fr,
+        user_keys.xK_ua,
+        user_keys.xK_fr,
         user_keys.s_ga,
         address_index,
         user_address_out));
@@ -231,7 +231,7 @@ static void convert_outlay_to_payment_proposal(const rct::xmr_amount outlay_amou
     payment_proposal_out = JamtisPaymentProposalV1{
             .m_destination = destination,
             .m_amount = outlay_amount,
-            .m_enote_ephemeral_privkey = make_secret_key(),
+            .m_enote_ephemeral_privkey = x25519_privkey_gen(),
             .m_partial_memo = partial_memo_for_destination
         };
 }
@@ -306,7 +306,7 @@ static void refresh_user_enote_store(const sp::jamtis::jamtis_mock_keys &user_ke
 {
     using namespace sp;
 
-    const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.k_fr};
+    const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.xk_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
     EnoteStoreUpdaterLedgerMock enote_store_updater{user_keys.K_1_base, user_keys.k_vb, user_enote_store_inout};
 
@@ -321,12 +321,12 @@ static void refresh_user_enote_store_PV(const sp::jamtis::jamtis_mock_keys &user
 {
     using namespace sp;
 
-    const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.k_fr};
+    const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.xk_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
     EnoteStoreUpdaterLedgerMockIntermediate enote_store_updater{
             user_keys.K_1_base,
-            user_keys.k_ua,
-            user_keys.k_fr,
+            user_keys.xk_ua,
+            user_keys.xk_fr,
             user_keys.s_ga,
             user_enote_store_inout
         };
@@ -558,8 +558,8 @@ TEST(seraphis_enote_scanning, trivial_ledger)
     JamtisDestinationV1 user_address;
 
     ASSERT_NO_THROW(make_jamtis_destination_v1(user_keys.K_1_base,
-        user_keys.K_ua,
-        user_keys.K_fr,
+        user_keys.xK_ua,
+        user_keys.xK_fr,
         user_keys.s_ga,
         j,
         user_address));
@@ -572,7 +572,7 @@ TEST(seraphis_enote_scanning, trivial_ledger)
     const JamtisPaymentProposalV1 payment_proposal{
             .m_destination = user_address,
             .m_amount = enote_amount,
-            .m_enote_ephemeral_privkey = make_secret_key(),
+            .m_enote_ephemeral_privkey = x25519_privkey_gen(),
             .m_partial_memo = mock_tx_supplement.m_tx_extra
         };
     SpOutputProposalV1 output_proposal;
@@ -593,7 +593,7 @@ TEST(seraphis_enote_scanning, trivial_ledger)
             .m_max_chunk_size = 1,
             .m_max_partialscan_attempts = 0
         };
-    const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.k_fr};
+    const EnoteFindingContextLedgerMock enote_finding_context{ledger_context, user_keys.xk_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context{enote_finding_context};
     EnoteStoreUpdaterLedgerMock enote_store_updater{user_keys.K_1_base, user_keys.k_vb, user_enote_store};
 
@@ -1933,7 +1933,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning_1)
     //   b. unconfirmed chunk: empty
     //   c. follow-up onchain loop: success on block 0 (range [0, 0) -> DONE)
     // 5. DONE: refresh enote store of A
-    const EnoteFindingContextLedgerMock enote_finding_context_A{ledger_context, user_keys_A.k_fr};
+    const EnoteFindingContextLedgerMock enote_finding_context_A{ledger_context, user_keys_A.xk_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context_A{enote_finding_context_A};
     InvocableTest1 invocable_get_onchain{ledger_context};
     EnoteScanningContextLedgerTEST test_scanning_context_A(enote_scanning_context_A,
@@ -2062,7 +2062,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning_2)
     //   b. unconfirmed chunk: empty
     //   c. follow-up onchain loop: success on block 3 (range [3, 3) -> DONE)
     // 5. DONE: refresh enote store of A
-    const EnoteFindingContextLedgerMock enote_finding_context_A{ledger_context, user_keys_A.k_fr};
+    const EnoteFindingContextLedgerMock enote_finding_context_A{ledger_context, user_keys_A.xk_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context_A{enote_finding_context_A};
     InvocableTest2 invocable_get_onchain{destination_A, {3, 5}, ledger_context};
     EnoteScanningContextLedgerTEST test_scanning_context_A(enote_scanning_context_A,
@@ -2190,7 +2190,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning_3)
     //   b. unconfirmed chunk: empty
     //   c. follow-up onchain loop: success on block 3 (range [3, 3) -> DONE)
     // 5. DONE: refresh enote store of B
-    const EnoteFindingContextLedgerMock enote_finding_context_B{ledger_context, user_keys_B.k_fr};
+    const EnoteFindingContextLedgerMock enote_finding_context_B{ledger_context, user_keys_B.xk_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context_B{enote_finding_context_B};
     InvocableTest3 invocable_get_onchain{destination_B, {3, 5}, ledger_context};
     EnoteScanningContextLedgerTEST test_scanning_context_B(enote_scanning_context_B,
@@ -2307,7 +2307,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning_4)
     //     iii. get onchain chunk: block 2  (inject: pop 1, +1 blocks) (fail: chunk range [2, 2) -> NEED_PARTIALSCAN)
     //   b. skip unconfirmed chunk: (NEED_PARTIALSCAN)
     // 5. ... etc. until partialscan attempts runs out (then throw)
-    const EnoteFindingContextLedgerMock enote_finding_context_B{ledger_context, user_keys_B.k_fr};
+    const EnoteFindingContextLedgerMock enote_finding_context_B{ledger_context, user_keys_B.xk_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context_B{enote_finding_context_B};
     InvocableTest4 invocable_get_onchain{destination_B, 1, ledger_context};
     EnoteScanningContextLedgerTEST test_scanning_context_B(enote_scanning_context_B,
@@ -2417,7 +2417,7 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning_5)
     //     i.   get onchain chunk: block 2  (inject: commit unconfirmed)  (success: chunk range [2, 3])
     //     ii.  get onchain chunk: block 3  (success: chunk range [3, 3) -> DONE)
     // 4. DONE: refresh enote store of B
-    const EnoteFindingContextLedgerMock enote_finding_context_B{ledger_context, user_keys_B.k_fr};
+    const EnoteFindingContextLedgerMock enote_finding_context_B{ledger_context, user_keys_B.xk_fr};
     EnoteScanningContextLedgerSimple enote_scanning_context_B{enote_finding_context_B};
     InvocableTest5Submit invocable_get_onchain{std::move(sneaky_tx), ledger_context};
     InvocableTest5Commit invocable_get_unconfirmed{ledger_context};

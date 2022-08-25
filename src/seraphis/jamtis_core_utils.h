@@ -40,6 +40,7 @@
 //local headers
 #include "crypto/crypto.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 
 //third party headers
 
@@ -61,32 +62,32 @@ struct jamtis_mock_keys
 {
     crypto::secret_key k_m;   //master
     crypto::secret_key k_vb;  //view-balance
-    crypto::secret_key k_ua;  //unlock-amounts
-    crypto::secret_key k_fr;  //find-received
+    x25519_secret_key xk_ua;  //unlock-amounts
+    x25519_secret_key xk_fr;  //find-received
     crypto::secret_key s_ga;  //generate-address
     crypto::secret_key s_ct;  //cipher-tag
     rct::key K_1_base;        //wallet spend base = k_vb X + k_m U
-    rct::key K_ua;            //unlock-amounts pubkey = k_ua G
-    rct::key K_fr;            //find-received pubkey = k_fr k_ua G
+    x25519_pubkey xK_ua;     //unlock-amounts pubkey = xk_ua xG
+    x25519_pubkey xK_fr;     //find-received pubkey = xk_fr xk_ua xG
 };
 
 /**
 * brief: make_jamtis_unlockamounts_key - unlock-amounts key, for decrypting amounts and reconstructing amount commitments
-*   k_ua = H_n[k_vb]()
+*   xk_ua = H_n_x25519[k_vb]()
 * param: k_view_balance - k_vb
-* outparam: k_unlock_amounts_out - k_ua
+* outparam: xk_unlock_amounts_out - xk_ua
 */
 void make_jamtis_unlockamounts_key(const crypto::secret_key &k_view_balance,
-    crypto::secret_key &k_unlock_amounts_out);
+    x25519_secret_key &xk_unlock_amounts_out);
 /**
 * brief: make_jamtis_findreceived_key - find-received key, for finding enotes received by the wallet
 *   - use to compute view tags and nominal spend keys
-*   k_fr = H_n[k_vb]()
+*   xk_fr = H_n_x25519[k_vb]()
 * param: k_view_balance - k_vb
-* outparam: k_find_received_out - k_fr
+* outparam: xk_find_received_out - xk_fr
 */
 void make_jamtis_findreceived_key(const crypto::secret_key &k_view_balance,
-    crypto::secret_key &k_find_received_out);
+    x25519_secret_key &xk_find_received_out);
 /**
 * brief: make_jamtis_generateaddress_secret - generate-address secret, for generating addresses
 *   s_ga = H_32[k_vb]()
@@ -103,14 +104,6 @@ void make_jamtis_generateaddress_secret(const crypto::secret_key &k_view_balance
 */
 void make_jamtis_ciphertag_secret(const crypto::secret_key &s_generate_address,
     crypto::secret_key &s_cipher_tag_out);
-/**
-* brief: make_jamtis_identifywallet_key - identify-wallet key, for certifying that an address belongs to a certain wallet
-*   k_id = H_n[s_ga]()
-* param: s_generate_address - s_ga
-* outparam: k_identify_wallet_out - k_id
-*/
-void make_jamtis_identifywallet_key(const crypto::secret_key &s_generate_address,
-    crypto::secret_key &k_identify_wallet_out);
 
 
 /**

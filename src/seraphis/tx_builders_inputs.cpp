@@ -284,7 +284,7 @@ void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,
@@ -442,6 +442,8 @@ void make_v1_membership_proof_v1(const std::size_t ref_set_decomp_n,
     const rct::key image_offset{rct::addKeys(masked_address, masked_commitment)};  //Q" = K" + C"
 
     // secret key of: Q[l] - Q" = -(t_k + t_c) G
+    static const rct::key MINUS_ONE{minus_one()};
+
     crypto::secret_key image_mask;
     sc_add(to_bytes(image_mask), to_bytes(address_mask), to_bytes(commitment_mask));  // t_k + t_c
     sc_mul(to_bytes(image_mask), to_bytes(image_mask), MINUS_ONE.bytes);  // -(t_k + t_c)

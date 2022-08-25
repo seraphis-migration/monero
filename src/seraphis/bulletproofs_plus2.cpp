@@ -48,6 +48,7 @@ extern "C"
 #include "ringct/rctOps.h"
 #include "ringct/multiexp.h"
 #include "seraphis_config_temp.h"
+#include "sp_crypto_utils.h"
 #include "sp_generator_factory.h"
 #include "sp_hash_functions.h"
 #include "sp_multiexp.h"
@@ -375,65 +376,6 @@ namespace sp
             sc_mul(res[i].bytes, a[i].bytes, x.bytes);
         }
         return res;
-    }
-
-    // Inversion helper function
-    static rct::key sm(rct::key y, int n, const rct::key &x)
-    {
-        while (n--)
-            sc_mul(y.bytes, y.bytes, y.bytes);
-        sc_mul(y.bytes, y.bytes, x.bytes);
-        return y;
-    }
-
-    // Compute the inverse of a nonzero
-    static rct::key invert(const rct::key &x)
-    {
-        CHECK_AND_ASSERT_THROW_MES(!(x == ZERO), "Cannot invert zero!");
-        rct::key _1, _10, _100, _11, _101, _111, _1001, _1011, _1111;
-
-        _1 = x;
-        sc_mul(_10.bytes, _1.bytes, _1.bytes);
-        sc_mul(_100.bytes, _10.bytes, _10.bytes);
-        sc_mul(_11.bytes, _10.bytes, _1.bytes);
-        sc_mul(_101.bytes, _10.bytes, _11.bytes);
-        sc_mul(_111.bytes, _10.bytes, _101.bytes);
-        sc_mul(_1001.bytes, _10.bytes, _111.bytes);
-        sc_mul(_1011.bytes, _10.bytes, _1001.bytes);
-        sc_mul(_1111.bytes, _100.bytes, _1011.bytes);
-
-        rct::key inv;
-        sc_mul(inv.bytes, _1111.bytes, _1.bytes);
-
-        inv = sm(inv, 123 + 3, _101);
-        inv = sm(inv, 2 + 2, _11);
-        inv = sm(inv, 1 + 4, _1111);
-        inv = sm(inv, 1 + 4, _1111);
-        inv = sm(inv, 4, _1001);
-        inv = sm(inv, 2, _11);
-        inv = sm(inv, 1 + 4, _1111);
-        inv = sm(inv, 1 + 3, _101);
-        inv = sm(inv, 3 + 3, _101);
-        inv = sm(inv, 3, _111);
-        inv = sm(inv, 1 + 4, _1111);
-        inv = sm(inv, 2 + 3, _111);
-        inv = sm(inv, 2 + 2, _11);
-        inv = sm(inv, 1 + 4, _1011);
-        inv = sm(inv, 2 + 4, _1011);
-        inv = sm(inv, 6 + 4, _1001);
-        inv = sm(inv, 2 + 2, _11);
-        inv = sm(inv, 3 + 2, _11);
-        inv = sm(inv, 3 + 2, _11);
-        inv = sm(inv, 1 + 4, _1001);
-        inv = sm(inv, 1 + 3, _111);
-        inv = sm(inv, 2 + 4, _1111);
-        inv = sm(inv, 1 + 4, _1011);
-        inv = sm(inv, 3, _101);
-        inv = sm(inv, 2 + 4, _1111);
-        inv = sm(inv, 3, _101);
-        inv = sm(inv, 1 + 2, _11);
-
-        return inv;
     }
 
     // Invert a batch of scalars, all of which _must_ be nonzero

@@ -151,20 +151,20 @@ void MockLedgerContext::get_onchain_chunk_legacy(const std::uint64_t chunk_start
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::get_onchain_chunk_sp(const std::uint64_t chunk_start_height,
     const std::uint64_t chunk_max_size,
-    const crypto::secret_key &k_find_received,
+    const x25519_secret_key &xk_find_received,
     EnoteScanningChunkLedgerV1 &chunk_out) const
 {
     boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
 
-    get_onchain_chunk_sp_impl(chunk_start_height, chunk_max_size, k_find_received, chunk_out);
+    get_onchain_chunk_sp_impl(chunk_start_height, chunk_max_size, xk_find_received, chunk_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::try_get_unconfirmed_chunk_sp(const crypto::secret_key &k_find_received,
+bool MockLedgerContext::try_get_unconfirmed_chunk_sp(const x25519_secret_key &xk_find_received,
     EnoteScanningChunkNonLedgerV1 &chunk_out) const
 {
     boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
 
-    return try_get_unconfirmed_chunk_sp_impl(k_find_received, chunk_out);
+    return try_get_unconfirmed_chunk_sp_impl(xk_find_received, chunk_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t MockLedgerContext::add_legacy_coinbase(const rct::key &tx_id,
@@ -412,7 +412,7 @@ void MockLedgerContext::get_onchain_chunk_legacy_impl(const std::uint64_t chunk_
 //-------------------------------------------------------------------------------------------------------------------
 void MockLedgerContext::get_onchain_chunk_sp_impl(const std::uint64_t chunk_start_height,
     const std::uint64_t chunk_max_size,
-    const crypto::secret_key &k_find_received,
+    const x25519_secret_key &xk_find_received,
     EnoteScanningChunkLedgerV1 &chunk_out) const
 {
     chunk_out.m_basic_records_per_tx.clear();
@@ -523,7 +523,7 @@ void MockLedgerContext::get_onchain_chunk_sp_impl(const std::uint64_t chunk_star
                 for (const auto &tx_with_output_contents : block_of_tx_output_contents.second)
                 {
                     // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
-                    if (try_find_sp_enotes_in_tx(k_find_received,
+                    if (try_find_sp_enotes_in_tx(xk_find_received,
                         block_of_tx_output_contents.first,
                         std::get<std::uint64_t>(m_block_infos.at(block_of_tx_output_contents.first)),
                         sortable2rct(tx_with_output_contents.first),
@@ -532,7 +532,6 @@ void MockLedgerContext::get_onchain_chunk_sp_impl(const std::uint64_t chunk_star
                         std::get<SpTxSupplementV1>(tx_with_output_contents.second),
                         std::get<std::vector<SpEnoteV1>>(tx_with_output_contents.second),
                         SpEnoteOriginStatus::ONCHAIN,
-                        hw::get_device("default"),
                         chunk_out.m_basic_records_per_tx))
                     {
                         CHECK_AND_ASSERT_THROW_MES(
@@ -562,7 +561,7 @@ void MockLedgerContext::get_onchain_chunk_sp_impl(const std::uint64_t chunk_star
         );
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockLedgerContext::try_get_unconfirmed_chunk_sp_impl(const crypto::secret_key &k_find_received,
+bool MockLedgerContext::try_get_unconfirmed_chunk_sp_impl(const x25519_secret_key &xk_find_received,
     EnoteScanningChunkNonLedgerV1 &chunk_out) const
 {
     // find-received scan each tx in the unconfirmed chache
@@ -572,7 +571,7 @@ bool MockLedgerContext::try_get_unconfirmed_chunk_sp_impl(const crypto::secret_k
     for (const auto &tx_with_output_contents : m_unconfirmed_tx_output_contents)
     {
         // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
-        if (try_find_sp_enotes_in_tx(k_find_received,
+        if (try_find_sp_enotes_in_tx(xk_find_received,
             -1,
             -1,
             sortable2rct(tx_with_output_contents.first),
@@ -581,7 +580,6 @@ bool MockLedgerContext::try_get_unconfirmed_chunk_sp_impl(const crypto::secret_k
             std::get<SpTxSupplementV1>(tx_with_output_contents.second),
             std::get<std::vector<SpEnoteV1>>(tx_with_output_contents.second),
             SpEnoteOriginStatus::UNCONFIRMED,
-            hw::get_device("default"),
             chunk_out.m_basic_records_per_tx))
         {
             CHECK_AND_ASSERT_THROW_MES(m_unconfirmed_tx_key_images.find(tx_with_output_contents.first) !=

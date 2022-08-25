@@ -37,6 +37,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_enote_utils.h"
+#include "sp_crypto_utils.h"
 #include "tx_component_types.h"
 #include "tx_enote_scanning.h"
 #include "tx_enote_scanning_utils.h"
@@ -62,12 +63,12 @@ bool MockOffchainContext::key_image_exists_v1(const crypto::key_image &key_image
     return key_image_exists_v1_impl(key_image);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockOffchainContext::try_get_offchain_chunk_sp(const crypto::secret_key &k_find_received,
+bool MockOffchainContext::try_get_offchain_chunk_sp(const x25519_secret_key &xk_find_received,
     EnoteScanningChunkNonLedgerV1 &chunk_out) const
 {
     boost::shared_lock<boost::shared_mutex> lock{m_context_mutex};
 
-    return try_get_offchain_chunk_sp_impl(k_find_received, chunk_out);
+    return try_get_offchain_chunk_sp_impl(xk_find_received, chunk_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool MockOffchainContext::try_add_partial_tx_v1(const SpPartialTxV1 &partial_tx)
@@ -112,7 +113,7 @@ bool MockOffchainContext::key_image_exists_v1_impl(const crypto::key_image &key_
     return m_sp_key_images.find(key_image) != m_sp_key_images.end();
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool MockOffchainContext::try_get_offchain_chunk_sp_impl(const crypto::secret_key &k_find_received,
+bool MockOffchainContext::try_get_offchain_chunk_sp_impl(const x25519_secret_key &xk_find_received,
     EnoteScanningChunkNonLedgerV1 &chunk_out) const
 {
     // find-received scan each tx in the unconfirmed chache
@@ -122,7 +123,7 @@ bool MockOffchainContext::try_get_offchain_chunk_sp_impl(const crypto::secret_ke
     for (const auto &tx_with_output_contents : m_output_contents)
     {
         // if this tx contains at least one view-tag match, then add the tx's key images to the chunk
-        if (try_find_sp_enotes_in_tx(k_find_received,
+        if (try_find_sp_enotes_in_tx(xk_find_received,
             -1,
             -1,
             tx_with_output_contents.first,  //use input context as proxy for tx id
@@ -131,7 +132,6 @@ bool MockOffchainContext::try_get_offchain_chunk_sp_impl(const crypto::secret_ke
             std::get<SpTxSupplementV1>(tx_with_output_contents.second),
             std::get<std::vector<SpEnoteV1>>(tx_with_output_contents.second),
             SpEnoteOriginStatus::OFFCHAIN,
-            hw::get_device("default"),
             chunk_out.m_basic_records_per_tx))
         {
             CHECK_AND_ASSERT_THROW_MES(m_tx_key_images.find(tx_with_output_contents.first) != m_tx_key_images.end(),

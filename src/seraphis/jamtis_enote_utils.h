@@ -35,9 +35,9 @@
 
 //local headers
 #include "crypto/crypto.h"
-#include "device/device.hpp"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 
 //third party headers
 
@@ -52,37 +52,35 @@ namespace jamtis
 {
 
 /**
-* brief: make_jamtis_enote_ephemeral_pubkey - enote ephemeral pubkey K_e
-*   K_e = r K_3
-* param: enote_privkey - r
-* param: DH_base - K_3
-* outparam: enote_ephemeral_pubkey_out - K_e
+* brief: make_jamtis_enote_ephemeral_pubkey - enote ephemeral pubkey xK_e
+*   xK_e = xr xK_3
+* param: enote_ephemeral_privkey - xr
+* param: DH_base - xK_3
+* outparam: enote_ephemeral_pubkey_out - xK_e
 */
-void make_jamtis_enote_ephemeral_pubkey(const crypto::secret_key &enote_privkey,
-    const rct::key &DH_base,
-    rct::key &enote_ephemeral_pubkey_out);
+void make_jamtis_enote_ephemeral_pubkey(const x25519_secret_key &enote_ephemeral_privkey,
+    const x25519_pubkey &DH_base,
+    x25519_pubkey &enote_ephemeral_pubkey_out);
 /**
 * brief: make_jamtis_view_tag - view tag for optimized identification of owned enotes
-*    view_tag = H_1(K_d, Ko)
-* param: sender_receiver_DH_derivation - K_d
+*    view_tag = H_1(xK_d, Ko)
+* param: sender_receiver_DH_derivation - xK_d
 * param: onetime_address - Ko
 * outparam: view_tag_out - view_tag
 */
-void make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation,
+void make_jamtis_view_tag(const x25519_pubkey &sender_receiver_DH_derivation,
     const rct::key &onetime_address,
     view_tag_t &view_tag_out);
 /**
 * brief: make_jamtis_view_tag - view tag for optimized identification of owned enotes
-*    view_tag = H_1(8 * privkey * DH_key, Ko)
-* param: privkey - [sender: r] [recipient: k_fr]
-* param: DH_key - [sender: K_2] [sender-change-2out: k_fr * K_3_other] [recipient: K_e = r K_3]
-* param: hwdev - abstract reference to a hardware-specific implemention of key derivation
+*    view_tag = H_1(privkey * DH_key, Ko)
+* param: privkey - [sender: xr] [recipient: xk_fr]
+* param: DH_key - [sender: xK_2] [sender-change-2out: xk_fr * xK_3_other] [recipient: xK_e = xr xK_3]
 * param: onetime_address - Ko
 * outparam: view_tag_out - view_tag
 */
-void make_jamtis_view_tag(const crypto::secret_key &privkey,
-    const rct::key &DH_key,
-    hw::device &hwdev,
+void make_jamtis_view_tag(const x25519_secret_key &privkey,
+    const x25519_pubkey &DH_key,
     const rct::key &onetime_address,
     view_tag_t &view_tag_out);
 /**
@@ -102,46 +100,44 @@ void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &in
     rct::key &input_context_out);
 /**
 * brief: make_jamtis_sender_receiver_secret_plain - sender-receiver secret q for a normal enote
-*    q = H_32(DH_derivation, K_e, input_context)
-* param: sender_receiver_DH_derivation - K_d = 8 * privkey * DH_key
-* param: enote_ephemeral_pubkey - K_e
+*    q = H_32(DH_derivation, xK_e, input_context)
+* param: sender_receiver_DH_derivation - xK_d = 8 * privkey * DH_key
+* param: enote_ephemeral_pubkey - xK_e
 * param: input_context - [normal: H_32({input KI}); coinbase: H_32(block height)]
 * outparam: sender_receiver_secret_out - q
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 */
-void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const rct::key &enote_ephemeral_pubkey,
+void make_jamtis_sender_receiver_secret_plain(const x25519_pubkey &sender_receiver_DH_derivation,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
     rct::key &sender_receiver_secret_out);
 /**
 * brief: make_jamtis_sender_receiver_secret_plain - sender-receiver secret q for a normal enote
-*    q = H_32(8 * r * k_fr * G, input_context) => H_32(8 * privkey * DH_key, input_context)
-* param: privkey - [sender: r] [recipient: k_fr]
-* param: DH_key - [sender: K_2] [sender-change-2out: k_fr * K_3_other] [recipient: K_e = r K_3]
-* param: enote_ephemeral_pubkey - K_e
+*    q = H_32(xr * xk_fr * xG, input_context) => H_32(privkey * DH_key, input_context)
+* param: privkey - [sender: xr] [recipient: xk_fr]
+* param: DH_key - [sender: xK_2] [sender-change-2out: xk_fr * xK_3_other] [recipient: xK_e = xr xK_3]
+* param: enote_ephemeral_pubkey - xK_e
 * param: input_context - [normal: H_32({input KI}); coinbase: H_32(block height)]
-* param: hwdev - abstract reference to a hardware-specific implemention of key derivation
 * outparam: sender_receiver_secret_out - q
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 */
-void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
-    const rct::key &DH_key,
-    const rct::key &enote_ephemeral_pubkey,
+void make_jamtis_sender_receiver_secret_plain(const x25519_secret_key &privkey,
+    const x25519_pubkey &DH_key,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
-    hw::device &hwdev,
     rct::key &sender_receiver_secret_out);
 /**
 * brief: make_jamtis_sender_receiver_secret_selfsend - sender-receiver secret q for a self-send enote of a specific type
-*    q = H_32[k_vb](K_e)
+*    q = H_32[k_vb](xK_e)
 * param: k_view_balance - k_vb
-* param: enote_ephemeral_pubkey - K_e
+* param: enote_ephemeral_pubkey - xK_e
 * param: input_context - [normal: H_32({input KI}); coinbase: H_32(block height)]
 * param: self_send_type - type of the self-send enote, used to select the domain separator
 * outparam: sender_receiver_secret_out - q
 *   - note: this is 'rct::key' instead of 'crypto::secret_key' for better performance in multithreaded environments
 */
 void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_view_balance,
-    const rct::key &enote_ephemeral_pubkey,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const jamtis::JamtisSelfSendType self_send_type,
     rct::key &sender_receiver_secret_out);
@@ -171,34 +167,34 @@ void make_jamtis_onetime_address(const rct::key &sender_receiver_secret,
 /**
 * brief: make_jamtis_amount_baked_key_plain_sender - key baked into amount encodings of plain enotes, to provide
 *    fine-tuned control over read rights to the amount
-*    [sender] baked_key = 8 r G
-* param: enote_privkey - r
-* outparam: baked_key_out - 8 r G
+*    [sender] baked_key = xr xG
+* param: enote_ephemeral_privkey - xr
+* outparam: baked_key_out - xr xG
 */
-void make_jamtis_amount_baked_key_plain_sender(const crypto::secret_key &enote_privkey,
-    crypto::key_derivation &baked_key_out);
+void make_jamtis_amount_baked_key_plain_sender(const x25519_secret_key &enote_ephemeral_privkey,
+    x25519_pubkey &baked_key_out);
 /**
 * brief: make_jamtis_amount_baked_key_plain_recipient - key baked into amount encodings of plain enotes, to provide
 *    fine-tuned control over read rights to the amount
-*    [recipient] baked_key = 8 * (1/(k^j_a * k_ua)) * K_e
-* param: address_privkey - k^j_a
-* param: k_unlock_amounts - k_ua
-* param: enote_ephemeral_pubkey - K_e
-* outparam: baked_key_out - 8 * (1/(k^j_a * k_ua)) * K_e
+*    [recipient] baked_key = (1/(xk^j_a * xk_ua)) * xK_e
+* param: address_privkey - xk^j_a
+* param: xk_unlock_amounts - xk_ua
+* param: enote_ephemeral_pubkey - xK_e
+* outparam: baked_key_out - (1/(k^j_a * k_ua)) * xK_e
 */
-void make_jamtis_amount_baked_key_plain_recipient(const crypto::secret_key &address_privkey,
-    const crypto::secret_key &k_unlock_amounts,
-    const rct::key &enote_ephemeral_pubkey,
-    crypto::key_derivation &baked_key_out);
+void make_jamtis_amount_baked_key_plain_recipient(const x25519_secret_key &address_privkey,
+    const x25519_secret_key &xk_unlock_amounts,
+    const x25519_pubkey &enote_ephemeral_pubkey,
+    x25519_pubkey &baked_key_out);
 /**
 * brief: make_jamtis_amount_blinding_factor_plain - x for a normal enote's amount commitment C = x G + a H
-*   x = H_n(q, 8 r G)
+*   x = H_n(q, xr xG)
 * param: sender_receiver_secret - q
-* param: baked_key - 8 r G
+* param: baked_key - xr xG
 * outparam: mask_out - x
 */
 void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_secret,
-    const crypto::key_derivation &baked_key,
+    const x25519_pubkey &baked_key,
     crypto::secret_key &mask_out);
 /**
 * brief: make_jamtis_amount_blinding_factor_selfsend - x for a self-spend enote's amount commitment C = x G + a H
@@ -210,26 +206,26 @@ void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver
     crypto::secret_key &mask_out);
 /**
 * brief: encode_jamtis_amount_plain - encode an amount for a normal enote
-*   a_enc = a XOR H_8(q, 8 r G)
+*   a_enc = a XOR H_8(q, xr xG)
 * param: amount - a
 * param: sender_receiver_secret - q
-* param: baked_key - 8 r G
+* param: baked_key - xr xG
 * return: a_enc
 */
 rct::xmr_amount encode_jamtis_amount_plain(const rct::xmr_amount amount,
     const rct::key &sender_receiver_secret,
-    const crypto::key_derivation &baked_key);
+    const x25519_pubkey &baked_key);
 /**
 * brief: decode_jamtis_amount_plain - decode an amount froma normal enote
-*   a = a_enc XOR H_8(q, 8 r G)
+*   a = a_enc XOR H_8(q, xr xG)
 * param: encoded_amount - a_enc
 * param: sender_receiver_secret - q
-* param: baked_key - 8 r G
+* param: baked_key - xr xG
 * return: a
 */
 rct::xmr_amount decode_jamtis_amount_plain(const rct::xmr_amount encoded_amount,
     const rct::key &sender_receiver_secret,
-    const crypto::key_derivation &baked_key);
+    const x25519_pubkey &baked_key);
 /**
 * brief: encode_jamtis_amount_selfsend - encode an amount for a self-send enote
 *   a_enc = a XOR H_8(q)
@@ -263,16 +259,16 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
 /**
 * brief: try_get_jamtis_sender_receiver_secret_plain - test view tag; if it passes, get the nominal sender-receiver secret
 *    (for a normal enote)
-* param: sender_receiver_DH_derivation - 8 * privkey * DH_key
-* param: enote_ephemeral_pubkey - K_e
+* param: sender_receiver_DH_derivation - privkey * DH_key
+* param: enote_ephemeral_pubkey - xK_e
 * param: input_context - [normal: H_32({input KI}); coinbase: H_32(block height)]
 * param: onetime_address - Ko
 * param: view_tag - view_tag
 * outparam: sender_receiver_secret_out - q
 * return: true if successfully recomputed the view tag
 */
-bool try_get_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const rct::key &enote_ephemeral_pubkey,
+bool try_get_jamtis_sender_receiver_secret_plain(const x25519_pubkey &sender_receiver_DH_derivation,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &onetime_address,
     const view_tag_t view_tag,
@@ -281,7 +277,7 @@ bool try_get_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &s
 * brief: try_get_jamtis_amount_plain - test recreating the amount commitment; if it is recreate-able, return the amount
 *    (for a normal enote)
 * param: sender_receiver_secret - q
-* param: baked_key - 8 r G
+* param: baked_key - xr xG
 * param: amount_commitment - C = x G + a H
 * param: encoded_amount - enc_a
 * outparam: amount_out - a' = dec(enc_a)
@@ -289,7 +285,7 @@ bool try_get_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &s
 * return: true if successfully recomputed the amount commitment (C' = x' G + a' H ?= C)
 */
 bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
-    const crypto::key_derivation &baked_key,
+    const x25519_pubkey &baked_key,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out,

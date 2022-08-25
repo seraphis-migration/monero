@@ -36,6 +36,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 #include "sp_transcript.h"
 
 //third party headers
@@ -50,7 +51,7 @@
 namespace sp
 {
 //-------------------------------------------------------------------------------------------------------------------
-bool keys_are_unique(const std::vector<rct::key> &keys)
+bool keys_are_unique(const std::vector<x25519_pubkey> &keys)
 {
     for (auto key_it = keys.begin(); key_it != keys.end(); ++key_it)
     {

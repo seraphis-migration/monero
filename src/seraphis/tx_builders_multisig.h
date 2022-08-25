@@ -34,7 +34,7 @@
 //          considered sanity checks that only a malicious implementation can/will circumvent. Note that multisig
 //          is only assumed to work when a threshold of honest players are interacting.
 //          - The semantic checks SHOULD detect unintended behavior that would allow a successful transaction. For example,
-//            the checks prevent a multisig tx proposer from making a tx with no self-sends (which would make balance
+//            the checks prevent a multisig tx proposer from making a tx with no self-sends (which would make balance checks
 //            much more difficult).
 //          - If users encounter tx construction failures, it may be necessary to identify malicious player(s) and
 //            exclude them.
@@ -50,6 +50,7 @@
 #include "multisig/multisig_signer_set_filter.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
+#include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
 #include "tx_builder_types_multisig.h"
 #include "tx_component_types.h"
@@ -86,7 +87,7 @@ void check_v1_multisig_public_input_proposal_semantics_v1(const SpMultisigPublic
 * outparam: proposal_out -
 */
 void make_v1_multisig_public_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const crypto::secret_key &address_mask,
     const crypto::secret_key &commitment_mask,

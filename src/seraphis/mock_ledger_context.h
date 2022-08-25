@@ -144,20 +144,20 @@ public:
     * brief: get_onchain_chunk_sp - find-received scan a chunk of blocks
     * param: chunk_start_height -
     * param: chunk_max_size -
-    * param: k_find_received -
+    * param: xk_find_received -
     * outparam: chunk_out - chunk of scanned blocks (or empty chunk representing top of current chain)
     */
     void get_onchain_chunk_sp(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
-        const crypto::secret_key &k_find_received,
+        const x25519_secret_key &xk_find_received,
         EnoteScanningChunkLedgerV1 &chunk_out) const;
     /**
     * brief: try_get_unconfirmed_chunk_sp - try to find-received scan the unconfirmed tx cache
-    * param: k_find_received -
+    * param: xk_find_received -
     * outparam: chunk_out -
     * return: true if chunk is not empty
     */
-    bool try_get_unconfirmed_chunk_sp(const crypto::secret_key &k_find_received,
+    bool try_get_unconfirmed_chunk_sp(const x25519_secret_key &xk_find_received,
         EnoteScanningChunkNonLedgerV1 &chunk_out) const;
     /**
     * brief: add_legacy_coinbase - make a block with a mock legacy coinbase tx (containing legacy key images)
@@ -228,9 +228,9 @@ private:
         EnoteScanningChunkLedgerV1 &chunk_out) const;
     void get_onchain_chunk_sp_impl(const std::uint64_t chunk_start_height,
         const std::uint64_t chunk_max_size,
-        const crypto::secret_key &k_find_received,
+        const x25519_secret_key &xk_find_received,
         EnoteScanningChunkLedgerV1 &chunk_out) const;
-    bool try_get_unconfirmed_chunk_sp_impl(const crypto::secret_key &k_find_received,
+    bool try_get_unconfirmed_chunk_sp_impl(const x25519_secret_key &xk_find_received,
         EnoteScanningChunkNonLedgerV1 &chunk_out) const;
     std::uint64_t add_legacy_coinbase_impl(const rct::key &tx_id,
         const std::uint64_t unlock_time,

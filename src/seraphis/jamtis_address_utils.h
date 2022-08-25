@@ -37,6 +37,7 @@
 #include "crypto/crypto.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 
 //third party headers
 
@@ -58,19 +59,19 @@ namespace jamtis
 * param: j - address index
 * outparam: extension_out - k^j_x
 */
-void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
+void make_jamtis_spendkey_extension(const crypto::secret_key &s_generate_address,
     const address_index_t j,
     crypto::secret_key &extension_out);
 /**
-* brief: make_jamtis_address_privkey - k^j_a
-*   - k^j_a = H_n[s_ga](j)
+* brief: make_jamtis_address_privkey - xk^j_a
+*   - xk^j_a = H_n_x25519[s_ga](j)
 * param: s_generate_address - s_ga
 * param: j - address index
-* outparam: address_privkey_out - k^j_a
+* outparam: address_privkey_out - xk^j_a
 */
-void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
+void make_jamtis_address_privkey(const crypto::secret_key &s_generate_address,
     const address_index_t j,
-    crypto::secret_key &address_privkey_out);
+    x25519_secret_key &address_privkey_out);
 /**
 * brief: make_jamtis_address_spend_key - K_1
 *   - K_1 = k^j_x X + K_s

@@ -35,6 +35,7 @@
 
 //local headers
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 #include "tx_component_types.h"
 #include "tx_discretized_fee.h"
 #include "tx_extra.h"
@@ -152,7 +153,7 @@ bool validate_sp_semantics_input_images_v1(const std::vector<SpEnoteImageV1> &in
 bool validate_sp_semantics_layout_v1(const std::vector<SpMembershipProofV1> &membership_proofs,
     const std::vector<SpEnoteImageV1> &input_images,
     const std::vector<SpEnoteV1> &outputs,
-    const std::vector<rct::key> &enote_ephemeral_pubkeys,
+    const std::vector<x25519_pubkey> &enote_ephemeral_pubkeys,
     const TxExtra &tx_extra);
 /**
 * brief: validate_sp_semantics_fee_v1 - check that a discretized fee is a valid fee representation

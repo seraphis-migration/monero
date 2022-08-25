@@ -66,7 +66,6 @@ namespace config
   const constexpr char HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY[] = "jamtis_unlock_amounts_key";
   const constexpr char HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET[] = "jamtis_generate_address_secret";
   const constexpr char HASH_KEY_JAMTIS_CIPHERTAG_SECRET[] = "jamtis_cipher_tag_secret";
-  const constexpr char HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY[] = "jamtis_identify_wallet_key";
   const constexpr char HASH_KEY_JAMTIS_FINDRECEIVED_KEY[] = "jamtis_find_received_key";
   const constexpr char HASH_KEY_JAMTIS_ADDRESS_PRIVKEY[] = "jamtis_address_privkey";
   const constexpr char HASH_KEY_JAMTIS_SPENDKEY_EXTENSION[] = "jamtis_spendkey_extension";

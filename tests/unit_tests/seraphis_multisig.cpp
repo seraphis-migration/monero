@@ -26,6 +26,10 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+extern "C"
+{
+#include "mx25519.h"
+}
 #include "crypto/crypto.h"
 #include "crypto/generators.h"
 #include "multisig/account_generator_era.h"
@@ -83,14 +87,17 @@ static void make_multisig_jamtis_mock_keys(const multisig::multisig_account &acc
     using namespace jamtis;
 
     keys_out.k_vb = account.get_common_privkey();
-    make_jamtis_unlockamounts_key(keys_out.k_vb, keys_out.k_ua);
-    make_jamtis_findreceived_key(keys_out.k_vb, keys_out.k_fr);
+    make_jamtis_unlockamounts_key(keys_out.k_vb, keys_out.xk_ua);
+    make_jamtis_findreceived_key(keys_out.k_vb, keys_out.xk_fr);
     make_jamtis_generateaddress_secret(keys_out.k_vb, keys_out.s_ga);
     make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
     keys_out.K_1_base = rct::pk2rct(account.get_multisig_pubkey());
     extend_seraphis_spendkey(keys_out.k_vb, keys_out.K_1_base);
-    rct::scalarmultBase(keys_out.K_ua, rct::sk2rct(keys_out.k_ua));
-    rct::scalarmultKey(keys_out.K_fr, keys_out.K_ua, rct::sk2rct(keys_out.k_fr));
+    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &keys_out.xK_ua, &keys_out.xk_ua);
+    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
+        &keys_out.xK_fr,
+        &keys_out.xk_fr,
+        &keys_out.xK_ua);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -323,8 +330,8 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     JamtisDestinationV1 user_address;
 
     ASSERT_NO_THROW(make_jamtis_destination_v1(keys.K_1_base,
-        keys.K_ua,
-        keys.K_fr,
+        keys.xK_ua,
+        keys.xK_fr,
         keys.s_ga,
         j,
         user_address));
@@ -334,7 +341,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
     SpOutputProposalV1 output_proposal_temp;
 
     std::vector<SpEnoteV1> input_enotes;
-    std::vector<rct::key> input_enote_ephemeral_pubkeys;
+    std::vector<x25519_pubkey> input_enote_ephemeral_pubkeys;
     input_enotes.reserve(in_amounts.size());
     input_enote_ephemeral_pubkeys.reserve(in_amounts.size());
 
@@ -343,7 +350,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
         payment_proposal_temp = JamtisPaymentProposalV1{
                 .m_destination = user_address,
                 .m_amount = in_amount,
-                .m_enote_ephemeral_privkey = make_secret_key(),
+                .m_enote_ephemeral_privkey = x25519_privkey_gen(),
                 .m_partial_memo = TxExtra{}
             };
         payment_proposal_temp.get_output_proposal_v1(rct::zero(), output_proposal_temp);
@@ -415,7 +422,7 @@ static void seraphis_multisig_tx_v1_test(const std::uint32_t threshold,
                     .m_destination = user_address,
                     .m_amount = out_amount,
                     .m_type = JamtisSelfSendType::SELF_SPEND,
-                    .m_enote_ephemeral_privkey = make_secret_key(),
+                    .m_enote_ephemeral_privkey = x25519_privkey_gen(),
                     .m_partial_memo = TxExtra{}
                 }
             );

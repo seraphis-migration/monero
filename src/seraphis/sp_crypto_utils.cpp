@@ -58,7 +58,18 @@ namespace sp
 // Useful scalar and group constants
 static const rct::key ZERO = rct::zero();
 static const rct::key ONE = rct::identity();
+/// scalar: -1 mod q
+static const rct::key MINUS_ONE = { {0xec, 0xd3, 0xf5, 0x5c, 0x1a, 0x63, 0x12, 0x58, 0xd6, 0x9c, 0xf7, 0xa2, 0xde, 0xf9,
+    0xde, 0x14, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10} };
 
+static const x25519_secret_key X25519_EIGHT{
+        []() -> x25519_secret_key
+        {
+            x25519_secret_key temp{};
+            temp.data[0] = { 8 };
+            return temp;
+        }()
+    };
 
 //-------------------------------------------------------------------------------------------------------------------
 // Helper function for scalar inversion
@@ -72,6 +83,67 @@ static rct::key sm(rct::key y, int n, const rct::key &x)
     return y;
 }
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+rct::key minus_one()
+{
+    return MINUS_ONE;
+}
+//-------------------------------------------------------------------------------------------------------------------
+x25519_secret_key x25519_eight()
+{
+    return X25519_EIGHT;
+}
+//-------------------------------------------------------------------------------------------------------------------
+x25519_secret_key x25519_privkey_gen()
+{
+    x25519_secret_key privkey;
+    crypto::rand(32, privkey.data);
+    privkey.data[0] &= 255 - 7;
+    privkey.data[31] &= 127;
+
+    return privkey;
+}
+//-------------------------------------------------------------------------------------------------------------------
+x25519_pubkey x25519_pubkey_gen()
+{
+    const x25519_secret_key privkey{x25519_privkey_gen()};
+    x25519_pubkey pubkey;
+    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &pubkey, &privkey);
+
+    return pubkey;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool x25519_privkey_is_canonical(const x25519_privkey &test_privkey)
+{
+    //todo: is this constant time?
+    return (test_privkey.data[0] & 7) == 0 &&
+        (test_privkey.data[31] & 128) == 0;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void x25519_invmul_key(std::vector<x25519_secret_key> privkeys_to_invert,
+    const x25519_pubkey &initial_pubkey,
+    x25519_pubkey &result_out)
+{
+    // 1. (1/({privkey1 * privkey2 * ...}))
+    // note: mx25519_invkey() will error if the resulting X25519 scalar is >= 2^255, so we 'search' for a valid solution
+    x25519_secret_key inverted_xkey;
+    result_out = initial_pubkey;
+
+    while (mx25519_invkey(&inverted_xkey, privkeys_to_invert.data(), privkeys_to_invert.size()) != 0)
+    {
+        privkeys_to_invert.emplace_back(X25519_EIGHT);  //add 8 to keys to invert
+        mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
+            &result_out,
+            &X25519_EIGHT,
+            &result_out);  //xK = 8 * xK
+    }
+
+    // 2. (1/([8*8*...*8] * {privkey1 * privkey2 * ...})) * [8*8*...*8] * xK
+    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
+        &result_out,
+        &inverted_xkey,
+        &result_out);
+}
 //-------------------------------------------------------------------------------------------------------------------
 rct::key invert(const rct::key &x)
 {
@@ -245,13 +317,6 @@ bool key_domain_is_prime_subgroup(const rct::key &check_key)
     ge_scalarmult_p3(&check_key_p3, rct::curveOrder().bytes, &check_key_p3);
 
     return (ge_p3_is_point_at_infinity_vartime(&check_key_p3) != 0);
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool mx25519_privkey_is_canonical(const mx25519_privkey &test_privkey)
-{
-    //todo: is this constant time?
-    return (test_privkey.data[0] & 7) == 0 &&
-        (test_privkey.data[31] & 128) == 0;
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

@@ -37,6 +37,7 @@
 #include "jamtis_support_types.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 #include "tx_builders_outputs.h"
 
 //third party headers
@@ -59,19 +60,19 @@ static bool ephemeral_pubkeys_are_unique(const std::vector<jamtis::JamtisPayment
     const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payment_proposals)
 {
     // record all as 8*K_e to remove torsion elements if they exist
-    std::unordered_set<rct::key> enote_ephemeral_pubkeys;
-    rct::key temp_enote_ephemeral_pubkey;
+    std::unordered_set<x25519_pubkey> enote_ephemeral_pubkeys;
+    x25519_pubkey temp_enote_ephemeral_pubkey;
 
     for (const jamtis::JamtisPaymentProposalV1 &normal_proposal : normal_payment_proposals)
     {
         normal_proposal.get_enote_ephemeral_pubkey(temp_enote_ephemeral_pubkey);
-        enote_ephemeral_pubkeys.insert(rct::scalarmultKey(temp_enote_ephemeral_pubkey, rct::EIGHT));
+        enote_ephemeral_pubkeys.insert(temp_enote_ephemeral_pubkey);
     }
 
     for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal : selfsend_payment_proposals)
     {
         selfsend_proposal.get_enote_ephemeral_pubkey(temp_enote_ephemeral_pubkey);
-        enote_ephemeral_pubkeys.insert(rct::scalarmultKey(temp_enote_ephemeral_pubkey, rct::EIGHT));
+        enote_ephemeral_pubkeys.insert(temp_enote_ephemeral_pubkey);
     }
 
     return enote_ephemeral_pubkeys.size() == normal_payment_proposals.size() + selfsend_payment_proposals.size();

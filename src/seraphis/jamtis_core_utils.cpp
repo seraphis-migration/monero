@@ -32,6 +32,10 @@
 #include "jamtis_core_utils.h"
 
 //local headers
+extern "C"
+{
+#include "mx25519.h"
+}
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
 #include "ringct/rctOps.h"
@@ -55,19 +59,19 @@ namespace jamtis
 {
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_unlockamounts_key(const crypto::secret_key &k_view_balance,
-    crypto::secret_key &k_unlock_amounts_out)
+    x25519_secret_key &xk_unlock_amounts_out)
 {
-    // k_ua = H_n[k_vb]()
+    // xk_ua = H_n_x25519[k_vb]()
     SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY, 0};
-    sp_derive_key(to_bytes(k_view_balance), transcript, to_bytes(k_unlock_amounts_out));
+    sp_derive_x25519_key(to_bytes(k_view_balance), transcript, xk_unlock_amounts_out.data);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_findreceived_key(const crypto::secret_key &k_view_balance,
-    crypto::secret_key &k_find_received_out)
+    x25519_secret_key &xk_find_received_out)
 {
-    // k_fr = H_n[k_vb]()
+    // xk_fr = H_n_x25519[k_vb]()
     SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_FINDRECEIVED_KEY, 0};
-    sp_derive_key(to_bytes(k_view_balance), transcript, to_bytes(k_find_received_out));
+    sp_derive_x25519_key(to_bytes(k_view_balance), transcript, xk_find_received_out.data);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_generateaddress_secret(const crypto::secret_key &k_view_balance,
@@ -86,25 +90,20 @@ void make_jamtis_ciphertag_secret(const crypto::secret_key &s_generate_address,
     sp_derive_secret(to_bytes(s_generate_address), transcript, to_bytes(s_cipher_tag_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_identifywallet_key(const crypto::secret_key &s_generate_address,
-    crypto::secret_key &k_identify_wallet_out)
-{
-    // k_id = H_n[s_ga]()
-    SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_IDENTIFYWALLET_KEY, 0};
-    sp_derive_key(to_bytes(s_generate_address), transcript, to_bytes(k_identify_wallet_out));
-}
-//-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_mock_keys(jamtis_mock_keys &keys_out)
 {
     keys_out.k_m = rct::rct2sk(rct::skGen());
     keys_out.k_vb = rct::rct2sk(rct::skGen());
-    make_jamtis_unlockamounts_key(keys_out.k_vb, keys_out.k_ua);
-    make_jamtis_findreceived_key(keys_out.k_vb, keys_out.k_fr);
+    make_jamtis_unlockamounts_key(keys_out.k_vb, keys_out.xk_ua);
+    make_jamtis_findreceived_key(keys_out.k_vb, keys_out.xk_fr);
     make_jamtis_generateaddress_secret(keys_out.k_vb, keys_out.s_ga);
     make_jamtis_ciphertag_secret(keys_out.s_ga, keys_out.s_ct);
     make_seraphis_spendkey(keys_out.k_vb, keys_out.k_m, keys_out.K_1_base);
-    rct::scalarmultBase(keys_out.K_ua, rct::sk2rct(keys_out.k_ua));
-    rct::scalarmultKey(keys_out.K_fr, keys_out.K_ua, rct::sk2rct(keys_out.k_fr));
+    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &keys_out.xK_ua, &keys_out.xk_ua);
+    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
+        &keys_out.xK_fr,
+        &keys_out.xk_fr,
+        &keys_out.xK_ua);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis

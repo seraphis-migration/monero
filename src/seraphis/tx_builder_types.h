@@ -38,6 +38,7 @@
 #include "ringct/rctTypes.h"
 #include "jamtis_payment_proposal.h"
 #include "sp_core_types.h"
+#include "sp_crypto_utils.h"
 #include "tx_component_types.h"
 #include "tx_discretized_fee.h"
 #include "tx_extra.h"
@@ -94,8 +95,8 @@ struct SpOutputProposalV1 final
     /// core of the proposal
     SpOutputProposal m_core;
 
-    /// K_e: enote ephemeral pubkey
-    rct::key m_enote_ephemeral_pubkey;
+    /// xK_e: enote ephemeral pubkey
+    x25519_pubkey m_enote_ephemeral_pubkey;
     /// enc_a
     rct::xmr_amount m_encoded_amount;
     /// addr_tag_enc

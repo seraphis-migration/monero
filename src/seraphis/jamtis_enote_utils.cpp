@@ -36,10 +36,10 @@
 extern "C"
 {
 #include "crypto/crypto-ops.h"
+#include "mx25519.h"
 }
 #include "cryptonote_config.h"
 #include "seraphis_config_temp.h"
-#include "device/device.hpp"
 #include "int-util.h"
 #include "jamtis_support_types.h"
 #include "misc_language.h"
@@ -65,35 +65,35 @@ namespace sp
 namespace jamtis
 {
 //-------------------------------------------------------------------------------------------------------------------
-// derivation = 8 * privkey * DH_key
+// derivation = privkey * DH_key (with X25519)
+// note: X25519 DH derivations are implicitly mul 8
 //-------------------------------------------------------------------------------------------------------------------
-static auto make_derivation_with_wiper(const crypto::secret_key &privkey,
-    const rct::key &DH_key,
-    hw::device &hwdev,
-    crypto::key_derivation &derivation_out)
+static auto make_derivation_with_wiper(const x25519_secret_key &privkey,
+    const x25519_pubkey &DH_key,
+    x25519_pubkey &derivation_out)
 {
     auto a_wiper = epee::misc_utils::create_scope_leave_handler(
             [&derivation_out]()
             {
-                memwipe(&derivation_out, sizeof(crypto::key_derivation));
+                memwipe(&derivation_out, sizeof(derivation_out));
             }
         );
 
-    hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation_out);
+    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &derivation_out, &privkey, &DH_key);
 
     return a_wiper;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// a = a_enc XOR H_8(q, 8 r G)
-// a_enc = a XOR H_8(q, 8 r G)
+// a = a_enc XOR H_8(q, xr xG)
+// a_enc = a XOR H_8(q, xr xG)
 //-------------------------------------------------------------------------------------------------------------------
 static rct::xmr_amount enc_dec_jamtis_amount_plain(const rct::xmr_amount original,
     const rct::key &sender_receiver_secret,
-    const crypto::key_derivation &baked_key)
+    const x25519_pubkey &baked_key)
 {
     static_assert(sizeof(rct::xmr_amount) == 8, "");
 
-    // ret = H_8(q, 8 r G) XOR_64 original
+    // ret = H_8(q, xr xG) XOR_64 original
     SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN, 2*sizeof(rct::key)};
     transcript.append("q", sender_receiver_secret);
     transcript.append("baked_key", baked_key);
@@ -129,40 +129,41 @@ static rct::xmr_amount enc_dec_jamtis_amount_selfsend(const rct::xmr_amount orig
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_enote_ephemeral_pubkey(const crypto::secret_key &enote_privkey,
-    const rct::key &DH_base,
-    rct::key &enote_ephemeral_pubkey_out)
+void make_jamtis_enote_ephemeral_pubkey(const x25519_secret_key &enote_ephemeral_privkey,
+    const x25519_pubkey &DH_base,
+    x25519_pubkey &enote_ephemeral_pubkey_out)
 {
-    // K_e = r K_3
-    rct::scalarmultKey(enote_ephemeral_pubkey_out, DH_base, rct::sk2rct(enote_privkey));
+    // xK_e = xr xK_3
+    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
+        &enote_ephemeral_pubkey_out,
+        &enote_ephemeral_privkey,
+        &DH_base);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_view_tag(const crypto::key_derivation &sender_receiver_DH_derivation,
+void make_jamtis_view_tag(const x25519_pubkey &sender_receiver_DH_derivation,
     const rct::key &onetime_address,
     view_tag_t &view_tag_out)
 {
     static_assert(sizeof(view_tag_t) == 1, "");
 
-    // view_tag = H_1(K_d, Ko)
+    // view_tag = H_1(xK_d, Ko)
     SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_VIEW_TAG, 2*sizeof(rct::key)};
-    transcript.append("K_d", sender_receiver_DH_derivation);
+    transcript.append("xK_d", sender_receiver_DH_derivation);
     transcript.append("Ko", onetime_address);
 
     sp_hash_to_1(transcript, &view_tag_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_view_tag(const crypto::secret_key &privkey,
-    const rct::key &DH_key,
-    hw::device &hwdev,
+void make_jamtis_view_tag(const x25519_secret_key &privkey,
+    const x25519_pubkey &DH_key,
     const rct::key &onetime_address,
     view_tag_t &view_tag_out)
 {
-    // K_d = 8 * privkey * DH_key
-    //TODO: consider using curve25519/x25519 variable-scalar-mult to get the derivation instead (faster?)
-    crypto::key_derivation derivation;
-    auto a_wiper = make_derivation_with_wiper(privkey, DH_key, hwdev, derivation);
+    // xK_d = privkey * DH_key
+    x25519_pubkey derivation;
+    auto a_wiper = make_derivation_with_wiper(privkey, DH_key, derivation);
 
-    // view_tag = H_1(K_d, Ko)
+    // view_tag = H_1(xK_d, Ko)
     make_jamtis_view_tag(derivation, onetime_address, view_tag_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -193,32 +194,31 @@ void make_jamtis_input_context_standard(const std::vector<crypto::key_image> &in
     sp_hash_to_32(transcript, input_context_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const rct::key &enote_ephemeral_pubkey,
+void make_jamtis_sender_receiver_secret_plain(const x25519_pubkey &sender_receiver_DH_derivation,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
     rct::key &sender_receiver_secret_out)
 {
-    // q = H_32(K_d, K_e, input_context)
+    // q = H_32(xK_d, xK_e, input_context)
     SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_SENDER_RECEIVER_SECRET_PLAIN, 3*sizeof(rct::key)};
-    transcript.append("K_d", sender_receiver_DH_derivation);
-    transcript.append("K_e", enote_ephemeral_pubkey);
+    transcript.append("xK_d", sender_receiver_DH_derivation);
+    transcript.append("xK_e", enote_ephemeral_pubkey);
     transcript.append("input_context", input_context);
 
     sp_hash_to_32(transcript, sender_receiver_secret_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
-    const rct::key &DH_key,
-    const rct::key &enote_ephemeral_pubkey,
+void make_jamtis_sender_receiver_secret_plain(const x25519_secret_key &privkey,
+    const x25519_pubkey &DH_key,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
-    hw::device &hwdev,
     rct::key &sender_receiver_secret_out)
 {
-    // 8 * privkey * DH_key
-    crypto::key_derivation derivation;
-    auto a_wiper = make_derivation_with_wiper(privkey, DH_key, hwdev, derivation);
+    // privkey * DH_key
+    x25519_pubkey derivation;
+    auto a_wiper = make_derivation_with_wiper(privkey, DH_key, derivation);
 
-    // q = H_32(K_d, K_e, input_context)
+    // q = H_32(xK_d, xK_e, input_context)
     make_jamtis_sender_receiver_secret_plain(derivation,
         enote_ephemeral_pubkey,
         input_context,
@@ -226,7 +226,7 @@ void make_jamtis_sender_receiver_secret_plain(const crypto::secret_key &privkey,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_view_balance,
-    const rct::key &enote_ephemeral_pubkey,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const jamtis::JamtisSelfSendType self_send_type,
     rct::key &sender_receiver_secret_out)
@@ -261,9 +261,9 @@ void make_jamtis_sender_receiver_secret_selfsend(const crypto::secret_key &k_vie
             }()
         };
 
-    // q = H_32[k_vb](K_e, input_context)
+    // q = H_32[k_vb](xK_e, input_context)
     SpKDFTranscript transcript{domain_separator, 2*sizeof(rct::key)};
-    transcript.append("K_e", enote_ephemeral_pubkey);
+    transcript.append("xK_e", enote_ephemeral_pubkey);
     transcript.append("input_context", input_context);
 
     sp_derive_secret(to_bytes(k_view_balance), transcript, sender_receiver_secret_out.bytes);
@@ -294,35 +294,30 @@ void make_jamtis_onetime_address(const rct::key &sender_receiver_secret,
     extend_seraphis_spendkey(extension, onetime_address_out);  //H_n(q, C) X + K_1
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_amount_baked_key_plain_sender(const crypto::secret_key &enote_privkey,
-    crypto::key_derivation &baked_key_out)
+void make_jamtis_amount_baked_key_plain_sender(const x25519_secret_key &enote_ephemeral_privkey,
+    x25519_pubkey &baked_key_out)
 {
-    // 8 r G
-    crypto::generate_key_derivation(rct::rct2pk(rct::G), enote_privkey, baked_key_out);
+    // xr xG
+    mx25519_scmul_base(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO), &baked_key_out, &enote_ephemeral_privkey);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_amount_baked_key_plain_recipient(const crypto::secret_key &address_privkey,
-    const crypto::secret_key &k_unlock_amounts,
-    const rct::key &enote_ephemeral_pubkey,
-    crypto::key_derivation &baked_key_out)
+void make_jamtis_amount_baked_key_plain_recipient(const x25519_secret_key &address_privkey,
+    const x25519_secret_key &xk_unlock_amounts,
+    const x25519_pubkey &enote_ephemeral_pubkey,
+    x25519_pubkey &baked_key_out)
 {
-    // 8 * (1/(k^j_a * k_ua)) * K_e = 8 r G
-    //TODO: does this create a temporary that isn't properly memwiped?
-    crypto::secret_key unlock_key_inverted;
-    sc_mul(to_bytes(unlock_key_inverted), to_bytes(address_privkey), to_bytes(k_unlock_amounts));  //k^j_a * k_ua
-    unlock_key_inverted = rct::rct2sk(invert(rct::sk2rct(unlock_key_inverted)));  //(1/(k^j_a * k_ua))
-
-    crypto::generate_key_derivation(rct::rct2pk(enote_ephemeral_pubkey), unlock_key_inverted, baked_key_out);
+    // (1/(xk^j_a * xk_ua)) * xK_e = xr xG
+    x25519_invmul_key({address_privkey, xk_unlock_amounts}, enote_ephemeral_pubkey, baked_key_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_amount_blinding_factor_plain(const rct::key &sender_receiver_secret,
-    const crypto::key_derivation &baked_key,
+    const x25519_pubkey &baked_key,
     crypto::secret_key &mask_out)
 {
-    // x = H_n(q, 8 r G)
+    // x = H_n(q, xr xG)
     SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_AMOUNT_BLINDING_FACTOR_PLAIN, 2*sizeof(rct::key)};
     transcript.append("q", sender_receiver_secret);
-    transcript.append("baked_key", baked_key);  //q || 8 r G
+    transcript.append("baked_key", baked_key);  //q || xr xG
 
     sp_hash_to_scalar(transcript, to_bytes(mask_out));
 }
@@ -339,17 +334,17 @@ void make_jamtis_amount_blinding_factor_selfsend(const rct::key &sender_receiver
 //-------------------------------------------------------------------------------------------------------------------
 rct::xmr_amount encode_jamtis_amount_plain(const rct::xmr_amount amount,
     const rct::key &sender_receiver_secret,
-    const crypto::key_derivation &baked_key)
+    const x25519_pubkey &baked_key)
 {
-    // a_enc = little_endian(a) XOR H_8(q, 8 r G)
+    // a_enc = little_endian(a) XOR H_8(q, xr xG)
     return enc_dec_jamtis_amount_plain(SWAP64LE(amount), sender_receiver_secret, baked_key);
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::xmr_amount decode_jamtis_amount_plain(const rct::xmr_amount encoded_amount,
     const rct::key &sender_receiver_secret,
-    const crypto::key_derivation &baked_key)
+    const x25519_pubkey &baked_key)
 {
-    // a = system_endian( a_enc XOR H_8(q, 8 r G) )
+    // a = system_endian( a_enc XOR H_8(q, xr xG) )
     return SWAP64LE(enc_dec_jamtis_amount_plain(encoded_amount, sender_receiver_secret, baked_key));
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -379,8 +374,8 @@ void make_jamtis_nominal_spend_key(const rct::key &sender_receiver_secret,
     reduce_seraphis_spendkey(extension, nominal_spend_key_out);  //(-H_n(q, C)) X + Ko_t
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool try_get_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const rct::key &enote_ephemeral_pubkey,
+bool try_get_jamtis_sender_receiver_secret_plain(const x25519_pubkey &sender_receiver_DH_derivation,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &onetime_address,
     const view_tag_t view_tag,
@@ -403,7 +398,7 @@ bool try_get_jamtis_sender_receiver_secret_plain(const crypto::key_derivation &s
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_jamtis_amount_plain(const rct::key &sender_receiver_secret,
-    const crypto::key_derivation &baked_key,
+    const x25519_pubkey &baked_key,
     const rct::key &amount_commitment,
     const rct::xmr_amount encoded_amount,
     rct::xmr_amount &amount_out,

@@ -56,7 +56,7 @@ namespace sp
 namespace jamtis
 {
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
+void make_jamtis_spendkey_extension(const crypto::secret_key &s_generate_address,
     const address_index_t j,
     crypto::secret_key &extension_out)
 {
@@ -67,15 +67,15 @@ void make_jamtis_spendkey_extension(const crypto::secret_key s_generate_address,
     sp_derive_key(to_bytes(s_generate_address), transcript, to_bytes(extension_out));
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_address_privkey(const crypto::secret_key s_generate_address,
+void make_jamtis_address_privkey(const crypto::secret_key &s_generate_address,
     const address_index_t j,
-    crypto::secret_key &address_privkey_out)
+    x25519_secret_key &address_privkey_out)
 {
-    // k^j_a = H_n[s_ga](j)
+    // xk^j_a = H_n_x25519[s_ga](j)
     SpKDFTranscript transcript{config::HASH_KEY_JAMTIS_ADDRESS_PRIVKEY, ADDRESS_INDEX_BYTES};
     transcript.append("j", j.bytes);
 
-    sp_derive_key(to_bytes(s_generate_address), transcript, to_bytes(address_privkey_out));
+    sp_derive_x25519_key(to_bytes(s_generate_address), transcript, address_privkey_out.data);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_jamtis_address_spend_key(const rct::key &wallet_spend_pubkey,

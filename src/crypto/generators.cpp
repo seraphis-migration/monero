@@ -75,7 +75,7 @@ static ge_cached H_cached;
 static ge_cached U_cached;
 static ge_cached X_cached;
 //X25519 generator: x = 9
-static const mx25519_pubkey mx25519_G = { .data = { 9 } };
+static const mx25519_pubkey mx25519_G{ .data = { 9 } };
 
 // misc
 static std::once_flag init_gens_once_flag;

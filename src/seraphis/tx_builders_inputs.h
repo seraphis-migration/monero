@@ -38,6 +38,7 @@
 #include "mock_ledger_context.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
+#include "sp_crypto_utils.h"
 #include "tx_binned_reference_set.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
@@ -155,7 +156,7 @@ void make_v1_input_proposal_v1(const SpEnoteRecordV1 &enote_record,
 * outparam: proposal_out -
 */
 bool try_make_v1_input_proposal_v1(const SpEnoteV1 &enote,
-    const rct::key &enote_ephemeral_pubkey,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const rct::key &input_context,
     const rct::key &wallet_spend_pubkey,
     const crypto::secret_key &k_view_balance,

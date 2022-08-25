@@ -32,6 +32,10 @@
 #include "tx_builders_outputs.h"
 
 //local headers
+extern "C"
+{
+#include "mx25519.h"
+}
 #include "crypto/crypto.h"
 #include "cryptonote_config.h"
 #include "seraphis/tx_extra.h"
@@ -43,6 +47,7 @@
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 #include "tx_extra.h"
@@ -66,15 +71,10 @@ namespace sp
 //-------------------------------------------------------------------------------------------------------------------
 static bool ephemeral_pubkeys_are_unique(const std::vector<SpOutputProposalV1> &output_proposals)
 {
-    // record all as 8*K_e to remove torsion elements if they exist
-    std::unordered_set<rct::key> enote_ephemeral_pubkeys;
+    std::unordered_set<x25519_pubkey> enote_ephemeral_pubkeys;
 
     for (const SpOutputProposalV1 &output_proposal : output_proposals)
-    {
-        enote_ephemeral_pubkeys.insert(
-                rct::scalarmultKey(output_proposal.m_enote_ephemeral_pubkey, rct::EIGHT)
-            );
-    }
+        enote_ephemeral_pubkeys.insert(output_proposal.m_enote_ephemeral_pubkey);
 
     return enote_ephemeral_pubkeys.size() == output_proposals.size();
 }
@@ -85,19 +85,19 @@ static bool ephemeral_pubkeys_are_unique(const std::vector<jamtis::JamtisPayment
     const std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payment_proposals)
 {
     // record all as 8*K_e to remove torsion elements if they exist
-    std::unordered_set<rct::key> enote_ephemeral_pubkeys;
-    rct::key temp_enote_ephemeral_pubkey;
+    std::unordered_set<x25519_pubkey> enote_ephemeral_pubkeys;
+    x25519_pubkey temp_enote_ephemeral_pubkey;
 
     for (const jamtis::JamtisPaymentProposalV1 &normal_proposal : normal_payment_proposals)
     {
         normal_proposal.get_enote_ephemeral_pubkey(temp_enote_ephemeral_pubkey);
-        enote_ephemeral_pubkeys.insert(rct::scalarmultKey(temp_enote_ephemeral_pubkey, rct::EIGHT));
+        enote_ephemeral_pubkeys.insert(temp_enote_ephemeral_pubkey);
     }
 
     for (const jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal : selfsend_payment_proposals)
     {
         selfsend_proposal.get_enote_ephemeral_pubkey(temp_enote_ephemeral_pubkey);
-        enote_ephemeral_pubkeys.insert(rct::scalarmultKey(temp_enote_ephemeral_pubkey, rct::EIGHT));
+        enote_ephemeral_pubkeys.insert(temp_enote_ephemeral_pubkey);
     }
 
     return enote_ephemeral_pubkeys.size() == normal_payment_proposals.size() + selfsend_payment_proposals.size();
@@ -109,19 +109,21 @@ static void make_additional_output_normal_dummy_v1(jamtis::JamtisPaymentProposal
     // make random payment proposal for a 'normal' dummy output
     dummy_proposal_out.m_destination.gen();
     dummy_proposal_out.m_amount = 0;
-    dummy_proposal_out.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+    dummy_proposal_out.m_enote_ephemeral_privkey = x25519_privkey_gen();
     dummy_proposal_out.m_partial_memo = TxExtra{};
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void make_additional_output_special_dummy_v1(const rct::key &enote_ephemeral_pubkey,
+static void make_additional_output_special_dummy_v1(const x25519_pubkey &enote_ephemeral_pubkey,
     jamtis::JamtisPaymentProposalV1 &dummy_proposal_out)
 {
     // make random payment proposal for a 'special' dummy output
     dummy_proposal_out.m_destination.gen();
-    dummy_proposal_out.m_destination.m_addr_K3 = enote_ephemeral_pubkey;  //K_e_other
+    x25519_invmul_key({x25519_eight()},
+        enote_ephemeral_pubkey,
+        dummy_proposal_out.m_destination.m_addr_K3);  //(1/8) * xK_e_other
     dummy_proposal_out.m_amount = 0;
-    dummy_proposal_out.m_enote_ephemeral_privkey = rct::rct2sk(rct::identity());  //r = 1 (not needed)
+    dummy_proposal_out.m_enote_ephemeral_privkey = x25519_eight();  //r = 8 (can't do r = 1 for x25519)
     dummy_proposal_out.m_partial_memo = TxExtra{};
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -135,37 +137,44 @@ static void make_additional_output_normal_self_send_v1(const jamtis::JamtisSelfS
     selfsend_proposal_out.m_destination = destination;
     selfsend_proposal_out.m_amount = amount;
     selfsend_proposal_out.m_type = self_send_type;
-    selfsend_proposal_out.m_enote_ephemeral_privkey = rct::rct2sk(rct::skGen());
+    selfsend_proposal_out.m_enote_ephemeral_privkey = x25519_privkey_gen();
     selfsend_proposal_out.m_partial_memo = TxExtra{};
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void make_additional_output_special_self_send_v1(const jamtis::JamtisSelfSendType self_send_type,
-    const rct::key &enote_ephemeral_pubkey,
+    const x25519_pubkey &enote_ephemeral_pubkey,
     const jamtis::JamtisDestinationV1 &destination,
     const crypto::secret_key &k_view_balance,
     const rct::xmr_amount amount,
     jamtis::JamtisPaymentProposalSelfSendV1 &selfsend_proposal_out)
 {
     // build payment proposal for a 'special' self-send that uses a shared enote ephemeral pubkey
-    crypto::secret_key findreceived_key;
-    jamtis::make_jamtis_findreceived_key(k_view_balance, findreceived_key);
-    const rct::key special_addr_K2{
-            rct::scalarmultKey(enote_ephemeral_pubkey, rct::sk2rct(findreceived_key))
-        };  //k_fr * K_e_other
+    x25519_secret_key findreceived_xkey;
+    jamtis::make_jamtis_findreceived_key(k_view_balance, findreceived_xkey);
+
+    x25519_pubkey special_addr_K2;
+    mx25519_scmul_key(mx25519_select_impl(mx25519_type::MX25519_TYPE_AUTO),
+        &special_addr_K2,
+        &findreceived_xkey,
+        &enote_ephemeral_pubkey);  //xk_fr * xK_e_other
 
     selfsend_proposal_out.m_destination = destination;
-    selfsend_proposal_out.m_destination.m_addr_K2 = special_addr_K2;  //k_fr * K_e_other
-    selfsend_proposal_out.m_destination.m_addr_K3 = enote_ephemeral_pubkey;  //K_e_other
+    x25519_invmul_key({x25519_eight()},
+        special_addr_K2,
+        selfsend_proposal_out.m_destination.m_addr_K2);  //(1/8) * xk_fr * xK_e_other
+    x25519_invmul_key({x25519_eight()},
+        enote_ephemeral_pubkey,
+        selfsend_proposal_out.m_destination.m_addr_K3);  //(1/8) * xK_e_other
     selfsend_proposal_out.m_amount = amount;
     selfsend_proposal_out.m_type = self_send_type;
-    selfsend_proposal_out.m_enote_ephemeral_privkey = rct::rct2sk(rct::identity());  //r = 1 (not needed)
+    selfsend_proposal_out.m_enote_ephemeral_privkey = x25519_eight();  //r = 8 (can't do r = 1 for x25519)
     selfsend_proposal_out.m_partial_memo = TxExtra{};
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void make_additional_output_dummy_v1(const OutputProposalSetExtraTypesV1 additional_output_type,
-    const rct::key &first_enote_ephemeral_pubkey,
+    const x25519_pubkey &first_enote_ephemeral_pubkey,
     jamtis::JamtisPaymentProposalV1 &normal_proposal_out)
 {
     // choose which output type to make, and make it
@@ -190,7 +199,7 @@ static void make_additional_output_dummy_v1(const OutputProposalSetExtraTypesV1 
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void make_additional_output_selfsend_v1(const OutputProposalSetExtraTypesV1 additional_output_type,
-    const rct::key &first_enote_ephemeral_pubkey,
+    const x25519_pubkey &first_enote_ephemeral_pubkey,
     const jamtis::JamtisDestinationV1 &change_destination,
     const jamtis::JamtisDestinationV1 &dummy_destination,
     const crypto::secret_key &k_view_balance,
@@ -318,13 +327,11 @@ void check_v1_tx_supplement_semantics_v1(const SpTxSupplementV1 &tx_supplement, 
             "Semantics check tx supplement v1: enote pubkeys must be unique.");
     }
 
-    // enote ephemeral pubkeys should not be zero or identity
+    // enote ephemeral pubkeys should not be zero
     // note: these are easy checks to do, but in no way guarantee the enote ephemeral pubkeys are valid/usable
-    for (const rct::key &enote_ephemeral_pubkey : tx_supplement.m_output_enote_ephemeral_pubkeys)
+    for (const x25519_pubkey &enote_ephemeral_pubkey : tx_supplement.m_output_enote_ephemeral_pubkeys)
     {
-        CHECK_AND_ASSERT_THROW_MES(!(enote_ephemeral_pubkey == rct::identity()),
-            "Semantics check tx supplement v1: an enote ephemeral pubkey is the identity element.");
-        CHECK_AND_ASSERT_THROW_MES(!(enote_ephemeral_pubkey == rct::zero()),
+        CHECK_AND_ASSERT_THROW_MES(!(enote_ephemeral_pubkey == x25519_pubkey{}),
             "Semantics check tx supplement v1: an enote ephemeral pubkey is zero.");
     }
 
@@ -342,7 +349,7 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     std::vector<SpEnoteV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
-    std::vector<rct::key> &output_enote_ephemeral_pubkeys_out)
+    std::vector<x25519_pubkey> &output_enote_ephemeral_pubkeys_out)
 {
     // output proposal set should be valid
     check_v1_output_proposal_set_semantics_v1(output_proposals);
@@ -588,7 +595,7 @@ void finalize_v1_output_proposal_set_v1(const boost::multiprecision::uint128_t &
         self_send_output_types.emplace_back(selfsend_proposal.m_type);
 
     // set the shared enote ephemeral pubkey here: it will always be the first one when it is needed
-    rct::key first_enote_ephemeral_pubkey{rct::identity()};
+    x25519_pubkey first_enote_ephemeral_pubkey{};
 
     if (normal_payment_proposals_inout.size() > 0)
         normal_payment_proposals_inout[0].get_enote_ephemeral_pubkey(first_enote_ephemeral_pubkey);

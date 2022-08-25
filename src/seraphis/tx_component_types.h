@@ -41,6 +41,7 @@
 #include "ringct/rctTypes.h"
 #include "sp_composition_proof.h"
 #include "sp_core_types.h"
+#include "sp_crypto_utils.h"
 #include "tx_binned_reference_set.h"
 #include "tx_extra.h"
 
@@ -179,8 +180,8 @@ void append_to_transcript(const SpBalanceProofV1 &container, SpTranscriptBuilder
 ///
 struct SpTxSupplementV1 final
 {
-    /// Ke: enote ephemeral pubkeys for outputs
-    rct::keyV m_output_enote_ephemeral_pubkeys;
+    /// xKe: enote ephemeral pubkeys for outputs
+    std::vector<x25519_pubkey> m_output_enote_ephemeral_pubkeys;
     /// tx memo
     TxExtra m_tx_extra;
 

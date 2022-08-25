@@ -41,6 +41,7 @@
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "sp_core_types.h"
+#include "sp_crypto_utils.h"
 #include "tx_component_types.h"
 #include "tx_extra.h"
 
@@ -134,7 +135,7 @@ struct SpBasicEnoteRecordV1 final
     /// original enote
     SpEnoteV1 m_enote;
     /// the enote's ephemeral pubkey
-    rct::key m_enote_ephemeral_pubkey;
+    x25519_pubkey m_enote_ephemeral_pubkey;
     /// context of the tx input(s) associated with this enote
     rct::key m_input_context;
     /// t'_addr: nominal address tag
@@ -150,7 +151,7 @@ struct SpIntermediateEnoteRecordV1 final
     /// original enote
     SpEnoteV1 m_enote;
     /// the enote's ephemeral pubkey
-    rct::key m_enote_ephemeral_pubkey;
+    x25519_pubkey m_enote_ephemeral_pubkey;
     /// context of the tx input(s) associated with this enote
     rct::key m_input_context;
     /// a: amount
@@ -170,7 +171,7 @@ struct SpEnoteRecordV1 final
     /// original enote
     SpEnoteV1 m_enote;
     /// the enote's ephemeral pubkey
-    rct::key m_enote_ephemeral_pubkey;
+    x25519_pubkey m_enote_ephemeral_pubkey;
     /// context of the tx input(s) associated with this enote
     rct::key m_input_context;
     /// k_a: enote view privkey

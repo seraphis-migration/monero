@@ -176,7 +176,7 @@ std::size_t SpTxSupplementV1::get_size_bytes() const
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const SpTxSupplementV1 &container, SpTranscriptBuilder &transcript_inout)
 {
-    transcript_inout.append("output_K_e_keys", container.m_output_enote_ephemeral_pubkeys);
+    transcript_inout.append("output_xK_e_keys", container.m_output_enote_ephemeral_pubkeys);
     transcript_inout.append("tx_extra", container.m_tx_extra);
 }
 //-------------------------------------------------------------------------------------------------------------------

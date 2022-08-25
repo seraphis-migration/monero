@@ -36,6 +36,7 @@
 #include "jamtis_payment_proposal.h"
 #include "jamtis_support_types.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 #include "tx_builder_types.h"
 #include "tx_component_types.h"
 
@@ -107,7 +108,7 @@ void make_v1_outputs_v1(const std::vector<SpOutputProposalV1> &output_proposals,
     std::vector<SpEnoteV1> &outputs_out,
     std::vector<rct::xmr_amount> &output_amounts_out,
     std::vector<crypto::secret_key> &output_amount_commitment_blinding_factors_out,
-    std::vector<rct::key> &output_enote_ephemeral_pubkeys_out);
+    std::vector<x25519_pubkey> &output_enote_ephemeral_pubkeys_out);
 //todo
 void finalize_tx_extra_v1(const TxExtra &partial_memo,
     const std::vector<SpOutputProposalV1> &output_proposals,

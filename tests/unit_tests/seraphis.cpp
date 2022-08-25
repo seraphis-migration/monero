@@ -30,6 +30,7 @@
 extern "C"
 {
 #include "crypto/crypto-ops.h"
+#include "mx25519.h"
 }
 #include "device/device.hpp"
 #include "misc_language.h"
@@ -86,6 +87,12 @@ static void make_secret_key(crypto::secret_key &skey_out)
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void make_secret_key(sp::x25519_secret_key &skey_out)
+{
+    skey_out = sp::x25519_privkey_gen();
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void check_is_owned_with_intermediate_record(const sp::SpOutputProposalV1 &test_proposal,
     const sp::jamtis::jamtis_mock_keys &keys,
     const sp::jamtis::address_index_t j_expected,
@@ -102,8 +109,8 @@ static void check_is_owned_with_intermediate_record(const sp::SpOutputProposalV1
         test_proposal.m_enote_ephemeral_pubkey,
         rct::zero(),
         keys.K_1_base,
-        keys.k_ua,
-        keys.k_fr,
+        keys.xk_ua,
+        keys.xk_fr,
         keys.s_ga,
         intermediate_enote_record));
 
@@ -434,7 +441,8 @@ TEST(seraphis, information_recovery_keyimage)
     rct::key wallet_spend_pubkey{k_bU};
     crypto::secret_key k_view_balance, spendkey_extension;
     sc_add(to_bytes(k_view_balance), to_bytes(y), to_bytes(y));  // k_vb = 2*(2*y)
-    sc_mul(to_bytes(spendkey_extension), sp::MINUS_ONE.bytes, to_bytes(k_a_sender));  // k^j_x = -y
+    const rct::key MINUS_ONE{sp::minus_one()};
+    sc_mul(to_bytes(spendkey_extension), MINUS_ONE.bytes, to_bytes(k_a_sender));  // k^j_x = -y
     sp::extend_seraphis_spendkey(k_view_balance, wallet_spend_pubkey);  // 4*y X + z U
     sp::jamtis::make_seraphis_key_image_jamtis_style(wallet_spend_pubkey,
         k_view_balance,
@@ -457,7 +465,7 @@ TEST(seraphis, information_recovery_amountencoding)
     make_secret_key(sender_receiver_secret);
     const rct::xmr_amount amount{rct::randXmrAmount(rct::xmr_amount{static_cast<rct::xmr_amount>(-1)})};
 
-    crypto::key_derivation fake_baked_key;
+    x25519_pubkey fake_baked_key;
     memcpy(&fake_baked_key, rct::zero().bytes, sizeof(rct::key));
 
     rct::xmr_amount encoded_amount{
@@ -505,13 +513,13 @@ TEST(seraphis, information_recovery_jamtisdestination)
     JamtisDestinationV1 destination_known;
     address_index_t j;
     j.gen();
-    make_jamtis_destination_v1(keys.K_1_base, keys.K_ua, keys.K_fr, keys.s_ga, j, destination_known);
+    make_jamtis_destination_v1(keys.K_1_base, keys.xK_ua, keys.xK_fr, keys.s_ga, j, destination_known);
 
     address_index_t j_nominal;
     EXPECT_TRUE(try_get_jamtis_index_from_destination_v1(destination_known,
         keys.K_1_base,
-        keys.K_ua,
-        keys.K_fr,
+        keys.xK_ua,
+        keys.xK_fr,
         keys.s_ga,
         j_nominal));
     EXPECT_TRUE(j_nominal == j);
@@ -521,8 +529,8 @@ TEST(seraphis, information_recovery_jamtisdestination)
     destination_unknown.gen();
     EXPECT_FALSE(try_get_jamtis_index_from_destination_v1(destination_unknown,
         keys.K_1_base,
-        keys.K_ua,
-        keys.K_fr,
+        keys.xK_ua,
+        keys.xK_fr,
         keys.s_ga,
         j_nominal));
 }
@@ -542,15 +550,15 @@ TEST(seraphis, information_recovery_enote_v1_plain)
     JamtisDestinationV1 user_address;
 
     make_jamtis_destination_v1(keys.K_1_base,
-        keys.K_ua,
-        keys.K_fr,
+        keys.xK_ua,
+        keys.xK_fr,
         keys.s_ga,
         j,
         user_address);
 
     // make a plain enote paying to address
     const rct::xmr_amount amount{crypto::rand_idx(static_cast<rct::xmr_amount>(-1))};
-    crypto::secret_key enote_privkey{make_secret_key()};
+    const x25519_secret_key enote_privkey{x25519_privkey_gen()};
 
     JamtisPaymentProposalV1 payment_proposal{user_address, amount, enote_privkey};
     SpOutputProposalV1 output_proposal;
@@ -575,15 +583,15 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
     JamtisDestinationV1 user_address;
 
     make_jamtis_destination_v1(keys.K_1_base,
-        keys.K_ua,
-        keys.K_fr,
+        keys.xK_ua,
+        keys.xK_fr,
         keys.s_ga,
         j,
         user_address);
 
     // make a self-spend enote paying to address
     rct::xmr_amount amount{crypto::rand_idx(static_cast<rct::xmr_amount>(-1))};
-    crypto::secret_key enote_privkey{make_secret_key()};
+    x25519_secret_key enote_privkey{x25519_privkey_gen()};
 
     JamtisPaymentProposalSelfSendV1 payment_proposal_selfspend{user_address,
         amount,
@@ -597,7 +605,7 @@ TEST(seraphis, information_recovery_enote_v1_selfsend)
 
     // make a change enote paying to address
     amount = crypto::rand_idx(static_cast<rct::xmr_amount>(-1));
-    enote_privkey = make_secret_key();
+    enote_privkey = x25519_privkey_gen();
 
     JamtisPaymentProposalSelfSendV1 payment_proposal_change{user_address,
         amount,
@@ -629,9 +637,9 @@ TEST(seraphis, finalize_v1_output_proposal_set_v1)
     JamtisDestinationV1 selfspend_dest;
     JamtisDestinationV1 change_dest;
     JamtisDestinationV1 dummy_dest;
-    make_jamtis_destination_v1(keys.K_1_base, keys.K_ua, keys.K_fr, keys.s_ga, j_selfspend, selfspend_dest);
-    make_jamtis_destination_v1(keys.K_1_base, keys.K_ua, keys.K_fr, keys.s_ga, j_change, change_dest);
-    make_jamtis_destination_v1(keys.K_1_base, keys.K_ua, keys.K_fr, keys.s_ga, j_dummy, dummy_dest);
+    make_jamtis_destination_v1(keys.K_1_base, keys.xK_ua, keys.xK_fr, keys.s_ga, j_selfspend, selfspend_dest);
+    make_jamtis_destination_v1(keys.K_1_base, keys.xK_ua, keys.xK_fr, keys.s_ga, j_change, change_dest);
+    make_jamtis_destination_v1(keys.K_1_base, keys.xK_ua, keys.xK_fr, keys.s_ga, j_dummy, dummy_dest);
 
     // prepare self-spend payment proposals
     JamtisPaymentProposalSelfSendV1 self_spend_payment_proposal1_amnt_1;

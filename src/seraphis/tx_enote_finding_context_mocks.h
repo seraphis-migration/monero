@@ -38,6 +38,7 @@
 #include "mock_ledger_context.h"
 #include "mock_offchain_context.h"
 #include "ringct/rctTypes.h"
+#include "sp_crypto_utils.h"
 #include "tx_enote_finding_context.h"
 #include "tx_enote_scanning.h"
 
@@ -100,9 +101,9 @@ class EnoteFindingContextLedgerMock final : public EnoteFindingContextLedger
 {
 public:
 //constructors
-    EnoteFindingContextLedgerMock(const MockLedgerContext &mock_ledger_context, const crypto::secret_key &k_find_received) :
+    EnoteFindingContextLedgerMock(const MockLedgerContext &mock_ledger_context, const x25519_secret_key &xk_find_received) :
         m_mock_ledger_context{mock_ledger_context},
-        m_k_find_received{k_find_received}
+        m_xk_find_received{xk_find_received}
     {}
 
 //overloaded operators
@@ -120,7 +121,7 @@ public:
 //member variables
 private:
     const MockLedgerContext &m_mock_ledger_context;
-    const crypto::secret_key &m_k_find_received;
+    const x25519_secret_key &m_xk_find_received;
 };
 
 ////
@@ -132,9 +133,9 @@ class EnoteFindingContextOffchainMock final : public EnoteFindingContextOffchain
 public:
 //constructors
     EnoteFindingContextOffchainMock(const MockOffchainContext &mock_offchain_context,
-        const crypto::secret_key &k_find_received) :
+        const x25519_secret_key &xk_find_received) :
             m_mock_offchain_context{mock_offchain_context},
-            m_k_find_received{k_find_received}
+            m_xk_find_received{xk_find_received}
     {}
 
 //overloaded operators
@@ -148,7 +149,7 @@ public:
 //member variables
 private:
     const MockOffchainContext &m_mock_offchain_context;
-    const crypto::secret_key &m_k_find_received;
+    const x25519_secret_key &m_xk_find_received;
 };
 
 } //namespace sp
