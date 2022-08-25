@@ -29,11 +29,6 @@
 #pragma once
 
 #include "crypto/crypto.h"
-extern "C"
-{
-#include "crypto/siphash.h"
-#include "crypto/blake2b.h"
-}
 #include "device/device.hpp"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -43,6 +38,7 @@ extern "C"
 #include "seraphis/jamtis_enote_utils.h"
 #include "seraphis/jamtis_payment_proposal.h"
 #include "seraphis/jamtis_support_types.h"
+#include "seraphis/legacy_core_utils.h"
 #include "seraphis/seraphis_config_temp.h"
 #include "seraphis/sp_core_enote_utils.h"
 #include "seraphis/sp_crypto_utils.h"
@@ -57,14 +53,21 @@ extern "C"
 //---------------------------------------------------------------------------------------------------------------------
 //---------------------------------------------------------------------------------------------------------------------
 
-/// cryptonote view key scanning
+struct ParamsShuttleViewScan final : public ParamsShuttle
+{
+    bool test_view_tag_check{false};
+};
+
+/// cryptonote view key scanning (with optional view tag check)
 class test_view_scan_cn
 {
 public:
     static const size_t loop_count = 1000;
 
-    bool init()
+    bool init(const ParamsShuttleViewScan &params)
     {
+        m_test_view_tag_check = params.test_view_tag_check;
+
         m_view_secret_key = rct::rct2sk(rct::skGen());
         m_spendkey = rct::rct2pk(rct::pkGen());
         m_tx_pub_key = rct::rct2pk(rct::pkGen());
@@ -85,8 +88,15 @@ public:
         crypto::key_derivation derivation;
         crypto::public_key nominal_spendkey;
         crypto::generate_key_derivation(m_tx_pub_key, m_view_secret_key, derivation);
-        crypto::derive_subaddress_public_key(m_onetime_address, derivation, 0, nominal_spendkey);
 
+        // view tag check: early return after computing a view tag
+        crypto::view_tag mock_view_tag;
+        crypto::derive_view_tag(derivation, 0, mock_view_tag);
+
+        if (m_test_view_tag_check)
+            return true;
+
+        crypto::derive_subaddress_public_key(m_onetime_address, derivation, 0, nominal_spendkey);
         return nominal_spendkey == m_spendkey;
     }
 
@@ -96,6 +106,8 @@ private:
 
     crypto::public_key m_tx_pub_key;
     crypto::public_key m_onetime_address;
+
+    bool m_test_view_tag_check;
 };
 
 //---------------------------------------------------------------------------------------------------------------------
@@ -103,7 +115,7 @@ private:
 //---------------------------------------------------------------------------------------------------------------------
 
 ////
-// cryptonote view key scanning using optimized crypto library
+// cryptonote view key scanning using optimized crypto library (with optional view tag check)
 // note: this relies on 'default hwdev' to auto-find the supercop crypto library (I think?)
 /// 
 class test_view_scan_cn_opt
@@ -111,8 +123,10 @@ class test_view_scan_cn_opt
 public:
     static const size_t loop_count = 1000;
 
-    bool init()
+    bool init(const ParamsShuttleViewScan &params)
     {
+        m_test_view_tag_check = params.test_view_tag_check;
+
         m_view_secret_key = rct::rct2sk(rct::skGen());
         m_spendkey = rct::rct2pk(rct::pkGen());
         m_tx_pub_key = rct::rct2pk(rct::pkGen());
@@ -133,8 +147,15 @@ public:
         crypto::key_derivation derivation;
         crypto::public_key nominal_spendkey;
         m_hwdev.generate_key_derivation(m_tx_pub_key, m_view_secret_key, derivation);
-        m_hwdev.derive_subaddress_public_key(m_onetime_address, derivation, 0, nominal_spendkey);
 
+        // view tag check: early return after computing a view tag
+        crypto::view_tag mock_view_tag;
+        crypto::derive_view_tag(derivation, 0, mock_view_tag);
+
+        if (m_test_view_tag_check)
+            return true;
+
+        m_hwdev.derive_subaddress_public_key(m_onetime_address, derivation, 0, nominal_spendkey);
         return nominal_spendkey == m_spendkey;
     }
 
@@ -146,6 +167,8 @@ private:
 
     crypto::public_key m_tx_pub_key;
     crypto::public_key m_onetime_address;
+
+    bool m_test_view_tag_check;
 };
 
 //---------------------------------------------------------------------------------------------------------------------
@@ -153,11 +176,6 @@ private:
 //---------------------------------------------------------------------------------------------------------------------
 
 /// seraphis view key scanning
-struct ParamsShuttleViewScan final : public ParamsShuttle
-{
-    bool test_view_tag_check{false};
-};
-
 class test_view_scan_sp
 {
 public:
@@ -175,15 +193,15 @@ public:
         sp::jamtis::address_index_t j{0}; //address 0
 
         sp::jamtis::make_jamtis_destination_v1(m_keys.K_1_base,
-            m_keys.K_ua,
-            m_keys.K_fr,
+            m_keys.xK_ua,
+            m_keys.xK_fr,
             m_keys.s_ga,
             j,
             user_address);
 
         // make enote paying to address
-        const crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
-        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, rct::xmr_amount{0}, enote_privkey};
+        const sp::x25519_secret_key enote_privkey{sp::x25519_privkey_gen()};
+        const sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, rct::xmr_amount{0}, enote_privkey};
         sp::SpOutputProposalV1 output_proposal;
         payment_proposal.get_output_proposal_v1(rct::zero(), output_proposal);
         m_enote_ephemeral_pubkey = output_proposal.m_enote_ephemeral_pubkey;
@@ -202,8 +220,7 @@ public:
         if (!sp::try_get_basic_enote_record_v1(m_enote,
                 m_enote_ephemeral_pubkey,
                 rct::zero(),
-                m_keys.k_fr,
-                m_hwdev,
+                m_keys.xk_fr,
                 basic_enote_record))
             return m_test_view_tag_check;  // this branch is only valid if trying to trigger view tag check
 
@@ -211,415 +228,12 @@ public:
     }
 
 private:
-    hw::device &m_hwdev{hw::get_device("default")};
     sp::jamtis::jamtis_mock_keys m_keys;
 
     sp::SpEnoteV1 m_enote;
-    rct::key m_enote_ephemeral_pubkey;
+    sp::x25519_pubkey m_enote_ephemeral_pubkey;
 
     bool m_test_view_tag_check;
-};
-
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-
-inline void domain_separate_derivation_hash_siphash(const std::string &domain_separator,
-    const crypto::key_derivation &derivation,
-    rct::key &hash_result_out)
-{
-    // derivation_hash = H("domain-sep", derivation)
-    std::string hash;
-    // "domain-sep"
-    hash = domain_separator;
-
-    // siphash key
-    char siphash_key[16];
-    for (std::size_t i{0}; i < 16; ++i)
-        siphash_key[i] = derivation.data[i];
-
-    // hash to the result
-    siphash(hash.data(), hash.size(), siphash_key, hash_result_out.bytes, 8);
-
-    memwipe(siphash_key, 16);
-}
-
-inline unsigned char make_seraphis_view_tag_siphash(const crypto::key_derivation &sender_receiver_DH_derivation)
-{
-    static std::string salt{config::HASH_KEY_JAMTIS_VIEW_TAG};
-
-    // tag_t = H("domain-sep", derivation)
-    rct::key view_tag_scalar;
-
-    domain_separate_derivation_hash_siphash(salt,
-        sender_receiver_DH_derivation,
-        view_tag_scalar);
-
-    return static_cast<unsigned char>(view_tag_scalar.bytes[0]);
-}
-
-inline unsigned char make_seraphis_view_tag_siphash(const crypto::secret_key &privkey,
-    const rct::key &DH_key,
-    hw::device &hwdev)
-{
-    // privkey * DH_key
-    crypto::key_derivation derivation;
-    hwdev.generate_key_derivation(rct::rct2pk(DH_key), privkey, derivation);
-
-    // tag_t = H("domain-sep", derivation, t)
-    unsigned char view_tag{make_seraphis_view_tag_siphash(derivation)};
-
-    memwipe(&derivation, sizeof(derivation));
-
-    return view_tag;
-}
-
-inline bool try_get_jamtis_nominal_spend_key_plain_siphash(const crypto::key_derivation &sender_receiver_DH_derivation,
-    const rct::key &enote_ephemeral_pubkey,
-    const rct::key &onetime_address,
-    const rct::key &amount_commitment,
-    const unsigned char view_tag,
-    rct::key &sender_receiver_secret_out,
-    rct::key &nominal_spend_key_out)
-{
-    // tag'_t = H(q_t)
-    const unsigned char nominal_view_tag{make_seraphis_view_tag_siphash(sender_receiver_DH_derivation)};
-
-    // check that recomputed tag matches original tag; short-circuit on failure
-    if (nominal_view_tag != view_tag)
-        return false;
-
-    // q_t
-    // note: computing this after view tag check is an optimization
-    sp::jamtis::make_jamtis_sender_receiver_secret_plain(sender_receiver_DH_derivation,
-        enote_ephemeral_pubkey,
-        rct::zero(),
-        sender_receiver_secret_out);
-
-    // K'^s_t = Ko_t - H(q_t) X
-    crypto::secret_key k_a_extender;
-    sp::jamtis::make_jamtis_onetime_address_extension(sender_receiver_secret_out,
-        amount_commitment,
-        k_a_extender);  // H(q_t)
-    sc_mul(to_bytes(k_a_extender), sp::MINUS_ONE.bytes, to_bytes(k_a_extender));  // -H(q_t)
-    nominal_spend_key_out = onetime_address;  // Ko_t
-    sp::extend_seraphis_spendkey(k_a_extender, nominal_spend_key_out); // (-H(q_t)) X + Ko_t
-
-    return true;
-}
-
-// seraphis view-key scanning with siphash hash function
-class test_view_scan_sp_siphash
-{
-public:
-    static const size_t loop_count = 1000;
-
-    bool init()
-    {
-        // prepare user wallet keys
-        make_jamtis_mock_keys(m_keys);
-
-        // user address
-        sp::jamtis::JamtisDestinationV1 user_address;
-
-        sp::jamtis::make_jamtis_destination_v1(m_keys.K_1_base,
-            m_keys.K_ua,
-            m_keys.K_fr,
-            m_keys.s_ga,
-            0, //address 0
-            user_address);
-
-        m_recipient_spend_key = user_address.m_addr_K1;
-
-        // make enote paying to address
-        const crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
-        const sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, 0, enote_privkey};
-        sp::SpOutputProposalV1 output_proposal;
-        payment_proposal.get_output_proposal_v1(rct::zero(), output_proposal);
-        m_enote_ephemeral_pubkey = output_proposal.m_enote_ephemeral_pubkey;
-        output_proposal.get_enote_v1(m_enote);
-
-        // kludge: use siphash to make view tag
-        m_enote.m_view_tag = make_seraphis_view_tag_siphash(enote_privkey,
-            user_address.m_addr_K3,
-            hw::get_device("default"));
-        // want view tag test to fail
-        ++m_enote.m_view_tag;
-
-        return true;
-    }
-
-    bool test()
-    {
-        rct::key sender_receiver_secret_dummy;
-        crypto::key_derivation derivation;
-
-        hw::get_device("default").generate_key_derivation(rct::rct2pk(m_enote_ephemeral_pubkey),
-            m_keys.k_fr,
-            derivation);
-
-        rct::key nominal_recipient_spendkey;
-
-        if (!try_get_jamtis_nominal_spend_key_plain_siphash(derivation,
-            m_enote_ephemeral_pubkey,
-            m_enote.m_core.m_onetime_address,
-            m_enote.m_core.m_amount_commitment,
-            m_enote.m_view_tag,
-            sender_receiver_secret_dummy,  //outparam not used
-            nominal_recipient_spendkey))
-        {
-            return true; //expect it to fail on view tag
-        }
-
-        memwipe(&sender_receiver_secret_dummy, sizeof(rct::key));
-        memwipe(&derivation, sizeof(derivation));
-
-        return nominal_recipient_spendkey == m_recipient_spend_key;
-    }
-
-private:
-    rct::key m_recipient_spend_key;
-    sp::jamtis::jamtis_mock_keys m_keys;
-
-    sp::SpEnoteV1 m_enote;
-    rct::key m_enote_ephemeral_pubkey;
-};
-
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-
-////
-// Plain perf test of hash functions eligible for making view tags
-// - cn_fast_hash
-// - siphash
-// - blake2b
-///
-
-struct ParamsShuttleViewHash final : public ParamsShuttle
-{
-    std::string domain_separator;
-};
-
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-
-
-class test_view_scan_hash_siphash
-{
-public:
-    static const size_t loop_count = 1000;
-    static const size_t re_loop = 100;
-
-    bool init(const ParamsShuttleViewHash &params)
-    {
-        hw::get_device("default").generate_key_derivation(rct::rct2pk(rct::pkGen()),
-            rct::rct2sk(rct::skGen()),
-            m_derivation);
-
-        m_domain_separator = params.domain_separator;
-
-        return true;
-    }
-
-    bool test()
-    {
-        static std::size_t index{0};
-
-        for (std::size_t i{0}; i < re_loop; ++i)
-        {
-            // derivation_hash = H[derivation]("domain-sep", index)
-            std::string hash;
-            hash.reserve(sizeof(m_domain_separator) + ((sizeof(std::size_t) * 8 + 6) / 7));
-            // "domain-sep"
-            hash = m_domain_separator;
-            // index
-            char converted_index[(sizeof(size_t) * 8 + 6) / 7];
-            char* end = converted_index;
-            tools::write_varint(end, index);
-            assert(end <= converted_index + sizeof(converted_index));
-            hash.append(converted_index, end - converted_index);
-
-            // hash to the result
-            // note: only the first 16 bytes of 'm_derivation' is used for the siphash key
-            rct::key hash_result;
-            siphash(hash.data(), hash.size(), &m_derivation, hash_result.bytes, 8);
-        }
-
-        return true;
-    }
-
-private:
-    crypto::key_derivation m_derivation;
-    std::string m_domain_separator;
-};
-
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-
-class test_view_scan_hash_halfsiphash
-{
-public:
-    static const size_t loop_count = 1000;
-    static const size_t re_loop = 100;
-
-    bool init(const ParamsShuttleViewHash &params)
-    {
-        hw::get_device("default").generate_key_derivation(rct::rct2pk(rct::pkGen()),
-            rct::rct2sk(rct::skGen()),
-            m_derivation);
-
-        m_domain_separator = params.domain_separator;
-
-        return true;
-    }
-
-    bool test()
-    {
-        static std::size_t index{0};
-
-        for (std::size_t i{0}; i < re_loop; ++i)
-        {
-            // derivation_hash = H[derivation]("domain-sep", index)
-            std::string hash;
-            hash.reserve(sizeof(m_domain_separator) + ((sizeof(std::size_t) * 8 + 6) / 7));
-            // "domain-sep"
-            hash = m_domain_separator;
-            // index
-            char converted_index[(sizeof(size_t) * 8 + 6) / 7];
-            char* end = converted_index;
-            tools::write_varint(end, index);
-            assert(end <= converted_index + sizeof(converted_index));
-            hash.append(converted_index, end - converted_index);
-
-            // siphash key
-            char siphash_key[8];
-            for (std::size_t i{0}; i < 8; ++i)
-                siphash_key[i] = m_derivation.data[i];
-
-            // hash to the result
-            rct::key hash_result;
-            halfsiphash(hash.data(), hash.size(), siphash_key, hash_result.bytes, 4);
-        }
-
-        return true;
-    }
-
-private:
-    crypto::key_derivation m_derivation;
-    std::string m_domain_separator;
-};
-
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-
-class test_view_scan_hash_cnhash
-{
-public:
-    static const size_t loop_count = 1000;
-    static const size_t re_loop = 100;
-
-    bool init(const ParamsShuttleViewHash &params)
-    {
-        hw::get_device("default").generate_key_derivation(rct::rct2pk(rct::pkGen()),
-            rct::rct2sk(rct::skGen()),
-            m_derivation);
-
-        m_domain_separator = params.domain_separator;
-
-        return true;
-    }
-
-    bool test()
-    {
-        static std::size_t index{0};
-
-        for (std::size_t i{0}; i < re_loop; ++i)
-        {
-            // derivation_hash = H("domain-sep", derivation, index)
-            std::string hash;
-            hash.reserve(sizeof(m_domain_separator) + sizeof(rct::key) +
-                ((sizeof(std::size_t) * 8 + 6) / 7));
-            // "domain-sep"
-            hash = m_domain_separator;
-            // derivation (e.g. a DH shared key)
-            hash.append((const char*) &m_derivation, sizeof(rct::key));
-            // index
-            char converted_index[(sizeof(size_t) * 8 + 6) / 7];
-            char* end = converted_index;
-            tools::write_varint(end, index);
-            assert(end <= converted_index + sizeof(converted_index));
-            hash.append(converted_index, end - converted_index);
-
-            // hash to the result
-            rct::key hash_result;
-            rct::hash_to_scalar(hash_result, hash.data(), hash.size());
-        }
-
-        return true;
-    }
-
-private:
-    crypto::key_derivation m_derivation;
-    std::string m_domain_separator;
-};
-
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-//---------------------------------------------------------------------------------------------------------------------
-
-class test_view_scan_hash_b2bhash
-{
-public:
-    static const size_t loop_count = 1000;
-    static const size_t re_loop = 100;
-
-    bool init(const ParamsShuttleViewHash &params)
-    {
-        hw::get_device("default").generate_key_derivation(rct::rct2pk(rct::pkGen()),
-            rct::rct2sk(rct::skGen()),
-            m_derivation);
-
-        m_domain_separator = params.domain_separator;
-
-        return true;
-    }
-
-    bool test()
-    {
-        static std::size_t index{0};
-
-        for (std::size_t i{0}; i < re_loop; ++i)
-        {
-            // derivation_hash = H("domain-sep", derivation, index)
-            std::string hash;
-            hash.reserve(sizeof(m_domain_separator) + sizeof(rct::key) +
-                ((sizeof(std::size_t) * 8 + 6) / 7));
-            // "domain-sep"
-            hash = m_domain_separator;
-            // derivation (e.g. a DH shared key)
-            hash.append((const char*) &m_derivation, sizeof(rct::key));
-            // index
-            char converted_index[(sizeof(size_t) * 8 + 6) / 7];
-            char* end = converted_index;
-            tools::write_varint(end, index);
-            assert(end <= converted_index + sizeof(converted_index));
-            hash.append(converted_index, end - converted_index);
-
-            // hash to the result
-            rct::key hash_result;
-            blake2b(hash_result.bytes, 32, hash.data(), hash.size(), nullptr, 0);
-        }
-
-        return true;
-    }
-
-private:
-    crypto::key_derivation m_derivation;
-    std::string m_domain_separator;
 };
 
 //---------------------------------------------------------------------------------------------------------------------
@@ -661,8 +275,8 @@ public:
         m_real_address_index = sp::jamtis::address_index_t{0}; //address 0
 
         sp::jamtis::make_jamtis_destination_v1(m_keys.K_1_base,
-            m_keys.K_ua,
-            m_keys.K_fr,
+            m_keys.xK_ua,
+            m_keys.xK_fr,
             m_keys.s_ga,
             m_real_address_index,
             user_address);
@@ -671,8 +285,8 @@ public:
         m_cipher_context = std::make_shared<sp::jamtis::jamtis_address_tag_cipher_context>(rct::sk2rct(m_keys.s_ct));
 
         // make enote paying to address
-        crypto::secret_key enote_privkey{rct::rct2sk(rct::skGen())};
-        sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, rct::xmr_amount{0}, enote_privkey};
+        const sp::x25519_secret_key enote_privkey{sp::x25519_privkey_gen()};
+        const sp::jamtis::JamtisPaymentProposalV1 payment_proposal{user_address, rct::xmr_amount{0}, enote_privkey};
         sp::SpOutputProposalV1 output_proposal;
         payment_proposal.get_output_proposal_v1(rct::zero(), output_proposal);
         sp::SpEnoteV1 real_enote;
@@ -683,8 +297,7 @@ public:
         if (!sp::try_get_basic_enote_record_v1(real_enote,
                 output_proposal.m_enote_ephemeral_pubkey,
                 rct::zero(),
-                m_keys.k_fr,
-                hw::get_device("default"),
+                m_keys.xk_fr,
                 basic_record))
             return false;
 
@@ -737,8 +350,8 @@ public:
                     try_get_enote_record_v1_plain(m_basic_records[record_index],
                         m_keys.K_1_base,
                         m_keys.k_vb,
-                        m_keys.k_ua,
-                        m_keys.k_fr,
+                        m_keys.xk_ua,
+                        m_keys.xk_fr,
                         m_keys.s_ga,
                         *m_cipher_context,
                         enote_record)
