@@ -97,6 +97,10 @@ struct SimpleTask final
 {
     unsigned char priority;
     task_t task;
+
+    SimpleTask() = default;
+    SimpleTask(const SimpleTask&) = delete;
+    SimpleTask(SimpleTask&&) = default;
 };
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -107,6 +111,10 @@ struct SleepyTask final
 {
     SimpleTask simple_task;
     WakeTime wake_time;
+
+    SleepyTask() = default;
+    SleepyTask(const SleepyTask&) = delete;
+    SleepyTask(SleepyTask&&) = default;
 };
 
 //-------------------------------------------------------------------------------------------------------------------
