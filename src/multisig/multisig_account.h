@@ -244,10 +244,11 @@ namespace multisig
     void kex_update_impl(const std::vector<multisig_kex_msg> &expanded_msgs, const bool incomplete_signer_set);
     /**
     * brief: get_kex_exclude_pubkeys - collect the local signer's shared keys to ignore in incoming messages
+    * param: generators - generators this account uses
     * return: keys held by the local account corresponding to the 'in-progress round'
     *    - If 'in-progress round' is the final round, these are the local account's shares of the final aggregate key.
     */
-    std::vector<crypto::public_key> get_kex_exclude_pubkeys() const;
+    std::vector<crypto::public_key> get_kex_exclude_pubkeys(const cryptonote::account_generators &generators) const;
     /**
     * brief: initialize_kex_update - initialize the multisig account for the first kex round
     *    - Collect the local signer's shared keys to ignore in incoming messages, build the aggregate ancillary key
@@ -258,8 +259,7 @@ namespace multisig
     */
     void initialize_kex_update(const cryptonote::account_generators &generators,
       const std::vector<multisig_kex_msg> &expanded_msgs,
-      const std::uint32_t kex_rounds_required,
-      std::vector<crypto::public_key> &exclude_pubkeys_out);
+      const std::uint32_t kex_rounds_required);
     /**
     * brief: finalize_kex_update - Helper for kex_update_impl()
     * param: generators - generators this account uses

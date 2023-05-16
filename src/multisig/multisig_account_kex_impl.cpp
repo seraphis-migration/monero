@@ -672,7 +672,7 @@ namespace multisig
     {
       // in the first round, only the local pubkey is recommended by the local signer
       const rct::key initial_pubkey{rct::scalarmultKey(rct::pk2rct(generators.m_primary), rct::sk2rct(m_base_privkey))};
-      exclude_pubkeys.emplace_back(initial_pubkey);
+      exclude_pubkeys.emplace_back(rct::rct2pk(initial_pubkey));
     }
     else
     {
@@ -909,7 +909,7 @@ namespace multisig
       result_keys_to_origins_map);
 
     // finish account update
-    this->finalize_kex_update(kex_rounds_required, std::move(result_keys_to_origins_map));
+    this->finalize_kex_update(generators, kex_rounds_required, std::move(result_keys_to_origins_map));
   }
   //-----------------------------------------------------------------
   // multisig_account: EXTERNAL
