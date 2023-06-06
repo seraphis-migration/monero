@@ -31,6 +31,7 @@ set(unit_tests_sources
   apply_permutation.cpp
   address_from_url.cpp
   async.cpp
+  base32.cpp
   base58.cpp
   blockchain_db.cpp
   block_queue.cpp
