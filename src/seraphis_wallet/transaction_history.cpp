@@ -375,6 +375,7 @@ bool SpTransactionHistory::write_tx_funded_proof(const rct::key &txid, const SpE
     make_serializable_tx_funded_proof_v1(tx_funded_proof,ser_tx_funded_proof);
 
     // 6. prepare to save to file by proof name and date
+    // TODO: Add date into proof name
     write_encrypted_file("tx_funded_proof", "", ser_tx_funded_proof);
     return true;
 }

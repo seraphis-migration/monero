@@ -72,7 +72,6 @@ struct ser_TransactionRecordV1
     std::vector<std::pair<sp::serialization::ser_JamtisDestinationV1, rct::xmr_amount>> outlays;
 
     // fees and total sent: 
-    // useful to store here also instead of looking directly at the enotes and blockchain
     rct::xmr_amount amount_sent;
     rct::xmr_amount fee_sent;
 
@@ -89,17 +88,12 @@ struct ser_SpTransactionStoreV1
 {
     // quickly find TransactionRecordV1 from txid
     serializable_unordered_map<rct::key, ser_TransactionRecordV1> tx_records;
-    // std::unordered_map<rct::key, TransactionRecordV1> tx_records;
 
     // sort by blockheight to find last transactions or txs 
     // in a specific time range
-    // std::multimap<std::uint64_t,rct::key, std::greater<std::uint64_t>> confirmed_txids;
     serializable_multimap<std::uint64_t,rct::key, std::greater<std::uint64_t>> confirmed_txids;
 
     // sort by timestamp instead of blockheight
-    // std::multimap<std::uint64_t, rct::key,std::greater<std::uint64_t>> unconfirmed_txids;
-    // std::multimap<std::uint64_t, rct::key,std::greater<std::uint64_t>> offchain_txids;
-
     serializable_multimap<std::uint64_t, rct::key,std::greater<std::uint64_t>> unconfirmed_txids;
     serializable_multimap<std::uint64_t, rct::key,std::greater<std::uint64_t>> offchain_txids;
 
@@ -115,7 +109,7 @@ struct ser_SpTransactionStoreV1
 struct ser_TxFundedProofV1
 {
     rct::key message;
-    rct::key masked_address;  //K" = t_k G + Ko  (using a different mask t_k than was used in the tx)
+    rct::key masked_address;  
     crypto::key_image KI;
     ser_SpCompositionProof composition_proof;
 

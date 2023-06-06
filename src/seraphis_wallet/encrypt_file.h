@@ -130,6 +130,8 @@ bool write_encrypted_file(std::string path, const epee::wipeable_string &passwor
   return true;
 }
 
+
+// TO BE REPLACED BY KEY_CONTAINER
 bool generate_master_wallet(std::string path, const epee::wipeable_string &password);
 bool read_master_wallet(std::string path, const epee::wipeable_string &password, jamtis_mock_keys &keys_out);
 
