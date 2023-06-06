@@ -77,6 +77,17 @@ public:
 template <template <bool> class Archive, typename K, typename V> bool do_serialize(Archive<false> &ar, serializable_unordered_multimap<K, V> &v);
 template <template <bool> class Archive, typename K, typename V> bool do_serialize(Archive<true> &ar, serializable_unordered_multimap<K, V> &v);
 
+template<typename K, typename V, typename C>
+class serializable_multimap: public std::multimap<K, V>
+{
+public:
+  typedef typename std::pair<K, V> value_type;
+  typename std::multimap<K, V, C> &parent() { return *this; }
+};
+
+template <template <bool> class Archive, typename K, typename V, typename C> bool do_serialize(Archive<false> &ar, serializable_multimap<K, V, C> &v);
+template <template <bool> class Archive, typename K, typename V, typename C> bool do_serialize(Archive<true> &ar, serializable_multimap<K, V, C> &v);
+
 template <template <bool> class Archive, class T> bool do_serialize(Archive<false> &ar, std::unordered_set<T> &v);
 template <template <bool> class Archive, class T> bool do_serialize(Archive<true> &ar, std::unordered_set<T> &v);
 
@@ -97,6 +108,8 @@ namespace serialization
     template <typename K, typename V> void do_add(serializable_map<K, V> &c, std::pair<K, V> &&e) { c.insert(std::forward<std::pair<K, V>>(e)); }
 
     template <typename K, typename V> void do_add(serializable_unordered_multimap<K, V> &c, std::pair<K, V> &&e) { c.insert(std::forward<std::pair<K, V>>(e)); }
+
+    template <typename K, typename V, typename C> void do_add(serializable_multimap<K, V, C> &c, std::pair<K, V> &&e) { c.insert(std::forward<std::pair<K, V>>(e)); }
 
     template <typename T> void do_add(std::unordered_set<T> &c, T &&e) { c.insert(std::forward<T>(e)); }
 
@@ -120,6 +133,9 @@ template <template <bool> class Archive, typename K, typename V> bool do_seriali
 
 template <template <bool> class Archive, typename K, typename V> bool do_serialize(Archive<false> &ar, serializable_unordered_multimap<K, V> &v) { return do_serialize_container(ar, v); }
 template <template <bool> class Archive, typename K, typename V> bool do_serialize(Archive<true> &ar, serializable_unordered_multimap<K, V> &v) { return do_serialize_container(ar, v); }
+
+template <template <bool> class Archive, typename K, typename V, typename C> bool do_serialize(Archive<false> &ar, serializable_multimap<K, V, C> &v) { return do_serialize_container(ar, v); }
+template <template <bool> class Archive, typename K, typename V, typename C> bool do_serialize(Archive<true> &ar, serializable_multimap<K, V, C> &v) { return do_serialize_container(ar, v); }
 
 template <template <bool> class Archive, class T> bool do_serialize(Archive<false> &ar, std::unordered_set<T> &v) { return do_serialize_container(ar, v); }
 template <template <bool> class Archive, class T> bool do_serialize(Archive<true> &ar, std::unordered_set<T> &v) { return do_serialize_container(ar, v); }
