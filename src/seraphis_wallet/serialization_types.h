@@ -26,41 +26,39 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 #pragma once
 
 // local headers
+#include "ringct/rctTypes.h"
 #include "seraphis_core/jamtis_destination.h"
 #include "seraphis_crypto/sp_crypto_utils.h"
 #include "seraphis_impl/enote_store.h"
-#include "seraphis_main/contextual_enote_record_types.h"
-#include "seraphis_main/sp_knowledge_proof_utils.h"
-#include "seraphis_main/sp_knowledge_proof_types.h"
-#include "ringct/rctTypes.h"
 #include "seraphis_impl/serialization_demo_types.h"
+#include "seraphis_main/contextual_enote_record_types.h"
+#include "seraphis_main/sp_knowledge_proof_types.h"
+#include "seraphis_main/sp_knowledge_proof_utils.h"
 
-//third party headers
+// third party headers
+#include <boost/range.hpp>
+
 #include "boost/range/iterator_range.hpp"
 #include "seraphis_wallet/transaction_history.h"
+#include "serialization/binary_archive.h"
 #include "serialization/containers.h"
 #include "serialization/serialization.h"
-#include <boost/range.hpp>
-#include "serialization/binary_archive.h"
 
-//standard headers
+// standard headers
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <map>
-#include <unordered_map>
 #include <tuple>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
-
 using namespace sp::knowledge_proofs;
 using namespace sp::serialization;
-
 
 struct ser_TransactionRecordV1
 {
@@ -71,16 +69,16 @@ struct ser_TransactionRecordV1
     // sent funds
     std::vector<std::pair<sp::serialization::ser_JamtisDestinationV1, rct::xmr_amount>> outlays;
 
-    // fees and total sent: 
+    // fees and total sent:
     rct::xmr_amount amount_sent;
     rct::xmr_amount fee_sent;
 
     BEGIN_SERIALIZE_OBJECT()
-        FIELD(legacy_spent_enotes)
-        FIELD(sp_spent_enotes)
-        FIELD(outlays)
-        FIELD(amount_sent)
-        FIELD(fee_sent)
+    FIELD(legacy_spent_enotes)
+    FIELD(sp_spent_enotes)
+    FIELD(outlays)
+    FIELD(amount_sent)
+    FIELD(fee_sent)
     END_SERIALIZE()
 };
 
@@ -89,47 +87,43 @@ struct ser_SpTransactionStoreV1
     // quickly find TransactionRecordV1 from txid
     serializable_unordered_map<rct::key, ser_TransactionRecordV1> tx_records;
 
-    // sort by blockheight to find last transactions or txs 
+    // sort by blockheight to find last transactions or txs
     // in a specific time range
-    serializable_multimap<std::uint64_t,rct::key, std::greater<std::uint64_t>> confirmed_txids;
+    serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> confirmed_txids;
 
     // sort by timestamp instead of blockheight
-    serializable_multimap<std::uint64_t, rct::key,std::greater<std::uint64_t>> unconfirmed_txids;
-    serializable_multimap<std::uint64_t, rct::key,std::greater<std::uint64_t>> offchain_txids;
+    serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> unconfirmed_txids;
+    serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> offchain_txids;
 
     BEGIN_SERIALIZE_OBJECT()
-        FIELD(tx_records)
-        FIELD(confirmed_txids)
-        FIELD(unconfirmed_txids)
-        FIELD(offchain_txids)
+    FIELD(tx_records)
+    FIELD(confirmed_txids)
+    FIELD(unconfirmed_txids)
+    FIELD(offchain_txids)
     END_SERIALIZE()
-
 };
 
 struct ser_TxFundedProofV1
 {
     rct::key message;
-    rct::key masked_address;  
+    rct::key masked_address;
     crypto::key_image KI;
     ser_SpCompositionProof composition_proof;
 
-
     BEGIN_SERIALIZE_OBJECT()
-        FIELD(message)
-        FIELD(masked_address)
-        FIELD(KI)
-        FIELD(composition_proof)
+    FIELD(message)
+    FIELD(masked_address)
+    FIELD(KI)
+    FIELD(composition_proof)
     END_SERIALIZE()
 };
 
-
 void make_serializable_transaction_record_v1(const TransactionRecordV1 &tx_rec, ser_TransactionRecordV1 &ser_tx_rec);
-void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_store, ser_SpTransactionStoreV1 &ser_tx_store);
+void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_store,
+                                               ser_SpTransactionStoreV1 &ser_tx_store);
 
-
-void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec,TransactionRecordV1 &tx_rec);
-void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_store,SpTransactionStoreV1 &tx_store);
-
+void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec, TransactionRecordV1 &tx_rec);
+void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_store, SpTransactionStoreV1 &tx_store);
 
 void make_serializable_tx_funded_proof_v1(const TxFundedProofV1 &proof, ser_TxFundedProofV1 &ser_proof);
 void recover_tx_funded_proof_v1(const ser_TxFundedProofV1 &ser_proof, TxFundedProofV1 &proof);

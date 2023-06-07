@@ -26,14 +26,18 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 // paired header
 #include "transaction_history.h"
 
 // local headers
+#include "checkpoints/checkpoints.h"
 #include "common/container_helpers.h"
+#include "common/unordered_containers_boost_serialization.h"
 #include "common/util.h"
+#include "crypto/chacha.h"
 #include "crypto/crypto.h"
+#include "crypto/hash.h"
+#include "cryptonote_basic/account_boost_serialization.h"
 #include "file_io_utils.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
@@ -47,29 +51,27 @@
 #include "seraphis_wallet/serialization_types.h"
 #include "serialization/binary_utils.h"
 #include "serialization/containers.h"
-#include "transaction_utils.h"
+#include "serialization/crypto.h"
+#include "serialization/pair.h"
+#include "serialization/string.h"
+#include "serialization/tuple.h"
 #include "serialization_types.h"
 #include "string_tools.h"
-#include "cryptonote_basic/account_boost_serialization.h"
-#include "common/unordered_containers_boost_serialization.h"
-#include "common/util.h"
-#include "crypto/chacha.h"
-#include "crypto/hash.h"
-#include "ringct/rctTypes.h"
-#include "ringct/rctOps.h"
-#include "checkpoints/checkpoints.h"
-#include "serialization/crypto.h"
-#include "serialization/string.h"
-#include "serialization/pair.h"
-#include "serialization/tuple.h"
-#include "serialization/containers.h"
+#include "transaction_utils.h"
 
 // third party headers
 #include <boost/range.hpp>
 #include <boost/range/iterator_range_core.hpp>
+
 #include "boost/range/iterator_range.hpp"
 
 // standard headers
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/variables_map.hpp>
+#include <boost/serialization/deque.hpp>
+#include <boost/serialization/list.hpp>
+#include <boost/serialization/vector.hpp>
+#include <boost/thread/lock_guard.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
@@ -80,36 +82,23 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-#include <boost/program_options/options_description.hpp>
-#include <boost/program_options/variables_map.hpp>
-#include <boost/serialization/list.hpp>
-#include <boost/serialization/vector.hpp>
-#include <boost/serialization/deque.hpp>
-#include <boost/thread/lock_guard.hpp>
 
 // #include <boost/program_options/variables_map.hpp>
 #if BOOST_VERSION >= 107400
 #include <boost/serialization/library_version_type.hpp>
 #endif
 
-
-
 bool operator==(const SpTransactionStoreV1 &a, const SpTransactionStoreV1 &b)
 {
-    
-    return a.tx_records == b.tx_records &&
-        a.confirmed_txids == b.confirmed_txids &&
-        a.unconfirmed_txids == b.unconfirmed_txids &&
-        a.offchain_txids == b.offchain_txids;
+
+    return a.tx_records == b.tx_records && a.confirmed_txids == b.confirmed_txids &&
+           a.unconfirmed_txids == b.unconfirmed_txids && a.offchain_txids == b.offchain_txids;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool operator==(const TransactionRecordV1 &a, const TransactionRecordV1 &b)
 {
-    return a.legacy_spent_enotes == b.legacy_spent_enotes &&
-        a.sp_spent_enotes == b.sp_spent_enotes &&
-        a.outlays == b.outlays &&
-        a.amount_sent == b.amount_sent &&
-        a.fee_sent == b.fee_sent;
+    return a.legacy_spent_enotes == b.legacy_spent_enotes && a.sp_spent_enotes == b.sp_spent_enotes &&
+           a.outlays == b.outlays && a.amount_sent == b.amount_sent && a.fee_sent == b.fee_sent;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpTransactionHistory::add_entry_to_tx_records(const rct::key &txid, const TransactionRecordV1 &record)
@@ -117,12 +106,10 @@ void SpTransactionHistory::add_entry_to_tx_records(const rct::key &txid, const T
     m_sp_tx_store.tx_records[txid] = record;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// std::multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> *SpTransactionStore::get_pointer_to_tx_status(
-serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> *SpTransactionHistory::get_pointer_to_tx_status(
-    const SpTxStatus tx_status)
+serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> *
+SpTransactionHistory::get_pointer_to_tx_status(const SpTxStatus tx_status)
 {
     // get pointer to corresponding multimap
-    // std::multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> *ptr = nullptr;
     serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> *ptr = nullptr;
     switch (tx_status)
     {
@@ -155,10 +142,7 @@ void SpTransactionHistory::add_entry_txs(const SpTxStatus tx_status, const uint6
     ptr_status->emplace(block_or_timestamp, txid);
 }
 //-------------------------------------------------------------------------------------------------------------------
-const SpTransactionStoreV1 SpTransactionHistory::get_tx_store()
-{
-    return m_sp_tx_store;
-}
+const SpTransactionStoreV1 SpTransactionHistory::get_tx_store() { return m_sp_tx_store; }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTransactionHistory::set_tx_store(const SpTransactionStoreV1 &tx_store)
 {
@@ -277,13 +261,8 @@ void SpTransactionHistory::print_tx_view(const TxViewV1 tx_view)
 {
     // Only a draft. Very simple version.
 
-    std::cout << tx_view.block << " | "
-    << tx_view.direction << " | " 
-    << tx_view.timestamp << " | " 
-    << tx_view.amount << " | " 
-    << tx_view.hash << " | " 
-    << tx_view.fee << " | " 
-    << tx_view.destinations << std::endl;
+    std::cout << tx_view.block << " | " << tx_view.direction << " | " << tx_view.timestamp << " | " << tx_view.amount
+              << " | " << tx_view.hash << " | " << tx_view.fee << " | " << tx_view.destinations << std::endl;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpTransactionHistory::show_txs(SpEnoteStore &enote_store, uint64_t N)
@@ -292,7 +271,7 @@ void SpTransactionHistory::show_txs(SpEnoteStore &enote_store, uint64_t N)
     std::cout << " ----------- Confirmed ----------- " << std::endl;
 
     // a. print last 3 confirmed txs
-    const auto range_confirmed{get_last_N_txs(SpTxStatus::CONFIRMED,N)};
+    const auto range_confirmed{get_last_N_txs(SpTxStatus::CONFIRMED, N)};
     if (!range_confirmed.empty())
     {
         std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> enotes_selected;
@@ -332,29 +311,28 @@ void SpTransactionHistory::show_txs(SpEnoteStore &enote_store, uint64_t N)
 void SpTransactionHistory::show_tx_hashes(uint64_t N)
 {
     // a. print last N confirmed txs
-    const auto range_confirmed{get_last_N_txs(SpTxStatus::CONFIRMED,N)};
+    const auto range_confirmed{get_last_N_txs(SpTxStatus::CONFIRMED, N)};
     if (!range_confirmed.empty())
     {
         for (auto it_range : range_confirmed)
         {
-        std::cout << "Height: " << it_range.first << " Hash: " << it_range.second << std::endl;
+            std::cout << "Height: " << it_range.first << " Hash: " << it_range.second << std::endl;
         }
-
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTransactionHistory::write_tx_funded_proof(const rct::key &txid, const SpEnoteStore &enote_store,
-                                               const crypto::secret_key &sp_spend_privkey,
-                                               const crypto::secret_key &k_view_balance)
+                                                 const crypto::secret_key &sp_spend_privkey,
+                                                 const crypto::secret_key &k_view_balance)
 {
     std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> enotes_from_tx{};
     ContextualRecordVariant representing_enote{};
 
     // 1. get enotes and check if txid exists in storage
     if (!get_enotes_from_tx(txid, enote_store, enotes_from_tx)) return false;
-    
+
     // 2. get representing enote from tx
-    get_representing_enote_from_tx(enotes_from_tx,representing_enote);
+    get_representing_enote_from_tx(enotes_from_tx, representing_enote);
 
     // 2. get random message
     const rct::key message{rct::skGen()};
@@ -365,14 +343,14 @@ bool SpTransactionHistory::write_tx_funded_proof(const rct::key &txid, const SpE
     // 4. make proof
     // TODO: verify legacy enotes too and make proof on whatever is available
     if (representing_enote.is_type<SpContextualEnoteRecordV1>())
-        make_tx_funded_proof_v1(message,representing_enote.unwrap<SpContextualEnoteRecordV1>().record ,sp_spend_privkey, k_view_balance,
-                            tx_funded_proof);
+        make_tx_funded_proof_v1(message, representing_enote.unwrap<SpContextualEnoteRecordV1>().record,
+                                sp_spend_privkey, k_view_balance, tx_funded_proof);
     // else
     // make legacy tx_funded_proof
 
     // 5. serialize struct
     ser_TxFundedProofV1 ser_tx_funded_proof{};
-    make_serializable_tx_funded_proof_v1(tx_funded_proof,ser_tx_funded_proof);
+    make_serializable_tx_funded_proof_v1(tx_funded_proof, ser_tx_funded_proof);
 
     // 6. prepare to save to file by proof name and date
     // TODO: Add date into proof name
@@ -380,18 +358,17 @@ bool SpTransactionHistory::write_tx_funded_proof(const rct::key &txid, const SpE
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool SpTransactionHistory::check_tx_funded_proof(const TxFundedProofV1 &proof, const rct::key &tx_id) 
+bool SpTransactionHistory::check_tx_funded_proof(const TxFundedProofV1 &proof, const rct::key &tx_id)
 {
     // 1. From tx_id get all key images of tx by querying node.
 
     // 2. Loop over key images to check if one corresponds to proof.
     //*(A better way would be to store the index of the key image in the proof structure)
 
-
     // 3. Verify tx_funded_proof
-// verify_tx_funded_proof_v1(const TxFundedProofV1 &proof,
-//     const rct::key &expected_message,
-//     const crypto::key_image &expected_KI)
+    // verify_tx_funded_proof_v1(const TxFundedProofV1 &proof,
+    //     const rct::key &expected_message,
+    //     const crypto::key_image &expected_KI)
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -405,14 +382,15 @@ bool SpTransactionHistory::write_sp_tx_history(std::string path, const epee::wip
     return write_encrypted_file(path, password, ser_tx_store);
 }
 // //-------------------------------------------------------------------------------------------------------------------
-bool SpTransactionHistory::read_sp_tx_history(std::string path, const epee::wipeable_string &password, SpTransactionStoreV1 &sp_tx_store)
+bool SpTransactionHistory::read_sp_tx_history(std::string path, const epee::wipeable_string &password,
+                                              SpTransactionStoreV1 &sp_tx_store)
 {
     // 1. Read file into serializable
     ser_SpTransactionStoreV1 ser_tx_store;
     read_encrypted_file(path, password, ser_tx_store);
-    
+
     // 2. Recover struct from serializable
-    recover_sp_transaction_store_v1(ser_tx_store,sp_tx_store);
-    
+    recover_sp_transaction_store_v1(ser_tx_store, sp_tx_store);
+
     return true;
 }

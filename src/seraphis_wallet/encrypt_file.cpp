@@ -26,22 +26,20 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 #include "encrypt_file.h"
+
+#include <string>
+#include <vector>
 
 #include "crypto/chacha.h"
 #include "crypto/crypto.h"
+#include "file_io_utils.h"
+#include "seraphis_mocks/jamtis_mock_keys.h"
 #include "serialization/binary_archive.h"
 #include "serialization/containers.h"
-#include "serialization/serialization.h"
 #include "serialization/crypto.h"
+#include "serialization/serialization.h"
 #include "serialization/string.h"
-
-#include "seraphis_mocks/jamtis_mock_keys.h"
-#include "file_io_utils.h"
-
-#include <vector>
-#include <string>
 
 using namespace sp::jamtis::mocks;
 
@@ -51,11 +49,10 @@ bool generate_master_wallet(std::string path, const epee::wipeable_string &passw
     jamtis_mock_keys master_keys;
     make_jamtis_mock_keys(master_keys);
 
-    return write_encrypted_file<jamtis_mock_keys>(path,password, master_keys);
+    return write_encrypted_file<jamtis_mock_keys>(path, password, master_keys);
 }
 
 bool read_master_wallet(std::string path, const epee::wipeable_string &password, jamtis_mock_keys &keys_out)
 {
     return read_encrypted_file<jamtis_mock_keys>(path, password, keys_out);
 }
-

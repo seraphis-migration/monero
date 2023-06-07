@@ -28,110 +28,100 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "crypto/chacha.h"
 #include "crypto/crypto.h"
+#include "file_io_utils.h"
+#include "seraphis_mocks/jamtis_mock_keys.h"
 #include "serialization/binary_archive.h"
 #include "serialization/containers.h"
-#include "serialization/serialization.h"
 #include "serialization/crypto.h"
+#include "serialization/serialization.h"
 #include "serialization/string.h"
-#include "seraphis_mocks/jamtis_mock_keys.h"
-
-#include "file_io_utils.h"
-
-#include <vector>
-#include <string>
-
 
 using namespace sp::jamtis::mocks;
 
-struct encrypted_file 
+struct encrypted_file
 {
-  std::string encrypted_data;
-  crypto::chacha_iv iv;
+    std::string encrypted_data;
+    crypto::chacha_iv iv;
 
-  BEGIN_SERIALIZE_OBJECT()
+    BEGIN_SERIALIZE_OBJECT()
     VERSION_FIELD(0)
     FIELD(encrypted_data)
     FIELD(iv)
-  END_SERIALIZE()
+    END_SERIALIZE()
 };
 
 template <class T>
 bool read_encrypted_file(std::string path, const epee::wipeable_string &password, T &ti)
 {
 
-  // 1. Load encrypted file to string
-  std::string buf;
-  if (!epee::file_io_utils::load_file_to_string(path, buf))
-    return false;
+    // 1. Load encrypted file to string
+    std::string buf;
+    if (!epee::file_io_utils::load_file_to_string(path, buf)) return false;
 
-  encrypted_file file;
+    encrypted_file file;
 
-  // 2. Serialize to encrypted_file format
-  binary_archive<false> file_ar{epee::strspan<std::uint8_t>(buf)};
-  if (!::serialization::serialize(file_ar, file))
-    return false;
+    // 2. Serialize to encrypted_file format
+    binary_archive<false> file_ar{epee::strspan<std::uint8_t>(buf)};
+    if (!::serialization::serialize(file_ar, file)) return false;
 
-  // 3. Generate chacha key using cryptonote slow_hash
-  crypto::chacha_key key;
-  crypto::generate_chacha_key(password.data(), password.size(), key, 1);
+    // 3. Generate chacha key using cryptonote slow_hash
+    crypto::chacha_key key;
+    crypto::generate_chacha_key(password.data(), password.size(), key, 1);
 
-  // 4. Get string with decrypted data
-  std::string decrypted_data;
-  decrypted_data.resize(file.encrypted_data.size());
-  crypto::chacha20(file.encrypted_data.data(), file.encrypted_data.size(), key,
-                   file.iv, &decrypted_data[0]);
+    // 4. Get string with decrypted data
+    std::string decrypted_data;
+    decrypted_data.resize(file.encrypted_data.size());
+    crypto::chacha20(file.encrypted_data.data(), file.encrypted_data.size(), key, file.iv, &decrypted_data[0]);
 
-  // 5. Deserialize into the structure
-  binary_archive<false> ar{epee::strspan<std::uint8_t>(decrypted_data)};
-  if (!::serialization::serialize(ar, ti))
-    return false;
+    // 5. Deserialize into the structure
+    binary_archive<false> ar{epee::strspan<std::uint8_t>(decrypted_data)};
+    if (!::serialization::serialize(ar, ti)) return false;
 
-  return true;
+    return true;
 }
 
 template <class T>
-bool write_encrypted_file(std::string path, const epee::wipeable_string &password, T &ti) {
+bool write_encrypted_file(std::string path, const epee::wipeable_string &password, T &ti)
+{
 
-  // 1. Generate chacha key using cryptonote slow_hash
-  crypto::chacha_key key;
-  crypto::generate_chacha_key(password.data(), password.size(), key, 1);
+    // 1. Generate chacha key using cryptonote slow_hash
+    crypto::chacha_key key;
+    crypto::generate_chacha_key(password.data(), password.size(), key, 1);
 
-  // 2. Serialize structure
-  std::stringstream data_oss;
-  binary_archive<true> data_ar(data_oss);
-  if (!::serialization::serialize(data_ar, ti))
-    return false;
-  std::string buf = data_oss.str();
+    // 2. Serialize structure
+    std::stringstream data_oss;
+    binary_archive<true> data_ar(data_oss);
+    if (!::serialization::serialize(data_ar, ti)) return false;
+    std::string buf = data_oss.str();
 
-  // 3. Generate random iv for the encrypted file
-  encrypted_file tf = {};
-  tf.iv = crypto::rand<crypto::chacha_iv>();
+    // 3. Generate random iv for the encrypted file
+    encrypted_file tf = {};
+    tf.iv = crypto::rand<crypto::chacha_iv>();
 
-  // 4. Resize encrypted_data to the size of serialized string
-  std::string encrypted_data;
-  encrypted_data.resize(buf.size());
+    // 4. Resize encrypted_data to the size of serialized string
+    std::string encrypted_data;
+    encrypted_data.resize(buf.size());
 
-  // 5. Encrypt data with iv
-  crypto::chacha20(buf.data(), buf.size(), key, tf.iv, &encrypted_data[0]);
-  tf.encrypted_data = encrypted_data;
+    // 5. Encrypt data with iv
+    crypto::chacha20(buf.data(), buf.size(), key, tf.iv, &encrypted_data[0]);
+    tf.encrypted_data = encrypted_data;
 
-  // 6. Serialize encrypted data
-  std::stringstream file_oss;
-  binary_archive<true> file_ar(file_oss);
-  if (!::serialization::serialize(file_ar, tf))
-    return false;
+    // 6. Serialize encrypted data
+    std::stringstream file_oss;
+    binary_archive<true> file_ar(file_oss);
+    if (!::serialization::serialize(file_ar, tf)) return false;
 
-  // 7. Save encrypted string to file
-  if (!epee::file_io_utils::save_string_to_file(path, file_oss.str()))
-    return false;
+    // 7. Save encrypted string to file
+    if (!epee::file_io_utils::save_string_to_file(path, file_oss.str())) return false;
 
-  return true;
+    return true;
 }
-
 
 // TO BE REPLACED BY KEY_CONTAINER
 bool generate_master_wallet(std::string path, const epee::wipeable_string &password);
 bool read_master_wallet(std::string path, const epee::wipeable_string &password, jamtis_mock_keys &keys_out);
-

@@ -26,39 +26,37 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-
 #include "serialization_types.h"
 
 // local headers
+#include "ringct/rctTypes.h"
 #include "seraphis_core/jamtis_destination.h"
 #include "seraphis_crypto/sp_crypto_utils.h"
 #include "seraphis_impl/enote_store.h"
+#include "seraphis_impl/serialization_demo_types.h"
 #include "seraphis_impl/serialization_demo_utils.h"
 #include "seraphis_main/contextual_enote_record_types.h"
-#include "seraphis_main/sp_knowledge_proof_utils.h"
 #include "seraphis_main/sp_knowledge_proof_types.h"
-#include "ringct/rctTypes.h"
-#include "seraphis_impl/serialization_demo_types.h"
+#include "seraphis_main/sp_knowledge_proof_utils.h"
 
-//third party headers
+// third party headers
+#include <boost/range.hpp>
+
 #include "boost/range/iterator_range.hpp"
 #include "seraphis_wallet/transaction_history.h"
+#include "serialization/binary_archive.h"
 #include "serialization/containers.h"
 #include "serialization/serialization.h"
-#include <boost/range.hpp>
-#include "serialization/binary_archive.h"
 
-//standard headers
+// standard headers
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <map>
-#include <unordered_map>
 #include <tuple>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-
 
 void make_serializable_transaction_record_v1(const TransactionRecordV1 &tx_rec, ser_TransactionRecordV1 &ser_tx_rec)
 {
@@ -66,10 +64,10 @@ void make_serializable_transaction_record_v1(const TransactionRecordV1 &tx_rec, 
     ser_tx_rec.sp_spent_enotes = tx_rec.sp_spent_enotes;
     sp::serialization::ser_JamtisDestinationV1 ser_dest{};
     std::vector<std::pair<sp::serialization::ser_JamtisDestinationV1, rct::xmr_amount>> outlays_aux{};
-    for (auto &r: tx_rec.outlays)
+    for (auto &r : tx_rec.outlays)
     {
-        make_serializable_sp_destination_v1(r.first, ser_dest); 
-        outlays_aux.emplace_back(ser_dest,r.second);
+        make_serializable_sp_destination_v1(r.first, ser_dest);
+        outlays_aux.emplace_back(ser_dest, r.second);
     }
     ser_tx_rec.outlays = outlays_aux;
     ser_tx_rec.amount_sent = tx_rec.amount_sent;
@@ -77,11 +75,11 @@ void make_serializable_transaction_record_v1(const TransactionRecordV1 &tx_rec, 
     outlays_aux.clear();
 }
 
-
-void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_store, ser_SpTransactionStoreV1 &ser_tx_store)
+void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_store,
+                                               ser_SpTransactionStoreV1 &ser_tx_store)
 {
     ser_TransactionRecordV1 ser_tx_rec{};
-    for (auto &r: tx_store.tx_records)
+    for (auto &r : tx_store.tx_records)
     {
         make_serializable_transaction_record_v1(r.second, ser_tx_rec);
         ser_tx_store.tx_records[r.first] = ser_tx_rec;
@@ -91,17 +89,17 @@ void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_st
     ser_tx_store.offchain_txids = tx_store.offchain_txids;
 }
 
-void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec,TransactionRecordV1 &tx_rec)
+void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec, TransactionRecordV1 &tx_rec)
 {
     tx_rec.legacy_spent_enotes = ser_tx_rec.legacy_spent_enotes;
     tx_rec.sp_spent_enotes = ser_tx_rec.sp_spent_enotes;
 
     JamtisDestinationV1 dest{};
     std::vector<std::pair<JamtisDestinationV1, rct::xmr_amount>> outlays_aux{};
-    for (auto &r: ser_tx_rec.outlays)
+    for (auto &r : ser_tx_rec.outlays)
     {
-        recover_sp_destination_v1(r.first, dest); 
-        outlays_aux.emplace_back(dest,r.second);
+        recover_sp_destination_v1(r.first, dest);
+        outlays_aux.emplace_back(dest, r.second);
     }
     tx_rec.outlays = outlays_aux;
     tx_rec.amount_sent = ser_tx_rec.amount_sent;
@@ -109,11 +107,10 @@ void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec,Tra
     outlays_aux.clear();
 }
 
-
-void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_store,SpTransactionStoreV1 &tx_store)
+void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_store, SpTransactionStoreV1 &tx_store)
 {
     TransactionRecordV1 tx_rec;
-    for (auto &r: ser_tx_store.tx_records)
+    for (auto &r : ser_tx_store.tx_records)
     {
         recover_transaction_record_v1(r.second, tx_rec);
         tx_store.tx_records[r.first] = tx_rec;
@@ -122,7 +119,6 @@ void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_stor
     tx_store.unconfirmed_txids = ser_tx_store.unconfirmed_txids;
     tx_store.offchain_txids = ser_tx_store.offchain_txids;
 }
-
 
 void make_serializable_tx_funded_proof_v1(const TxFundedProofV1 &proof, ser_TxFundedProofV1 &ser_proof)
 {

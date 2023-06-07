@@ -29,19 +29,17 @@
 #pragma once
 
 // local headers
-#include "seraphis_core/jamtis_destination.h"
 #include "ringct/rctTypes.h"
+#include "seraphis_core/jamtis_destination.h"
 
-//third party headers
+// third party headers
 
-//standard headers
+// standard headers
 
 // forward declarations
 
 using namespace sp::jamtis;
 using namespace sp;
-
-
 
 // These should not be here -> src/common/checksum_jamtis is a better place
 std::string jamtis_add_checksum(const std::string &addr_without_checksum);
