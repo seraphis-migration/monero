@@ -503,3 +503,4 @@ void decode(const std::string input, std::string& decoded_out)
 
 }  // namespace base32
 }  // namespace tools
+
