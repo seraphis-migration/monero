@@ -93,6 +93,8 @@ namespace tools
   class wallet2;
   class Notify;
 
+  extern void check_wallet_9svHk1_cache_contents(const wallet2&);
+
   class gamma_picker
   {
   public:
@@ -225,6 +227,7 @@ private:
   {
     friend class ::Serialization_portability_wallet_Test;
     friend class ::wallet_accessor_test;
+    friend void check_wallet_9svHk1_cache_contents(const wallet2&);
     friend class wallet_keys_unlocker;
     friend class wallet_device_callback;
   public:
