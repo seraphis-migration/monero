@@ -56,6 +56,11 @@ namespace sp
 {
 namespace serialization
 {
+/// serializable jamtis::address_index_t
+struct ser_address_index_t final
+{
+    unsigned char bytes[sizeof(jamtis::address_index_t)];
+};
 
 /// serializable jamtis::address_tag_t
 struct ser_address_tag_t final
@@ -437,6 +442,7 @@ struct ser_JamtisDestinationV1 final
 } //namespace serialization
 } //namespace sp
 
+BLOB_SERIALIZER(sp::serialization::ser_address_index_t);
 BLOB_SERIALIZER(sp::serialization::ser_address_tag_t);
 BLOB_SERIALIZER(sp::serialization::ser_encrypted_address_tag_t);
 BLOB_SERIALIZER(sp::serialization::ser_encoded_amount_t);

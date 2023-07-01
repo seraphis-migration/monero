@@ -26,18 +26,24 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "encrypt_file.h"
+#pragma once
 
-#include <string>
-#include <vector>
-
-#include "crypto/chacha.h"
 #include "crypto/crypto.h"
-#include "file_io_utils.h"
-#include "seraphis_mocks/jamtis_mock_keys.h"
-#include "serialization/binary_archive.h"
-#include "serialization/containers.h"
-#include "serialization/crypto.h"
-#include "serialization/serialization.h"
-#include "serialization/string.h"
+#include "crypto/hash.h"
+#include "cryptonote_basic/cryptonote_basic.h"
+#include "rpc/core_rpc_server_commands_defs.h"
+#include "rpc/core_rpc_server_error_codes.h"
+#include "seraphis_impl/enote_store.h"
 
+using namespace sp;
+
+std::string get_legacy_spend_proof(const std::string &message,
+    const crypto::hash &txid,
+    const crypto::secret_key &spend_key,
+    const sp::SpEnoteStore &enote_store);
+
+bool check_spend_proof(const crypto::hash &txid, const std::string &message, const std::string &sig_str);
+
+bool get_pruned_tx(const cryptonote::COMMAND_RPC_GET_TRANSACTIONS::entry &entry,
+    cryptonote::transaction &tx,
+    crypto::hash &tx_hash);

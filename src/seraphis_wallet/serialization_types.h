@@ -118,12 +118,49 @@ struct ser_TxFundedProofV1
     END_SERIALIZE()
 };
 
+struct ser_AddressOwnershipProofV1
+{
+    rct::key message;
+    rct::key K;
+    crypto::key_image addr_key_image;  //'key image' of the address used in this proof
+    ser_SpCompositionProof composition_proof;
+
+    BEGIN_SERIALIZE_OBJECT()
+    FIELD(message)
+    FIELD(K)
+    FIELD(addr_key_image)
+    FIELD(composition_proof)
+    END_SERIALIZE()
+};
+
+struct ser_AddressIndexProofV1
+{
+    rct::key K_s;
+    ser_address_index_t j;
+    rct::key generator;
+    rct::key K_1;
+
+    BEGIN_SERIALIZE_OBJECT()
+    FIELD(K_s)
+    FIELD(j)
+    FIELD(generator)
+    FIELD(K_1)
+    END_SERIALIZE()
+};
+
 void make_serializable_transaction_record_v1(const TransactionRecordV1 &tx_rec, ser_TransactionRecordV1 &ser_tx_rec);
 void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_store,
-                                               ser_SpTransactionStoreV1 &ser_tx_store);
+    ser_SpTransactionStoreV1 &ser_tx_store);
 
 void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec, TransactionRecordV1 &tx_rec);
 void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_store, SpTransactionStoreV1 &tx_store);
 
 void make_serializable_tx_funded_proof_v1(const TxFundedProofV1 &proof, ser_TxFundedProofV1 &ser_proof);
 void recover_tx_funded_proof_v1(const ser_TxFundedProofV1 &ser_proof, TxFundedProofV1 &proof);
+
+void make_serializable_address_ownership_proof_v1(const AddressOwnershipProofV1 &proof,
+    ser_AddressOwnershipProofV1 &ser_proof);
+void recover_address_ownership_proof_v1(const ser_AddressOwnershipProofV1 &ser_proof, AddressOwnershipProofV1 &proof);
+
+void make_serializable_address_index_proof_v1(const AddressIndexProofV1 &proof, ser_AddressIndexProofV1 &ser_proof);
+void recover_address_index_proof_v1(const ser_AddressIndexProofV1 &ser_proof, AddressIndexProofV1 &proof);
