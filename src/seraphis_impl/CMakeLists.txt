@@ -47,6 +47,7 @@ monero_add_library(seraphis_impl
 
 target_link_libraries(seraphis_impl
   PUBLIC
+    async
     cncrypto
     common
     cryptonote_basic
