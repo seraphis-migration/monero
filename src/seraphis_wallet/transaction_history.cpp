@@ -55,6 +55,8 @@
 #include "seraphis_main/contextual_enote_record_types.h"
 #include "seraphis_main/sp_knowledge_proof_types.h"
 #include "seraphis_main/sp_knowledge_proof_utils.h"
+#include "seraphis_mocks/mock_ledger_context.h"
+#include "seraphis_mocks/seraphis_mocks.h"
 #include "seraphis_wallet/encrypt_file.h"
 #include "seraphis_wallet/serialization_types.h"
 #include "serialization/binary_utils.h"
@@ -182,9 +184,8 @@ SpTransactionHistory::get_pointer_to_tx_status(const SpTxStatus tx_status)
     return ptr;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void SpTransactionHistory::add_entry_txs(const SpTxStatus tx_status,
-    const uint64_t block_or_timestamp,
-    const rct::key &txid)
+void SpTransactionHistory::add_entry_txs(const SpTxStatus tx_status, const uint64_t block_or_timestamp,
+                                         const rct::key &txid)
 {
     // add entry to corresponding variable
     auto ptr_status = get_pointer_to_tx_status(tx_status);
@@ -206,7 +207,7 @@ const range_txids_by_block_or_time SpTransactionHistory::get_last_N_txs(const Sp
 
     // 2. set begin and end iterators to beggining of multimap
     std::multimap<unsigned long, rct::key>::iterator it_begin = ptr_status->begin();
-    std::multimap<unsigned long, rct::key>::iterator it_end   = ptr_status->begin();
+    std::multimap<unsigned long, rct::key>::iterator it_end = ptr_status->begin();
 
     // 3. get size of multimap
     uint64_t counts{ptr_status->size()};
@@ -221,8 +222,8 @@ const range_txids_by_block_or_time SpTransactionHistory::get_last_N_txs(const Sp
     return boost::make_iterator_range(it_begin, it_end);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool SpTransactionHistory::get_enotes_from_tx(const rct::key &txid,
-    const SpEnoteStore &enote_store,
+bool SpTransactionHistory::get_enotes_from_tx(
+    const rct::key &txid, const SpEnoteStore &enote_store,
     std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> &enotes_out)
 {
     // 1. get TransactionRecord if txid exists
@@ -287,14 +288,14 @@ bool SpTransactionHistory::get_tx_view(const ContextualRecordVariant &contextual
     TransactionRecordV1 tx_record{m_sp_tx_store.tx_records[tx_id]};
 
     // 2. fill TxView with info available
-    tx_view_out.block     = spent_context.block_index == static_cast<std::uint64_t>(-1)
-                                ? std::string{"<unknown>"}
-                                : std::to_string(spent_context.block_index);
+    tx_view_out.block = spent_context.block_index == static_cast<std::uint64_t>(-1)
+                            ? std::string{"<unknown>"}
+                            : std::to_string(spent_context.block_index);
     tx_view_out.direction = "out";
     tx_view_out.timestamp = tools::get_human_readable_timestamp(spent_context.block_timestamp);
-    tx_view_out.amount    = std::to_string(tx_record.amount_sent);
-    tx_view_out.hash      = epee::string_tools::pod_to_hex(spent_context.transaction_id);
-    tx_view_out.fee       = std::to_string(tx_record.fee_sent);
+    tx_view_out.amount = std::to_string(tx_record.amount_sent);
+    tx_view_out.hash = epee::string_tools::pod_to_hex(spent_context.transaction_id);
+    tx_view_out.fee = std::to_string(tx_record.fee_sent);
     std::string str_dest{};
     for (auto dest : tx_record.outlays)
     {
@@ -382,9 +383,8 @@ bool SpTransactionHistory::write_sp_tx_history(std::string path, const epee::wip
     return write_encrypted_file(path, password, ser_tx_store);
 }
 // //-------------------------------------------------------------------------------------------------------------------
-bool SpTransactionHistory::read_sp_tx_history(std::string path,
-    const epee::wipeable_string &password,
-    SpTransactionStoreV1 &sp_tx_store)
+bool SpTransactionHistory::read_sp_tx_history(std::string path, const epee::wipeable_string &password,
+                                              SpTransactionStoreV1 &sp_tx_store)
 {
     // 1. Read file into serializable
     ser_SpTransactionStoreV1 ser_tx_store;
@@ -398,11 +398,10 @@ bool SpTransactionHistory::read_sp_tx_history(std::string path,
 //-------------------------------------------------------------------------------------------------------------------
 // KNOWLEDGE PROOFS
 //-------------------------------------------------------------------------------------------------------------------
-bool SpTransactionHistory::write_tx_funded_proof(const rct::key &txid,
-    const SpEnoteStore &enote_store,
-    const crypto::secret_key &sp_spend_privkey,
-    const crypto::secret_key &k_view_balance,
-    const std::string &message_in)
+bool SpTransactionHistory::write_tx_funded_proof(const rct::key &txid, const SpEnoteStore &enote_store,
+                                                 const crypto::secret_key &sp_spend_privkey,
+                                                 const crypto::secret_key &k_view_balance,
+                                                 const std::string &message_in)
 {
     std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> enotes_from_tx{};
     ContextualRecordVariant representing_enote{};
@@ -424,11 +423,8 @@ bool SpTransactionHistory::write_tx_funded_proof(const rct::key &txid,
 
     // 5. make proof
     if (representing_enote.is_type<SpContextualEnoteRecordV1>())
-        make_tx_funded_proof_v1(message,
-            representing_enote.unwrap<SpContextualEnoteRecordV1>().record,
-            sp_spend_privkey,
-            k_view_balance,
-            tx_funded_proof);
+        make_tx_funded_proof_v1(message, representing_enote.unwrap<SpContextualEnoteRecordV1>().record,
+                                sp_spend_privkey, k_view_balance, tx_funded_proof);
     // else
     // make legacy tx_funded_proof
 
@@ -442,30 +438,38 @@ bool SpTransactionHistory::write_tx_funded_proof(const rct::key &txid,
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool SpTransactionHistory::read_tx_funded_proof(std::string &path,
-    const epee::wipeable_string &password,
-    const rct::key &tx_id)
+bool read_tx_funded_proof(std::string &path, const epee::wipeable_string &password, const rct::key &tx_id,
+                          const std::string &message_in, const sp::mocks::MockLedgerContext &ledger_context)
 {
-    // read proof from file
+    // 1. Read proof from file
+    ser_TxFundedProofV1 ser_tx_funded_proof{};
+    TxFundedProofV1 tx_funded_proof{};
+    read_encrypted_file(path, password, ser_tx_funded_proof);
+    recover_tx_funded_proof_v1(ser_tx_funded_proof, tx_funded_proof);
 
-    // 1. From tx_id get all key images of tx by querying node.
+    // 2. Get msg
+    rct::key message;
+    make_message_v1(tx_id, message_in, message);
 
-    // 2. Loop over key images to check if one corresponds to proof.
-    //*(A better way would be to store the index of the key image in the proof
-    // structure)
+    // 3. From tx_id get all key images of tx by querying node.
+    std::vector<crypto::key_image> key_images = ledger_context.get_sp_key_images_at_tx(tx_id);
 
-    // 3. Verify tx_funded_proof
-    // verify_tx_funded_proof_v1(const TxFundedProofV1 &proof,
-    //     const rct::key &expected_message,
-    //     const crypto::key_image &expected_KI)
-    return true;
+    // 4. Loop over key images to check if one corresponds to proof.
+    for (auto ki : key_images)
+    {
+        if (ki == tx_funded_proof.KI)
+        {
+            // 5. Verify tx_funded_proof
+            return verify_tx_funded_proof_v1(tx_funded_proof, message, ki);
+        }
+    }
+    return false;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTransactionHistory::write_address_ownership_proof(const jamtis::address_index_t &j,
-    const crypto::secret_key &sp_spend_privkey,
-    const crypto::secret_key &k_view_balance,
-    const bool bool_Ks_K1,
-    const std::string &message_in)
+                                                         const crypto::secret_key &sp_spend_privkey,
+                                                         const crypto::secret_key &k_view_balance,
+                                                         const bool bool_Ks_K1, const std::string &message_in)
 {
     // There are two scenarios for the message:
     // 1. message_in is an empty string -> in this case the prover can make a
@@ -500,13 +504,8 @@ bool SpTransactionHistory::write_address_ownership_proof(const jamtis::address_i
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-// bool SpTransactionHistory::read_address_ownership_proof(const
-// AddressOwnershipProofV1 &proof, const std::string &message_in, const rct::key
-// &K)
-bool SpTransactionHistory::read_address_ownership_proof(std::string &path,
-    const epee::wipeable_string &password,
-    const std::string &message_in,
-    const rct::key &K)
+bool read_address_ownership_proof(std::string &path, const epee::wipeable_string &password,
+                                  const std::string &message_in, const rct::key &K)
 {
     // 1. read from file
     ser_AddressOwnershipProofV1 ser_address_ownership_proof{};
@@ -524,8 +523,7 @@ bool SpTransactionHistory::read_address_ownership_proof(std::string &path,
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTransactionHistory::write_address_index_proof(const rct::key &jamtis_spend_pubkey,
-    const jamtis::address_index_t &j,
-    const crypto::secret_key &s_ga)
+                                                     const jamtis::address_index_t &j, const crypto::secret_key &s_ga)
 {
 
     // 2. initialize proof struct
@@ -544,9 +542,7 @@ bool SpTransactionHistory::write_address_index_proof(const rct::key &jamtis_spen
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool SpTransactionHistory::read_address_index_proof(std::string &path,
-    const epee::wipeable_string &password,
-    const rct::key &K_1)
+bool read_address_index_proof(std::string &path, const epee::wipeable_string &password, const rct::key &K_1)
 {
     // 1. read from file
     ser_AddressIndexProofV1 ser_address_index_proof{};
@@ -559,14 +555,3 @@ bool SpTransactionHistory::read_address_index_proof(std::string &path,
     return verify_address_index_proof_v1(address_index_proof, K_1);
 }
 //-------------------------------------------------------------------------------------------------------------------
-// bool SpTransactionHistory::write_enote_ownership_proof(const rct::key &jamtis_spend_pubkey,
-//     const jamtis::address_index_t &j,
-//     const crypto::secret_key &s_ga)
-// {
-// make_enote_ownership_proof_v1(const rct::key &jamtis_address_spend_key,
-//     const rct::key &sender_receiver_secret,
-//     const rct::key &amount_commitment,
-//     const rct::key &onetime_address,
-//     EnoteOwnershipProofV1 &proof_out);
-// 3. make proof
-// }

@@ -1020,7 +1020,18 @@ void MockLedgerContext::get_onchain_chunk_sp(const std::uint64_t chunk_start_ind
         );
 }
 //-------------------------------------------------------------------------------------------------------------------
-
+std::vector<crypto::key_image> MockLedgerContext::get_sp_key_images_at_tx(const rct::key &tx_id) const
+{
+    std::vector<crypto::key_image> sp_kis{};
+    for (auto blocks : m_blocks_of_tx_key_images)
+    {
+        if (blocks.second.find(tx_id) != blocks.second.end())
+        {
+            sp_kis = blocks.second[tx_id].second;
+        }
+    }
+    return sp_kis;
+}
 //-------------------------------------------------------------------------------------------------------------------
 // free functions
 //-------------------------------------------------------------------------------------------------------------------

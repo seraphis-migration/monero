@@ -70,7 +70,6 @@ bool check_tx_proof(const crypto::hash &txid, const cryptonote::account_public_a
                     const std::string &message, const std::string &sig_str, uint64_t &received, bool &in_pool,
                     uint64_t &confirmations);
 //----------------------------------------------------------------------------------------------------
-
 /// Auxiliary Functions
 //----------------------------------------------------------------------------------------------------
 bool get_pruned_tx(const cryptonote::COMMAND_RPC_GET_TRANSACTIONS::entry &entry, cryptonote::transaction &tx,

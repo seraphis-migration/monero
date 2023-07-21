@@ -40,9 +40,11 @@
 #include "encrypt_file.h"
 #include "enote_store.h"
 #include "gtest/gtest.h"
+#include "jamtis_mock_keys.h"
 #include "legacy_mock_keys.h"
 #include "misc_language.h"
 #include "misc_log_ex.h"
+#include "mock_ledger_context.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_core/binned_reference_set.h"
@@ -145,7 +147,7 @@ static void fill_tx_store(const SpTxSquashedV1 &single_tx,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void make_transfers(SpEnoteStore &enote_store_in_out, SpTransactionHistory &tx_store_in_out)
+static void make_transfers(MockLedgerContext &ledger_context,SpEnoteStore &enote_store_in_out, SpTransactionHistory &tx_store_in_out, const legacy_mock_keys &legacy_user_keys_A, const jamtis_mock_keys &user_keys_A)
 {
     /// config
     const std::size_t max_inputs{1000};
@@ -161,8 +163,6 @@ static void make_transfers(SpEnoteStore &enote_store_in_out, SpTransactionHistor
 
     const SpBinnedReferenceSetConfigV1 bin_config{.bin_radius = 1, .num_bin_members = 2};
 
-    /// mock ledger context for this test
-    MockLedgerContext ledger_context{0, 10000};
 
     /// prepare for membership proofs
     // a. add enough fake enotes to the ledger so we can reliably make seraphis membership proofs
@@ -176,11 +176,7 @@ static void make_transfers(SpEnoteStore &enote_store_in_out, SpTransactionHistor
     /// make two users
 
     // a. user keys
-    legacy_mock_keys legacy_user_keys_A;
-    jamtis_mock_keys user_keys_A;
     jamtis_mock_keys user_keys_B;
-
-    make_legacy_mock_keys(legacy_user_keys_A);
 
     // CHECK_AND_ASSERT_THROW_MES(read_master_wallet("masterA.wallet", "passwordA", user_keys_A),
     //                                "Reading master wallet failed.");
@@ -188,7 +184,6 @@ static void make_transfers(SpEnoteStore &enote_store_in_out, SpTransactionHistor
     // CHECK_AND_ASSERT_THROW_MES(read_master_wallet("masterB.wallet", "passwordB", user_keys_B),
     //                                "Reading master wallet failed.");
 
-    make_jamtis_mock_keys(user_keys_A);
     make_jamtis_mock_keys(user_keys_B);
 
     // b. destination address
@@ -269,22 +264,36 @@ TEST(seraphis_wallet, show_transfers)
     // 1. generate enote_store and tx_store
     SpEnoteStore enote_store_A{0, 0, 0};
     SpTransactionHistory tx_store_A;
+    /// mock ledger context for this test
+    MockLedgerContext ledger_context{0, 10000};
+    
+
+    legacy_mock_keys legacy_user_keys_A;
+    jamtis_mock_keys user_keys_A;
+    make_jamtis_mock_keys(user_keys_A);
 
     // 2. make transfers to fill enote_store and tx_store
-    make_transfers(enote_store_A, tx_store_A);
+    make_transfers(ledger_context,enote_store_A, tx_store_A, legacy_user_keys_A, user_keys_A);
 
     // 3. example of block to show info from tx_store (using the enote store)
     tx_store_A.show_tx_hashes(3);
 }
 
+//-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_wallet, read_write_history)
 {
     // 1. generate enote_store and tx_store
     SpEnoteStore enote_store_A{0, 0, 0};
     SpTransactionHistory tx_store_A;
+    /// mock ledger context for this test
+    MockLedgerContext ledger_context{0, 10000};
 
     // 2. make transfers to fill enote_store and tx_store
-    make_transfers(enote_store_A, tx_store_A);
+    legacy_mock_keys legacy_user_keys_A;
+    jamtis_mock_keys user_keys_A;
+    make_jamtis_mock_keys(user_keys_A);
+
+    make_transfers(ledger_context,enote_store_A, tx_store_A, legacy_user_keys_A, user_keys_A);
 
     // 3. save to file 
     if (!tx_store_A.write_sp_tx_history("wallet.history", "UserA"))
@@ -308,14 +317,21 @@ TEST(seraphis_wallet, read_write_history)
 
 
 
+//-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_wallet, read_write_serialization)
 {
     // 1. generate enote_store and tx_store
     SpEnoteStore enote_store_A{0, 0, 0};
     SpTransactionHistory tx_store_A;
+    /// mock ledger context for this test
+    MockLedgerContext ledger_context{0, 10000};
 
     // 2. make transfers to fill enote_store and tx_store
-    make_transfers(enote_store_A, tx_store_A);
+    legacy_mock_keys legacy_user_keys_A;
+    jamtis_mock_keys user_keys_A;
+    make_jamtis_mock_keys(user_keys_A);
+
+    make_transfers(ledger_context,enote_store_A, tx_store_A, legacy_user_keys_A, user_keys_A);
 
     // 3. Get serializable of structure
     ser_SpTransactionStoreV1 ser_tx_store;
@@ -330,4 +346,37 @@ TEST(seraphis_wallet, read_write_serialization)
 
     // 5. Assert if Tx record is the same
     CHECK_AND_ASSERT_THROW_MES(tx_store_A.get_tx_store() == tx_store_recovered.get_tx_store(),"Tx stores are not the same.");
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_wallet, tx_funded_proof)
+{
+    // Test to display info stored in the tx_store class
+
+    // 1. generate enote_store and tx_store
+    SpEnoteStore enote_store_A{0, 0, 0};
+    SpTransactionHistory tx_store_A;
+    /// mock ledger context for this test
+    MockLedgerContext ledger_context{0, 10000};
+
+    // 2. make transfers to fill enote_store and tx_store
+    legacy_mock_keys legacy_user_keys_A;
+    jamtis_mock_keys user_keys_A;
+    make_jamtis_mock_keys(user_keys_A);
+
+    make_transfers(ledger_context,enote_store_A, tx_store_A, legacy_user_keys_A, user_keys_A);
+
+    // 3. example of block to show info from tx_store (using the enote store)
+    tx_store_A.show_tx_hashes(3);
+
+    std::string message_in{};
+    const auto range_confirmed{tx_store_A.get_last_N_txs(SpTxStatus::CONFIRMED, 1)};
+    rct::key tx_id_proof = range_confirmed.begin()->second; 
+
+
+    tx_store_A.write_tx_funded_proof(tx_id_proof, enote_store_A, user_keys_A.k_m, user_keys_A.k_vb, message_in);
+
+    std::string path = "tx_funded_proof";
+    CHECK_AND_ASSERT_THROW_MES(read_tx_funded_proof(path, "", tx_id_proof, message_in,ledger_context),"Tx_funded_proof is invalid!");
+
+
 }
