@@ -47,7 +47,10 @@
 #include "ringct/rctOps.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_core/jamtis_destination.h"
+#include "seraphis_core/jamtis_enote_utils.h"
+#include "seraphis_core/jamtis_payment_proposal.h"
 #include "seraphis_core/jamtis_support_types.h"
+#include "seraphis_core/sp_core_types.h"
 #include "seraphis_crypto/sp_crypto_utils.h"
 #include "seraphis_crypto/sp_hash_functions.h"
 #include "seraphis_crypto/sp_transcript.h"
@@ -55,6 +58,8 @@
 #include "seraphis_main/contextual_enote_record_types.h"
 #include "seraphis_main/sp_knowledge_proof_types.h"
 #include "seraphis_main/sp_knowledge_proof_utils.h"
+#include "seraphis_main/tx_builders_outputs.h"
+#include "seraphis_main/tx_component_types.h"
 #include "seraphis_mocks/mock_ledger_context.h"
 #include "seraphis_mocks/seraphis_mocks.h"
 #include "seraphis_wallet/encrypt_file.h"
@@ -148,7 +153,8 @@ bool operator==(const SpTransactionStoreV1 &a, const SpTransactionStoreV1 &b)
 bool operator==(const TransactionRecordV1 &a, const TransactionRecordV1 &b)
 {
     return a.legacy_spent_enotes == b.legacy_spent_enotes && a.sp_spent_enotes == b.sp_spent_enotes &&
-           a.outlays == b.outlays && a.amount_sent == b.amount_sent && a.fee_sent == b.fee_sent;
+           a.normal_payments == b.normal_payments && a.selfsend_payments == b.selfsend_payments &&
+           a.amount_sent == b.amount_sent && a.fee_sent == b.fee_sent;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void SpTransactionHistory::add_entry_to_tx_records(const rct::key &txid, const TransactionRecordV1 &record)
@@ -260,14 +266,14 @@ bool SpTransactionHistory::get_representing_enote_from_tx(
     const std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> &enotes_in_tx,
     ContextualRecordVariant &contextual_enote_out)
 {
-    // try to get a sp enote representing the tx
+    // try to get the first sp enote representing the tx
     if (!enotes_in_tx.second.empty())
     {
         contextual_enote_out = enotes_in_tx.second[0];
         return true;
     }
     else
-    // try to get a legacy enote representing the tx
+    // try to get the first legacy enote representing the tx
     {
         if (!enotes_in_tx.first.empty())
         {
@@ -277,6 +283,12 @@ bool SpTransactionHistory::get_representing_enote_from_tx(
     }
     return false;
 }
+//-------------------------------------------------------------------------------------------------------------------
+TransactionRecordV1 SpTransactionHistory::get_tx_record_from_txid(const rct::key &txid)
+{
+    return m_sp_tx_store.tx_records[txid];
+}
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTransactionHistory::get_tx_view(const ContextualRecordVariant &contextual_enote, TxViewV1 &tx_view_out)
 {
@@ -297,9 +309,9 @@ bool SpTransactionHistory::get_tx_view(const ContextualRecordVariant &contextual
     tx_view_out.hash = epee::string_tools::pod_to_hex(spent_context.transaction_id);
     tx_view_out.fee = std::to_string(tx_record.fee_sent);
     std::string str_dest{};
-    for (auto dest : tx_record.outlays)
+    for (auto dest : tx_record.normal_payments)
     {
-        get_str_from_destination(dest.first, str_dest);
+        get_str_from_destination(dest.destination, str_dest);
         tx_view_out.destinations += str_dest + std::string(" , ");
     }
     tx_view_out.destinations.erase(tx_view_out.destinations.size() - 3, 3);
@@ -439,7 +451,7 @@ bool SpTransactionHistory::write_tx_funded_proof(const rct::key &txid, const SpE
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool read_tx_funded_proof(std::string &path, const epee::wipeable_string &password, const rct::key &tx_id,
-                          const std::string &message_in, const sp::mocks::MockLedgerContext &ledger_context)
+                          const std::string &message_in, const std::vector<crypto::key_image> &key_images)
 {
     // 1. Read proof from file
     ser_TxFundedProofV1 ser_tx_funded_proof{};
@@ -451,20 +463,101 @@ bool read_tx_funded_proof(std::string &path, const epee::wipeable_string &passwo
     rct::key message;
     make_message_v1(tx_id, message_in, message);
 
-    // 3. From tx_id get all key images of tx by querying node.
-    std::vector<crypto::key_image> key_images = ledger_context.get_sp_key_images_at_tx(tx_id);
-
-    // 4. Loop over key images to check if one corresponds to proof.
+    // 3. Loop over key images to check if one corresponds to proof.
     for (auto ki : key_images)
     {
         if (ki == tx_funded_proof.KI)
         {
-            // 5. Verify tx_funded_proof
+            // 4. Verify tx_funded_proof
             return verify_tx_funded_proof_v1(tx_funded_proof, message, ki);
         }
     }
     return false;
 }
+//-------------------------------------------------------------------------------------------------------------------
+bool SpTransactionHistory::write_enote_ownership_proof_sender(
+    const rct::key txid,
+    const rct::key &onetime_address,
+    const JamtisDestinationV1 &dest,
+    const rct::key &spend_pubkey,
+    const crypto::secret_key &k_vb,
+    const bool selfsend)
+{
+
+    // get tx info from this enote
+    EnoteOwnershipProofV1 proof;
+    auto tx_record = m_sp_tx_store.tx_records.find(txid);
+    if (tx_record != m_sp_tx_store.tx_records.end())
+    {
+        if (selfsend)
+        {
+            JamtisPaymentProposalSelfSendV1 payment_proposal;
+            for (auto rec : tx_record->second.selfsend_payments)
+            {
+                if (rec.destination == dest) payment_proposal = rec;
+            }
+
+            // check if payment proposal is not empty
+            if (!(payment_proposal.destination == dest)) return false;
+
+            rct::key input_context;
+            make_jamtis_input_context_standard(tx_record->second.legacy_spent_enotes, tx_record->second.sp_spent_enotes,
+                                               input_context);
+
+            SpOutputProposalV1 output_proposal;
+            make_v1_output_proposal_v1(payment_proposal, k_vb, input_context, output_proposal);
+            SpEnoteV1 enote;
+            get_enote_v1(output_proposal, enote);
+
+            // check if onetime_address corresponds to enote onetime_address
+            if (!(enote.core.onetime_address == onetime_address)) return false;
+
+            make_enote_ownership_proof_v1_sender_selfsend(
+                output_proposal.enote_ephemeral_pubkey, dest.addr_K1, input_context, k_vb, payment_proposal.type,
+                enote.core.amount_commitment, enote.core.onetime_address, proof);
+        }
+        else
+        {
+            JamtisPaymentProposalV1 payment_proposal;
+            for (auto rec : tx_record->second.normal_payments)
+            {
+                if (rec.destination == dest) payment_proposal = rec;
+            }
+
+            // check if payment proposal is not empty
+            if (!(payment_proposal.destination == dest)) return false;
+
+            rct::key input_context;
+            make_jamtis_input_context_standard(tx_record->second.legacy_spent_enotes, tx_record->second.sp_spent_enotes,
+                                               input_context);
+
+            SpOutputProposalV1 output_proposal;
+            make_v1_output_proposal_v1(payment_proposal, input_context, output_proposal);
+            SpEnoteV1 enote;
+            get_enote_v1(output_proposal, enote);
+
+            // check if onetime_address corresponds to enote onetime_address
+            if (!(enote.core.onetime_address == onetime_address)) return false;
+
+            make_enote_ownership_proof_v1_sender_plain(payment_proposal.enote_ephemeral_privkey, dest, input_context,
+                                                       enote.core.amount_commitment, enote.core.onetime_address, proof);
+        }
+    }
+
+    // Check if proof is not empty
+    if (!(proof.Ko == onetime_address)) return false;
+
+    // 6. serialize struct
+    ser_EnoteOwnershipProofV1 ser_enote_ownership_proof{};
+    make_serializable_enote_ownership_proof_v1(proof, ser_enote_ownership_proof);
+
+    // 7. prepare to save to file by proof name and date
+    // TODO: Add date into proof name
+    write_encrypted_file("enote_ownership_proof", "", ser_enote_ownership_proof);
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTransactionHistory::write_address_ownership_proof(const jamtis::address_index_t &j,
                                                          const crypto::secret_key &sp_spend_privkey,
@@ -526,17 +619,17 @@ bool SpTransactionHistory::write_address_index_proof(const rct::key &jamtis_spen
                                                      const jamtis::address_index_t &j, const crypto::secret_key &s_ga)
 {
 
-    // 2. initialize proof struct
+    // 1. initialize proof struct
     AddressIndexProofV1 proof{};
 
-    // 3. make proof
+    // 2. make proof
     make_address_index_proof_v1(jamtis_spend_pubkey, j, s_ga, proof);
 
-    // 4. serialize struct
+    // 3. serialize struct
     ser_AddressIndexProofV1 ser_address_index_proof{};
     make_serializable_address_index_proof_v1(proof, ser_address_index_proof);
 
-    // 5. prepare to save to file by proof name and date
+    // 4. prepare to save to file by proof name and date
     // TODO: Add date into proof name
     write_encrypted_file("tx_address_index_proof", "", ser_address_index_proof);
     return true;
@@ -555,3 +648,71 @@ bool read_address_index_proof(std::string &path, const epee::wipeable_string &pa
     return verify_address_index_proof_v1(address_index_proof, K_1);
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool get_enote_out_info(std::vector<SpEnoteVariant> &enotes_out,
+                        const std::vector<JamtisPaymentProposalV1> &normal_payments,
+                        const std::vector<JamtisPaymentProposalSelfSendV1> &selfsend_payments,
+                        const rct::key &input_context, 
+                        const crypto::secret_key &k_vb,
+                        std::vector<EnoteOutInfo> &enote_info)
+{
+    // find correspondence between enote and destination
+
+    // 1. check if size(normal) + size(selfsend) == size(enotes_out)
+    size_t s = enotes_out.size();
+    if (normal_payments.size() + selfsend_payments.size() != s) return false;
+
+    enote_info.clear();
+    crypto::x25519_pubkey xK_e;
+    rct::key q;
+    // 2. loop over normal
+    for (auto payment : normal_payments)
+    {
+        // 2.1. calculate sender-receiver secret
+        // enote ephemeral pubkey: xK_e = xr xK_3
+        make_jamtis_enote_ephemeral_pubkey(payment.enote_ephemeral_privkey, payment.destination.addr_K3, xK_e);
+        make_jamtis_sender_receiver_secret_plain(payment.enote_ephemeral_privkey, payment.destination.addr_K2, xK_e,
+                                                 input_context, q);
+        // loop over enotes
+        for (size_t i = 0; i < enotes_out.size(); i++)
+        {
+            if (test_jamtis_onetime_address(payment.destination.addr_K1, q, amount_commitment_ref(enotes_out[i]),
+                                            onetime_address_ref(enotes_out[i])))
+            {
+                // add to vector
+                enote_info.push_back(EnoteOutInfo{enotes_out[i], payment.destination, payment.amount,payment.enote_ephemeral_privkey, false});
+                enotes_out.erase(enotes_out.begin() + i);
+                break;
+            }
+        }
+    }
+
+    // 3. loop over selfsend
+    for (auto payment : selfsend_payments)
+    {
+        // 2.1. calculate sender-receiver secret
+        // enote ephemeral pubkey: xK_e = xr xK_3
+        make_jamtis_enote_ephemeral_pubkey(payment.enote_ephemeral_privkey, payment.destination.addr_K3, xK_e);
+
+        make_jamtis_sender_receiver_secret_selfsend(k_vb, xK_e, input_context, payment.type, q);
+
+        // loop over enotes
+        for (size_t i = 0; i < enotes_out.size(); i++)
+        {
+            if (test_jamtis_onetime_address(payment.destination.addr_K1, q, amount_commitment_ref(enotes_out[i]),
+                                            onetime_address_ref(enotes_out[i])))
+            {
+                // add to vector
+                enote_info.push_back(EnoteOutInfo{enotes_out[i], payment.destination, payment.amount, payment.enote_ephemeral_privkey, true});
+                enotes_out.erase(enotes_out.begin() + i);
+                break;
+            }
+        }
+    }
+
+    // check if all onetime addresses were properly built 
+    // and match all jamtis payments
+    if (enote_info.size()!=s)
+        return false;
+    
+    return true;
+}

@@ -31,6 +31,7 @@
 // local headers
 #include "ringct/rctTypes.h"
 #include "seraphis_core/jamtis_destination.h"
+#include "seraphis_core/jamtis_payment_proposal.h"
 #include "seraphis_crypto/sp_crypto_utils.h"
 #include "seraphis_impl/enote_store.h"
 #include "seraphis_impl/serialization_demo_types.h"
@@ -61,22 +62,25 @@
 void make_serializable_transaction_record_v1(const TransactionRecordV1 &tx_rec, ser_TransactionRecordV1 &ser_tx_rec)
 {
     ser_tx_rec.legacy_spent_enotes = tx_rec.legacy_spent_enotes;
-    ser_tx_rec.sp_spent_enotes     = tx_rec.sp_spent_enotes;
-    sp::serialization::ser_JamtisDestinationV1 ser_dest{};
-    std::vector<std::pair<sp::serialization::ser_JamtisDestinationV1, rct::xmr_amount>> outlays_aux{};
-    for (auto &r : tx_rec.outlays)
+    ser_tx_rec.sp_spent_enotes = tx_rec.sp_spent_enotes;
+    ser_tx_rec.normal_payments.clear();
+    for (auto payment:tx_rec.normal_payments)
     {
-        make_serializable_sp_destination_v1(r.first, ser_dest);
-        outlays_aux.emplace_back(ser_dest, r.second);
+        ser_tx_rec.normal_payments.emplace_back();
+        make_serializable_jamtis_payment_proposal_v1(payment,ser_tx_rec.normal_payments.back());
     }
-    ser_tx_rec.outlays     = outlays_aux;
+    ser_tx_rec.selfsend_payments.clear();
+    for (auto payment:tx_rec.selfsend_payments)
+    {
+        ser_tx_rec.selfsend_payments.emplace_back();
+        make_serializable_jamtis_payment_proposal_selfsend_v1(payment,ser_tx_rec.selfsend_payments.back());
+    }
     ser_tx_rec.amount_sent = tx_rec.amount_sent;
-    ser_tx_rec.fee_sent    = tx_rec.fee_sent;
-    outlays_aux.clear();
+    ser_tx_rec.fee_sent = tx_rec.fee_sent;
 }
 
 void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_store,
-    ser_SpTransactionStoreV1 &ser_tx_store)
+                                               ser_SpTransactionStoreV1 &ser_tx_store)
 {
     ser_TransactionRecordV1 ser_tx_rec{};
     for (auto &r : tx_store.tx_records)
@@ -84,27 +88,29 @@ void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_st
         make_serializable_transaction_record_v1(r.second, ser_tx_rec);
         ser_tx_store.tx_records[r.first] = ser_tx_rec;
     }
-    ser_tx_store.confirmed_txids   = tx_store.confirmed_txids;
+    ser_tx_store.confirmed_txids = tx_store.confirmed_txids;
     ser_tx_store.unconfirmed_txids = tx_store.unconfirmed_txids;
-    ser_tx_store.offchain_txids    = tx_store.offchain_txids;
+    ser_tx_store.offchain_txids = tx_store.offchain_txids;
 }
 
 void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec, TransactionRecordV1 &tx_rec)
 {
     tx_rec.legacy_spent_enotes = ser_tx_rec.legacy_spent_enotes;
-    tx_rec.sp_spent_enotes     = ser_tx_rec.sp_spent_enotes;
-
-    JamtisDestinationV1 dest{};
-    std::vector<std::pair<JamtisDestinationV1, rct::xmr_amount>> outlays_aux{};
-    for (auto &r : ser_tx_rec.outlays)
+    tx_rec.sp_spent_enotes = ser_tx_rec.sp_spent_enotes;
+    tx_rec.normal_payments.clear();
+    for (auto payment: ser_tx_rec.normal_payments)
     {
-        recover_sp_destination_v1(r.first, dest);
-        outlays_aux.emplace_back(dest, r.second);
+        tx_rec.normal_payments.emplace_back();
+        recover_jamtis_payment_proposal_v1(payment,tx_rec.normal_payments.back());
     }
-    tx_rec.outlays     = outlays_aux;
+    tx_rec.selfsend_payments.clear();
+    for (auto payment: ser_tx_rec.selfsend_payments)
+    {
+        tx_rec.selfsend_payments.emplace_back();
+        recover_jamtis_payment_proposal_selfsend_v1(payment,tx_rec.selfsend_payments.back());
+    }
     tx_rec.amount_sent = ser_tx_rec.amount_sent;
-    tx_rec.fee_sent    = ser_tx_rec.fee_sent;
-    outlays_aux.clear();
+    tx_rec.fee_sent = ser_tx_rec.fee_sent;
 }
 
 void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_store, SpTransactionStoreV1 &tx_store)
@@ -115,40 +121,40 @@ void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_stor
         recover_transaction_record_v1(r.second, tx_rec);
         tx_store.tx_records[r.first] = tx_rec;
     }
-    tx_store.confirmed_txids   = ser_tx_store.confirmed_txids;
+    tx_store.confirmed_txids = ser_tx_store.confirmed_txids;
     tx_store.unconfirmed_txids = ser_tx_store.unconfirmed_txids;
-    tx_store.offchain_txids    = ser_tx_store.offchain_txids;
+    tx_store.offchain_txids = ser_tx_store.offchain_txids;
 }
 
 void make_serializable_tx_funded_proof_v1(const TxFundedProofV1 &proof, ser_TxFundedProofV1 &ser_proof)
 {
-    ser_proof.message        = proof.message;
+    ser_proof.message = proof.message;
     ser_proof.masked_address = proof.masked_address;
-    ser_proof.KI             = proof.KI;
+    ser_proof.KI = proof.KI;
     make_serializable_sp_composition_proof(proof.composition_proof, ser_proof.composition_proof);
 }
 
 void recover_tx_funded_proof_v1(const ser_TxFundedProofV1 &ser_proof, TxFundedProofV1 &proof)
 {
-    proof.message        = ser_proof.message;
+    proof.message = ser_proof.message;
     proof.masked_address = ser_proof.masked_address;
-    proof.KI             = ser_proof.KI;
+    proof.KI = ser_proof.KI;
     recover_sp_composition_proof(ser_proof.composition_proof, proof.composition_proof);
 }
 
 void make_serializable_address_ownership_proof_v1(const AddressOwnershipProofV1 &proof,
-    ser_AddressOwnershipProofV1 &ser_proof)
+                                                  ser_AddressOwnershipProofV1 &ser_proof)
 {
-    ser_proof.message        = proof.message;
-    ser_proof.K              = proof.K;
+    ser_proof.message = proof.message;
+    ser_proof.K = proof.K;
     ser_proof.addr_key_image = proof.addr_key_image;
     make_serializable_sp_composition_proof(proof.composition_proof, ser_proof.composition_proof);
 }
 
 void recover_address_ownership_proof_v1(const ser_AddressOwnershipProofV1 &ser_proof, AddressOwnershipProofV1 &proof)
 {
-    proof.message        = ser_proof.message;
-    proof.K              = ser_proof.K;
+    proof.message = ser_proof.message;
+    proof.K = ser_proof.K;
     proof.addr_key_image = ser_proof.addr_key_image;
     recover_sp_composition_proof(ser_proof.composition_proof, proof.composition_proof);
 }
@@ -156,15 +162,31 @@ void recover_address_ownership_proof_v1(const ser_AddressOwnershipProofV1 &ser_p
 void make_serializable_address_index_proof_v1(const AddressIndexProofV1 &proof, ser_AddressIndexProofV1 &ser_proof)
 {
     ser_proof.generator = proof.generator;
-    ser_proof.K_1       = proof.K_1;
-    ser_proof.K_s       = proof.K_s;
+    ser_proof.K_1 = proof.K_1;
+    ser_proof.K_s = proof.K_s;
     memcpy(ser_proof.j.bytes, proof.j.bytes, sizeof(proof.j));
 }
 
 void recover_address_index_proof_v1(const ser_AddressIndexProofV1 &ser_proof, AddressIndexProofV1 &proof)
 {
     proof.generator = ser_proof.generator;
-    proof.K_1       = ser_proof.K_1;
-    proof.K_s       = ser_proof.K_s;
+    proof.K_1 = ser_proof.K_1;
+    proof.K_s = ser_proof.K_s;
     memcpy(proof.j.bytes, ser_proof.j.bytes, sizeof(ser_proof.j));
+}
+
+void make_serializable_enote_ownership_proof_v1(const EnoteOwnershipProofV1 &proof, ser_EnoteOwnershipProofV1 &ser_proof)
+{
+    ser_proof.K_1 = proof.K_1;
+    ser_proof.C = proof.C;
+    ser_proof.Ko = proof.Ko;
+    ser_proof.q = proof.q;
+}
+
+void recover_enote_ownership_proof_v1(ser_EnoteOwnershipProofV1 &ser_proof, EnoteOwnershipProofV1 &proof)
+{
+    proof.K_1 = ser_proof.K_1;
+    proof.C = ser_proof.C;
+    proof.Ko = ser_proof.Ko;
+    proof.q = ser_proof.q;
 }

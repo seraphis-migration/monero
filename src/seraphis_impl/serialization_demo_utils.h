@@ -137,6 +137,8 @@ void make_serializable_discretized_fee(const DiscretizedFee discretized_fee,
 void make_serializable_sp_tx_coinbase_v1(const SpTxCoinbaseV1 &tx, ser_SpTxCoinbaseV1 &serializable_tx_out);
 void make_serializable_sp_tx_squashed_v1(const SpTxSquashedV1 &tx, ser_SpTxSquashedV1 &serializable_tx_out);
 void make_serializable_sp_destination_v1(const jamtis::JamtisDestinationV1 &dest, ser_JamtisDestinationV1 &serializable_dest_out); 
+void make_serializable_jamtis_payment_proposal_v1(const jamtis::JamtisPaymentProposalV1 &payment, ser_JamtisPaymentProposalV1 &serializable_payment_out);
+void make_serializable_jamtis_payment_proposal_selfsend_v1(const jamtis::JamtisPaymentProposalSelfSendV1 &payment, ser_JamtisPaymentProposalSelfSendV1 &serializable_payment_out);
 /**
 * brief: recover_* - convert a serializable object back into its normal object parent
 * param: serializable_object_in - serializable object to be consumed (destructive: may be left in an unusable state)
@@ -189,6 +191,8 @@ bool try_recover_sp_tx_squashed_v1(ser_SpTxSquashedV1 &serializable_tx_in,
     SpTxSquashedV1 &tx_out);
 bool try_recover_sp_tx_squashed_v1(ser_SpTxSquashedV1 &serializable_tx_in, SpTxSquashedV1 &tx_out);
 void recover_sp_destination_v1(const ser_JamtisDestinationV1 &serializable_destination, jamtis::JamtisDestinationV1 &dest_out);
+void recover_jamtis_payment_proposal_v1(const ser_JamtisPaymentProposalV1 &serializable_payment, jamtis::JamtisPaymentProposalV1 &payment_out);
+void recover_jamtis_payment_proposal_selfsend_v1(const ser_JamtisPaymentProposalSelfSendV1 &serializable_payment, jamtis::JamtisPaymentProposalSelfSendV1 &payment_out);
 
 } //namespace serialization
 } //namespace sp

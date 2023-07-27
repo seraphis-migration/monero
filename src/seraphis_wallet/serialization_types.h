@@ -67,7 +67,8 @@ struct ser_TransactionRecordV1
     std::vector<crypto::key_image> sp_spent_enotes;
 
     // sent funds
-    std::vector<std::pair<sp::serialization::ser_JamtisDestinationV1, rct::xmr_amount>> outlays;
+    std::vector<ser_JamtisPaymentProposalSelfSendV1> selfsend_payments;
+    std::vector<ser_JamtisPaymentProposalV1> normal_payments;
 
     // fees and total sent:
     rct::xmr_amount amount_sent;
@@ -76,7 +77,8 @@ struct ser_TransactionRecordV1
     BEGIN_SERIALIZE_OBJECT()
     FIELD(legacy_spent_enotes)
     FIELD(sp_spent_enotes)
-    FIELD(outlays)
+    FIELD(selfsend_payments)
+    FIELD(normal_payments)
     FIELD(amount_sent)
     FIELD(fee_sent)
     END_SERIALIZE()
@@ -100,21 +102,6 @@ struct ser_SpTransactionStoreV1
     FIELD(confirmed_txids)
     FIELD(unconfirmed_txids)
     FIELD(offchain_txids)
-    END_SERIALIZE()
-};
-
-struct ser_TxFundedProofV1
-{
-    rct::key message;
-    rct::key masked_address;
-    crypto::key_image KI;
-    ser_SpCompositionProof composition_proof;
-
-    BEGIN_SERIALIZE_OBJECT()
-    FIELD(message)
-    FIELD(masked_address)
-    FIELD(KI)
-    FIELD(composition_proof)
     END_SERIALIZE()
 };
 
@@ -148,6 +135,37 @@ struct ser_AddressIndexProofV1
     END_SERIALIZE()
 };
 
+struct ser_EnoteOwnershipProofV1
+{
+    rct::key K_1;
+    rct::key q;
+    rct::key C;
+    rct::key Ko;
+    
+    BEGIN_SERIALIZE_OBJECT()
+    FIELD(K_1)
+    FIELD(q)
+    FIELD(C)
+    FIELD(Ko)
+    END_SERIALIZE()
+};
+
+struct ser_TxFundedProofV1
+{
+    rct::key message;
+    rct::key masked_address;
+    crypto::key_image KI;
+    ser_SpCompositionProof composition_proof;
+
+    BEGIN_SERIALIZE_OBJECT()
+    FIELD(message)
+    FIELD(masked_address)
+    FIELD(KI)
+    FIELD(composition_proof)
+    END_SERIALIZE()
+};
+
+
 void make_serializable_transaction_record_v1(const TransactionRecordV1 &tx_rec, ser_TransactionRecordV1 &ser_tx_rec);
 void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_store,
     ser_SpTransactionStoreV1 &ser_tx_store);
@@ -155,12 +173,15 @@ void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_st
 void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec, TransactionRecordV1 &tx_rec);
 void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_store, SpTransactionStoreV1 &tx_store);
 
-void make_serializable_tx_funded_proof_v1(const TxFundedProofV1 &proof, ser_TxFundedProofV1 &ser_proof);
-void recover_tx_funded_proof_v1(const ser_TxFundedProofV1 &ser_proof, TxFundedProofV1 &proof);
-
 void make_serializable_address_ownership_proof_v1(const AddressOwnershipProofV1 &proof,
     ser_AddressOwnershipProofV1 &ser_proof);
 void recover_address_ownership_proof_v1(const ser_AddressOwnershipProofV1 &ser_proof, AddressOwnershipProofV1 &proof);
 
 void make_serializable_address_index_proof_v1(const AddressIndexProofV1 &proof, ser_AddressIndexProofV1 &ser_proof);
 void recover_address_index_proof_v1(const ser_AddressIndexProofV1 &ser_proof, AddressIndexProofV1 &proof);
+
+void make_serializable_enote_ownership_proof_v1(const EnoteOwnershipProofV1 &proof, ser_EnoteOwnershipProofV1 &ser_proof);
+void recover_enote_ownership_proof_v1(ser_EnoteOwnershipProofV1 &ser_proof, EnoteOwnershipProofV1 &proof);
+
+void make_serializable_tx_funded_proof_v1(const TxFundedProofV1 &proof, ser_TxFundedProofV1 &ser_proof);
+void recover_tx_funded_proof_v1(const ser_TxFundedProofV1 &ser_proof, TxFundedProofV1 &proof);

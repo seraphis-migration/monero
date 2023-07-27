@@ -34,8 +34,11 @@
 #pragma once
 
 // local headers
+#include "crypto/x25519.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_core/jamtis_destination.h"
+#include "seraphis_core/jamtis_payment_proposal.h"
+#include "seraphis_core/jamtis_support_types.h"
 #include "seraphis_crypto/sp_crypto_utils.h"
 #include "seraphis_impl/enote_store.h"
 #include "seraphis_impl/serialization_demo_types.h"
@@ -47,6 +50,7 @@
 #include <boost/range.hpp>
 
 #include "boost/range/iterator_range.hpp"
+#include "seraphis_main/tx_component_types.h"
 #include "seraphis_mocks/mock_ledger_context.h"
 #include "serialization/binary_archive.h"
 #include "serialization/containers.h"
@@ -115,14 +119,27 @@ struct TxViewV1
     std::string note;
 };
 
+struct EnoteOutInfo
+{
+    SpEnoteVariant enote;
+    JamtisDestinationV1 destination;
+    rct::xmr_amount amount;
+    crypto::x25519_secret_key enote_ephemeral_privkey;
+    bool selfsend;
+};
+
 struct TransactionRecordV1
 {
     // key images of spent enotes for tracking purposes
     std::vector<crypto::key_image> legacy_spent_enotes;
     std::vector<crypto::key_image> sp_spent_enotes;
 
-    // sent funds
-    std::vector<std::pair<JamtisDestinationV1, rct::xmr_amount>> outlays;
+    // input proposal structs
+    // - destination address - JamtisDestinationV1
+    // - amount sent - xmr_amount
+    // - enote ephemeral private key - x25519_secret_key
+    std::vector<JamtisPaymentProposalSelfSendV1> selfsend_payments;
+    std::vector<JamtisPaymentProposalV1> normal_payments;
 
     // fees and total sent:
     // useful to store here also instead of looking directly at the enotes and
@@ -192,6 +209,9 @@ class SpTransactionHistory
     bool get_representing_enote_from_tx(const std::pair<std::vector<LegacyContextualEnoteRecordV1>,
                                                         std::vector<SpContextualEnoteRecordV1>> &enotes_in_tx,
                                         ContextualRecordVariant &contextual_enote_out);
+
+    TransactionRecordV1 get_tx_record_from_txid(const rct::key &txid);
+
     //-----------------------------------------------------------------
     /// Show transfers
     // (TEMPORARY)
@@ -213,23 +233,32 @@ class SpTransactionHistory
     //-----------------------------------------------------------------
     /// Get Knowledge proofs
     // (TEMPORARY)
-
-    bool write_tx_funded_proof(const rct::key &txid, const SpEnoteStore &enote_store,
-                               const crypto::secret_key &sp_spend_privkey, const crypto::secret_key &k_view_balance,
-                               const std::string &message_in);
-
     bool write_address_ownership_proof(const jamtis::address_index_t &j, const crypto::secret_key &sp_spend_privkey,
                                        const crypto::secret_key &k_view_balance, const bool bool_Ks_K1,
                                        const std::string &message_in);
 
     bool write_address_index_proof(const rct::key &jamtis_spend_pubkey, const jamtis::address_index_t &j,
                                    const crypto::secret_key &s_ga);
-};
 
-bool read_tx_funded_proof(std::string &path, const epee::wipeable_string &password, const rct::key &tx_id,
-                          const std::string &message_in, const sp::mocks::MockLedgerContext &ledger_context);
+    bool write_enote_ownership_proof_sender(const rct::key txid, const rct::key &onetime_address,
+                                            const JamtisDestinationV1 &dest, const rct::key &spend_pubkey,
+                                            const crypto::secret_key &k_vb, const bool selfsend);
+
+    bool write_tx_funded_proof(const rct::key &txid, const SpEnoteStore &enote_store,
+                               const crypto::secret_key &sp_spend_privkey, const crypto::secret_key &k_view_balance,
+                               const std::string &message_in);
+};
 
 bool read_address_ownership_proof(std::string &path, const epee::wipeable_string &password,
                                   const std::string &message_in, const rct::key &K);
 
 bool read_address_index_proof(std::string &path, const epee::wipeable_string &password, const rct::key &K_1);
+
+bool read_tx_funded_proof(std::string &path, const epee::wipeable_string &password, const rct::key &tx_id,
+                          const std::string &message_in, const std::vector<crypto::key_image> &key_images);
+
+bool get_enote_out_info(std::vector<SpEnoteVariant> &enotes_out,
+                        const std::vector<JamtisPaymentProposalV1> &normal_payments,
+                        const std::vector<JamtisPaymentProposalSelfSendV1> &selfsend_payments,
+                        const rct::key &input_context, const crypto::secret_key &k_vb,
+                        std::vector<EnoteOutInfo> &enote_info);

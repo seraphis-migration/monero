@@ -256,7 +256,8 @@ public:
         scanning::ChunkContext &chunk_context_out,
         scanning::ChunkData &chunk_data_out) const;
 
-    std::vector<crypto::key_image> get_sp_key_images_at_tx(const rct::key &tx_id) const;
+    std::vector<crypto::key_image> get_sp_key_images_from_tx(const rct::key &tx_id) const;
+    std::vector<SpEnoteVariant> get_sp_enotes_out_from_tx(const rct::key &tx_id) const;
 
 private:
     /// first block where a seraphis tx is allowed (this block and all following must have a seraphis coinbase tx)

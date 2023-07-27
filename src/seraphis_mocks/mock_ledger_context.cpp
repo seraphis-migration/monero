@@ -57,6 +57,7 @@
 #include <algorithm>
 #include <type_traits>
 #include <vector>
+#include <tuple>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "seraphis_mocks"
@@ -1020,17 +1021,29 @@ void MockLedgerContext::get_onchain_chunk_sp(const std::uint64_t chunk_start_ind
         );
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::vector<crypto::key_image> MockLedgerContext::get_sp_key_images_at_tx(const rct::key &tx_id) const
+std::vector<crypto::key_image> MockLedgerContext::get_sp_key_images_from_tx(const rct::key &tx_id) const
 {
-    std::vector<crypto::key_image> sp_kis{};
+    std::vector<crypto::key_image> sp_key_images{};
     for (auto blocks : m_blocks_of_tx_key_images)
     {
         if (blocks.second.find(tx_id) != blocks.second.end())
         {
-            sp_kis = blocks.second[tx_id].second;
+            sp_key_images = blocks.second[tx_id].second;
         }
     }
-    return sp_kis;
+    return sp_key_images;
+}
+std::vector<SpEnoteVariant> MockLedgerContext::get_sp_enotes_out_from_tx(const rct::key &tx_id) const
+{
+    std::vector<SpEnoteVariant> sp_enotes{};
+    for (auto blocks : m_blocks_of_sp_tx_output_contents)
+    {
+        if (blocks.second.find(tx_id) != blocks.second.end())
+        {
+            sp_enotes = std::get<2>(blocks.second[tx_id]);
+        }
+    }
+    return sp_enotes;
 }
 //-------------------------------------------------------------------------------------------------------------------
 // free functions

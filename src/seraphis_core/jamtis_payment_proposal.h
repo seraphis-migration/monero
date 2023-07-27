@@ -91,6 +91,10 @@ struct JamtisPaymentProposalSelfSendV1 final
     TxExtra partial_memo;
 };
 
+/// equality operators
+bool operator==(const JamtisPaymentProposalV1 a, const JamtisPaymentProposalV1 b);
+bool operator==(const JamtisPaymentProposalSelfSendV1 a, const JamtisPaymentProposalSelfSendV1 b);
+
 /**
 * brief: get_enote_ephemeral_pubkey - get the proposal's enote ephemeral pubkey xK_e
 * param: proposal -
