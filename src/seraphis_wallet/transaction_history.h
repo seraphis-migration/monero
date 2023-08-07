@@ -34,6 +34,7 @@
 #pragma once
 
 // local headers
+#include "crypto/crypto.h"
 #include "crypto/x25519.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_core/jamtis_destination.h"
@@ -125,6 +126,8 @@ struct EnoteOutInfo
     JamtisDestinationV1 destination;
     rct::xmr_amount amount;
     crypto::x25519_secret_key enote_ephemeral_privkey;
+    rct::key sender_receiver_secret;
+    crypto::secret_key amount_blinding_factor;
     bool selfsend;
 };
 
@@ -201,19 +204,23 @@ class SpTransactionHistory
     const range_txids_by_block_or_time get_last_N_txs(const SpTxStatus tx_status, const uint64_t N);
 
     // get specific enotes by txid
-    bool get_enotes_from_tx(
-        const rct::key &txid, const SpEnoteStore &enote_store,
+    bool get_enotes_from_tx(const rct::key &txid,
+        const SpEnoteStore &enote_store,
         std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> &enotes_out);
 
     // get an enote with tx_info
-    bool get_representing_enote_from_tx(const std::pair<std::vector<LegacyContextualEnoteRecordV1>,
-                                                        std::vector<SpContextualEnoteRecordV1>> &enotes_in_tx,
-                                        ContextualRecordVariant &contextual_enote_out);
+    bool get_representing_enote_from_tx(
+        const std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>>
+            &enotes_in_tx,
+        ContextualRecordVariant &contextual_enote_out);
 
     TransactionRecordV1 get_tx_record_from_txid(const rct::key &txid);
 
     //-----------------------------------------------------------------
     /// Show transfers
+    // Currently only showing "out" transfers.
+    // Probably showing transaction info is not the way to go.
+    // A better way would be to show the enotes.
     // (TEMPORARY)
 
     // Exhibit txs chronologically
@@ -233,32 +240,129 @@ class SpTransactionHistory
     //-----------------------------------------------------------------
     /// Get Knowledge proofs
     // (TEMPORARY)
-    bool write_address_ownership_proof(const jamtis::address_index_t &j, const crypto::secret_key &sp_spend_privkey,
-                                       const crypto::secret_key &k_view_balance, const bool bool_Ks_K1,
-                                       const std::string &message_in);
+    std::string get_address_ownership_proof(const jamtis::address_index_t &j,
+        const crypto::secret_key &sp_spend_privkey,
+        const crypto::secret_key &k_view_balance,
+        const bool bool_Ks_K1,
+        const std::string message_in,
+        const boost::optional<std::string> filename);
 
-    bool write_address_index_proof(const rct::key &jamtis_spend_pubkey, const jamtis::address_index_t &j,
-                                   const crypto::secret_key &s_ga);
+    std::string get_address_index_proof(const rct::key &jamtis_spend_pubkey,
+        const jamtis::address_index_t &j,
+        const crypto::secret_key &s_ga,
+        const boost::optional<std::string> filename);
 
-    bool write_enote_ownership_proof_sender(const rct::key txid, const rct::key &onetime_address,
-                                            const JamtisDestinationV1 &dest, const rct::key &spend_pubkey,
-                                            const crypto::secret_key &k_vb, const bool selfsend);
+    bool try_make_enote_ownership_proof_sender(const rct::key txid,
+        const rct::key &onetime_address,
+        const JamtisDestinationV1 &dest,
+        const crypto::secret_key &k_vb,
+        const bool selfsend,
+        EnoteOwnershipProofV1 &proof);
 
-    bool write_tx_funded_proof(const rct::key &txid, const SpEnoteStore &enote_store,
-                               const crypto::secret_key &sp_spend_privkey, const crypto::secret_key &k_view_balance,
-                               const std::string &message_in);
+    std::string get_enote_ownership_proof_sender(const rct::key txid,
+        const rct::key &onetime_address,
+        const JamtisDestinationV1 &dest,
+        const crypto::secret_key &k_vb,
+        const bool selfsend,
+        const boost::optional<std::string> filename);
+
+    std::string get_enote_ownership_proof_receiver(const SpEnoteRecordV1 &enote_record,
+        const rct::key &jamtis_spend_pubkey,
+        const crypto::secret_key &k_vb,
+        const boost::optional<std::string> filename);
+
+    bool try_make_amount_proof(const rct::xmr_amount &amount,
+        const crypto::secret_key &mask,
+        const rct::key &commitment,
+        EnoteAmountProofV1 &amount_proof);
+
+    std::string get_amount_proof(const rct::xmr_amount &amount,
+        const crypto::secret_key &mask,
+        const rct::key &commitment,
+        const boost::optional<std::string> filename);
+
+    std::string get_enote_key_image_proof(const SpEnoteStore &enote_store,
+        const crypto::key_image &key_image,
+        const crypto::secret_key &k_m,
+        const crypto::secret_key &k_vb,
+        const boost::optional<std::string> filename);
+
+    std::string get_enote_sent_proof(const rct::key txid,
+        const rct::key &onetime_address,
+        const JamtisDestinationV1 &dest,
+        const crypto::secret_key &k_vb,
+        const bool selfsend,
+        const rct::xmr_amount &amount,
+        const crypto::secret_key &mask,
+        const rct::key &commitment,
+        const boost::optional<std::string> filename);
+
+    std::string get_tx_funded_proof(const rct::key &txid,
+        const SpEnoteStore &enote_store,
+        const crypto::secret_key &sp_spend_privkey,
+        const crypto::secret_key &k_view_balance,
+        const std::string &message_in,
+        const boost::optional<std::string> filename);
+
+    std::string get_enote_reserve_proof(const std::string &message_in,
+        const std::vector<SpContextualEnoteRecordV1> &reserved_enote_records,
+        const rct::key &jamtis_spend_pubkey,
+        const crypto::secret_key &sp_spend_privkey,
+        const crypto::secret_key &k_view_balance,
+        const rct::xmr_amount proof_amount,
+        const boost::optional<std::string> filename);
 };
 
-bool read_address_ownership_proof(std::string &path, const epee::wipeable_string &password,
-                                  const std::string &message_in, const rct::key &K);
+bool read_address_ownership_proof(const boost::optional<std::string> filename,
+    const boost::optional<std::string> proof_str,
+    const std::string &message_in,
+    const rct::key &K);
 
-bool read_address_index_proof(std::string &path, const epee::wipeable_string &password, const rct::key &K_1);
+bool read_address_index_proof(const boost::optional<std::string> filename,
+    const boost::optional<std::string> proof_str,
+    const rct::key &K_1);
 
-bool read_tx_funded_proof(std::string &path, const epee::wipeable_string &password, const rct::key &tx_id,
-                          const std::string &message_in, const std::vector<crypto::key_image> &key_images);
+bool read_enote_ownership_proof(const boost::optional<std::string> filename,
+    const boost::optional<std::string> proof_str,
+    const rct::key &expected_amount_commitment,
+    const rct::key &expected_onetime_address);
+
+bool read_amount_proof(const boost::optional<std::string> filename,
+    const boost::optional<std::string> proof_str,
+    const rct::key &expected_amount_commitment);
+
+bool read_enote_key_image_proof(const boost::optional<std::string> filename,
+    const boost::optional<std::string> proof_str,
+    const rct::key &expected_onetime_address,
+    const crypto::key_image &expected_KI);
+
+bool read_enote_sent_proof(const boost::optional<std::string> filename,
+    const boost::optional<std::string> proof_str,
+    const rct::key &expected_amount_commitment,
+    const rct::key &expected_onetime_address);
+
+bool read_tx_funded_proof(const boost::optional<std::string> filename,
+    const boost::optional<std::string> proof_str,
+    const rct::key &tx_id,
+    const std::string &message_in,
+    const std::vector<crypto::key_image> &key_images);
+
+bool read_enote_reserve_proof(const boost::optional<std::string> filename,
+    const boost::optional<std::string> proof_str,
+    const std::string &expected_message,
+    const TxValidationContext &validation_context);
 
 bool get_enote_out_info(std::vector<SpEnoteVariant> &enotes_out,
-                        const std::vector<JamtisPaymentProposalV1> &normal_payments,
-                        const std::vector<JamtisPaymentProposalSelfSendV1> &selfsend_payments,
-                        const rct::key &input_context, const crypto::secret_key &k_vb,
-                        std::vector<EnoteOutInfo> &enote_info);
+    const std::vector<JamtisPaymentProposalV1> &normal_payments,
+    const std::vector<JamtisPaymentProposalSelfSendV1> &selfsend_payments,
+    const rct::key &input_context,
+    const crypto::secret_key &k_vb,
+    std::vector<EnoteOutInfo> &enote_info);
+
+template <typename T>
+std::string proof_to_str(T &serializable_proof, std::string prefix);
+
+template <typename T>
+T str_to_proof(const std::string prefix,
+    const boost::optional<std::string> filename,
+    const boost::optional<std::string> proof_str);

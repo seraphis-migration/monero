@@ -29,6 +29,7 @@
 #pragma once
 
 // local headers
+#include "cryptonote_config.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_core/jamtis_destination.h"
 #include "seraphis_crypto/sp_crypto_utils.h"
@@ -141,7 +142,7 @@ struct ser_EnoteOwnershipProofV1
     rct::key q;
     rct::key C;
     rct::key Ko;
-    
+
     BEGIN_SERIALIZE_OBJECT()
     FIELD(K_1)
     FIELD(q)
@@ -150,38 +151,120 @@ struct ser_EnoteOwnershipProofV1
     END_SERIALIZE()
 };
 
-struct ser_TxFundedProofV1
+struct ser_EnoteAmountProofV1
 {
-    rct::key message;
-    rct::key masked_address;
+    rct::xmr_amount a;
+    rct::key x;
+    rct::key C;
+
+    BEGIN_SERIALIZE_OBJECT()
+    FIELD(a)
+    FIELD(x)
+    FIELD(C)
+    END_SERIALIZE()
+};
+
+struct ser_EnoteKeyImageProofV1
+{
+    rct::key Ko;
     crypto::key_image KI;
     ser_SpCompositionProof composition_proof;
 
     BEGIN_SERIALIZE_OBJECT()
-    FIELD(message)
-    FIELD(masked_address)
+    FIELD(Ko)
     FIELD(KI)
     FIELD(composition_proof)
     END_SERIALIZE()
 };
 
+struct ser_EnoteSentProofV1
+{
+    ser_EnoteOwnershipProofV1 enote_ownership_proof;
+    ser_EnoteAmountProofV1 amount_proof;
 
-void make_serializable_transaction_record_v1(const TransactionRecordV1 &tx_rec, ser_TransactionRecordV1 &ser_tx_rec);
+    BEGIN_SERIALIZE_OBJECT()
+    FIELD(enote_ownership_proof)
+    FIELD(amount_proof)
+    END_SERIALIZE()
+};
+
+struct ser_TxFundedProofV1
+{
+    rct::key message;
+    rct::key masked_address;
+    crypto::key_image KI;
+    ser_SpCompositionProof composition_proof_out;
+
+    BEGIN_SERIALIZE_OBJECT()
+    FIELD(message)
+    FIELD(masked_address)
+    FIELD(KI)
+    FIELD(composition_proof_out)
+    END_SERIALIZE()
+};
+
+struct ser_ReservedEnoteProofV1
+{
+    ser_EnoteOwnershipProofV1 enote_ownership_proof;
+    ser_EnoteAmountProofV1 amount_proof;
+    ser_EnoteKeyImageProofV1 KI_proof;
+    std::uint64_t enote_ledger_index;
+
+    BEGIN_SERIALIZE_OBJECT()
+    FIELD(enote_ownership_proof)
+    FIELD(amount_proof)
+    FIELD(KI_proof)
+    FIELD(enote_ledger_index)
+    END_SERIALIZE()
+};
+
+struct ser_ReserveProofV1
+{
+    std::vector<ser_AddressOwnershipProofV1> address_ownership_proofs;
+    std::vector<ser_ReservedEnoteProofV1> reserved_enote_proofs;
+
+    BEGIN_SERIALIZE_OBJECT()
+    FIELD(address_ownership_proofs)
+    FIELD(reserved_enote_proofs)
+    END_SERIALIZE()
+};
+
+void make_serializable_transaction_record_v1(const TransactionRecordV1 &tx_rec,
+    ser_TransactionRecordV1 &ser_tx_rec_out);
 void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_store,
-    ser_SpTransactionStoreV1 &ser_tx_store);
+    ser_SpTransactionStoreV1 &ser_tx_store_out);
 
-void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec, TransactionRecordV1 &tx_rec);
-void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_store, SpTransactionStoreV1 &tx_store);
+void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec, TransactionRecordV1 &tx_rec_out);
+void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_store, SpTransactionStoreV1 &tx_store_out);
 
 void make_serializable_address_ownership_proof_v1(const AddressOwnershipProofV1 &proof,
-    ser_AddressOwnershipProofV1 &ser_proof);
-void recover_address_ownership_proof_v1(const ser_AddressOwnershipProofV1 &ser_proof, AddressOwnershipProofV1 &proof);
+    ser_AddressOwnershipProofV1 &ser_proof_out);
+void recover_address_ownership_proof_v1(const ser_AddressOwnershipProofV1 &ser_proof,
+    AddressOwnershipProofV1 &proof_out);
 
-void make_serializable_address_index_proof_v1(const AddressIndexProofV1 &proof, ser_AddressIndexProofV1 &ser_proof);
-void recover_address_index_proof_v1(const ser_AddressIndexProofV1 &ser_proof, AddressIndexProofV1 &proof);
+void make_serializable_address_index_proof_v1(const AddressIndexProofV1 &proof, ser_AddressIndexProofV1 &ser_proof_out);
+void recover_address_index_proof_v1(const ser_AddressIndexProofV1 &ser_proof, AddressIndexProofV1 &proof_out);
 
-void make_serializable_enote_ownership_proof_v1(const EnoteOwnershipProofV1 &proof, ser_EnoteOwnershipProofV1 &ser_proof);
-void recover_enote_ownership_proof_v1(ser_EnoteOwnershipProofV1 &ser_proof, EnoteOwnershipProofV1 &proof);
+void make_serializable_enote_ownership_proof_v1(const EnoteOwnershipProofV1 &proof,
+    ser_EnoteOwnershipProofV1 &ser_proof_out);
+void recover_enote_ownership_proof_v1(const ser_EnoteOwnershipProofV1 &ser_proof, EnoteOwnershipProofV1 &proof_out);
 
-void make_serializable_tx_funded_proof_v1(const TxFundedProofV1 &proof, ser_TxFundedProofV1 &ser_proof);
-void recover_tx_funded_proof_v1(const ser_TxFundedProofV1 &ser_proof, TxFundedProofV1 &proof);
+void make_serializable_enote_amount_proof_v1(const EnoteAmountProofV1 &proof, ser_EnoteAmountProofV1 &ser_proof_out);
+void recover_enote_amount_proof_v1(const ser_EnoteAmountProofV1 &ser_proof, EnoteAmountProofV1 &proof_out);
+
+void make_serializable_enote_key_image_proof_v1(const EnoteKeyImageProofV1 &proof,
+    ser_EnoteKeyImageProofV1 &ser_proof_out);
+void recover_enote_key_image_proof_v1(const ser_EnoteKeyImageProofV1 &ser_proof, EnoteKeyImageProofV1 &proof_out);
+
+void make_serializable_enote_sent_proof_v1(const EnoteSentProofV1 &proof, ser_EnoteSentProofV1 &ser_proof_out);
+void recover_enote_sent_proof_v1(const ser_EnoteSentProofV1 &ser_proof, EnoteSentProofV1 &proof_out);
+
+void make_serializable_tx_funded_proof_v1(const TxFundedProofV1 &proof, ser_TxFundedProofV1 &ser_proof_out);
+void recover_tx_funded_proof_v1(const ser_TxFundedProofV1 &ser_proof, TxFundedProofV1 &proof_out);
+
+void make_serializable_reserved_enote_proof_v1(const ReservedEnoteProofV1 &proof,
+    ser_ReservedEnoteProofV1 &ser_proof_out);
+void recover_reserved_enote_proof_v1(const ser_ReservedEnoteProofV1 &ser_proof, ReservedEnoteProofV1 &proof_out);
+
+void make_serializable_reserve_proof_v1(const ReserveProofV1 &proof, ser_ReserveProofV1 &ser_proof_out);
+void recover_reserve_proof_v1(const ser_ReserveProofV1 &ser_proof, ReserveProofV1 &proof_out);
