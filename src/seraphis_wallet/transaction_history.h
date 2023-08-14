@@ -217,19 +217,16 @@ class SpTransactionHistory
     TransactionRecordV1 get_tx_record_from_txid(const rct::key &txid);
 
     //-----------------------------------------------------------------
-    /// Show transfers
-    // Currently only showing "out" transfers.
-    // Probably showing transaction info is not the way to go.
-    // A better way would be to show the enotes.
+    /// Show out transfers. Maybe useful for showing failed transfers.
     // (TEMPORARY)
 
-    // Exhibit txs chronologically
-    bool get_tx_view(const ContextualRecordVariant &contextual_enote, TxViewV1 &tx_view_out);
+    // // Exhibit txs chronologically
+    // bool get_tx_view(const ContextualRecordVariant &contextual_enote, TxViewV1 &tx_view_out);
 
-    // Print transactions to screen
-    void show_txs(SpEnoteStore &enote_store, uint64_t N);
-    void show_tx_hashes(uint64_t N);
-    void print_tx_view(const TxViewV1 tx_view);
+    // // Print transactions to screen
+    // void print_tx_view(const TxViewV1 tx_view);
+    // void show_txs(SpEnoteStore &enote_store, uint64_t N);
+    // void show_tx_hashes(uint64_t N);
 
     //-----------------------------------------------------------------
     /// Save/read data to/from file

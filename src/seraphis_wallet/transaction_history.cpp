@@ -2,34 +2,29 @@
 //
 // All rights reserved.
 //
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions are met:
+// Redistribution and use in source and binary forms, with or without modification, are
+// permitted provided that the following conditions are met:
 //
-// 1. Redistributions of source code must retain the above copyright notice,
-// this list of
+// 1. Redistributions of source code must retain the above copyright notice, this list of
 //    conditions and the following disclaimer.
 //
-// 2. Redistributions in binary form must reproduce the above copyright notice,
-// this list
-//    of conditions and the following disclaimer in the documentation and/or
-//    other materials provided with the distribution.
+// 2. Redistributions in binary form must reproduce the above copyright notice, this list
+//    of conditions and the following disclaimer in the documentation and/or other
+//    materials provided with the distribution.
 //
-// 3. Neither the name of the copyright holder nor the names of its contributors
-// may be
-//    used to endorse or promote products derived from this software without
-//    specific prior written permission.
+// 3. Neither the name of the copyright holder nor the names of its contributors may be
+//    used to endorse or promote products derived from this software without specific
+//    prior written permission.
 //
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-// ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-// LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-// POSSIBILITY OF SUCH DAMAGE.
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+// THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+// THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // paired header
 #include "transaction_history.h"
@@ -94,6 +89,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <iostream>
 #include <map>
 #include <memory>
 #include <string>
@@ -109,6 +105,7 @@
 
 using namespace sp::knowledge_proofs;
 
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void make_message_v1(const rct::key &tx_id, const std::string &message_in, rct::key &message_out)
 {
@@ -129,6 +126,7 @@ static void make_message_v1(const rct::key &tx_id, const std::string &message_in
     sp_hash_to_32(transcript.data(), transcript.size(), message_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static void make_message_v2(const std::string &message_in, rct::key &message_out)
 {
     rct::key message;
@@ -146,6 +144,7 @@ static void make_message_v2(const std::string &message_in, rct::key &message_out
 
     sp_hash_to_32(transcript.data(), transcript.size(), message_out.bytes);
 }
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 bool operator==(const SpTransactionStoreV1 &a, const SpTransactionStoreV1 &b)
 {
@@ -294,99 +293,100 @@ TransactionRecordV1 SpTransactionHistory::get_tx_record_from_txid(const rct::key
     return m_sp_tx_store.tx_records[txid];
 }
 //-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-bool SpTransactionHistory::get_tx_view(const ContextualRecordVariant &contextual_enote, TxViewV1 &tx_view_out)
-{
-    // Only a draft. Very simple version.
+// //-------------------------------------------------------------------------------------------------------------------
+// bool SpTransactionHistory::get_tx_view(const ContextualRecordVariant &contextual_enote, TxViewV1 &tx_view_out)
+// {
+//     // Only a draft. Very simple version.
 
-    // 1. get SpEnoteSpentContext and TransactionRecord from contextual_enote
-    SpEnoteSpentContextV1 spent_context{spent_context_ref(contextual_enote)};
-    rct::key tx_id{spent_context.transaction_id};
-    TransactionRecordV1 tx_record{m_sp_tx_store.tx_records[tx_id]};
+//     // 1. get SpEnoteSpentContext and TransactionRecord from contextual_enote
+//     SpEnoteSpentContextV1 spent_context{spent_context_ref(contextual_enote)};
+//     rct::key tx_id{spent_context.transaction_id};
+//     TransactionRecordV1 tx_record{m_sp_tx_store.tx_records[tx_id]};
 
-    // 2. fill TxView with info available
-    tx_view_out.block     = spent_context.block_index == static_cast<std::uint64_t>(-1)
-                                ? std::string{"<unknown>"}
-                                : std::to_string(spent_context.block_index);
-    tx_view_out.direction = "out";
-    tx_view_out.timestamp = tools::get_human_readable_timestamp(spent_context.block_timestamp);
-    tx_view_out.amount    = std::to_string(tx_record.amount_sent);
-    tx_view_out.hash      = epee::string_tools::pod_to_hex(spent_context.transaction_id);
-    tx_view_out.fee       = std::to_string(tx_record.fee_sent);
-    std::string str_dest{};
-    for (auto dest : tx_record.normal_payments)
-    {
-        get_str_from_destination(dest.destination, str_dest);
-        tx_view_out.destinations += str_dest + std::string(" , ");
-    }
-    tx_view_out.destinations.erase(tx_view_out.destinations.size() - 3, 3);
+//     // 2. fill TxView with info available
+//     tx_view_out.block     = spent_context.block_index == static_cast<std::uint64_t>(-1)
+//                                 ? std::string{"<unknown>"}
+//                                 : std::to_string(spent_context.block_index);
+//     tx_view_out.direction = "out";
+//     tx_view_out.timestamp = tools::get_human_readable_timestamp(spent_context.block_timestamp);
+//     tx_view_out.amount    = std::to_string(tx_record.amount_sent);
+//     tx_view_out.hash      = epee::string_tools::pod_to_hex(spent_context.transaction_id);
+//     tx_view_out.fee       = std::to_string(tx_record.fee_sent);
+//     std::string str_dest{};
+//     for (auto dest : tx_record.normal_payments)
+//     {
+//         get_str_from_destination(dest.destination, str_dest);
+//         tx_view_out.destinations += str_dest + std::string(" , ");
+//     }
+//     tx_view_out.destinations.erase(tx_view_out.destinations.size() - 3, 3);
 
-    return true;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpTransactionHistory::print_tx_view(const TxViewV1 tx_view)
-{
-    // Only a draft. Very simple version.
+//     return true;
+// }
+// //-------------------------------------------------------------------------------------------------------------------
+// void SpTransactionHistory::print_tx_view(const TxViewV1 tx_view)
+// {
+//     // Only a draft. Very simple version.
 
-    std::cout << tx_view.block << " | " << tx_view.direction << " | " << tx_view.timestamp << " | " << tx_view.amount
-              << " | " << tx_view.hash << " | " << tx_view.fee << " | " << tx_view.destinations << std::endl;
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpTransactionHistory::show_txs(SpEnoteStore &enote_store, uint64_t N)
-{
-    std::cout << "Block | Direction | Timestamp | Amount | Tx id | Fee | Destination " << std::endl;
-    std::cout << " ----------- Confirmed ----------- " << std::endl;
+//     std::cout << tx_view.block << " | " << tx_view.direction << " | " << tx_view.timestamp << " | " << tx_view.amount
+//               << " | " << tx_view.hash << " | " << tx_view.fee << " | " << tx_view.destinations << std::endl;
+// }
+// //-------------------------------------------------------------------------------------------------------------------
+// void SpTransactionHistory::show_txs(SpEnoteStore &enote_store, uint64_t N)
+// {
+//     std::cout << "Block | Direction | Timestamp | Amount | Tx id | Fee | Destination " << std::endl;
+//     std::cout << " ----------- Confirmed ----------- " << std::endl;
 
-    // a. print last 3 confirmed txs
-    const auto range_confirmed{get_last_N_txs(SpTxStatus::CONFIRMED, N)};
-    if (!range_confirmed.empty())
-    {
-        std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> enotes_selected;
-        ContextualRecordVariant contextual_record;
-        for (auto it_range : range_confirmed)
-        {
-            get_enotes_from_tx(it_range.second, enote_store, enotes_selected);
-            if (get_representing_enote_from_tx(enotes_selected, contextual_record))
-            {
-                TxViewV1 tx_view;
-                get_tx_view(contextual_record, tx_view);
-                print_tx_view(tx_view);
-            }
-        }
-    }
+//     // a. print last 3 confirmed txs
+//     const auto range_confirmed{get_last_N_txs(SpTxStatus::CONFIRMED, N)};
+//     if (!range_confirmed.empty())
+//     {
+//         std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> enotes_selected;
+//         ContextualRecordVariant contextual_record;
+//         for (auto it_range : range_confirmed)
+//         {
+//             get_enotes_from_tx(it_range.second, enote_store, enotes_selected);
+//             if (get_representing_enote_from_tx(enotes_selected, contextual_record))
+//             {
+//                 TxViewV1 tx_view;
+//                 get_tx_view(contextual_record, tx_view);
+//                 print_tx_view(tx_view);
+//             }
+//         }
+//     }
 
-    // b. print last N unconfirmed txs
-    std::cout << " ----------- Unconfirmed ----------- " << std::endl;
-    const auto range_unconfirmed{get_last_N_txs(SpTxStatus::UNCONFIRMED, N)};
-    if (!range_unconfirmed.empty())
-    {
-        std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> enotes_selected;
-        ContextualRecordVariant contextual_record;
-        for (auto it_range : range_unconfirmed)
-        {
-            get_enotes_from_tx(it_range.second, enote_store, enotes_selected);
-            if (get_representing_enote_from_tx(enotes_selected, contextual_record))
-            {
-                TxViewV1 tx_view;
-                get_tx_view(contextual_record, tx_view);
-                print_tx_view(tx_view);
-            }
-        }
-    }
-}
-//-------------------------------------------------------------------------------------------------------------------
-void SpTransactionHistory::show_tx_hashes(uint64_t N)
-{
-    // a. print last N confirmed txs
-    const auto range_confirmed{get_last_N_txs(SpTxStatus::CONFIRMED, N)};
-    if (!range_confirmed.empty())
-    {
-        for (auto it_range : range_confirmed)
-        {
-            std::cout << "Height: " << it_range.first << " Hash: " << it_range.second << std::endl;
-        }
-    }
-}
+//     // b. print last N unconfirmed txs
+//     std::cout << " ----------- Unconfirmed ----------- " << std::endl;
+//     const auto range_unconfirmed{get_last_N_txs(SpTxStatus::UNCONFIRMED, N)};
+//     if (!range_unconfirmed.empty())
+//     {
+//         std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> enotes_selected;
+//         ContextualRecordVariant contextual_record;
+//         for (auto it_range : range_unconfirmed)
+//         {
+//             get_enotes_from_tx(it_range.second, enote_store, enotes_selected);
+//             if (get_representing_enote_from_tx(enotes_selected, contextual_record))
+//             {
+//                 TxViewV1 tx_view;
+//                 get_tx_view(contextual_record, tx_view);
+//                 print_tx_view(tx_view);
+//             }
+//         }
+//     }
+// }
+// //-------------------------------------------------------------------------------------------------------------------
+// void SpTransactionHistory::show_tx_hashes(uint64_t N)
+// {
+//     // a. print last N confirmed txs
+//     const auto range_confirmed{get_last_N_txs(SpTxStatus::CONFIRMED, N)};
+//     if (!range_confirmed.empty())
+//     {
+//         for (auto it_range : range_confirmed)
+//         {
+//             std::cout << "Height: " << it_range.first << " Hash: " << it_range.second << std::endl;
+//         }
+//     }
+// }
+
 //-------------------------------------------------------------------------------------------------------------------
 // UPDATE TRANSACTION HISTORY
 //-------------------------------------------------------------------------------------------------------------------

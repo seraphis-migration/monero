@@ -30,7 +30,9 @@
 #include <boost/format/format_fwd.hpp>
 #include <boost/none.hpp>
 #include <cstddef>
+#include <cstdint>
 #include <ostream>
+#include <utility>
 #include <vector>
 
 #include "boost/multiprecision/cpp_int.hpp"
@@ -89,6 +91,7 @@
 #include "seraphis_mocks/seraphis_mocks.h"
 #include "seraphis_wallet/transaction_history.h"
 #include "seraphis_wallet/transaction_utils.h"
+#include "seraphis_wallet/show_enotes.h"
 #include "serialization_demo_utils.h"
 #include "serialization_types.h"
 
@@ -154,6 +157,154 @@ static void fill_tx_store(const SpTxSquashedV1 &single_tx,
 
     // 4. update with either the info from legacy or sp context
     tx_history_in_out.add_entry_txs(status, temp_sp_enote_records.spent_context.block_index, tx_id);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static void make_transfers2(MockLedgerContext &ledger_context,
+    SpEnoteStore &enote_store_in_out,
+    SpTransactionHistory &tx_history_in_out,
+    const legacy_mock_keys &legacy_user_keys_A,
+    const jamtis_mock_keys &user_keys_A,
+    const uint64_t number_txs)
+{
+    /// config
+    const std::size_t max_inputs{1000};
+    const std::size_t fee_per_tx_weight{1};
+    const std::size_t legacy_ring_size{2};
+    const std::size_t ref_set_decomp_n{2};
+    const std::size_t ref_set_decomp_m{2};
+
+    const scanning::ScanMachineConfig refresh_config{
+        .reorg_avoidance_increment = 1, .max_chunk_size_hint = 1, .max_partialscan_attempts = 0};
+
+    const FeeCalculatorMockTrivial fee_calculator;  // trivial calculator for easy fee (fee = fee/weight * 1 weight)
+
+    const SpBinnedReferenceSetConfigV1 bin_config{.bin_radius = 1, .num_bin_members = 2};
+
+    /// prepare for membership proofs
+    // a. add enough fake enotes to the ledger so we can reliably make seraphis membership proofs
+    std::vector<rct::xmr_amount> fake_sp_enote_amounts(
+        static_cast<std::size_t>(compute_bin_width(bin_config.bin_radius)), 0);
+    JamtisDestinationV1 fake_destination;
+    fake_destination = gen_jamtis_destination_v1();
+
+    send_sp_coinbase_amounts_to_user(fake_sp_enote_amounts, fake_destination, ledger_context);
+
+    /// make two users
+
+    // a. user keys
+    jamtis_mock_keys user_keys_B;
+
+    // CHECK_AND_ASSERT_THROW_MES(read_master_wallet("masterA.wallet", "passwordA", user_keys_A),
+    //                                "Reading master wallet failed.");
+
+    // CHECK_AND_ASSERT_THROW_MES(read_master_wallet("masterB.wallet", "passwordB", user_keys_B),
+    //                                "Reading master wallet failed.");
+
+    make_jamtis_mock_keys(user_keys_B);
+
+    // b. destination address
+    JamtisDestinationV1 destination_A;
+    JamtisDestinationV1 destination_B;
+    make_random_address_for_user(user_keys_A, destination_A);
+    make_random_address_for_user(user_keys_B, destination_B);
+
+    // c. user enote stores (refresh index = 0; seraphis initial block = 0; default spendable age = 0)
+    SpEnoteStore enote_store_B{0, 0, 0};
+
+    // d. user input selectors
+    const InputSelectorMockV1 input_selector_A{enote_store_in_out};
+    const InputSelectorMockV1 input_selector_B{enote_store_B};
+
+    /// initial funding for user A: seraphis 1000
+    send_sp_coinbase_amounts_to_user({1000, 1000, 1000, 1000, 1000}, destination_A, ledger_context);
+
+    refresh_user_enote_store(user_keys_A, refresh_config, ledger_context, enote_store_in_out);
+
+    /// variables of one tx
+    SpTxSquashedV1 single_tx;
+    const TxValidationContextMock tx_validation_context{ledger_context};
+    std::vector<JamtisPaymentProposalV1> normal_payments;
+    std::vector<JamtisPaymentProposalSelfSendV1> selfsend_payments;
+
+    /// Send 5 confirmed txs
+    for (int i = 0; i < number_txs; i++)
+    {
+        std::pair<JamtisDestinationV1, rct::xmr_amount> outlays{destination_B, rand() % 100};
+        // 1. make one tx
+        construct_tx_for_mock_ledger_v1(legacy_user_keys_A,
+            user_keys_A,
+            input_selector_A,
+            fee_calculator,
+            fee_per_tx_weight,
+            max_inputs,
+            {{outlays.second, outlays.first, TxExtra{}}},
+            legacy_ring_size,
+            ref_set_decomp_n,
+            ref_set_decomp_m,
+            bin_config,
+            ledger_context,
+            single_tx,
+            selfsend_payments,
+            normal_payments);
+
+        // 2. validate and submit to the mock ledger
+        const TxValidationContextMock tx_validation_context{ledger_context};
+        CHECK_AND_ASSERT_THROW_MES(validate_tx(single_tx, tx_validation_context),
+            "transfer funds single mock unconfirmed sp only: validating tx failed.");
+        CHECK_AND_ASSERT_THROW_MES(try_add_tx_to_ledger(single_tx, ledger_context),
+            "transfer funds single mock unconfirmed sp only: validating tx failed.");
+
+        // 3. refresh user stores
+        refresh_user_enote_store(user_keys_A, refresh_config, ledger_context, enote_store_in_out);
+
+        // 4. add tx to tx_records
+        fill_tx_store(single_tx,
+            selfsend_payments,
+            normal_payments,
+            SpTxStatus::CONFIRMED,
+            enote_store_in_out,
+            tx_history_in_out);
+    }
+
+    // Send 5 unconfirmed_txs
+    for (int i = 0; i < number_txs; i++)
+    {
+        std::pair<JamtisDestinationV1, rct::xmr_amount> outlays{destination_B, rand() % 100};
+        // 1. make one tx
+        construct_tx_for_mock_ledger_v1(legacy_user_keys_A,
+            user_keys_A,
+            input_selector_A,
+            fee_calculator,
+            fee_per_tx_weight,
+            max_inputs,
+            {{outlays.second, outlays.first, TxExtra{}}},
+            legacy_ring_size,
+            ref_set_decomp_n,
+            ref_set_decomp_m,
+            bin_config,
+            ledger_context,
+            single_tx,
+            selfsend_payments,
+            normal_payments);
+
+        // 2. validate and submit to the mock ledger
+        CHECK_AND_ASSERT_THROW_MES(validate_tx(single_tx, tx_validation_context),
+            "transfer funds single mock unconfirmed sp only: validating tx failed.");
+        CHECK_AND_ASSERT_THROW_MES(try_add_tx_to_ledger(single_tx, ledger_context),
+            "transfer funds single mock unconfirmed sp only: validating tx failed.");
+
+        // 3. refresh user stores
+        refresh_user_enote_store(user_keys_A, refresh_config, ledger_context, enote_store_in_out);
+
+        // 4. add tx to tx_records
+        fill_tx_store(single_tx,
+            selfsend_payments,
+            normal_payments,
+            SpTxStatus::UNCONFIRMED,
+            enote_store_in_out,
+            tx_history_in_out);
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -303,7 +454,31 @@ static void make_transfers(MockLedgerContext &ledger_context,
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-TEST(seraphis_wallet_show, show_transfers)
+// TEST(seraphis_wallet_show, show_transfers)
+// {
+//     // Test to display info stored in the tx_store class
+
+//     // 1. generate enote_store and tx_store
+//     SpEnoteStore enote_store_A{0, 0, 0};
+//     SpTransactionHistory tx_history_A;
+//     /// mock ledger context for this test
+//     MockLedgerContext ledger_context{0, 10000};
+
+//     legacy_mock_keys legacy_user_keys_A;
+//     jamtis_mock_keys user_keys_A;
+//     make_jamtis_mock_keys(user_keys_A);
+
+//     // 2. make transfers to fill enote_store and tx_store
+//     make_transfers(ledger_context, enote_store_A, tx_history_A, legacy_user_keys_A, user_keys_A);
+
+//     // 3. example of block to show info from tx_store (using the enote store)
+//     tx_history_A.show_tx_hashes(3);
+
+//     // 4. example to show last txs
+//     tx_history_A.show_txs(enote_store_A, 3);
+// }
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_wallet_show, show_enotes_all)
 {
     // Test to display info stored in the tx_store class
 
@@ -318,13 +493,22 @@ TEST(seraphis_wallet_show, show_transfers)
     make_jamtis_mock_keys(user_keys_A);
 
     // 2. make transfers to fill enote_store and tx_store
-    make_transfers(ledger_context, enote_store_A, tx_history_A, legacy_user_keys_A, user_keys_A);
+    make_transfers2(ledger_context, enote_store_A, tx_history_A, legacy_user_keys_A, user_keys_A,30);
 
     // 3. example of block to show info from tx_store (using the enote store)
-    tx_history_A.show_tx_hashes(3);
+    std::vector<SpContextualEnoteRecordV1> enote_records;
+    get_enotes(enote_store_A, SpTxDirectionStatus::ALL,{0,-1},enote_records);
+    show_enotes(enote_records);
 
-    // 4. example to show last txs
-    tx_history_A.show_txs(enote_store_A, 3);
+    get_enotes(enote_store_A, SpTxDirectionStatus::IN_ONCHAIN,{0,-1},enote_records);
+    show_enotes(enote_records);
+
+    get_enotes(enote_store_A, SpTxDirectionStatus::OUT_ONCHAIN,{0,-1},enote_records);
+    show_enotes(enote_records);
+
+    get_enotes(enote_store_A, SpTxDirectionStatus::ALL,{20,40},enote_records);
+    show_enotes(enote_records);
+    // std::cout << "Balance onchain : " << get_balance(enote_store_A,{SpEnoteOriginStatus::ONCHAIN},{SpEnoteSpentStatus::SPENT_ONCHAIN}) << std::endl;
 }
 
 //-------------------------------------------------------------------------------------------------------------------

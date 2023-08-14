@@ -247,7 +247,9 @@ std::uint64_t MockLedgerContext::add_legacy_coinbase(const rct::key &tx_id,
         m_blocks_of_sp_tx_output_contents[new_index];
 
     // 3. add block info (random block ID and zero timestamp in mockup)
-    m_block_infos[new_index] = {rct::pkGen(), 0};
+    std::time_t timestamp = std::time(nullptr);
+    std::asctime(std::localtime(&timestamp));
+    m_block_infos[new_index] = {rct::pkGen(), timestamp};
 
     // 4. clear unconfirmed cache
     this->clear_unconfirmed_cache();
@@ -458,7 +460,9 @@ std::uint64_t MockLedgerContext::commit_unconfirmed_txs_v1(const rct::key &coinb
         m_blocks_of_legacy_tx_output_contents[new_index];
 
     // 3. add block info (random block ID and zero timestamp in mockup)
-    m_block_infos[new_index] = {rct::pkGen(), 0};
+    std::time_t timestamp = std::time(nullptr);
+    std::asctime(std::localtime(&timestamp));
+    m_block_infos[new_index] = {rct::pkGen(), timestamp};
 
     // 4. clear unconfirmed chache
     this->clear_unconfirmed_cache();
