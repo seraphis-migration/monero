@@ -28,7 +28,7 @@
 
 set(seraphis_wallet_sources
   encrypt_file.cpp
-  legacy_knowledge_proofs
+  legacy_knowledge_proofs.cpp
   serialization_types.cpp
   show_enotes.cpp
   transaction_history.cpp

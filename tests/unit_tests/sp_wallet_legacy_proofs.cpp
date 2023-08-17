@@ -26,12 +26,13 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "common/container_helpers.h"
-#include "crypto/crypto.h"
-#include "seraphis_wallet/legacy_knowledge_proofs.cpp"
 
 #include "gtest/gtest.h"
 #include "string_tools.h"
+
+#include "common/container_helpers.h"
+#include "crypto/crypto.h"
+#include "seraphis_wallet/legacy_knowledge_proofs.h"
 
 #include <iostream>
 #include <memory>
