@@ -107,18 +107,18 @@ enum class SpTxStatus
 };
 
 // (TEMPORARY)
-struct TxViewV1
-{
-    std::string block;
-    std::string direction;
-    std::string unlocked;
-    std::string timestamp;
-    std::string amount;
-    std::string hash;
-    std::string fee;
-    std::string destinations;
-    std::string note;
-};
+// struct TxViewV1
+// {
+//     std::string block;
+//     std::string direction;
+//     std::string unlocked;
+//     std::string timestamp;
+//     std::string amount;
+//     std::string hash;
+//     std::string fee;
+//     std::string destinations;
+//     std::string note;
+// };
 
 struct EnoteOutInfo
 {
@@ -214,7 +214,7 @@ class SpTransactionHistory
             &enotes_in_tx,
         ContextualRecordVariant &contextual_enote_out);
 
-    TransactionRecordV1 get_tx_record_from_txid(const rct::key &txid);
+    bool try_get_tx_record_from_txid(const rct::key &txid, TransactionRecordV1 &tx_record_out) const;
 
     //-----------------------------------------------------------------
     /// Show out transfers. Maybe useful for showing failed transfers.

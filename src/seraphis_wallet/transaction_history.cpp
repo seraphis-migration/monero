@@ -288,9 +288,13 @@ bool SpTransactionHistory::get_representing_enote_from_tx(
     return false;
 }
 //-------------------------------------------------------------------------------------------------------------------
-TransactionRecordV1 SpTransactionHistory::get_tx_record_from_txid(const rct::key &txid)
+bool SpTransactionHistory::try_get_tx_record_from_txid(const rct::key &txid, TransactionRecordV1 &tx_record_out) const
 {
-    return m_sp_tx_store.tx_records[txid];
+    if (m_sp_tx_store.tx_records.find(txid) != m_sp_tx_store.tx_records.end())
+        tx_record_out = m_sp_tx_store.tx_records.at(txid);
+    else
+        return false;
+    return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 // //-------------------------------------------------------------------------------------------------------------------
