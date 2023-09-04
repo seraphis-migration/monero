@@ -32,6 +32,7 @@
 #include "jamtis_mock_keys.h"
 
 //local headers
+#include "crypto/chacha.h"
 #include "crypto/crypto.h"
 #include "crypto/x25519.h"
 #include "ringct/rctOps.h"
@@ -77,6 +78,21 @@ void make_random_address_for_user(const jamtis_mock_keys &user_keys, JamtisDesti
         user_keys.s_ga,
         address_index,
         user_address_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void jamtis_mock_keys::encrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv)
+{
+    crypto::chacha20(k_m.data, sizeof(k_m), key, iv, k_m.data);
+    crypto::chacha20(k_vb.data, sizeof(k_vb), key, iv, k_vb.data);
+    crypto::chacha20(xk_ua.data, sizeof(xk_ua), key, iv, (char *)xk_ua.data);
+    crypto::chacha20(xk_fr.data, sizeof(xk_fr), key, iv, (char *)xk_fr.data);
+    crypto::chacha20(s_ga.data, sizeof(s_ga), key, iv, s_ga.data);
+    crypto::chacha20(s_ct.data, sizeof(s_ct), key, iv, s_ct.data);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void jamtis_mock_keys::decrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv)
+{
+    encrypt(key, iv); // NOTE: well
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace mocks

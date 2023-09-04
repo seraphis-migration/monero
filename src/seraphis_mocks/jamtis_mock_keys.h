@@ -37,14 +37,20 @@
 #pragma once
 
 //local headers
+#include "crypto/blake256.h"
+#include "crypto/chacha.h"
 #include "crypto/crypto.h"
 #include "crypto/x25519.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_core/jamtis_destination.h"
+#include "serialization/keyvalue_serialization.h"
+#include "serialization/serialization.h"
+#include "wipeable_string.h"
 
 //third party headers
 
 //standard headers
+#include <functional>
 #include <vector>
 
 //forward declarations
@@ -71,6 +77,34 @@ struct jamtis_mock_keys
     rct::key K_1_base;                //jamtis spend base     = k_vb X + k_m U
     crypto::x25519_pubkey xK_ua;      //unlock-amounts pubkey = xk_ua xG
     crypto::x25519_pubkey xK_fr;      //find-received pubkey  = xk_fr xk_ua xG
+
+    BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(k_m)
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(k_vb)
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(xk_ua)
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(xk_fr)
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(s_ga)
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(s_ct)
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(K_1_base)
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(xK_ua)
+        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(xK_fr)
+    END_KV_SERIALIZE_MAP()
+
+    bool operator==(const jamtis_mock_keys &other) {
+        // use hash?
+        return other.k_m == k_m &&
+            other.k_vb == k_vb &&
+            other.xk_ua == xk_ua &&
+            other.xk_fr == xk_fr &&
+            other.s_ga == s_ga &&
+            other.s_ct == s_ct &&
+            other.K_1_base == K_1_base &&
+            other.xK_ua == xK_ua &&
+            other.xK_fr == xK_fr;
+    }
+
+    void encrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv);
+    void decrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv);
 };
 
 /// make a set of mock jamtis keys (for mock-ups/unit testing)

@@ -1,0 +1,16 @@
+---
+Language: Cpp
+BasedOnStyle:  LLVM
+IndentWidth: 4
+ColumnLimit: 120
+BinPackParameters: false
+BinPackArguments: false
+AllowAllParametersOfDeclarationOnNextLine: false
+# IndentAccessModifiers: true
+AccessModifierOffset: -4
+AllowAllArgumentsOnNextLine: false
+AlignAfterOpenBracket: DontAlign
+BreakBeforeBraces: Allman
+ContinuationIndentWidth: 4
+AllowShortFunctionsOnASingleLine: Empty
+...
