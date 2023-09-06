@@ -2,23 +2,26 @@
 Language:        Cpp
 # BasedOnStyle:  Google
 AccessModifierOffset: -1
-AlignAfterOpenBracket: Align
+# AlignAfterOpenBracket: ContinuationIndentWidth 
+# AlignAfterOpenBracket: BlockIndent 
+# AlignAfterOpenBracket: Align
+AlignAfterOpenBracket: DontAlign
 AlignArrayOfStructures: None
 AlignConsecutiveMacros: None
-AlignConsecutiveAssignments: None
+AlignConsecutiveAssignments: Consecutive 
 AlignConsecutiveBitFields: None
 AlignConsecutiveDeclarations: None
 AlignEscapedNewlines: Left
 AlignOperands:   Align
 AlignTrailingComments: true
 AllowAllArgumentsOnNextLine: true
-AllowAllParametersOfDeclarationOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: false
 AllowShortEnumsOnASingleLine: true
 AllowShortBlocksOnASingleLine: Never
 AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: All
 AllowShortLambdasOnASingleLine: All
-AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortIfStatementsOnASingleLine: Never
 AllowShortLoopsOnASingleLine: true
 AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakAfterReturnType: None
@@ -26,8 +29,8 @@ AlwaysBreakBeforeMultilineStrings: true
 AlwaysBreakTemplateDeclarations: Yes
 AttributeMacros:
   - __capability
-BinPackArguments: true
-BinPackParameters: true
+BinPackArguments: false 
+BinPackParameters: false
 BraceWrapping:
   AfterCaseLabel:  true
   AfterClass:      true
@@ -53,10 +56,10 @@ BreakBeforeBinaryOperators: None
 BreakBeforeConceptDeclarations: true
 # BreakBeforeBraces: Stroustrup
 BreakBeforeInheritanceComma: false
-BreakInheritanceList: BeforeColon
+BreakInheritanceList: AfterColon
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializersBeforeComma: false
-BreakConstructorInitializers: BeforeColon
+BreakConstructorInitializers: AfterColon
 BreakAfterJavaFieldAnnotations: false
 BreakStringLiterals: true
 ColumnLimit:    120 
@@ -72,7 +75,7 @@ DisableFormat:   false
 EmptyLineAfterAccessModifier: Never
 EmptyLineBeforeAccessModifier: LogicalBlock
 ExperimentalAutoDetectBinPacking: false
-PackConstructorInitializers: NextLine
+PackConstructorInitializers: Never 
 BasedOnStyle:    ''
 ConstructorInitializerAllOnOneLineOrOnePerLine: false
 AllowAllConstructorInitializersOnNextLine: true
@@ -226,3 +229,25 @@ WhitespaceSensitiveMacros:
   - CF_SWIFT_NAME
 ...
 
+
+# ---
+# AlignAfterOpenBracket: ContinuationIndentWidth 
+# IndentWidth: 4
+# TabWidth: 4
+# UseTab: Never
+# AllowShortIfStatementsOnASingleLine: false
+# AllowShortFunctionsOnASingleLine: None
+# IndentCaseLabels: false
+# AllowAllParametersOfDeclarationOnNextLine: true
+# # BreakBeforeBraces: Stroustrup
+# ColumnLimit: 120
+# BreakBeforeBraces: Custom
+# BraceWrapping:
+#   AfterControlStatement: true
+#   AfterEnum: true
+#   AfterFunction: false 
+#   AfterStruct: true
+#   AfterUnion: true
+#   BeforeElse: false
+#   IndentBraces: false
+# ...
