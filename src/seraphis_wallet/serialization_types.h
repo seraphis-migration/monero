@@ -92,17 +92,11 @@ struct ser_SpTransactionStoreV1
 
     // sort by blockheight to find last transactions or txs
     // in a specific time range
-    serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> confirmed_txids;
-
-    // sort by timestamp instead of blockheight
-    serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> unconfirmed_txids;
-    serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> offchain_txids;
+    serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> txs_by_timestamp;
 
     BEGIN_SERIALIZE_OBJECT()
     FIELD(tx_records)
-    FIELD(confirmed_txids)
-    FIELD(unconfirmed_txids)
-    FIELD(offchain_txids)
+    FIELD(txs_by_timestamp)
     END_SERIALIZE()
 };
 

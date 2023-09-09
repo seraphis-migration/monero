@@ -103,6 +103,9 @@
 #include <boost/serialization/library_version_type.hpp>
 #endif
 
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "seraphis_wallet"
+
 using namespace sp::knowledge_proofs;
 
 //-------------------------------------------------------------------------------------------------------------------
@@ -149,8 +152,7 @@ static void make_message_v2(const std::string &message_in, rct::key &message_out
 bool operator==(const SpTransactionStoreV1 &a, const SpTransactionStoreV1 &b)
 {
 
-    return a.tx_records == b.tx_records && a.confirmed_txids == b.confirmed_txids &&
-           a.unconfirmed_txids == b.unconfirmed_txids && a.offchain_txids == b.offchain_txids;
+    return a.tx_records == b.tx_records && a.txs_by_timestamp == b.txs_by_timestamp;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool operator==(const TransactionRecordV1 &a, const TransactionRecordV1 &b)
@@ -159,49 +161,76 @@ bool operator==(const TransactionRecordV1 &a, const TransactionRecordV1 &b)
            a.normal_payments == b.normal_payments && a.selfsend_payments == b.selfsend_payments &&
            a.amount_sent == b.amount_sent && a.fee_sent == b.fee_sent;
 }
-//-------------------------------------------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------
+/// Add entries to SpTransactionStore
+//-----------------------------------------------------------------
+
 void SpTransactionHistory::add_entry_to_tx_records(const rct::key &txid, const TransactionRecordV1 &record)
 {
     m_sp_tx_store.tx_records[txid] = record;
 }
 //-------------------------------------------------------------------------------------------------------------------
-serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> *
-SpTransactionHistory::get_pointer_to_tx_status(const SpTxStatus tx_status)
+void SpTransactionHistory::add_entry_to_txs_by_timestamp(const uint64_t timestamp, const rct::key &txid)
 {
-    // get pointer to corresponding multimap
-    serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> *ptr = nullptr;
-    switch (tx_status)
+    m_sp_tx_store.txs_by_timestamp.emplace(timestamp,txid);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void SpTransactionHistory::add_single_tx_to_tx_history(const SpTxSquashedV1 &single_tx,
+    const std::vector<JamtisPaymentProposalSelfSendV1> &selfsend_payments,
+    const std::vector<JamtisPaymentProposalV1> &normal_payments)
+{
+    /// 1. prepare variables of tx_store
+    rct::key tx_id;
+    std::vector<crypto::key_image> legacy_spent_ki;
+    std::vector<crypto::key_image> sp_spent_ki;
+    TransactionRecordV1 record;
+
+    // a. tx_id
+    get_sp_tx_squashed_v1_txid(single_tx, tx_id);
+
+    // b. legacy_spent_key_images
+    legacy_spent_ki.clear();
+    for (auto legacy_images : single_tx.legacy_input_images)
     {
-        case SpTxStatus::CONFIRMED:
-        {
-            ptr = &m_sp_tx_store.confirmed_txids;
-            break;
-        }
-        case SpTxStatus::UNCONFIRMED:
-        {
-            ptr = &m_sp_tx_store.unconfirmed_txids;
-            break;
-        }
-        case SpTxStatus::OFFCHAIN:
-        {
-            ptr = &m_sp_tx_store.offchain_txids;
-            break;
-        }
-        default:
-            break;
+        legacy_spent_ki.push_back(legacy_images.key_image);
     }
-    return ptr;
+
+    // c. sp_spent_key_images
+    sp_spent_ki.clear();
+    for (auto sp_images : single_tx.sp_input_images)
+    {
+        sp_spent_ki.push_back(sp_images.core.key_image);
+    }
+
+    // d. total amount sent
+    rct::xmr_amount total_amount_sent{};
+    for (auto outs : normal_payments)
+    {
+        total_amount_sent += outs.amount;
+    }
+
+    // e. fee
+    rct::xmr_amount tx_fee;
+    try_get_fee_value(single_tx.tx_fee, tx_fee);
+
+    // f. get TransactionRecord
+    record = TransactionRecordV1{
+        legacy_spent_ki, sp_spent_ki, selfsend_payments, normal_payments, total_amount_sent, tx_fee};
+
+    // 2. add record to tx_record by tx_id
+    add_entry_to_tx_records(tx_id, std::move(record));
+
+    // 3. add record to txs_by_timestamp
+    std::time_t timestamp = std::time(nullptr);
+    std::asctime(std::localtime(&timestamp));
+    add_entry_to_txs_by_timestamp(timestamp, tx_id);
 }
-//-------------------------------------------------------------------------------------------------------------------
-void SpTransactionHistory::add_entry_txs(const SpTxStatus tx_status,
-    const uint64_t block_or_timestamp,
-    const rct::key &txid)
-{
-    // add entry to corresponding variable
-    auto ptr_status = get_pointer_to_tx_status(tx_status);
-    ptr_status->emplace(block_or_timestamp, txid);
-}
-//-------------------------------------------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------
+/// Get/Set SpTransactionStore
+//-----------------------------------------------------------------
+
 const SpTransactionStoreV1 SpTransactionHistory::get_tx_store() { return m_sp_tx_store; }
 //-------------------------------------------------------------------------------------------------------------------
 bool SpTransactionHistory::set_tx_store(const SpTransactionStoreV1 &tx_store)
@@ -209,26 +238,28 @@ bool SpTransactionHistory::set_tx_store(const SpTransactionStoreV1 &tx_store)
     m_sp_tx_store = tx_store;
     return true;
 }
-//-------------------------------------------------------------------------------------------------------------------
-const range_txids_by_block_or_time SpTransactionHistory::get_last_N_txs(const SpTxStatus tx_status, const uint64_t N)
+
+//-----------------------------------------------------------------
+/// Get info from enotes and txs
+//-----------------------------------------------------------------
+
+const range_txids_by_block_or_time SpTransactionHistory::get_last_N_txs(const uint64_t N) 
 {
-    // 1. get pointer
-    auto ptr_status = get_pointer_to_tx_status(tx_status);
+    // 1. set begin and end iterators to beggining of multimap
+    auto it_begin = m_sp_tx_store.txs_by_timestamp.begin();
+    auto it_end   = m_sp_tx_store.txs_by_timestamp.begin();
 
-    // 2. set begin and end iterators to beggining of multimap
-    std::multimap<unsigned long, rct::key>::iterator it_begin = ptr_status->begin();
-    std::multimap<unsigned long, rct::key>::iterator it_end   = ptr_status->begin();
 
-    // 3. get size of multimap
-    uint64_t counts{ptr_status->size()};
+    // 2. get size of multimap
+    uint64_t counts{m_sp_tx_store.txs_by_timestamp.size()};
 
-    // 4. advance the end iterator to the end or to the position N
+    // 3. advance the end iterator to the end or to the position N
     if (N < counts)
         std::advance(it_end, N);
     else
         std::advance(it_end, counts);
 
-    // 5. return range
+    // 4. return range
     return boost::make_iterator_range(it_begin, it_end);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -296,104 +327,11 @@ bool SpTransactionHistory::try_get_tx_record_from_txid(const rct::key &txid, Tra
         return false;
     return true;
 }
-//-------------------------------------------------------------------------------------------------------------------
-// //-------------------------------------------------------------------------------------------------------------------
-// bool SpTransactionHistory::get_tx_view(const ContextualRecordVariant &contextual_enote, TxViewV1 &tx_view_out)
-// {
-//     // Only a draft. Very simple version.
 
-//     // 1. get SpEnoteSpentContext and TransactionRecord from contextual_enote
-//     SpEnoteSpentContextV1 spent_context{spent_context_ref(contextual_enote)};
-//     rct::key tx_id{spent_context.transaction_id};
-//     TransactionRecordV1 tx_record{m_sp_tx_store.tx_records[tx_id]};
+//-----------------------------------------------------------------
+/// Save/read data to/from file
+//-----------------------------------------------------------------
 
-//     // 2. fill TxView with info available
-//     tx_view_out.block     = spent_context.block_index == static_cast<std::uint64_t>(-1)
-//                                 ? std::string{"<unknown>"}
-//                                 : std::to_string(spent_context.block_index);
-//     tx_view_out.direction = "out";
-//     tx_view_out.timestamp = tools::get_human_readable_timestamp(spent_context.block_timestamp);
-//     tx_view_out.amount    = std::to_string(tx_record.amount_sent);
-//     tx_view_out.hash      = epee::string_tools::pod_to_hex(spent_context.transaction_id);
-//     tx_view_out.fee       = std::to_string(tx_record.fee_sent);
-//     std::string str_dest{};
-//     for (auto dest : tx_record.normal_payments)
-//     {
-//         get_str_from_destination(dest.destination, str_dest);
-//         tx_view_out.destinations += str_dest + std::string(" , ");
-//     }
-//     tx_view_out.destinations.erase(tx_view_out.destinations.size() - 3, 3);
-
-//     return true;
-// }
-// //-------------------------------------------------------------------------------------------------------------------
-// void SpTransactionHistory::print_tx_view(const TxViewV1 tx_view)
-// {
-//     // Only a draft. Very simple version.
-
-//     std::cout << tx_view.block << " | " << tx_view.direction << " | " << tx_view.timestamp << " | " << tx_view.amount
-//               << " | " << tx_view.hash << " | " << tx_view.fee << " | " << tx_view.destinations << std::endl;
-// }
-// //-------------------------------------------------------------------------------------------------------------------
-// void SpTransactionHistory::show_txs(SpEnoteStore &enote_store, uint64_t N)
-// {
-//     std::cout << "Block | Direction | Timestamp | Amount | Tx id | Fee | Destination " << std::endl;
-//     std::cout << " ----------- Confirmed ----------- " << std::endl;
-
-//     // a. print last 3 confirmed txs
-//     const auto range_confirmed{get_last_N_txs(SpTxStatus::CONFIRMED, N)};
-//     if (!range_confirmed.empty())
-//     {
-//         std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> enotes_selected;
-//         ContextualRecordVariant contextual_record;
-//         for (auto it_range : range_confirmed)
-//         {
-//             get_enotes_from_tx(it_range.second, enote_store, enotes_selected);
-//             if (get_representing_enote_from_tx(enotes_selected, contextual_record))
-//             {
-//                 TxViewV1 tx_view;
-//                 get_tx_view(contextual_record, tx_view);
-//                 print_tx_view(tx_view);
-//             }
-//         }
-//     }
-
-//     // b. print last N unconfirmed txs
-//     std::cout << " ----------- Unconfirmed ----------- " << std::endl;
-//     const auto range_unconfirmed{get_last_N_txs(SpTxStatus::UNCONFIRMED, N)};
-//     if (!range_unconfirmed.empty())
-//     {
-//         std::pair<std::vector<LegacyContextualEnoteRecordV1>, std::vector<SpContextualEnoteRecordV1>> enotes_selected;
-//         ContextualRecordVariant contextual_record;
-//         for (auto it_range : range_unconfirmed)
-//         {
-//             get_enotes_from_tx(it_range.second, enote_store, enotes_selected);
-//             if (get_representing_enote_from_tx(enotes_selected, contextual_record))
-//             {
-//                 TxViewV1 tx_view;
-//                 get_tx_view(contextual_record, tx_view);
-//                 print_tx_view(tx_view);
-//             }
-//         }
-//     }
-// }
-// //-------------------------------------------------------------------------------------------------------------------
-// void SpTransactionHistory::show_tx_hashes(uint64_t N)
-// {
-//     // a. print last N confirmed txs
-//     const auto range_confirmed{get_last_N_txs(SpTxStatus::CONFIRMED, N)};
-//     if (!range_confirmed.empty())
-//     {
-//         for (auto it_range : range_confirmed)
-//         {
-//             std::cout << "Height: " << it_range.first << " Hash: " << it_range.second << std::endl;
-//         }
-//     }
-// }
-
-//-------------------------------------------------------------------------------------------------------------------
-// UPDATE TRANSACTION HISTORY
-//-------------------------------------------------------------------------------------------------------------------
 bool SpTransactionHistory::write_sp_tx_history(std::string path, const epee::wipeable_string &password)
 {
     // 1. Get serializable of structure
@@ -417,9 +355,11 @@ bool SpTransactionHistory::read_sp_tx_history(std::string path,
 
     return true;
 }
-//-------------------------------------------------------------------------------------------------------------------
-// KNOWLEDGE PROOFS
-//-------------------------------------------------------------------------------------------------------------------
+
+//-----------------------------------------------------------------
+/// Get Knowledge proofs
+//-----------------------------------------------------------------
+
 std::string SpTransactionHistory::get_address_ownership_proof(const jamtis::address_index_t &j,
     const crypto::secret_key &sp_spend_privkey,
     const crypto::secret_key &k_view_balance,
@@ -839,9 +779,11 @@ std::string SpTransactionHistory::get_enote_reserve_proof(const std::string &mes
 
     return proof_str;
 }
+
+//-----------------------------------------------------------------
+/// Read/Verify Knowledge proofs
 //-------------------------------------------------------------------------------------------------------------------
-// READ KNOWLEDGE PROOFS
-//-------------------------------------------------------------------------------------------------------------------
+
 bool read_address_ownership_proof(const boost::optional<std::string> filename,
     const boost::optional<std::string> proof_str,
     const std::string &message_in,
@@ -1043,7 +985,7 @@ bool get_enote_out_info(std::vector<SpEnoteVariant> &enotes_out,
     // 3. loop over selfsend
     for (auto payment : selfsend_payments)
     {
-        // 2.1. calculate sender-receiver secret
+        // 3.1. calculate sender-receiver secret
         // enote ephemeral pubkey: xK_e = xr xK_3
         make_jamtis_enote_ephemeral_pubkey(payment.enote_ephemeral_privkey, payment.destination.addr_K3, xK_e);
 

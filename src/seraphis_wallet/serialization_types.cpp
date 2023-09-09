@@ -88,9 +88,7 @@ void make_serializable_sp_transaction_store_v1(const SpTransactionStoreV1 &tx_st
         make_serializable_transaction_record_v1(r.second, ser_tx_rec);
         ser_tx_store_out.tx_records[r.first] = ser_tx_rec;
     }
-    ser_tx_store_out.confirmed_txids   = tx_store.confirmed_txids;
-    ser_tx_store_out.unconfirmed_txids = tx_store.unconfirmed_txids;
-    ser_tx_store_out.offchain_txids    = tx_store.offchain_txids;
+    ser_tx_store_out.txs_by_timestamp = tx_store.txs_by_timestamp;
 }
 
 void recover_transaction_record_v1(const ser_TransactionRecordV1 &ser_tx_rec, TransactionRecordV1 &tx_rec_out)
@@ -121,9 +119,7 @@ void recover_sp_transaction_store_v1(const ser_SpTransactionStoreV1 &ser_tx_stor
         recover_transaction_record_v1(r.second, tx_rec);
         tx_store_out.tx_records[r.first] = tx_rec;
     }
-    tx_store_out.confirmed_txids   = ser_tx_store.confirmed_txids;
-    tx_store_out.unconfirmed_txids = ser_tx_store.unconfirmed_txids;
-    tx_store_out.offchain_txids    = ser_tx_store.offchain_txids;
+    tx_store_out.txs_by_timestamp = ser_tx_store.txs_by_timestamp;
 }
 
 void make_serializable_tx_funded_proof_v1(const TxFundedProofV1 &proof, ser_TxFundedProofV1 &ser_proof_out)

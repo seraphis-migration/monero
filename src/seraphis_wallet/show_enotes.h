@@ -39,26 +39,13 @@
 
 // standard headers
 
-
 using namespace sp;
 
 typedef void (*FilterEnotes)(const ContextualRecordVariant &enote,
     const std::pair<uint64_t, uint64_t> range_height,
     std::vector<ContextualRecordVariant> &vec_out);
 
-typedef bool (*ComparatorEnotes)(const ContextualRecordVariant&a, const ContextualRecordVariant &b);
-
-
-// typedef void (*FilterSpEnotes)(const std::pair<crypto::key_image, SpContextualEnoteRecordV1> &enote,
-//     const std::pair<uint64_t, uint64_t> range_height,
-//     std::vector<SpContextualEnoteRecordV1> &vec_out);
-
-// typedef void (*FilterLegacyEnotes)(const std::pair<crypto::key_image, LegacyContextualEnoteRecordV1> &enote,
-//     const std::pair<uint64_t, uint64_t> range_height,
-//     std::vector<LegacyContextualEnoteRecordV1> &vec_out);
-
-// typedef bool (*ComparatorSpEnotes)(const SpContextualEnoteRecordV1 &a, const SpContextualEnoteRecordV1 &b);
-// typedef bool (*ComparatorLegacyEnotes)(const LegacyContextualEnoteRecordV1&a, const LegacyContextualEnoteRecordV1 &b);
+typedef bool (*ComparatorEnotes)(const ContextualRecordVariant &a, const ContextualRecordVariant &b);
 
 ///
 enum class SpTxDirectionStatus : unsigned char
@@ -81,19 +68,30 @@ enum class SpTxDirectionStatus : unsigned char
     FAILED,
 };
 
-// void get_enotes(const SpEnoteStore &sp_enote_store,
-//     const SpTxDirectionStatus tx_status,
-//     const std::pair<uint64_t, uint64_t> range_height,
-//     std::vector<SpContextualEnoteRecordV1> &vec_sp_enote_records_out,
-//     std::vector<LegacyContextualEnoteRecordV1> &vec_legacy_enote_records_out);
+/**
+* brief: get enotes after filtering them
+* param: sp_enote_store- EnoteStore where all enotes are stored
+* param: tx_status - filter according to tx_status
+* param: range_height - filter according to range of height 
+* outparam: vec_enote_records_out - enote record of filtered enotes according to specified criteria
+*/
 void get_enotes(const SpEnoteStore &sp_enote_store,
     const SpTxDirectionStatus tx_status,
     const std::pair<uint64_t, uint64_t> range_height,
     std::vector<ContextualRecordVariant> &vec_enote_records_out);
 
-// void show_enotes(const std::vector<SpContextualEnoteRecordV1> &vec_enote_records);
+/**
+* brief: show enotes 
+* param: vec_enote_records - enote record of filtered enotes
+*/
 void show_enotes(const std::vector<ContextualRecordVariant> &vec_enote_records);
 
+/**
+* brief: show specific enote according to its key_image
+* param: enote_store- EnoteStore where all enotes are stored
+* param: transaction_history - TransactionHistory where transaction attempts are stored
+* param: key_image - key_image of specific enote
+*/
 void show_specific_enote(const SpEnoteStore &enote_store,
     const SpTransactionHistory &transaction_history,
     const crypto::key_image &key_image);
