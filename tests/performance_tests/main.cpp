@@ -345,7 +345,6 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 4, 1, 1, 0, 1); // 1x 4
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 8, 1, 1, 0, 1); // 1x 8
   TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 16, 1, 1, 0, 1); // 1x 16
-  TEST_PERFORMANCE6(filter, p, test_aggregated_bulletproof, true, 32, 1, 1, 0, 1); // 1x 32
 
   ParamsShuttleBPPAgg p_bpp_agg;
   p_bpp_agg = {p.core_params, true, {1}, {1}};
@@ -358,8 +357,6 @@ int main(int argc, char** argv)
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 8
   p_bpp_agg = {p.core_params, true, {16}, {1}};
   TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 16
-  p_bpp_agg = {p.core_params, true, {32}, {1}};
-  TEST_PERFORMANCE0(filter, p_bpp_agg, test_aggregated_bulletproof_plus);  // 1x 32
 
 
 /*
