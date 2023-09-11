@@ -31,6 +31,7 @@ set(seraphis_impl_sources
   enote_store.cpp
   enote_store_payment_validator.cpp
   enote_store_utils.cpp
+  jamtis_address_checksum.cpp
   legacy_ki_import_tool.cpp
   scan_ledger_chunk_async.cpp
   scan_process_basic.cpp
