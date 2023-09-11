@@ -50,6 +50,7 @@
 #include "seraphis_crypto/sp_composition_proof.h"
 #include "seraphis_crypto/sp_crypto_utils.h"
 #include "seraphis_impl/enote_store_utils.h"
+#include "seraphis_impl/jamtis_address_checksum.h"
 #include "seraphis_impl/tx_fee_calculator_squashed_v1.h"
 #include "seraphis_impl/tx_input_selection_output_context_v1.h"
 #include "seraphis_main/contextual_enote_record_utils.h"
@@ -76,6 +77,16 @@ using namespace sp;
 using namespace jamtis;
 using namespace sp::mocks;
 using namespace jamtis::mocks;
+
+static std::string create_random_base32_string(size_t len)
+{
+    std::string s;
+    s.resize(len);
+    srand(crypto::rand<unsigned int>());
+    for (int i = 0; i < s.size(); ++i)
+        s[i] = base32::JAMTIS_ALPHABET[rand() % 32];
+    return s;
+}
 
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_integration, txtype_squashed_v1)
@@ -237,5 +248,21 @@ TEST(seraphis_integration, txtype_squashed_v1)
         ref_set_decomp_m,
         bin_config,
         ledger_context);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_integration, jamtis_checksum_create_verify)
+{
+    for (size_t datalen = 0; datalen < 250; ++datalen)
+    {
+        for (size_t i = 0; i < 10; ++i)
+        {
+            const std::string random_b32 = create_random_base32_string(datalen);
+
+            char checksum[sp::jamtis::ADDRESS_CHECKSUM_SIZE_ENCODED];
+            EXPECT_TRUE(sp::jamtis::create_address_checksum(random_b32.data(), random_b32.size(), checksum));
+
+            EXPECT_TRUE(sp::jamtis::verify_address_checksum(random_b32.data(), random_b32.size(), checksum));
+        }
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
