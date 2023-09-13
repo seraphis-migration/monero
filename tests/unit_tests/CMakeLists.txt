@@ -100,6 +100,8 @@ set(unit_tests_sources
   slow_memmem.cpp
   sp_wallet_tx_history.cpp
   sp_wallet_legacy_proofs.cpp
+  sp_wallet_show_enotes.cpp
+  sp_wallet_sp_knowledge_proofs.cpp
   subaddress.cpp
   tasking_system_demo.cpp
   test_tx_utils.cpp
@@ -150,6 +152,7 @@ target_link_libraries(unit_tests
     seraphis_mocks
     seraphis_wallet
     wallet
+    wallet2_basic
     p2p
     version
     ${Boost_CHRONO_LIBRARY}
