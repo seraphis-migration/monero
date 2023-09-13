@@ -32,43 +32,88 @@
 #include "crypto/crypto.h"
 #include "include_base_utils.h"
 #include "string_tools.h"
+#include "unit_tests_utils.h"
 
+#include <fstream>
+#include <stdexcept>
 #include <string>
 
 using namespace tools;
 using namespace std;
 
-void do_test_simple()
+TEST(base32, simple_encode_decode) 
 {
     // a
     std::string test{"a"};
     std::string encoded_test;
 
-    base32::encode(test,encoded_test);
+    encoded_test = base32::encode(test);
 
     ASSERT_EQ(encoded_test, "ga");
 
     std::string recovered_test;
-    base32::decode(encoded_test, recovered_test);
+    recovered_test = base32::decode(encoded_test);
 
     ASSERT_EQ(recovered_test, test);
 
     // aaaaaa....
     test = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    base32::encode(test,encoded_test);
+    encoded_test = base32::encode(test);
 
     ASSERT_EQ(encoded_test, "gskwr0fmgskwr0fmgskwr0fmgskwr0fmgskwr0fmgskwr0fmgskwr0fmgskwr0fmgskwr0fmgskwr0fmgskwr0fmgskwr02");
 
-    base32::decode(encoded_test, recovered_test);
+    recovered_test = base32::decode(encoded_test);
 
     ASSERT_EQ(recovered_test, test);
+
 }
 
-
-
-TEST(base32, encode_decode) 
+TEST(base32, invalid_character)
 {
-    do_test_simple();
+    // z
+    std::string wrong_encoded_test{"z"};
+    std::string recovered_test;
+
+    ASSERT_THROW(base32::decode(wrong_encoded_test), std::invalid_argument);
 }
 
+TEST(base32, future_modification_protection)
+{
+    const boost::filesystem::path test_file_path = unit_test::data_dir / "base32" / "future_modification_protection.txt";
 
+    // pairs of (hex encoding of random bytes, base32_monero encoding of random bytes)
+    std::vector<std::pair<std::string, std::string>> test_cases;
+
+    // read test cases from data file
+    std::ifstream ifs(test_file_path.string());
+    ASSERT_TRUE(ifs);
+    while (ifs)
+    {
+        std::string hex_enc;
+        ifs >> hex_enc;
+
+        if (hex_enc.empty())
+            break;
+
+        std::string base32_enc;
+        ifs >> base32_enc;
+
+        ASSERT_FALSE(base32_enc.empty()); // we shouldn't run out of data on this part
+
+        test_cases.push_back({hex_enc, base32_enc});
+    }
+
+    ASSERT_EQ(249, test_cases.size()); // there should be 249 test cases in the file
+
+    for (const auto& test_case : test_cases)
+    {
+        // test that base32_encode(hex_decode(test_case.first)) == test_case.second
+
+        std::string raw_buf;
+        ASSERT_TRUE(epee::string_tools::parse_hexstr_to_binbuff(test_case.first, raw_buf));
+
+        const std::string encoded_buf = base32::encode(raw_buf);
+
+        EXPECT_EQ(test_case.second, encoded_buf);
+    }
+}

@@ -58,11 +58,13 @@
 
 #include "base32.h"
 
-#include <stdlib.h>  // for abort()
+#include <assert.h>
 
 #include <iostream>
 #include <limits>
+#include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace tools
 {
@@ -72,15 +74,44 @@ namespace base32
 template <bool B>
 using uint8_if = typename std::enable_if<B, uint8_t>::type;
 
-static constexpr char base32_monero_alphabet[] = {'x', 'm', 'r', 'b', 'a', 's', 'e', '3', '2', 'c', 'd',
-                                                  'f', 'g', 'h', 'i', 'j', 'k', 'n', 'p', 'q', 't', 'u',
-                                                  'w', 'y', '0', '1', '4', '5', '6', '7', '8', '9'};
+static constexpr char base32_monero_alphabet[] = {'x',
+    'm',
+    'r',
+    'b',
+    'a',
+    's',
+    'e',
+    '3',
+    '2',
+    'c',
+    'd',
+    'f',
+    'g',
+    'h',
+    'i',
+    'j',
+    'k',
+    'n',
+    'p',
+    'q',
+    't',
+    'u',
+    'w',
+    'y',
+    '0',
+    '1',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9'};
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static constexpr uint8_t binary_block_size() { return 5; }
+static constexpr uint8_t binary_block_size{5};
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static constexpr uint8_t encoded_block_size() { return 8; }
+static constexpr uint8_t encoded_block_size{8};
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static constexpr size_t alphabet_size()
@@ -104,7 +135,7 @@ static constexpr char normalized_symbol(char c)
 template <uint8_t I>
 static constexpr uint8_t index(const uint8_t* b /*binary block*/) noexcept
 {
-    static_assert(I >= 0 && I < encoded_block_size(), "invalid encoding symbol index in a block");
+    static_assert(I >= 0 && I < encoded_block_size, "invalid encoding symbol index in a block");
 
     return (I == 0)   ? ((b[0] >> 3) & 0x1F)  // first 5 bits
            : (I == 1) ? (((b[0] << 2) & 0x1C) | ((b[1] >> 6) & 0x3))
@@ -159,7 +190,7 @@ struct enc
     // Block encoding: Go from 0 to (block size - 1), append a symbol for each iteration unconditionally.
     static void block(std::string& encoded, const uint8_t* src)
     {
-        using EncodedBlockSizeT = decltype(encoded_block_size());
+        using EncodedBlockSizeT                              = decltype(encoded_block_size);
         constexpr static const EncodedBlockSizeT SymbolIndex = static_cast<EncodedBlockSizeT>(I - 1);
 
         enc<I - 1>().block(encoded, src);
@@ -167,11 +198,11 @@ struct enc
     }
 
     // Tail encoding: Go from 0 until (runtime) num_symbols, append a symbol for each iteration.
-    template <typename EncodedBlockSizeT = decltype(encoded_block_size())>
+    template <typename EncodedBlockSizeT = decltype(encoded_block_size)>
     static void tail(std::string& encoded, const uint8_t* src, EncodedBlockSizeT num_symbols)
     {
-        constexpr static const EncodedBlockSizeT SymbolIndex = encoded_block_size() - I;
-        constexpr static const EncodedBlockSizeT NumSymbols = SymbolIndex + static_cast<EncodedBlockSizeT>(1);
+        constexpr static const EncodedBlockSizeT SymbolIndex = encoded_block_size - I;
+        constexpr static const EncodedBlockSizeT NumSymbols  = SymbolIndex + static_cast<EncodedBlockSizeT>(1);
 
         if (num_symbols == NumSymbols)
         {
@@ -189,31 +220,38 @@ struct enc<0>
 {
     static void block(std::string&, const uint8_t*) {}
 
-    template <typename EncodedBlockSizeT = decltype(encoded_block_size())>
+    template <typename EncodedBlockSizeT = decltype(encoded_block_size)>
     static void tail(std::string&, const uint8_t*, EncodedBlockSizeT)
     {
-        abort();  // Not reached: block() should be called if num_symbols == block size, not tail().
+        // Not reached: block() should be called if num_symbols == block size, not tail().
+        throw std::logic_error("base32/tail: this should not be called.");
     }
 };
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-template <unsigned... Is>
-struct seq
-{
-};
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-template <unsigned N, unsigned... Is>
-struct gen_seq : gen_seq<N - 4, N - 4, N - 3, N - 2, N - 1, Is...>
-{
-    // Clang up to 3.6 has a limit of 256 for template recursion,
-    // so pass a few more symbols at once to make it work.
-    static_assert(N % 4 == 0, "I must be divisible by 4 to eventually end at 0");
-};
-template <unsigned... Is>
-struct gen_seq<0, Is...> : seq<Is...>
-{
-};
+template<unsigned... Is>
+using seq = std::integer_sequence<unsigned, Is...>;
+
+template<unsigned I>
+using gen_seq = std::make_integer_sequence<unsigned, I>;
+
+// template <unsigned... Is>
+// struct seq
+// {
+// };
+// //-------------------------------------------------------------------------------------------------------------------
+// //-------------------------------------------------------------------------------------------------------------------
+// template <unsigned N, unsigned... Is>
+// struct gen_seq : gen_seq<N - 4, N - 4, N - 3, N - 2, N - 1, Is...>
+// {
+//     // Clang up to 3.6 has a limit of 256 for template recursion,
+//     // so pass a few more symbols at once to make it work.
+//     static_assert(N % 4 == 0, "I must be divisible by 4 to eventually end at 0");
+// };
+// template <unsigned... Is>
+// struct gen_seq<0, Is...> : seq<Is...>
+// {
+// };
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 template <size_t N>
@@ -238,14 +276,6 @@ constexpr lookup_table_t<N> make_lookup_table(LambdaType evalFunc)
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-template <typename T>
-static constexpr size_t num_possible_values()
-{
-    return static_cast<size_t>(static_cast<intmax_t>((std::numeric_limits<T>::max)()) -
-                               static_cast<intmax_t>((std::numeric_limits<T>::min)()) + 1);
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 template <alphabet_index_t InvalidIdx, size_t I>
 struct index_if_in_alphabet
 {
@@ -267,9 +297,9 @@ struct index_if_in_alphabet<InvalidIdx, 0>
 //-------------------------------------------------------------------------------------------------------------------
 struct alphabet_index_info
 {
-    static constexpr const size_t num_possible_symbols = num_possible_values<char>();
-    static constexpr const alphabet_index_t invalid_idx = 1 << 9;
-    static constexpr const alphabet_index_t eof_idx = 1 << 10;
+    static constexpr const size_t num_possible_symbols          = 256;
+    static constexpr const alphabet_index_t invalid_idx         = 1 << 9;
+    static constexpr const alphabet_index_t eof_idx             = 1 << 10;
     static constexpr const alphabet_index_t stop_character_mask = static_cast<alphabet_index_t>(~0xFFu);
 
     static constexpr bool is_invalid(alphabet_index_t idx) { return idx == invalid_idx; }
@@ -286,41 +316,21 @@ struct alphabet_index_info
 
     static constexpr alphabet_index_t index_of(char symbol_char)
     {
-        return valid_index_or(idx_if_in_alphabet::for_symbol(symbol_char),
-                              is_eof_symbol(symbol_char) ? eof_idx : invalid_idx);
+        return valid_index_or(
+            idx_if_in_alphabet::for_symbol(symbol_char), is_eof_symbol(symbol_char) ? eof_idx : invalid_idx);
     }
 
-    // GCC <= 4.9 has a bug with retaining constexpr when passing a function pointer.
-    // To get around this, we'll create a callable with operator() and pass that one.
-    // Unfortunately, MSVC prior to VS 2017 (for MinSizeRel or Release builds)
-    // chokes on this by compiling the project in 20 minutes instead of seconds.
-    // So let's define two separate variants and remove the old GCC one whenever we
-    // decide not to support GCC < 5.0 anymore.
-#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 5
-    struct index_at
-    {
-        constexpr alphabet_index_t operator()(size_t symbol_char) const
-        {
-            return index_of(normalized_symbol(static_cast<char>(symbol_char)));
-        }
-    };
-#else
     static constexpr alphabet_index_t index_at(size_t symbol_char)
     {
         return index_of(normalized_symbol(static_cast<char>(symbol_char)));
     }
-#endif
 
    public:
     struct lookup
     {
         static alphabet_index_t for_symbol(char symbol_char)
         {
-#if defined(__GNUC__) && !defined(__clang__) && __GNUC__ < 5
-            static constexpr const auto t = make_lookup_table<num_possible_symbols>(index_at());
-#else
             static constexpr const auto t = make_lookup_table<num_possible_symbols>(&index_at);
-#endif
             static_assert(t.size == num_possible_symbols, "lookup table must cover each possible (character) symbol");
             return t.lookup[static_cast<uint8_t>(symbol_char)];
         }
@@ -330,47 +340,43 @@ struct alphabet_index_info
 //-------------------------------------------------------------------------------------------------------------------
 size_t encoded_size(size_t binary_size) noexcept
 {
-    return (binary_size * encoded_block_size() / binary_block_size()) +
-           (((binary_size * encoded_block_size()) % binary_block_size()) ? 1 : 0);
+    return (binary_size * encoded_block_size / binary_block_size) +
+           (((binary_size * encoded_block_size) % binary_block_size) ? 1 : 0);
 }
 //-------------------------------------------------------------------------------------------------------------------
 size_t decoded_max_size(size_t encoded_size) noexcept
 {
-    return (encoded_size / encoded_block_size() * binary_block_size()) +
-           ((encoded_size % encoded_block_size()) * binary_block_size() / encoded_block_size());
+    return (encoded_size / encoded_block_size * binary_block_size) +
+           ((encoded_size % encoded_block_size) * binary_block_size / encoded_block_size);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void init(std::string& result, size_t capacity)
 {
-    result.resize(0);
+    result.clear();
     result.reserve(capacity);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void encode(std::string& encoded_result, const uint8_t* src, size_t src_size)
 {
-    using encoder = enc<encoded_block_size()>;
+    using encoder = enc<encoded_block_size>;
 
     const uint8_t* src_end = src + src_size;
 
-    if (src_size >= binary_block_size())
+    if (src_size >= binary_block_size)
     {
-        src_end -= binary_block_size();
+        src_end -= binary_block_size;
 
-        for (; src <= src_end; src += binary_block_size())
+        for (; src <= src_end; src += binary_block_size)
         {
             encoder::block(encoded_result, src);
         }
-        src_end += binary_block_size();
+        src_end += binary_block_size;
     }
 
     if (src_end > src)
     {
         auto remaining_src_len = src_end - src;
-        if (!remaining_src_len || remaining_src_len >= binary_block_size())
-        {
-            abort();
-            return;
-        }
+        assert(!(!remaining_src_len || remaining_src_len >= binary_block_size));
 
         auto num_symbols = num_encoded_tail_symbols(static_cast<uint8_t>(remaining_src_len));
 
@@ -428,15 +434,15 @@ void decode(std::string& binary_result, const char* src_encoded, size_t src_size
 {
     using alphabet_index_lookup = typename alphabet_index_info::lookup;
 
-    const char* src = src_encoded;
+    const char* src     = src_encoded;
     const char* src_end = src + src_size;
 
-    alphabet_index_t alphabet_indexes[encoded_block_size()] = {};
-    alphabet_indexes[0] = alphabet_index_info::eof_idx;
+    alphabet_index_t alphabet_indexes[encoded_block_size] = {};
+    alphabet_indexes[0]                                   = alphabet_index_info::eof_idx;
 
-    alphabet_index_t* const alphabet_index_start = &alphabet_indexes[0];
-    alphabet_index_t* const alphabet_index_end = &alphabet_indexes[encoded_block_size()];
-    alphabet_index_t* alphabet_index_ptr = &alphabet_indexes[0];
+    alphabet_index_t const* const alphabet_index_start = &alphabet_indexes[0];
+    alphabet_index_t const* const alphabet_index_end   = &alphabet_indexes[encoded_block_size];
+    alphabet_index_t* alphabet_index_ptr         = &alphabet_indexes[0];
 
     while (src < src_end)
     {
@@ -456,7 +462,8 @@ void decode(std::string& binary_result, const char* src_encoded, size_t src_size
         if (alphabet_index_ptr == alphabet_index_end)
         {
             decode_block(binary_result, alphabet_indexes);
-            alphabet_index_ptr = alphabet_index_start;
+            alphabet_index_ptr = const_cast<alphabet_index_t*>(alphabet_index_start);
+            // alphabet_index_ptr = alphabet_index_start;
         }
     }
 
@@ -470,37 +477,32 @@ void decode(std::string& binary_result, const char* src_encoded, size_t src_size
 
     if (last_index_ptr != alphabet_index_start)
     {
-        if (alphabet_index_ptr >= alphabet_index_end)
-        {
-            abort();
-            return;
-        }
+        assert(!(alphabet_index_ptr >= alphabet_index_end));
         decode_tail(binary_result, alphabet_indexes, static_cast<size_t>(alphabet_index_ptr - alphabet_index_start));
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-void encode(const std::string input, std::string& encoded_out)
+std::string encode(const std::string input)
 {
     const uint8_t* binary = reinterpret_cast<const uint8_t*>(reinterpret_cast<const char*>(input.data()));
     size_t binary_size{input.size()};
-
     size_t encoded_buffer_size = encoded_size(binary_size);
-
+    std::string encoded_out;
     init(encoded_out, encoded_buffer_size);
     encode(encoded_out, binary, binary_size);
+    return encoded_out;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void decode(const std::string input, std::string& decoded_out)
+std::string decode(const std::string input)
 {
     const char* binary = reinterpret_cast<const char*>(input.data());
     size_t binary_size{input.size()};
     size_t binary_buffer_size{decoded_max_size(binary_size)};
-
+    std::string decoded_out;
     init(decoded_out, binary_buffer_size);
     decode(decoded_out, binary, binary_size);
+    return decoded_out;
 }
-
 
 }  // namespace base32
 }  // namespace tools
-

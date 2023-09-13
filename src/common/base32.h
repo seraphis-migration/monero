@@ -74,8 +74,8 @@ void decode_tail(std::string& decoded, const alphabet_index_t* idx, size_t idx_l
 void encode(std::string& encoded_result, const uint8_t* src, size_t src_size);
 void decode(std::string& binary_result, const char* src_encoded, size_t src_size);
 
-void encode(const std::string input, std::string& encoded_out);
-void decode(const std::string input, std::string& decoded_out);
+std::string encode(const std::string input);
+std::string decode(const std::string input);
 
 
 }  // namespace base32
