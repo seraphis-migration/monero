@@ -31,6 +31,7 @@ set(seraphis_wallet_sources
   legacy_knowledge_proofs.cpp
   serialization_types.cpp
   show_enotes.cpp
+  sp_knowledge_proofs.cpp
   transaction_history.cpp
   transaction_utils.cpp
   )

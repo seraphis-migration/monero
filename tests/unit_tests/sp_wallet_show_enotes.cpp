@@ -94,6 +94,7 @@
 #include "seraphis_wallet/transaction_utils.h"
 #include "serialization_demo_utils.h"
 #include "serialization_types.h"
+#include "sp_knowledge_proofs.h"
 
 using namespace sp;
 using namespace jamtis;
@@ -273,6 +274,9 @@ static void make_transfers2(MockLedgerContext &ledger_context,
     /// Send 5 confirmed txs
     for (int i = 0; i < number_txs; i++)
     {
+        normal_payments.clear();
+        selfsend_payments.clear();
+
         rct::xmr_amount to_send{10};
         // rct::xmr_amount to_send{static_cast<uint64_t>(rand() % 100)};
         // std::cout << "to send: " << to_send << std::endl;
@@ -443,7 +447,7 @@ TEST(seraphis_wallet_show, show_legacy_enote_with_sent_proof)
                       << " with amount: " << enote_info.amount << "XMR"
                       << " and amount commitment: " << amount_commitment_ref(enote_info.enote) << std::endl;
 
-            str_proof = tx_history_A.get_enote_sent_proof(tx_id_proof,
+            str_proof = get_enote_sent_proof(tx_id_proof,
                 onetime_address_ref(enote_info.enote),
                 enote_info.destination,
                 user_keys_A.k_vb,
@@ -451,6 +455,7 @@ TEST(seraphis_wallet_show, show_legacy_enote_with_sent_proof)
                 enote_info.amount,
                 enote_info.amount_blinding_factor,
                 amount_commitment_ref(enote_info.enote),
+                tx_history_A,
                 boost::none);
 
             std::cout << "Proof generated: " << str_proof << std::endl;
