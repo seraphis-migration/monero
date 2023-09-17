@@ -47,7 +47,6 @@
 // third party headers
 #include <boost/range.hpp>
 #include <boost/range/iterator_range_core.hpp>
-
 #include "boost/range/iterator_range.hpp"
 
 // standard headers
@@ -60,6 +59,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "seraphis_wallet"
 
 using namespace sp::serialization;
 
@@ -126,7 +128,7 @@ void get_destination_from_str(const std::string &address, JamtisDestinationV1 &d
 
     // 3. prepare to recover JamtisDestinationV1
     std::string serialized_address;
-    tools::base32::decode(main_address, serialized_address);
+    serialized_address = base32::decode(main_address);
     sp::serialization::ser_JamtisDestinationV1 serializable_destination_recovered;
     sp::serialization::try_get_serializable(epee::strspan<std::uint8_t>(serialized_address),
                                             serializable_destination_recovered);
@@ -148,7 +150,7 @@ void get_str_from_destination(const JamtisDestinationV1 &dest, std::string &addr
     std::string serialized_address;
     sp::serialization::try_append_serializable(serializable_destination, serialized_address);
     std::string address_main;
-    tools::base32::encode(serialized_address, address_main);
+    address_main = base32::encode(serialized_address);
     std::string address = address_prefix + address_type + address_version + address_network + address_main;
     address_out = jamtis_add_checksum(address);
 }

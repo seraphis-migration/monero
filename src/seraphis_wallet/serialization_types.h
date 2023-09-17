@@ -90,9 +90,9 @@ struct ser_SpTransactionStoreV1
     // quickly find TransactionRecordV1 from txid
     serializable_unordered_map<rct::key, ser_TransactionRecordV1> tx_records;
 
-    // sort by blockheight to find last transactions or txs
+    // sort by timestamp to find last transactions or txs
     // in a specific time range
-    serializable_multimap<std::uint64_t, rct::key, std::greater<std::uint64_t>> txs_by_timestamp;
+    std::vector<std::pair<uint64_t,rct::key>> txs_by_timestamp;
 
     BEGIN_SERIALIZE_OBJECT()
     FIELD(tx_records)

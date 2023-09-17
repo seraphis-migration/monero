@@ -579,7 +579,7 @@ std::string get_enote_reserve_proof(const std::string &message_in,
 
 //-----------------------------------------------------------------
 /// Read/Verify Knowledge proofs
-//-------------------------------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------
 
 bool read_address_ownership_proof(const boost::optional<std::string> filename,
     const boost::optional<std::string> proof_str,
@@ -719,23 +719,19 @@ bool read_enote_reserve_proof(const boost::optional<std::string> filename,
     make_message_v2(expected_message, message);
 
     // 3. verify proof and get amount
-    if (verify_reserve_proof_v1(reserve_proof, message, validation_context))
-        std::cout << "Reserve proof is valid. Value of reserves: " << total_reserve_amount(reserve_proof) << std::endl;
-    else
+    if (!verify_reserve_proof_v1(reserve_proof, message, validation_context))
         return false;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool get_enote_out_info(std::vector<SpEnoteVariant> &enotes_out,
+bool try_get_enote_out_info(std::vector<SpEnoteVariant> &enotes_out,
     const std::vector<JamtisPaymentProposalV1> &normal_payments,
     const std::vector<JamtisPaymentProposalSelfSendV1> &selfsend_payments,
     const rct::key &input_context,
     const crypto::secret_key &k_vb,
-    std::vector<EnoteOutInfo> &enote_info)
+    std::vector<EnoteInfo> &enote_info)
 {
-    // find correspondence between enote and destination
-
     // 1. check if size(normal) + size(selfsend) == size(enotes_out)
     size_t s = enotes_out.size();
     if (normal_payments.size() + selfsend_payments.size() != s)
@@ -766,7 +762,7 @@ bool get_enote_out_info(std::vector<SpEnoteVariant> &enotes_out,
                 make_jamtis_amount_blinding_factor(q, baked_key, mask);
 
                 // add to vector
-                enote_info.push_back(EnoteOutInfo{enotes_out[i],
+                enote_info.push_back(EnoteInfo{enotes_out[i],
                     payment.destination,
                     payment.amount,
                     payment.enote_ephemeral_privkey,
@@ -800,7 +796,7 @@ bool get_enote_out_info(std::vector<SpEnoteVariant> &enotes_out,
                 make_jamtis_amount_blinding_factor(q, baked_key, mask);
 
                 // add to vector
-                enote_info.push_back(EnoteOutInfo{enotes_out[i],
+                enote_info.push_back(EnoteInfo{enotes_out[i],
                     payment.destination,
                     payment.amount,
                     payment.enote_ephemeral_privkey,

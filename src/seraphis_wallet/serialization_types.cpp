@@ -59,6 +59,9 @@
 #include <unordered_set>
 #include <vector>
 
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "seraphis_wallet"
+
 void make_serializable_transaction_record_v1(const TransactionRecordV1 &tx_rec, ser_TransactionRecordV1 &ser_tx_rec_out)
 {
     ser_tx_rec_out.legacy_spent_enotes = tx_rec.legacy_spent_enotes;

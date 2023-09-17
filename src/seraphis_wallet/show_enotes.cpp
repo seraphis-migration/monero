@@ -25,11 +25,9 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
 // paired header
-
 #include "seraphis_wallet/show_enotes.h"
-
-#include <openssl/x509v3.h>
 
 // local headers
 #include "common/util.h"
@@ -49,6 +47,10 @@
 #include <boost/optional/optional_io.hpp>
 
 // standard headers
+
+
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "seraphis_wallet"
 
 using namespace std;
 //-------------------------------------------------------------------------------------------------------------------
@@ -311,6 +313,7 @@ void get_enotes(const SpEnoteStore &sp_enote_store,
     stable_sort(vec_enote_records_out.begin(), vec_enote_records_out.end(), comparator);
 }
 //-------------------------------------------------------------------------------------------------------------------
+// Temporary function to show enotes
 void show_enotes(const vector<ContextualRecordVariant> &vec_enote_records)
 {
     rct::xmr_amount unspent_total{};
@@ -359,6 +362,7 @@ void show_enotes(const vector<ContextualRecordVariant> &vec_enote_records)
 //-------------------------------------------------------------------------------------------------------------------
 // k_vb is only necessary to show selfsend enotes
 // this could be done in a separate function
+// TEMPORARY
 void show_specific_enote(const SpEnoteStore &enote_store,
     const SpTransactionHistory &transaction_history,
     const crypto::key_image &key_image)

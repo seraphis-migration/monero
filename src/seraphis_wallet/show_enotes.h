@@ -47,7 +47,6 @@ typedef void (*FilterEnotes)(const ContextualRecordVariant &enote,
 
 typedef bool (*ComparatorEnotes)(const ContextualRecordVariant &a, const ContextualRecordVariant &b);
 
-///
 enum class SpTxDirectionStatus : unsigned char
 {
     // get all (in,out,offchain,pool) except failed
@@ -84,6 +83,7 @@ void get_enotes(const SpEnoteStore &sp_enote_store,
 * brief: show enotes 
 * param: vec_enote_records - enote record of filtered enotes
 */
+// TEMPORARY
 void show_enotes(const std::vector<ContextualRecordVariant> &vec_enote_records);
 
 /**
@@ -92,6 +92,7 @@ void show_enotes(const std::vector<ContextualRecordVariant> &vec_enote_records);
 * param: transaction_history - TransactionHistory where transaction attempts are stored
 * param: key_image - key_image of specific enote
 */
+// TEMPORARY
 void show_specific_enote(const SpEnoteStore &enote_store,
     const SpTransactionHistory &transaction_history,
     const crypto::key_image &key_image);

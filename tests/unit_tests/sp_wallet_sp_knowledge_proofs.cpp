@@ -90,9 +90,9 @@
 #include "seraphis_main/txtype_squashed_v1.h"
 #include "seraphis_mocks/seraphis_mocks.h"
 #include "seraphis_wallet/show_enotes.h"
+#include "seraphis_wallet/sp_knowledge_proofs.h"
 #include "seraphis_wallet/transaction_history.h"
 #include "seraphis_wallet/transaction_utils.h"
-#include "seraphis_wallet/sp_knowledge_proofs.h"
 #include "serialization_demo_utils.h"
 #include "serialization_types.h"
 
@@ -204,9 +204,7 @@ static void make_transfers(MockLedgerContext &ledger_context,
         refresh_user_enote_store(user_keys_A, refresh_config, ledger_context, enote_store_in_out);
 
         // 4. add tx to tx_records
-        tx_history_in_out.add_single_tx_to_tx_history(single_tx,
-            selfsend_payments,
-            normal_payments);
+        tx_history_in_out.add_single_tx_to_tx_history(single_tx, selfsend_payments, normal_payments);
     }
 
     // Send 5 unconfirmed_txs
@@ -272,8 +270,7 @@ TEST(seraphis_wallet_knowledge_proofs, address_ownership_proof)
     // 5a. generate and verify proof on K1 -> bool_Ks_K1 = false
     // str_proof = tx_history_A.get_address_ownership_proof(j, user_keys_A.k_m, user_keys_A.k_vb, false,
     // message_in,filename);
-    str_proof =
-        get_address_ownership_proof(j, user_keys_A.k_m, user_keys_A.k_vb, false, message_in, filename);
+    str_proof = get_address_ownership_proof(j, user_keys_A.k_m, user_keys_A.k_vb, false, message_in, filename);
 
     CHECK_AND_ASSERT_THROW_MES(read_address_ownership_proof(boost::none, str_proof, message_in, destination.addr_K1),
         "Address proof (K1) is invalid!");
@@ -329,9 +326,9 @@ TEST(seraphis_wallet_knowledge_proofs, enote_ownership_proof_sender)
     // 3. make some txs
     make_transfers(ledger_context, enote_store_A, tx_history_A, legacy_user_keys_A, user_keys_A);
 
-    // 4. get tx_id of last tx
-    const auto range_confirmed{tx_history_A.get_last_N_txs(1)};
-    rct::key tx_id_proof = range_confirmed.begin()->second;
+    // 4. get last tx
+    const auto last_txs{tx_history_A.get_last_N_txs(1)};
+    rct::key tx_id_proof = last_txs[0].second;
 
     // 5. define message and path to store proof
     std::string message_in{"enote ownership proof test"};
@@ -348,8 +345,8 @@ TEST(seraphis_wallet_knowledge_proofs, enote_ownership_proof_sender)
     make_jamtis_input_context_standard(tx_record.legacy_spent_enotes, tx_record.sp_spent_enotes, input_context);
 
     // 9. try to match enotes with destinations
-    std::vector<EnoteOutInfo> enote_out_info;
-    CHECK_AND_ASSERT_THROW_MES(get_enote_out_info(out_enotes,
+    std::vector<EnoteInfo> enote_out_info;
+    CHECK_AND_ASSERT_THROW_MES(try_get_enote_out_info(out_enotes,
                                    tx_record.normal_payments,
                                    tx_record.selfsend_payments,
                                    input_context,
@@ -406,8 +403,7 @@ TEST(seraphis_wallet_knowledge_proofs, enote_ownership_proof_receiver)
     {
         SpEnoteRecordV1 enote_record = all_enote_records[0].record;
 
-        str_proof = get_enote_ownership_proof_receiver(
-            enote_record, user_keys_A.K_1_base, user_keys_A.k_vb, filename);
+        str_proof = get_enote_ownership_proof_receiver(enote_record, user_keys_A.K_1_base, user_keys_A.k_vb, filename);
 
         // read enote ownership proof
         CHECK_AND_ASSERT_THROW_MES(read_enote_ownership_proof(filename,
@@ -434,8 +430,8 @@ TEST(seraphis_wallet_knowledge_proofs, amount_proof)
     make_transfers(ledger_context, enote_store_A, tx_history_A, legacy_user_keys_A, user_keys_A);
 
     // 4. get tx_id of last tx
-    const auto range_confirmed{tx_history_A.get_last_N_txs(1)};
-    rct::key tx_id_proof = range_confirmed.begin()->second;
+    const auto last_txs{tx_history_A.get_last_N_txs(1)};
+    rct::key tx_id_proof = last_txs[0].second;
 
     // 5. from tx_id get tx_record
     TransactionRecordV1 tx_record;
@@ -475,8 +471,8 @@ TEST(seraphis_wallet_knowledge_proofs, key_image_proof)
     make_transfers(ledger_context, enote_store_A, tx_history_A, legacy_user_keys_A, user_keys_A);
 
     // 4. get tx_id of last tx
-    const auto range_confirmed{tx_history_A.get_last_N_txs(1)};
-    rct::key tx_id_proof = range_confirmed.begin()->second;
+    const auto last_txs{tx_history_A.get_last_N_txs(1)};
+    rct::key tx_id_proof = last_txs[0].second;
 
     // 5. from tx_id get tx_record
     TransactionRecordV1 tx_record;
@@ -515,8 +511,8 @@ TEST(seraphis_wallet_knowledge_proofs, enote_sent_proof)
     make_transfers(ledger_context, enote_store_A, tx_history_A, legacy_user_keys_A, user_keys_A);
 
     // 4. get tx_id of last tx
-    const auto range_confirmed{tx_history_A.get_last_N_txs(1)};
-    rct::key tx_id_proof = range_confirmed.begin()->second;
+    const auto last_txs{tx_history_A.get_last_N_txs(1)};
+    rct::key tx_id_proof = last_txs[0].second;
 
     // 5. define message and path to store proof
     boost::optional<std::string> filename{"tx_enote_sent_proof"};
@@ -534,8 +530,8 @@ TEST(seraphis_wallet_knowledge_proofs, enote_sent_proof)
     make_jamtis_input_context_standard(tx_record.legacy_spent_enotes, tx_record.sp_spent_enotes, input_context);
 
     // 9. try to match enotes with destinations
-    std::vector<EnoteOutInfo> enote_out_info;
-    CHECK_AND_ASSERT_THROW_MES(get_enote_out_info(out_enotes,
+    std::vector<EnoteInfo> enote_out_info;
+    CHECK_AND_ASSERT_THROW_MES(try_get_enote_out_info(out_enotes,
                                    tx_record.normal_payments,
                                    tx_record.selfsend_payments,
                                    input_context,
@@ -584,8 +580,8 @@ TEST(seraphis_wallet_knowledge_proofs, tx_funded_proof)
     boost::optional<std::string> str_proof;
 
     std::string message_in{};
-    const auto range_confirmed{tx_history_A.get_last_N_txs(1)};
-    rct::key tx_id_proof = range_confirmed.begin()->second;
+    const auto last_txs{tx_history_A.get_last_N_txs(1)};
+    rct::key tx_id_proof = last_txs[0].second;
 
     str_proof = get_tx_funded_proof(
         tx_id_proof, enote_store_A, tx_history_A, user_keys_A.k_m, user_keys_A.k_vb, message_in, filename);
@@ -614,13 +610,10 @@ TEST(seraphis_wallet_knowledge_proofs, tx_reserve_proof)
     std::vector<SpContextualEnoteRecordV1> all_enote_records;
     all_enote_records.reserve(enote_store_A.sp_records().size());
 
-    for (const auto &enote_record : enote_store_A.sp_records()) all_enote_records.push_back(enote_record.second);
+    for (const auto &enote_record : enote_store_A.sp_records())
+        all_enote_records.push_back(enote_record.second);
 
     std::string message_in{"hi"};
-
-    std::cout << "Balance: "
-              << get_balance(enote_store_A, {SpEnoteOriginStatus::ONCHAIN}, {SpEnoteSpentStatus::SPENT_ONCHAIN})
-              << std::endl;
 
     rct::xmr_amount amount_proof{1500};
 
@@ -631,7 +624,7 @@ TEST(seraphis_wallet_knowledge_proofs, tx_reserve_proof)
         message_in, all_enote_records, user_keys_A.K_1_base, user_keys_A.k_m, user_keys_A.k_vb, amount_proof, filename);
 
     const TxValidationContextMock tx_validation_context{ledger_context};
-    std::cout << str_proof.get() << std::endl;
+    // std::cout << str_proof.get() << std::endl;
 
     // 4. From tx_id get all key images of tx by querying node.
     // std::vector<crypto::key_image> key_images = ledger_context.get_sp_key_images_from_tx(tx_id_proof);
