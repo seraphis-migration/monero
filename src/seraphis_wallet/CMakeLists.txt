@@ -27,7 +27,6 @@
 # THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 set(seraphis_wallet_sources
-  encrypt_file.cpp
   legacy_knowledge_proofs.cpp
   serialization_types.cpp
   show_enotes.cpp

@@ -98,7 +98,7 @@ set(unit_tests_sources
   seraphis_tx.cpp
   sha256.cpp
   slow_memmem.cpp
-  sp_wallet_tx_history.cpp
+  sp_wallet_read_write.cpp
   sp_wallet_legacy_proofs.cpp
   sp_wallet_show_enotes.cpp
   sp_wallet_sp_knowledge_proofs.cpp
