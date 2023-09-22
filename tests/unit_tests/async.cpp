@@ -143,3 +143,78 @@ TEST(async, basic_multithreaded)
     std::cout << "tasks submitted\n";
 }
 //-------------------------------------------------------------------------------------------------------------------
+TEST(async, multithreaded_only_wait_for_first)
+{
+    async::Threadpool &pool{async::get_default_threadpool()};
+
+    // 1. make join signals
+    auto join_signal_a = pool.make_join_signal();
+    auto join_signal_b = pool.make_join_signal();
+    auto join_signal_c = pool.make_join_signal();
+
+    // 2. get join tokens
+    auto join_token_a = pool.get_join_token(join_signal_a);
+    auto join_token_b = pool.get_join_token(join_signal_b);
+    auto join_token_c = pool.get_join_token(join_signal_c);
+
+    bool first_complete = false;
+    bool a_complete = false, b_complete = false, c_complete = false;
+
+    // 3. submit tasks
+    pool.submit(async::make_simple_task(0,
+            [&first_complete, &a_complete, l_join_token = join_token_a]() mutable -> async::TaskVariant
+            {
+                std::cout << std::this_thread::get_id() <<": A\n";
+                std::this_thread::sleep_for(std::chrono::seconds{5});
+                std::cout << "A\n";
+                a_complete = true;
+                first_complete = true;
+                l_join_token = nullptr;
+                return boost::none;
+            }
+        ));
+    pool.submit(async::make_simple_task(0,
+            [&first_complete, &b_complete, l_join_token = join_token_b]() mutable -> async::TaskVariant
+            {
+                std::cout << std::this_thread::get_id() <<": B\n";
+                std::this_thread::sleep_for(std::chrono::seconds{5});
+                std::cout << "B\n";
+                b_complete = true;
+                first_complete = true;
+                l_join_token = nullptr;
+                return boost::none;
+            }
+        ));
+    pool.submit(async::make_simple_task(0,
+            [&first_complete, &c_complete, l_join_token = join_token_c]() mutable -> async::TaskVariant
+            {
+                std::cout << std::this_thread::get_id() <<": C\n";
+                std::this_thread::sleep_for(std::chrono::milliseconds{100});
+                std::cout << "C\n";
+                c_complete = true;
+                first_complete = true;
+                l_join_token = nullptr;
+                return boost::none;
+            }
+        ));
+
+    // 4. get join conditions
+    auto join_condition_a = pool.get_join_condition(std::move(join_signal_a), std::move(join_token_a));
+    auto join_condition_b = pool.get_join_condition(std::move(join_signal_b), std::move(join_token_b));
+    auto join_condition_c = pool.get_join_condition(std::move(join_signal_c), std::move(join_token_c));
+
+    auto check_any = [&join_condition_a, &join_condition_b, &join_condition_c]
+        {
+            return join_condition_a() || join_condition_b() || join_condition_c();
+        };
+
+    // 5. join the tasks
+    std::this_thread::sleep_for(std::chrono::milliseconds{100});
+    pool.work_while_waiting(std::move(check_any));
+
+    ASSERT_TRUE(first_complete);
+    ASSERT_TRUE(c_complete);
+    ASSERT_FALSE(a_complete);
+    ASSERT_FALSE(b_complete);
+}
+//-------------------------------------------------------------------------------------------------------------------

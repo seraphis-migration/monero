@@ -128,7 +128,7 @@ struct LegacyEnoteRecord final
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ////
-// SpBasicEnoteRecordV1  (jamtis non-selfsend enote type only)
+// SpBasicEnoteRecordV1
 // - a seraphis enote that has passed the view-tag check using a jamtis find-received key
 ///
 struct SpBasicEnoteRecordV1 final
@@ -139,12 +139,12 @@ struct SpBasicEnoteRecordV1 final
     crypto::x25519_pubkey enote_ephemeral_pubkey;
     /// context of the tx input(s) associated with this enote
     rct::key input_context;
-    /// t'_addr: nominal address tag
+    /// t'_addr: nominal address tag (only useful for jamtis non-selfsend enote types)
     jamtis::address_tag_t nominal_address_tag;
 };
 
 ////
-// SpIntermediateEnoteRecordV1  (jamtis non-selfsend enote type only)
+// SpIntermediateEnoteRecordV1 (jamtis non-selfsend enote type only)
 // - a seraphis enote with info extracted using a jamtis find-received key, generate-address secret, and unlock-amounts key
 ///
 struct SpIntermediateEnoteRecordV1 final

@@ -1,4 +1,4 @@
-// Copyright (c) 2022, The Monero Project
+// Copyright (c) 2023, The Monero Project
 //
 // All rights reserved.
 //
@@ -36,6 +36,7 @@
 #include "ringct/rctTypes.h"
 #include "seraphis_core/binned_reference_set.h"
 #include "seraphis_core/discretized_fee.h"
+#include "seraphis_core/jamtis_destination.h"
 #include "seraphis_core/jamtis_support_types.h"
 #include "serialization/containers.h"
 #include "serialization/crypto.h"
@@ -55,6 +56,12 @@ namespace sp
 {
 namespace serialization
 {
+
+/// serializable jamtis::address_tag_t
+struct ser_address_tag_t final
+{
+    unsigned char bytes[sizeof(jamtis::address_tag_t)];
+};
 
 /// serializable jamtis::encrypted_address_tag_t
 struct ser_encrypted_address_tag_t final
@@ -406,8 +413,30 @@ struct ser_SpTxSquashedV1 final
     END_SERIALIZE()
 };
 
+/// serializable JamtisDestinationV1
+struct ser_JamtisDestinationV1 final
+{
+    /// K_1 (address spend key)
+    rct::key addr_K1;
+    /// xK_2 (address view key)
+    crypto::x25519_pubkey addr_K2;
+    /// xK_3 (DH base key)
+    crypto::x25519_pubkey addr_K3;
+    /// addr_tag
+    ser_address_tag_t addr_tag;
+
+    BEGIN_SERIALIZE()
+        FIELD(addr_K1)
+        FIELD(addr_K2)
+        FIELD(addr_K3)
+        FIELD(addr_tag)    static_assert(sizeof(addr_tag) == sizeof(jamtis::address_tag_t), "");
+    END_SERIALIZE()
+};
+
+
 } //namespace serialization
 } //namespace sp
 
+BLOB_SERIALIZER(sp::serialization::ser_address_tag_t);
 BLOB_SERIALIZER(sp::serialization::ser_encrypted_address_tag_t);
 BLOB_SERIALIZER(sp::serialization::ser_encoded_amount_t);
