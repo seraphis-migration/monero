@@ -29,6 +29,7 @@
 #include "gtest/gtest.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
 #include <fstream>
 #include <string>
@@ -370,5 +371,5 @@ TEST(base32, bad_chars)
     for (const char c : BASE32_UNALLOWED)
         EXPECT_EQ(base32::BADC, base32::JAMTIS_INVERTED_ALPHABET[(unsigned) c]);
     
-    EXPECT_EQ(base32::IGNC, base32::JAMTIS_INVERTED_ALPHABET[(unsigned) "-"]);
+    EXPECT_EQ(base32::IGNC, base32::JAMTIS_INVERTED_ALPHABET[(unsigned) '-']);
 }
