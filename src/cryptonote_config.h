@@ -334,8 +334,8 @@ namespace config
   const uint32_t MULTISIG_MAX_SIGNERS{16};
 
   // Wallet
-  const constexpr char HASH_KEY_SP_WALLET_TX_HISTORY_MESSAGE_V1[] = "sp_wallet_tx_history_message_1"; 
-  const constexpr char HASH_KEY_SP_WALLET_TX_HISTORY_MESSAGE_V2[] = "sp_wallet_tx_history_message_2"; 
+  const constexpr char HASH_KEY_SP_WALLET_TX_HISTORY_MESSAGE_V1[] = "sp_wallet_tx_history_message_1";
+  const constexpr char HASH_KEY_SP_WALLET_TX_HISTORY_MESSAGE_V2[] = "sp_wallet_tx_history_message_2";
 
   namespace testnet
   {
