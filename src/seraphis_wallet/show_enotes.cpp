@@ -37,6 +37,7 @@
 #include "seraphis_core/jamtis_support_types.h"
 #include "seraphis_impl/enote_store.h"
 #include "seraphis_main/contextual_enote_record_types.h"
+#include "seraphis_main/enote_record_types.h"
 #include "seraphis_main/tx_builders_outputs.h"
 #include "seraphis_main/tx_component_types.h"
 #include "seraphis_wallet/transaction_history.h"
@@ -45,9 +46,9 @@
 
 // third party headers
 #include <boost/optional/optional_io.hpp>
+#include <sstream>
 
 // standard headers
-
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "seraphis_wallet"
@@ -123,6 +124,7 @@ static string sp_jamtis_enote_selfsend_type_to_string(JamtisSelfSendType type)
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+// Sort by timestamp when enote was spent and put UNSPENT first
 static bool compare_block_timestamp(const ContextualRecordVariant &a, const ContextualRecordVariant &b)
 {
     if (spent_context_ref(a).spent_status != spent_context_ref(b).spent_status)
@@ -223,6 +225,20 @@ static void filter_out_offchain(const ContextualRecordVariant &enote,
         origin_context_ref(enote).block_index >= range_height.first)
         vec_out.push_back(enote);
 }
+// //-------------------------------------------------------------------------------------------------------------------
+// //-------------------------------------------------------------------------------------------------------------------
+// static void filter_selfsend(const ContextualRecordVariant &enote,
+//     const pair<uint64_t, uint64_t> range_height,
+//     vector<ContextualRecordVariant> &vec_out)
+// {
+//     if (enote.is_type<SpContextualEnoteRecordV1>())
+//     {
+//         if (!is_jamtis_selfsend_type(enote.unwrap<SpContextualEnoteRecordV1>().record.type))
+//         {
+//             vec_out.push_back(enote);
+//         }
+//     }
+// }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 static void select_filter_comparator(const SpTxDirectionStatus tx_status,
@@ -292,8 +308,7 @@ void get_enotes(const SpEnoteStore &sp_enote_store,
     const pair<uint64_t, uint64_t> range_height,
     vector<ContextualRecordVariant> &vec_enote_records_out)
 {
-
-    vec_enote_records_out.clear();
+    // vec_enote_records_out.clear();
 
     FilterEnotes filter;
     ComparatorEnotes comparator;
@@ -317,47 +332,50 @@ void get_enotes(const SpEnoteStore &sp_enote_store,
 void show_enotes(const vector<ContextualRecordVariant> &vec_enote_records)
 {
     rct::xmr_amount unspent_total{};
+    std::stringstream ss;
     for (int i = vec_enote_records.size() - 1; i >= 0; i--)
     {
         // Status
-        cout << "Status: " << sp_spent_status_to_string(spent_context_ref(vec_enote_records[i]).spent_status);
+        ss << "Status: " << sp_spent_status_to_string(spent_context_ref(vec_enote_records[i]).spent_status);
 
         // Amount
-        cout << "  |   Amount: " << amount_ref(vec_enote_records[i]);
+        ss << "  |   Amount: " << amount_ref(vec_enote_records[i]);
 
         // Type
         if (vec_enote_records[i].is_type<SpContextualEnoteRecordV1>())
         {
-            cout << "  |   Type: "
-                 << "Sp";
-            cout << "  |   Key-image: " << vec_enote_records[i].unwrap<SpContextualEnoteRecordV1>().record.key_image;
+            ss << "  |   Type: "
+               << "Sp";
+            ss << "  |   Key-image: " << vec_enote_records[i].unwrap<SpContextualEnoteRecordV1>().record.key_image;
         }
         else
         {
-            cout << "  |   Type: "
-                 << "Legacy";
-            cout << "  |   Key-image: "
-                 << vec_enote_records[i].unwrap<LegacyContextualEnoteRecordV1>().record.key_image;
+            ss << "  |   Type: "
+               << "Legacy";
+            ss << "  |   Key-image: " << vec_enote_records[i].unwrap<LegacyContextualEnoteRecordV1>().record.key_image;
         }
 
         // Info from origin_context or spent_context
         if (spent_context_ref(vec_enote_records[i]).spent_status == sp::SpEnoteSpentStatus::UNSPENT)
         {
-            cout << "  |   Timestamp origin: "
-                 << tools::get_human_readable_timestamp(origin_context_ref(vec_enote_records[i]).block_timestamp);
-            cout << "  |   Block height origin: " << origin_context_ref(vec_enote_records[i]).block_index;
-            cout << "  |   Tx id origin: " << origin_context_ref(vec_enote_records[i]).transaction_id << endl;
+            ss << "  |   Timestamp origin: "
+               << tools::get_human_readable_timestamp(origin_context_ref(vec_enote_records[i]).block_timestamp);
+            ss << "  |   Block height origin: " << origin_context_ref(vec_enote_records[i]).block_index;
+            ss << "  |   Tx id origin: " << origin_context_ref(vec_enote_records[i]).transaction_id << endl;
             unspent_total += amount_ref(vec_enote_records[i]);
         }
         else
         {
-            cout << "  |   Timestamp spent: "
-                 << tools::get_human_readable_timestamp(spent_context_ref(vec_enote_records[i]).block_timestamp);
-            cout << "  |   Block height spent: " << spent_context_ref(vec_enote_records[i]).block_index;
-            cout << "  |   Tx id spent: " << spent_context_ref(vec_enote_records[i]).transaction_id << endl;
+            ss << "  |   Timestamp spent: "
+               << tools::get_human_readable_timestamp(spent_context_ref(vec_enote_records[i]).block_timestamp);
+            ss << "  |   Block height spent: " << spent_context_ref(vec_enote_records[i]).block_index;
+            ss << "  |   Tx id spent: " << spent_context_ref(vec_enote_records[i]).transaction_id << endl;
         }
     }
-    cout << "Total unspent: " << unspent_total << endl;
+    ss << "Total unspent: " << unspent_total << endl;
+
+    // TODO: change output of string
+    cout << ss.str();
 }
 //-------------------------------------------------------------------------------------------------------------------
 // k_vb is only necessary to show selfsend enotes
@@ -365,66 +383,69 @@ void show_enotes(const vector<ContextualRecordVariant> &vec_enote_records)
 // TEMPORARY
 void show_specific_enote(const SpEnoteStore &enote_store,
     const SpTransactionHistory &transaction_history,
-    const crypto::key_image &key_image)
+    const crypto::key_image &key_image,
+    const JamtisAddressVersion address_version,
+    const JamtisAddressNetwork address_network)
 {
+    std::stringstream ss;
     // Legacy enote
     LegacyContextualEnoteRecordV1 legacy_enote_record;
     if (enote_store.try_get_legacy_enote_record(key_image, legacy_enote_record))
     {
         // Info from enote
         {
-            cout << "--------------- INFO FROM ENOTE ---------------" << endl;
+            ss << "--------------- INFO FROM ENOTE ---------------" << endl;
 
-            cout << "  |   Type: "
-                 << "Legacy" << endl;
-            cout << "  |   Key image: " << legacy_enote_record.record.key_image << endl;
+            ss << "  |   Type: "
+               << "Legacy" << endl;
+            ss << "  |   Key image: " << legacy_enote_record.record.key_image << endl;
 
             // Amount
-            cout << "  |   Amount commitment: " << amount_commitment_ref(legacy_enote_record.record.enote) << endl;
-            cout << "  |   Amount: " << legacy_enote_record.record.amount << endl;
-            cout << "  |   Amount blinding factor: " << legacy_enote_record.record.amount_blinding_factor << endl;
+            ss << "  |   Amount commitment: " << amount_commitment_ref(legacy_enote_record.record.enote) << endl;
+            ss << "  |   Amount: " << legacy_enote_record.record.amount << endl;
+            ss << "  |   Amount blinding factor: " << legacy_enote_record.record.amount_blinding_factor << endl;
             // Onetime-Address
-            cout << "  |   Onetime-Address: " << onetime_address_ref(legacy_enote_record.record.enote) << endl;
-            cout << "  |   Address index: " << legacy_enote_record.record.address_index << endl;
-            cout << "  |   Enote ephemeral public key: " << legacy_enote_record.record.enote_ephemeral_pubkey << endl;
-            cout << "  |   Enote view extension (private key): " << legacy_enote_record.record.enote_view_extension
-                 << endl;
-            cout << "  |   Transaction output index: " << legacy_enote_record.record.tx_output_index << endl;
-            cout << "  |   Unlock time: " << legacy_enote_record.record.unlock_time << endl;
+            ss << "  |   Onetime-Address: " << onetime_address_ref(legacy_enote_record.record.enote) << endl;
+            ss << "  |   Address index: " << legacy_enote_record.record.address_index << endl;
+            ss << "  |   Enote ephemeral public key: " << legacy_enote_record.record.enote_ephemeral_pubkey << endl;
+            ss << "  |   Enote view extension (private key): " << legacy_enote_record.record.enote_view_extension
+               << endl;
+            ss << "  |   Transaction output index: " << legacy_enote_record.record.tx_output_index << endl;
+            ss << "  |   Unlock time: " << legacy_enote_record.record.unlock_time << endl;
         }
 
         // Info from origin_context
-        cout << "--------------- ORIGIN CONTEXT ---------------" << endl;
+        ss << "--------------- ORIGIN CONTEXT ---------------" << endl;
         {
-            cout << "  |   Timestamp origin: "
-                 << tools::get_human_readable_timestamp(legacy_enote_record.origin_context.block_timestamp) << endl;
-            cout << "  |   Block height origin: " << legacy_enote_record.origin_context.block_index << endl;
-            cout << "  |   Tx id origin: " << legacy_enote_record.origin_context.transaction_id << endl;
-            cout << "  |   Origin Status: "
-                 << sp_origin_status_to_string(legacy_enote_record.origin_context.origin_status) << endl;
-            cout << "  |   Enote Ledge Index: " << legacy_enote_record.origin_context.enote_ledger_index << endl;
-            cout << "  |   Enote Transaction Index: " << legacy_enote_record.origin_context.enote_tx_index << endl;
+            ss << "  |   Timestamp origin: "
+               << tools::get_human_readable_timestamp(legacy_enote_record.origin_context.block_timestamp) << endl;
+            ss << "  |   Block height origin: " << legacy_enote_record.origin_context.block_index << endl;
+            ss << "  |   Tx id origin: " << legacy_enote_record.origin_context.transaction_id << endl;
+            ss << "  |   Origin Status: "
+               << sp_origin_status_to_string(legacy_enote_record.origin_context.origin_status) << endl;
+            ss << "  |   Enote Ledge Index: " << legacy_enote_record.origin_context.enote_ledger_index << endl;
+            ss << "  |   Enote Transaction Index: " << legacy_enote_record.origin_context.enote_tx_index << endl;
             // TODO
-            // cout << "  |   Memo: " << legacy_enote_record.origin_context.memo << endl;
+            // ss << "  |   Memo: " << legacy_enote_record.origin_context.memo << endl;
         }
         // Info from spent_context if spent
         if (legacy_enote_record.spent_context.spent_status != sp::SpEnoteSpentStatus::UNSPENT)
         {
-            cout << "--------------- SPENT CONTEXT ---------------" << endl;
-            cout << "  |   Spent status: " << sp_spent_status_to_string(legacy_enote_record.spent_context.spent_status)
-                 << endl;
-            cout << "  |   Timestamp spent: "
-                 << tools::get_human_readable_timestamp(legacy_enote_record.spent_context.block_timestamp) << endl;
-            cout << "  |   Block height spent: " << legacy_enote_record.spent_context.block_index << endl;
-            cout << "  |   Tx id spent: " << legacy_enote_record.spent_context.transaction_id << endl;
+            ss << "--------------- SPENT CONTEXT ---------------" << endl;
+            ss << "  |   Spent status: " << sp_spent_status_to_string(legacy_enote_record.spent_context.spent_status)
+               << endl;
+            ss << "  |   Timestamp spent: "
+               << tools::get_human_readable_timestamp(legacy_enote_record.spent_context.block_timestamp) << endl;
+            ss << "  |   Block height spent: " << legacy_enote_record.spent_context.block_index << endl;
+            ss << "  |   Tx id spent: " << legacy_enote_record.spent_context.transaction_id << endl;
 
             // Get transaction record
             TransactionRecordV1 tx_record;
             if (transaction_history.try_get_tx_record_from_txid(
                     legacy_enote_record.spent_context.transaction_id, tx_record))
             {
-                cout << "--------------- SPENT CONTEXT - DETAILED ---------------" << endl;
-                cout << "This enote was consumed to send funds to the following addresses: " << endl;
+                ss << "--------------- SPENT CONTEXT - DETAILED ---------------" << endl;
+                ss << "This enote was consumed to send funds to the following addresses: " << endl;
                 string str_addr_out;
                 for (auto p : tx_record.normal_payments)
                 {
@@ -439,38 +460,38 @@ void show_specific_enote(const SpEnoteStore &enote_store,
                     SpEnoteV1 enote;
                     get_enote_v1(output_proposal, enote);
 
-                    get_str_from_destination(p.destination, str_addr_out);
-                    cout << "  |   Destination: " << str_addr_out << endl;
-                    cout << "  |   Onetime-address: " << enote.core.onetime_address << endl;
-                    cout << "  |   Amount commitment: " << enote.core.amount_commitment << endl;
+                    get_str_from_destination(p.destination, address_version, address_network,  str_addr_out);
+                    ss << "  |   Destination: " << str_addr_out << endl;
+                    ss << "  |   Onetime-address: " << enote.core.onetime_address << endl;
+                    ss << "  |   Amount commitment: " << enote.core.amount_commitment << endl;
 
-                    cout << "  |   Amount: " << p.amount << endl;
-                    cout << "  |   Enote ephemeral private key: "
-                         << epee::string_tools::pod_to_hex(p.enote_ephemeral_privkey) << endl;
-                    // cout << "  |   Partial Memo: " << (p.partial_memo) << endl;
-                    cout << "  |   --- " << endl;
+                    ss << "  |   Amount: " << p.amount << endl;
+                    ss << "  |   Enote ephemeral private key: "
+                       << epee::string_tools::pod_to_hex(p.enote_ephemeral_privkey) << endl;
+                    // ss << "  |   Partial Memo: " << (p.partial_memo) << endl;
+                    ss << "  |   --- " << endl;
                 }
                 for (auto p : tx_record.selfsend_payments)
                 {
-                    cout << "  |   Type: " << sp_jamtis_enote_selfsend_type_to_string(p.type) << endl;
+                    ss << "  |   Type: " << sp_jamtis_enote_selfsend_type_to_string(p.type) << endl;
 
                     // Prover does not need to know onetime-address to create knowledge proofs.
                     // But it is nice to show and include on the proofs to avoid mistakes on both sides.
                     // k_vb is only necessary for selfsend enotes.
                     // Selfsend OTA enotes can be obtained by different show functions.
 
-                    get_str_from_destination(p.destination, str_addr_out);
-                    cout << "  |   Destination: " << str_addr_out << endl;
-                    cout << "  |   Amount: " << p.amount << endl;
-                    cout << "  |   Enote ephemeral private key: "
-                         << epee::string_tools::pod_to_hex(p.enote_ephemeral_privkey) << endl;
-                    // cout << "  |   Partial Memo: " << (np.partial_memo) << endl;
-                    cout << "  |   --- " << endl;
+                    get_str_from_destination(p.destination, address_version, address_network, str_addr_out);
+                    ss << "  |   Destination: " << str_addr_out << endl;
+                    ss << "  |   Amount: " << p.amount << endl;
+                    ss << "  |   Enote ephemeral private key: "
+                       << epee::string_tools::pod_to_hex(p.enote_ephemeral_privkey) << endl;
+                    // ss << "  |   Partial Memo: " << (np.partial_memo) << endl;
+                    ss << "  |   --- " << endl;
                 }
             }
         }
         else
-            cout << "This enote has not been spent yet." << endl;
+            ss << "This enote has not been spent yet." << endl;
     }
 
     // Seraphis enote
@@ -479,63 +500,63 @@ void show_specific_enote(const SpEnoteStore &enote_store,
     {
         // Info from enote
         {
-            cout << "--------------- INFO FROM ENOTE ---------------" << endl;
-            cout << "  |   Type: "
-                 << "Seraphis" << endl;
-            cout << "  |   Jamtis Type: " << sp_jamtis_enote_type_to_string(sp_enote_record.record.type) << endl;
-            cout << "  |   Key image: " << sp_enote_record.record.key_image << endl;
+            ss << "--------------- INFO FROM ENOTE ---------------" << endl;
+            ss << "  |   Type: "
+               << "Seraphis" << endl;
+            ss << "  |   Jamtis Type: " << sp_jamtis_enote_type_to_string(sp_enote_record.record.type) << endl;
+            ss << "  |   Key image: " << sp_enote_record.record.key_image << endl;
 
             // Amount
-            cout << "  |   Amount commitment: " << amount_commitment_ref(sp_enote_record.record.enote) << endl;
-            cout << "  |   Amount: " << sp_enote_record.record.amount << endl;
-            cout << "  |   Amount blinding factor: " << sp_enote_record.record.amount_blinding_factor << endl;
+            ss << "  |   Amount commitment: " << amount_commitment_ref(sp_enote_record.record.enote) << endl;
+            ss << "  |   Amount: " << sp_enote_record.record.amount << endl;
+            ss << "  |   Amount blinding factor: " << sp_enote_record.record.amount_blinding_factor << endl;
             // Onetime-Address
-            cout << "  |   Onetime-Address: " << onetime_address_ref(sp_enote_record.record.enote) << endl;
-            cout << "  |   Address index: " << epee::string_tools::pod_to_hex(sp_enote_record.record.address_index)
-                 << endl;
-            cout << "  |   Enote ephemeral public key: "
-                 << epee::string_tools::pod_to_hex(sp_enote_record.record.enote_ephemeral_pubkey) << endl;
-            cout << "  |   Enote view extension g (private key): " << sp_enote_record.record.enote_view_extension_g
-                 << endl;
-            cout << "  |   Enote view extension u (private key): " << sp_enote_record.record.enote_view_extension_u
-                 << endl;
-            cout << "  |   Enote view extension x (private key): " << sp_enote_record.record.enote_view_extension_x
-                 << endl;
-            cout << "  |   Input context: " << sp_enote_record.record.input_context << endl;
+            ss << "  |   Onetime-Address: " << onetime_address_ref(sp_enote_record.record.enote) << endl;
+            ss << "  |   Address index: " << epee::string_tools::pod_to_hex(sp_enote_record.record.address_index)
+               << endl;
+            ss << "  |   Enote ephemeral public key: "
+               << epee::string_tools::pod_to_hex(sp_enote_record.record.enote_ephemeral_pubkey) << endl;
+            ss << "  |   Enote view extension g (private key): " << sp_enote_record.record.enote_view_extension_g
+               << endl;
+            ss << "  |   Enote view extension u (private key): " << sp_enote_record.record.enote_view_extension_u
+               << endl;
+            ss << "  |   Enote view extension x (private key): " << sp_enote_record.record.enote_view_extension_x
+               << endl;
+            ss << "  |   Input context: " << sp_enote_record.record.input_context << endl;
         }
 
         // Info from origin_context
         {
-            cout << "--------------- ORIGIN CONTEXT ---------------" << endl;
-            cout << "  |   Timestamp origin: "
-                 << tools::get_human_readable_timestamp(sp_enote_record.origin_context.block_timestamp);
-            cout << "  |   Block height origin: " << sp_enote_record.origin_context.block_index;
-            cout << "  |   Tx id origin: " << sp_enote_record.origin_context.transaction_id << endl;
-            cout << "  |   Origin Status: " << sp_origin_status_to_string(sp_enote_record.origin_context.origin_status)
-                 << endl;
-            cout << "  |   Enote Ledge Index: " << sp_enote_record.origin_context.enote_ledger_index << endl;
-            cout << "  |   Enote Transaction Index: " << sp_enote_record.origin_context.enote_tx_index << endl;
+            ss << "--------------- ORIGIN CONTEXT ---------------" << endl;
+            ss << "  |   Timestamp origin: "
+               << tools::get_human_readable_timestamp(sp_enote_record.origin_context.block_timestamp);
+            ss << "  |   Block height origin: " << sp_enote_record.origin_context.block_index;
+            ss << "  |   Tx id origin: " << sp_enote_record.origin_context.transaction_id << endl;
+            ss << "  |   Origin Status: " << sp_origin_status_to_string(sp_enote_record.origin_context.origin_status)
+               << endl;
+            ss << "  |   Enote Ledge Index: " << sp_enote_record.origin_context.enote_ledger_index << endl;
+            ss << "  |   Enote Transaction Index: " << sp_enote_record.origin_context.enote_tx_index << endl;
             // TODO
-            // cout << "  |   Memo: " << sp_enote_record.origin_context.memo << endl;
+            // ss << "  |   Memo: " << sp_enote_record.origin_context.memo << endl;
         }
         // Info from spent_context if spent
         if (sp_enote_record.spent_context.spent_status != sp::SpEnoteSpentStatus::UNSPENT)
         {
-            cout << "--------------- SPENT CONTEXT ---------------" << endl;
-            cout << "  |   Spent status: " << sp_spent_status_to_string(sp_enote_record.spent_context.spent_status)
-                 << endl;
-            cout << "  |   Timestamp spent: "
-                 << tools::get_human_readable_timestamp(sp_enote_record.spent_context.block_timestamp) << endl;
-            cout << "  |   Block height spent: " << sp_enote_record.spent_context.block_index << endl;
-            cout << "  |   Tx id spent: " << sp_enote_record.spent_context.transaction_id << endl;
+            ss << "--------------- SPENT CONTEXT ---------------" << endl;
+            ss << "  |   Spent status: " << sp_spent_status_to_string(sp_enote_record.spent_context.spent_status)
+               << endl;
+            ss << "  |   Timestamp spent: "
+               << tools::get_human_readable_timestamp(sp_enote_record.spent_context.block_timestamp) << endl;
+            ss << "  |   Block height spent: " << sp_enote_record.spent_context.block_index << endl;
+            ss << "  |   Tx id spent: " << sp_enote_record.spent_context.transaction_id << endl;
 
             // Get transaction record
             TransactionRecordV1 tx_record;
             if (transaction_history.try_get_tx_record_from_txid(
                     sp_enote_record.spent_context.transaction_id, tx_record))
             {
-                cout << "--------------- SPENT CONTEXT - DETAILED ---------------" << endl;
-                cout << "This enote was consumed to send funds to the following addresses: " << endl;
+                ss << "--------------- SPENT CONTEXT - DETAILED ---------------" << endl;
+                ss << "This enote was consumed to send funds to the following addresses: " << endl;
                 string str_addr_out;
                 for (auto p : tx_record.normal_payments)
                 {
@@ -550,34 +571,37 @@ void show_specific_enote(const SpEnoteStore &enote_store,
                     SpEnoteV1 enote;
                     get_enote_v1(output_proposal, enote);
 
-                    get_str_from_destination(p.destination, str_addr_out);
-                    cout << "  |   Destination: " << str_addr_out << endl;
-                    cout << "  |   Onetime-address: " << enote.core.onetime_address << endl;
-                    cout << "  |   Amount commitment: " << enote.core.amount_commitment << endl;
-                    cout << "  |   Amount: " << p.amount << endl;
-                    cout << "  |   Enote ephemeral private key: "
-                         << epee::string_tools::pod_to_hex(p.enote_ephemeral_privkey) << endl;
-                    cout << "  |   --- " << endl;
-                    // cout << "  |   Partial Memo: " << (p.partial_memo) << endl;
+                    get_str_from_destination(p.destination, address_version, address_network, str_addr_out);
+                    ss << "  |   Destination: " << str_addr_out << endl;
+                    ss << "  |   Onetime-address: " << enote.core.onetime_address << endl;
+                    ss << "  |   Amount commitment: " << enote.core.amount_commitment << endl;
+                    ss << "  |   Amount: " << p.amount << endl;
+                    ss << "  |   Enote ephemeral private key: "
+                       << epee::string_tools::pod_to_hex(p.enote_ephemeral_privkey) << endl;
+                    ss << "  |   --- " << endl;
+                    // ss << "  |   Partial Memo: " << (p.partial_memo) << endl;
                 }
                 for (auto p : tx_record.selfsend_payments)
                 {
-                    cout << "  |   Type: " << sp_jamtis_enote_selfsend_type_to_string(p.type) << endl;
+                    ss << "  |   Type: " << sp_jamtis_enote_selfsend_type_to_string(p.type) << endl;
                     // Prover does not need to know onetime-address to create knowledge proofs.
                     // But it is nice to show and include on the proofs to avoid mistakes on both sides.
                     // k_vb is only necessary for selfsend enotes.
                     // Selfsend OTA enotes can be obtained by different show functions.
-                    get_str_from_destination(p.destination, str_addr_out);
-                    cout << "  |   Destination: " << str_addr_out << endl;
-                    cout << "  |   Amount: " << p.amount << endl;
-                    cout << "  |   Enote ephemeral private key: "
-                         << epee::string_tools::pod_to_hex(p.enote_ephemeral_privkey) << endl;
-                    cout << "  |   --- " << endl;
-                    // cout << "  |   Partial Memo: " << (np.partial_memo) << endl;
+                    get_str_from_destination(p.destination, address_version, address_network, str_addr_out);
+                    ss << "  |   Destination: " << str_addr_out << endl;
+                    ss << "  |   Amount: " << p.amount << endl;
+                    ss << "  |   Enote ephemeral private key: "
+                       << epee::string_tools::pod_to_hex(p.enote_ephemeral_privkey) << endl;
+                    ss << "  |   --- " << endl;
+                    // ss << "  |   Partial Memo: " << (np.partial_memo) << endl;
                 }
             }
         }
         else
-            cout << "This enote has not been spent yet." << endl;
+            ss << "This enote has not been spent yet." << endl;
     }
+
+    // TODO: change output of string
+    cout << ss.str();
 }

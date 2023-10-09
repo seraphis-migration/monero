@@ -268,8 +268,6 @@ TEST(seraphis_wallet_knowledge_proofs, address_ownership_proof)
     boost::optional<std::string> str_proof;
 
     // 5a. generate and verify proof on K1 -> bool_Ks_K1 = false
-    // str_proof = tx_history_A.get_address_ownership_proof(j, user_keys_A.k_m, user_keys_A.k_vb, false,
-    // message_in,filename);
     str_proof = get_address_ownership_proof(j, user_keys_A.k_m, user_keys_A.k_vb, false, message_in, filename);
 
     CHECK_AND_ASSERT_THROW_MES(read_address_ownership_proof(boost::none, str_proof, message_in, destination.addr_K1),
@@ -360,10 +358,8 @@ TEST(seraphis_wallet_knowledge_proofs, enote_ownership_proof_sender)
     for (const auto &enote_info : enote_out_info)
     {
         str_proof = get_enote_ownership_proof_sender(tx_id_proof,
-            onetime_address_ref(enote_info.enote),
-            enote_info.destination,
             user_keys_A.k_vb,
-            enote_info.selfsend,
+            enote_info,
             tx_history_A,
             filename);
 
@@ -410,7 +406,7 @@ TEST(seraphis_wallet_knowledge_proofs, enote_ownership_proof_receiver)
                                        str_proof,
                                        amount_commitment_ref(enote_record.enote),
                                        onetime_address_ref(enote_record.enote)),
-            "Verification of enote_sent_proof failed.");
+            "Verification of enote_ownership_proof_receiver failed.");
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -543,13 +539,8 @@ TEST(seraphis_wallet_knowledge_proofs, enote_sent_proof)
     for (auto enote_info : enote_out_info)
     {
         str_proof = get_enote_sent_proof(tx_id_proof,
-            onetime_address_ref(enote_info.enote),
-            enote_info.destination,
             user_keys_A.k_vb,
-            enote_info.selfsend,
-            enote_info.amount,
-            enote_info.amount_blinding_factor,
-            amount_commitment_ref(enote_info.enote),
+            enote_info,
             tx_history_A,
             filename);
 

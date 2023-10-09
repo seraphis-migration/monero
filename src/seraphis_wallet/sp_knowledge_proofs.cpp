@@ -227,29 +227,26 @@ std::string get_address_index_proof(const rct::key &jamtis_spend_pubkey,
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_make_enote_ownership_proof_sender(const rct::key txid,
-    const rct::key &onetime_address,
-    const JamtisDestinationV1 &dest,
     const crypto::secret_key &k_vb,
-    const bool selfsend,
+    const EnoteInfo &enote_info,
     const SpTransactionHistory &transaction_history,
     EnoteOwnershipProofV1 &proof)
 {
     // get tx info from this enote
-    // const auto tx_record = transaction_history.get_tx_store().tx_records.find(txid);
     TransactionRecordV1 tx_record;
     if (transaction_history.try_get_tx_record_from_txid(txid, tx_record))
     {
-        if (selfsend)
+        if (enote_info.selfsend)
         {
             JamtisPaymentProposalSelfSendV1 payment_proposal{};
             for (const auto &rec : tx_record.selfsend_payments)
             {
-                if (rec.destination == dest)
+                if (rec.destination == enote_info.destination)
                     payment_proposal = rec;
             }
 
             // check if payment proposal is not empty
-            if (!(payment_proposal.destination == dest))
+            if (!(payment_proposal.destination == enote_info.destination))
                 return false;
 
             rct::key input_context;
@@ -262,11 +259,11 @@ bool try_make_enote_ownership_proof_sender(const rct::key txid,
             get_enote_v1(output_proposal, enote);
 
             // check if onetime_address corresponds to enote onetime_address
-            if (!(enote.core.onetime_address == onetime_address))
+            if (!(enote.core.onetime_address == onetime_address_ref(enote_info.enote)))
                 return false;
 
             make_enote_ownership_proof_v1_sender_selfsend(output_proposal.enote_ephemeral_pubkey,
-                dest.addr_K1,
+                enote_info.destination.addr_K1,
                 input_context,
                 k_vb,
                 payment_proposal.type,
@@ -279,12 +276,12 @@ bool try_make_enote_ownership_proof_sender(const rct::key txid,
             JamtisPaymentProposalV1 payment_proposal{};
             for (const auto &rec : tx_record.normal_payments)
             {
-                if (rec.destination == dest)
+                if (rec.destination == enote_info.destination)
                     payment_proposal = rec;
             }
 
             // check if payment proposal is not empty
-            if (!(payment_proposal.destination == dest))
+            if (!(payment_proposal.destination == enote_info.destination))
                 return false;
 
             rct::key input_context;
@@ -297,11 +294,11 @@ bool try_make_enote_ownership_proof_sender(const rct::key txid,
             get_enote_v1(output_proposal, enote);
 
             // check if onetime_address corresponds to enote onetime_address
-            if (!(enote.core.onetime_address == onetime_address))
+            if (!(enote.core.onetime_address == onetime_address_ref(enote_info.enote)))
                 return false;
 
             make_enote_ownership_proof_v1_sender_plain(payment_proposal.enote_ephemeral_privkey,
-                dest,
+                enote_info.destination,
                 input_context,
                 enote.core.amount_commitment,
                 enote.core.onetime_address,
@@ -310,24 +307,22 @@ bool try_make_enote_ownership_proof_sender(const rct::key txid,
     }
 
     // Check if proof is not empty
-    if (!(proof.Ko == onetime_address))
+    if (!(proof.Ko == onetime_address_ref(enote_info.enote)))
         return false;
 
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::string get_enote_ownership_proof_sender(const rct::key txid,
-    const rct::key &onetime_address,
-    const JamtisDestinationV1 &dest,
     const crypto::secret_key &k_vb,
-    const bool selfsend,
+    const EnoteInfo &enote_info,
     const SpTransactionHistory &transaction_history,
     const boost::optional<std::string> filename)
 {
     // 1. make proof
     EnoteOwnershipProofV1 proof;
     CHECK_AND_ASSERT_THROW_MES(
-        try_make_enote_ownership_proof_sender(txid, onetime_address, dest, k_vb, selfsend, transaction_history, proof),
+        try_make_enote_ownership_proof_sender(txid, k_vb, enote_info, transaction_history, proof),
         "get_enote_ownership_proof_sender: failed to make enote ownership proof "
         "sender.");
 
@@ -433,13 +428,8 @@ std::string get_enote_key_image_proof(const SpEnoteStore &enote_store,
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::string get_enote_sent_proof(const rct::key txid,
-    const rct::key &onetime_address,
-    const JamtisDestinationV1 &dest,
     const crypto::secret_key &k_vb,
-    const bool selfsend,
-    const rct::xmr_amount &amount,
-    const crypto::secret_key &mask,
-    const rct::key &commitment,
+    const EnoteInfo &enote_info,
     const SpTransactionHistory &transaction_history,
     const boost::optional<std::string> filename)
 {
@@ -449,10 +439,10 @@ std::string get_enote_sent_proof(const rct::key txid,
     EnoteSentProofV1 enote_sent_proof{};
 
     // 2. make proofs
-    CHECK_AND_ASSERT_THROW_MES(try_make_amount_proof(amount, mask, commitment, enote_amount_proof),
+    CHECK_AND_ASSERT_THROW_MES(try_make_amount_proof(enote_info.amount, enote_info.amount_blinding_factor, amount_commitment_ref(enote_info.enote), enote_amount_proof),
         "get_enote_sent_proof: failed to make amount proof.");
     CHECK_AND_ASSERT_THROW_MES(
-        try_make_enote_ownership_proof_sender(txid, onetime_address, dest, k_vb, selfsend, transaction_history, enote_onwnership_proof),
+        try_make_enote_ownership_proof_sender(txid, k_vb, enote_info, transaction_history, enote_onwnership_proof),
         "get_enote_sent_proof: failed to make ownership proof.");
 
     make_enote_sent_proof_v1(enote_onwnership_proof, enote_amount_proof, enote_sent_proof);

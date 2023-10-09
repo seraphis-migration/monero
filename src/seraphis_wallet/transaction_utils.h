@@ -26,12 +26,12 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// ********* TEMPORARY FILE *********
-// Jamtis checksum will probably change its place
 
 #pragma once
 
 // local headers
+#include <cstdint>
+#include <string>
 #include "ringct/rctTypes.h"
 #include "seraphis_core/jamtis_destination.h"
 
@@ -44,10 +44,26 @@
 using namespace sp::jamtis;
 using namespace sp;
 
-// These should not be here -> src/common/checksum_jamtis is a better place
-std::string jamtis_add_checksum(const std::string &addr_without_checksum);
-bool jamtis_verify_checksum(const std::string &data);
-int64_t jamtis_polymod(const std::vector<int> &data);
+enum class JamtisAddressNetwork
+{
+    MAINNET = 0,
+    TESTNET = 1,
+    STAGENET = 2,
+    FAKECHAIN = 3,
+    UNDEFINED = 255
+};
+
+enum class JamtisAddressVersion
+{
+    V0 = 0,
+    V1 = 1,
+};
+
+
+void get_str_from_destination(const JamtisDestinationV1 &dest,
+    const JamtisAddressVersion address_version,
+    const JamtisAddressNetwork address_network,
+    std::string &address_out);
+
 
 void get_destination_from_str(const std::string &address, JamtisDestinationV1 &dest_out);
-void get_str_from_destination(const JamtisDestinationV1 &dest, std::string &address_out);

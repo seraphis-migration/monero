@@ -119,38 +119,30 @@ std::string get_address_index_proof(const rct::key &jamtis_spend_pubkey,
 /**
 * brief: try make enote_ownership_proof_sender
 * param: txid - transaction id
-* param: onetime_address - onetime_address of enote
-* param: dest - jamtis destination
 * param: k_vb - private view_balance key
-* param: selfsend - true if selfsend
+* param: enote_info - struct containing enote info
 * param: transaction_history - transaction_history component
 * outparam: - enote_ownership_proof out
 * return: true if succeeds making proofs
 */
 bool try_make_enote_ownership_proof_sender(const rct::key txid,
-    const rct::key &onetime_address,
-    const JamtisDestinationV1 &dest,
     const crypto::secret_key &k_vb,
-    const bool selfsend,
+    const EnoteInfo &enote_info,
     const SpTransactionHistory &transaction_history,
     EnoteOwnershipProofV1 &proof);
 
 /**
 * brief: get enote_ownership_proof_sender
 * param: txid - transaction id
-* param: onetime_address - onetime_address of enote
-* param: dest - jamtis destination
 * param: k_vb - private view_balance key
-* param: selfsend - true if selfsend
+* param: enote_info - struct containing enote info
 * param: transaction_history - transaction_history component
 * param: filename - filename to save proof
 * return: string with base58 encoded proof
 */
 std::string get_enote_ownership_proof_sender(const rct::key txid,
-    const rct::key &onetime_address,
-    const JamtisDestinationV1 &dest,
     const crypto::secret_key &k_vb,
-    const bool selfsend,
+    const EnoteInfo &enote_info,
     const SpTransactionHistory &transaction_history,
     const boost::optional<std::string> filename);
 
@@ -211,25 +203,15 @@ std::string get_enote_key_image_proof(const SpEnoteStore &enote_store,
 /**
 * brief: get enote_sent_proof 
 * param: txid - transaction id
-* param: onetime_address - onetime_address of enote
-* param: dest - jamtis destination
 * param: k_vb - private view_balance key
-* param: selfsend - true if selfsend
-* param: amount - amount of enote
-* param: mask - mask of commitment
-* param: commitment - commitment
+* param: enote_info - struct containing enote info
 * param: transaction_history - transaction_history component
 * param: filename - filename to save proof
 * return: string with base58 encoded proof
 */
 std::string get_enote_sent_proof(const rct::key txid,
-    const rct::key &onetime_address,
-    const JamtisDestinationV1 &dest,
     const crypto::secret_key &k_vb,
-    const bool selfsend,
-    const rct::xmr_amount &amount,
-    const crypto::secret_key &mask,
-    const rct::key &commitment,
+    const EnoteInfo &enote_info,
     const SpTransactionHistory &transaction_history,
     const boost::optional<std::string> filename);
 

@@ -33,6 +33,7 @@
 #include "crypto/crypto.h"
 #include "seraphis_impl/enote_store.h"
 #include "seraphis_main/contextual_enote_record_types.h"
+#include "seraphis_wallet/transaction_utils.h"
 #include "transaction_history.h"
 
 // third party headers
@@ -95,4 +96,6 @@ void show_enotes(const std::vector<ContextualRecordVariant> &vec_enote_records);
 // TEMPORARY
 void show_specific_enote(const SpEnoteStore &enote_store,
     const SpTransactionHistory &transaction_history,
-    const crypto::key_image &key_image);
+    const crypto::key_image &key_image,
+    const JamtisAddressVersion address_version,
+    const JamtisAddressNetwork address_network);
