@@ -56,6 +56,11 @@ namespace sp
 {
 namespace serialization
 {
+/// serializable jamtis::address_index_t
+struct ser_address_index_t final
+{
+    unsigned char bytes[sizeof(jamtis::address_index_t)];
+};
 
 /// serializable jamtis::address_tag_t
 struct ser_address_tag_t final
@@ -433,10 +438,53 @@ struct ser_JamtisDestinationV1 final
     END_SERIALIZE()
 };
 
+/// serializable JamtisPaymentProposalV1
+struct ser_JamtisPaymentProposalV1 final
+{
+    /// destination address
+    ser_JamtisDestinationV1 destination;
+    /// amount
+    rct::xmr_amount amount;
+    /// enote ephemeral private key
+    crypto::x25519_scalar enote_ephemeral_privkey;
+    /// memo elements
+    std::vector<unsigned char> partial_memo;
+
+    BEGIN_SERIALIZE()
+        FIELD(destination)
+        FIELD(amount)
+        FIELD(enote_ephemeral_privkey)
+        FIELD(partial_memo)
+    END_SERIALIZE()
+};
+
+/// serializable JamtisPaymentProposalV1
+struct ser_JamtisPaymentProposalSelfSendV1 final
+{
+    /// destination address
+    ser_JamtisDestinationV1 destination;
+    /// amount
+    rct::xmr_amount amount;
+    /// selfspend type
+    unsigned char type;
+    /// enote ephemeral private key
+    crypto::x25519_scalar enote_ephemeral_privkey;
+    /// memo elements
+    std::vector<unsigned char> partial_memo;
+
+    BEGIN_SERIALIZE()
+        FIELD(destination)
+        FIELD(amount)
+        FIELD(type)
+        FIELD(enote_ephemeral_privkey)
+        FIELD(partial_memo)
+    END_SERIALIZE()
+};
 
 } //namespace serialization
 } //namespace sp
 
+BLOB_SERIALIZER(sp::serialization::ser_address_index_t);
 BLOB_SERIALIZER(sp::serialization::ser_address_tag_t);
 BLOB_SERIALIZER(sp::serialization::ser_encrypted_address_tag_t);
 BLOB_SERIALIZER(sp::serialization::ser_encoded_amount_t);

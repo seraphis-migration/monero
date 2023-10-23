@@ -37,6 +37,8 @@
 #include "seraphis_core/binned_reference_set.h"
 #include "seraphis_core/discretized_fee.h"
 #include "seraphis_core/jamtis_destination.h"
+#include "seraphis_core/jamtis_payment_proposal.h"
+#include "seraphis_core/jamtis_support_types.h"
 #include "seraphis_crypto/bulletproofs_plus2.h"
 #include "seraphis_crypto/grootle.h"
 #include "seraphis_crypto/sp_composition_proof.h"
@@ -221,6 +223,23 @@ void make_serializable_grootle_proof(const GrootleProof &grootle, ser_GrootlePro
     serializable_grootle_out.X  = grootle.X;
     serializable_grootle_out.zA = grootle.zA;
     serializable_grootle_out.z  = grootle.z;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_serializable_jamtis_payment_proposal_v1(const jamtis::JamtisPaymentProposalV1 &payment, ser_JamtisPaymentProposalV1 &serializable_payment_out)
+{
+    make_serializable_sp_destination_v1(payment.destination, serializable_payment_out.destination);
+    serializable_payment_out.amount = payment.amount;
+    serializable_payment_out.enote_ephemeral_privkey = payment.enote_ephemeral_privkey;
+    serializable_payment_out.partial_memo = payment.partial_memo;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void make_serializable_jamtis_payment_proposal_selfsend_v1(const jamtis::JamtisPaymentProposalSelfSendV1 &payment, ser_JamtisPaymentProposalSelfSendV1 &serializable_payment_out)
+{
+    make_serializable_sp_destination_v1(payment.destination, serializable_payment_out.destination);
+    serializable_payment_out.amount = payment.amount;
+    serializable_payment_out.type = static_cast<unsigned char>(payment.type);
+    serializable_payment_out.enote_ephemeral_privkey = payment.enote_ephemeral_privkey;
+    serializable_payment_out.partial_memo = payment.partial_memo;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_serializable_sp_composition_proof(const SpCompositionProof &proof,
@@ -433,6 +452,23 @@ void recover_grootle_proof(ser_GrootleProof &serializable_grootle_in, GrootlePro
     grootle_out.X  = std::move(serializable_grootle_in.X);
     grootle_out.zA = serializable_grootle_in.zA;
     grootle_out.z  = serializable_grootle_in.z;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void recover_jamtis_payment_proposal_v1(const ser_JamtisPaymentProposalV1 &serializable_payment, jamtis::JamtisPaymentProposalV1 &payment_out)
+{
+    recover_sp_destination_v1(serializable_payment.destination, payment_out.destination);
+    payment_out.amount = serializable_payment.amount;
+    payment_out.enote_ephemeral_privkey = serializable_payment.enote_ephemeral_privkey;
+    payment_out.partial_memo = serializable_payment.partial_memo;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void recover_jamtis_payment_proposal_selfsend_v1(const ser_JamtisPaymentProposalSelfSendV1 &serializable_payment, jamtis::JamtisPaymentProposalSelfSendV1 &payment_out)
+{
+    recover_sp_destination_v1(serializable_payment.destination, payment_out.destination);
+    payment_out.amount = serializable_payment.amount;
+    payment_out.type = static_cast<jamtis::JamtisSelfSendType>(serializable_payment.type);
+    payment_out.enote_ephemeral_privkey = serializable_payment.enote_ephemeral_privkey;
+    payment_out.partial_memo = serializable_payment.partial_memo;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void recover_sp_composition_proof(const ser_SpCompositionProof &serializable_proof, SpCompositionProof &proof_out)
@@ -701,5 +737,6 @@ void recover_sp_destination_v1(const ser_JamtisDestinationV1 &serializable_desti
         sizeof(serializable_destination.addr_tag));
 }
 //-------------------------------------------------------------------------------------------------------------------
+
 } //namespace serialization
 } //namespace sp
