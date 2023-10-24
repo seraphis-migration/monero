@@ -73,10 +73,12 @@ inline auto compare_func(ComparisonOpT comparison_op_func)
 }
 /// test if a container is sorted and unique according to a comparison criteria (defaults to operator<)
 /// NOTE: ComparisonOpT must establish 'strict weak ordering' https://en.cppreference.com/w/cpp/named_req/Compare
+/// NOTE: T::const_iterator must satisfy LegacyForwardIterator https://en.cppreference.com/w/cpp/named_req/ForwardIterator
 template <typename T, typename ComparisonOpT = std::less<typename T::value_type>>
 bool is_sorted_and_unique(const T &container, ComparisonOpT comparison_op = ComparisonOpT{})
 {
     using ValueT = typename T::value_type;
+    using ConstIt = typename T::const_iterator;
     static_assert(
             std::is_same<
                     bool,
@@ -90,17 +92,20 @@ bool is_sorted_and_unique(const T &container, ComparisonOpT comparison_op = Comp
             "invalid callable - expected callable in form bool(ValueT, ValueT)"
         );
 
-    if (!std::is_sorted(container.begin(), container.end(), comparison_op))
-        return false;
+    const ConstIt end = container.cend();
 
-    if (std::adjacent_find(container.begin(),
-                container.end(),
-                [comparison_op = std::move(comparison_op)](const ValueT &a, const ValueT &b) -> bool
-                {
-                    return !comparison_op(a, b) && !comparison_op(b, a);
-                })
-            != container.end())
-        return false;
+    ConstIt it_a = container.cbegin();
+    if (it_a == end)
+        return true;
+
+    ConstIt it_b = it_a;
+    it_b++;
+
+    for (; it_b != end; it_a = it_b++)
+    {
+        if (!comparison_op(*it_a, *it_b))
+            return false;
+    }
 
     return true;
 }
