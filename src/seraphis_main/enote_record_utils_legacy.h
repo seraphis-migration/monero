@@ -37,6 +37,7 @@
 #include "enote_record_types.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_core/legacy_enote_types.h"
+#include "cryptonote_basic/cryptonote_basic.h"
 
 //third party headers
 
@@ -142,5 +143,11 @@ void get_legacy_enote_record(const LegacyIntermediateEnoteRecord &intermediate_r
     const crypto::secret_key &legacy_spend_privkey,
     hw::device &hwdev,
     LegacyEnoteRecord &record_out);
+/**
+* brief: legacy_outputs_to_enotes - convert legacy tx's "outputs" to Seraphis lib compatible "enotes"
+* param: tx -
+* outparam: enotes_out -
+*/
+void legacy_outputs_to_enotes(const cryptonote::transaction &tx, std::vector<LegacyEnoteVariant> &enotes_out);
 
 } //namespace sp

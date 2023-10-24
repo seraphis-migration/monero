@@ -36,6 +36,7 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
+#include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_basic/subaddress_index.h"
 #include "device/device.hpp"
 #include "enote_record_types.h"
@@ -366,6 +367,197 @@ bool try_get_legacy_basic_enote_record(const LegacyEnoteVariant &enote,
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool is_encoded_amount_v1(const cryptonote::transaction &tx)
+{
+    return tx.rct_signatures.type == rct::RCTTypeFull || tx.rct_signatures.type == rct::RCTTypeSimple ||
+        tx.rct_signatures.type == rct::RCTTypeBulletproof;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool is_encoded_amount_v2(const cryptonote::transaction &tx)
+{
+    return tx.rct_signatures.type == rct::RCTTypeBulletproof2 || tx.rct_signatures.type == rct::RCTTypeCLSAG ||
+        tx.rct_signatures.type == rct::RCTTypeBulletproofPlus;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool is_legacy_enote_v1(const cryptonote::transaction &tx, const cryptonote::tx_out &out)
+{
+    // Plaintext amount, no view tag
+    return (tx.version == 1 || (tx.version == 2 && cryptonote::is_coinbase(tx))) &&
+        out.target.type() == typeid(cryptonote::txout_to_key);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool is_legacy_enote_v2(const cryptonote::transaction &tx, const cryptonote::tx_out &out)
+{
+    // Encrypted amount v1, no view tag
+    return tx.version == 2 && !cryptonote::is_coinbase(tx) && is_encoded_amount_v1(tx) &&
+        out.target.type() == typeid(cryptonote::txout_to_key);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool is_legacy_enote_v3(const cryptonote::transaction &tx, const cryptonote::tx_out &out)
+{
+    // Encrypted amount v2, no view tag
+    return tx.version == 2 && !cryptonote::is_coinbase(tx) && is_encoded_amount_v2(tx) &&
+        out.target.type() == typeid(cryptonote::txout_to_key);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool is_legacy_enote_v4(const cryptonote::transaction &tx, const cryptonote::tx_out &out)
+{
+    // Plaintext amount, view tag
+    return (tx.version == 1 || (tx.version == 2 && cryptonote::is_coinbase(tx))) &&
+        out.target.type() == typeid(cryptonote::txout_to_tagged_key);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool is_legacy_enote_v5(const cryptonote::transaction &tx, const cryptonote::tx_out &out)
+{
+    // Encrypted amount v2, view tag
+    return tx.version == 2 && !cryptonote::is_coinbase(tx) && is_encoded_amount_v2(tx) &&
+        out.target.type() == typeid(cryptonote::txout_to_tagged_key);
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool try_out_to_legacy_enote_v1(const cryptonote::transaction &tx,
+    const size_t output_index,
+    sp::LegacyEnoteVariant &enote_out)
+{
+    if (output_index >= tx.vout.size())
+        return false;
+    if (!is_legacy_enote_v1(tx, tx.vout[output_index]))
+        return false;
+
+    sp::LegacyEnoteV1 enote_v1;
+
+    /// Ko
+    crypto::public_key out_pub_key;
+    cryptonote::get_output_public_key(tx.vout[output_index], out_pub_key);
+    enote_v1.onetime_address = rct::pk2rct(out_pub_key);
+    /// a
+    enote_v1.amount = tx.vout[output_index].amount;
+
+    enote_out = std::move(enote_v1);
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool try_out_to_legacy_enote_v2(const cryptonote::transaction &tx,
+    const size_t output_index,
+    sp::LegacyEnoteVariant &enote_out)
+{
+    if (output_index >= tx.vout.size())
+        return false;
+     if (!is_legacy_enote_v2(tx, tx.vout[output_index]))
+        return false;
+    if (output_index >= tx.rct_signatures.outPk.size() || output_index >= tx.rct_signatures.ecdhInfo.size())
+        return false;
+
+    sp::LegacyEnoteV2 enote_v2;
+
+    /// Ko
+    crypto::public_key out_pub_key;
+    cryptonote::get_output_public_key(tx.vout[output_index], out_pub_key);
+    enote_v2.onetime_address = rct::pk2rct(out_pub_key);
+    /// C
+    enote_v2.amount_commitment = tx.rct_signatures.outPk[output_index].mask;
+    /// enc(x)
+    enote_v2.encoded_amount_blinding_factor = tx.rct_signatures.ecdhInfo[output_index].mask;
+    /// enc(a)
+    enote_v2.encoded_amount = tx.rct_signatures.ecdhInfo[output_index].amount;
+
+    enote_out = std::move(enote_v2);
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool try_out_to_legacy_enote_v3(const cryptonote::transaction &tx,
+    const size_t output_index,
+    sp::LegacyEnoteVariant &enote_out)
+{
+    if (output_index >= tx.vout.size())
+        return false;
+    if (!is_legacy_enote_v3(tx, tx.vout[output_index]))
+        return false;
+    if (output_index >= tx.rct_signatures.outPk.size() || output_index >= tx.rct_signatures.ecdhInfo.size())
+        return false;
+
+    sp::LegacyEnoteV3 enote_v3;
+
+    /// Ko
+    crypto::public_key out_pub_key;
+    cryptonote::get_output_public_key(tx.vout[output_index], out_pub_key);
+    enote_v3.onetime_address = rct::pk2rct(out_pub_key);
+    /// C
+    enote_v3.amount_commitment = tx.rct_signatures.outPk[output_index].mask;
+    /// enc(a)
+    constexpr size_t byte_size = sizeof(enote_v3.encoded_amount);
+    static_assert(byte_size <= sizeof(tx.rct_signatures.ecdhInfo[output_index].amount.bytes));
+    memcpy(&enote_v3.encoded_amount, &tx.rct_signatures.ecdhInfo[output_index].amount.bytes, byte_size);
+
+    enote_out = std::move(enote_v3);
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool try_out_to_legacy_enote_v4(const cryptonote::transaction &tx,
+    const size_t output_index,
+    sp::LegacyEnoteVariant &enote_out)
+{
+    if (output_index >= tx.vout.size())
+        return false;
+    if (!is_legacy_enote_v4(tx, tx.vout[output_index]))
+        return false;
+
+    sp::LegacyEnoteV4 enote_v4;
+
+    /// Ko
+    crypto::public_key out_pub_key;
+    cryptonote::get_output_public_key(tx.vout[output_index], out_pub_key);
+    enote_v4.onetime_address = rct::pk2rct(out_pub_key);
+    /// a
+    enote_v4.amount = tx.vout[output_index].amount;
+    /// view_tag
+    enote_v4.view_tag = *cryptonote::get_output_view_tag(tx.vout[output_index]);
+
+    enote_out = std::move(enote_v4);
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+static bool try_out_to_legacy_enote_v5(const cryptonote::transaction &tx,
+    const size_t output_index,
+    LegacyEnoteVariant &enote_out)
+{
+    if (output_index >= tx.vout.size())
+        return false;
+    if (!is_legacy_enote_v5(tx, tx.vout[output_index]))
+        return false;
+    if (output_index >= tx.rct_signatures.outPk.size() || output_index >= tx.rct_signatures.ecdhInfo.size())
+        return false;
+
+    sp::LegacyEnoteV5 enote_v5;
+
+    /// Ko
+    crypto::public_key out_pub_key;
+    cryptonote::get_output_public_key(tx.vout[output_index], out_pub_key);
+    enote_v5.onetime_address = rct::pk2rct(out_pub_key);
+    /// C
+    enote_v5.amount_commitment = tx.rct_signatures.outPk[output_index].mask;
+    /// enc(a)
+    constexpr size_t byte_size = sizeof(enote_v5.encoded_amount);
+    static_assert(byte_size <= sizeof(tx.rct_signatures.ecdhInfo[output_index].amount.bytes));
+    memcpy(&enote_v5.encoded_amount, &tx.rct_signatures.ecdhInfo[output_index].amount.bytes, byte_size);
+    /// view_tag
+    enote_v5.view_tag = *cryptonote::get_output_view_tag(tx.vout[output_index]);
+
+    enote_out = std::move(enote_v5);
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
 bool try_get_legacy_basic_enote_record(const LegacyEnoteVariant &enote,
     const rct::key &enote_ephemeral_pubkey,
     const std::uint64_t tx_output_index,
@@ -552,6 +744,25 @@ void get_legacy_enote_record(const LegacyIntermediateEnoteRecord &intermediate_r
 
     // 2. assemble data
     get_legacy_enote_record(intermediate_record, key_image, record_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void legacy_outputs_to_enotes(const cryptonote::transaction &tx, std::vector<LegacyEnoteVariant> &enotes_out)
+{
+    enotes_out.clear();
+    enotes_out.reserve(tx.vout.size());
+
+    for (size_t i = 0; i < tx.vout.size(); ++i)
+    {
+        enotes_out.emplace_back();
+        if (!try_out_to_legacy_enote_v1(tx, i, enotes_out.back())
+            && !try_out_to_legacy_enote_v2(tx, i, enotes_out.back())
+            && !try_out_to_legacy_enote_v3(tx, i, enotes_out.back())
+            && !try_out_to_legacy_enote_v4(tx, i, enotes_out.back())
+            && !try_out_to_legacy_enote_v5(tx, i, enotes_out.back()))
+        {
+            CHECK_AND_ASSERT_THROW_MES(false, "converting legacy output type to enote type: unknown output type.");
+        }
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp
