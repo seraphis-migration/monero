@@ -96,6 +96,21 @@ void construct_tx_for_mock_ledger_v1(const legacy_mock_keys &local_user_legacy_k
     const std::size_t ref_set_decomp_m,
     const SpBinnedReferenceSetConfigV1 &bin_config,
     const MockLedgerContext &ledger_context,
+    SpTxSquashedV1 &tx_out,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payments_out,
+    std::vector<jamtis::JamtisPaymentProposalV1> &normal_payments_out);
+void construct_tx_for_mock_ledger_v1(const legacy_mock_keys &local_user_legacy_keys,
+    const jamtis::mocks::jamtis_mock_keys &local_user_sp_keys,
+    const InputSelectorV1 &local_user_input_selector,
+    const FeeCalculator &tx_fee_calculator,
+    const rct::xmr_amount fee_per_tx_weight,
+    const std::size_t max_inputs,
+    const std::vector<std::tuple<rct::xmr_amount, jamtis::JamtisDestinationV1, TxExtra>> &outlays,
+    const std::size_t legacy_ring_size,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
+    const MockLedgerContext &ledger_context,
     SpTxSquashedV1 &tx_out);
 /// create transactions and submit them to a mock ledger
 void transfer_funds_single_mock_v1_unconfirmed_sp_only(const jamtis::mocks::jamtis_mock_keys &local_user_sp_keys,

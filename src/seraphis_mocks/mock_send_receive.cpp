@@ -228,7 +228,9 @@ void construct_tx_for_mock_ledger_v1(const legacy_mock_keys &local_user_legacy_k
     const std::size_t ref_set_decomp_m,
     const SpBinnedReferenceSetConfigV1 &bin_config,
     const MockLedgerContext &ledger_context,
-    SpTxSquashedV1 &tx_out)
+    SpTxSquashedV1 &tx_out,
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> &selfsend_payments_out,
+    std::vector<jamtis::JamtisPaymentProposalV1> &normal_payments_out)
 {
     /// build transaction
 
@@ -250,6 +252,8 @@ void construct_tx_for_mock_ledger_v1(const legacy_mock_keys &local_user_legacy_k
             tools::add_element(normal_payment_proposals));
     }
 
+    normal_payments_out = normal_payment_proposals;
+
     // 3. prepare inputs and finalize outputs
     std::vector<LegacyContextualEnoteRecordV1> legacy_contextual_inputs;
     std::vector<SpContextualEnoteRecordV1> sp_contextual_inputs;
@@ -270,6 +274,8 @@ void construct_tx_for_mock_ledger_v1(const legacy_mock_keys &local_user_legacy_k
             selfsend_payment_proposals,
             discretized_transaction_fee),
         "construct tx for mock ledger (v1): preparing inputs and outputs failed.");
+
+    selfsend_payments_out = selfsend_payment_proposals;
 
     // 4. tx proposal
     SpTxProposalV1 tx_proposal;
@@ -323,6 +329,40 @@ void construct_tx_for_mock_ledger_v1(const legacy_mock_keys &local_user_legacy_k
         local_user_sp_keys.k_vb,
         hw::get_device("default"),
         tx_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void construct_tx_for_mock_ledger_v1(const legacy_mock_keys &local_user_legacy_keys,
+    const jamtis::mocks::jamtis_mock_keys &local_user_sp_keys,
+    const InputSelectorV1 &local_user_input_selector,
+    const FeeCalculator &tx_fee_calculator,
+    const rct::xmr_amount fee_per_tx_weight,
+    const std::size_t max_inputs,
+    const std::vector<std::tuple<rct::xmr_amount, jamtis::JamtisDestinationV1, TxExtra>> &outlays,
+    const std::size_t legacy_ring_size,
+    const std::size_t ref_set_decomp_n,
+    const std::size_t ref_set_decomp_m,
+    const SpBinnedReferenceSetConfigV1 &bin_config,
+    const MockLedgerContext &ledger_context,
+    SpTxSquashedV1 &tx_out)
+{
+    std::vector<jamtis::JamtisPaymentProposalSelfSendV1> selfsend_payments;
+    std::vector<jamtis::JamtisPaymentProposalV1> normal_payments;
+
+    construct_tx_for_mock_ledger_v1(local_user_legacy_keys,
+        local_user_sp_keys,
+        local_user_input_selector,
+        tx_fee_calculator,
+        fee_per_tx_weight,
+        max_inputs,
+        outlays,
+        legacy_ring_size,
+        ref_set_decomp_n,
+        ref_set_decomp_m,
+        bin_config,
+        ledger_context,
+        tx_out,
+        selfsend_payments,
+        normal_payments);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void transfer_funds_single_mock_v1_unconfirmed_sp_only(const jamtis::mocks::jamtis_mock_keys &local_user_sp_keys,
