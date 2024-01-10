@@ -98,6 +98,7 @@ set(unit_tests_sources
   seraphis_tx.cpp
   sha256.cpp
   slow_memmem.cpp
+  sp_wallet_read_write.cpp
   subaddress.cpp
   tasking_system_demo.cpp
   test_tx_utils.cpp
@@ -149,6 +150,7 @@ target_link_libraries(unit_tests
     seraphis_impl
     seraphis_main
     seraphis_mocks
+    seraphis_wallet
     wallet
     wallet2_basic
     p2p
