@@ -1,4 +1,4 @@
-// Copyright (c) 2022, The Monero Project
+// Copyright (c) 2024, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -184,6 +184,7 @@ void make_random_address_for_user(const JamtisKeys &user_keys, JamtisDestination
     make_address_for_user(user_keys, random_j, user_address_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
+<<<<<<< HEAD
 void make_jamtis_amount(const JamtisKeys &user_keys, JamtisDestinationV1 &user_address_out)
 {
     const address_index_t random_j = gen_address_index();
@@ -209,8 +210,16 @@ void xor_with_key_stream(const crypto::chacha_key &chacha_key,
 //-------------------------------------------------------------------------------------------------------------------
 bool jamtis_keys_equal(const JamtisKeys &keys, const JamtisKeys &other)
 {
-    // ugly
-    return keys.k_m == other.k_m && keys.k_vb == other.k_vb && keys.d_vr == other.d_vr&& keys.d_fa == other.d_fa && keys.s_ga == other.s_ga && keys.s_ct == other.s_ct && keys.K_s_base == other.K_s_base && keys.D_vr == other.D_vr && keys.D_fa == other.D_fa && keys.D_base == other.D_base;
+    return (keys.k_m == other.k_m) &&
+           (keys.k_vb == other.k_vb) &&
+           (keys.d_vr == other.d_vr) &&
+           (keys.d_fa == other.d_fa) &&
+           (keys.s_ga == other.s_ga) &&
+           (keys.s_ct == other.s_ct) &&
+           (keys.K_s_base == other.K_s_base) &&
+           (keys.D_vr == other.D_vr) &&
+           (keys.D_fa == other.D_fa) &&
+           (keys.D_base == other.D_base);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis
