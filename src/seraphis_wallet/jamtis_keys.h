@@ -26,35 +26,24 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// NOT FOR PRODUCTION
-
 ////
-// Mock jamtis keys
-//
 // reference: https://gist.github.com/tevador/50160d160d24cfc6c52ae02eb3d17024
 ///
 
 #pragma once
 
 //local headers
-#include "crypto/blake256.h"
 #include "crypto/chacha.h"
 #include "crypto/crypto.h"
 #include "crypto/x25519.h"
 #include "ringct/rctTypes.h"
 #include "seraphis_core/jamtis_destination.h"
-#include "serialization/keyvalue_serialization.h"
-#include "serialization/serialization.h"
-#include "wipeable_string.h"
 
 //third party headers
 
 //standard headers
-#include <functional>
-#include <vector>
 
 //forward declarations
-
 
 namespace sp
 {
@@ -64,7 +53,7 @@ namespace jamtis
 ////
 // A set of jamtis keys for mock-ups/unit testing
 ///
-struct jamtis_keys
+struct JamtisKeys
 {
     crypto::secret_key k_m;           //master
     crypto::secret_key k_vb;          //view-balance
@@ -76,19 +65,7 @@ struct jamtis_keys
     crypto::x25519_pubkey xK_ua;      //unlock-amounts pubkey = xk_ua xG
     crypto::x25519_pubkey xK_fr;      //find-received pubkey  = xk_fr xk_ua xG
 
-    BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(k_m)
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(k_vb)
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(xk_ua)
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(xk_fr)
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(s_ga)
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(s_ct)
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(K_1_base)
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(xK_ua)
-        KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(xK_fr)
-    END_KV_SERIALIZE_MAP()
-
-    bool operator==(const jamtis_keys &other) {
+    bool operator==(const JamtisKeys &other) const {
         // use hash?
         return other.k_m == k_m &&
             other.k_vb == k_vb &&
@@ -106,9 +83,10 @@ struct jamtis_keys
 };
 
 /// make a set of mock jamtis keys (for mock-ups/unit testing)
-void make_jamtis_keys(jamtis_keys &keys_out);
+void make_jamtis_keys(JamtisKeys &keys_out);
 /// make a random jamtis address for the given privkeys
-void make_random_address_for_user(const jamtis_keys &user_keys, JamtisDestinationV1 &user_address_out);
+void make_address_random(const JamtisKeys &user_keys, JamtisDestinationV1 &user_address_out);
+void make_address_zero(const JamtisKeys &user_keys, JamtisDestinationV1 &user_address_out);
 
 } //namespace jamtis
 } //namespace sp

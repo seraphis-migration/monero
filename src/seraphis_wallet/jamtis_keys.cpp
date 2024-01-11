@@ -1,4 +1,4 @@
-// Copyright (c) 2022, The Monero Project
+// Copyright (c) 2024, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -45,14 +45,14 @@
 
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
-#define MONERO_DEFAULT_LOG_CATEGORY "seraphis_mocks"
+#define MONERO_DEFAULT_LOG_CATEGORY "seraphis_wallet"
 
 namespace sp
 {
 namespace jamtis
 {
 //-------------------------------------------------------------------------------------------------------------------
-void make_jamtis_keys(jamtis_keys &keys_out)
+void make_jamtis_keys(JamtisKeys &keys_out)
 {
     keys_out.k_m  = rct::rct2sk(rct::skGen());
     keys_out.k_vb = rct::rct2sk(rct::skGen());
@@ -65,7 +65,7 @@ void make_jamtis_keys(jamtis_keys &keys_out)
     make_jamtis_findreceived_pubkey(keys_out.xk_fr, keys_out.xK_ua, keys_out.xK_fr);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void make_random_address_for_user(const jamtis_keys &user_keys, JamtisDestinationV1 &user_address_out)
+void make_address_random(const JamtisKeys &user_keys, JamtisDestinationV1 &user_address_out)
 {
     address_index_t address_index;
     address_index = gen_address_index();
@@ -78,7 +78,19 @@ void make_random_address_for_user(const jamtis_keys &user_keys, JamtisDestinatio
         user_address_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void jamtis_keys::encrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv)
+void make_address_zero(const JamtisKeys &user_keys, JamtisDestinationV1 &user_address_out)
+{
+    address_index_t address_index{};
+
+    make_jamtis_destination_v1(user_keys.K_1_base,
+        user_keys.xK_ua,
+        user_keys.xK_fr,
+        user_keys.s_ga,
+        address_index,
+        user_address_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void JamtisKeys::encrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv)
 {
     crypto::chacha20(k_m.data, sizeof(k_m), key, iv, k_m.data);
     crypto::chacha20(k_vb.data, sizeof(k_vb), key, iv, k_vb.data);
@@ -88,9 +100,9 @@ void jamtis_keys::encrypt(const crypto::chacha_key &key, const crypto::chacha_iv
     crypto::chacha20(s_ct.data, sizeof(s_ct), key, iv, s_ct.data);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void jamtis_keys::decrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv)
+void JamtisKeys::decrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv)
 {
-    encrypt(key, iv); // NOTE: well
+    encrypt(key, iv); 
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace jamtis
