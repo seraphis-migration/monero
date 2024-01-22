@@ -182,6 +182,7 @@ bool KeyContainer::compare_keys(KeyContainer &other, const crypto::chacha_key &c
 {
     // 1. decrypt keys if they are encrypted in memory
     other.decrypt(chacha_key);
+
     // 2. decrypt if encrypted in memory
     decrypt(chacha_key);
 
