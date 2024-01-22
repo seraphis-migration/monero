@@ -19,7 +19,7 @@ struct test_s
     END_KV_SERIALIZE_MAP()
 };
 
-TEST(EncryptedFile, ReadWriteBlob)
+TEST(seraphis_encrypted_file, read_write_blob)
 {
     boost::filesystem::path temp_file = boost::filesystem::unique_path();
     const std::string tmp_path = temp_file.native();
@@ -36,7 +36,7 @@ TEST(EncryptedFile, ReadWriteBlob)
     ASSERT_TRUE(test.data == "monero is awesome");
 }
 
-TEST(EncryptedFile, ReadWriteJson)
+TEST(seraphis_encrypted_file, read_write_json)
 {
     boost::filesystem::path temp_file = boost::filesystem::unique_path();
     const std::string tmp_path = temp_file.native();

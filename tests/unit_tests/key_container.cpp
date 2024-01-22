@@ -8,11 +8,6 @@
 
 using namespace seraphis_wallet;
 
-TEST(seraphis_wallet, key_container) {
-    KeyContainer container;
-    crypto::chacha_key key;
-}
-
 TEST(seraphis_wallet, store_and_load_key_container)
 {
     // 1. create variables, set password and path

@@ -50,9 +50,6 @@ namespace sp
 namespace jamtis
 {
 
-////
-// A set of jamtis keys for mock-ups/unit testing
-///
 struct JamtisKeys
 {
     crypto::secret_key k_m;           //master
@@ -82,7 +79,6 @@ struct JamtisKeys
     void decrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv);
 };
 
-/// make a set of mock jamtis keys (for mock-ups/unit testing)
 void make_jamtis_keys(JamtisKeys &keys_out);
 /// make a random jamtis address for the given privkeys
 void make_address_random(const JamtisKeys &user_keys, JamtisDestinationV1 &user_address_out);

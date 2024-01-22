@@ -296,12 +296,10 @@ void KeyContainer::recover_jamtis_keys(const ser_JamtisKeys &ser_keys, JamtisKey
 bool KeyContainer::compare_keys(KeyContainer &other, const crypto::chacha_key &chacha_key)
 {
     // 1. decrypt keys if they are encrypted in memory
-    if (other.m_encrypted)
-        other.decrypt(chacha_key);
+    other.decrypt(chacha_key);
 
     // 2. decrypt if encrypted in memory
-    if (m_encrypted)
-        decrypt(chacha_key);
+    decrypt(chacha_key);
 
     bool r = other.m_keys.k_m == m_keys.k_m && other.m_keys.k_vb == m_keys.k_vb && other.m_keys.xk_ua == m_keys.xk_ua &&
              other.m_keys.xk_fr == m_keys.xk_fr && other.m_keys.s_ga == m_keys.s_ga &&
@@ -309,12 +307,10 @@ bool KeyContainer::compare_keys(KeyContainer &other, const crypto::chacha_key &c
              other.m_keys.xK_ua == m_keys.xK_ua && other.m_keys.xK_fr == m_keys.xK_fr;
 
     // 3. encrypt in memory
-    if (!other.m_encrypted)
-        other.encrypt(chacha_key);
+    other.encrypt(chacha_key);
 
     // 4. encrypt in memory
-    if (!m_encrypted)
-        encrypt(chacha_key);
+    encrypt(chacha_key);
 
     // 5. return result of comparison
     return r;
