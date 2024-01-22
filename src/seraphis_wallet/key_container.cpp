@@ -178,7 +178,26 @@ void KeyContainer::recover_jamtis_keys(const ser_JamtisKeys &ser_keys, sp::jamti
     keys_out.D_fa    = ser_keys.D_fa;
 }
 //-------------------------------------------------------------------------------------------------------------------
+bool KeyContainer::compare_keys(KeyContainer &other, const crypto::chacha_key &chacha_key)
+{
+    // 1. decrypt keys if they are encrypted in memory
+    other.decrypt(chacha_key);
 
+    // 2. decrypt if encrypted in memory
+    decrypt(chacha_key);
+
+    bool r = sp::jamtis::jamtis_keys_equal(m_keys, other.m_keys);
+
+    // 3. encrypt in memory
+    other.encrypt(chacha_key);
+
+    // 4. encrypt in memory
+    encrypt(chacha_key);
+
+    // 5. return result of comparison
+    return r;
+}
+//-------------------------------------------------------------------------------------------------------------------
 // KeyGuard
 //-------------------------------------------------------------------------------------------------------------------
 KeyGuard::KeyGuard(const KeyGuard &other) :
