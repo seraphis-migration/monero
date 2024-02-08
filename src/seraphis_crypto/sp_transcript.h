@@ -275,7 +275,7 @@ private:
         std::enable_if_t<!std::is_unsigned<T>::value, bool> = true>
     void append_impl(const boost::string_ref label, const T signed_integer)
     {
-        using unsigned_type = std::make_unsigned<T>::type;
+        using unsigned_type = typename std::make_unsigned<T>::type;
         static_assert(sizeof(unsigned_type) <= sizeof(std::uint64_t),
             "SpTranscriptBuilder: unsupported signed integer type.");
         this->append_label(label);

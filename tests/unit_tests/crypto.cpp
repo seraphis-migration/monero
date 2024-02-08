@@ -340,20 +340,3 @@ TEST(Crypto, generator_consistency)
   // ringct/rctTypes.h
   ASSERT_TRUE(memcmp(H.data, rct::H.bytes, 32) == 0);
 }
-
-TEST(Crypto, generator_consistency)
-{
-  // crypto/generators.h
-  const crypto::public_key G{crypto::get_G()};
-  const crypto::public_key H{crypto::get_H()};
-  const ge_p3 H_p3 = crypto::get_H_p3();
-
-  // crypto/crypto-ops.h
-  ASSERT_TRUE(memcmp(&H_p3, &ge_p3_H, sizeof(ge_p3)) == 0);
-
-  // ringct/rctOps.h
-  ASSERT_TRUE(memcmp(G.data, rct::G.bytes, 32) == 0);
-
-  // ringct/rctTypes.h
-  ASSERT_TRUE(memcmp(H.data, rct::H.bytes, 32) == 0);
-}

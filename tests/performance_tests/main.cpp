@@ -110,14 +110,12 @@ int main(int argc, char** argv)
 
   const std::string filter = tools::glob_to_regex(command_line::get_arg(vm, arg_filter));
   const std::string timings_database = command_line::get_arg(vm, arg_timings_database);
-  Params core_params;
+  ParamsShuttle p;
   if (!timings_database.empty())
-    core_params.td = TimingsDatabase(timings_database);
-  core_params.verbose = command_line::get_arg(vm, arg_verbose);
-  core_params.stats = command_line::get_arg(vm, arg_stats);
-  core_params.loop_multiplier = command_line::get_arg(vm, arg_loop_multiplier);
-
-  ParamsShuttle p{core_params};
+    p.core_params.td = std::make_shared<TimingsDatabase>(timings_database);
+  p.core_params.verbose = command_line::get_arg(vm, arg_verbose);
+  p.core_params.stats = command_line::get_arg(vm, arg_stats);
+  p.core_params.loop_multiplier = command_line::get_arg(vm, arg_loop_multiplier);
 
   performance_timer timer;
   timer.start();
