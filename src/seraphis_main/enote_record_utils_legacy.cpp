@@ -103,7 +103,7 @@ static bool try_check_legacy_view_tag(const LegacyEnoteVariant &enote,
         boost::optional<crypto::view_tag> operator()(const LegacyEnoteV5 &enote) const { return enote.view_tag; }
     };
 
-    const boost::optional<crypto::view_tag> enote_view_tag{enote.visit(visitor{})};
+    const boost::optional<crypto::view_tag> enote_view_tag{enote.visit(visitor())};
 
     if (!enote_view_tag)
         return true;  //check succeeds automatically for enotes with no view tag

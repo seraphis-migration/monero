@@ -67,7 +67,7 @@ static InputSelectionType input_selection_type(const ContextualRecordVariant &co
         InputSelectionType operator()(const SpContextualEnoteRecordV1&) const { return InputSelectionType::SERAPHIS; }
     };
 
-    return contextual_enote_record.visit(visitor{});
+    return contextual_enote_record.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
