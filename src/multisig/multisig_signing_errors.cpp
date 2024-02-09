@@ -66,7 +66,7 @@ const std::string& error_message_ref(const MultisigSigningErrorVariant &variant)
         { return error.error_message; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace multisig

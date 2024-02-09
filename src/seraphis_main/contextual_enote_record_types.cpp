@@ -97,7 +97,7 @@ const SpEnoteOriginContextV1& origin_context_ref(const ContextualBasicRecordVari
         { return record.origin_context; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::xmr_amount amount_ref(const ContextualRecordVariant &variant)
@@ -109,7 +109,7 @@ rct::xmr_amount amount_ref(const ContextualRecordVariant &variant)
         rct::xmr_amount operator()(const SpContextualEnoteRecordV1 &record)     const { return amount_ref(record); }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 const SpEnoteOriginContextV1& origin_context_ref(const ContextualRecordVariant &variant)
@@ -123,7 +123,7 @@ const SpEnoteOriginContextV1& origin_context_ref(const ContextualRecordVariant &
         { return record.origin_context; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 const SpEnoteSpentContextV1& spent_context_ref(const ContextualRecordVariant &variant)
@@ -137,7 +137,7 @@ const SpEnoteSpentContextV1& spent_context_ref(const ContextualRecordVariant &va
         { return record.spent_context; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool is_older_than(const SpEnoteOriginContextV1 &context, const SpEnoteOriginContextV1 &other_context)

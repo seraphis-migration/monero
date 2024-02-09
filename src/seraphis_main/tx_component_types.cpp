@@ -91,7 +91,7 @@ SpEnoteCoreVariant core_ref(const SpEnoteVariant &variant)
         SpEnoteCoreVariant operator()(const SpEnoteV1 &enote)         const { return enote.core; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 const rct::key& onetime_address_ref(const SpEnoteVariant &variant)
@@ -103,7 +103,7 @@ const rct::key& onetime_address_ref(const SpEnoteVariant &variant)
         const rct::key& operator()(const SpEnoteV1 &enote)         const { return enote.core.onetime_address; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key amount_commitment_ref(const SpEnoteVariant &variant)
@@ -115,7 +115,7 @@ rct::key amount_commitment_ref(const SpEnoteVariant &variant)
         rct::key operator()(const SpEnoteV1 &enote)         const { return enote.core.amount_commitment;       }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 const jamtis::encrypted_address_tag_t& addr_tag_enc_ref(const SpEnoteVariant &variant)
@@ -129,7 +129,7 @@ const jamtis::encrypted_address_tag_t& addr_tag_enc_ref(const SpEnoteVariant &va
         { return enote.addr_tag_enc; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 jamtis::view_tag_t view_tag_ref(const SpEnoteVariant &variant)
@@ -141,7 +141,7 @@ jamtis::view_tag_t view_tag_ref(const SpEnoteVariant &variant)
         jamtis::view_tag_t operator()(const SpEnoteV1 &enote)         const { return enote.view_tag; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 const crypto::key_image& key_image_ref(const SpEnoteImageV1 &enote_image)

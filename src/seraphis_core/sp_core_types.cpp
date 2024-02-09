@@ -73,7 +73,7 @@ const rct::key& onetime_address_ref(const SpEnoteCoreVariant &variant)
         const rct::key& operator()(const SpEnoteCore &enote)         const { return enote.onetime_address; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key amount_commitment_ref(const SpEnoteCoreVariant &variant)
@@ -85,7 +85,7 @@ rct::key amount_commitment_ref(const SpEnoteCoreVariant &variant)
         rct::key operator()(const SpEnoteCore &enote)         const { return enote.amount_commitment;       }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const SpEnoteImageCore &container, SpTranscriptBuilder &transcript_inout)

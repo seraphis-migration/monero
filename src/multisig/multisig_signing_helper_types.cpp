@@ -57,7 +57,7 @@ const rct::key& proof_key_ref(const MultisigPartialSigVariant &variant)
         { return partial_sig.K; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 const rct::key& message_ref(const MultisigPartialSigVariant &variant)
@@ -71,7 +71,7 @@ const rct::key& message_ref(const MultisigPartialSigVariant &variant)
         { return partial_sig.message; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool try_get_nonces(const MultisigProofInitSetV1 &init_set,

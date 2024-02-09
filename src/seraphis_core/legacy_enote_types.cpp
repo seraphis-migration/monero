@@ -58,7 +58,7 @@ const rct::key& onetime_address_ref(const LegacyEnoteVariant &variant)
         const rct::key& operator()(const LegacyEnoteV5 &enote) const { return enote.onetime_address; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::key amount_commitment_ref(const LegacyEnoteVariant &variant)
@@ -73,7 +73,7 @@ rct::key amount_commitment_ref(const LegacyEnoteVariant &variant)
         rct::key operator()(const LegacyEnoteV5 &enote) const { return enote.amount_commitment; }
     };
 
-    return variant.visit(visitor{});
+    return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
 LegacyEnoteV1 gen_legacy_enote_v1()
