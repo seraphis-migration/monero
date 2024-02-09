@@ -36,6 +36,7 @@
 //third party headers
 
 //standard headers
+#include <cstdint>
 #include <string>
 #include <vector>
 
