@@ -217,7 +217,7 @@ struct MultisigSigningErrorBadSigSet final
 // MultisigSigningErrorVariant
 ///
 using MultisigSigningErrorVariant =
-    tools::variant<
+    tools::optional_variant<
         MultisigSigningErrorBadInitSet,
         MultisigSigningErrorBadInitSetCollection,
         MultisigSigningErrorAvailableSigners,

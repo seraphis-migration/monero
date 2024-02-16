@@ -38,6 +38,7 @@
 #include <type_traits>
 #include <vector>
 
+using tools::optional_variant;
 using tools::variant;
 using tools::variant_static_visitor;
 
@@ -239,7 +240,7 @@ struct test_stringify_visitor: public variant_static_visitor<std::string>
 //-------------------------------------------------------------------------------------------------------------------
 TEST(variant, operatorbool)
 {
-    variant<int8_t, uint8_t, int16_t, uint16_t, std::string> v;
+    optional_variant<int8_t, uint8_t, int16_t, uint16_t, std::string> v;
     EXPECT_FALSE(v);
     v = (int16_t) 2023;
     EXPECT_TRUE(v);
@@ -251,7 +252,7 @@ TEST(variant, operatorbool)
 //-------------------------------------------------------------------------------------------------------------------
 TEST(variant, is_empty)
 {
-    variant<int8_t, uint8_t, int16_t, uint16_t, std::string> v;
+    optional_variant<int8_t, uint8_t, int16_t, uint16_t, std::string> v;
     EXPECT_TRUE(v.is_empty());
     v = (int16_t) 2023;
     EXPECT_FALSE(v.is_empty());
@@ -260,7 +261,7 @@ TEST(variant, is_empty)
     v = boost::blank{};
     EXPECT_TRUE(v.is_empty());
 
-    variant<> v2;
+    optional_variant<> v2;
     EXPECT_TRUE(v2.is_empty());
     v2 = boost::blank{};
     EXPECT_TRUE(v2.is_empty());

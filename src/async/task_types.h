@@ -86,7 +86,7 @@ struct SimpleTask;
 struct SleepyTask;
 
 /// task
-using TaskVariant = tools::variant<SimpleTask, SleepyTask>;
+using TaskVariant = tools::optional_variant<SimpleTask, SleepyTask>;
 using task_t      = std::function<TaskVariant()>;  //tasks auto-return their continuation (or an empty variant)
 
 //-------------------------------------------------------------------------------------------------------------------
