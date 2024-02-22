@@ -38,7 +38,6 @@
 //local headers
 #include "crypto/crypto.h"
 #include "crypto/x25519.h"
-#include "ringct/rctTypes.h"
 
 //third party headers
 
@@ -52,6 +51,14 @@ namespace sp
 namespace jamtis
 {
 
+/**
+* brief: make_jamtis_viewbalance_key - view-balance key, for viewing all balance information
+*   k_vb = H_n[k_m]()
+* param: k_master - k_m
+* outparam: k_view_balance_out - k_vb
+*/
+void make_jamtis_viewbalance_key(const crypto::secret_key &k_master,
+    crypto::secret_key &k_view_balance_out);
 /**
 * brief: make_jamtis_unlockamounts_key - unlock-amounts key, for recovering amounts and reconstructing amount commitments
 *   xk_ua = H_n_x25519[k_vb]()
