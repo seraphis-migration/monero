@@ -305,6 +305,7 @@ namespace config
   const constexpr char HASH_KEY_BINNED_REF_SET_GENERATOR_SEED[] = "binned_refset_generator_seed";
   const constexpr char HASH_KEY_BINNED_REF_SET_MEMBER[] = "binned_refset_member";
 
+  const constexpr char HASH_KEY_JAMTIS_VIEWBALANCE_KEY[] = "jamtis_view_balance_key";
   const constexpr char HASH_KEY_JAMTIS_UNLOCKAMOUNTS_KEY[] = "jamtis_unlock_amounts_key";
   const constexpr char HASH_KEY_JAMTIS_GENERATEADDRESS_SECRET[] = "jamtis_generate_address_secret";
   const constexpr char HASH_KEY_JAMTIS_CIPHERTAG_SECRET[] = "jamtis_cipher_tag_secret";
