@@ -113,7 +113,7 @@ void make_grootle_proof(const rct::key &message,
 * brief: verify_grootle_proofs - verify a batch of grootle proofs
 * param: proofs - batch of proofs to verify
 * param: message - (per-proof) message to insert in Fiat-Shamir transform hash
-* param: S - (per-proof) referenced commitments
+* param: M - (per-proof) referenced commitments
 * param: proof_offsets - (per-proof) offset for commitment to zero at unknown indices in each proof
 * param: n - decomposition of the reference set size: n^m
 * param: m - ...
@@ -121,7 +121,7 @@ void make_grootle_proof(const rct::key &message,
 */
 void get_grootle_verification_data(const std::vector<const GrootleProof*> &proofs,
     const rct::keyV &messages,
-    const std::vector<rct::keyV> &S,
+    const std::vector<rct::keyV> &M,
     const rct::keyV &proof_offsets,
     const std::size_t n,
     const std::size_t m,
