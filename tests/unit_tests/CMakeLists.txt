@@ -98,6 +98,7 @@ set(unit_tests_sources
   seraphis_tx.cpp
   sha256.cpp
   slow_memmem.cpp
+  spw_address_utils.cpp
   subaddress.cpp
   tasking_system_demo.cpp
   test_tx_utils.cpp
@@ -108,8 +109,6 @@ set(unit_tests_sources
   hardfork.cpp
   unbound.cpp
   uri.cpp
-  variant.cpp
-  util.cpp
   varint.cpp
   ver_rct_non_semantics_simple_cached.cpp
   ringct.cpp
@@ -151,6 +150,7 @@ target_link_libraries(unit_tests
     seraphis_impl
     seraphis_main
     seraphis_mocks
+    seraphis_wallet
     wallet
     wallet2_basic
     p2p
@@ -174,6 +174,8 @@ if (NOT MSVC)
     PROPERTY
       COMPILE_FLAGS " -Wno-undef -Wno-sign-compare")
 endif ()
+
+SET_PROPERTY(SOURCE main.cpp PROPERTY COMPILE_FLAGS -DDEFAULT_DATA_DIR="\\"${CMAKE_SOURCE_DIR}/tests/data\\"")
 
 SET_PROPERTY(SOURCE memwipe.cpp PROPERTY COMPILE_FLAGS -Ofast)
 
