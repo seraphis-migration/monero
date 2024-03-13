@@ -75,19 +75,19 @@ void check_chunk_data_semantics(const ChunkData &chunk_data,
     {
         for (const ContextualBasicRecordVariant &contextual_basic_record : tx_basic_records.second)
         {
-            CHECK_AND_ASSERT_THROW_MES(origin_context_ref(contextual_basic_record).origin_status ==
+            CHECK_AND_ASSERT_THROW_MES(origin_status_ref(contextual_basic_record) ==
                     expected_origin_status,
                 "scan chunk data semantics check: contextual basic record doesn't have expected origin status.");
-            CHECK_AND_ASSERT_THROW_MES(origin_context_ref(contextual_basic_record).transaction_id ==
+            CHECK_AND_ASSERT_THROW_MES(transaction_id_ref(contextual_basic_record) ==
                     tx_basic_records.first,
                 "scan chunk data semantics check: contextual basic record doesn't have origin tx id matching mapped id.");
-            CHECK_AND_ASSERT_THROW_MES(origin_context_ref(contextual_basic_record).block_index ==
-                    origin_context_ref(*tx_basic_records.second.begin()).block_index,
+            CHECK_AND_ASSERT_THROW_MES(block_index_ref(contextual_basic_record) ==
+                    block_index_ref(*tx_basic_records.second.begin()),
                 "scan chunk data semantics check: contextual record tx index doesn't match other records in tx.");
 
             CHECK_AND_ASSERT_THROW_MES(
-                    origin_context_ref(contextual_basic_record).block_index >= allowed_lowest_index &&
-                    origin_context_ref(contextual_basic_record).block_index <= allowed_highest_index,
+                    block_index_ref(contextual_basic_record) >= allowed_lowest_index &&
+                    block_index_ref(contextual_basic_record) <= allowed_highest_index,
                 "scan chunk data semantics check: contextual record block index is out of the expected range.");
         }
     }

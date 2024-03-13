@@ -75,16 +75,18 @@ static boost::multiprecision::uint128_t get_balance_intermediate_legacy(
     for (const auto &mapped_contextual_record : legacy_intermediate_records)
     {
         const LegacyContextualIntermediateEnoteRecordV1 &current_contextual_record{mapped_contextual_record.second};
+        SpEnoteOriginStatus current_record_origin_status;
+        origin_status_ref(current_contextual_record.origin_context, current_record_origin_status);
 
         // a. ignore this enote if its origin status is not requested
-        if (origin_statuses.find(current_contextual_record.origin_context.origin_status) == origin_statuses.end())
+        if (origin_statuses.find(current_record_origin_status) == origin_statuses.end())
             continue;
 
         // b. ignore locked onchain enotes if they should be excluded
         if (exclusions.find(BalanceExclusions::ORIGIN_LEDGER_LOCKED) != exclusions.end() &&
-            current_contextual_record.origin_context.origin_status == SpEnoteOriginStatus::ONCHAIN &&
+            current_record_origin_status == SpEnoteOriginStatus::ONCHAIN &&
             onchain_legacy_enote_is_locked(
-                    current_contextual_record.origin_context.block_index,
+                    block_index_ref(current_contextual_record.origin_context),
                     current_contextual_record.record.unlock_time,
                     top_block_index,
                     default_spendable_age,
@@ -111,10 +113,9 @@ static boost::multiprecision::uint128_t get_balance_intermediate_legacy(
                         "get balance intermediate legacy: tracked legacy duplicates has an entry that "
                         "doesn't line up 1:1 with the legacy intermediate map even though it should (bug).");
 
-                    return legacy_intermediate_records
+                    return origin_status_ref(legacy_intermediate_records
                         .at(identifier)
-                        .origin_context
-                        .origin_status;
+                        .origin_context);
                 },
                 [&legacy_intermediate_records](const rct::key &identifier) -> rct::xmr_amount
                 {
@@ -156,9 +157,11 @@ static boost::multiprecision::uint128_t get_balance_full_legacy(
     for (const auto &mapped_contextual_record : legacy_records)
     {
         const LegacyContextualEnoteRecordV1 &current_contextual_record{mapped_contextual_record.second};
+        SpEnoteOriginStatus current_record_origin_status;
+        origin_status_ref(current_contextual_record.origin_context, current_record_origin_status);
 
         // a. ignore this enote if its origin status is not requested
-        if (origin_statuses.find(current_contextual_record.origin_context.origin_status) == origin_statuses.end())
+        if (origin_statuses.find(current_record_origin_status) == origin_statuses.end())
             continue;
 
         // b. ignore this enote if its spent status is requested
@@ -167,9 +170,9 @@ static boost::multiprecision::uint128_t get_balance_full_legacy(
 
         // c. ignore locked onchain enotes if they should be excluded
         if (exclusions.find(BalanceExclusions::ORIGIN_LEDGER_LOCKED) != exclusions.end() &&
-            current_contextual_record.origin_context.origin_status == SpEnoteOriginStatus::ONCHAIN &&
+            current_record_origin_status == SpEnoteOriginStatus::ONCHAIN &&
             onchain_legacy_enote_is_locked(
-                    current_contextual_record.origin_context.block_index,
+                    block_index_ref(current_contextual_record.origin_context),
                     current_contextual_record.record.unlock_time,
                     top_block_index,
                     default_spendable_age,
@@ -195,10 +198,9 @@ static boost::multiprecision::uint128_t get_balance_full_legacy(
                         "get balance full legacy: tracked legacy duplicates has an entry that doesn't line up "
                         "1:1 with the legacy map even though it should (bug).");
 
-                    return legacy_records
+                    return origin_status_ref(legacy_records
                         .at(identifier)
-                        .origin_context
-                        .origin_status;
+                        .origin_context);
                 },
                 [&legacy_records](const rct::key &identifier) -> rct::xmr_amount
                 {

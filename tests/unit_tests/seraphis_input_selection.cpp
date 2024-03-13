@@ -61,9 +61,7 @@ static void prepare_enote_store(const std::vector<rct::xmr_amount> &legacy_amoun
         temp_record.key_image = rct::rct2ki(rct::pkGen());
 
         enote_store_inout.add_record(
-                LegacyContextualEnoteRecordV1{
-                    .record = temp_record
-                }
+                LegacyContextualEnoteRecordV1(temp_record)
             );
     }
 

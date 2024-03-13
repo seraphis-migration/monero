@@ -123,6 +123,8 @@ bool try_get_membership_proof_real_reference_mappings(const std::vector<SpContex
 * param: fresh_origin_context -
 * inoutparam: current_origin_context_inout -
 */
+bool try_update_enote_origin_context_v1(const LegacyEnoteOriginContextVariant &fresh_origin_context,
+    LegacyEnoteOriginContextVariant &current_origin_context_inout);
 bool try_update_enote_origin_context_v1(const SpEnoteOriginContextV1 &fresh_origin_context,
     SpEnoteOriginContextV1 &current_origin_context_inout);
 /**
@@ -163,6 +165,10 @@ bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentStatus spent_statu
 * inoutparam: origin_context_inout -
 * inoutparam: spent_context_inout -
 */
+void update_contextual_enote_record_contexts_v1(const LegacyEnoteOriginContextVariant &new_origin_context,
+    const SpEnoteSpentContextV1 &new_spent_context,
+    LegacyEnoteOriginContextVariant &origin_context_inout,
+    SpEnoteSpentContextV1 &spent_context_inout);
 void update_contextual_enote_record_contexts_v1(const SpEnoteOriginContextV1 &new_origin_context,
     const SpEnoteSpentContextV1 &new_spent_context,
     SpEnoteOriginContextV1 &origin_context_inout,

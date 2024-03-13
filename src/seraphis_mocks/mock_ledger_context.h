@@ -255,6 +255,17 @@ public:
         const crypto::x25519_secret_key &xk_find_received,
         scanning::ChunkContext &chunk_context_out,
         scanning::ChunkData &chunk_data_out) const;
+    /**
+    * brief: get_legacy_amount_counts - getter for m_legacy_amount_counts
+    * param: amount -
+    * return: number of enotes with same amount -
+    */
+    std::uint64_t get_legacy_amount_counts(rct::xmr_amount amount);
+    /**
+    * brief: is_empty_legacy_amount_counts
+    * return: true if map is empty -
+    */
+    bool is_empty_legacy_amount_counts();
 
 private:
     /// first block where a seraphis tx is allowed (this block and all following must have a seraphis coinbase tx)
@@ -327,7 +338,8 @@ private:
             std::tuple<       // tx output contents
                 std::uint64_t,                    // unlock time
                 TxExtra,                          // tx memo
-                std::vector<LegacyEnoteVariant>   // output enotes
+                std::vector<LegacyEnoteVariant>,  // output enotes
+                std::vector<std::uint64_t>        // enote same amount ledger indices
             >
         >
     > m_blocks_of_legacy_tx_output_contents;
@@ -351,6 +363,11 @@ private:
             std::uint64_t   // block timestamp
         >
     > m_block_infos;
+    /// map of legacy amount counts
+    std::map<
+        rct::xmr_amount,    // amount
+        std::uint64_t       // count
+    > m_legacy_amount_counts;
 };
 
 bool try_add_tx_to_ledger(const SpTxCoinbaseV1 &tx_to_add, MockLedgerContext &ledger_context_inout);

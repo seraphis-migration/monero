@@ -60,6 +60,21 @@ namespace sp
 */
 void get_legacy_enote_identifier(const rct::key &onetime_address, const rct::xmr_amount amount, rct::key &identifier_out);
 /**
+* brief: make_legacy_pre_rct_enote - make a v1 legacy pre-ringct enote sending to an address or subaddress
+* param: destination_spendkey - [address: K^s = k^s G] [subaddress: K^{s,i} = (Hn(k^v, i) + k^s) G]
+* param: destination_viewkey - [address: K^v = k^v G] [subaddress: K^{v,i} = k^v*(Hn(k^v, i) + k^s) G]
+* param: amount - a
+* param: output_index - t
+* param: enote_ephemeral_privkey - [address: r] [subaddres: r_t]
+* outparam: enote_out - [K^o, a]
+*/
+void make_legacy_pre_rct_enote(const rct::key &destination_spendkey,
+    const rct::key &destination_viewkey,
+    const rct::xmr_amount amount,
+    const std::uint64_t output_index,
+    const crypto::secret_key &enote_ephemeral_privkey,
+    LegacyEnoteV1 &enote_out);
+/**
 * brief: make_legacy_enote_v1 - make a v1 legacy enote sending to an address or subaddress
 * param: destination_spendkey - [address: K^s = k^s G] [subaddress: K^{s,i} = (Hn(k^v, i) + k^s) G]
 * param: destination_viewkey - [address: K^v = k^v G] [subaddress: K^{v,i} = k^v*(Hn(k^v, i) + k^s) G]

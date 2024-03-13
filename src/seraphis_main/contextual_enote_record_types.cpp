@@ -45,6 +45,138 @@
 
 namespace sp
 {
+
+//-------------------------------------------------------------------------------------------------------------------
+LegacyContextualIntermediateEnoteRecordV1::LegacyContextualIntermediateEnoteRecordV1()
+{
+    // just assume post-rct enote as default, if no EnoteRecord gets provided
+    // Note : don't forget to manually set LegacyEnoteOriginContextVariant to V1 if enote is pre-rct
+    LegacyEnoteOriginContextV2 new_origin_context;
+    origin_context = new_origin_context;
+}
+//-------------------------------------------------------------------------------------------------------------------
+LegacyContextualIntermediateEnoteRecordV1::LegacyContextualIntermediateEnoteRecordV1(LegacyIntermediateEnoteRecord record_in)
+    : record{ record_in }
+{
+    LegacyEnoteOriginContextV1 new_origin_context_v1;
+    LegacyEnoteOriginContextV2 new_origin_context_v2;
+    if (record.enote.is_type<LegacyEnoteV1>() && record.enote.unwrap<LegacyEnoteV1>().is_pre_rct)
+        origin_context = new_origin_context_v1;
+    else
+        origin_context = new_origin_context_v2;
+}
+//-------------------------------------------------------------------------------------------------------------------
+LegacyContextualEnoteRecordV1::LegacyContextualEnoteRecordV1()
+{
+    // just assume post-rct enote as default, if no EnoteRecord gets provided
+    // Note : don't forget to manually set LegacyEnoteOriginContextVariant to V1 if enote is pre-rct
+    LegacyEnoteOriginContextV2 new_origin_context;
+    origin_context = new_origin_context;
+}
+//-------------------------------------------------------------------------------------------------------------------
+LegacyContextualEnoteRecordV1::LegacyContextualEnoteRecordV1(LegacyEnoteRecord record_in) : record{ record_in }
+{
+    LegacyEnoteOriginContextV1 new_origin_context_v1;
+    LegacyEnoteOriginContextV2 new_origin_context_v2;
+    if (record.enote.is_type<LegacyEnoteV1>() && record.enote.unwrap<LegacyEnoteV1>().is_pre_rct)
+        origin_context = new_origin_context_v1;
+    else
+        origin_context = new_origin_context_v2;
+}
+//-------------------------------------------------------------------------------------------------------------------
+const std::uint64_t& block_index_ref(const LegacyEnoteOriginContextVariant &variant)
+{
+    struct visitor final : public tools::variant_static_visitor<const std::uint64_t&>
+    {
+        using variant_static_visitor::operator();  //for blank overload
+        const std::uint64_t& operator()(const LegacyEnoteOriginContextV1 &record) const
+        { return record.block_index; }
+        const std::uint64_t& operator()(const LegacyEnoteOriginContextV2 &record) const
+        { return record.block_index; }
+    };
+
+    return variant.visit(visitor{});
+}
+//-------------------------------------------------------------------------------------------------------------------
+const std::uint64_t& block_timestamp_ref(const LegacyEnoteOriginContextVariant &variant)
+{
+    struct visitor final : public tools::variant_static_visitor<const std::uint64_t&>
+    {
+        using variant_static_visitor::operator();  //for blank overload
+        const std::uint64_t& operator()(const LegacyEnoteOriginContextV1 &record) const
+        { return record.block_timestamp; }
+        const std::uint64_t& operator()(const LegacyEnoteOriginContextV2 &record) const
+        { return record.block_timestamp; }
+    };
+
+    return variant.visit(visitor{});
+}
+//-------------------------------------------------------------------------------------------------------------------
+const rct::key& transaction_id_ref(const LegacyEnoteOriginContextVariant &variant)
+{
+    struct visitor final : public tools::variant_static_visitor<const rct::key&>
+    {
+        using variant_static_visitor::operator();  //for blank overload
+        const rct::key& operator()(const LegacyEnoteOriginContextV1 &record) const
+        { return record.transaction_id; }
+        const rct::key& operator()(const LegacyEnoteOriginContextV2 &record) const
+        { return record.transaction_id; }
+    };
+
+    return variant.visit(visitor{});
+}
+//-------------------------------------------------------------------------------------------------------------------
+const std::uint64_t& enote_ledger_index_ref(const LegacyEnoteOriginContextVariant &variant)
+{
+    struct visitor final : public tools::variant_static_visitor<const std::uint64_t&>
+    {
+        using variant_static_visitor::operator();  //for blank overload
+        const std::uint64_t& operator()(const LegacyEnoteOriginContextV1 &record) const
+        { return record.enote_ledger_index; }
+        const std::uint64_t& operator()(const LegacyEnoteOriginContextV2 &record) const
+        { return record.enote_ledger_index; }
+    };
+
+    return variant.visit(visitor{});
+}
+//-------------------------------------------------------------------------------------------------------------------
+const SpEnoteOriginStatus& origin_status_ref(const LegacyEnoteOriginContextVariant &variant)
+{
+    struct visitor final : public tools::variant_static_visitor<const SpEnoteOriginStatus&>
+    {
+        using variant_static_visitor::operator();  //for blank overload
+        const SpEnoteOriginStatus& operator()(const LegacyEnoteOriginContextV1 &record) const
+        { return record.origin_status; }
+        const SpEnoteOriginStatus& operator()(const LegacyEnoteOriginContextV2 &record) const
+        { return record.origin_status; }
+    };
+
+    return variant.visit(visitor{});
+}
+//-------------------------------------------------------------------------------------------------------------------
+void origin_status_ref(const LegacyEnoteOriginContextVariant &variant, SpEnoteOriginStatus &origin_status_out)
+{
+    if (variant.is_type<LegacyEnoteOriginContextV1>())
+        origin_status_out = variant.unwrap<LegacyEnoteOriginContextV1>().origin_status;
+    else if (variant.is_type<LegacyEnoteOriginContextV2>())
+        origin_status_out = variant.unwrap<LegacyEnoteOriginContextV2>().origin_status;
+    else
+        ASSERT_MES_AND_THROW("unknown LegacyEnoteOriginContextVariant");
+}
+//-------------------------------------------------------------------------------------------------------------------
+const std::uint64_t& enote_version_dependent_index_ref(const LegacyEnoteOriginContextVariant &variant)
+{
+    struct visitor final : public tools::variant_static_visitor<const std::uint64_t&>
+    {
+        using variant_static_visitor::operator();  //for blank overload
+        const std::uint64_t& operator()(const LegacyEnoteOriginContextV1 &record) const
+        { return record.enote_same_amount_ledger_index; }
+        const std::uint64_t& operator()(const LegacyEnoteOriginContextV2 &record) const
+        { return record.rct_enote_ledger_index; }
+    };
+
+    return variant.visit(visitor{});
+}
 //-------------------------------------------------------------------------------------------------------------------
 const rct::key& onetime_address_ref(const LegacyContextualIntermediateEnoteRecordV1 &record)
 {
@@ -86,18 +218,46 @@ rct::xmr_amount amount_ref(const SpContextualEnoteRecordV1 &record)
     return record.record.amount;
 }
 //-------------------------------------------------------------------------------------------------------------------
-const SpEnoteOriginContextV1& origin_context_ref(const ContextualBasicRecordVariant &variant)
+const SpEnoteOriginStatus& origin_status_ref(const ContextualBasicRecordVariant &variant)
 {
-    struct visitor final : public tools::variant_static_visitor<const SpEnoteOriginContextV1&>
+    struct visitor final : public tools::variant_static_visitor<const SpEnoteOriginStatus&>
     {
         using variant_static_visitor::operator();  //for blank overload
-        const SpEnoteOriginContextV1& operator()(const LegacyContextualBasicEnoteRecordV1 &record) const
-        { return record.origin_context; }
-        const SpEnoteOriginContextV1& operator()(const SpContextualBasicEnoteRecordV1 &record) const
-        { return record.origin_context; }
+        const SpEnoteOriginStatus& operator()(const LegacyContextualBasicEnoteRecordV1 &record) const
+        { return origin_status_ref(record.origin_context); }
+        const SpEnoteOriginStatus& operator()(const SpContextualBasicEnoteRecordV1 &record) const
+        { return record.origin_context.origin_status; }
     };
 
-    return variant.visit(visitor());
+    return variant.visit(visitor{});
+}
+//-------------------------------------------------------------------------------------------------------------------
+const rct::key& transaction_id_ref(const ContextualBasicRecordVariant &variant)
+{
+    struct visitor final : public tools::variant_static_visitor<const rct::key&>
+    {
+        using variant_static_visitor::operator();  //for blank overload
+        const rct::key& operator()(const LegacyContextualBasicEnoteRecordV1 &record) const
+        { return transaction_id_ref(record.origin_context); }
+        const rct::key& operator()(const SpContextualBasicEnoteRecordV1 &record) const
+        { return record.origin_context.transaction_id; }
+    };
+
+    return variant.visit(visitor{});
+}
+//-------------------------------------------------------------------------------------------------------------------
+const std::uint64_t& block_index_ref(const ContextualBasicRecordVariant &variant)
+{
+    struct visitor final : public tools::variant_static_visitor<const std::uint64_t&>
+    {
+        using variant_static_visitor::operator();  //for blank overload
+        const std::uint64_t& operator()(const LegacyContextualBasicEnoteRecordV1 &record) const
+        { return block_index_ref(record.origin_context); }
+        const std::uint64_t& operator()(const SpContextualBasicEnoteRecordV1 &record) const
+        { return record.origin_context.block_index; }
+    };
+
+    return variant.visit(visitor{});
 }
 //-------------------------------------------------------------------------------------------------------------------
 rct::xmr_amount amount_ref(const ContextualRecordVariant &variant)
@@ -107,20 +267,6 @@ rct::xmr_amount amount_ref(const ContextualRecordVariant &variant)
         using variant_static_visitor::operator();  //for blank overload
         rct::xmr_amount operator()(const LegacyContextualEnoteRecordV1 &record) const { return amount_ref(record); }
         rct::xmr_amount operator()(const SpContextualEnoteRecordV1 &record)     const { return amount_ref(record); }
-    };
-
-    return variant.visit(visitor());
-}
-//-------------------------------------------------------------------------------------------------------------------
-const SpEnoteOriginContextV1& origin_context_ref(const ContextualRecordVariant &variant)
-{
-    struct visitor final : public tools::variant_static_visitor<const SpEnoteOriginContextV1&>
-    {
-        using variant_static_visitor::operator();  //for blank overload
-        const SpEnoteOriginContextV1& operator()(const LegacyContextualEnoteRecordV1 &record) const
-        { return record.origin_context; }
-        const SpEnoteOriginContextV1& operator()(const SpContextualEnoteRecordV1 &record) const
-        { return record.origin_context; }
     };
 
     return variant.visit(visitor());
@@ -138,6 +284,45 @@ const SpEnoteSpentContextV1& spent_context_ref(const ContextualRecordVariant &va
     };
 
     return variant.visit(visitor());
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool is_older_than(const LegacyEnoteOriginContextVariant &context, const LegacyEnoteOriginContextVariant &other_context)
+{
+    CHECK_AND_ASSERT_THROW_MES(LegacyEnoteOriginContextVariant::same_type(context, other_context), "compared LegacyEnoteOriginContextVariants are of different types");
+
+    // 1. origin status (higher statuses are assumed to be 'older')
+    if (origin_status_ref(context) > origin_status_ref(other_context))
+        return true;
+    if (origin_status_ref(context) < origin_status_ref(other_context))
+        return false;
+
+    // 2. block index
+    if (block_index_ref(context) < block_index_ref(other_context))
+        return true;
+    if (block_index_ref(context) > block_index_ref(other_context))
+        return false;
+
+    // note: don't assess the tx output index
+
+    // 3. enote same amount ledger index / rct enote ledger index
+    if (enote_version_dependent_index_ref(context) < enote_version_dependent_index_ref(other_context))
+        return true;
+    if (enote_version_dependent_index_ref(context) > enote_version_dependent_index_ref(other_context))
+        return false;
+
+    // 4. enote ledger index
+    if (enote_ledger_index_ref(context) < enote_ledger_index_ref(other_context))
+        return true;
+    if (enote_ledger_index_ref(context) > enote_ledger_index_ref(other_context))
+        return false;
+
+    // 5. block timestamp
+    if (block_timestamp_ref(context) < block_timestamp_ref(other_context))
+        return true;
+    if (block_timestamp_ref(context) > block_timestamp_ref(other_context))
+        return false;
+
+    return false;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool is_older_than(const SpEnoteOriginContextV1 &context, const SpEnoteOriginContextV1 &other_context)
@@ -227,12 +412,12 @@ bool have_same_destination(const SpContextualEnoteRecordV1 &a, const SpContextua
 //-------------------------------------------------------------------------------------------------------------------
 bool has_origin_status(const LegacyContextualIntermediateEnoteRecordV1 &record, const SpEnoteOriginStatus test_status)
 {
-    return record.origin_context.origin_status == test_status;
+    return origin_status_ref(record.origin_context) == test_status;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool has_origin_status(const LegacyContextualEnoteRecordV1 &record, const SpEnoteOriginStatus test_status)
 {
-    return record.origin_context.origin_status == test_status;
+    return origin_status_ref(record.origin_context) == test_status;
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool has_origin_status(const SpContextualIntermediateEnoteRecordV1 &record, const SpEnoteOriginStatus test_status)

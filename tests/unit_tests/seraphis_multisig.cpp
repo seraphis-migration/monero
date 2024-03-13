@@ -183,7 +183,7 @@ static bool legacy_multisig_input_is_ready_to_spend(const LegacyMultisigInputPro
         return false;
 
     // 4. expect the enote is spendable within the index specified
-    if (onchain_legacy_enote_is_locked(contextual_record.origin_context.block_index,
+    if (onchain_legacy_enote_is_locked(block_index_ref(contextual_record.origin_context),
             contextual_record.record.unlock_time,
             top_block_index,
             0,  //default spendable age: configurable

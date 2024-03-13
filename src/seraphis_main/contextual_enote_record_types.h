@@ -87,6 +87,79 @@ enum class SpEnoteSpentStatus : unsigned char
 };
 
 ////
+// LegacyEnoteOriginContextV1
+// - info related to the transaction where a pre-RingCT enote was found
+// - note that an enote may originate off-chain in a partial tx where the tx id is unknown
+///
+struct LegacyEnoteOriginContextV1 final
+{
+    /// block index of tx (-1 if index is unknown)
+    std::uint64_t block_index{static_cast<std::uint64_t>(-1)};
+    /// timestamp of tx's block (-1 if timestamp is unknown)
+    std::uint64_t block_timestamp{static_cast<std::uint64_t>(-1)};
+    /// tx id of the tx (0 if tx is unknown)
+    rct::key transaction_id{rct::zero()};
+    /// index of the enote in the tx's output set (-1 if index is unknown)
+    std::uint64_t enote_tx_index{static_cast<std::uint16_t>(-1)};
+    /// index of the enote in the set [0, number of enotes in the chain with exact same amount) (-1 if index is unknown)
+    std::uint64_t enote_same_amount_ledger_index{static_cast<std::uint64_t>(-1)};
+    /// ledger index of the enote (-1 if index is unknown)
+    std::uint64_t enote_ledger_index{static_cast<std::uint64_t>(-1)};
+    /// origin status (off-chain by default)
+    SpEnoteOriginStatus origin_status{SpEnoteOriginStatus::OFFCHAIN};
+
+    /// associated memo field (none by default)
+    TxExtra memo{};
+};
+
+////
+// LegacyEnoteOriginContextV2
+// - info related to the transaction where a post-RingCT enote was found
+// - note that an enote may originate off-chain in a partial tx where the tx id is unknown
+///
+struct LegacyEnoteOriginContextV2 final
+{
+    /// block index of tx (-1 if index is unknown)
+    std::uint64_t block_index{static_cast<std::uint64_t>(-1)};
+    /// timestamp of tx's block (-1 if timestamp is unknown)
+    std::uint64_t block_timestamp{static_cast<std::uint64_t>(-1)};
+    /// tx id of the tx (0 if tx is unknown)
+    rct::key transaction_id{rct::zero()};
+    /// index of the enote in the tx's output set (-1 if index is unknown)
+    std::uint64_t enote_tx_index{static_cast<std::uint16_t>(-1)};
+    /// index of the enote with amount 0 in m_legacy_amount_counts (-1 if index is unknown)
+    std::uint64_t rct_enote_ledger_index{static_cast<std::uint64_t>(-1)};
+    /// ledger index of the enote (-1 if index is unknown)
+    std::uint64_t enote_ledger_index{static_cast<std::uint64_t>(-1)};
+    /// origin status (off-chain by default)
+    SpEnoteOriginStatus origin_status{SpEnoteOriginStatus::OFFCHAIN};
+
+    /// associated memo field (none by default)
+    TxExtra memo{};
+};
+
+////
+// LegacyEnoteOriginContextVariant
+// - variant of all legacy enote origin context types
+//
+// block_index_ref(): get the enote's block index
+// block_timestamp_ref(): get the enote's block timestamp
+// transaction_id_ref(): get the enote's transaction id
+// enote_ledger_index_ref(): get the enote's ledger index
+// origin_status_ref(): get the enote's origin status
+// enote_version_dependent_index_ref(): get the enote's
+//      enote_same_amount_ledger_index (V1) or rct_enote_ledger_index (V2)
+///
+using LegacyEnoteOriginContextVariant = tools::variant<LegacyEnoteOriginContextV1, LegacyEnoteOriginContextV2>;
+const std::uint64_t& block_index_ref(const LegacyEnoteOriginContextVariant &variant);
+const std::uint64_t& block_timestamp_ref(const LegacyEnoteOriginContextVariant &variant);
+const rct::key& transaction_id_ref(const LegacyEnoteOriginContextVariant &variant);
+const std::uint64_t& enote_ledger_index_ref(const LegacyEnoteOriginContextVariant &variant);
+const SpEnoteOriginStatus& origin_status_ref(const LegacyEnoteOriginContextVariant &variant);
+void origin_status_ref(const LegacyEnoteOriginContextVariant &variant, SpEnoteOriginStatus &origin_status_out);
+const std::uint64_t& enote_version_dependent_index_ref(const LegacyEnoteOriginContextVariant &variant);
+
+////
 // SpEnoteOriginContextV1
 // - info related to the transaction where an enote was found
 // - note that an enote may originate off-chain in a partial tx where the tx id is unknown
@@ -140,7 +213,7 @@ struct LegacyContextualBasicEnoteRecordV1 final
     /// basic info about the enote
     LegacyBasicEnoteRecord record;
     /// info about where the enote was found
-    SpEnoteOriginContextV1 origin_context;
+    LegacyEnoteOriginContextVariant origin_context;
 };
 
 ////
@@ -152,8 +225,11 @@ struct LegacyContextualIntermediateEnoteRecordV1 final
 {
     /// intermediate info about the enote
     LegacyIntermediateEnoteRecord record;
-    /// info about where the enote was found
-    SpEnoteOriginContextV1 origin_context;
+    /// info about where the enote was found (V2 (post-rct) by default (empty constructor))
+    LegacyEnoteOriginContextVariant origin_context;
+
+    LegacyContextualIntermediateEnoteRecordV1();
+    LegacyContextualIntermediateEnoteRecordV1(LegacyIntermediateEnoteRecord record_in);
 };
 
 /// get the record's onetime address
@@ -170,9 +246,12 @@ struct LegacyContextualEnoteRecordV1 final
     /// info about the enote
     LegacyEnoteRecord record;
     /// info about where the enote was found
-    SpEnoteOriginContextV1 origin_context;
+    LegacyEnoteOriginContextVariant origin_context;
     /// info about where the enote was spent
     SpEnoteSpentContextV1 spent_context;
+
+    LegacyContextualEnoteRecordV1();
+    LegacyContextualEnoteRecordV1(LegacyEnoteRecord record_in);
 };
 
 /// get the record's key image
@@ -241,22 +320,24 @@ rct::xmr_amount amount_ref(const SpContextualEnoteRecordV1 &record);
 // ContextualBasicRecordVariant
 // - variant of all contextual basic enote record types
 //
-// origin_context_ref(): get the record's origin context
+// origin_status_ref(): get the enote's origin status
+// transaction_id_ref(): get the enote's transaction id
+// block_index_ref(): get the enote's block index
 ///
 using ContextualBasicRecordVariant = tools::variant<LegacyContextualBasicEnoteRecordV1, SpContextualBasicEnoteRecordV1>;
-const SpEnoteOriginContextV1& origin_context_ref(const ContextualBasicRecordVariant &variant);
+const SpEnoteOriginStatus& origin_status_ref(const ContextualBasicRecordVariant &variant);
+const rct::key& transaction_id_ref(const ContextualBasicRecordVariant &variant);
+const std::uint64_t& block_index_ref(const ContextualBasicRecordVariant &variant);
 
 ////
 // ContextualRecordVariant
 // - variant of all contextual full enote record types
 //
 // amount_ref(): get the record's amount
-// origin_context_ref(): get the record's origin context
 // spent_context_ref(): get the record's spent context
 ///
 using ContextualRecordVariant = tools::variant<LegacyContextualEnoteRecordV1, SpContextualEnoteRecordV1>;
 rct::xmr_amount amount_ref(const ContextualRecordVariant &variant);
-const SpEnoteOriginContextV1& origin_context_ref(const ContextualRecordVariant &variant);
 const SpEnoteSpentContextV1& spent_context_ref(const ContextualRecordVariant &variant);
 
 ////
@@ -278,6 +359,7 @@ struct SpContextualKeyImageSetV1 final
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// check if a context is older than another (returns false if apparently the same age, or younger)
+bool is_older_than(const LegacyEnoteOriginContextVariant &context, const LegacyEnoteOriginContextVariant &other_context);
 bool is_older_than(const SpEnoteOriginContextV1 &context, const SpEnoteOriginContextV1 &other_context);
 bool is_older_than(const SpEnoteSpentContextV1 &context, const SpEnoteSpentContextV1 &other_context);
 /// check if records have onetime address equivalence

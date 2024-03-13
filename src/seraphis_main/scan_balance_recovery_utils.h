@@ -85,6 +85,7 @@ bool try_find_legacy_enotes_in_tx(const rct::key &legacy_base_spend_pubkey,
     const std::uint64_t unlock_time,
     const TxExtra &tx_memo,
     const std::vector<LegacyEnoteVariant> &enotes_in_tx,
+    const std::vector<uint64_t> enote_version_dependent_indices,
     const SpEnoteOriginStatus origin_status,
     hw::device &hwdev,
     std::list<ContextualBasicRecordVariant> &basic_records_in_tx_out);

@@ -76,11 +76,12 @@ rct::key amount_commitment_ref(const LegacyEnoteVariant &variant)
     return variant.visit(visitor());
 }
 //-------------------------------------------------------------------------------------------------------------------
-LegacyEnoteV1 gen_legacy_enote_v1()
+LegacyEnoteV1 gen_legacy_enote_v1(bool is_pre_rct)
 {
     LegacyEnoteV1 temp;
     temp.onetime_address = rct::pkGen();
     temp.amount          = crypto::rand_idx<rct::xmr_amount>(0);
+    temp.is_pre_rct      = is_pre_rct;
     return temp;
 }
 //-------------------------------------------------------------------------------------------------------------------

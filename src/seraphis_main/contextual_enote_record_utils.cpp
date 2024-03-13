@@ -204,7 +204,7 @@ bool try_get_membership_proof_real_reference_mappings(const std::vector<LegacyCo
 
         // 2. save the [ KI : enote ledger index ] entry
         enote_ledger_mappings_out[key_image_ref(contextual_record)] =
-            contextual_record.origin_context.enote_ledger_index;
+            enote_ledger_index_ref(contextual_record.origin_context);
     }
 
     return true;
@@ -226,6 +226,19 @@ bool try_get_membership_proof_real_reference_mappings(const std::vector<SpContex
         enote_ledger_mappings_out[key_image_ref(contextual_record)] =
             contextual_record.origin_context.enote_ledger_index;
     }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool try_update_enote_origin_context_v1(const LegacyEnoteOriginContextVariant &fresh_origin_context,
+    LegacyEnoteOriginContextVariant &current_origin_context_inout)
+{
+    // 1. fail if the current context is older than the fresh one
+    if (is_older_than(current_origin_context_inout, fresh_origin_context))
+        return false;
+
+    // 2. overwrite with the fresh context (do this even if the fresh one seems to have the same age)
+    current_origin_context_inout = fresh_origin_context;
 
     return true;
 }
@@ -304,6 +317,23 @@ bool try_bump_enote_record_origin_status_v1(const SpEnoteSpentStatus spent_statu
     origin_status_inout = implied_origin_status;
 
     return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+void update_contextual_enote_record_contexts_v1(const LegacyEnoteOriginContextVariant &new_origin_context,
+    const SpEnoteSpentContextV1 &new_spent_context,
+    LegacyEnoteOriginContextVariant &origin_context_inout,
+    SpEnoteSpentContextV1 &spent_context_inout)
+{
+    // 1. update the origin context
+    try_update_enote_origin_context_v1(new_origin_context, origin_context_inout);
+
+    // 2. update the spent context
+    try_update_enote_spent_context_v1(new_spent_context, spent_context_inout);
+
+    // 3. bump the origin status based on the new spent status
+    SpEnoteOriginStatus origin_status_out;
+    origin_status_ref(origin_context_inout, origin_status_out);
+    try_bump_enote_record_origin_status_v1(spent_context_inout.spent_status, origin_status_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void update_contextual_enote_record_contexts_v1(const SpEnoteOriginContextV1 &new_origin_context,

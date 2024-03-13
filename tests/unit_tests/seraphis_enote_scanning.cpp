@@ -316,6 +316,9 @@ TEST(seraphis_enote_scanning, trivial_ledger)
 
     // expect the enote to be found
     ASSERT_TRUE(user_enote_store.has_enote_with_key_image(single_enote_record.key_image));
+
+    // m_legacy_amount_counts should not change, because we reached first_sp_only_block
+    ASSERT_TRUE(ledger_context.is_empty_legacy_amount_counts());
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, simple_ledger_1)
@@ -2284,6 +2287,227 @@ TEST(seraphis_enote_scanning, reorgs_while_scanning_5)
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_enote_scanning, legacy_pre_rct_1)
+{
+    /// setup
+
+    // 1. config
+    const scanning::ScanMachineConfig refresh_config{
+            .reorg_avoidance_increment = 1,
+            .max_chunk_size_hint = 1,
+            .max_partialscan_attempts = 0
+        };
+    MockLedgerContext ledger_context{10000, 10000};
+    SpEnoteStore enote_store{0, 10000, 0};
+
+    // 2. user keys
+    legacy_mock_keys legacy_keys;
+    make_legacy_mock_keys(legacy_keys);
+
+    // 3. user normal address
+    const rct::key normal_addr_spendkey{legacy_keys.Ks};
+    const rct::key normal_addr_viewkey{rct::scalarmultBase(rct::sk2rct(legacy_keys.k_v))};
+
+    // 4. user subaddress
+    rct::key subaddr_spendkey;
+    rct::key subaddr_viewkey;
+    cryptonote::subaddress_index subaddr_index;
+
+    gen_legacy_subaddress(legacy_keys.Ks, legacy_keys.k_v, subaddr_spendkey, subaddr_viewkey, subaddr_index);
+
+    std::unordered_map<rct::key, cryptonote::subaddress_index> legacy_subaddress_map;
+    legacy_subaddress_map[subaddr_spendkey] = subaddr_index;
+
+
+    /// test
+
+    LegacyEnoteV1 enote_1; //to normal destination
+    const crypto::secret_key enote_ephemeral_privkey_1{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_1{
+            rct::scalarmultBase(rct::sk2rct(enote_ephemeral_privkey_1))
+        };
+
+    ASSERT_NO_THROW(make_legacy_pre_rct_enote(normal_addr_spendkey,
+        normal_addr_viewkey,
+        1,  //amount
+        0,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_1,
+        enote_1));
+
+    LegacyEnoteV1 enote_2; //to subaddress destination
+    const crypto::secret_key enote_ephemeral_privkey_2{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_2{
+            rct::scalarmultKey(subaddr_spendkey, rct::sk2rct(enote_ephemeral_privkey_2))
+        };
+
+    ASSERT_NO_THROW(make_legacy_pre_rct_enote(subaddr_spendkey,
+        subaddr_viewkey,
+        1,  //amount
+        1,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_2,
+        enote_2));
+
+    TxExtra tx_extra_1;
+    ASSERT_TRUE(try_append_legacy_enote_ephemeral_pubkeys_to_tx_extra(
+            {
+                enote_ephemeral_pubkey_1,
+                enote_ephemeral_pubkey_2
+            },
+            tx_extra_1
+        ));
+
+    //block 0
+    ASSERT_NO_THROW(ledger_context.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_1,
+            {},
+            {
+                enote_1,
+                enote_2
+            }
+        ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(1) == 2); // [ 2*LegacyEnoteV1 ]
+
+    refresh_user_enote_store_legacy_full(legacy_keys.Ks,
+        legacy_subaddress_map,
+        legacy_keys.k_s,
+        legacy_keys.k_v,
+        refresh_config,
+        ledger_context,
+        enote_store);
+
+    ASSERT_TRUE(get_balance(enote_store, {SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+}
+//-------------------------------------------------------------------------------------------------------------------
+TEST(seraphis_enote_scanning, legacy_coinbase_1)
+{
+    /// setup
+
+    // 1. config
+    const scanning::ScanMachineConfig refresh_config{
+            .reorg_avoidance_increment = 1,
+            .max_chunk_size_hint = 1,
+            .max_partialscan_attempts = 0
+        };
+    MockLedgerContext ledger_context{10000, 10000};
+    SpEnoteStore enote_store{0, 10000, 0};
+
+    // 2. user keys
+    legacy_mock_keys legacy_keys;
+    make_legacy_mock_keys(legacy_keys);
+
+    // 3. user normal address
+    const rct::key normal_addr_spendkey{legacy_keys.Ks};
+    const rct::key normal_addr_viewkey{rct::scalarmultBase(rct::sk2rct(legacy_keys.k_v))};
+
+    // 4. user subaddress
+    rct::key subaddr_spendkey;
+    rct::key subaddr_viewkey;
+    cryptonote::subaddress_index subaddr_index;
+
+    gen_legacy_subaddress(legacy_keys.Ks, legacy_keys.k_v, subaddr_spendkey, subaddr_viewkey, subaddr_index);
+
+    std::unordered_map<rct::key, cryptonote::subaddress_index> legacy_subaddress_map;
+    legacy_subaddress_map[subaddr_spendkey] = subaddr_index;
+
+
+    /// test
+
+    LegacyEnoteV1 enote_v1_1;
+    const crypto::secret_key enote_ephemeral_privkey_1{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_1{
+            rct::scalarmultBase(rct::sk2rct(enote_ephemeral_privkey_1))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v1(normal_addr_spendkey,
+        normal_addr_viewkey,
+        1,  //amount
+        0,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_1,
+        enote_v1_1));
+
+    LegacyEnoteV1 enote_v1_2;
+    const crypto::secret_key enote_ephemeral_privkey_2{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_2{
+            rct::scalarmultKey(subaddr_spendkey, rct::sk2rct(enote_ephemeral_privkey_2))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v1(subaddr_spendkey,
+        subaddr_viewkey,
+        1,  //amount
+        1,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_2,
+        enote_v1_2));
+
+    LegacyEnoteV4 enote_v4_1;
+    const crypto::secret_key enote_ephemeral_privkey_3{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_3{
+            rct::scalarmultBase(rct::sk2rct(enote_ephemeral_privkey_3))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v4(normal_addr_spendkey,
+        normal_addr_viewkey,
+        1,  //amount
+        2,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_3,
+        enote_v4_1));
+
+    LegacyEnoteV4 enote_v4_2;
+    const crypto::secret_key enote_ephemeral_privkey_4{make_secret_key()};
+    const rct::key enote_ephemeral_pubkey_4{
+            rct::scalarmultKey(subaddr_spendkey, rct::sk2rct(enote_ephemeral_privkey_4))
+        };
+
+    ASSERT_NO_THROW(make_legacy_enote_v4(subaddr_spendkey,
+        subaddr_viewkey,
+        1,  //amount
+        3,  //index in planned mock coinbase tx
+        enote_ephemeral_privkey_4,
+        enote_v4_2));
+
+    TxExtra tx_extra_1;
+    ASSERT_TRUE(try_append_legacy_enote_ephemeral_pubkeys_to_tx_extra(
+            {
+                enote_ephemeral_pubkey_1,
+                enote_ephemeral_pubkey_2,
+                enote_ephemeral_pubkey_3,
+                enote_ephemeral_pubkey_4
+            },
+            tx_extra_1
+        ));
+
+    //block 0
+    ASSERT_NO_THROW(ledger_context.add_legacy_coinbase(
+            rct::pkGen(),
+            0,
+            tx_extra_1,
+            {},
+            {
+                enote_v1_1,
+                enote_v1_2,
+                enote_v4_1,
+                enote_v4_2
+            }
+        ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 4); // [ 2*LegacyEnoteV1 + 2*LegacyEnoteV4 ]
+
+    refresh_user_enote_store_legacy_full(legacy_keys.Ks,
+        legacy_subaddress_map,
+        legacy_keys.k_s,
+        legacy_keys.k_v,
+        refresh_config,
+        ledger_context,
+        enote_store);
+
+    ASSERT_TRUE(get_balance(enote_store, {SpEnoteOriginStatus::ONCHAIN},
+        {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 4);
+}
+//-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_pre_transition_1)
 {
     /// setup
@@ -2413,6 +2637,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_1)
         enote_ephemeral_privkey_6,
         enote_v3_2));
 
+    // QUESTION : Shouldn't this rather be called enote_v5_1?
     LegacyEnoteV5 enote_v4_1;  //to normal destination
     const crypto::secret_key enote_ephemeral_privkey_7{make_secret_key()};
     const rct::key enote_ephemeral_pubkey_7{
@@ -2426,6 +2651,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_1)
         enote_ephemeral_privkey_7,
         enote_v4_1));
 
+    // QUESTION : and this enote_v5_2?
     LegacyEnoteV5 enote_v4_2;  //to subaddress destination
     const crypto::secret_key enote_ephemeral_privkey_8{make_secret_key()};
     const rct::key enote_ephemeral_pubkey_8{
@@ -2469,6 +2695,9 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_1)
                 enote_v4_2
             }
         ));
+
+    //                            comments for this check explained: [ <enotes in block 0> ] ... [ <enotes in block min(top_block_index(), m_first_seraphis_only_block-1)> ]
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 8); // [ 2*LegacyV1 + 2*LegacyV2 + 2*LegacyV3 + 2*LegacyV5 ]
 
     refresh_user_enote_store_legacy_full(legacy_keys.Ks,
         legacy_subaddress_map,
@@ -2561,6 +2790,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_2)
                 enote_1
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
 
     //intermediate refresh
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
@@ -2808,6 +3039,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_3)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ 2*LegacyV5 ]
+
     //intermediate scan
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
         legacy_subaddress_map,
@@ -2862,6 +3095,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_3)
                 enote_2
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ 2*LegacyV5 ] [ 1*LegacyV5 ]
 
     //get intermediate scan index
     const std::uint64_t intermediate_index_pre_import_cycle_1{
@@ -3079,6 +3314,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_3)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 4); // [ 2*LegacyV5 ] [ 1*LegacyV5 ] [ 1*LegacyV5 ]
+
     //full scan
     refresh_user_enote_store_legacy_full(legacy_keys.Ks,
         legacy_subaddress_map,
@@ -3209,6 +3446,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_3)
 
     ASSERT_TRUE(enote_store.top_legacy_partialscanned_block_index() == 2);
     ASSERT_TRUE(enote_store.top_legacy_fullscanned_block_index() == 2);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 4); // [ 2*LegacyV5 ] [ 1*LegacyV5 ] [ 1*LegacyV5 ]
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_pre_transition_4)
@@ -3287,6 +3525,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_4)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
+
     //make enote: 2 -> user
     LegacyEnoteV5 enote_2;
     rct::key enote_ephemeral_pubkey_2;
@@ -3323,6 +3563,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_4)
                 enote_2
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ LegacyV5 ] [ LegacyV5 ]
 
     //intermediate scan
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
@@ -3404,6 +3646,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_4)
 
     ASSERT_TRUE(enote_store.top_legacy_partialscanned_block_index() == 0); //index not effected
     ASSERT_TRUE(enote_store.top_legacy_fullscanned_block_index() == 0);  //index set
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_pre_transition_5)
@@ -3482,6 +3725,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_5)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
+
     //make enote: 2 -> user
     LegacyEnoteV5 enote_2;
     rct::key enote_ephemeral_pubkey_2;
@@ -3518,6 +3763,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_5)
                 enote_2
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ LegacyV5 ] [ LegacyV5 ]
 
     //intermediate scan
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
@@ -3608,6 +3855,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_5)
 
     ASSERT_TRUE(enote_store.top_legacy_partialscanned_block_index() == 1); //index not effected
     ASSERT_TRUE(enote_store.top_legacy_fullscanned_block_index() == 1);  //index set
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_pre_transition_6)
@@ -3687,6 +3935,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_6)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
+
     //intermediate scan (don't import key image yet)
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
         legacy_subaddress_map,
@@ -3727,6 +3977,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_6)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ LegacyV5 ] [ LegacyV5 ]
+
     //intermediate scan (don't import key image yet); should still be only 1 intermediate record, with origin index 0
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
         legacy_subaddress_map,
@@ -3738,7 +3990,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_6)
 
     ASSERT_TRUE(enote_store_int.legacy_intermediate_records().size() == 1);
     ASSERT_TRUE(
-            enote_store_int.legacy_intermediate_records().begin()->second.origin_context.block_index == 0
+            block_index_ref(enote_store_int.legacy_intermediate_records().begin()->second.origin_context) == 0
         );
     ASSERT_TRUE(get_balance(enote_store_int, {SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
@@ -3773,7 +4025,7 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_6)
 
     ASSERT_TRUE(enote_store_int.legacy_intermediate_records().size() == 1);
     ASSERT_TRUE(
-            enote_store_int.legacy_intermediate_records().begin()->second.origin_context.block_index == 0
+            block_index_ref(enote_store_int.legacy_intermediate_records().begin()->second.origin_context) == 0
         );
     ASSERT_TRUE(get_balance(enote_store_int, {SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 1);
@@ -3846,6 +4098,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_6)
                 enote_1
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ LegacyV5 ] [ LegacyV5 ]
 
     //intermediate scan: no intermediate records
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
@@ -3950,6 +4204,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_6)
                 enote_1
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ LegacyV5 ] [ LegacyV5 ]
 
     //intermediate scan: still no intermediate records, balance still has enote 1-a
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
@@ -4179,6 +4435,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_7)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
+
     //intermediate scan (don't import key image yet)
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
         legacy_subaddress_map,
@@ -4218,6 +4476,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_7)
                 enote_1b
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ LegacyV5 ] [ LegacyV5 ]
 
     //intermediate scan (with key image import)
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
@@ -4348,6 +4608,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_7)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ LegacyV5 ] [ LegacyV5 ]
+
     //block 2: enote 1-d (amount 4)
     ASSERT_NO_THROW(ledger_context.add_legacy_coinbase(
             rct::pkGen(),
@@ -4358,6 +4620,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_7)
                 enote_1d
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ LegacyV5 ] [ LegacyV5 ] [ LegacyV5 ]
 
     //intermediate scan
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
@@ -4633,6 +4897,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_8)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
+
     //intermediate scan (don't import key image yet)
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
         legacy_subaddress_map,
@@ -4680,6 +4946,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_8)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ LegacyV5 ] [ LegacyV5 ]
+
     //intermediate scan (don't import key image yet)
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
         legacy_subaddress_map,
@@ -4726,6 +4994,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_8)
                 enote_3
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ LegacyV5 ] [ LegacyV5 ] [ LegacyV5 ]
 
     //intermediate scan (don't import key image yet)
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
@@ -5018,6 +5288,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_9)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
+
     //intermediate scan (don't import key image yet)
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
         legacy_subaddress_map,
@@ -5109,6 +5381,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_9)
                 enote_1b
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ LegacyV5 ] [ ] [ LegacyV5 ]
 
     //intermediate scan (don't import key image yet)
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
@@ -5253,6 +5527,8 @@ TEST(seraphis_enote_scanning, legacy_pre_transition_9)
                 enote_1c
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ LegacyV5 ] [ ] [ LegacyV5 ] [ ] [ LegacyV5 ]
 
     //intermediate scan
     refresh_user_enote_store_legacy_intermediate(legacy_keys.Ks,
@@ -5649,6 +5925,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_1)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ 2*LegacyV5 ]
+
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
         legacy_subaddress_map,
@@ -5729,6 +6007,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_1)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ 2*LegacyV5 ] [ LegacyV5 ]
+
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
         legacy_subaddress_map,
@@ -5772,6 +6052,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_1)
 
     //block 2: seraphis amount 10
     send_sp_coinbase_amounts_to_users({{10}, {0, 0, 0}}, {sp_destination, sp_destination_random}, ledger_context);
+    // m_legacy_amount_counts should not change, because we reached first_sp_only_block
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0)  == 3); // [ 2*LegacyV5 ] [ LegacyV5 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -5937,6 +6219,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_1)
 
     //block 0: seraphis amount 10
     send_sp_coinbase_amounts_to_users({{10}, {0, 0, 0}}, {sp_destination, sp_destination_random}, ledger_context);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 4); // [ 4*SpCoinbaseV1 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -6020,6 +6303,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_1)
                 legacy_enote_5
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 6); // [ 4*SpCoinbaseV1 ] [ 2*LegacyV5 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -6196,6 +6481,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_1)
 
     //block 0: seraphis amount 10
     send_sp_coinbase_amounts_to_users({{10}}, {sp_destination}, ledger_context);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ SpCoinbaseV1 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -6228,6 +6514,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_1)
 
     //block 1: seraphis amount 10
     send_sp_coinbase_amounts_to_users({{10}}, {sp_destination}, ledger_context);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ SpCoinbaseV1 ] [ SpCoinbaseV1 ]
 
     //legacy scan
     refresh_user_enote_store_legacy_full(legacy_keys.Ks,
@@ -6290,6 +6577,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_1)
                 legacy_enote_5
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ SpCoinbaseV1 ] [ 2*LegacyV5 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -6737,6 +7026,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_2)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ 2*LegacyV5 ]
+
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
         legacy_subaddress_map,
@@ -6817,6 +7108,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_2)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ 2*LegacyV5 ] [ LegacyV5 ]
+
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
         legacy_subaddress_map,
@@ -6860,6 +7153,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_2)
 
     //block 2: seraphis amount 10
     send_sp_coinbase_amounts_to_users({{10}, {0, 0, 0}}, {sp_destination, sp_destination_random}, ledger_context);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 7); // [ 2*LegacyV5 ] [ LegacyV5 ] [ 4*SpCoinbaseV1 ]
 
     //test recovery
     //seraphis scan should throw if this line in mock ledger context is changed to '> 0'
@@ -6902,6 +7196,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_2)
 
     //block 3: seraphis amount 10
     send_sp_coinbase_amounts_to_users({{10}}, {sp_destination}, ledger_context);
+    // m_legacy_amount_counts should not change, because we reached first_sp_only_block
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 7); // [ 2*LegacyV5 ] [ LegacyV5 ] [ 4*SpCoinbaseV1 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -7040,6 +7336,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_2)
 
     //block 1: seraphis amount 10
     send_sp_coinbase_amounts_to_users({{10}, {0, 0, 0}}, {sp_destination, sp_destination_random}, ledger_context);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 6); // [ 2*LegacyV5 ] [ 4*SpCoinbaseV1 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -7090,6 +7387,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_2)
                 legacy_enote_3
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 7); // [ 2*LegacyV5 ] [ 4*SpCoinbaseV1 ] [ LegacyV5 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -7267,6 +7566,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_2)
 
     //remove blocks 1, 2, 3, 4, 5
     ledger_context.pop_blocks(5);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ 2*LegacyV5 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -7305,6 +7605,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_2)
 
     //block 1: seraphis amount 10
     send_sp_coinbase_amounts_to_users({{10}}, {sp_destination}, ledger_context);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ 2*LegacyV5 ] [ SpCoinbaseV1 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -7343,6 +7644,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_2)
 
     //block 2: seraphis amount 10
     send_sp_coinbase_amounts_to_users({{10}}, {sp_destination}, ledger_context);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 4); // [ 2*LegacyV5 ] [ SpCoinbaseV1 ] [ SpCoinbaseV1 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -7619,6 +7921,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_2)
 
         enote_store_full,
         enote_store_view);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 4); // [ 2*LegacyV5 ] [ SpCoinbaseV1 ] [ SpCoinbaseV1 ]
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_sp_transition_3)
@@ -7733,6 +8036,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_3)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
+
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
         legacy_subaddress_map,
@@ -7772,6 +8077,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_3)
 
     //block 1: seraphis amount 10
     send_sp_coinbase_amounts_to_users({{10}, {0, 0, 0}}, {sp_destination, sp_destination_random}, ledger_context);
+    // m_legacy_amount_counts should not change, because we reached first_sp_only_block
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -7859,6 +8166,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_3)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 1); // [ LegacyV5 ]
+
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
         legacy_subaddress_map,
@@ -8154,6 +8463,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_3)
 
         enote_store_full,
         enote_store_view);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0)  == 1); // [ LegacyV5 ]
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_sp_transition_4)
@@ -8297,6 +8607,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_4)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ 2*LegacyV5 ]
+
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
         legacy_subaddress_map,
@@ -8376,6 +8688,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_4)
                 legacy_enote_3
             }
         ));
+
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ 2*LegacyV5 ] [ LegacyV5 ]
 
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
@@ -8762,6 +9076,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_4)
 
         enote_store_full,
         enote_store_view);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ 2*LegacyV5 ] [ ]
 }
 //-------------------------------------------------------------------------------------------------------------------
 TEST(seraphis_enote_scanning, legacy_sp_transition_5)
@@ -8916,6 +9231,8 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_5)
             }
         ));
 
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 2); // [ 2*LegacyV5 ]
+
     //test recovery
     legacy_sp_transition_test_recovery_assertions(legacy_keys,
         legacy_subaddress_map,
@@ -9011,6 +9328,7 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_5)
 
     //block 1: seraphis block
     send_sp_coinbase_amounts_to_users({{0}}, {sp_destination_random}, ledger_context);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ 2*LegacyV5 ] [ SpCoinbaseV1 ]
 
     //don't scan
 
@@ -9322,4 +9640,5 @@ TEST(seraphis_enote_scanning, legacy_sp_transition_5)
 
     ASSERT_TRUE(get_balance(enote_store_fresh, {SpEnoteOriginStatus::ONCHAIN},
         {SpEnoteSpentStatus::SPENT_ONCHAIN}) == 2);
+    ASSERT_TRUE(ledger_context.get_legacy_amount_counts(0) == 3); // [ 2*LegacyV5 ] [ SpCoinbaseV1 ]
 }

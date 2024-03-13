@@ -851,7 +851,7 @@ void SpEnoteStore::clean_maps_for_legacy_ledger_update(const std::uint64_t first
                 return false;
 
             // b. ignore onchain enotes outside of range [first_new_block, end of chain]
-            if (mapped_contextual_enote_record.second.origin_context.block_index < first_new_block)
+            if (block_index_ref(mapped_contextual_enote_record.second.origin_context) < first_new_block)
                 return false;
 
             // c. record the identifier of the enote being removed

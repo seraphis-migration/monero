@@ -58,6 +58,27 @@ void get_legacy_enote_identifier(const rct::key &onetime_address, const rct::xmr
     sp_hash_to_32(transcript.data(), transcript.size(), identifier_out.bytes);
 }
 //-------------------------------------------------------------------------------------------------------------------
+void make_legacy_pre_rct_enote(const rct::key &destination_spendkey,
+    const rct::key &destination_viewkey,
+    const rct::xmr_amount amount,
+    const std::uint64_t output_index,
+    const crypto::secret_key &enote_ephemeral_privkey,
+    LegacyEnoteV1 &enote_out)
+{
+    // onetime address: K^o = Hn(r K^v, t) G + K^s
+    make_legacy_onetime_address(destination_spendkey,
+        destination_viewkey,
+        output_index,
+        enote_ephemeral_privkey,
+        hw::get_device("default"),
+        enote_out.onetime_address);
+
+    // amount: a
+    enote_out.amount = amount;
+
+    enote_out.is_pre_rct = true;
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_legacy_enote_v1(const rct::key &destination_spendkey,
     const rct::key &destination_viewkey,
     const rct::xmr_amount amount,
@@ -75,6 +96,8 @@ void make_legacy_enote_v1(const rct::key &destination_spendkey,
 
     // amount: a
     enote_out.amount = amount;
+
+    enote_out.is_pre_rct = false;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_legacy_enote_v2(const rct::key &destination_spendkey,

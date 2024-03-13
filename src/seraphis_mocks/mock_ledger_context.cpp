@@ -213,6 +213,7 @@ std::uint64_t MockLedgerContext::add_legacy_coinbase(const rct::key &tx_id,
 
     /// update state
     const std::uint64_t new_index{this->top_block_index() + 1};
+    std::vector<std::uint64_t> enote_same_amount_ledger_indices;
 
     // 1. add legacy key images (mockup: force key images into chain as part of coinbase tx)
     for (const crypto::key_image &legacy_key_image : legacy_key_images_for_block)
@@ -231,6 +232,12 @@ std::uint64_t MockLedgerContext::add_legacy_coinbase(const rct::key &tx_id,
         m_legacy_enote_references[total_legacy_output_count] = {onetime_address_ref(enote), amount_commitment_ref(enote)};
 
         ++total_legacy_output_count;
+
+        // increment legacy amount count
+        const LegacyEnoteV1 *tmp_enote = enote.try_unwrap<LegacyEnoteV1>();
+        rct::xmr_amount amount = tmp_enote && tmp_enote->is_pre_rct ? tmp_enote->amount : 0;
+        ++m_legacy_amount_counts[amount];
+        enote_same_amount_ledger_indices.emplace_back(m_legacy_amount_counts[amount]);
     }
 
     // c. add this block's accumulated output count
@@ -240,7 +247,10 @@ std::uint64_t MockLedgerContext::add_legacy_coinbase(const rct::key &tx_id,
         m_accumulated_sp_output_counts[new_index] = m_sp_squashed_enotes.size();
 
     // d. add this block's tx output contents
-    m_blocks_of_legacy_tx_output_contents[new_index][tx_id] = {unlock_time, std::move(memo), std::move(output_enotes)};
+    m_blocks_of_legacy_tx_output_contents[new_index][tx_id] = {unlock_time,
+                                                               std::move(memo),
+                                                               std::move(output_enotes),
+                                                               std::move(enote_same_amount_ledger_indices)};
 
     if (new_index >= m_first_seraphis_allowed_block)
         m_blocks_of_sp_tx_output_contents[new_index];
@@ -441,6 +451,10 @@ std::uint64_t MockLedgerContext::commit_unconfirmed_txs_v1(const rct::key &coinb
                 m_sp_squashed_enotes[total_sp_output_count]);
 
             ++total_sp_output_count;
+
+            // increment legacy amount count
+            if (new_index < m_first_seraphis_only_block)
+                ++m_legacy_amount_counts[0];
         }
     }
 
@@ -519,7 +533,41 @@ std::uint64_t MockLedgerContext::pop_chain_at_index(const std::uint64_t pop_inde
         }
     }
 
-    // 2. remove legacy enote references
+    // 2. decrement m_legacy_amount_counts for all (pre seraphis_only) blocks that get popped
+    for (uint64_t idx = pop_index;
+         idx < m_first_seraphis_only_block && idx < this->top_block_index() + 1;
+         idx++)
+    {
+        // legacy, txs in block
+        for (auto const &tx_output_contents : m_blocks_of_legacy_tx_output_contents[idx])
+        {
+            // enotes in tx
+            for (LegacyEnoteVariant enote : std::get<std::vector<LegacyEnoteVariant>>(tx_output_contents.second))
+            {
+                const LegacyEnoteV1 *tmp_enote = enote.try_unwrap<LegacyEnoteV1>();
+                rct::xmr_amount amount = tmp_enote && tmp_enote->is_pre_rct ? tmp_enote->amount : 0;
+                if (m_legacy_amount_counts[amount] > 1)
+                    --m_legacy_amount_counts[amount];
+                else
+                    m_legacy_amount_counts.erase(amount);
+            }
+        }
+        // seraphis, txs in block
+        for (auto const &tx_output_contents : m_blocks_of_sp_tx_output_contents[idx])
+        {
+            // enotes in tx
+            for (SpEnoteVariant enote : std::get<std::vector<SpEnoteVariant>>(tx_output_contents.second))
+            {
+                rct::xmr_amount amount = 0;
+                if (m_legacy_amount_counts[amount] > 1)
+                    --m_legacy_amount_counts[amount];
+                else
+                    m_legacy_amount_counts.erase(amount);
+            }
+        }
+    }
+
+    // 3. remove legacy enote references
     if (m_accumulated_legacy_output_counts.size() > 0)
     {
         // sanity check
@@ -540,7 +588,7 @@ std::uint64_t MockLedgerContext::pop_chain_at_index(const std::uint64_t pop_inde
             m_legacy_enote_references.end());
     }
 
-    // 3. remove squashed enotes
+    // 4. remove squashed enotes
     if (m_accumulated_sp_output_counts.size() > 0)
     {
         // sanity check
@@ -560,7 +608,7 @@ std::uint64_t MockLedgerContext::pop_chain_at_index(const std::uint64_t pop_inde
         m_sp_squashed_enotes.erase(m_sp_squashed_enotes.find(first_output_to_remove), m_sp_squashed_enotes.end());
     }
 
-    // 4. clean up block maps
+    // 5. clean up block maps
     erase_ledger_cache_map_from_index(pop_index, m_blocks_of_tx_key_images);
     erase_ledger_cache_map_from_index(pop_index, m_accumulated_legacy_output_counts);
     erase_ledger_cache_map_from_index(pop_index, m_accumulated_sp_output_counts);
@@ -785,6 +833,7 @@ void MockLedgerContext::get_onchain_chunk_legacy(const std::uint64_t chunk_start
                             std::get<std::uint64_t>(tx_with_output_contents.second),
                             std::get<TxExtra>(tx_with_output_contents.second),
                             std::get<std::vector<LegacyEnoteVariant>>(tx_with_output_contents.second),
+                            std::get<std::vector<std::uint64_t>>(tx_with_output_contents.second),
                             SpEnoteOriginStatus::ONCHAIN,
                             hw::get_device("default"),
                             collected_records))
@@ -1018,6 +1067,16 @@ void MockLedgerContext::get_onchain_chunk_sp(const std::uint64_t chunk_start_ind
                 }
             }
         );
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::uint64_t MockLedgerContext::get_legacy_amount_counts(rct::xmr_amount amount)
+{
+    return m_legacy_amount_counts.find(amount) == m_legacy_amount_counts.end() ? 0 : m_legacy_amount_counts[amount];
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool MockLedgerContext::is_empty_legacy_amount_counts()
+{
+    return m_legacy_amount_counts.empty();
 }
 //-------------------------------------------------------------------------------------------------------------------
 
