@@ -158,8 +158,6 @@ struct SpCoinbaseTxProposalV1 final
 {
     /// block height
     std::uint64_t block_height;
-    /// block reward
-    rct::xmr_amount block_reward;
     /// outputs (SORTED)
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals;
     /// partial memo

@@ -775,7 +775,7 @@ void check_v1_coinbase_tx_proposal_semantics_v1(const SpCoinbaseTxProposalV1 &tx
     check_v1_tx_supplement_semantics_v1(tx_supplement, output_enotes.size());
 
     // 6. check balance
-    CHECK_AND_ASSERT_THROW_MES(validate_sp_coinbase_amount_balance_v1(tx_proposal.block_reward, output_enotes),
+    CHECK_AND_ASSERT_THROW_MES(validate_sp_coinbase_amount_overflow_v1(output_enotes),
         "Semantics check coinbase tx proposal v1: outputs do not balance the block reward.");
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -821,14 +821,12 @@ void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_v1_coinbase_tx_proposal_v1(const std::uint64_t block_height,
-    const rct::xmr_amount block_reward,
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
     SpCoinbaseTxProposalV1 &tx_proposal_out)
 {
     // set fields
     tx_proposal_out.block_height             = block_height;
-    tx_proposal_out.block_reward             = block_reward;
     tx_proposal_out.normal_payment_proposals = std::move(normal_payment_proposals);
     make_tx_extra(std::move(additional_memo_elements), tx_proposal_out.partial_memo);
 }

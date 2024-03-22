@@ -364,9 +364,6 @@ void make_serializable_sp_tx_coinbase_v1(const SpTxCoinbaseV1 &tx, ser_SpTxCoinb
     // block height
     serializable_tx_out.block_height = tx.block_height;
 
-    // block reward
-    serializable_tx_out.block_reward = tx.block_reward;
-
     // tx outputs (new enotes)
     copy_array(&make_serializable_sp_coinbase_enote_v1, tx.outputs, serializable_tx_out.outputs);
 
@@ -618,9 +615,6 @@ void recover_sp_tx_coinbase_v1(ser_SpTxCoinbaseV1 &serializable_tx_in, SpTxCoinb
 
     // block height
     tx_out.block_height = serializable_tx_in.block_height;
-
-    // block reward
-    tx_out.block_reward = serializable_tx_in.block_reward;
 
     // tx outputs (new enotes)
     relay_array(&recover_sp_coinbase_enote_v1, serializable_tx_in.outputs, tx_out.outputs);

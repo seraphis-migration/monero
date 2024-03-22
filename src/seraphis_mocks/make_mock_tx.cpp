@@ -66,38 +66,23 @@ namespace mocks
 //-------------------------------------------------------------------------------------------------------------------
 template <>
 void make_mock_tx<SpTxCoinbaseV1>(const SpTxParamPackV1 &params,
-    const std::vector<rct::xmr_amount> &legacy_in_amounts,
-    const std::vector<rct::xmr_amount> &sp_in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts,
-    const DiscretizedFee discretized_transaction_fee,
     MockLedgerContext &ledger_context_inout,
     SpTxCoinbaseV1 &tx_out)
 {
-    CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "SpTxCoinbaseV1: tried to make mock tx without any outputs.");
-    CHECK_AND_ASSERT_THROW_MES(discretized_transaction_fee == rct::xmr_amount{0},
-        "SpTxCoinbaseV1: tried to make mock tx with nonzero fee.");
+    const std::vector<rct::xmr_amount> &out_amounts = params.output_amounts;
+
+    CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0,
+        "SpTxCoinbaseV1: tried to make mock tx without any outputs.");
 
     // 1. mock semantics version
     const SpTxCoinbaseV1::SemanticRulesVersion semantic_rules_version{SpTxCoinbaseV1::SemanticRulesVersion::MOCK};
 
-    // 2. set block reward from input amounts
-    rct::xmr_amount block_reward{0};
-
-    for (const rct::xmr_amount &input_amount : legacy_in_amounts)
-        block_reward += input_amount;
-    for (const rct::xmr_amount &input_amount : sp_in_amounts)
-        block_reward += input_amount;
-
-    // 3. make mock outputs
+    // 2. make mock outputs
     std::vector<SpCoinbaseOutputProposalV1> output_proposals{
             gen_mock_sp_coinbase_output_proposals_v1(out_amounts, params.num_random_memo_elements)
         };
 
-    // 4. expect amounts to balance
-    CHECK_AND_ASSERT_THROW_MES(balance_check_in_out_amnts_v1(block_reward, output_proposals),
-        "SpTxCoinbaseV1: tried to make mock tx with unbalanced amounts.");
-
-    // 5. make partial memo
+    // 3. make partial memo
     std::vector<ExtraFieldElement> additional_memo_elements;
     additional_memo_elements.resize(params.num_random_memo_elements);
 
@@ -107,18 +92,17 @@ void make_mock_tx<SpTxCoinbaseV1>(const SpTxParamPackV1 &params,
     TxExtra partial_memo;
     make_tx_extra(std::move(additional_memo_elements), partial_memo);
 
-    // 6. extract info from output proposals
+    // 4. extract info from output proposals
     std::vector<SpCoinbaseEnoteV1> output_enotes;
     SpTxSupplementV1 tx_supplement;
     make_v1_coinbase_outputs_v1(output_proposals, output_enotes, tx_supplement.output_enote_ephemeral_pubkeys);
 
-    // 7. collect full memo
+    // 5. collect full memo
     finalize_tx_extra_v1(partial_memo, output_proposals, tx_supplement.tx_extra);
 
-    // 8. finish tx
+    // 6. finish tx
     make_seraphis_tx_coinbase_v1(semantic_rules_version,
         ledger_context_inout.chain_height() + 1,  //next block
-        block_reward,
         std::move(output_enotes),
         std::move(tx_supplement),
         tx_out);
@@ -126,13 +110,14 @@ void make_mock_tx<SpTxCoinbaseV1>(const SpTxParamPackV1 &params,
 //-------------------------------------------------------------------------------------------------------------------
 template <>
 void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
-    const std::vector<rct::xmr_amount> &legacy_in_amounts,
-    const std::vector<rct::xmr_amount> &sp_in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts,
-    const DiscretizedFee discretized_transaction_fee,
     MockLedgerContext &ledger_context_inout,
     SpTxSquashedV1 &tx_out)
 {
+    const std::vector<rct::xmr_amount> &legacy_in_amounts = params.legacy_input_amounts;
+    const std::vector<rct::xmr_amount> &sp_in_amounts = params.sp_input_amounts;
+    const std::vector<rct::xmr_amount> &out_amounts = params.output_amounts;
+    const DiscretizedFee &discretized_transaction_fee = params.discretized_fee;
+
     CHECK_AND_ASSERT_THROW_MES(legacy_in_amounts.size() + sp_in_amounts.size() > 0,
         "SpTxSquashedV1: tried to make mock tx without any inputs.");
     CHECK_AND_ASSERT_THROW_MES(out_amounts.size() > 0, "SpTxSquashedV1: tried to make mock tx without any outputs.");

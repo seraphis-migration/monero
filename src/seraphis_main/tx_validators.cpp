@@ -408,17 +408,15 @@ bool validate_sp_key_images_v1(const std::vector<LegacyEnoteImageV2> &legacy_inp
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool validate_sp_coinbase_amount_balance_v1(const rct::xmr_amount block_reward,
-    const std::vector<SpCoinbaseEnoteV1> &outputs)
+bool validate_sp_coinbase_amount_overflow_v1(const std::vector<SpCoinbaseEnoteV1> &outputs)
 {
-    // add together output amounts (use uint128_t to prevent malicious overflow)
+    // expect the output sum doesn't overflow
     boost::multiprecision::uint128_t output_amount_sum{0};
 
     for (const SpCoinbaseEnoteV1 &output : outputs)
         output_amount_sum += output.core.amount;
 
-    // expect output amount equals coinbase block reward
-    if (block_reward != output_amount_sum)
+    if (output_amount_sum > std::numeric_limits<rct::xmr_amount>::max())
         return false;
 
     return true;

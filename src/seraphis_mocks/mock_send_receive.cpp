@@ -139,7 +139,6 @@ void send_sp_coinbase_amounts_to_user(const std::vector<rct::xmr_amount> &coinba
     // 1. prepare payment proposals
     std::vector<jamtis::JamtisPaymentProposalV1> payment_proposals;
     payment_proposals.reserve(coinbase_amounts.size());
-    rct::xmr_amount block_reward{0};
 
     for (const rct::xmr_amount coinbase_amount : coinbase_amounts)
     {
@@ -148,16 +147,12 @@ void send_sp_coinbase_amounts_to_user(const std::vector<rct::xmr_amount> &coinba
         user_address,
         TxExtra{},
         tools::add_element(payment_proposals));
-
-        // b. accumulate the block reward
-        block_reward += coinbase_amount;
     }
 
     // 2. make a coinbase tx
     SpTxCoinbaseV1 coinbase_tx;
     make_seraphis_tx_coinbase_v1(SpTxCoinbaseV1::SemanticRulesVersion::MOCK,
         ledger_context_inout.chain_height() + 1,
-        block_reward,
         std::move(payment_proposals),
         {},
         coinbase_tx);
@@ -181,7 +176,6 @@ void send_sp_coinbase_amounts_to_users(const std::vector<std::vector<rct::xmr_am
     // 1. prepare payment proposals
     std::vector<jamtis::JamtisPaymentProposalV1> payment_proposals;
     payment_proposals.reserve(coinbase_amounts_per_user.size());
-    rct::xmr_amount block_reward{0};
 
     for (std::size_t user_index{0}; user_index < user_addresses.size(); ++user_index)
     {
@@ -192,9 +186,6 @@ void send_sp_coinbase_amounts_to_users(const std::vector<std::vector<rct::xmr_am
                 user_addresses[user_index],
                 TxExtra{},
                 tools::add_element(payment_proposals));
-
-            // b. accumulate the block reward
-            block_reward += user_amount;
         }
     }
 
@@ -202,7 +193,6 @@ void send_sp_coinbase_amounts_to_users(const std::vector<std::vector<rct::xmr_am
     SpTxCoinbaseV1 coinbase_tx;
     make_seraphis_tx_coinbase_v1(SpTxCoinbaseV1::SemanticRulesVersion::MOCK,
         ledger_context_inout.chain_height() + 1,
-        block_reward,
         std::move(payment_proposals),
         {},
         coinbase_tx);

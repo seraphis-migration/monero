@@ -34,6 +34,7 @@
 
 //local headers
 #include "seraphis_core/binned_reference_set.h"
+#include "seraphis_core/discretized_fee.h"
 
 //third party headers
 
@@ -44,7 +45,6 @@
 namespace rct { using xmr_amount = uint64_t; }
 namespace sp
 {
-    struct DiscretizedFee;
     struct SpTxCoinbaseV1;
     struct SpTxSquashedV1;
     class TxValidationContext;
@@ -64,19 +64,11 @@ namespace mocks
 * type: SpTxType - 
 * type: SpTxParamsT -
 * param: params -
-* param: legacy_in_amounts -
-* param: sp_in_amounts -
-* param: out_amounts -
-* param: discretized_transaction_fee -
 * inoutparam: ledger_context_inout -
 * outparam: tx_out -
 */
 template <typename SpTxType, typename SpTxParamsT>
 void make_mock_tx(const SpTxParamsT &params,
-    const std::vector<rct::xmr_amount> &legacy_in_amounts,
-    const std::vector<rct::xmr_amount> &sp_in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts,
-    const DiscretizedFee discretized_transaction_fee,
     MockLedgerContext &ledger_context_inout,
     SpTxType &tx_out);
 
@@ -90,23 +82,19 @@ struct SpTxParamPackV1
     std::size_t ref_set_decomp_m{0};
     std::size_t num_random_memo_elements{0};
     SpBinnedReferenceSetConfigV1 bin_config{0, 0};
+    std::vector<rct::xmr_amount> legacy_input_amounts{};
+    std::vector<rct::xmr_amount> sp_input_amounts{};
+    std::vector<rct::xmr_amount> output_amounts{};
+    DiscretizedFee discretized_fee{sp::discretize_fee(0)};
 };
 /// make an SpTxCoinbaseV1 transaction
 template <>
 void make_mock_tx<SpTxCoinbaseV1>(const SpTxParamPackV1 &params,
-    const std::vector<rct::xmr_amount> &legacy_in_amounts,
-    const std::vector<rct::xmr_amount> &sp_in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts,
-    const DiscretizedFee discretized_transaction_fee,
     MockLedgerContext &ledger_context_inout,
     SpTxCoinbaseV1 &tx_out);
 /// make an SpTxSquashedV1 transaction
 template <>
 void make_mock_tx<SpTxSquashedV1>(const SpTxParamPackV1 &params,
-    const std::vector<rct::xmr_amount> &legacy_in_amounts,
-    const std::vector<rct::xmr_amount> &sp_in_amounts,
-    const std::vector<rct::xmr_amount> &out_amounts,
-    const DiscretizedFee discretized_transaction_fee,
     MockLedgerContext &ledger_context_inout,
     SpTxSquashedV1 &tx_out);
 

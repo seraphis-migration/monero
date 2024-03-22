@@ -73,8 +73,6 @@ struct SpTxCoinbaseV1 final
 
     /// height of the block whose block reward this coinbase tx disperses
     std::uint64_t block_height;
-    /// block reward dispersed by this coinbase tx
-    rct::xmr_amount block_reward;
     /// tx outputs (new coinbase enotes)
     std::vector<SpCoinbaseEnoteV1> outputs;
     /// supplemental data for tx
@@ -103,7 +101,6 @@ void get_sp_tx_coinbase_v1_txid(const SpTxCoinbaseV1 &tx, rct::key &tx_id_out);
 */
 void make_seraphis_tx_coinbase_v1(const SpTxCoinbaseV1::SemanticRulesVersion semantic_rules_version,
     const std::uint64_t block_height,
-    const rct::xmr_amount block_reward,
     std::vector<SpCoinbaseEnoteV1> outputs,
     SpTxSupplementV1 tx_supplement,
     SpTxCoinbaseV1 &tx_out);
@@ -112,7 +109,6 @@ void make_seraphis_tx_coinbase_v1(const SpTxCoinbaseV1::SemanticRulesVersion sem
     SpTxCoinbaseV1 &tx_out);
 void make_seraphis_tx_coinbase_v1(const SpTxCoinbaseV1::SemanticRulesVersion semantic_rules_version,
     const std::uint64_t block_height,
-    const rct::xmr_amount block_reward,
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
     SpTxCoinbaseV1 &tx_out);

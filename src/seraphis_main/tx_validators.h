@@ -235,14 +235,11 @@ bool validate_sp_key_images_v1(const std::vector<LegacyEnoteImageV2> &legacy_inp
     const std::vector<SpEnoteImageV1> &sp_input_images,
     const TxValidationContext &tx_validation_context);
 /**
-* brief: validate_sp_coinbase_amount_balance_v1 - check that amounts balance in the coinbase tx (block reward == outputs)
-*   - check block_reward == sum(output amounts)
-* param: block_reward -
+* brief: validate_sp_coinbase_amount_overflow_v1 - check that coinbase amount sum doesn't overflow
 * param: outputs -
 * return: true/false on validation result
 */
-bool validate_sp_coinbase_amount_balance_v1(const rct::xmr_amount block_reward,
-    const std::vector<SpCoinbaseEnoteV1> &outputs);
+bool validate_sp_coinbase_amount_overflow_v1(const std::vector<SpCoinbaseEnoteV1> &outputs);
 /**
 * brief: validate_sp_amount_balance_v1 - check that amounts balance in the tx (inputs == outputs)
 *   - check sum(input image masked commitments) == sum(output commitments) + fee*H + remainder*G

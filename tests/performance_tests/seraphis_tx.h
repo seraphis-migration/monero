@@ -317,14 +317,14 @@ public:
                                 sp::math::uint_pow(params.n, params.m / 2)
                             )
                     };  //bin config must be compatible with n^m
+                tx_params.legacy_input_amounts = std::move(legacy_input_amounts);
+                tx_params.sp_input_amounts = std::move(sp_input_amounts);
+                tx_params.output_amounts = std::move(output_amounts);
+                tx_params.discretized_fee = sp::discretize_fee(0);
 
                 // make tx
                 m_txs.emplace_back();
                 sp::mocks::make_mock_tx<SpTxType>(tx_params,
-                    legacy_input_amounts,
-                    sp_input_amounts,
-                    output_amounts,
-                    sp::discretize_fee(0),
                     *m_ledger_contex,
                     m_txs.back());
 

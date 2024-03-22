@@ -153,13 +153,11 @@ void check_v1_tx_proposal_semantics_v1(const SpTxProposalV1 &tx_proposal,
 /**
 * brief: make_v1_coinbase_tx_proposal_v1 - make v1 coinbase tx proposal
 * param: block_height -
-* param: block_reward -
 * param: normal_payment_proposals -
 * param: additional_memo_elements -
 * outparam: tx_proposal_out -
 */
 void make_v1_coinbase_tx_proposal_v1(const std::uint64_t block_height,
-    const rct::xmr_amount block_reward,
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
     SpCoinbaseTxProposalV1 &tx_proposal_out);

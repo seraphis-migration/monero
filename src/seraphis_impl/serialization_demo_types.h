@@ -363,8 +363,6 @@ struct ser_SpTxCoinbaseV1 final
 
     /// height of the block whose block reward this coinbase tx disperses
     std::uint64_t block_height;
-    /// block reward dispersed by this coinbase tx
-    rct::xmr_amount block_reward;
     /// tx outputs (new enotes)
     std::vector<ser_SpCoinbaseEnoteV1> outputs;
     /// supplemental data for tx
@@ -373,7 +371,6 @@ struct ser_SpTxCoinbaseV1 final
     BEGIN_SERIALIZE()
         VARINT_FIELD(tx_semantic_rules_version)
         VARINT_FIELD(block_height)
-        VARINT_FIELD(block_reward)
         FIELD(outputs)
         FIELD(tx_supplement)
     END_SERIALIZE()

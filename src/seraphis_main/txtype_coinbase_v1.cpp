@@ -102,7 +102,6 @@ void get_sp_tx_coinbase_v1_txid(const SpTxCoinbaseV1 &tx, rct::key &tx_id_out)
         };
     transcript.append("tx_version", tx_version.bytes);
     transcript.append("block_height", tx.block_height);
-    transcript.append("block_reward", tx.block_reward);
     transcript.append("output_enotes", tx.outputs);
     transcript.append("tx_supplement", tx.tx_supplement);
 
@@ -111,18 +110,18 @@ void get_sp_tx_coinbase_v1_txid(const SpTxCoinbaseV1 &tx, rct::key &tx_id_out)
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_coinbase_v1(const SpTxCoinbaseV1::SemanticRulesVersion semantic_rules_version,
     const std::uint64_t block_height,
-    const rct::xmr_amount block_reward,
     std::vector<SpCoinbaseEnoteV1> outputs,
     SpTxSupplementV1 tx_supplement,
     SpTxCoinbaseV1 &tx_out)
 {
     tx_out.tx_semantic_rules_version = semantic_rules_version;
     tx_out.block_height              = block_height;
-    tx_out.block_reward              = block_reward;
     tx_out.outputs                   = std::move(outputs);
     tx_out.tx_supplement             = std::move(tx_supplement);
 
     CHECK_AND_ASSERT_THROW_MES(validate_tx_semantics(tx_out), "Failed to assemble an SpTxCoinbaseV1.");
+    CHECK_AND_ASSERT_THROW_MES(validate_tx_amount_balance(tx_out),
+        "Failed to assemble an SpTxCoinbaseV1: amount balancing");
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_coinbase_v1(const SpTxCoinbaseV1::SemanticRulesVersion semantic_rules_version,
@@ -147,7 +146,6 @@ void make_seraphis_tx_coinbase_v1(const SpTxCoinbaseV1::SemanticRulesVersion sem
     // 5. finish tx
     make_seraphis_tx_coinbase_v1(semantic_rules_version,
         tx_proposal.block_height,
-        tx_proposal.block_reward,
         std::move(output_enotes),
         std::move(tx_supplement),
         tx_out);
@@ -155,7 +153,6 @@ void make_seraphis_tx_coinbase_v1(const SpTxCoinbaseV1::SemanticRulesVersion sem
 //-------------------------------------------------------------------------------------------------------------------
 void make_seraphis_tx_coinbase_v1(const SpTxCoinbaseV1::SemanticRulesVersion semantic_rules_version,
     const std::uint64_t block_height,
-    const rct::xmr_amount block_reward,
     std::vector<jamtis::JamtisPaymentProposalV1> normal_payment_proposals,
     std::vector<ExtraFieldElement> additional_memo_elements,
     SpTxCoinbaseV1 &tx_out)
@@ -163,7 +160,6 @@ void make_seraphis_tx_coinbase_v1(const SpTxCoinbaseV1::SemanticRulesVersion sem
     // make a coinbase tx proposal
     SpCoinbaseTxProposalV1 tx_proposal;
     make_v1_coinbase_tx_proposal_v1(block_height,
-        block_reward,
         std::move(normal_payment_proposals),
         std::move(additional_memo_elements),
         tx_proposal);
@@ -229,7 +225,7 @@ template <>
 bool validate_tx_amount_balance<SpTxCoinbaseV1>(const SpTxCoinbaseV1 &tx)
 {
     // balance proof
-    if (!validate_sp_coinbase_amount_balance_v1(tx.block_reward, tx.outputs))
+    if (!validate_sp_coinbase_amount_overflow_v1(tx.outputs))
         return false;
 
     return true;

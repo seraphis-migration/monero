@@ -93,14 +93,14 @@ static void run_mock_tx_test(const std::size_t legacy_ring_size,
         tx_params.ref_set_decomp_m         = ref_set_decomp_m;
         tx_params.num_random_memo_elements = 0;
         tx_params.bin_config               = bin_config;
+        tx_params.legacy_input_amounts     = std::move(legacy_input_amounts);
+        tx_params.sp_input_amounts         = std::move(sp_input_amounts);
+        tx_params.output_amounts           = std::move(output_amounts);
+        tx_params.discretized_fee          = discretized_transaction_fee;
 
         // make tx
         SpTxType tx;
         make_mock_tx<SpTxType>(tx_params,
-            legacy_input_amounts,
-            sp_input_amounts,
-            output_amounts,
-            discretized_transaction_fee,
             ledger_context_inout,
             tx);
 
@@ -186,19 +186,20 @@ static void run_mock_tx_test_batch(const std::vector<SpTxGenData> &gen_data)
                 expected_result = gen.expected_result;
 
                 // mock params
-                SpTxParamPackV1 tx_params;
+                SpTxParamPackV1 tx_params{};
 
-                tx_params.legacy_ring_size = gen.legacy_ring_size;
-                tx_params.ref_set_decomp_n = gen.ref_set_decomp_n;
-                tx_params.ref_set_decomp_m = gen.ref_set_decomp_m;
-                tx_params.bin_config = gen.bin_config;
+                tx_params.legacy_ring_size         = gen.legacy_ring_size;
+                tx_params.ref_set_decomp_n         = gen.ref_set_decomp_n;
+                tx_params.ref_set_decomp_m         = gen.ref_set_decomp_m;
+                tx_params.num_random_memo_elements = 0;
+                tx_params.bin_config               = gen.bin_config;
+                tx_params.legacy_input_amounts     = std::move(legacy_input_amounts);
+                tx_params.sp_input_amounts         = std::move(sp_input_amounts);
+                tx_params.output_amounts           = std::move(gen.output_amounts);
+                tx_params.discretized_fee          = gen.discretized_transaction_fee;
 
                 // make tx
                 make_mock_tx<SpTxType>(tx_params,
-                    legacy_input_amounts,
-                    sp_input_amounts,
-                    gen.output_amounts,
-                    gen.discretized_transaction_fee,
                     ledger_context,
                     tools::add_element(txs_to_verify));
             }
@@ -274,20 +275,21 @@ static void run_mock_tx_test_cached(const std::size_t legacy_ring_size,
     try
     {
         // mock params
-        SpTxParamPackV1 tx_params;
+        SpTxParamPackV1 tx_params{};
 
-        tx_params.legacy_ring_size = legacy_ring_size;
-        tx_params.ref_set_decomp_n = ref_set_decomp_n;
-        tx_params.ref_set_decomp_m = ref_set_decomp_m;
-        tx_params.bin_config = bin_config;
+        tx_params.legacy_ring_size         = legacy_ring_size;
+        tx_params.ref_set_decomp_n         = ref_set_decomp_n;
+        tx_params.ref_set_decomp_m         = ref_set_decomp_m;
+        tx_params.num_random_memo_elements = 0;
+        tx_params.bin_config               = bin_config;
+        tx_params.legacy_input_amounts     = std::move(legacy_input_amounts);
+        tx_params.sp_input_amounts         = std::move(sp_input_amounts);
+        tx_params.output_amounts           = std::move(output_amounts);
+        tx_params.discretized_fee          = discretized_transaction_fee;
 
         // make tx
         SpTxType tx;
         make_mock_tx<SpTxType>(tx_params,
-            legacy_input_amounts,
-            sp_input_amounts,
-            output_amounts,
-            discretized_transaction_fee,
             ledger_context_inout,
             tx);
 
