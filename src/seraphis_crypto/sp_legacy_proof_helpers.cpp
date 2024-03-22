@@ -103,9 +103,8 @@ void make_bpp2_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     range_proofs_out = bulletproof_plus2_PROVE(amounts, amount_commitment_blinding_factors);
 }
 //-------------------------------------------------------------------------------------------------------------------
-void append_bpp2_to_transcript(const BulletproofPlus2 &bpp2_proof, SpTranscriptBuilder &transcript_inout)
+void append_bpp2_proof_to_transcript(const BulletproofPlus2Proof &bpp2_proof, SpTranscriptBuilder &transcript_inout)
 {
-    transcript_inout.append("V", bpp2_proof.V);
     transcript_inout.append("A", bpp2_proof.A);
     transcript_inout.append("A1", bpp2_proof.A1);
     transcript_inout.append("B", bpp2_proof.B);
@@ -116,45 +115,50 @@ void append_bpp2_to_transcript(const BulletproofPlus2 &bpp2_proof, SpTranscriptB
     transcript_inout.append("R", bpp2_proof.R);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t bpp_size_bytes(const std::size_t num_range_proofs, const bool include_commitments)
+std::size_t bpp_lr_length(const std::size_t num_range_proofs)
 {
-    // BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)
-    std::size_t proof_size{32 * (2 * highest_bit_position(round_up_to_power_of_2(64 * num_range_proofs)) + 6)};
-
-    // size of commitments that are range proofed (if requested)
-    if (include_commitments)
-        proof_size += 32 * num_range_proofs;
-
-    return proof_size;
+    // L/R length: ceil(log2(64 * num range proofs)
+    return highest_bit_position(round_up_to_power_of_2(64 * num_range_proofs));
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::size_t bpp_weight(const std::size_t num_range_proofs, const bool include_commitments)
+std::size_t bpp_size_bytes_lr(const std::size_t lr_length)
 {
+    // BP+ size: 32 * (2 * LR vec size) + 6)
+    return 32 * (2 * lr_length + 6);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t bpp_size_bytes(const std::size_t num_range_proofs)
+{
+    // BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)
+    return bpp_size_bytes_lr(bpp_lr_length(num_range_proofs));
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t bpp_weight_lr(const std::size_t lr_length)
+{
+    CHECK_AND_ASSERT_THROW_MES(lr_length >= 6, "L/R length can not be less than 6: " << lr_length);
+
     // BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)
     // BP+ size (2 range proofs): 32 * 20
     // weight = size(proof) + 0.8 * (32*20*(num range proofs + num dummy range proofs)/2) - size(proof))
     // explanation: 'claw back' 80% of the size of this BP+ if it were split into proofs of pairs of range proofs
-    // note: the weight can optionally include the commitments that are range proofed
 
     // BP+ size of an aggregate proof with two range proofs
     const std::size_t size_two_agg_proof{32 * 20};
 
     // number of BP+ proofs if this BP+ were split into proofs of pairs of range proofs
     // num = (range proofs + dummy range proofs) / 2
-    const std::size_t num_two_agg_groups{round_up_to_power_of_2(num_range_proofs) / 2};
+    const std::size_t num_two_agg_groups = (1 << (lr_length - 6)) >> 1;
 
     // the proof size
-    const std::size_t proof_size{bpp_size_bytes(num_range_proofs, false)};  //don't include commitments here
-
-    // size of commitments that are range proofed (if requested)
-    const std::size_t commitments_size{
-            include_commitments
-            ? 32 * num_range_proofs
-            : 0
-        };
+    const std::size_t proof_size{bpp_size_bytes_lr(lr_length)};
 
     // return the weight
-    return (2 * proof_size + 8 * size_two_agg_proof * num_two_agg_groups) / 10 + commitments_size;
+    return (2 * proof_size + 8 * size_two_agg_proof * num_two_agg_groups) / 10;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::size_t bpp_weight(const std::size_t num_range_proofs)
+{
+    return bpp_weight_lr(bpp_lr_length(num_range_proofs));
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace sp

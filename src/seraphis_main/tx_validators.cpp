@@ -123,8 +123,7 @@ bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCoun
     const std::size_t num_sp_membership_proofs,
     const std::size_t num_sp_image_proofs,
     const std::size_t num_outputs,
-    const std::size_t num_enote_pubkeys,
-    const std::size_t num_range_proofs)
+    const std::size_t num_enote_pubkeys)
 {
     // input count
     if (num_legacy_input_images + num_sp_input_images < config.min_inputs ||
@@ -146,10 +145,6 @@ bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCoun
     // output count
     if (num_outputs < config.min_outputs ||
         num_outputs > config.max_outputs)
-        return false;
-
-    // range proofs should be 1:1 with seraphis input image amount commitments and outputs
-    if (num_range_proofs != num_sp_input_images + num_outputs)
         return false;
 
     // outputs and enote pubkeys should be 1:1
@@ -428,10 +423,8 @@ bool validate_sp_amount_balance_v1(const std::vector<LegacyEnoteImageV2> &legacy
     const DiscretizedFee discretized_transaction_fee,
     const SpBalanceProofV1 &balance_proof)
 {
-    const BulletproofPlus2 &range_proofs = balance_proof.bpp2_proof;
-
     // sanity check
-    if (range_proofs.V.size() == 0)
+    if (outputs.size() == 0)
         return false;
 
     // try to extract the fee
@@ -446,26 +439,6 @@ bool validate_sp_amount_balance_v1(const std::vector<LegacyEnoteImageV2> &legacy
             raw_transaction_fee,
             balance_proof.remainder_blinding_factor))
         return false;
-
-    // check that commitments in range proofs line up with seraphis input image and output commitments
-    if (sp_input_images.size() + outputs.size() != range_proofs.V.size())
-        return false;
-
-    for (std::size_t input_commitment_index{0}; input_commitment_index < sp_input_images.size(); ++input_commitment_index)
-    {
-        // the two stored copies of input image commitments must match
-        if (!(masked_commitment_ref(sp_input_images[input_commitment_index]) ==
-                rct::scalarmult8(range_proofs.V[input_commitment_index])))
-            return false;
-    }
-
-    for (std::size_t output_commitment_index{0}; output_commitment_index < outputs.size(); ++output_commitment_index)
-    {
-        // the two stored copies of output commitments must match
-        if (!(outputs[output_commitment_index].core.amount_commitment ==
-                rct::scalarmult8(range_proofs.V[sp_input_images.size() + output_commitment_index])))
-            return false;
-    }
 
     // BP+: deferred for batch-verification
 

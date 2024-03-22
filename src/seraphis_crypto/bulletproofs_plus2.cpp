@@ -737,7 +737,8 @@ try_again:
         sc_muladd(d1.bytes, d_.bytes, e.bytes, eta.bytes);
         sc_muladd(d1.bytes, alpha1.bytes, e_squared.bytes, d1.bytes);
 
-        return BulletproofPlus2{std::move(V), A, A1, B, r1, s1, d1, std::move(L), std::move(R)};
+        return BulletproofPlus2{std::move(V),
+            BulletproofPlus2Proof{A, A1, B, r1, s1, d1, std::move(L), std::move(R)}};
     }
 
     BulletproofPlus2 bulletproof_plus2_PROVE(const std::vector<uint64_t> &v, const rct::keyV &gamma)
@@ -761,9 +762,12 @@ try_again:
     };
 
     // Given a batch of range proofs, determine if they are all valid
-    bool try_get_bulletproof_plus2_verification_data(const std::vector<const BulletproofPlus2*> &proofs,
+    bool try_get_bulletproof_plus2_verification_data(const std::vector<const rct::keyV*> &Vs,
+        const std::vector<const BulletproofPlus2Proof*> &proofs,
         std::list<SpMultiexpBuilder> &prep_data_out)
     {
+        CHECK_AND_ASSERT_MES(Vs.size() == proofs.size(), false, "Vs and proofs sizes differ");
+
         init_exponents();
 
         const size_t logN = 6;
@@ -781,16 +785,17 @@ try_again:
         std::vector<rct::key> to_invert;
         to_invert.reserve(14 * proofs.size()); // maximal size, given the aggregation limit
 
-        for (const BulletproofPlus2 *p: proofs)
+        for (size_t i = 0; i < proofs.size(); ++i)
         {
-            const BulletproofPlus2 &proof = *p;
+            const rct::keyV &V = *Vs[i];
+            const BulletproofPlus2Proof &proof = *proofs[i];
 
             // Sanity checks
             CHECK_AND_ASSERT_MES(is_reduced(proof.r1), false, "Input scalar not in range");
             CHECK_AND_ASSERT_MES(is_reduced(proof.s1), false, "Input scalar not in range");
             CHECK_AND_ASSERT_MES(is_reduced(proof.d1), false, "Input scalar not in range");
 
-            CHECK_AND_ASSERT_MES(proof.V.size() >= 1, false, "V does not have at least one element");
+            CHECK_AND_ASSERT_MES(V.size() >= 1, false, "V does not have at least one element");
             CHECK_AND_ASSERT_MES(proof.L.size() == proof.R.size(), false, "Mismatched L and R sizes");
             CHECK_AND_ASSERT_MES(proof.L.size() > 0, false, "Empty proof");
 
@@ -801,7 +806,7 @@ try_again:
 
             // Reconstruct the challenges
             rct::key transcript = copy(initial_transcript);
-            transcript_update(transcript, proof.V);
+            transcript_update(transcript, V);
             pd.y = transcript_update(transcript, proof.A);
             CHECK_AND_ASSERT_MES(!(pd.y == rct::zero()), false, "y == 0");
             pd.z = transcript_update(transcript);
@@ -809,7 +814,7 @@ try_again:
 
             // Determine the number of inner-product rounds based on proof size
             size_t M;
-            for (pd.logM = 0; (M = 1<<pd.logM) <= maxM && M < proof.V.size(); ++pd.logM);
+            for (pd.logM = 0; (M = 1<<pd.logM) <= maxM && M < V.size(); ++pd.logM);
             CHECK_AND_ASSERT_MES(proof.L.size() == 6+pd.logM, false, "Proof is not the expected size");
 
             const size_t rounds = pd.logM+logN;
@@ -864,9 +869,10 @@ try_again:
 
 
         // Process each proof and add to the weighted batch
-        for (const BulletproofPlus2 *p: proofs)
+        for (size_t i = 0; i < proofs.size(); ++i)
         {
-            const BulletproofPlus2 &proof = *p;
+            const rct::keyV &V = *Vs[i];
+            const BulletproofPlus2Proof &proof = *proofs[i];
             const bp_plus2_proof_data_t &pd = proof_data[proof_data_index++];
 
             CHECK_AND_ASSERT_MES(proof.L.size() == 6+pd.logM, false, "Proof is not the expected size");
@@ -881,13 +887,13 @@ try_again:
             }
 
             // note: set the multiexp builder's weight to 1 and manually weight proof elements for efficiency
-            prep_data_out.emplace_back(rct::identity(), 2 * MN, proof.V.size() + 2 * (pd.logM + logN) + 3);
+            prep_data_out.emplace_back(rct::identity(), 2 * MN, V.size() + 2 * (pd.logM + logN) + 3);
             SpMultiexpBuilder &data_builder = prep_data_out.back();
 
             // Rescale previously offset proof elements
             //
             // This ensures that all such group elements are in the prime-order subgroup.
-            proof8_V.resize(proof.V.size()); for (size_t i = 0; i < proof.V.size(); ++i) rct::scalarmult8(proof8_V[i], proof.V[i]);
+            proof8_V.resize(V.size()); for (size_t i = 0; i < V.size(); ++i) rct::scalarmult8(proof8_V[i], V[i]);
             proof8_L.resize(proof.L.size()); for (size_t i = 0; i < proof.L.size(); ++i) rct::scalarmult8(proof8_L[i], proof.L[i]);
             proof8_R.resize(proof.R.size()); for (size_t i = 0; i < proof.R.size(); ++i) rct::scalarmult8(proof8_R[i], proof.R[i]);
             ge_p3 proof8_A1;
@@ -1050,11 +1056,12 @@ try_again:
         return true;
     }
 
-    bool bulletproof_plus2_VERIFY(const std::vector<const BulletproofPlus2*> &proofs)
+    bool bulletproof_plus2_VERIFY(const std::vector<const rct::keyV*> &Vs,
+        const std::vector<const BulletproofPlus2Proof*> &proofs)
     {
         // build multiexp
         std::list<SpMultiexpBuilder> prep_data;
-        if (!try_get_bulletproof_plus2_verification_data(proofs, prep_data))
+        if (!try_get_bulletproof_plus2_verification_data(Vs, proofs, prep_data))
             return false;;
 
         // verify all elements sum to zero
@@ -1069,15 +1076,20 @@ try_again:
 
     bool bulletproof_plus2_VERIFY(const std::vector<BulletproofPlus2> &proofs)
     {
-        std::vector<const BulletproofPlus2*> proof_pointers;
+        std::vector<const rct::keyV*> value_pointers;
+        std::vector<const BulletproofPlus2Proof*> proof_pointers;
+        value_pointers.reserve(proofs.size());
         proof_pointers.reserve(proofs.size());
         for (const BulletproofPlus2 &proof: proofs)
-            proof_pointers.push_back(&proof);
-        return bulletproof_plus2_VERIFY(proof_pointers);
+        {
+            value_pointers.push_back(&proof.V);
+            proof_pointers.push_back(&proof.proof);
+        }
+        return bulletproof_plus2_VERIFY(value_pointers, proof_pointers);
     }
 
     bool bulletproof_plus2_VERIFY(const BulletproofPlus2 &proof)
     {
-        return bulletproof_plus2_VERIFY({&proof});
+        return bulletproof_plus2_VERIFY({&proof.V}, {&proof.proof});
     }
 } //namespace sp

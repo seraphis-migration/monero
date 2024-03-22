@@ -72,19 +72,26 @@ void make_bpp2_rangeproofs(const std::vector<rct::xmr_amount> &amounts,
     BulletproofPlus2 &range_proofs_out);
 /**
 * brief: append_bpp2_to_transcript - append BP+ v2 proof to a transcript
-*   transcript += {V} || A || A1 || B || r1 || s1 || d1 || {L} || {R}
+*   transcript += A || A1 || B || r1 || s1 || d1 || {L} || {R}
 * param: bpp_proof -
 * inoutparam: transcript_inout - contents appended to a transcript
 */
-void append_bpp2_to_transcript(const BulletproofPlus2 &bpp_proof, SpTranscriptBuilder &transcript_inout);
+void append_bpp2_proof_to_transcript(const BulletproofPlus2Proof &bpp_proof,
+    SpTranscriptBuilder &transcript_inout);
 /**
-* brief: bpp_size_bytes - get the size of a BP+ proof in bytes
+ * brief: bpp_lr_length - get the length of the BP+ L/R vectors, given the number of range proofs
+ *   - L/R length: ceil(log2(64 * num range proofs)
+*/
+std::size_t bpp_lr_length(const std::size_t num_range_proofs);
+/**
+* brief: bpp_size_bytes - get the size of a BP+ proof in bytes (excluding commitments)
 *   - BP+ size: 32 * (2*ceil(log2(64 * num range proofs)) + 6)
 * param: num_range_proofs -
-* param: include_commitments -
+* param: lr_length - length of the L/R proof vectors
 * return: the BP+ proof's size in bytes
 */
-std::size_t bpp_size_bytes(const std::size_t num_range_proofs, const bool include_commitments);
+std::size_t bpp_size_bytes(const std::size_t num_range_proofs);
+std::size_t bpp_size_bytes_lr(const std::size_t lr_length);
 /**
 * brief: bpp_weight - get the 'weight' of a BP+ proof
 *   - Verifying a BP+ is linear in the number of aggregated range proofs, but the proof size is logarithmic,
@@ -99,9 +106,10 @@ std::size_t bpp_size_bytes(const std::size_t num_range_proofs, const bool includ
 *   weight = size(proof) + clawback
 *   clawback = 0.8 * [(num range proofs + num dummy range proofs)*size(BP+ proof with 2 range proofs) - size(proof)]
 * param: num_range_proofs -
-* param: include_commitments -
+* param: lr_length - length of the L/R proof vectors
 * return: the BP+ proof's weight
 */
-std::size_t bpp_weight(const std::size_t num_range_proofs, const bool include_commitments);
+std::size_t bpp_weight(const std::size_t num_range_proofs);
+std::size_t bpp_weight_lr(const std::size_t lr_length);
 
 } //namespace sp

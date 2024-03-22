@@ -107,7 +107,7 @@ bool try_get_serializable(epee::span<const std::uint8_t> serialized, Serializabl
 * param: object - normal object
 * outparam: serializable_object_out - object to map the normal object into; this should be serializable/deserializable
 */
-void make_serializable_bpp2(const BulletproofPlus2 &bpp2, ser_BulletproofPlus2_PARTIAL &serializable_bpp2_out);
+void make_serializable_bpp2(const BulletproofPlus2Proof &bpp2_proof, ser_BulletproofPlus2_PARTIAL &serializable_bpp2_out);
 void make_serializable_clsag(const rct::clsag &clsag, ser_clsag_PARTIAL &serializable_clsag_out);
 void make_serializable_grootle_proof(const GrootleProof &grootle, ser_GrootleProof &serializable_grootle_out);
 void make_serializable_jamtis_payment_proposal_v1(const jamtis::JamtisPaymentProposalV1 &payment, ser_JamtisPaymentProposalV1 &serializable_payment_out);
@@ -146,8 +146,7 @@ void make_serializable_sp_destination_v1(const jamtis::JamtisDestinationV1 &dest
 * outparam: object_out - object to map the serializable object and extra params into
 */
 void recover_bpp2(ser_BulletproofPlus2_PARTIAL &serializable_bpp2_in,
-    std::vector<rct::key> balance_proof_commitments_mulinv8,
-    BulletproofPlus2 &bpp2_out);
+    BulletproofPlus2Proof &bpp2_proof_out);
 void recover_clsag(ser_clsag_PARTIAL &serializable_clsag_in, const crypto::key_image &key_image, rct::clsag &clsag_out);
 void recover_grootle_proof(ser_GrootleProof &serializable_grootle_in, GrootleProof &grootle_out);
 void recover_jamtis_payment_proposal_v1(const ser_JamtisPaymentProposalV1 &serializable_payment, jamtis::JamtisPaymentProposalV1 &payment_out);
@@ -165,7 +164,6 @@ void recover_sp_coinbase_enote_v1(const ser_SpCoinbaseEnoteV1 &serializable_enot
 void recover_sp_enote_v1(const ser_SpEnoteV1 &serializable_enote, SpEnoteV1 &enote_out);
 void recover_sp_enote_image_v1(const ser_SpEnoteImageV1 &serializable_image, SpEnoteImageV1 &image_out);
 void recover_sp_balance_proof_v1(ser_SpBalanceProofV1_PARTIAL &serializable_proof_in,
-    std::vector<rct::key> commitments_inv8,
     SpBalanceProofV1 &proof_out);
 void recover_legacy_ring_signature_v4(ser_LegacyRingSignatureV4_PARTIAL &serializable_signature_in,
     const crypto::key_image &key_image,

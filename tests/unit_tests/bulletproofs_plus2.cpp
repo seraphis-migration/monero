@@ -139,31 +139,31 @@ TEST(bulletproofs_plus2, invalid_torsion)
       ASSERT_FALSE(sp::bulletproof_plus2_VERIFY(proof));
       k = org_k;
     }
-    for (auto &k: proof.L)
+    for (auto &k: proof.proof.L)
     {
       const rct::key org_k = k;
       rct::addKeys(k, org_k, x);
       ASSERT_FALSE(sp::bulletproof_plus2_VERIFY(proof));
       k = org_k;
     }
-    for (auto &k: proof.R)
+    for (auto &k: proof.proof.R)
     {
       const rct::key org_k = k;
       rct::addKeys(k, org_k, x);
       ASSERT_FALSE(sp::bulletproof_plus2_VERIFY(proof));
       k = org_k;
     }
-    const rct::key org_A = proof.A;
-    rct::addKeys(proof.A, org_A, x);
+    const rct::key org_A = proof.proof.A;
+    rct::addKeys(proof.proof.A, org_A, x);
     ASSERT_FALSE(sp::bulletproof_plus2_VERIFY(proof));
-    proof.A = org_A;
-    const rct::key org_A1 = proof.A1;
-    rct::addKeys(proof.A1, org_A1, x);
+    proof.proof.A = org_A;
+    const rct::key org_A1 = proof.proof.A1;
+    rct::addKeys(proof.proof.A1, org_A1, x);
     ASSERT_FALSE(sp::bulletproof_plus2_VERIFY(proof));
-    proof.A1 = org_A1;
-    const rct::key org_B = proof.B;
-    rct::addKeys(proof.B, org_B, x);
+    proof.proof.A1 = org_A1;
+    const rct::key org_B = proof.proof.B;
+    rct::addKeys(proof.proof.B, org_B, x);
     ASSERT_FALSE(sp::bulletproof_plus2_VERIFY(proof));
-    proof.B = org_B;
+    proof.proof.B = org_B;
   }
 }

@@ -120,7 +120,6 @@ bool validate_sp_semantics_coinbase_component_counts_v1(const SemanticConfigCoin
 * param: num_sp_image_proofs -
 * param: num_outputs -
 * param: num_enote_pubkeys -
-* param: num_range_proofs -
 * return: true/false on validation result
 */
 bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCountsV1 &config,
@@ -130,8 +129,7 @@ bool validate_sp_semantics_component_counts_v1(const SemanticConfigComponentCoun
     const std::size_t num_sp_membership_proofs,
     const std::size_t num_sp_image_proofs,
     const std::size_t num_outputs,
-    const std::size_t num_enote_pubkeys,
-    const std::size_t num_range_proofs);
+    const std::size_t num_enote_pubkeys);
 /**
 * brief: validate_sp_semantics_legacy_reference_sets_v1 - check legacy ring signatures have consistent and
 *   valid reference sets
@@ -249,6 +247,7 @@ bool validate_sp_coinbase_amount_overflow_v1(const std::vector<SpCoinbaseEnoteV1
 * param: outputs -
 * param: discretized_transaction_fee -
 * param: balance_proof -
+* param: sp_tx_commitments -
 * return: true/false on validation result
 */
 bool validate_sp_amount_balance_v1(const std::vector<LegacyEnoteImageV2> &legacy_input_images,

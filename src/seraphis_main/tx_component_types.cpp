@@ -218,7 +218,7 @@ void append_to_transcript(const SpImageProofV1 &container, SpTranscriptBuilder &
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const SpBalanceProofV1 &container, SpTranscriptBuilder &transcript_inout)
 {
-    append_bpp2_to_transcript(container.bpp2_proof, transcript_inout);
+    append_bpp2_proof_to_transcript(container.bpp2_proof, transcript_inout);
     transcript_inout.append("remainder_blinding_factor", container.remainder_blinding_factor);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -227,7 +227,7 @@ std::size_t sp_balance_proof_v1_size_bytes(const std::size_t num_range_proofs)
     std::size_t size{0};
 
     // BP+ proof
-    size += bpp_size_bytes(num_range_proofs, true);  //include commitments
+    size += bpp_size_bytes(num_range_proofs);
 
     // remainder blinding factor
     size += 32;
@@ -237,18 +237,15 @@ std::size_t sp_balance_proof_v1_size_bytes(const std::size_t num_range_proofs)
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t sp_balance_proof_v1_size_bytes(const SpBalanceProofV1 &proof)
 {
-    return sp_balance_proof_v1_size_bytes(proof.bpp2_proof.V.size());
-}
-//-------------------------------------------------------------------------------------------------------------------
-std::size_t sp_balance_proof_v1_size_bytes_compact(const std::size_t num_range_proofs)
-{
-    // proof size minus cached amount commitments
-    return sp_balance_proof_v1_size_bytes(num_range_proofs) - 32*(num_range_proofs);
-}
-//-------------------------------------------------------------------------------------------------------------------
-std::size_t sp_balance_proof_v1_size_bytes_compact(const SpBalanceProofV1 &proof)
-{
-    return sp_balance_proof_v1_size_bytes_compact(proof.bpp2_proof.V.size());
+    std::size_t size{0};
+
+    // BP+ proof
+    size += bpp_size_bytes_lr(proof.bpp2_proof.L.size());
+
+    // remainder blinding factor
+    size += 32;
+
+    return size;
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t sp_balance_proof_v1_weight(const std::size_t num_range_proofs)
@@ -256,7 +253,7 @@ std::size_t sp_balance_proof_v1_weight(const std::size_t num_range_proofs)
     std::size_t weight{0};
 
     // BP+ proof
-    weight += bpp_weight(num_range_proofs, false);  //weight without cached amount commitments
+    weight += bpp_weight(num_range_proofs);  //weight without cached amount commitments
 
     // remainder blinding factor
     weight += 32;
@@ -266,7 +263,15 @@ std::size_t sp_balance_proof_v1_weight(const std::size_t num_range_proofs)
 //-------------------------------------------------------------------------------------------------------------------
 std::size_t sp_balance_proof_v1_weight(const SpBalanceProofV1 &proof)
 {
-    return sp_balance_proof_v1_weight(proof.bpp2_proof.V.size());
+    std::size_t weight{0};
+
+    // BP+ proof
+    weight += bpp_weight_lr(proof.bpp2_proof.L.size());  //weight without cached amount commitments
+
+    // remainder blinding factor
+    weight += 32;
+
+    return weight;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void append_to_transcript(const SpTxSupplementV1 &container, SpTranscriptBuilder &transcript_inout)

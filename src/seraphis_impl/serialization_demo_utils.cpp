@@ -85,21 +85,6 @@ static void relay_array(const RelayFuncT &relay_func, std::vector<Type1> &array1
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-static void collect_sp_balance_proof_commitments_v1(const std::vector<SpEnoteImageV1> &seraphis_input_images,
-    const std::vector<SpEnoteV1> &output_enotes,
-    std::vector<rct::key> &commitments_out)
-{
-    commitments_out.clear();
-    commitments_out.reserve(seraphis_input_images.size() + output_enotes.size());
-
-    for (const SpEnoteImageV1 &input_image : seraphis_input_images)
-        commitments_out.emplace_back(rct::scalarmultKey(masked_commitment_ref(input_image), rct::INV_EIGHT));
-
-    for (const SpEnoteV1 &output_enote : output_enotes)
-        commitments_out.emplace_back(rct::scalarmultKey(output_enote.core.amount_commitment, rct::INV_EIGHT));
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 static void indices_to_offsets(std::vector<std::uint64_t> &indices_inout)
 {
     if (indices_inout.size() == 0)
@@ -196,16 +181,16 @@ static void make_serializable_sp_membership_proofs_v1(const std::vector<SpMember
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-void make_serializable_bpp2(const BulletproofPlus2 &bpp2, ser_BulletproofPlus2_PARTIAL &serializable_bpp2_out)
+void make_serializable_bpp2(const BulletproofPlus2Proof &bpp2_proof, ser_BulletproofPlus2_PARTIAL &serializable_bpp2_out)
 {
-    serializable_bpp2_out.A  = bpp2.A;
-    serializable_bpp2_out.A1 = bpp2.A1;
-    serializable_bpp2_out.B  = bpp2.B;
-    serializable_bpp2_out.r1 = bpp2.r1;
-    serializable_bpp2_out.s1 = bpp2.s1;
-    serializable_bpp2_out.d1 = bpp2.d1;
-    serializable_bpp2_out.L  = bpp2.L;
-    serializable_bpp2_out.R  = bpp2.R;
+    serializable_bpp2_out.A  = bpp2_proof.A;
+    serializable_bpp2_out.A1 = bpp2_proof.A1;
+    serializable_bpp2_out.B  = bpp2_proof.B;
+    serializable_bpp2_out.r1 = bpp2_proof.r1;
+    serializable_bpp2_out.s1 = bpp2_proof.s1;
+    serializable_bpp2_out.d1 = bpp2_proof.d1;
+    serializable_bpp2_out.L  = bpp2_proof.L;
+    serializable_bpp2_out.R  = bpp2_proof.R;
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_serializable_clsag(const rct::clsag &clsag, ser_clsag_PARTIAL &serializable_clsag_out)
@@ -419,18 +404,16 @@ void make_serializable_sp_destination_v1(const jamtis::JamtisDestinationV1 &dest
 
 //-------------------------------------------------------------------------------------------------------------------
 void recover_bpp2(ser_BulletproofPlus2_PARTIAL &serializable_bpp2_in,
-    std::vector<rct::key> balance_proof_commitments_mulinv8,
-    BulletproofPlus2 &bpp2_out)
+    BulletproofPlus2Proof &bpp2_proof_out)
 {
-    bpp2_out.V  = std::move(balance_proof_commitments_mulinv8);
-    bpp2_out.A  = serializable_bpp2_in.A;
-    bpp2_out.A1 = serializable_bpp2_in.A1;
-    bpp2_out.B  = serializable_bpp2_in.B;
-    bpp2_out.r1 = serializable_bpp2_in.r1;
-    bpp2_out.s1 = serializable_bpp2_in.s1;
-    bpp2_out.d1 = serializable_bpp2_in.d1;
-    bpp2_out.L  = std::move(serializable_bpp2_in.L);
-    bpp2_out.R  = std::move(serializable_bpp2_in.R);
+    bpp2_proof_out.A  = serializable_bpp2_in.A;
+    bpp2_proof_out.A1 = serializable_bpp2_in.A1;
+    bpp2_proof_out.B  = serializable_bpp2_in.B;
+    bpp2_proof_out.r1 = serializable_bpp2_in.r1;
+    bpp2_proof_out.s1 = serializable_bpp2_in.s1;
+    bpp2_proof_out.d1 = serializable_bpp2_in.d1;
+    bpp2_proof_out.L  = std::move(serializable_bpp2_in.L);
+    bpp2_proof_out.R  = std::move(serializable_bpp2_in.R);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void recover_clsag(ser_clsag_PARTIAL &serializable_clsag_in, const crypto::key_image &key_image, rct::clsag &clsag_out)
@@ -548,11 +531,10 @@ void recover_sp_enote_image_v1(const ser_SpEnoteImageV1 &serializable_image, SpE
 }
 //-------------------------------------------------------------------------------------------------------------------
 void recover_sp_balance_proof_v1(ser_SpBalanceProofV1_PARTIAL &serializable_proof_in,
-    std::vector<rct::key> commitments_inv8,
     SpBalanceProofV1 &proof_out)
 {
     // bpp2
-    recover_bpp2(serializable_proof_in.bpp2_proof_PARTIAL, std::move(commitments_inv8), proof_out.bpp2_proof);
+    recover_bpp2(serializable_proof_in.bpp2_proof_PARTIAL, proof_out.bpp2_proof);
 
     // remainder blinding factor
     proof_out.remainder_blinding_factor = serializable_proof_in.remainder_blinding_factor;
@@ -642,12 +624,7 @@ void recover_sp_tx_squashed_v1(ser_SpTxSquashedV1 &serializable_tx_in,
     relay_array(&recover_sp_enote_v1, serializable_tx_in.outputs, tx_out.outputs);
 
     // balance proof (balance proof and range proofs)
-    std::vector<rct::key> balance_proof_commitments_mulinv8;
-    collect_sp_balance_proof_commitments_v1(tx_out.sp_input_images,
-        tx_out.outputs,
-        balance_proof_commitments_mulinv8);
     recover_sp_balance_proof_v1(serializable_tx_in.balance_proof,
-        std::move(balance_proof_commitments_mulinv8),
         tx_out.balance_proof);
 
     // ring signature proofs: membership and ownership/key-image-legitimacy for each legacy input

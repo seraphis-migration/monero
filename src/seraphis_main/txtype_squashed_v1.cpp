@@ -91,7 +91,7 @@ std::size_t sp_tx_squashed_v1_size_bytes(const std::size_t num_legacy_inputs,
     size += num_outputs * sp_enote_v1_size_bytes();
 
     // balance proof (note: only seraphis inputs and outputs are range proofed)
-    size += sp_balance_proof_v1_size_bytes_compact(num_sp_inputs + num_outputs);
+    size += sp_balance_proof_v1_size_bytes(num_sp_inputs + num_outputs);
 
     // legacy ring signatures
     size += num_legacy_inputs * legacy_ring_signature_v4_size_bytes(legacy_ring_size);
@@ -166,7 +166,7 @@ std::size_t sp_tx_squashed_v1_weight(const std::size_t num_legacy_inputs,
         };
 
     // subtract balance proof size and add its weight
-    weight -= sp_balance_proof_v1_size_bytes_compact(num_sp_inputs + num_outputs);
+    weight -= sp_balance_proof_v1_size_bytes(num_sp_inputs + num_outputs);
     weight += sp_balance_proof_v1_weight(num_sp_inputs + num_outputs);
 
     return weight;
@@ -530,8 +530,7 @@ bool validate_tx_semantics<SpTxSquashedV1>(const SpTxSquashedV1 &tx)
             tx.sp_membership_proofs.size(),
             tx.sp_image_proofs.size(),
             tx.outputs.size(),
-            tx.tx_supplement.output_enote_ephemeral_pubkeys.size(),
-            tx.balance_proof.bpp2_proof.V.size()))
+            tx.tx_supplement.output_enote_ephemeral_pubkeys.size()))
         return false;
 
     // validate legacy input proof reference set sizes
@@ -624,9 +623,13 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
 {
     std::vector<const SpMembershipProofV1*> sp_membership_proof_ptrs;
     std::vector<const SpEnoteImageCore*> sp_input_image_ptrs;
-    std::vector<const BulletproofPlus2*> range_proof_ptrs;
+    std::vector<rct::keyV> tx_commitments;
+    std::vector<const rct::keyV*> tx_commitments_ptrs;
+    std::vector<const BulletproofPlus2Proof*> range_proof_ptrs;
     sp_membership_proof_ptrs.reserve(txs.size()*20);  //heuristic... (most txs have 1-2 seraphis inputs)
     sp_input_image_ptrs.reserve(txs.size()*20);
+    tx_commitments.reserve(txs.size());
+    tx_commitments_ptrs.reserve(txs.size());
     range_proof_ptrs.reserve(txs.size());
 
     // prepare for batch-verification
@@ -635,16 +638,36 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
         if (!tx)
             return false;
 
+        // used to gather all new tx commitments (sp enote image masked, then enote outputs)
+        rct::keyV &curr_tx_commitments = tools::add_element(tx_commitments);
+        curr_tx_commitments.reserve(tx->sp_input_images.size() + tx->outputs.size());
+
         // gather membership proof pieces
         for (const SpMembershipProofV1 &sp_membership_proof : tx->sp_membership_proofs)
             sp_membership_proof_ptrs.push_back(&sp_membership_proof);
 
+        // gather enote images and also their masked commitments (mul 1/8)
         for (const SpEnoteImageV1 &sp_input_image : tx->sp_input_images)
+        {
             sp_input_image_ptrs.push_back(&(sp_input_image.core));
+            curr_tx_commitments.push_back(rct::scalarmultKey(masked_commitment_ref(sp_input_image),
+                rct::INV_EIGHT));
+        }
+
+        // make keyV for all output commitments (mul 1/8)
+        for (const SpEnoteV1 &sp_output_enote : tx->outputs)
+        {
+            curr_tx_commitments.push_back(rct::scalarmultKey(sp_output_enote.core.amount_commitment,
+                rct::INV_EIGHT));
+        }
 
         // gather range proofs
         range_proof_ptrs.push_back(&(tx->balance_proof.bpp2_proof));
     }
+
+    // gather pointers to tx commitment lists (we do this after done modifying tx_commitments)
+    for (const auto &cvec : tx_commitments)
+        tx_commitments_ptrs.push_back(&cvec);
 
     // batch verification: collect pippenger data sets for an aggregated multiexponentiation
 
@@ -658,7 +681,8 @@ bool validate_txs_batchable<SpTxSquashedV1>(const std::vector<const SpTxSquashed
 
     // range proofs
     std::list<SpMultiexpBuilder> validation_data_range_proofs;
-    if (!try_get_bulletproof_plus2_verification_data(range_proof_ptrs, validation_data_range_proofs))
+    if (!try_get_bulletproof_plus2_verification_data(tx_commitments_ptrs, range_proof_ptrs,
+            validation_data_range_proofs))
         return false;
 
     // batch verify

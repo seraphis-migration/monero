@@ -46,22 +46,29 @@
 namespace sp
 {
 
-struct BulletproofPlus2
+struct BulletproofPlus2Proof
 {
-    rct::keyV V;
     rct::key A, A1, B;
     rct::key r1, s1, d1;
     rct::keyV L, R;
+};
+
+struct BulletproofPlus2
+{
+    rct::keyV V; //! @brief Pederson commitment points multiplied by (1/8)
+    BulletproofPlus2Proof proof;
 };
 
 BulletproofPlus2 bulletproof_plus2_PROVE(const rct::key &v, const rct::key &gamma);
 BulletproofPlus2 bulletproof_plus2_PROVE(uint64_t v, const rct::key &gamma);
 BulletproofPlus2 bulletproof_plus2_PROVE(const rct::keyV &v, const rct::keyV &gamma);
 BulletproofPlus2 bulletproof_plus2_PROVE(const std::vector<uint64_t> &v, const rct::keyV &gamma);
-bool try_get_bulletproof_plus2_verification_data(const std::vector<const BulletproofPlus2*> &proofs,
+bool try_get_bulletproof_plus2_verification_data(const std::vector<const rct::keyV*> &Vs,
+    const std::vector<const BulletproofPlus2Proof*> &proofs,
     std::list<SpMultiexpBuilder> &prep_data_out);
 bool bulletproof_plus2_VERIFY(const BulletproofPlus2 &proof);
-bool bulletproof_plus2_VERIFY(const std::vector<const BulletproofPlus2*> &proofs);
+bool bulletproof_plus2_VERIFY(const std::vector<const rct::keyV*> &Vs,
+    const std::vector<const BulletproofPlus2Proof*> &proofs);
 bool bulletproof_plus2_VERIFY(const std::vector<BulletproofPlus2> &proofs);
 
 } //namespace sp

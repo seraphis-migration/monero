@@ -964,7 +964,7 @@ void make_v1_balance_proof_v1(const std::vector<rct::xmr_amount> &legacy_input_a
     auto vec_wiper = convert_skv_to_rctv(range_proof_blinding_factors, range_proof_amount_commitment_blinding_factors);
     make_bpp2_rangeproofs(range_proof_amounts, range_proof_amount_commitment_blinding_factors, range_proofs);
 
-    balance_proof_out.bpp2_proof = std::move(range_proofs);
+    balance_proof_out.bpp2_proof = std::move(range_proofs.proof);
 
     // 4. set the remainder blinding factor
     // blinding_factor = sum(legacy input blinding factors) + sum(sp input blinding factors) - sum(output blinding factors)

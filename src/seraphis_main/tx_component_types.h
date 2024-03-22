@@ -182,21 +182,18 @@ inline std::size_t sp_image_proof_v1_size_bytes() { return sp_composition_size_b
 ///
 struct SpBalanceProofV1 final
 {
-    /// an aggregate set of BP+ proofs
-    BulletproofPlus2 bpp2_proof;
+    /// an aggregate set of BP+ proofs (does not contain V output commitment vector)
+    BulletproofPlus2Proof bpp2_proof;
     /// the remainder blinding factor
     rct::key remainder_blinding_factor;
 };
 inline const boost::string_ref container_name(const SpBalanceProofV1&) { return "SpBalanceProofV1"; }
 void append_to_transcript(const SpBalanceProofV1 &container, SpTranscriptBuilder &transcript_inout);
 
-/// get the size in bytes
-/// - note: the compact version does not include the bulletproof's cached amount commitments
+/// get the proof size in bytes (does not include commitment values)
 std::size_t sp_balance_proof_v1_size_bytes(const std::size_t num_range_proofs);
 std::size_t sp_balance_proof_v1_size_bytes(const SpBalanceProofV1 &proof);
-std::size_t sp_balance_proof_v1_size_bytes_compact(const std::size_t num_range_proofs);
-std::size_t sp_balance_proof_v1_size_bytes_compact(const SpBalanceProofV1 &proof);
-/// get the proof weight (using compact size)
+/// get the proof weight
 std::size_t sp_balance_proof_v1_weight(const std::size_t num_range_proofs);
 std::size_t sp_balance_proof_v1_weight(const SpBalanceProofV1 &proof);
 
