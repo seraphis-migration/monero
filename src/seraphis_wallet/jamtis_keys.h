@@ -57,6 +57,9 @@ namespace sp
 namespace jamtis
 {
 
+////
+// A set of jamtis keys for mock-ups/unit testing
+///
 struct JamtisKeys
 {
     crypto::secret_key k_m;           //master
