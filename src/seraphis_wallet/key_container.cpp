@@ -32,11 +32,8 @@
 // local headers
 #include "crypto/chacha.h"
 #include "jamtis_keys.h"
-#include "ringct/rctOps.h"
-#include "seraphis_core/jamtis_core_utils.h"
-#include "seraphis_core/jamtis_destination.h"
-#include "seraphis_core/sp_core_enote_utils.h"
 #include "seraphis_wallet/encrypted_file.h"
+#include "jamtis_keys.h"
 
 // standard headers
 
@@ -46,7 +43,7 @@
 namespace seraphis_wallet
 {
 //-------------------------------------------------------------------------------------------------------------------
-KeyContainer::KeyContainer(JamtisKeys &&keys, const crypto::chacha_key &key) :
+KeyContainer::KeyContainer(sp::jamtis::JamtisKeys &&keys, const crypto::chacha_key &key) :
     m_keys{keys},
     m_encrypted{false},
     m_encryption_iv{}
@@ -54,7 +51,7 @@ KeyContainer::KeyContainer(JamtisKeys &&keys, const crypto::chacha_key &key) :
     encrypt(key);
 }
 //-------------------------------------------------------------------------------------------------------------------
-KeyContainer::KeyContainer(JamtisKeys &&keys, bool encrypted, const crypto::chacha_iv encryption_iv) :
+KeyContainer::KeyContainer(sp::jamtis::JamtisKeys &&keys, bool encrypted, const crypto::chacha_iv encryption_iv) :
     m_keys{keys},
     m_encrypted{encrypted},
     m_encryption_iv{encryption_iv}
@@ -71,7 +68,7 @@ bool KeyContainer::load_from_keys_file(const std::string &path, const crypto::ch
         read_encrypted_file(path, chacha_key, ser_keys), "load_from_keys_file: failed reading encrypted file.");
 
     // 3. recover jamtis keys 
-    JamtisKeys recovered_keys{};
+    sp::jamtis::JamtisKeys recovered_keys{};
     recover_jamtis_keys(ser_keys, recovered_keys);
 
     // 4. check if keys are valid and move to m_keys if so
@@ -84,44 +81,16 @@ bool KeyContainer::load_from_keys_file(const std::string &path, const crypto::ch
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool KeyContainer::jamtis_keys_valid(const JamtisKeys &keys, const crypto::chacha_key &chacha_key)
+bool KeyContainer::jamtis_keys_valid(const sp::jamtis::JamtisKeys &keys, const crypto::chacha_key &chacha_key)
 {
-    // 1. make test_keys = keys
-    JamtisKeys test_keys{keys};
+    // 1. copy original keys
+    sp::jamtis::JamtisKeys test_keys{keys};
 
     // 2. derive keys
-    switch (get_wallet_type())
-    {
-        case WalletType::Master:
-        {
-            sp::jamtis::make_jamtis_unlockamounts_key(test_keys.k_vb, test_keys.xk_ua);
-            sp::jamtis::make_jamtis_findreceived_key(test_keys.k_vb, test_keys.xk_fr);
-            sp::jamtis::make_jamtis_generateaddress_secret(test_keys.k_vb, test_keys.s_ga);
-            sp::jamtis::make_jamtis_ciphertag_secret(test_keys.s_ga, test_keys.s_ct);
-            sp::make_seraphis_spendkey(test_keys.k_vb, test_keys.k_m, test_keys.K_1_base);
-            sp::jamtis::make_jamtis_unlockamounts_pubkey(test_keys.xk_ua, test_keys.xK_ua);
-            sp::jamtis::make_jamtis_findreceived_pubkey(test_keys.xk_fr, test_keys.xK_ua, test_keys.xK_fr);
-            break;
-        }
-        case WalletType::ViewOnly:
-        {
-            sp::jamtis::make_jamtis_findreceived_pubkey(test_keys.xk_fr, test_keys.xK_ua, test_keys.xK_fr);
-            break;
-        }
-        case WalletType::ViewBalance:
-        {
-            sp::jamtis::make_jamtis_findreceived_key(test_keys.k_vb, test_keys.xk_fr);
-            break;
-        }
-        default:
-        {
-            return false;
-            break;
-        }
-    }
+    sp::jamtis::derive_jamtis_keys(test_keys);
 
-    // 3. check if derived keys are correct
-    return test_keys == keys;
+    // 3. check if the given keys match
+    return sp::jamtis::jamtis_keys_equal(test_keys, keys);
 }
 //-------------------------------------------------------------------------------------------------------------------
 bool KeyContainer::encrypt(const crypto::chacha_key &chacha_key)
@@ -134,7 +103,7 @@ bool KeyContainer::encrypt(const crypto::chacha_key &chacha_key)
     m_encryption_iv = crypto::rand<crypto::chacha_iv>();
 
     // 3. encrypt keys with chacha_key and iv
-    m_keys.encrypt(chacha_key, m_encryption_iv);
+    sp::jamtis::xor_with_key_stream(chacha_key, m_encryption_iv, m_keys);
 
     // 4. set encrypted flag true
     m_encrypted = true;
@@ -149,7 +118,7 @@ bool KeyContainer::decrypt(const crypto::chacha_key &chacha_key)
         return false;
 
     // 2. decrypt keys with chacha_key and iv
-    m_keys.decrypt(chacha_key, m_encryption_iv);
+    sp::jamtis::xor_with_key_stream(chacha_key, m_encryption_iv, m_keys);
 
     // 3. set encrypted flag false
     m_encrypted = false;
@@ -167,155 +136,49 @@ void KeyContainer::generate_keys(const crypto::chacha_key &chacha_key)
         encrypt(chacha_key);
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool KeyContainer::write_all(const std::string &path, const crypto::chacha_key &chacha_key)
-{
-    // 1. decrypt keys if they are encrypted in memory
+sp::jamtis::JamtisKeys &KeyContainer::get_keys(const crypto::chacha_key &chacha_key) {
     if (m_encrypted)
         decrypt(chacha_key);
 
-    // 2. copy keys to serializable
-    // (the serializable with the decrypted private keys will
-    // remain in memory only during the scope of the function)
-    ser_JamtisKeys ser_keys = {
-        .k_m      = m_keys.k_m,
-        .k_vb     = m_keys.k_vb,
-        .xk_ua    = m_keys.xk_ua,
-        .xk_fr    = m_keys.xk_fr,
-        .s_ga     = m_keys.s_ga,
-        .s_ct     = m_keys.s_ct,
-        .K_1_base = m_keys.K_1_base,
-        .xK_ua    = m_keys.xK_ua,
-        .xK_fr    = m_keys.xK_fr,
-    };
-
-    // 3. encrypt keys if they are decrypted
-    if (!m_encrypted)
-        encrypt(chacha_key);
-
-    // 4. write serializable to file
-    return write_encrypted_file(path, chacha_key, ser_keys);
+    return m_keys;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool KeyContainer::write_view_only(const std::string &path, const crypto::chacha_key &chacha_key)
-{
-    // 1. decrypt keys if they are encrypted in memory
-    if (m_encrypted)
-        decrypt(chacha_key);
-
-    // 2. copy keys to serializable
-    // (the serializable with the decrypted private keys will
-    // remain in memory only during the scope of the function)
-    ser_JamtisKeys view_only_keys = {
-        .k_m      = {},
-        .k_vb     = {},
-        .xk_ua    = {},
-        .xk_fr    = m_keys.xk_fr,
-        .s_ga     = {},
-        .s_ct     = {},
-        .K_1_base = {},
-        .xK_ua    = m_keys.xK_ua,
-        .xK_fr    = m_keys.xK_fr,
-    };
-
-    // 3. encrypt keys if they are decrypted
-    if (!m_encrypted)
-        encrypt(chacha_key);
-
-    // 4. write serializable to file
-    return write_encrypted_file(path, chacha_key, view_only_keys);
-}
-//-------------------------------------------------------------------------------------------------------------------
-bool KeyContainer::write_view_balance(const std::string &path, const crypto::chacha_key &chacha_key)
-{
-    // 1. decrypt keys if they are encrypted in memory
-    if (m_encrypted)
-        decrypt(chacha_key);
-
-    // 2. copy keys to serializable
-    // (the serializable with the decrypted private keys will
-    // remain in memory only during the scope of the function)
-    ser_JamtisKeys view_balance{
-        .k_m      = {},
-        .k_vb     = m_keys.k_vb,
-        .xk_ua    = {},
-        .xk_fr    = m_keys.xk_fr,
-        .s_ga     = {},
-        .s_ct     = {},
-        .K_1_base = {},
-        .xK_ua    = m_keys.xK_ua,
-        .xK_fr    = m_keys.xK_fr,
-    };
-
-    // 3. encrypt keys if they are decrypted
-    if (!m_encrypted)
-        encrypt(chacha_key);
-
-    // 4. write serializable to file
-    return write_encrypted_file(path, chacha_key, view_balance);
+KeyGuard KeyContainer::get_keys_guard(const crypto::chacha_key &chacha_key) {
+    return KeyGuard{*this, chacha_key};
 }
 //-------------------------------------------------------------------------------------------------------------------
 WalletType KeyContainer::get_wallet_type()
 {
-    // 1. check which keys are present
-    if (m_keys.k_m == rct::rct2sk(rct::zero()))
-    {
-        if (m_keys.k_vb == rct::rct2sk(rct::zero()))
-            return WalletType::ViewOnly;
-        else
-            return WalletType::ViewBalance;
-    }
-    return WalletType::Master;
+    return sp::jamtis::get_wallet_type(m_keys);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void KeyContainer::make_serializable_jamtis_keys(ser_JamtisKeys &serializable_keys)
 {
     serializable_keys.k_m      = m_keys.k_m;
     serializable_keys.k_vb     = m_keys.k_vb;
-    serializable_keys.xk_ua    = m_keys.xk_ua;
-    serializable_keys.xk_fr    = m_keys.xk_fr;
+    serializable_keys.d_vr    = m_keys.d_vr;
+    serializable_keys.d_fa    = m_keys.d_fa;
     serializable_keys.s_ga     = m_keys.s_ga;
     serializable_keys.s_ct     = m_keys.s_ct;
-    serializable_keys.K_1_base = m_keys.K_1_base;
-    serializable_keys.xK_ua    = m_keys.xK_ua;
-    serializable_keys.xK_fr    = m_keys.xK_fr;
+    serializable_keys.K_s_base = m_keys.K_s_base;
+    serializable_keys.D_vr    = m_keys.D_vr;
+    serializable_keys.D_fa    = m_keys.D_fa;
 }
 //-------------------------------------------------------------------------------------------------------------------
-void KeyContainer::recover_jamtis_keys(const ser_JamtisKeys &ser_keys, JamtisKeys &keys_out)
+void KeyContainer::recover_jamtis_keys(const ser_JamtisKeys &ser_keys, sp::jamtis::JamtisKeys &keys_out)
 {
     keys_out.k_m      = ser_keys.k_m;
     keys_out.k_vb     = ser_keys.k_vb;
-    keys_out.xk_ua    = ser_keys.xk_ua;
-    keys_out.xk_fr    = ser_keys.xk_fr;
+    keys_out.d_vr    = ser_keys.d_vr;
+    keys_out.d_fa    = ser_keys.d_fa;
     keys_out.s_ga     = ser_keys.s_ga;
     keys_out.s_ct     = ser_keys.s_ct;
-    keys_out.K_1_base = ser_keys.K_1_base;
-    keys_out.xK_ua    = ser_keys.xK_ua;
-    keys_out.xK_fr    = ser_keys.xK_fr;
+    keys_out.K_s_base = ser_keys.K_s_base;
+    keys_out.D_vr    = ser_keys.D_vr;
+    keys_out.D_fa    = ser_keys.D_fa;
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool KeyContainer::compare_keys(KeyContainer &other, const crypto::chacha_key &chacha_key)
-{
-    // 1. decrypt keys if they are encrypted in memory
-    other.decrypt(chacha_key);
 
-    // 2. decrypt if encrypted in memory
-    decrypt(chacha_key);
-
-    bool r = other.m_keys.k_m == m_keys.k_m && other.m_keys.k_vb == m_keys.k_vb && other.m_keys.xk_ua == m_keys.xk_ua &&
-             other.m_keys.xk_fr == m_keys.xk_fr && other.m_keys.s_ga == m_keys.s_ga &&
-             other.m_keys.s_ct == m_keys.s_ct && other.m_keys.K_1_base == m_keys.K_1_base &&
-             other.m_keys.xK_ua == m_keys.xK_ua && other.m_keys.xK_fr == m_keys.xK_fr;
-
-    // 3. encrypt in memory
-    other.encrypt(chacha_key);
-
-    // 4. encrypt in memory
-    encrypt(chacha_key);
-
-    // 5. return result of comparison
-    return r;
-}
-//-------------------------------------------------------------------------------------------------------------------
 // KeyGuard
 //-------------------------------------------------------------------------------------------------------------------
 KeyGuard::KeyGuard(const KeyGuard &other) :
@@ -330,7 +193,7 @@ KeyGuard::KeyGuard(KeyContainer &container, const crypto::chacha_key &key) :
     m_ref{1},
     m_key{key}
 {
-    m_container.encrypt(key);
+    m_container.decrypt(key);
 }
 //-------------------------------------------------------------------------------------------------------------------
 KeyGuard::~KeyGuard()

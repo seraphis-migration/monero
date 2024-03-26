@@ -31,7 +31,8 @@
 // local headers
 #include "crypto/chacha.h"
 #include "crypto/crypto.h"
-#include "jamtis_keys.h"
+#include "serialization/crypto.h"
+#include "seraphis_wallet/jamtis_keys.h"
 #include "serialization/serialization.h"
 
 // third party headers
@@ -41,71 +42,63 @@
 
 // forward declarations
 
-using namespace sp::jamtis;
-
-// NOTE: I don't think this is a good idea.
 struct ser_JamtisKeys
 {
-    crypto::secret_key k_m;          // master
-    crypto::secret_key k_vb;         // view-balance
-    crypto::x25519_secret_key xk_ua; // unlock-amounts
-    crypto::x25519_secret_key xk_fr; // find-received
-    crypto::secret_key s_ga;         // generate-address
-    crypto::secret_key s_ct;         // cipher-tag
-    rct::key K_1_base;               // jamtis spend base     = k_vb X + k_m U
-    crypto::x25519_pubkey xK_ua;     // unlock-amounts pubkey = xk_ua xG
-    crypto::x25519_pubkey xK_fr;     // find-received pubkey  = xk_fr xk_ua xG
+    crypto::secret_key k_m;           //master
+    crypto::secret_key k_vb;          //view-balance
+    crypto::x25519_secret_key d_vr;   //view-received
+    crypto::x25519_secret_key d_fa;   //filter-assist
+    crypto::secret_key s_ga;          //generate-address
+    crypto::secret_key s_ct;          //cipher-tag
+    rct::key K_s_base;                //jamtis spend base    = k_vb X + k_m U
+    crypto::x25519_pubkey D_vr;       //view-received pubkey = d_vr D_base
+    crypto::x25519_pubkey D_fa;       //filter-assist pubkey = d_fa D_base
+    crypto::x25519_pubkey D_base;     //exchange-base pubkey = d_vr xG
 
     BEGIN_SERIALIZE()
-    FIELD(k_m)
-    FIELD(k_vb)
-    FIELD(xk_ua)
-    FIELD(xk_fr)
-    FIELD(s_ga)
-    FIELD(s_ct)
-    FIELD(K_1_base)
-    FIELD(xK_ua)
-    FIELD(xK_fr)
-    END_SERIALIZE()
-};
-
-struct ser_KeyContainer
-{
-    crypto::chacha_iv encryption_iv;
-    ser_JamtisKeys keys;
-    bool encrypted;
-
-    BEGIN_SERIALIZE()
-    FIELD(keys)
-    FIELD(encryption_iv)
-    FIELD(encrypted)
+        FIELD(k_m)
+        FIELD(k_vb)
+        FIELD(d_vr)
+        FIELD(d_fa)
+        FIELD(s_ga)
+        FIELD(s_ct)
+        FIELD(K_s_base)
+        FIELD(D_vr)
+        FIELD(D_fa)
+        FIELD(D_base)
     END_SERIALIZE()
 };
 
 BLOB_SERIALIZER(ser_JamtisKeys);
-BLOB_SERIALIZER(ser_KeyContainer);
 
 namespace seraphis_wallet
 {
 
+// forward declaration
+class KeyGuard;
+
 enum class WalletType
 {
-    ViewOnly,
-    ViewBalance,
+    Empty,
+    FilterAssist,
+    AddressGenerator,
+    FilterAssistAndAddressGen,
+    PaymentValidator,
+    ViewAll,
     Master,
 };
 
 /// KeyContainer
-// - it handles (store, load, generate, etc) the private keys.
+// - it handles (store, load, etc) the private keys.
 ///
 class KeyContainer
 {
 public:
-    KeyContainer(JamtisKeys &&keys, const crypto::chacha_key &key);
+    KeyContainer(sp::jamtis::JamtisKeys &&keys, const crypto::chacha_key &key);
 
     KeyContainer() : m_keys{}, m_encryption_iv{}, m_encrypted{false} {}
 
-    KeyContainer(JamtisKeys &&keys,
+    KeyContainer(sp::jamtis::JamtisKeys &&keys,
         bool encrypted,
         const crypto::chacha_iv encryption_iv);
 
@@ -118,7 +111,12 @@ public:
     bool load_from_keys_file(const std::string &path, const crypto::chacha_key &chacha_key);
 
     /// check if keys are valid 
-    bool jamtis_keys_valid(const JamtisKeys &keys, const crypto::chacha_key &chacha_key);
+    bool jamtis_keys_valid(const sp::jamtis::JamtisKeys &keys, const crypto::chacha_key &chacha_key);
+
+    sp::jamtis::JamtisKeys &get_keys(const crypto::chacha_key &chacha_key);
+
+    /// get keys, protected by a guard
+    KeyGuard get_keys_guard(const crypto::chacha_key &chacha_key);
 
     /// encrypt the keys in-memory
     bool encrypt(const crypto::chacha_key &chacha_key);
@@ -129,15 +127,6 @@ public:
     /// generate new keys
     void generate_keys(const crypto::chacha_key &chacha_key);
 
-    /// write all private keys to file
-    bool write_all(const std::string &path, crypto::chacha_key const &chacha_key);
-
-    /// write view-only keys to file
-    bool write_view_only(const std::string &path, const crypto::chacha_key &chacha_key);
-
-    /// write view-balance keys to file
-    bool write_view_balance(const std::string &path, const crypto::chacha_key &chacha_key);
-
     /// get the wallet type of the loaded keys
     WalletType get_wallet_type();
 
@@ -145,7 +134,7 @@ public:
     void make_serializable_jamtis_keys(ser_JamtisKeys &serializable_keys);
 
     /// recover keys from serializable
-    void recover_jamtis_keys(const ser_JamtisKeys &ser_keys, JamtisKeys &keys_out);
+    void recover_jamtis_keys(const ser_JamtisKeys &ser_keys, sp::jamtis::JamtisKeys &keys_out);
 
     /// compare the keys of two containers that have the same chacha_key
     bool compare_keys(KeyContainer &other, const crypto::chacha_key &chacha_key);
@@ -154,8 +143,9 @@ private:
     /// initialization vector
     crypto::chacha_iv m_encryption_iv;
 
-    /// struct that contains the private keys 
-    epee::mlocked<JamtisKeys> m_keys;
+    /// struct that contains the keys so that
+    /// they wouldn't get swapped out of memory
+    epee::mlocked<sp::jamtis::JamtisKeys> m_keys;
 
     /// true if keys are encrypted in memory
     bool m_encrypted;

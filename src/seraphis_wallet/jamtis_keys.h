@@ -27,6 +27,8 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ////
+// Jamtis keys
+//
 // reference: https://gist.github.com/tevador/50160d160d24cfc6c52ae02eb3d17024
 ///
 
@@ -44,45 +46,55 @@
 //standard headers
 
 //forward declarations
+namespace seraphis_wallet {
+
+enum class WalletType;
+
+}
 
 namespace sp
 {
 namespace jamtis
 {
 
+////
+// A set of jamtis keys for mock-ups/unit testing
+///
 struct JamtisKeys
 {
     crypto::secret_key k_m;           //master
     crypto::secret_key k_vb;          //view-balance
-    crypto::x25519_secret_key xk_ua;  //unlock-amounts
-    crypto::x25519_secret_key xk_fr;  //find-received
+    crypto::x25519_secret_key d_vr;   //view-received
+    crypto::x25519_secret_key d_fa;   //filter-assist
     crypto::secret_key s_ga;          //generate-address
     crypto::secret_key s_ct;          //cipher-tag
-    rct::key K_1_base;                //jamtis spend base     = k_vb X + k_m U
-    crypto::x25519_pubkey xK_ua;      //unlock-amounts pubkey = xk_ua xG
-    crypto::x25519_pubkey xK_fr;      //find-received pubkey  = xk_fr xk_ua xG
-
-    bool operator==(const JamtisKeys &other) const {
-        // use hash?
-        return other.k_m == k_m &&
-            other.k_vb == k_vb &&
-            other.xk_ua == xk_ua &&
-            other.xk_fr == xk_fr &&
-            other.s_ga == s_ga &&
-            other.s_ct == s_ct &&
-            other.K_1_base == K_1_base &&
-            other.xK_ua == xK_ua &&
-            other.xK_fr == xK_fr;
-    }
-
-    void encrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv);
-    void decrypt(const crypto::chacha_key &key, const crypto::chacha_iv &iv);
+    rct::key K_s_base;                //jamtis spend base    = k_vb X + k_m U
+    crypto::x25519_pubkey D_vr;       //view-received pubkey = d_vr D_base
+    crypto::x25519_pubkey D_fa;       //filter-assist pubkey = d_fa D_base
+    crypto::x25519_pubkey D_base;     //exchange-base pubkey = d_vr xG
 };
 
+/// make a set of jamtis keys
 void make_jamtis_keys(JamtisKeys &keys_out);
+/// derive a set of jamtis keys from existing non-zero entries
+void derive_jamtis_keys(JamtisKeys &keys);
+/// make a jamtis address for the given privkeys and address index
+void make_address_for_user(const JamtisKeys &user_keys,
+    const address_index_t &j,
+    JamtisDestinationV1 &user_address_out);
 /// make a random jamtis address for the given privkeys
-void make_address_random(const JamtisKeys &user_keys, JamtisDestinationV1 &user_address_out);
-void make_address_zero(const JamtisKeys &user_keys, JamtisDestinationV1 &user_address_out);
+void make_random_address_for_user(const JamtisKeys &user_keys,
+    JamtisDestinationV1 &user_address_out);
+/// encrypt a set of jamtis keys in-place
+void xor_with_key_stream(const crypto::chacha_key &chacha_key,
+    const crypto::chacha_iv chacha_iv,
+    JamtisKeys &keys);
+
+/// get keys' wallet type from the existing keys
+seraphis_wallet::WalletType get_wallet_type(const JamtisKeys &keys);
+
+/// compare two key structures; both should be in the same decrypted/encrypted state
+bool jamtis_keys_equal(const JamtisKeys &keys, const JamtisKeys &other);
 
 } //namespace jamtis
 } //namespace sp
