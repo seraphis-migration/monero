@@ -57,6 +57,9 @@ namespace sp
 namespace jamtis
 {
 
+////
+// A set of jamtis keys for mock-ups/unit testing
+///
 struct JamtisKeys
 {
     crypto::secret_key k_m;           //master
@@ -71,6 +74,7 @@ struct JamtisKeys
     crypto::x25519_pubkey D_base;     //exchange-base pubkey = d_vr xG
 };
 
+/// make a set of jamtis keys
 void make_jamtis_keys(JamtisKeys &keys_out);
 /// derive a set of jamtis keys from existing non-zero entries
 void derive_jamtis_keys(JamtisKeys &keys);

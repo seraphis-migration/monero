@@ -1,4 +1,4 @@
-// Copyright (c) 2024, The Monero Project
+// Copyright (c) 2022, The Monero Project
 // 
 // All rights reserved.
 // 
@@ -184,7 +184,6 @@ void make_random_address_for_user(const JamtisKeys &user_keys, JamtisDestination
     make_address_for_user(user_keys, random_j, user_address_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
-<<<<<<< HEAD
 void make_jamtis_amount(const JamtisKeys &user_keys, JamtisDestinationV1 &user_address_out)
 {
     const address_index_t random_j = gen_address_index();
