@@ -2082,7 +2082,7 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       const blobdata &tx_blob = extra_block_tx.second.second;
 
       tx_verification_context tvc{};
-      if ((!m_tx_pool.have_tx(txid, relay_category::all) &&
+      if ((!m_tx_pool.have_tx(txid, relay_category::legacy) &&
           !m_db->tx_exists(txid) &&
           !m_tx_pool.add_tx(tx, tvc, relay_method::block, /*relayed=*/true, hf_version, hf_version))
           || tvc.m_verifivation_failed)
@@ -5463,7 +5463,7 @@ void Blockchain::notify_txpool_event(std::vector<txpool_event>&& event)
   {
     try
     {
-      m_txpool_notifier(event);
+      m_txpool_notifier(std::move(event));
     }
     catch (const std::exception &e)
     {
