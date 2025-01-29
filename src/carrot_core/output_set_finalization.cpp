@@ -37,12 +37,20 @@
 //third party headers
 
 //standard headers
+#include <set>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "carrot"
 
 namespace carrot
 {
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+template <typename T>
+struct compare_memcmp{ bool operator()(const T &a, const T &b) const { return memcmp(&a, &b, sizeof(T)) < 0; } };
+template <typename T>
+using memcmp_set = std::set<T, compare_memcmp<T>>;
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 std::optional<AdditionalOutputType> get_additional_output_type(const size_t num_outgoing,
     const size_t num_selfsend,
@@ -143,8 +151,8 @@ tools::optional_variant<CarrotPaymentProposalV1, CarrotPaymentProposalSelfSendV1
     ASSERT_MES_AND_THROW("get additional output proposal: unrecognized additional output type");
 }
 //-------------------------------------------------------------------------------------------------------------------
-void get_output_enote_proposals(std::vector<CarrotPaymentProposalV1> &&normal_payment_proposals,
-    std::vector<CarrotPaymentProposalSelfSendV1> &&selfsend_payment_proposals,
+void get_output_enote_proposals(const std::vector<CarrotPaymentProposalV1> &normal_payment_proposals,
+    const std::vector<CarrotPaymentProposalSelfSendV1> &selfsend_payment_proposals,
     const view_balance_secret_device *s_view_balance_dev,
     const view_incoming_key_device *k_view_dev,
     const crypto::public_key &account_spend_pubkey,
@@ -177,14 +185,11 @@ void get_output_enote_proposals(std::vector<CarrotPaymentProposalV1> &&normal_pa
         CHECK_AND_ASSERT_THROW_MES(normal_payment_proposal.randomness != janus_anchor_t{},
             "get output enote proposals: normal payment proposal has unset anchor_norm AKA randomness");
 
-    // sort normal payment proposals by anchor_norm and assert uniqueness of randomness for each payment
-    const auto sort_by_randomness = [](const CarrotPaymentProposalV1 &a, const CarrotPaymentProposalV1 &b) -> bool
-    {
-        return memcmp(&a.randomness, &b.randomness, JANUS_ANCHOR_BYTES) < 0;
-    };
-    std::sort(normal_payment_proposals.begin(), normal_payment_proposals.end(), sort_by_randomness);
-    const bool has_unique_randomness = tools::is_sorted_and_unique(normal_payment_proposals,
-        sort_by_randomness);
+    // assert uniqueness of randomness for each payment
+    memcmp_set<janus_anchor_t> randomnesses;
+    for (const CarrotPaymentProposalV1 &normal_payment_proposal : normal_payment_proposals)
+        randomnesses.insert(normal_payment_proposal.randomness);
+    const bool has_unique_randomness = randomnesses.size() == normal_payment_proposals.size();
     CHECK_AND_ASSERT_THROW_MES(has_unique_randomness,
         "get output enote proposals: normal payment proposals contain duplicate anchor_norm AKA randomness");
 
@@ -246,16 +251,11 @@ void get_output_enote_proposals(std::vector<CarrotPaymentProposalV1> &&normal_pa
         }
     }
 
-    // sort enotes by D_e and assert uniqueness properties of D_e
-    const auto sort_by_ephemeral_pubkey = [](const RCTOutputEnoteProposal &a, const RCTOutputEnoteProposal &b) -> bool
-    {
-        return memcmp(&a.enote.enote_ephemeral_pubkey,
-            &b.enote.enote_ephemeral_pubkey,
-            sizeof(mx25519_pubkey)) < 0;
-    };
-    std::sort(output_enote_proposals_out.begin(), output_enote_proposals_out.end(), sort_by_ephemeral_pubkey);
-    const bool has_unique_ephemeral_pubkeys = tools::is_sorted_and_unique(output_enote_proposals_out,
-        sort_by_ephemeral_pubkey);
+    // assert uniqueness of D_e
+    memcmp_set<mx25519_pubkey> ephemeral_pubkeys;
+    for (const RCTOutputEnoteProposal &p : output_enote_proposals_out)
+        ephemeral_pubkeys.insert(p.enote.enote_ephemeral_pubkey);
+    const bool has_unique_ephemeral_pubkeys = ephemeral_pubkeys.size() == output_enote_proposals_out.size();
     CHECK_AND_ASSERT_THROW_MES(!(num_proposals == 2 && has_unique_ephemeral_pubkeys),
         "get output enote proposals: a 2-out set needs to share an ephemeral pubkey, but this 2-out set doesn't");
     CHECK_AND_ASSERT_THROW_MES(!(num_proposals != 2 && !has_unique_ephemeral_pubkeys),

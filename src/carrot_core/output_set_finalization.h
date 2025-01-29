@@ -41,6 +41,7 @@
 
 //standard headers
 #include <optional>
+#include <vector>
 
 //forward declarations
 
@@ -99,8 +100,8 @@ tools::optional_variant<CarrotPaymentProposalV1, CarrotPaymentProposalSelfSendV1
  * If s_view_balance_dev is not NULL, then the selfsend payments are converted into *internal* enotes.
  * Otherwise, if k_view_dev is not NULL, then the selfsend payments are converted into *external* enotes.
  */
-void get_output_enote_proposals(std::vector<CarrotPaymentProposalV1> &&normal_payment_proposals,
-    std::vector<CarrotPaymentProposalSelfSendV1> &&selfsend_payment_proposals,
+void get_output_enote_proposals(const std::vector<CarrotPaymentProposalV1> &normal_payment_proposals,
+    const std::vector<CarrotPaymentProposalSelfSendV1> &selfsend_payment_proposals,
     const view_balance_secret_device *s_view_balance_dev,
     const view_incoming_key_device *k_view_dev,
     const crypto::public_key &account_spend_pubkey,
