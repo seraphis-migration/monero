@@ -351,13 +351,16 @@ void get_output_proposal_special_v1(const CarrotPaymentProposalSelfSendV1 &propo
     make_carrot_input_context(tx_first_key_image, input_context);
 
     // 3. D_e
+    const bool missing_enote_ephemeral_pubkeys = !proposal.enote_ephemeral_pubkey && !other_enote_ephemeral_pubkey;
     const bool mismatched_enote_ephemeral_pubkeys = proposal.enote_ephemeral_pubkey &&
         other_enote_ephemeral_pubkey &&
         memcmp(&*proposal.enote_ephemeral_pubkey, &*other_enote_ephemeral_pubkey, sizeof(mx25519_pubkey));
+    CHECK_AND_ASSERT_THROW_MES(!missing_enote_ephemeral_pubkeys,
+        "get output proposal special v1: no enote ephemeral pubkey provided");
     CHECK_AND_ASSERT_THROW_MES(!mismatched_enote_ephemeral_pubkeys,
         "get output proposal special v1: mismatched enote ephemeral pubkeys provided");
     const mx25519_pubkey enote_ephemeral_pubkey = proposal.enote_ephemeral_pubkey.value_or(
-        other_enote_ephemeral_pubkey.value_or(gen_x25519_pubkey()));
+        other_enote_ephemeral_pubkey.value_or(mx25519_pubkey{}));
 
     // 4. s_sr = k_v D_e
     mx25519_pubkey s_sender_receiver_unctx; auto ecdh_wiper = auto_wiper(s_sender_receiver_unctx);
@@ -417,13 +420,16 @@ void get_output_proposal_internal_v1(const CarrotPaymentProposalSelfSendV1 &prop
     make_carrot_input_context(tx_first_key_image, input_context);
 
     // 3. D_e
+    const bool missing_enote_ephemeral_pubkeys = !proposal.enote_ephemeral_pubkey && !other_enote_ephemeral_pubkey;
     const bool mismatched_enote_ephemeral_pubkeys = proposal.enote_ephemeral_pubkey &&
         other_enote_ephemeral_pubkey &&
         memcmp(&*proposal.enote_ephemeral_pubkey, &*other_enote_ephemeral_pubkey, sizeof(mx25519_pubkey));
+    CHECK_AND_ASSERT_THROW_MES(!missing_enote_ephemeral_pubkeys,
+        "get output proposal special v1: no enote ephemeral pubkey provided");
     CHECK_AND_ASSERT_THROW_MES(!mismatched_enote_ephemeral_pubkeys,
         "get output proposal internal v1: mismatched enote ephemeral pubkeys provided");
     const mx25519_pubkey enote_ephemeral_pubkey = proposal.enote_ephemeral_pubkey.value_or(
-        other_enote_ephemeral_pubkey.value_or(gen_x25519_pubkey()));
+        other_enote_ephemeral_pubkey.value_or(mx25519_pubkey{}));
 
     // 4. s^ctx_sr = H_32(s_vb, D_e, input_context)
     crypto::hash s_sender_receiver; auto q_wiper = auto_wiper(s_sender_receiver);
