@@ -276,7 +276,7 @@ cryptonote::transaction store_carrot_to_coinbase_transaction_v1(
     tx.rct_signatures.type = rct::RCTTypeNull;
 
     //input
-    tx.vin.emplace_back(cryptonote::txin_gen{.height = block_index});
+    tx.vin.emplace_back(cryptonote::txin_gen{.height = static_cast<size_t>(block_index)});
 
     //outputs
     for (const CarrotCoinbaseEnoteV1 &enote : enotes)
