@@ -92,7 +92,7 @@ void make_unsigned_transaction(std::vector<CarrotPaymentProposalV1> &&normal_pay
     const view_incoming_key_device *k_view_dev,
     const crypto::public_key &account_spend_pubkey,
     cryptonote::transaction &tx_out,
-    crypto::secret_key &amount_blinding_factor_sum_out);
+    std::vector<crypto::secret_key> &output_amount_blinding_factors_out);
 
 void make_unsigned_transaction_transfer_subtractable(
     std::vector<CarrotPaymentProposalV1> &&normal_payment_proposals,
@@ -105,7 +105,7 @@ void make_unsigned_transaction_transfer_subtractable(
     const std::set<std::size_t> &subtractable_normal_payment_proposals,
     const std::set<std::size_t> &subtractable_selfsend_payment_proposals,
     cryptonote::transaction &tx_out,
-    crypto::secret_key &amount_blinding_factor_sum_out);
+    std::vector<crypto::secret_key> &output_amount_blinding_factors_out);
 
 void make_unsigned_transaction_transfer(
     std::vector<CarrotPaymentProposalV1> &&normal_payment_proposals,
@@ -116,7 +116,7 @@ void make_unsigned_transaction_transfer(
     const view_incoming_key_device *k_view_dev,
     const crypto::public_key &account_spend_pubkey,
     cryptonote::transaction &tx_out,
-    crypto::secret_key &amount_blinding_factor_sum_out);
+    std::vector<crypto::secret_key> &output_amount_blinding_factors_out);
 
 void make_unsigned_transaction_sweep(
     const tools::variant<CarrotPaymentProposalV1, CarrotPaymentProposalSelfSendV1> &payment_proposal,
@@ -126,5 +126,5 @@ void make_unsigned_transaction_sweep(
     const view_incoming_key_device *k_view_dev,
     const crypto::public_key &account_spend_pubkey,
     cryptonote::transaction &tx_out,
-    crypto::secret_key &amount_blinding_factor_sum_out);
+    std::vector<crypto::secret_key> &output_amount_blinding_factors_out);
 } //namespace carrot

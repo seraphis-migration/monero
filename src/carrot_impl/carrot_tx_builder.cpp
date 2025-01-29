@@ -97,8 +97,10 @@ void make_unsigned_transaction(std::vector<CarrotPaymentProposalV1> &&normal_pay
     const view_incoming_key_device *k_view_dev,
     const crypto::public_key &account_spend_pubkey,
     cryptonote::transaction &tx_out,
-    crypto::secret_key &amount_blinding_factor_sum_out)
+    std::vector<crypto::secret_key> &output_amount_blinding_factors_out)
 {
+    output_amount_blinding_factors_out.clear();
+
     // add an additional payment proposal to satisfy scanning/consensus rules, if applicable
     append_additional_payment_proposal_if_necessary(normal_payment_proposals,
         selfsend_payment_proposals,
@@ -167,11 +169,15 @@ void make_unsigned_transaction(std::vector<CarrotPaymentProposalV1> &&normal_pay
         output_enote_proposals,
         encrypted_payment_id);
 
-    // collect enotes
+    // collect enotes and blinding factors
     std::vector<CarrotEnoteV1> enotes;
     enotes.reserve(output_enote_proposals.size());
+    output_amount_blinding_factors_out.reserve(output_enote_proposals.size());
     for (const RCTOutputEnoteProposal &e : output_enote_proposals)
+    {
         enotes.push_back(e.enote);
+        output_amount_blinding_factors_out.push_back(e.amount_blinding_factor);
+    }
 
     // collect key images
     std::vector<crypto::key_image> key_images;
@@ -181,12 +187,6 @@ void make_unsigned_transaction(std::vector<CarrotPaymentProposalV1> &&normal_pay
 
     // serialize pruned transaction
     tx_out = store_carrot_to_transaction_v1(enotes, key_images, fee, encrypted_payment_id);
-
-    // calculate the sum of k_a for each output
-    unsigned char * const p_ka_sum = to_bytes(amount_blinding_factor_sum_out);
-    memcpy(p_ka_sum, rct::I.bytes, sizeof(amount_blinding_factor_sum_out)); // = 1
-    for (const RCTOutputEnoteProposal &e : output_enote_proposals)
-        sc_add(p_ka_sum, p_ka_sum, to_bytes(e.amount_blinding_factor)); // += k_a
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_unsigned_transaction_transfer_subtractable(
@@ -200,7 +200,7 @@ void make_unsigned_transaction_transfer_subtractable(
     const std::set<std::size_t> &subtractable_normal_payment_proposals,
     const std::set<std::size_t> &subtractable_selfsend_payment_proposals,
     cryptonote::transaction &tx_out,
-    crypto::secret_key &amount_blinding_factor_sum_out)
+    std::vector<crypto::secret_key> &output_amount_blinding_factors_out)
 {
     // always add implicit selfsend enote, so resultant enotes' amounts mirror given payments set close as possible 
     // note: we always do this, even if the amount ends up being 0 and we already have a selfsend. this is because if we
@@ -336,7 +336,7 @@ void make_unsigned_transaction_transfer_subtractable(
         k_view_dev,
         account_spend_pubkey,
         tx_out,
-        amount_blinding_factor_sum_out);
+        output_amount_blinding_factors_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_unsigned_transaction_transfer(
@@ -348,7 +348,7 @@ void make_unsigned_transaction_transfer(
     const view_incoming_key_device *k_view_dev,
     const crypto::public_key &account_spend_pubkey,
     cryptonote::transaction &tx_out,
-    crypto::secret_key &amount_blinding_factor_sum_out)
+    std::vector<crypto::secret_key> &output_amount_blinding_factors_out)
 {
     make_unsigned_transaction_transfer_subtractable(
         std::forward<std::vector<CarrotPaymentProposalV1>>(normal_payment_proposals),
@@ -361,7 +361,7 @@ void make_unsigned_transaction_transfer(
         /*subtractable_normal_payment_proposals=*/{},
         /*subtractable_selfsend_payment_proposals=*/{selfsend_payment_proposals.size()},
         tx_out,
-        amount_blinding_factor_sum_out);
+        output_amount_blinding_factors_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void make_unsigned_transaction_sweep(
@@ -372,7 +372,7 @@ void make_unsigned_transaction_sweep(
     const view_incoming_key_device *k_view_dev,
     const crypto::public_key &account_spend_pubkey,
     cryptonote::transaction &tx_out,
-    crypto::secret_key &amount_blinding_factor_sum_out)
+    std::vector<crypto::secret_key> &output_amount_blinding_factors_out)
 {
     // initialize payment proposals list from `payment_proposal`
     std::vector<CarrotPaymentProposalV1> normal_payment_proposals;
@@ -438,7 +438,7 @@ void make_unsigned_transaction_sweep(
         k_view_dev,
         account_spend_pubkey,
         tx_out,
-        amount_blinding_factor_sum_out);
+        output_amount_blinding_factors_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace carrot

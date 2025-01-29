@@ -54,8 +54,8 @@ namespace
 {
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
-static constexpr std::uint32_t MAX_SUBADDRESS_MAJOR_INDEX = 50;
-static constexpr std::uint32_t MAX_SUBADDRESS_MINOR_INDEX = 200;
+static constexpr std::uint32_t MAX_SUBADDRESS_MAJOR_INDEX = 5;
+static constexpr std::uint32_t MAX_SUBADDRESS_MINOR_INDEX = 20;
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 struct mock_carrot_or_legacy_keys
@@ -77,31 +77,9 @@ struct mock_carrot_or_legacy_keys
     view_incoming_key_ram_borrowed_device k_view_dev;
     view_balance_secret_ram_borrowed_device s_view_balance_dev;
 
+    std::unordered_map<crypto::public_key, cryptonote::subaddress_index> subaddress_map;
+
     mock_carrot_or_legacy_keys(): k_view_dev(k_view), s_view_balance_dev(s_view_balance) {}
-
-    void generate_carrot()
-    {
-        is_carrot = true;
-        crypto::generate_random_bytes_thread_safe(sizeof(crypto::secret_key), to_bytes(s_master));
-        make_carrot_provespend_key(s_master, k_prove_spend);
-        make_carrot_viewbalance_secret(s_master, s_view_balance);
-        make_carrot_generateimage_key(s_view_balance, k_generate_image);
-        make_carrot_viewincoming_key(s_view_balance, k_view);
-        make_carrot_generateaddress_secret(s_view_balance, s_generate_address);
-        make_carrot_spend_pubkey(k_generate_image, k_prove_spend, account_spend_pubkey);
-        account_view_pubkey = rct::rct2pk(rct::scalarmultKey(rct::pk2rct(account_spend_pubkey),
-            rct::sk2rct(k_view)));
-        main_address_view_pubkey = rct::rct2pk(rct::scalarmultBase(rct::sk2rct(k_view)));
-    }
-
-    void generate_legacy()
-    {
-        is_carrot = false;
-        legacy_acb.generate();
-        k_view = legacy_acb.get_keys().m_view_secret_key;
-        account_spend_pubkey = legacy_acb.get_keys().m_account_address.m_spend_public_key;
-        main_address_view_pubkey = legacy_acb.get_keys().m_account_address.m_view_public_key;
-    }
 
     const view_balance_secret_device* get_view_balance_device() const
     {
@@ -225,24 +203,58 @@ struct mock_carrot_or_legacy_keys
         crypto::secret_key &address_privkey_g_out,
         crypto::secret_key &address_privkey_t_out) const
     {
-        // shittier version of a subaddress lookahead table
+        const auto it = subaddress_map.find(address_spend_pubkey);
+        if (it == subaddress_map.cend())
+            return false;
 
-        for (major_index_out = 0; major_index_out < max_major_index; ++major_index_out)
+        crypto::public_key recomputed_address_spend_pubkey;
+        opening_for_subaddress(it->second.major,
+            it->second.minor,
+            address_privkey_g_out,
+            address_privkey_t_out,
+            recomputed_address_spend_pubkey);
+
+        return address_spend_pubkey == recomputed_address_spend_pubkey;
+    }
+
+    void generate_subaddress_map()
+    {
+        for (uint32_t major_index = 0; major_index < MAX_SUBADDRESS_MAJOR_INDEX; ++major_index)
         {
-            for (minor_index_out = 0; minor_index_out < max_minor_index; ++minor_index_out)
+            for (uint32_t minor_index = 0; minor_index < MAX_SUBADDRESS_MINOR_INDEX; ++minor_index)
             {
-                crypto::public_key recomputed_address_spend_pubkey;
-                opening_for_subaddress(major_index_out,
-                    minor_index_out,
-                    address_privkey_g_out,
-                    address_privkey_t_out,
-                    recomputed_address_spend_pubkey);
-                if (address_spend_pubkey == recomputed_address_spend_pubkey)
-                    return true;
+                const CarrotDestinationV1 addr = subaddress(major_index, minor_index);
+                subaddress_map.insert({addr.address_spend_pubkey, {major_index, minor_index}});
             }
         }
+    }
 
-        return false;
+    void generate_carrot()
+    {
+        is_carrot = true;
+        crypto::generate_random_bytes_thread_safe(sizeof(crypto::secret_key), to_bytes(s_master));
+        make_carrot_provespend_key(s_master, k_prove_spend);
+        make_carrot_viewbalance_secret(s_master, s_view_balance);
+        make_carrot_generateimage_key(s_view_balance, k_generate_image);
+        make_carrot_viewincoming_key(s_view_balance, k_view);
+        make_carrot_generateaddress_secret(s_view_balance, s_generate_address);
+        make_carrot_spend_pubkey(k_generate_image, k_prove_spend, account_spend_pubkey);
+        account_view_pubkey = rct::rct2pk(rct::scalarmultKey(rct::pk2rct(account_spend_pubkey),
+            rct::sk2rct(k_view)));
+        main_address_view_pubkey = rct::rct2pk(rct::scalarmultBase(rct::sk2rct(k_view)));
+
+        generate_subaddress_map();
+    }
+
+    void generate_legacy()
+    {
+        is_carrot = false;
+        legacy_acb.generate();
+        k_view = legacy_acb.get_keys().m_view_secret_key;
+        account_spend_pubkey = legacy_acb.get_keys().m_account_address.m_spend_public_key;
+        main_address_view_pubkey = legacy_acb.get_keys().m_account_address.m_view_public_key;
+
+        generate_subaddress_map();
     }
 };
 //----------------------------------------------------------------------------------------------------------------------
@@ -349,42 +361,50 @@ static void unittest_scan_enote_set_multi_account(const std::vector<CarrotEnoteV
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 static bool compare_scan_result(const unittest_carrot_scan_result_t &scan_res,
-    const CarrotPaymentProposalV1 &normal_payment_proposal)
+    const CarrotPaymentProposalV1 &normal_payment_proposal,
+    const rct::xmr_amount allowed_fee_margin_opt = 0)
 {
     if (scan_res.address_spend_pubkey != normal_payment_proposal.destination.address_spend_pubkey)
         return false;
-    
-    if (scan_res.amount != normal_payment_proposal.amount)
+
+    if (scan_res.amount > normal_payment_proposal.amount)
         return false;
-    
+
+    if (normal_payment_proposal.amount - scan_res.amount > allowed_fee_margin_opt)
+        return false;
+
     if (scan_res.enote_type != CarrotEnoteType::PAYMENT)
         return false;
-    
+
     if (scan_res.payment_id != normal_payment_proposal.destination.payment_id)
         return false;
-    
+
     if (scan_res.internal_message != janus_anchor_t{})
         return false;
-    
+
     return true;
 }
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 static bool compare_scan_result(const unittest_carrot_scan_result_t &scan_res,
-    const CarrotPaymentProposalSelfSendV1 &selfsend_payment_proposal)
+    const CarrotPaymentProposalSelfSendV1 &selfsend_payment_proposal,
+    const rct::xmr_amount allowed_fee_margin_opt = 0)
 {
     if (scan_res.address_spend_pubkey != selfsend_payment_proposal.destination_address_spend_pubkey)
         return false;
-    
-    if (scan_res.amount != selfsend_payment_proposal.amount)
+
+    if (scan_res.amount > selfsend_payment_proposal.amount)
         return false;
-    
+
+    if (selfsend_payment_proposal.amount - scan_res.amount > allowed_fee_margin_opt)
+        return false;
+
     if (scan_res.enote_type != selfsend_payment_proposal.enote_type)
         return false;
-    
+
     if (scan_res.payment_id != null_payment_id)
         return false;
-    
+
     if (scan_res.internal_message != selfsend_payment_proposal.internal_message.value_or(janus_anchor_t{}))
         return false;
 
@@ -394,25 +414,41 @@ static bool compare_scan_result(const unittest_carrot_scan_result_t &scan_res,
 //----------------------------------------------------------------------------------------------------------------------
 struct unittest_transaction_proposal
 {
-    using per_account = std::pair<mock_carrot_or_legacy_keys, std::vector<CarrotPaymentProposalV1>>;
+    using per_payment_proposal = std::pair<CarrotPaymentProposalV1, /*is subtractble?*/bool>;
+    using per_ss_payment_proposal = std::pair<CarrotPaymentProposalSelfSendV1, /*is subtractble?*/bool>;
+    using per_account = std::pair<mock_carrot_or_legacy_keys, std::vector<per_payment_proposal>>;
     using per_input = std::pair<crypto::key_image, rct::xmr_amount>;
 
     std::vector<per_account> per_account_payments;
-    std::vector<CarrotPaymentProposalSelfSendV1> explicit_selfsend_proposals;
+    std::vector<per_ss_payment_proposal> explicit_selfsend_proposals;
     size_t self_sender_index{0};
     rct::xmr_amount fee_per_weight;
 
     void get_flattened_payment_proposals(std::vector<CarrotPaymentProposalV1> &normal_payment_proposals_out,
-        std::vector<CarrotPaymentProposalSelfSendV1> &selfsend_payment_proposals_out) const 
+        std::vector<CarrotPaymentProposalSelfSendV1> &selfsend_payment_proposals_out,
+        std::set<size_t> &subtractable_normal_payment_proposals,
+        std::set<size_t> &subtractable_selfsend_payment_proposals) const
     {
+        size_t norm_idx = 0;
         for (const per_account &pa : per_account_payments)
         {
-            normal_payment_proposals_out.insert(normal_payment_proposals_out.end(), 
-                pa.second.cbegin(),
-                pa.second.cend());
+            for (const per_payment_proposal &ppp : pa.second)
+            {
+                normal_payment_proposals_out.push_back(ppp.first);
+                if (ppp.second)
+                    subtractable_normal_payment_proposals.insert(norm_idx);
+
+                norm_idx++;
+            }
         }
 
-        selfsend_payment_proposals_out = explicit_selfsend_proposals;
+        for (size_t ss_idx = 0; ss_idx < explicit_selfsend_proposals.size(); ++ss_idx)
+        {
+            const per_ss_payment_proposal &pspp = explicit_selfsend_proposals.at(ss_idx);
+            selfsend_payment_proposals_out.push_back(pspp.first);
+            if (pspp.second)
+                subtractable_selfsend_payment_proposals.insert(ss_idx);
+        }
     }
 };
 //----------------------------------------------------------------------------------------------------------------------
@@ -455,7 +491,12 @@ static void subtest_multi_account_transfer_over_transaction(const unittest_trans
     // get payment proposals
     std::vector<CarrotPaymentProposalV1> normal_payment_proposals;
     std::vector<CarrotPaymentProposalSelfSendV1> selfsend_payment_proposals;
-    tx_proposal.get_flattened_payment_proposals(normal_payment_proposals, selfsend_payment_proposals);
+    std::set<size_t> subtractable_normal_payment_proposals;
+    std::set<size_t> subtractable_selfsend_payment_proposals;
+    tx_proposal.get_flattened_payment_proposals(normal_payment_proposals,
+        selfsend_payment_proposals,
+        subtractable_normal_payment_proposals,
+        subtractable_selfsend_payment_proposals);
 
     // get self-sender account
     const mock_carrot_or_legacy_keys &ss_keys =
@@ -463,7 +504,7 @@ static void subtest_multi_account_transfer_over_transaction(const unittest_trans
 
     // make unsigned transaction
     cryptonote::transaction tx;
-    crypto::secret_key amount_blinding_factor_sum;
+    std::vector<crypto::secret_key> output_amount_blinding_factors;
     make_unsigned_transaction_transfer(std::vector<CarrotPaymentProposalV1>(normal_payment_proposals),
         std::vector<CarrotPaymentProposalSelfSendV1>(selfsend_payment_proposals),
         tx_proposal.fee_per_weight,
@@ -472,7 +513,14 @@ static void subtest_multi_account_transfer_over_transaction(const unittest_trans
         &ss_keys.k_view_dev,
         ss_keys.account_spend_pubkey,
         tx,
-        amount_blinding_factor_sum);
+        output_amount_blinding_factors);
+
+    // calculate acceptable fee margin between proposed amount and actual amount for subtractable outputs
+    const size_t num_subtractable = subtractable_normal_payment_proposals.size() +
+        subtractable_selfsend_payment_proposals.size();
+    const rct::xmr_amount acceptable_fee_margin = num_subtractable
+        ? (tx.rct_signatures.txnFee / num_subtractable) + 1
+        : 0;
 
     // load carrot stuff from tx
     std::vector<CarrotEnoteV1> parsed_enotes;
@@ -497,102 +545,131 @@ static void subtest_multi_account_transfer_over_transaction(const unittest_trans
         epee::to_span(accounts),
         scan_results);
 
-    // check that the scan results for each account match the corresponding payment proposals for each account
-    // also check that the accounts can each open their corresponding onetime outut pubkeys
+    // check that the scan results for each *normal* account match the corresponding payment
+    // proposals for each account. also check that the accounts can each open their corresponding
+    // onetime outut pubkeys
     ASSERT_EQ(scan_results.size(), accounts.size());
+    // for each normal account...
     for (size_t account_idx = 0; account_idx < accounts.size(); ++account_idx)
     {
-        const std::vector<unittest_carrot_scan_result_t> &account_scan_results = scan_results.at(account_idx);
+        // skip self-sender account
         if (account_idx == tx_proposal.self_sender_index)
+            continue;
+
+        const std::vector<unittest_carrot_scan_result_t> &account_scan_results = scan_results.at(account_idx);
+        const auto &account_payment_proposals = tx_proposal.per_account_payments.at(account_idx).second;
+        ASSERT_EQ(account_payment_proposals.size(), account_scan_results.size());
+        std::set<size_t> matched_payment_proposals;
+
+        // for each scan result assigned to this account...
+        for (const unittest_carrot_scan_result_t &single_scan_res : account_scan_results)
         {
-            ASSERT_EQ(selfsend_payment_proposals.size() + 1, account_scan_results.size());
-            std::set<size_t> matched_payment_proposals;
-            const unittest_carrot_scan_result_t* implicit_change_scan_res = nullptr;
-            for (const unittest_carrot_scan_result_t &single_scan_res : account_scan_results)
+            // for each normal payment proposal to this account...
+            for (size_t norm_prop_idx = 0; norm_prop_idx < account_payment_proposals.size(); ++norm_prop_idx)
             {
-                bool matched_payment = false;
-                for (size_t ss_prop_idx = 0; ss_prop_idx < selfsend_payment_proposals.size(); ++ss_prop_idx)
+                // calculate acceptable loss from fee subtraction
+                const CarrotPaymentProposalV1 &account_payment_proposal = account_payment_proposals.at(norm_prop_idx).first;
+                const bool is_subtractable = subtractable_normal_payment_proposals.count(norm_prop_idx);
+                const rct::xmr_amount acceptable_fee_margin_for_proposal = is_subtractable ? acceptable_fee_margin : 0;
+
+                // if the scan result matches the payment proposal...
+                if (compare_scan_result(single_scan_res, account_payment_proposal, acceptable_fee_margin_for_proposal))
                 {
-                    const CarrotPaymentProposalSelfSendV1 &account_payment_proposal = selfsend_payment_proposals.at(ss_prop_idx);
-                    if (compare_scan_result(single_scan_res, account_payment_proposal))
+                    // try searching for subaddress opening
+                    crypto::secret_key address_privkey_g;
+                    crypto::secret_key address_privkey_t;
+                    uint32_t _1{}, _2{};
+                    EXPECT_TRUE(accounts.at(account_idx)->try_searching_for_opening_for_subaddress(
+                        single_scan_res.address_spend_pubkey,
+                        MAX_SUBADDRESS_MAJOR_INDEX,
+                        MAX_SUBADDRESS_MINOR_INDEX,
+                        _1,
+                        _2,
+                        address_privkey_g,
+                        address_privkey_t));
+
+                    // try opening Ko
+                    EXPECT_TRUE(can_open_fcmp_onetime_address(address_privkey_g,
+                        address_privkey_t,
+                        single_scan_res.sender_extension_g,
+                        single_scan_res.sender_extension_t,
+                        parsed_enotes.at(single_scan_res.output_index).onetime_address));
+
+                    // if this payment proposal isn't already marked as scanned, mark as scanned
+                    if (!matched_payment_proposals.count(norm_prop_idx))
                     {
-                        crypto::secret_key address_privkey_g;
-                        crypto::secret_key address_privkey_t;
-                        uint32_t _1{}, _2{};
-                        EXPECT_TRUE(accounts.at(account_idx)->try_searching_for_opening_for_subaddress(
-                            single_scan_res.address_spend_pubkey,
-                            MAX_SUBADDRESS_MAJOR_INDEX,
-                            MAX_SUBADDRESS_MINOR_INDEX,
-                            _1,
-                            _2,
-                            address_privkey_g,
-                            address_privkey_t));
-
-                        EXPECT_TRUE(can_open_fcmp_onetime_address(address_privkey_g,
-                            address_privkey_t,
-                            single_scan_res.sender_extension_g,
-                            single_scan_res.sender_extension_t,
-                            parsed_enotes.at(single_scan_res.output_index).onetime_address));
-
-                        if (!matched_payment_proposals.count(ss_prop_idx))
-                        {
-                            matched_payment = true;
-                            matched_payment_proposals.insert(ss_prop_idx);
-                            break;
-                        }
+                        matched_payment_proposals.insert(norm_prop_idx);
+                        break;
                     }
                 }
-                if (!matched_payment)
-                {
-                    EXPECT_EQ(nullptr, implicit_change_scan_res); // only one non-matched scan result is allowed
-                    implicit_change_scan_res = &single_scan_res;
-                }
             }
-            EXPECT_EQ(selfsend_payment_proposals.size(), matched_payment_proposals.size());
-            EXPECT_NE(nullptr, implicit_change_scan_res);
-            // @TODO: assert properties of `implicit_change_scan_res`
         }
-        else
+        // check that the number of matched payment proposals is equal to the original number of them
+        // doing it this way checks that the same payment proposal isn't marked twice and another left out
+        EXPECT_EQ(account_payment_proposals.size(), matched_payment_proposals.size());
+    }
+
+    // check that the scan results for the selfsend account match the corresponding payment
+    // proposals. also check that the accounts can each open their corresponding onetime outut pubkeys
+    const std::vector<unittest_carrot_scan_result_t> &account_scan_results = scan_results.at(tx_proposal.self_sender_index);
+    ASSERT_EQ(selfsend_payment_proposals.size() + 1, account_scan_results.size());
+    std::set<size_t> matched_payment_proposals;
+    const unittest_carrot_scan_result_t* implicit_change_scan_res = nullptr;
+    // for each scan result assigned to the self-sender account...
+    for (const unittest_carrot_scan_result_t &single_scan_res : account_scan_results)
+    {
+        bool matched_payment = false;
+        // for each self-send payment proposal...
+        for (size_t ss_prop_idx = 0; ss_prop_idx < selfsend_payment_proposals.size(); ++ss_prop_idx)
         {
-            const std::vector<CarrotPaymentProposalV1> &account_payment_proposals = tx_proposal.per_account_payments.at(account_idx).second;
-            ASSERT_EQ(account_payment_proposals.size(), account_scan_results.size());
-            std::set<size_t> matched_payment_proposals;
-            for (const unittest_carrot_scan_result_t &single_scan_res : account_scan_results)
+            // calculate acceptable loss from fee subtraction
+            const CarrotPaymentProposalSelfSendV1 &account_payment_proposal = selfsend_payment_proposals.at(ss_prop_idx);
+            const bool is_subtractable = subtractable_selfsend_payment_proposals.count(ss_prop_idx);
+            const rct::xmr_amount acceptable_fee_margin_for_proposal = is_subtractable ? acceptable_fee_margin : 0;
+
+            // if the scan result matches the payment proposal...
+            if (compare_scan_result(single_scan_res, account_payment_proposal, acceptable_fee_margin_for_proposal))
             {
-                for (size_t norm_prop_idx = 0; norm_prop_idx < account_payment_proposals.size(); ++norm_prop_idx)
+                // try searching for subaddress opening
+                crypto::secret_key address_privkey_g;
+                crypto::secret_key address_privkey_t;
+                uint32_t _1{}, _2{};
+                EXPECT_TRUE(ss_keys.try_searching_for_opening_for_subaddress(
+                    single_scan_res.address_spend_pubkey,
+                    MAX_SUBADDRESS_MAJOR_INDEX,
+                    MAX_SUBADDRESS_MINOR_INDEX,
+                    _1,
+                    _2,
+                    address_privkey_g,
+                    address_privkey_t));
+
+                // try opening Ko
+                EXPECT_TRUE(can_open_fcmp_onetime_address(address_privkey_g,
+                    address_privkey_t,
+                    single_scan_res.sender_extension_g,
+                    single_scan_res.sender_extension_t,
+                    parsed_enotes.at(single_scan_res.output_index).onetime_address));
+
+                // if this payment proposal isn't already marked as scanned, mark as scanned
+                if (!matched_payment_proposals.count(ss_prop_idx))
                 {
-                    const CarrotPaymentProposalV1 &account_payment_proposal = account_payment_proposals.at(norm_prop_idx);
-                    if (compare_scan_result(single_scan_res, account_payment_proposal))
-                    {
-                        crypto::secret_key address_privkey_g;
-                        crypto::secret_key address_privkey_t;
-                        uint32_t _1{}, _2{};
-                        EXPECT_TRUE(accounts.at(account_idx)->try_searching_for_opening_for_subaddress(
-                            single_scan_res.address_spend_pubkey,
-                            MAX_SUBADDRESS_MAJOR_INDEX,
-                            MAX_SUBADDRESS_MINOR_INDEX,
-                            _1,
-                            _2,
-                            address_privkey_g,
-                            address_privkey_t));
-
-                        EXPECT_TRUE(can_open_fcmp_onetime_address(address_privkey_g,
-                            address_privkey_t,
-                            single_scan_res.sender_extension_g,
-                            single_scan_res.sender_extension_t,
-                            parsed_enotes.at(single_scan_res.output_index).onetime_address));
-
-                        if (!matched_payment_proposals.count(norm_prop_idx))
-                        {
-                            matched_payment_proposals.insert(norm_prop_idx);
-                            break;
-                        }
-                    }
+                    matched_payment = true;
+                    matched_payment_proposals.insert(ss_prop_idx);
+                    break;
                 }
             }
-            EXPECT_EQ(account_payment_proposals.size(), matched_payment_proposals.size());
+        }
+
+        // if this scan result has no matching payment...
+        if (!matched_payment)
+        {
+            EXPECT_EQ(nullptr, implicit_change_scan_res); // only one non-matched scan result is allowed
+            implicit_change_scan_res = &single_scan_res; // save the implicit change scan result for later 
         }
     }
+    EXPECT_EQ(selfsend_payment_proposals.size(), matched_payment_proposals.size());
+    EXPECT_NE(nullptr, implicit_change_scan_res);
+    // @TODO: assert properties of `implicit_change_scan_res`
 }
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
@@ -611,7 +688,7 @@ TEST(carrot_impl, multi_account_transfer_over_transaction_1)
     acc1.generate_carrot();
 
     // 1 normal payment
-    CarrotPaymentProposalV1 &normal_payment_proposal = tools::add_element( tx_proposal.per_account_payments[0].second);
+    CarrotPaymentProposalV1 &normal_payment_proposal = tools::add_element( tx_proposal.per_account_payments[0].second).first;
     normal_payment_proposal = CarrotPaymentProposalV1{
         .destination = acc0.cryptonote_address(),
         .amount = crypto::rand_idx((rct::xmr_amount) 1ull << 63),
@@ -650,21 +727,21 @@ TEST(carrot_impl, multi_account_transfer_over_transaction_2)
     tx_proposal.self_sender_index = 2;
 
     // 1 subaddress payment
-    tools::add_element(acc0.second) = CarrotPaymentProposalV1{
-        .destination = acc0.first.subaddress(17, 18),
+    tools::add_element(acc0.second).first = CarrotPaymentProposalV1{
+        .destination = acc0.first.subaddress(2, 3),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
 
     // 1 main address payment
-    tools::add_element(acc1.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc1.second).first = CarrotPaymentProposalV1{
         .destination = acc1.first.cryptonote_address(),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
 
     // 1 integrated address payment
-    tools::add_element(acc3.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc3.second).first = CarrotPaymentProposalV1{
         .destination = acc3.first.cryptonote_address(gen_payment_id()),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
@@ -699,25 +776,25 @@ TEST(carrot_impl, multi_account_transfer_over_transaction_3)
     tx_proposal.self_sender_index = 2;
 
     // 2 subaddress payment
-    tools::add_element(acc0.second) = CarrotPaymentProposalV1{
-        .destination = acc0.first.subaddress(17, 18),
+    tools::add_element(acc0.second).first = CarrotPaymentProposalV1{
+        .destination = acc0.first.subaddress(2, 3),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
     acc0.second.push_back(acc0.second.front());
-    acc0.second.back().randomness = gen_janus_anchor(); //mangle anchor_norm
+    acc0.second.back().first.randomness = gen_janus_anchor(); //mangle anchor_norm
 
     // 2 main address payment
-    tools::add_element(acc1.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc1.second).first = CarrotPaymentProposalV1{
         .destination = acc1.first.cryptonote_address(),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
     acc1.second.push_back(acc1.second.front());
-    acc1.second.back().randomness = gen_janus_anchor(); //mangle anchor_norm
+    acc1.second.back().first.randomness = gen_janus_anchor(); //mangle anchor_norm
 
     // 1 integrated address payment
-    tools::add_element(acc3.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc3.second).first = CarrotPaymentProposalV1{
         .destination = acc3.first.cryptonote_address(gen_payment_id()),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
@@ -752,32 +829,32 @@ TEST(carrot_impl, multi_account_transfer_over_transaction_4)
     tx_proposal.self_sender_index = 2;
 
     // 2 subaddress payment
-    tools::add_element(acc0.second) = CarrotPaymentProposalV1{
-        .destination = acc0.first.subaddress(17, 18),
+    tools::add_element(acc0.second).first = CarrotPaymentProposalV1{
+        .destination = acc0.first.subaddress(2, 3),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
     acc0.second.push_back(acc0.second.front());
-    acc0.second.back().randomness = gen_janus_anchor(); //mangle anchor_norm
+    acc0.second.back().first.randomness = gen_janus_anchor(); //mangle anchor_norm
 
     // 2 main address payment
-    tools::add_element(acc1.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc1.second).first = CarrotPaymentProposalV1{
         .destination = acc1.first.cryptonote_address(),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
     acc1.second.push_back(acc1.second.front());
-    acc1.second.back().randomness = gen_janus_anchor(); //mangle anchor_norm
+    acc1.second.back().first.randomness = gen_janus_anchor(); //mangle anchor_norm
 
     // 1 integrated address payment
-    tools::add_element(acc3.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc3.second).first = CarrotPaymentProposalV1{
         .destination = acc3.first.cryptonote_address(gen_payment_id()),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
 
     // 1 main address selfsend
-    tools::add_element(tx_proposal.explicit_selfsend_proposals) = CarrotPaymentProposalSelfSendV1{
+    tools::add_element(tx_proposal.explicit_selfsend_proposals).first = CarrotPaymentProposalSelfSendV1{
         .destination_address_spend_pubkey = acc2.first.account_spend_pubkey,
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .enote_type = CarrotEnoteType::PAYMENT,
@@ -785,8 +862,8 @@ TEST(carrot_impl, multi_account_transfer_over_transaction_4)
     };
 
     // 1 subaddress selfsend
-    tools::add_element(tx_proposal.explicit_selfsend_proposals) = CarrotPaymentProposalSelfSendV1{
-        .destination_address_spend_pubkey = acc2.first.subaddress(49, 199).address_spend_pubkey,
+    tools::add_element(tx_proposal.explicit_selfsend_proposals).first = CarrotPaymentProposalSelfSendV1{
+        .destination_address_spend_pubkey = acc2.first.subaddress(4, 19).address_spend_pubkey,
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .enote_type = CarrotEnoteType::CHANGE
     };
@@ -813,7 +890,7 @@ TEST(carrot_impl, multi_account_transfer_over_transaction_5)
     acc1.generate_legacy();
 
     // 1 normal payment
-    CarrotPaymentProposalV1 &normal_payment_proposal = tools::add_element( tx_proposal.per_account_payments[0].second);
+    CarrotPaymentProposalV1 &normal_payment_proposal = tools::add_element( tx_proposal.per_account_payments[0].second).first;
     normal_payment_proposal = CarrotPaymentProposalV1{
         .destination = acc0.cryptonote_address(),
         .amount = crypto::rand_idx((rct::xmr_amount) 1ull << 63),
@@ -852,21 +929,21 @@ TEST(carrot_impl, multi_account_transfer_over_transaction_6)
     tx_proposal.self_sender_index = 2;
 
     // 1 subaddress payment
-    tools::add_element(acc0.second) = CarrotPaymentProposalV1{
-        .destination = acc0.first.subaddress(17, 18),
+    tools::add_element(acc0.second).first = CarrotPaymentProposalV1{
+        .destination = acc0.first.subaddress(2, 3),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
 
     // 1 main address payment
-    tools::add_element(acc1.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc1.second).first = CarrotPaymentProposalV1{
         .destination = acc1.first.cryptonote_address(),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
 
     // 1 integrated address payment
-    tools::add_element(acc3.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc3.second).first = CarrotPaymentProposalV1{
         .destination = acc3.first.cryptonote_address(gen_payment_id()),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
@@ -901,25 +978,25 @@ TEST(carrot_impl, multi_account_transfer_over_transaction_7)
     tx_proposal.self_sender_index = 2;
 
     // 2 subaddress payment
-    tools::add_element(acc0.second) = CarrotPaymentProposalV1{
-        .destination = acc0.first.subaddress(17, 18),
+    tools::add_element(acc0.second).first = CarrotPaymentProposalV1{
+        .destination = acc0.first.subaddress(2, 3),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
     acc0.second.push_back(acc0.second.front());
-    acc0.second.back().randomness = gen_janus_anchor(); //mangle anchor_norm
+    acc0.second.back().first.randomness = gen_janus_anchor(); //mangle anchor_norm
 
     // 2 main address payment
-    tools::add_element(acc1.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc1.second).first = CarrotPaymentProposalV1{
         .destination = acc1.first.cryptonote_address(),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
     acc1.second.push_back(acc1.second.front());
-    acc1.second.back().randomness = gen_janus_anchor(); //mangle anchor_norm
+    acc1.second.back().first.randomness = gen_janus_anchor(); //mangle anchor_norm
 
     // 1 integrated address payment
-    tools::add_element(acc3.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc3.second).first = CarrotPaymentProposalV1{
         .destination = acc3.first.cryptonote_address(gen_payment_id()),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
@@ -954,32 +1031,32 @@ TEST(carrot_impl, multi_account_transfer_over_transaction_8)
     tx_proposal.self_sender_index = 2;
 
     // 2 subaddress payment
-    tools::add_element(acc0.second) = CarrotPaymentProposalV1{
-        .destination = acc0.first.subaddress(17, 18),
+    tools::add_element(acc0.second).first = CarrotPaymentProposalV1{
+        .destination = acc0.first.subaddress(2, 3),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
     acc0.second.push_back(acc0.second.front());
-    acc0.second.back().randomness = gen_janus_anchor(); //mangle anchor_norm
+    acc0.second.back().first.randomness = gen_janus_anchor(); //mangle anchor_norm
 
     // 2 main address payment
-    tools::add_element(acc1.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc1.second).first = CarrotPaymentProposalV1{
         .destination = acc1.first.cryptonote_address(),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
     acc1.second.push_back(acc1.second.front());
-    acc1.second.back().randomness = gen_janus_anchor(); //mangle anchor_norm
+    acc1.second.back().first.randomness = gen_janus_anchor(); //mangle anchor_norm
 
     // 1 integrated address payment
-    tools::add_element(acc3.second) = CarrotPaymentProposalV1{
+    tools::add_element(acc3.second).first = CarrotPaymentProposalV1{
         .destination = acc3.first.cryptonote_address(gen_payment_id()),
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .randomness = gen_janus_anchor()
     };
 
     // 1 main address selfsend
-    tools::add_element(tx_proposal.explicit_selfsend_proposals) = CarrotPaymentProposalSelfSendV1{
+    tools::add_element(tx_proposal.explicit_selfsend_proposals).first = CarrotPaymentProposalSelfSendV1{
         .destination_address_spend_pubkey = acc2.first.account_spend_pubkey,
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .enote_type = CarrotEnoteType::PAYMENT,
@@ -987,8 +1064,8 @@ TEST(carrot_impl, multi_account_transfer_over_transaction_8)
     };
 
     // 1 subaddress selfsend
-    tools::add_element(tx_proposal.explicit_selfsend_proposals) = CarrotPaymentProposalSelfSendV1{
-        .destination_address_spend_pubkey = acc2.first.subaddress(49, 199).address_spend_pubkey,
+    tools::add_element(tx_proposal.explicit_selfsend_proposals).first = CarrotPaymentProposalSelfSendV1{
+        .destination_address_spend_pubkey = acc2.first.subaddress(4, 19).address_spend_pubkey,
         .amount = crypto::rand_idx<rct::xmr_amount>(1000000),
         .enote_type = CarrotEnoteType::CHANGE
     };
