@@ -420,7 +420,7 @@ void get_output_proposal_internal_v1(const CarrotPaymentProposalSelfSendV1 &prop
         other_enote_ephemeral_pubkey &&
         memcmp(&*proposal.enote_ephemeral_pubkey, &*other_enote_ephemeral_pubkey, sizeof(mx25519_pubkey));
     CHECK_AND_ASSERT_THROW_MES(!missing_enote_ephemeral_pubkeys,
-        "get output proposal special v1: no enote ephemeral pubkey provided");
+        "get output proposal internal v1: no enote ephemeral pubkey provided");
     CHECK_AND_ASSERT_THROW_MES(!mismatched_enote_ephemeral_pubkeys,
         "get output proposal internal v1: mismatched enote ephemeral pubkeys provided");
     const mx25519_pubkey enote_ephemeral_pubkey = proposal.enote_ephemeral_pubkey.value_or(
