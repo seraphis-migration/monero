@@ -96,9 +96,6 @@ bool operator==(const CarrotPaymentProposalV1 &a, const CarrotPaymentProposalV1 
 /// equality operators
 bool operator==(const CarrotPaymentProposalSelfSendV1 &a, const CarrotPaymentProposalSelfSendV1 &b);
 
-/// comparison operators
-bool operator<(const RCTOutputEnoteProposal &a, const RCTOutputEnoteProposal &b);
-
 /**
 * brief: get_enote_ephemeral_pubkey - get the proposal's enote ephemeral pubkey D_e
 * param: proposal -

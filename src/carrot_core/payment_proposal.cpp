@@ -221,11 +221,6 @@ bool operator==(const CarrotPaymentProposalSelfSendV1 &a, const CarrotPaymentPro
            0 == memcmp(&a.enote_ephemeral_pubkey, &b.enote_ephemeral_pubkey, sizeof(mx25519_pubkey));
 }
 //-------------------------------------------------------------------------------------------------------------------
-bool operator<(const RCTOutputEnoteProposal &a, const RCTOutputEnoteProposal &b)
-{
-    return memcmp(&a.enote.onetime_address, &b.enote.onetime_address, sizeof(crypto::public_key)) < 0;
-}
-//-------------------------------------------------------------------------------------------------------------------
 mx25519_pubkey get_enote_ephemeral_pubkey(const CarrotPaymentProposalV1 &proposal,
     const input_context_t &input_context)
 {

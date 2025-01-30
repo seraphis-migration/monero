@@ -33,6 +33,7 @@
 #include "common/container_helpers.h"
 #include "enote_utils.h"
 #include "misc_log_ex.h"
+#include "ringct/rctOps.h"
 
 //third party headers
 
@@ -251,18 +252,50 @@ void get_output_enote_proposals(const std::vector<CarrotPaymentProposalV1> &norm
         }
     }
 
-    // assert uniqueness of D_e
+    // assert uniqueness of D_e if >2-out, shared otherwise. also check D_e is not trivial
     memcmp_set<mx25519_pubkey> ephemeral_pubkeys;
     for (const RCTOutputEnoteProposal &p : output_enote_proposals_out)
+    {
+        const bool trivial_enote_ephemeral_pubkey = memcmp(p.enote.enote_ephemeral_pubkey.data,
+            mx25519_pubkey{}.data,
+            sizeof(mx25519_pubkey)) == 0;
+        CHECK_AND_ASSERT_THROW_MES(!trivial_enote_ephemeral_pubkey,
+            "get output enote proposals: this set contains enote ephemeral pubkeys with x=0");
         ephemeral_pubkeys.insert(p.enote.enote_ephemeral_pubkey);
+    }
     const bool has_unique_ephemeral_pubkeys = ephemeral_pubkeys.size() == output_enote_proposals_out.size();
     CHECK_AND_ASSERT_THROW_MES(!(num_proposals == 2 && has_unique_ephemeral_pubkeys),
         "get output enote proposals: a 2-out set needs to share an ephemeral pubkey, but this 2-out set doesn't");
     CHECK_AND_ASSERT_THROW_MES(!(num_proposals != 2 && !has_unique_ephemeral_pubkeys),
         "get output enote proposals: this >2-out set contains duplicate enote ephemeral pubkeys");
 
-    // sort enotes by Ko
-    std::sort(output_enote_proposals_out.begin(), output_enote_proposals_out.end());
+    // sort enotes by K_o
+    const auto sort_output_enote_proposal = [](const RCTOutputEnoteProposal &a, const RCTOutputEnoteProposal &b)
+        -> bool { return a.enote.onetime_address < b.enote.onetime_address; };
+    std::sort(output_enote_proposals_out.begin(), output_enote_proposals_out.end(), sort_output_enote_proposal);
+
+    // assert uniqueness of K_o
+    CHECK_AND_ASSERT_THROW_MES(tools::is_sorted_and_unique(output_enote_proposals_out, sort_output_enote_proposal),
+        "get output enote proposals: this set contains duplicate onetime addresses");
+
+    // assert all K_o lie in prime order subgroup
+    for (const RCTOutputEnoteProposal &output_enote_proposal : output_enote_proposals_out)
+    {
+        CHECK_AND_ASSERT_THROW_MES(rct::isInMainSubgroup(rct::pk2rct(output_enote_proposal.enote.onetime_address)),
+            "get output enote proposals: this set contains an invalid onetime address");
+    }
+
+    // assert unique and non-trivial k_a
+    memcmp_set<crypto::secret_key> amount_blinding_factors;
+    for (const RCTOutputEnoteProposal &output_enote_proposal : output_enote_proposals_out)
+    {
+        CHECK_AND_ASSERT_THROW_MES(output_enote_proposal.amount_blinding_factor != crypto::null_skey,
+            "get output enote proposals: this set contains a trivial amount blinding factor");
+
+        amount_blinding_factors.insert(output_enote_proposal.amount_blinding_factor);
+    }
+    CHECK_AND_ASSERT_THROW_MES(amount_blinding_factors.size() == num_proposals,
+        "get output enote proposals: this set contains duplicate amount blinding factors");
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace carrot
