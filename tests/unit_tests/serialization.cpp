@@ -618,7 +618,7 @@ TEST(Serialization, serializes_ringct_types)
   destinations.push_back(Pk);
   //compute rct data with mixin 3
   const rct::RCTConfig rct_config{ rct::RangeProofPaddedBulletproof, 2 };
-  s0 = rct::genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, 0, 3, rct_config, hw::get_device("default"));
+  s0 = rct::genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, {}, {}, 0, 3, rct_config, hw::get_device("default"));
 
   ASSERT_FALSE(s0.p.MGs.empty());
   ASSERT_TRUE(s0.p.CLSAGs.empty());
@@ -643,7 +643,7 @@ TEST(Serialization, serializes_ringct_types)
   ASSERT_EQ(bp0, bp1);
 
   const rct::RCTConfig rct_config_clsag{ rct::RangeProofPaddedBulletproof, 3 };
-  s0 = rct::genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, 0, 3, rct_config_clsag, hw::get_device("default"));
+  s0 = rct::genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, {}, {}, 0, 3, rct_config_clsag, hw::get_device("default"));
 
   ASSERT_FALSE(s0.p.CLSAGs.empty());
   ASSERT_TRUE(s0.p.MGs.empty());
@@ -1311,9 +1311,9 @@ TEST(Serialization, tx_fcmp_pp)
 
   const std::size_t n_inputs = 2;
   const std::size_t n_outputs = 3;
-  const uint8_t curve_trees_tree_depth = 3;
+  const uint8_t n_tree_layers = 3;
 
-  const std::size_t proof_len = fcmp_pp::proof_len(n_inputs, curve_trees_tree_depth);
+  const std::size_t proof_len = fcmp_pp::proof_len(n_inputs, n_tree_layers);
 
   const auto make_dummy_fcmp_pp_tx = [proof_len]() -> transaction
   {
@@ -1373,7 +1373,7 @@ TEST(Serialization, tx_fcmp_pp)
     tx.rct_signatures.referenceBlock = referenceBlock;
 
     // Set the curve trees merkle tree depth
-    tx.rct_signatures.p.curve_trees_tree_depth = curve_trees_tree_depth;
+    tx.rct_signatures.p.n_tree_layers = n_tree_layers;
 
     // 1 fcmp++ proof
     fcmp_pp::FcmpPpProof fcmp_pp;

@@ -345,7 +345,7 @@ TEST(ringct, range_proofs)
         ASSERT_TRUE(ok);
 
         //compute rct data with mixin 3
-        rctSig s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, 0, 3, rct_config, hw::get_device("default"));
+        rctSig s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, {}, {}, 0, 3, rct_config, hw::get_device("default"));
 
         //verify rct data
         ASSERT_TRUE(verRctSimple(s));
@@ -362,7 +362,7 @@ TEST(ringct, range_proofs)
 
 
         //compute rct data with mixin 3
-        s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, 0, 3, rct_config, hw::get_device("default"));
+        s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, {}, {}, 0, 3, rct_config, hw::get_device("default"));
 
         //verify rct data
         ASSERT_FALSE(verRctSimple(s));
@@ -410,7 +410,7 @@ TEST(ringct, range_proofs_with_fee)
         const rct::RCTConfig rct_config { RangeProofBorromean, 0 };
 
         //compute rct data with mixin 3
-        rctSig s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, 1, 3, rct_config, hw::get_device("default"));
+        rctSig s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, {}, {}, 1, 3, rct_config, hw::get_device("default"));
 
         //verify rct data
         ASSERT_TRUE(verRctSimple(s));
@@ -427,7 +427,7 @@ TEST(ringct, range_proofs_with_fee)
 
 
         //compute rct data with mixin 3
-        s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, 500, 3, rct_config, hw::get_device("default"));
+        s = genRctSimple(rct::zero(), sc, pc, destinations, inamounts, amounts, amount_keys, {}, {}, 500, 3, rct_config, hw::get_device("default"));
 
         //verify rct data
         ASSERT_FALSE(verRctSimple(s));
@@ -486,7 +486,7 @@ TEST(ringct, simple)
         xmr_amount txnfee = 1;
 
         const rct::RCTConfig rct_config { RangeProofBorromean, 0 };
-        rctSig s = genRctSimple(message, sc, pc, destinations,inamounts, outamounts, amount_keys, txnfee, 2, rct_config, hw::get_device("default"));
+        rctSig s = genRctSimple(message, sc, pc, destinations,inamounts, outamounts, amount_keys, {}, {}, txnfee, 2, rct_config, hw::get_device("default"));
 
         //verify ring ct signature
         ASSERT_TRUE(verRctSimple(s));
@@ -548,7 +548,7 @@ static rct::rctSig make_sample_simple_rct_sig(int n_inputs, const uint64_t input
     }
 
     const rct::RCTConfig rct_config { RangeProofBorromean, 0 };
-    return genRctSimple(rct::zero(), sc, pc, destinations, inamounts, outamounts, amount_keys, fee, 3, rct_config, hw::get_device("default"));
+    return genRctSimple(rct::zero(), sc, pc, destinations, inamounts, outamounts, amount_keys, {}, {}, fee, 3, rct_config, hw::get_device("default"));
 }
 
 static bool range_proof_test(bool expected_valid,

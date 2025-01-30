@@ -4,6 +4,8 @@
 #include <ostream>
 #include <new>
 
+#pragma once
+
 
 namespace fcmp_pp_rust
 {

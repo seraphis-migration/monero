@@ -45,7 +45,8 @@ extern "C" {
 }
 #include "crypto/generic-ops.h"
 #include "crypto/crypto.h"
-#include "fcmp_pp/proof.h"
+#include "fcmp_pp/fcmp_pp_types.h"
+#include "fcmp_pp/prove.h"
 #include "hex.h"
 #include "span.h"
 #include "memwipe.h"
@@ -426,7 +427,7 @@ namespace rct {
         std::vector<mgSig> MGs; // simple rct has N, full has 1
         std::vector<clsag> CLSAGs;
         keyV pseudoOuts; //C - for simple rct
-        uint8_t curve_trees_tree_depth; // for fcmp++
+        uint8_t n_tree_layers; // for FCMP++
         fcmp_pp::FcmpPpProof fcmp_pp;
 
         // when changing this function, update cryptonote::get_pruned_transaction_weight
@@ -502,10 +503,12 @@ namespace rct {
 
           if (type == RCTTypeFcmpPlusPlus)
           {
-            FIELD(curve_trees_tree_depth)
+            // n_tree_layers can be inferred from the referenceBlock, however, if we didn't save n_tree_layers on the
+            // tx, we would need a db read (for n_tree_layers at the block) in order to de-serialize the FCMP++ proof
+            FIELD(n_tree_layers)
             ar.tag("fcmp_pp");
             ar.begin_object();
-            const std::size_t proof_len = fcmp_pp::proof_len(inputs, curve_trees_tree_depth);
+            const std::size_t proof_len = fcmp_pp::proof_len(inputs, n_tree_layers);
             if (!typename Archive<W>::is_saving())
               fcmp_pp.resize(proof_len);
             if (fcmp_pp.size() != proof_len)
@@ -630,7 +633,7 @@ namespace rct {
           FIELD(bulletproofs_plus)
           FIELD(MGs)
           FIELD(CLSAGs)
-          FIELD(curve_trees_tree_depth)
+          FIELD(n_tree_layers)
           FIELD(fcmp_pp)
           FIELD(pseudoOuts)
         END_SERIALIZE()
@@ -760,6 +763,8 @@ namespace rct {
     bool is_rct_bulletproof_plus(int type);
     bool is_rct_borromean(int type);
     bool is_rct_clsag(int type);
+    bool is_rct_fcmp_pp(int type);
+    bool is_rct_short_amount(int type);
 
     static inline const rct::key &pk2rct(const crypto::public_key &pk) { return (const rct::key&)pk; }
     static inline const rct::key &sk2rct(const crypto::secret_key &sk) { return (const rct::key&)sk; }
@@ -770,6 +775,7 @@ namespace rct {
     static inline const crypto::secret_key &rct2sk(const rct::key &k) { return (const crypto::secret_key&)k; }
     static inline const crypto::key_image &rct2ki(const rct::key &k) { return (const crypto::key_image&)k; }
     static inline const crypto::hash &rct2hash(const rct::key &k) { return (const crypto::hash&)k; }
+    static inline const crypto::ec_point &rct2pt(const rct::key &k) { return (const crypto::ec_point&)k; }
     static inline bool operator==(const rct::key &k0, const crypto::public_key &k1) { return !crypto_verify_32(k0.bytes, (const unsigned char*)&k1); }
     static inline bool operator!=(const rct::key &k0, const crypto::public_key &k1) { return crypto_verify_32(k0.bytes, (const unsigned char*)&k1); }
 }

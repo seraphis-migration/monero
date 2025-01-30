@@ -363,7 +363,7 @@ namespace boost
       a & x.CLSAGs;
     if (ver >= 3u)
     {
-      a & x.curve_trees_tree_depth;
+      a & x.n_tree_layers;
       a & x.fcmp_pp;
     }
     if (x.rangeSigs.empty())
@@ -400,7 +400,7 @@ namespace boost
       a & x.p.CLSAGs;
     if (ver >= 3u)
     {
-      a & x.p.curve_trees_tree_depth;
+      a & x.p.n_tree_layers;
       a & x.p.fcmp_pp;
     }
     if (x.type == rct::RCTTypeBulletproof || x.type == rct::RCTTypeBulletproof2 || x.type == rct::RCTTypeCLSAG || x.type == rct::RCTTypeBulletproofPlus || x.type == rct::RCTTypeFcmpPlusPlus)

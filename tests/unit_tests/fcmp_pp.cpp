@@ -30,6 +30,7 @@
 
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "curve_trees.h"
+#include "fcmp_pp/prove.h"
 #include "fcmp_pp/tower_cycle.h"
 #include "misc_log_ex.h"
 #include "ringct/rctOps.h"
@@ -122,7 +123,7 @@ TEST(fcmp_pp, prove)
 
     std::vector<const uint8_t *> fcmp_prove_inputs;
     std::vector<crypto::key_image> key_images;
-    std::vector<rct::key> pseudo_outs;
+    std::vector<crypto::ec_point> pseudo_outs;
 
     // Create proof for every leaf in the tree
     for (std::size_t leaf_idx = 0; leaf_idx < global_tree.get_n_leaf_tuples(); ++leaf_idx)
@@ -140,7 +141,7 @@ TEST(fcmp_pp, prove)
         const auto y = (uint8_t *) new_outputs.y_vec[leaf_idx].data;
 
         // Leaves
-        std::vector<fcmp_pp::tower_cycle::OutputBytes> output_bytes;
+        std::vector<fcmp_pp::OutputBytes> output_bytes;
         output_bytes.reserve(path.leaves.size());
         for (const auto &leaf : path.leaves)
         {
@@ -150,11 +151,11 @@ TEST(fcmp_pp, prove)
                     .C_bytes = (uint8_t *)&leaf.C.bytes,
                 });
         }
-        const fcmp_pp::tower_cycle::OutputChunk leaves{output_bytes.data(), output_bytes.size()};
+        const fcmp_pp::OutputChunk leaves{output_bytes.data(), output_bytes.size()};
 
-        const auto rerandomized_output = fcmp_pp::tower_cycle::rerandomize_output(output_bytes[output_idx]);
+        const auto rerandomized_output = fcmp_pp::rerandomize_output(output_bytes[output_idx]);
 
-        pseudo_outs.emplace_back(fcmp_pp::tower_cycle::pseudo_out(rerandomized_output));
+        pseudo_outs.emplace_back(fcmp_pp::pseudo_out(rerandomized_output));
 
         key_images.emplace_back();
         crypto::generate_key_image(rct::rct2pk(path.leaves[output_idx].O),
@@ -162,7 +163,7 @@ TEST(fcmp_pp, prove)
             key_images.back());
 
         // selene scalars from helios points
-        std::vector<std::vector<fcmp_pp::tower_cycle::SeleneScalar>> selene_scalars;
+        std::vector<std::vector<fcmp_pp::tower_cycle::Selene::Scalar>> selene_scalars;
         std::vector<fcmp_pp::tower_cycle::Selene::Chunk> selene_chunks;
         for (const auto &helios_points : path.c2_layers)
         {
@@ -182,7 +183,7 @@ TEST(fcmp_pp, prove)
         const Selene::ScalarChunks selene_scalar_chunks{selene_chunks.data(), selene_chunks.size()};
 
         // helios scalars from selene points
-        std::vector<std::vector<fcmp_pp::tower_cycle::HeliosScalar>> helios_scalars;
+        std::vector<std::vector<fcmp_pp::tower_cycle::Helios::Scalar>> helios_scalars;
         std::vector<fcmp_pp::tower_cycle::Helios::Chunk> helios_chunks;
         for (const auto &selene_points : path.c1_layers)
         {
@@ -201,23 +202,23 @@ TEST(fcmp_pp, prove)
         }
         const Helios::ScalarChunks helios_scalar_chunks{helios_chunks.data(), helios_chunks.size()};
 
-        const auto path_rust = fcmp_pp::tower_cycle::path_new(leaves,
+        const auto path_rust = fcmp_pp::path_new(leaves,
             output_idx,
             helios_scalar_chunks,
             selene_scalar_chunks);
 
         // Collect blinds for rerandomized output
-        const auto o_blind = fcmp_pp::tower_cycle::o_blind(rerandomized_output);
-        const auto i_blind = fcmp_pp::tower_cycle::i_blind(rerandomized_output);
-        const auto i_blind_blind = fcmp_pp::tower_cycle::i_blind_blind(rerandomized_output);
-        const auto c_blind = fcmp_pp::tower_cycle::c_blind(rerandomized_output);
+        const auto o_blind = fcmp_pp::o_blind(rerandomized_output);
+        const auto i_blind = fcmp_pp::i_blind(rerandomized_output);
+        const auto i_blind_blind = fcmp_pp::i_blind_blind(rerandomized_output);
+        const auto c_blind = fcmp_pp::c_blind(rerandomized_output);
 
-        const auto blinded_o_blind = fcmp_pp::tower_cycle::blind_o_blind(o_blind);
-        const auto blinded_i_blind = fcmp_pp::tower_cycle::blind_i_blind(i_blind);
-        const auto blinded_i_blind_blind = fcmp_pp::tower_cycle::blind_i_blind_blind(i_blind_blind);
-        const auto blinded_c_blind = fcmp_pp::tower_cycle::blind_c_blind(c_blind);
+        const auto blinded_o_blind = fcmp_pp::blind_o_blind(o_blind);
+        const auto blinded_i_blind = fcmp_pp::blind_i_blind(i_blind);
+        const auto blinded_i_blind_blind = fcmp_pp::blind_i_blind_blind(i_blind_blind);
+        const auto blinded_c_blind = fcmp_pp::blind_c_blind(c_blind);
 
-        const auto output_blinds = fcmp_pp::tower_cycle::output_blinds_new(blinded_o_blind,
+        const auto output_blinds = fcmp_pp::output_blinds_new(blinded_o_blind,
             blinded_i_blind,
             blinded_i_blind_blind,
             blinded_c_blind);
@@ -225,13 +226,13 @@ TEST(fcmp_pp, prove)
         // Cache branch blinds
         if (selene_branch_blinds.empty())
             for (std::size_t i = 0; i < helios_scalars.size(); ++i)
-                selene_branch_blinds.emplace_back(fcmp_pp::tower_cycle::selene_branch_blind());
+                selene_branch_blinds.emplace_back(fcmp_pp::selene_branch_blind());
 
         if (helios_branch_blinds.empty())
             for (std::size_t i = 0; i < selene_scalars.size(); ++i)
-                helios_branch_blinds.emplace_back(fcmp_pp::tower_cycle::helios_branch_blind());
+                helios_branch_blinds.emplace_back(fcmp_pp::helios_branch_blind());
 
-        auto fcmp_prove_input = fcmp_pp::tower_cycle::fcmp_prove_input_new(x,
+        auto fcmp_prove_input = fcmp_pp::fcmp_prove_input_new(x,
             y,
             rerandomized_output,
             path_rust,
@@ -245,15 +246,17 @@ TEST(fcmp_pp, prove)
 
         LOG_PRINT_L1("Constructing proof");
         const crypto::hash tx_hash{};
-        const auto proof = fcmp_pp::tower_cycle::prove(
+        const std::size_t n_layers = 1 + tree_depth;
+        const auto proof = fcmp_pp::prove(
                 tx_hash,
                 fcmp_prove_inputs,
-                1 + tree_depth
+                n_layers
             );
 
-        bool verify = fcmp_pp::tower_cycle::verify(
+        bool verify = fcmp_pp::verify(
                 tx_hash,
                 proof,
+                n_layers,
                 tree_root,
                 pseudo_outs,
                 key_images

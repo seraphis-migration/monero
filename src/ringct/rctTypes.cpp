@@ -197,6 +197,7 @@ namespace rct {
             case RCTTypeBulletproof2:
             case RCTTypeCLSAG:
             case RCTTypeBulletproofPlus:
+            case RCTTypeFcmpPlusPlus:
                 return true;
             default:
                 return false;
@@ -221,6 +222,7 @@ namespace rct {
         switch (type)
         {
             case RCTTypeBulletproofPlus:
+            case RCTTypeFcmpPlusPlus:
                 return true;
             default:
                 return false;
@@ -245,6 +247,31 @@ namespace rct {
         {
             case RCTTypeCLSAG:
             case RCTTypeBulletproofPlus:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool is_rct_fcmp_pp(int type)
+    {
+        switch (type)
+        {
+            case RCTTypeFcmpPlusPlus:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    bool is_rct_short_amount(int type)
+    {
+        switch (type)
+        {
+            case RCTTypeBulletproof2:
+            case RCTTypeCLSAG:
+            case RCTTypeBulletproofPlus:
+            case RCTTypeFcmpPlusPlus:
                 return true;
             default:
                 return false;

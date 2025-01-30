@@ -30,6 +30,7 @@
 
 #include "crypto/crypto.h"
 #include "fcmp_pp_rust/fcmp++.h"
+#include "fcmp_pp_types.h"
 #include "ringct/rctTypes.h"
 
 #include <string>
@@ -38,34 +39,6 @@ namespace fcmp_pp
 {
 namespace tower_cycle
 {
-//----------------------------------------------------------------------------------------------------------------------
-//----------------------------------------------------------------------------------------------------------------------
-// Rust types
-//----------------------------------------------------------------------------------------------------------------------
-using OutputBytes = fcmp_pp_rust::OutputBytes;
-using OutputChunk = fcmp_pp_rust::OutputSlice;
-//----------------------------------------------------------------------------------------------------------------------
-// Need to forward declare Scalar types for point_to_cycle_scalar below
-using SeleneScalar = fcmp_pp_rust::SeleneScalar;
-using HeliosScalar = fcmp_pp_rust::HeliosScalar;
-//----------------------------------------------------------------------------------------------------------------------
-struct SeleneT final
-{
-    using Scalar       = SeleneScalar;
-    using Point        = fcmp_pp_rust::SelenePoint;
-    using Chunk        = fcmp_pp_rust::SeleneScalarSlice;
-    using CycleScalar  = HeliosScalar;
-    using ScalarChunks = fcmp_pp_rust::SeleneScalarChunks;
-};
-//----------------------------------------------------------------------------------------------------------------------
-struct HeliosT final
-{
-    using Scalar       = HeliosScalar;
-    using Point        = fcmp_pp_rust::HeliosPoint;
-    using Chunk        = fcmp_pp_rust::HeliosScalarSlice;
-    using CycleScalar  = SeleneScalar;
-    using ScalarChunks = fcmp_pp_rust::HeliosScalarChunks;
-};
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 // Abstract parent curve class that curves in a cycle must implement
@@ -195,59 +168,6 @@ void extend_scalars_from_cycle_points(const std::unique_ptr<C_POINTS> &curve,
 //----------------------------------------------------------------------------------------------------------------------
 uint8_t *selene_tree_root(const Selene::Point &point);
 uint8_t *helios_tree_root(const Helios::Point &point);
-//----------------------------------------------------------------------------------------------------------------------
-// TODO: consider putting this section somewhere better than tower_cycle
-uint8_t *rerandomize_output(const OutputBytes output);
-
-rct::key pseudo_out(const uint8_t *rerandomized_output);
-
-uint8_t *o_blind(const uint8_t *rerandomized_output);
-uint8_t *i_blind(const uint8_t *rerandomized_output);
-uint8_t *i_blind_blind(const uint8_t *rerandomized_output);
-uint8_t *c_blind(const uint8_t *rerandomized_output);
-
-uint8_t *blind_o_blind(const uint8_t *o_blind);
-uint8_t *blind_i_blind(const uint8_t *i_blind);
-uint8_t *blind_i_blind_blind(const uint8_t *i_blind_blind);
-uint8_t *blind_c_blind(const uint8_t *c_blind);
-
-uint8_t *path_new(const OutputChunk &leaves,
-    std::size_t output_idx,
-    const Helios::ScalarChunks &helios_layer_chunks,
-    const Selene::ScalarChunks &selene_layer_chunks);
-
-uint8_t *output_blinds_new(const uint8_t *blinded_o_blind,
-    const uint8_t *blinded_i_blind,
-    const uint8_t *blinded_i_blind_blind,
-    const uint8_t *blinded_c_blind);
-
-uint8_t *selene_branch_blind();
-uint8_t *helios_branch_blind();
-
-uint8_t *fcmp_prove_input_new(const uint8_t *x,
-    const uint8_t *y,
-    const uint8_t *rerandomized_output,
-    const uint8_t *path,
-    const uint8_t *output_blinds,
-    const std::vector<const uint8_t *> &selene_branch_blinds,
-    const std::vector<const uint8_t *> &helios_branch_blinds);
-
-struct FcmpPpProof final
-{
-    uint8_t n_tree_layers;
-    std::vector<uint8_t> buf;
-};
-
-FcmpPpProof prove(const crypto::hash &signable_tx_hash,
-    const std::vector<const uint8_t *> &fcmp_prove_inputs,
-    const std::size_t n_tree_layers);
-
-bool verify(const crypto::hash &signable_tx_hash,
-    const FcmpPpProof &fcmp_pp_proof,
-    const uint8_t *tree_root,
-    const std::vector<rct::key> &pseudo_outs,
-    const std::vector<crypto::key_image> &key_images);
-
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 }//namespace tower_cycle
