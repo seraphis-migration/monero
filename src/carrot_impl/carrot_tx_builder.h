@@ -83,8 +83,8 @@ static inline std::size_t get_fcmppp_tx_weight(const std::size_t num_inputs,
 std::size_t get_fcmppp_coinbase_tx_weight(const std::size_t num_outputs,
     const std::size_t tx_extra_size);
 
-void make_unsigned_transaction(std::vector<CarrotPaymentProposalV1> &&normal_payment_proposals,
-    std::vector<CarrotPaymentProposalSelfSendV1> &&selfsend_payment_proposals,
+void make_unsigned_transaction(std::vector<CarrotPaymentProposalV1> &normal_payment_proposals_inout,
+    std::vector<CarrotPaymentProposalSelfSendV1> &selfsend_payment_proposals_inout,
     const rct::xmr_amount fee_per_weight,
     select_inputs_func_t &&select_inputs,
     carve_fees_and_balance_func_t &&carve_fees_and_balance,
@@ -95,8 +95,8 @@ void make_unsigned_transaction(std::vector<CarrotPaymentProposalV1> &&normal_pay
     std::vector<crypto::secret_key> &output_amount_blinding_factors_out);
 
 void make_unsigned_transaction_transfer_subtractable(
-    std::vector<CarrotPaymentProposalV1> &&normal_payment_proposals,
-    std::vector<CarrotPaymentProposalSelfSendV1> &&selfsend_payment_proposals,
+    std::vector<CarrotPaymentProposalV1> &normal_payment_proposals_inout,
+    std::vector<CarrotPaymentProposalSelfSendV1> &selfsend_payment_proposals_inout,
     const rct::xmr_amount fee_per_weight,
     select_inputs_func_t &&select_inputs,
     const view_balance_secret_device *s_view_balance_dev,
@@ -108,8 +108,8 @@ void make_unsigned_transaction_transfer_subtractable(
     std::vector<crypto::secret_key> &output_amount_blinding_factors_out);
 
 void make_unsigned_transaction_transfer(
-    std::vector<CarrotPaymentProposalV1> &&normal_payment_proposals,
-    std::vector<CarrotPaymentProposalSelfSendV1> &&selfsend_payment_proposals,
+    std::vector<CarrotPaymentProposalV1> &normal_payment_proposals_inout,
+    std::vector<CarrotPaymentProposalSelfSendV1> &selfsend_payment_proposals_inout,
     const rct::xmr_amount fee_per_weight,
     select_inputs_func_t &&select_inputs,
     const view_balance_secret_device *s_view_balance_dev,

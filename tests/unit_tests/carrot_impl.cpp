@@ -503,10 +503,12 @@ static void subtest_multi_account_transfer_over_transaction(const unittest_trans
         tx_proposal.per_account_payments.at(tx_proposal.self_sender_index).first;
 
     // make unsigned transaction
+    std::vector<CarrotPaymentProposalV1> modified_normal_payment_proposals = normal_payment_proposals;
+    std::vector<CarrotPaymentProposalSelfSendV1> modified_selfsend_payment_proposals = selfsend_payment_proposals;
     cryptonote::transaction tx;
     std::vector<crypto::secret_key> output_amount_blinding_factors;
-    make_unsigned_transaction_transfer(std::vector<CarrotPaymentProposalV1>(normal_payment_proposals),
-        std::vector<CarrotPaymentProposalSelfSendV1>(selfsend_payment_proposals),
+    make_unsigned_transaction_transfer(modified_normal_payment_proposals,
+        modified_selfsend_payment_proposals,
         tx_proposal.fee_per_weight,
         make_fake_input_selection_callback(),
         ss_keys.get_view_balance_device(),
@@ -532,6 +534,28 @@ static void subtest_multi_account_transfer_over_transaction(const unittest_trans
         parsed_key_images,
         parsed_fee,
         parsed_encrypted_payment_id));
+
+    // sanity check that the enotes and pid_enc loaded from the transaction are equal to the enotes
+    // and pic_enc returned from get_output_enote_proposals() when called with the modified payment
+    // proposals. we do this so that the modified payment proposals from make_unsigned_transaction()
+    // can be passed to a hardware device for deterministic verification of the signable tx hash
+    std::vector<RCTOutputEnoteProposal> rederived_output_enote_proposals;
+    encrypted_payment_id_t rederived_encrypted_payment_id;
+    get_output_enote_proposals(modified_normal_payment_proposals,
+        modified_selfsend_payment_proposals,
+        ss_keys.get_view_balance_device(),
+        &ss_keys.k_view_dev,
+        ss_keys.account_spend_pubkey,
+        parsed_key_images.at(0),
+        rederived_output_enote_proposals,
+        rederived_encrypted_payment_id);
+    ASSERT_TRUE(parsed_encrypted_payment_id);
+    EXPECT_EQ(*parsed_encrypted_payment_id, rederived_encrypted_payment_id);
+    ASSERT_EQ(parsed_enotes.size(), rederived_output_enote_proposals.size());
+    for (size_t enote_idx = 0; enote_idx < parsed_enotes.size(); ++enote_idx)
+    {
+        EXPECT_EQ(parsed_enotes.at(enote_idx), rederived_output_enote_proposals.at(enote_idx).enote);
+    }
 
     // collect accounts
     std::vector<const mock_carrot_or_legacy_keys*> accounts;
