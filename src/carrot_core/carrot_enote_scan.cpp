@@ -182,7 +182,7 @@ bool try_scan_carrot_coinbase_enote(const CarrotCoinbaseEnoteV1 &enote,
         s_sender_receiver);
 
     // C_a = G + a H
-    const rct::key implied_amount_commitment = rct::zeroCommit(enote.amount);
+    const rct::key implied_amount_commitment = rct::zeroCommitVartime(enote.amount);
 
     // k^o_g = H_n("..g..", s^ctx_sr, C_a)
     make_carrot_onetime_address_extension_g(s_sender_receiver,
