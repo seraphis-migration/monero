@@ -158,7 +158,7 @@ using ChildChunkCache   = std::unordered_map<ChildChunkIdx, CachedTreeElemChunk>
 // TODO: technically this can be a vector. There should *always* be at least 1 entry for every layer
 using TreeElemCache     = std::unordered_map<LayerIdx, ChildChunkCache>;
 
-static const int TREE_CACHE_VERSION = 0;
+static constexpr int TREE_CACHE_VERSION = 0;
 
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
@@ -308,7 +308,7 @@ struct version<fcmp_pp::curve_trees::TreeCache<C1, C2>>
 {
     typedef mpl::int_<fcmp_pp::curve_trees::TREE_CACHE_VERSION> type;
     typedef mpl::integral_c_tag tag;
-    BOOST_STATIC_CONSTANT(unsigned int, value = version::type::value);
+    static constexpr int value = version::type::value;
     BOOST_MPL_ASSERT((
         boost::mpl::less<
             boost::mpl::int_<fcmp_pp::curve_trees::TREE_CACHE_VERSION>,

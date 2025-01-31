@@ -30,7 +30,6 @@
 
 #include "crypto/crypto.h"
 #include "cryptonote_basic/cryptonote_basic.h"
-#include "cryptonote_basic/cryptonote_boost_serialization.h"
 #include "fcmp_pp_crypto.h"
 #include "misc_log_ex.h"
 #include "serialization/keyvalue_serialization.h"
