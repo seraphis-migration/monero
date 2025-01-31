@@ -534,6 +534,7 @@ static void subtest_multi_account_transfer_over_transaction(const unittest_trans
         parsed_key_images,
         parsed_fee,
         parsed_encrypted_payment_id));
+    ASSERT_TRUE(parsed_encrypted_payment_id);
 
     // sanity check that the enotes and pid_enc loaded from the transaction are equal to the enotes
     // and pic_enc returned from get_output_enote_proposals() when called with the modified payment
@@ -543,13 +544,13 @@ static void subtest_multi_account_transfer_over_transaction(const unittest_trans
     encrypted_payment_id_t rederived_encrypted_payment_id;
     get_output_enote_proposals(modified_normal_payment_proposals,
         modified_selfsend_payment_proposals,
+        *parsed_encrypted_payment_id,
         ss_keys.get_view_balance_device(),
         &ss_keys.k_view_dev,
         ss_keys.account_spend_pubkey,
         parsed_key_images.at(0),
         rederived_output_enote_proposals,
         rederived_encrypted_payment_id);
-    ASSERT_TRUE(parsed_encrypted_payment_id);
     EXPECT_EQ(*parsed_encrypted_payment_id, rederived_encrypted_payment_id);
     ASSERT_EQ(parsed_enotes.size(), rederived_output_enote_proposals.size());
     for (size_t enote_idx = 0; enote_idx < parsed_enotes.size(); ++enote_idx)

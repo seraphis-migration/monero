@@ -118,6 +118,9 @@ void make_unsigned_transaction(std::vector<CarrotPaymentProposalV1> &normal_paym
         }
     }
 
+    // generate random dummy encrypted payment ID for if none of the normal payment proposals are integrated
+    const encrypted_payment_id_t dummy_encrypted_payment_id = gen_payment_id();
+
     // calculate size of tx.extra
     const size_t tx_extra_size = get_carrot_default_tx_extra_size(num_outs);
 
@@ -173,6 +176,7 @@ void make_unsigned_transaction(std::vector<CarrotPaymentProposalV1> &normal_paym
     encrypted_payment_id_t encrypted_payment_id;
     get_output_enote_proposals(normal_payment_proposals_inout,
         selfsend_payment_proposals_inout,
+        dummy_encrypted_payment_id,
         s_view_balance_dev,
         k_view_dev,
         account_spend_pubkey,
