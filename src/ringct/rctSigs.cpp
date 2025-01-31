@@ -1330,7 +1330,7 @@ done:
                   n_tree_layers
               );
 
-          rv.referenceBlock = fcmp_pp_params.reference_block;
+          rv.p.reference_block = fcmp_pp_params.reference_block;
           return rv;
         }
 

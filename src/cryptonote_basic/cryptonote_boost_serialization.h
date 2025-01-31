@@ -344,8 +344,6 @@ namespace boost
     a & x.ecdhInfo;
     serializeOutPk(a, x.outPk, ver);
     a & x.txnFee;
-    if (x.type == rct::RCTTypeFcmpPlusPlus)
-      a & x.referenceBlock;
   }
 
   template <class Archive>
@@ -363,6 +361,7 @@ namespace boost
       a & x.CLSAGs;
     if (ver >= 3u)
     {
+      a & x.reference_block;
       a & x.n_tree_layers;
       a & x.fcmp_pp;
     }
@@ -385,8 +384,6 @@ namespace boost
     a & x.ecdhInfo;
     serializeOutPk(a, x.outPk, ver);
     a & x.txnFee;
-    if (x.type == rct::RCTTypeFcmpPlusPlus)
-      a & x.referenceBlock;
     //--------------
     a & x.p.rangeSigs;
     if (x.p.rangeSigs.empty())
@@ -400,6 +397,7 @@ namespace boost
       a & x.p.CLSAGs;
     if (ver >= 3u)
     {
+      a & x.p.reference_block;
       a & x.p.n_tree_layers;
       a & x.p.fcmp_pp;
     }

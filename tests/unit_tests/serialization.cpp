@@ -1369,8 +1369,8 @@ TEST(Serialization, tx_fcmp_pp)
       tx.rct_signatures.p.pseudoOuts.push_back(pseudoOut);
 
     // Set the reference block for fcmp++
-    const crypto::hash referenceBlock{0x01};
-    tx.rct_signatures.referenceBlock = referenceBlock;
+    const crypto::hash reference_block{0x01};
+    tx.rct_signatures.p.reference_block = reference_block;
 
     // Set the curve trees merkle tree depth
     tx.rct_signatures.p.n_tree_layers = n_tree_layers;
@@ -1394,8 +1394,8 @@ TEST(Serialization, tx_fcmp_pp)
     ASSERT_TRUE(serialization::dump_binary(tx, blob));
     ASSERT_TRUE(serialization::parse_binary(blob, tx1));
     ASSERT_EQ(tx, tx1);
-    ASSERT_EQ(tx.rct_signatures.referenceBlock, crypto::hash{0x01});
-    ASSERT_EQ(tx.rct_signatures.referenceBlock, tx1.rct_signatures.referenceBlock);
+    ASSERT_EQ(tx.rct_signatures.p.reference_block, crypto::hash{0x01});
+    ASSERT_EQ(tx.rct_signatures.p.reference_block, tx1.rct_signatures.p.reference_block);
     ASSERT_EQ(tx.rct_signatures.p.fcmp_pp, tx1.rct_signatures.p.fcmp_pp);
   }
 
