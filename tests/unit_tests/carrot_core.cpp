@@ -923,7 +923,7 @@ static void subtest_2out_transfer_get_output_enote_proposals_completeness(const 
             alice_j_minor,
             alice_address);
     }
-    else
+    else // alice main address
     {
         make_carrot_main_address_v1(alice.account_spend_pubkey,
             alice.main_address_view_pubkey,
@@ -951,7 +951,7 @@ static void subtest_2out_transfer_get_output_enote_proposals_completeness(const 
             gen_payment_id(),
             bob_address);
     }
-    else
+    else // bob main address
     {
         make_carrot_main_address_v1(bob.account_spend_pubkey,
             bob.main_address_view_pubkey,
@@ -979,11 +979,17 @@ static void subtest_2out_transfer_get_output_enote_proposals_completeness(const 
         .internal_message = alice_internal_selfsends ? std::make_optional(gen_janus_anchor()) : std::nullopt
     };
 
-    // turn payment proposals into enotes
+    // calculate dummy encrypted pid
+    const std::optional<encrypted_payment_id_t> dummy_encrypted_pid = bob_integrated
+        ? std::optional<encrypted_payment_id_t>{}
+        : gen_payment_id();
+
+    // turn payment proposals into enotes, passing dummy pid_enc if bob isn't integrated
     std::vector<RCTOutputEnoteProposal> enote_proposals;
     encrypted_payment_id_t encrypted_payment_id;
     get_output_enote_proposals({bob_payment_proposal},
         {alice_payment_proposal},
+        dummy_encrypted_pid,
         alice_internal_selfsends ? &alice.s_view_balance_dev : nullptr,
         &alice.k_view_dev,
         alice.account_spend_pubkey,

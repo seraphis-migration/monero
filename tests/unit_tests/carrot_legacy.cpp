@@ -185,11 +185,12 @@ static void subtest_legacy_2out_transfer_get_output_enote_proposals_completeness
     // alice mem devices
     view_incoming_key_ram_borrowed_device alive_k_v_dev(alice.get_keys().m_view_secret_key);
 
-    // turn payment proposals into enotes
+    // turn payment proposals into enotes, always pass dummy pid
     std::vector<RCTOutputEnoteProposal> enote_proposals;
     encrypted_payment_id_t encrypted_payment_id;
     get_output_enote_proposals({bob_payment_proposal},
         {alice_payment_proposal},
+        gen_payment_id(),
         nullptr,
         &alive_k_v_dev,
         alice.get_keys().m_account_address.m_spend_public_key,

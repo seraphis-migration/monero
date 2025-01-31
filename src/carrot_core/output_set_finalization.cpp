@@ -154,6 +154,7 @@ tools::optional_variant<CarrotPaymentProposalV1, CarrotPaymentProposalSelfSendV1
 //-------------------------------------------------------------------------------------------------------------------
 void get_output_enote_proposals(const std::vector<CarrotPaymentProposalV1> &normal_payment_proposals,
     const std::vector<CarrotPaymentProposalSelfSendV1> &selfsend_payment_proposals,
+    const std::optional<encrypted_payment_id_t> &dummy_encrypted_payment_id,
     const view_balance_secret_device *s_view_balance_dev,
     const view_incoming_key_device *k_view_dev,
     const crypto::public_key &account_spend_pubkey,
@@ -162,7 +163,6 @@ void get_output_enote_proposals(const std::vector<CarrotPaymentProposalV1> &norm
     encrypted_payment_id_t &encrypted_payment_id_out)
 {
     output_enote_proposals_out.clear();
-    encrypted_payment_id_out = null_payment_id;
 
     // assert payment proposals numbers
     const size_t num_proposals = normal_payment_proposals.size() + selfsend_payment_proposals.size();
@@ -208,17 +208,16 @@ void get_output_enote_proposals(const std::vector<CarrotPaymentProposalV1> &norm
             tools::add_element(output_enote_proposals_out),
             encrypted_payment_id);
 
-        // set pid to the first payment proposal or only integrated proposal
-        const bool is_first = i == 0;
+        // set pid_enc from integrated address proposal pic_enc
         const bool is_integrated = normal_payment_proposals[i].destination.payment_id != null_payment_id;
-        if (is_first || is_integrated)
+        if (is_integrated)
             encrypted_payment_id_out = encrypted_payment_id;
     }
 
     // in the case that the pid target is ambiguous, set it to random bytes
-    const bool ambiguous_pid_destination = num_integrated == 0 && normal_payment_proposals.size() > 1;
-    if (ambiguous_pid_destination)
-        encrypted_payment_id_out = gen_payment_id();
+    const bool missing_encrypted_pid = num_integrated == 0 && !dummy_encrypted_payment_id;
+    CHECK_AND_ASSERT_THROW_MES(!missing_encrypted_pid,
+        "get output enote proposals: missing encrypted payment ID: no integrated address nor provided dummy");
 
     // construct selfsend enotes, preferring internal enotes over special enotes when possible
     for (const CarrotPaymentProposalSelfSendV1 &selfsend_payment_proposal : selfsend_payment_proposals)
