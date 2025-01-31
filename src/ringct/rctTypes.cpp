@@ -253,17 +253,6 @@ namespace rct {
         }
     }
 
-    bool is_rct_fcmp_pp(int type)
-    {
-        switch (type)
-        {
-            case RCTTypeFcmpPlusPlus:
-                return true;
-            default:
-                return false;
-        }
-    }
-
     bool is_rct_short_amount(int type)
     {
         switch (type)

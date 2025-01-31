@@ -762,7 +762,6 @@ namespace rct {
     bool is_rct_bulletproof_plus(int type);
     bool is_rct_borromean(int type);
     bool is_rct_clsag(int type);
-    bool is_rct_fcmp_pp(int type);
     bool is_rct_short_amount(int type);
 
     static inline const rct::key &pk2rct(const crypto::public_key &pk) { return (const rct::key&)pk; }
