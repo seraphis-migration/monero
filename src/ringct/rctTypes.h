@@ -45,7 +45,8 @@ extern "C" {
 }
 #include "crypto/generic-ops.h"
 #include "crypto/crypto.h"
-
+#include "fcmp_pp/fcmp_pp_types.h"
+#include "fcmp_pp/prove.h"
 #include "hex.h"
 #include "span.h"
 #include "memwipe.h"
@@ -304,6 +305,7 @@ namespace rct {
       RCTTypeBulletproof2 = 4,
       RCTTypeCLSAG = 5,
       RCTTypeBulletproofPlus = 6,
+      RCTTypeFcmpPlusPlus = 7,
     };
     enum RangeProofType { RangeProofBorromean, RangeProofBulletproof, RangeProofMultiOutputBulletproof, RangeProofPaddedBulletproof };
     struct RCTConfig {
@@ -336,7 +338,7 @@ namespace rct {
           FIELD(type)
           if (type == RCTTypeNull)
             return ar.good();
-          if (type != RCTTypeFull && type != RCTTypeSimple && type != RCTTypeBulletproof && type != RCTTypeBulletproof2 && type != RCTTypeCLSAG && type != RCTTypeBulletproofPlus)
+          if (type != RCTTypeFull && type != RCTTypeSimple && type != RCTTypeBulletproof && type != RCTTypeBulletproof2 && type != RCTTypeCLSAG && type != RCTTypeBulletproofPlus && type != RCTTypeFcmpPlusPlus)
             return false;
           VARINT_FIELD(txnFee)
           // inputs/outputs not saved, only here for serialization help
@@ -365,7 +367,7 @@ namespace rct {
             return false;
           for (size_t i = 0; i < outputs; ++i)
           {
-            if (type == RCTTypeBulletproof2 || type == RCTTypeCLSAG || type == RCTTypeBulletproofPlus)
+            if (type == RCTTypeBulletproof2 || type == RCTTypeCLSAG || type == RCTTypeBulletproofPlus || type == RCTTypeFcmpPlusPlus)
             {
               // Since RCTTypeBulletproof2 enote types, we don't serialize the blinding factor, and only serialize the
               // first 8 bytes of ecdhInfo[i].amount
@@ -421,6 +423,9 @@ namespace rct {
         std::vector<mgSig> MGs; // simple rct has N, full has 1
         std::vector<clsag> CLSAGs;
         keyV pseudoOuts; //C - for simple rct
+        crypto::hash reference_block; // block containing the merkle tree root used for FCMP++
+        uint8_t n_tree_layers; // for FCMP++
+        fcmp_pp::FcmpPpProof fcmp_pp;
 
         // when changing this function, update cryptonote::get_pruned_transaction_weight
         template<bool W, template <bool> class Archive>
@@ -434,9 +439,9 @@ namespace rct {
             return false;
           if (type == RCTTypeNull)
             return ar.good();
-          if (type != RCTTypeFull && type != RCTTypeSimple && type != RCTTypeBulletproof && type != RCTTypeBulletproof2 && type != RCTTypeCLSAG && type != RCTTypeBulletproofPlus)
+          if (type != RCTTypeFull && type != RCTTypeSimple && type != RCTTypeBulletproof && type != RCTTypeBulletproof2 && type != RCTTypeCLSAG && type != RCTTypeBulletproofPlus && type != RCTTypeFcmpPlusPlus)
             return false;
-          if (type == RCTTypeBulletproofPlus)
+          if (type == RCTTypeBulletproofPlus || type == RCTTypeFcmpPlusPlus)
           {
             uint32_t nbp = bulletproofs_plus.size();
             VARINT_FIELD(nbp)
@@ -493,7 +498,25 @@ namespace rct {
             ar.end_array();
           }
 
-          if (type == RCTTypeCLSAG || type == RCTTypeBulletproofPlus)
+          if (type == RCTTypeFcmpPlusPlus)
+          {
+            FIELD(reference_block)
+            // n_tree_layers can be inferred from the reference_block, however, if we didn't save n_tree_layers on the
+            // tx, we would need a db read (for n_tree_layers at the block) in order to de-serialize the FCMP++ proof
+            VARINT_FIELD(n_tree_layers)
+            ar.tag("fcmp_pp");
+            ar.begin_object();
+            const std::size_t proof_len = fcmp_pp::proof_len(inputs, n_tree_layers);
+            if (!typename Archive<W>::is_saving())
+              fcmp_pp.resize(proof_len);
+            if (fcmp_pp.size() != proof_len)
+              return false;
+            ar.serialize_blob(fcmp_pp.data(), proof_len);
+            if (!ar.good())
+              return false;
+            ar.end_object();
+          }
+          else if (type == RCTTypeCLSAG || type == RCTTypeBulletproofPlus)
           {
             ar.tag("CLSAGs");
             ar.begin_array();
@@ -584,7 +607,7 @@ namespace rct {
             }
             ar.end_array();
           }
-          if (type == RCTTypeBulletproof || type == RCTTypeBulletproof2 || type == RCTTypeCLSAG || type == RCTTypeBulletproofPlus)
+          if (type == RCTTypeBulletproof || type == RCTTypeBulletproof2 || type == RCTTypeCLSAG || type == RCTTypeBulletproofPlus || type == RCTTypeFcmpPlusPlus)
           {
             ar.tag("pseudoOuts");
             ar.begin_array();
@@ -608,6 +631,9 @@ namespace rct {
           FIELD(bulletproofs_plus)
           FIELD(MGs)
           FIELD(CLSAGs)
+          FIELD(reference_block)
+          VARINT_FIELD(n_tree_layers)
+          FIELD(fcmp_pp)
           FIELD(pseudoOuts)
         END_SERIALIZE()
     };
@@ -616,12 +642,12 @@ namespace rct {
 
         keyV& get_pseudo_outs()
         {
-          return type == RCTTypeBulletproof || type == RCTTypeBulletproof2 || type == RCTTypeCLSAG || type == RCTTypeBulletproofPlus ? p.pseudoOuts : pseudoOuts;
+          return type == RCTTypeBulletproof || type == RCTTypeBulletproof2 || type == RCTTypeCLSAG || type == RCTTypeBulletproofPlus || type == RCTTypeFcmpPlusPlus ? p.pseudoOuts : pseudoOuts;
         }
 
         keyV const& get_pseudo_outs() const
         {
-          return type == RCTTypeBulletproof || type == RCTTypeBulletproof2 || type == RCTTypeCLSAG || type == RCTTypeBulletproofPlus ? p.pseudoOuts : pseudoOuts;
+          return type == RCTTypeBulletproof || type == RCTTypeBulletproof2 || type == RCTTypeCLSAG || type == RCTTypeBulletproofPlus || type == RCTTypeFcmpPlusPlus ? p.pseudoOuts : pseudoOuts;
         }
 
         BEGIN_SERIALIZE_OBJECT()
@@ -736,15 +762,18 @@ namespace rct {
     bool is_rct_bulletproof_plus(int type);
     bool is_rct_borromean(int type);
     bool is_rct_clsag(int type);
+    bool is_rct_short_amount(int type);
 
     static inline const rct::key &pk2rct(const crypto::public_key &pk) { return (const rct::key&)pk; }
     static inline const rct::key &sk2rct(const crypto::secret_key &sk) { return (const rct::key&)sk; }
     static inline const rct::key &ki2rct(const crypto::key_image &ki) { return (const rct::key&)ki; }
     static inline const rct::key &hash2rct(const crypto::hash &h) { return (const rct::key&)h; }
+    static inline const rct::key &pt2rct(const crypto::ec_point &pt) { return (const rct::key&)pt; }
     static inline const crypto::public_key &rct2pk(const rct::key &k) { return (const crypto::public_key&)k; }
     static inline const crypto::secret_key &rct2sk(const rct::key &k) { return (const crypto::secret_key&)k; }
     static inline const crypto::key_image &rct2ki(const rct::key &k) { return (const crypto::key_image&)k; }
     static inline const crypto::hash &rct2hash(const rct::key &k) { return (const crypto::hash&)k; }
+    static inline const crypto::ec_point &rct2pt(const rct::key &k) { return (const crypto::ec_point&)k; }
     static inline bool operator==(const rct::key &k0, const crypto::public_key &k1) { return !crypto_verify_32(k0.bytes, (const unsigned char*)&k1); }
     static inline bool operator!=(const rct::key &k0, const crypto::public_key &k1) { return crypto_verify_32(k0.bytes, (const unsigned char*)&k1); }
 }

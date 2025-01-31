@@ -42,13 +42,15 @@
 using namespace crypto;
 using namespace std;
 
+using Selene = fcmp_pp::curve_trees::Selene;
+using Helios = fcmp_pp::curve_trees::Helios;
+
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "ringct"
 
 #define CHECK_AND_ASSERT_MES_L1(expr, ret, message) {if(!(expr)) {MCERROR("verify", message); return ret;}}
 
-namespace
-{
+namespace rct {
     rct::Bulletproof make_dummy_bulletproof(const std::vector<uint64_t> &outamounts, rct::keyV &C, rct::keyV &masks)
     {
         const size_t n_outs = outamounts.size();
@@ -117,9 +119,7 @@ namespace
         const size_t n_scalars = ring_size;
         return rct::clsag{rct::keyV(n_scalars, I), I, I, I};
     }
-}
 
-namespace rct {
     Bulletproof proveRangeBulletproof(keyV &C, keyV &masks, const std::vector<uint64_t> &amounts, epee::span<const key> sk, hw::device &hwdev)
     {
         CHECK_AND_ASSERT_THROW_MES(amounts.size() == sk.size(), "Invalid amounts/sk sizes");
@@ -606,8 +606,8 @@ namespace rct {
 
       std::stringstream ss;
       binary_archive<true> ba(ss);
-      CHECK_AND_ASSERT_THROW_MES(!rv.mixRing.empty(), "Empty mixRing");
-      const size_t inputs = is_rct_simple(rv.type) ? rv.mixRing.size() : rv.mixRing[0].size();
+      const size_t inputs = (is_rct_bulletproof(rv.type) || is_rct_bulletproof_plus(rv.type)) ? rv.p.pseudoOuts.size() : rv.pseudoOuts.size();
+      CHECK_AND_ASSERT_THROW_MES(inputs > 0, "Empty pseudoOuts");
       const size_t outputs = rv.ecdhInfo.size();
       key prehash;
       CHECK_AND_ASSERT_THROW_MES(const_cast<rctSig&>(rv).serialize_rctsig_base(ba, inputs, outputs),
@@ -616,6 +616,12 @@ namespace rct {
       hashes.push_back(hash2rct(h));
 
       keyV kv;
+      if (rv.type == RCTTypeFcmpPlusPlus)
+      {
+        // Don't hash range proof data to enable cleaner separation of SAL signature <> membership proof <> range proof
+        goto done;
+      }
+
       if (rv.type == RCTTypeBulletproof || rv.type == RCTTypeBulletproof2 || rv.type == RCTTypeCLSAG)
       {
         kv.reserve((6*2+9) * rv.p.bulletproofs.size());
@@ -672,6 +678,7 @@ namespace rct {
         }
       }
       hashes.push_back(cn_fast_hash(kv));
+done:
       hwdev.mlsag_prehash(ss.str(), inputs, outputs, hashes, rv.outPk, prehash);
       return  prehash;
     }
@@ -1073,7 +1080,7 @@ namespace rct {
             //mask amount and mask
             rv.ecdhInfo[i].mask = copy(outSk[i].mask);
             rv.ecdhInfo[i].amount = d2h(amounts[i]);
-            hwdev.ecdhEncode(rv.ecdhInfo[i], amount_keys[i], rv.type == RCTTypeBulletproof2 || rv.type == RCTTypeCLSAG || rv.type == RCTTypeBulletproofPlus);
+            hwdev.ecdhEncode(rv.ecdhInfo[i], amount_keys[i], rct::is_rct_short_amount(rv.type));
         }
 
         //set txn fee
@@ -1102,8 +1109,9 @@ namespace rct {
     
     //RCT simple    
     //for post-rct only
-    rctSig genRctSimple(const key &message, const ctkeyV & inSk, const keyV & destinations, const vector<xmr_amount> &inamounts, const vector<xmr_amount> &outamounts, xmr_amount txnFee, const ctkeyM & mixRing, const keyV &amount_keys, const std::vector<unsigned int> & index, ctkeyV &outSk, const RCTConfig &rct_config, hw::device &hwdev) {
+    rctSig genRctSimple(const key &message, const ctkeyV & inSk, const keyV & destinations, const vector<xmr_amount> &inamounts, const vector<xmr_amount> &outamounts, xmr_amount txnFee, const ctkeyM & mixRing, const keyV &amount_keys, const std::vector<unsigned int> & index, ctkeyV &outSk, const std::vector<const uint8_t*> rerandomized_outputs, const fcmp_pp::ProofParams &fcmp_pp_params, const RCTConfig &rct_config, hw::device &hwdev) {
         const bool bulletproof_or_plus = rct_config.range_proof_type > RangeProofBorromean;
+        const bool is_fcmp_pp = rct_config.bp_version == 0 || rct_config.bp_version >= 5;
         CHECK_AND_ASSERT_THROW_MES(inamounts.size() > 0, "Empty inamounts");
         CHECK_AND_ASSERT_THROW_MES(inamounts.size() == inSk.size(), "Different number of inamounts/inSk");
         CHECK_AND_ASSERT_THROW_MES(outamounts.size() == destinations.size(), "Different number of amounts/destinations");
@@ -1113,6 +1121,20 @@ namespace rct {
         for (size_t n = 0; n < mixRing.size(); ++n) {
           CHECK_AND_ASSERT_THROW_MES(index[n] < mixRing[n].size(), "Bad index into mixRing");
         }
+        if (is_fcmp_pp) {
+          CHECK_AND_ASSERT_THROW_MES(rerandomized_outputs.size() > 0, "Empty rerandomized_outputs");
+          CHECK_AND_ASSERT_THROW_MES(rerandomized_outputs.size() == inamounts.size(), "Different number of rerandomized_outputs/inamounts");
+          CHECK_AND_ASSERT_THROW_MES(fcmp_pp_params.proof_inputs.size() > 0, "Empty FCMP++ proof inputs");
+          CHECK_AND_ASSERT_THROW_MES(fcmp_pp_params.proof_inputs.size() == inamounts.size(), "Different number of proof inputs/inamounts");
+          for (size_t n = 0; n < fcmp_pp_params.proof_inputs.size(); ++n) {
+            const auto &c1_branch_blinds = fcmp_pp_params.proof_inputs[n].selene_branch_blinds;
+            const auto &c2_branch_blinds = fcmp_pp_params.proof_inputs[n].helios_branch_blinds;
+            const auto &first_c1_branch_blinds = fcmp_pp_params.proof_inputs[0].selene_branch_blinds;
+            const auto &first_c2_branch_blinds = fcmp_pp_params.proof_inputs[0].helios_branch_blinds;
+            CHECK_AND_ASSERT_THROW_MES(c1_branch_blinds.size() == first_c1_branch_blinds.size(), "Bad c1_branch_blinds size");
+            CHECK_AND_ASSERT_THROW_MES(c2_branch_blinds.size() == first_c2_branch_blinds.size(), "Bad c2_branch_blinds size");
+          }
+        }
 
         rctSig rv;
         if (bulletproof_or_plus)
@@ -1120,6 +1142,9 @@ namespace rct {
           switch (rct_config.bp_version)
           {
             case 0:
+            case 5:
+              rv.type = RCTTypeFcmpPlusPlus;
+              break;
             case 4:
               rv.type = RCTTypeBulletproofPlus;
               break;
@@ -1248,16 +1273,69 @@ namespace rct {
             //mask amount and mask
             rv.ecdhInfo[i].mask = copy(outSk[i].mask);
             rv.ecdhInfo[i].amount = d2h(outamounts[i]);
-            hwdev.ecdhEncode(rv.ecdhInfo[i], amount_keys[i], rv.type == RCTTypeBulletproof2 || rv.type == RCTTypeCLSAG || rv.type == RCTTypeBulletproofPlus);
+            hwdev.ecdhEncode(rv.ecdhInfo[i], amount_keys[i], rct::is_rct_short_amount(rv.type));
         }
             
         //set txn fee
         rv.txnFee = txnFee;
 //        TODO: unused ??
 //        key txnFeeKey = scalarmultH(d2h(rv.txnFee));
-        rv.mixRing = mixRing;
         keyV &pseudoOuts = bulletproof_or_plus ? rv.p.pseudoOuts : rv.pseudoOuts;
         pseudoOuts.resize(inamounts.size());
+
+        if (is_fcmp_pp)
+        {
+          // TODO: separate function once this is finalized
+          std::vector<const uint8_t *> fcmp_prove_inputs;
+          fcmp_prove_inputs.reserve(inamounts.size());
+          for (i = 0; i < inamounts.size(); i++)
+          {
+            // Collect x and y
+            const uint8_t *x = (uint8_t *) inSk[i].dest.bytes;
+
+            // TODO: carrot uses the y. It's 0 when not implemented
+            crypto::secret_key ySk;
+            sc_0((unsigned char *)ySk.data);
+            const uint8_t *y = (uint8_t *) ySk.data;
+
+            const auto &rerandomized_output = rerandomized_outputs[i];
+            const auto &fcmp_pp_input = fcmp_pp_params.proof_inputs[i];
+
+            pseudoOuts[i] = rct::pt2rct(fcmp_pp::pseudo_out(rerandomized_output));
+
+            // TODO: separate SAL from membership proof. Implement SAL in hw device interface
+            auto fcmp_prove_input = fcmp_pp::fcmp_prove_input_new(x,
+                y,
+                rerandomized_output,
+                fcmp_pp_input.path,
+                fcmp_pp_input.output_blinds,
+                fcmp_pp_input.selene_branch_blinds,
+                fcmp_pp_input.helios_branch_blinds);
+
+            fcmp_prove_inputs.emplace_back(std::move(fcmp_prove_input));
+          }
+
+          const key full_message = get_pre_mlsag_hash(rv,hwdev);
+
+          const std::size_t n_tree_layers = 1
+              + fcmp_pp_params.proof_inputs.back().selene_branch_blinds.size()
+              + fcmp_pp_params.proof_inputs.back().helios_branch_blinds.size();
+
+          static_assert(sizeof(std::size_t) >= sizeof(uint8_t), "unexpected size of size_t");
+          rv.p.n_tree_layers = (uint8_t) n_tree_layers;
+
+          rv.p.fcmp_pp = fcmp_pp::prove(
+                  rct::rct2hash(full_message),
+                  fcmp_prove_inputs,
+                  n_tree_layers
+              );
+
+          rv.p.reference_block = fcmp_pp_params.reference_block;
+          return rv;
+        }
+
+        // mixRing is for non-FCMP++ txs (FCMP++ got rid of rings)
+        rv.mixRing = mixRing;
         if (is_rct_clsag(rv.type))
             rv.p.CLSAGs.resize(inamounts.size());
         else
@@ -1292,7 +1370,7 @@ namespace rct {
         return rv;
     }
 
-    rctSig genRctSimple(const key &message, const ctkeyV & inSk, const ctkeyV & inPk, const keyV & destinations, const vector<xmr_amount> &inamounts, const vector<xmr_amount> &outamounts, const keyV &amount_keys, xmr_amount txnFee, unsigned int mixin, const RCTConfig &rct_config, hw::device &hwdev) {
+    rctSig genRctSimple(const key &message, const ctkeyV & inSk, const ctkeyV & inPk, const keyV & destinations, const vector<xmr_amount> &inamounts, const vector<xmr_amount> &outamounts, const keyV &amount_keys, const std::vector<const uint8_t*> rerandomized_outputs, const fcmp_pp::ProofParams &fcmp_pp_params, xmr_amount txnFee, unsigned int mixin, const RCTConfig &rct_config, hw::device &hwdev) {
         std::vector<unsigned int> index;
         index.resize(inPk.size());
         ctkeyM mixRing;
@@ -1302,7 +1380,7 @@ namespace rct {
           mixRing[i].resize(mixin+1);
           index[i] = populateFromBlockchainSimple(mixRing[i], inPk[i], mixin);
         }
-        return genRctSimple(message, inSk, destinations, inamounts, outamounts, txnFee, mixRing, amount_keys, index, outSk, rct_config, hwdev);
+        return genRctSimple(message, inSk, destinations, inamounts, outamounts, txnFee, mixRing, amount_keys, index, outSk, rerandomized_outputs, fcmp_pp_params, rct_config, hwdev);
     }
 
     //RingCT protocol
@@ -1595,7 +1673,7 @@ namespace rct {
 
         //mask amount and mask
         ecdhTuple ecdh_info = rv.ecdhInfo[i];
-        hwdev.ecdhDecode(ecdh_info, sk, rv.type == RCTTypeBulletproof2 || rv.type == RCTTypeCLSAG || rv.type == RCTTypeBulletproofPlus);
+        hwdev.ecdhDecode(ecdh_info, sk, rct::is_rct_short_amount(rv.type));
         mask = ecdh_info.mask;
         key amount = ecdh_info.amount;
         key C = rv.outPk[i].mask;
@@ -1619,14 +1697,13 @@ namespace rct {
     }
 
     xmr_amount decodeRctSimple(const rctSig & rv, const key & sk, unsigned int i, key &mask, hw::device &hwdev) {
-        CHECK_AND_ASSERT_MES(rv.type == RCTTypeSimple || rv.type == RCTTypeBulletproof || rv.type == RCTTypeBulletproof2 || rv.type == RCTTypeCLSAG || rv.type == RCTTypeBulletproofPlus,
-            false, "decodeRct called on non simple rctSig");
+        CHECK_AND_ASSERT_MES(rct::is_rct_simple(rv.type), false, "decodeRct called on non simple rctSig");
         CHECK_AND_ASSERT_THROW_MES(i < rv.ecdhInfo.size(), "Bad index");
         CHECK_AND_ASSERT_THROW_MES(rv.outPk.size() == rv.ecdhInfo.size(), "Mismatched sizes of rv.outPk and rv.ecdhInfo");
 
         //mask amount and mask
         ecdhTuple ecdh_info = rv.ecdhInfo[i];
-        hwdev.ecdhDecode(ecdh_info, sk, rv.type == RCTTypeBulletproof2 || rv.type == RCTTypeCLSAG || rv.type == RCTTypeBulletproofPlus);
+        hwdev.ecdhDecode(ecdh_info, sk, rct::is_rct_short_amount(rv.type));
         mask = ecdh_info.mask;
         key amount = ecdh_info.amount;
         key C = rv.outPk[i].mask;
