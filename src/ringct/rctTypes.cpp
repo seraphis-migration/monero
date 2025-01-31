@@ -262,8 +262,12 @@ namespace rct {
             case RCTTypeBulletproofPlus:
             case RCTTypeFcmpPlusPlus:
                 return true;
-            default:
+            case RCTTypeFull:
+            case RCTTypeSimple:
+            case RCTTypeBulletproof:
                 return false;
+            default:
+                CHECK_AND_ASSERT_THROW_MES(false, "unknown rct type = " << type);
         }
     }
 
