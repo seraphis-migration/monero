@@ -38,6 +38,10 @@ set(unit_tests_sources
   bulletproofs.cpp
   bulletproofs_plus.cpp
   canonical_amounts.cpp
+  carrot_core.cpp
+  carrot_impl.cpp
+  carrot_legacy.cpp
+  carrot_transcript_fixed.cpp
   chacha.cpp
   checkpoints.cpp
   command_line.cpp
@@ -105,6 +109,7 @@ set(unit_tests_sources
   is_hdd.cpp
   aligned.cpp
   rpc_version_str.cpp
+  x25519.cpp
   zmq_rpc.cpp)
 
 set(unit_tests_headers
@@ -117,6 +122,8 @@ target_link_libraries(unit_tests
   PRIVATE
     ringct
     cncrypto
+    carrot_core
+    carrot_impl
     cryptonote_protocol
     cryptonote_core
     daemon_messages

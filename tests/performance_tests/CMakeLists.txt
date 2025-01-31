@@ -58,6 +58,7 @@ set(performance_tests_headers
   performance_utils.h
   single_tx_test_base.h
   torsion_ops.h
+  view_scan.h
   zero_commit.h)
 
 monero_add_minimal_executable(performance_tests
@@ -66,6 +67,7 @@ monero_add_minimal_executable(performance_tests
 target_link_libraries(performance_tests
   PRIVATE
     wallet
+    carrot_core
     cryptonote_core
     common
     cncrypto
