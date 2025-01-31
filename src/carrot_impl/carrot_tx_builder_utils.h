@@ -29,40 +29,18 @@
 #pragma once
 
 //local headers
-#include "carrot_core/payment_proposal.h"
+#include "carrot_tx_builder_types.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 
 //third party headers
-#include <boost/multiprecision/cpp_int.hpp>
 
 //standard headers
 #include <cstddef>
-#include <functional>
-#include <map>
-#include <set>
 
 //forward declarations
 
 namespace carrot
 {
-struct CarrotSelectedInput
-{
-    rct::xmr_amount amount;
-    crypto::key_image key_image;
-};
-
-using select_inputs_func_t = std::function<void(
-        const boost::multiprecision::int128_t&,        // nominal output sum, w/o fee
-        const std::map<std::size_t, rct::xmr_amount>&, // absolute fee per input count
-        std::vector<CarrotSelectedInput>&              // selected inputs result
-    )>;
-
-using carve_fees_and_balance_func_t = std::function<void(
-        const boost::multiprecision::int128_t&,       // input sum amount
-        const rct::xmr_amount,                        // fee
-        std::vector<CarrotPaymentProposalV1>&,        // normal payment proposals [inout]
-        std::vector<CarrotPaymentProposalSelfSendV1>& // selfsend payment proposals [inout]
-    )>;
 
 static inline std::size_t get_carrot_default_tx_extra_size(const std::size_t num_outputs)
 {
@@ -127,4 +105,5 @@ void make_unsigned_transaction_sweep(
     const crypto::public_key &account_spend_pubkey,
     cryptonote::transaction &tx_out,
     std::vector<crypto::secret_key> &output_amount_blinding_factors_out);
+
 } //namespace carrot

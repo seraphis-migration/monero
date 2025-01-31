@@ -38,7 +38,7 @@
 #include "carrot_core/enote_utils.h"
 #include "carrot_core/output_set_finalization.h"
 #include "carrot_core/payment_proposal.h"
-#include "carrot_impl/carrot_tx_builder.h"
+#include "carrot_impl/carrot_tx_builder_utils.h"
 #include "carrot_impl/carrot_tx_format_utils.h"
 #include "common/container_helpers.h"
 #include "crypto/generators.h"
