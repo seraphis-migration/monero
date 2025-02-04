@@ -44,6 +44,7 @@
 #include "crypto/generators.h"
 #include "cryptonote_basic/account.h"
 #include "cryptonote_basic/subaddress_index.h"
+#include "fcmp_pp/prove.h"
 #include "ringct/rctOps.h"
 
 using namespace carrot;
@@ -277,6 +278,50 @@ static bool can_open_fcmp_onetime_address(const crypto::secret_key &address_priv
 
     // Ko' ?= Ko
     return recomputed_onetime_address == onetime_address;
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static bool can_prove_sal(const crypto::secret_key &address_privkey_g,
+    const crypto::secret_key &address_privkey_t,
+    const crypto::secret_key &sender_extension_g,
+    const crypto::secret_key &sender_extension_t,
+    const crypto::public_key &onetime_address,
+    const rct::key &amount_commitment)
+{
+    // I = Hp(O)
+    crypto::public_key I;
+    crypto::derive_key_image_generator(onetime_address, I);
+
+    uint8_t *rerandomized_output = fcmp_pp::rerandomize_output(fcmp_pp::OutputBytes{
+        .O_bytes = to_bytes(onetime_address),
+        .I_bytes = to_bytes(I),
+        .C_bytes = amount_commitment.bytes
+    });
+
+    // x = address_privkey_g + sender_extension_g
+    crypto::secret_key combined_g;
+    sc_add(to_bytes(combined_g), to_bytes(address_privkey_g), to_bytes(sender_extension_g));
+
+    // y = address_privkey_t + sender_extension_t
+    crypto::secret_key combined_t;
+    sc_add(to_bytes(combined_t), to_bytes(address_privkey_t), to_bytes(sender_extension_t));
+
+    // get input
+    void *input = fcmp_pp_rust::fcmp_input_ref(rerandomized_output);
+
+    // make SA/L proof
+    const fcmp_pp::FcmpPpSalProof sal_proof = fcmp_pp::prove_sal({}, combined_g, combined_t, rerandomized_output);
+    free(rerandomized_output);
+
+    // L = x Hp(O)
+    crypto::key_image L;
+    crypto::generate_key_image(onetime_address, combined_g, L);
+
+    // verify SA/L
+    const bool ver = fcmp_pp::verify_sal({}, input, L, sal_proof);
+    free(input);
+
+    return ver;
 }
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
@@ -614,11 +659,20 @@ static void subtest_multi_account_transfer_over_transaction(const unittest_trans
                         address_privkey_t));
 
                     // try opening Ko
+                    const CarrotEnoteV1 &enote =  parsed_enotes.at(single_scan_res.output_index);
                     EXPECT_TRUE(can_open_fcmp_onetime_address(address_privkey_g,
                         address_privkey_t,
                         single_scan_res.sender_extension_g,
                         single_scan_res.sender_extension_t,
-                        parsed_enotes.at(single_scan_res.output_index).onetime_address));
+                        enote.onetime_address));
+
+                    // try making FCMP++ SA/L proof on tx output
+                    EXPECT_TRUE(can_prove_sal(address_privkey_g,
+                        address_privkey_t,
+                        single_scan_res.sender_extension_g,
+                        single_scan_res.sender_extension_t,
+                        enote.onetime_address,
+                        enote.amount_commitment));
 
                     // if this payment proposal isn't already marked as scanned, mark as scanned
                     if (!matched_payment_proposals.count(norm_prop_idx))
@@ -669,11 +723,20 @@ static void subtest_multi_account_transfer_over_transaction(const unittest_trans
                     address_privkey_t));
 
                 // try opening Ko
+                const CarrotEnoteV1 &enote = parsed_enotes.at(single_scan_res.output_index);
                 EXPECT_TRUE(can_open_fcmp_onetime_address(address_privkey_g,
                     address_privkey_t,
                     single_scan_res.sender_extension_g,
                     single_scan_res.sender_extension_t,
-                    parsed_enotes.at(single_scan_res.output_index).onetime_address));
+                    enote.onetime_address));
+
+                // try making FCMP++ SA/L proof on tx output
+                EXPECT_TRUE(can_prove_sal(address_privkey_g,
+                    address_privkey_t,
+                    single_scan_res.sender_extension_g,
+                    single_scan_res.sender_extension_t,
+                    enote.onetime_address,
+                    enote.amount_commitment));
 
                 // if this payment proposal isn't already marked as scanned, mark as scanned
                 if (!matched_payment_proposals.count(ss_prop_idx))
