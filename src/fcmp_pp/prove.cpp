@@ -184,6 +184,27 @@ FcmpPpProof prove(const crypto::hash &signable_tx_hash,
     return proof;
 }
 //----------------------------------------------------------------------------------------------------------------------
+FcmpPpSalProof prove_sal(const crypto::hash &signable_tx_hash,
+    const crypto::secret_key &x,
+    const crypto::secret_key &y,
+    const uint8_t *rerandomized_output)
+{
+    FcmpPpSalProof p;
+    p.resize(FCMP_PP_SAL_PROOF_SIZE_V1);
+
+    const fcmp_pp_rust::CResult res = fcmp_pp_rust::fcmp_pp_prove_sal(to_bytes(signable_tx_hash),
+        to_bytes(x),
+        to_bytes(y),
+        rerandomized_output,
+        &p[0]);
+
+    handle_res_ptr(__func__, res);
+
+    // No `free()` since result type `()` is zero-sized
+
+    return p;
+}
+//----------------------------------------------------------------------------------------------------------------------
 bool verify(const crypto::hash &signable_tx_hash,
     const FcmpPpProof &fcmp_pp_proof,
     const std::size_t n_tree_layers,
@@ -209,6 +230,20 @@ bool verify(const crypto::hash &signable_tx_hash,
             {pseudo_outs_ptrs.data(), pseudo_outs_ptrs.size()},
             {key_images_ptrs.data(), key_images_ptrs.size()}
         );
+}
+//----------------------------------------------------------------------------------------------------------------------
+bool verify_sal(const crypto::hash &signable_tx_hash,
+    const void *input,
+    crypto::key_image &key_image,
+    const FcmpPpSalProof &sal_proof)
+{
+    if (sal_proof.size() != FCMP_PP_SAL_PROOF_SIZE_V1)
+        return false;
+
+    return fcmp_pp_rust::fcmp_pp_verify_sal(to_bytes(signable_tx_hash),
+        input,
+        to_bytes(key_image),
+        sal_proof.data());
 }
 //----------------------------------------------------------------------------------------------------------------------
 std::size_t proof_len(const std::size_t n_inputs, const uint8_t n_tree_layers)

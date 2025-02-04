@@ -11,6 +11,8 @@ namespace fcmp_pp_rust
 {
 // ----- deps C bindings -----
 
+#define FCMP_PP_SAL_PROOF_SIZE_V1 (12*32)
+
 /// Inner integer type that the [`Limb`] newtype wraps.
 // TODO: test 32-bit platforms
 using Word = uintptr_t;
@@ -164,6 +166,7 @@ CResult path_new(OutputSlice leaves,
 CResult rerandomize_output(OutputBytes output);
 
 uint8_t *pseudo_out(const uint8_t *rerandomized_output);
+void *fcmp_input_ref(const uint8_t* rerandomized_output);
 
 CResult o_blind(const uint8_t *rerandomized_output);
 CResult i_blind(const uint8_t *rerandomized_output);
@@ -195,6 +198,26 @@ CResult prove(const uint8_t *signable_tx_hash,
                                              Slice<const uint8_t *> fcmp_prove_inputs,
                                              uintptr_t n_tree_layers);
 
+/**
+ * brief: fcmp_pp_prove_sal - Make a FCMP++ spend auth & linkability proof
+ * param: signable_tx_hash - message to sign
+ * param: x - ed25519 scalar s.t. O~ = x G + y T
+ * param: y - ed25519 scalar s.t. O~ = x G + y T
+ * param: rerandomized_output - used for input tuple, r_i, and r_r_i
+ * outparam: sal_proof_out - a buffer of size FCMP_PP_SAL_PROOF_SIZE_V1 where resultant SAL proof is stored
+ * return: an error on failure, nothing otherwise
+ * 
+ * note: This call can technically be stripped down even more because `rerandomized_output` contains
+ *       more information than we need: we can discard r_o and r_c. However, in practice, these
+ *       values will always be known before a call to this function since O~ and C~ are added to the
+ *       challenge transcript, so passing `rerandomized_output` is more ergonomic.
+ */
+CResult fcmp_pp_prove_sal(const uint8_t signable_tx_hash[32],
+                                             const uint8_t x[32],
+                                             const uint8_t y[32],
+                                             const void *rerandomized_output,
+                                             uint8_t sal_proof_out[FCMP_PP_SAL_PROOF_SIZE_V1]);
+
 uintptr_t fcmp_pp_proof_size(uintptr_t n_inputs, uintptr_t n_tree_layers);
 
 bool verify(const uint8_t *signable_tx_hash,
@@ -203,6 +226,18 @@ bool verify(const uint8_t *signable_tx_hash,
                                              const uint8_t *tree_root,
                                              Slice<const uint8_t *> pseudo_outs,
                                              Slice<const uint8_t *> key_images);
+/**
+ * brief: fcmp_pp_verify_sal - Verify a FCMP++ spend auth & linkability proof
+ * param: signable_tx_hash - message to verify
+ * param: input - (O~, I~, C~, R) tuple
+ * param: L - L = x Hp(O), AKA key image
+ * param: sal_proof - SAL proof to verify
+ * return: true on verification success, false otherwise
+ */
+bool fcmp_pp_verify_sal(const uint8_t signable_tx_hash[32],
+                                             const void *input,
+                                             const uint8_t L[32],
+                                             const uint8_t sal_proof[FCMP_PP_SAL_PROOF_SIZE_V1]);
 
 } // extern "C"
 }//namespace fcmp_pp_rust

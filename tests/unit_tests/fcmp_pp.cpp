@@ -36,15 +36,27 @@
 #include "ringct/rctOps.h"
 
 #include "crypto/crypto.h"
+#include "crypto/generators.h"
 
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 struct OutputContextsAndKeys
 {
     std::vector<crypto::secret_key> x_vec;
     std::vector<crypto::secret_key> y_vec;
     std::vector<fcmp_pp::curve_trees::OutputContext> outputs;
 };
-
-const OutputContextsAndKeys generate_random_outputs(const CurveTreesV1 &curve_trees,
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+rct::key derive_key_image_generator(const rct::key O)
+{
+    crypto::public_key I;
+    crypto::derive_key_image_generator(rct::rct2pk(O), I);
+    return rct::pk2rct(I);
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static const OutputContextsAndKeys generate_random_outputs(const CurveTreesV1 &curve_trees,
     const std::size_t old_n_leaf_tuples,
     const std::size_t new_n_leaf_tuples)
 {
@@ -87,7 +99,7 @@ const OutputContextsAndKeys generate_random_outputs(const CurveTreesV1 &curve_tr
 
     return outs;
 }
-
+//----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 TEST(fcmp_pp, prove)
 {
@@ -267,5 +279,45 @@ TEST(fcmp_pp, prove)
         pseudo_outs.clear();
         key_images.clear();
     }
+}
+//----------------------------------------------------------------------------------------------------------------------
+#include "string_tools.h"
+TEST(fcmp_pp, sal_completeness)
+{
+    // O, I, C, L
+    const rct::key x = rct::skGen();
+    const rct::key y = rct::skGen();
+    rct::key O;
+    rct::addKeys2(O, x, y, rct::pk2rct(crypto::get_T())); // O = x G + y T
+    const rct::key I = derive_key_image_generator(O);
+    const rct::key C = rct::pkGen();
+    crypto::key_image L;
+    crypto::generate_key_image(rct::rct2pk(O), rct::rct2sk(x), L);
+
+    // Rerandomize
+    uint8_t *rerandomized_output{fcmp_pp::rerandomize_output(fcmp_pp::OutputBytes{
+        .O_bytes = O.bytes,
+        .I_bytes = I.bytes,
+        .C_bytes = C.bytes
+    })};
+
+    // Generate signable_tx_hash
+    const crypto::hash signable_tx_hash = crypto::rand<crypto::hash>();
+
+    // Get the input
+    void *fcmp_input = fcmp_pp_rust::fcmp_input_ref(rerandomized_output);
+
+    // Prove
+    const fcmp_pp::FcmpPpSalProof sal_proof = fcmp_pp::prove_sal(signable_tx_hash,
+        rct::rct2sk(x),
+        rct::rct2sk(y),
+        rerandomized_output);
+    free(rerandomized_output);
+
+    // Verify
+    const bool ver = fcmp_pp::verify_sal(signable_tx_hash, fcmp_input, L, sal_proof);
+    free(fcmp_input);
+
+    EXPECT_TRUE(ver);
 }
 //----------------------------------------------------------------------------------------------------------------------

@@ -94,12 +94,22 @@ FcmpPpProof prove(const crypto::hash &signable_tx_hash,
     const std::vector<const uint8_t *> &fcmp_prove_inputs,
     const std::size_t n_tree_layers);
 
+FcmpPpSalProof prove_sal(const crypto::hash &signable_tx_hash,
+    const crypto::secret_key &x,
+    const crypto::secret_key &y,
+    const uint8_t *rerandomized_output);
+
 bool verify(const crypto::hash &signable_tx_hash,
     const FcmpPpProof &fcmp_pp_proof,
     const std::size_t n_tree_layers,
     const uint8_t *tree_root,
     const std::vector<crypto::ec_point> &pseudo_outs,
     const std::vector<crypto::key_image> &key_images);
+
+bool verify_sal(const crypto::hash &signable_tx_hash,
+    const void *input,
+    crypto::key_image &key_image,
+    const FcmpPpSalProof &sal_proof);
 
 std::size_t proof_len(const std::size_t n_inputs, const uint8_t n_tree_layers);
 //----------------------------------------------------------------------------------------------------------------------

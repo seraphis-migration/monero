@@ -21,7 +21,7 @@ use monero_fcmp_plus_plus::{
         TreeRoot,
     },
     sal::{OpenedInputTuple, RerandomizedOutput, SpendAuthAndLinkability},
-    Curves, FcmpPlusPlus, Output, FCMP_PARAMS, HELIOS_GENERATORS, HELIOS_HASH_INIT,
+    Curves, FcmpPlusPlus, Input, Output, FCMP_PARAMS, HELIOS_GENERATORS, HELIOS_HASH_INIT,
     SELENE_GENERATORS, SELENE_HASH_INIT,
 };
 
@@ -100,6 +100,10 @@ fn ed25519_scalar_from_bytes(ed25519_scalar: *const u8) -> Scalar {
     let mut ed25519_scalar = unsafe { core::slice::from_raw_parts(ed25519_scalar, 32) };
     // TODO: Return an error here (instead of unwrapping)
     <Ed25519>::read_F(&mut ed25519_scalar).unwrap()
+}
+
+fn hash_array_from_bytes(h: *const u8) -> [u8; 32] {
+    unsafe { core::slice::from_raw_parts(h, 32) }.try_into().unwrap()
 }
 
 #[allow(clippy::not_unsafe_ptr_arg_deref)]
@@ -386,6 +390,19 @@ pub extern "C" fn rerandomize_output(output: OutputBytes) -> CResult<Rerandomize
 pub unsafe extern "C" fn pseudo_out(output: *const RerandomizedOutput) -> *const u8 {
     let rerandomized_output = unsafe { output.read() };
     c_u8_32(rerandomized_output.input().C_tilde().to_bytes())
+}
+
+//---------------------------------------------- FCMPInput
+
+/// # Safety
+///
+/// This function assumes that the rerandomized output being passed in input was
+/// allocated on the heap and returned through a CResult instance.
+
+#[no_mangle]
+pub extern "C" fn fcmp_input_ref(output: *const RerandomizedOutput) -> *mut u8 {
+    let rerandomized_output = unsafe { output.read() };
+    return Box::into_raw(Box::new(rerandomized_output.input())) as *mut u8;
 }
 
 //---------------------------------------------- OBlind
@@ -701,6 +718,38 @@ pub unsafe extern "C" fn prove(
     CResult::ok(ptr)
 }
 
+/// # Safety
+///
+/// This function assumes that the signable_tx_hash, x, and y are 32 bytes, sal_proof_out is
+/// FCMP_PP_SAL_PROOF_SIZE_V1 bytes, and that the rerandomized output is returned from rerandomize_output().
+#[no_mangle]
+pub extern "C" fn fcmp_pp_prove_sal(signable_tx_hash: *const u8,
+    x: *const u8,
+    y: *const u8,
+    rerandomized_output: *const RerandomizedOutput,
+    sal_proof_out: *mut u8
+) -> CResult<(), ()> {
+    let signable_tx_hash = hash_array_from_bytes(signable_tx_hash);
+
+    let Some(opening) = OpenedInputTuple::open(unsafe { (*rerandomized_output).clone() },
+        &ed25519_scalar_from_bytes(x),
+        &ed25519_scalar_from_bytes(y)
+    ) else {
+        return CResult::err(());
+    };
+
+    let (_, proof) = SpendAuthAndLinkability::prove(&mut OsRng,
+        signable_tx_hash,
+        opening);
+
+    let mut sal_proof_out: &mut [u8] = unsafe { core::slice::from_raw_parts_mut(sal_proof_out, 12*32) }; // @TODO: remove magic number
+
+    match proof.write(&mut sal_proof_out) {
+        Ok(_) => CResult::ok(()),
+        Err(_) => CResult::err(()) 
+    }
+}
+
 // TODO: cache a static global table for proof lens by n_inputs and n_tree_layers bc the calc is slow
 #[no_mangle]
 pub extern "C" fn fcmp_pp_proof_size(n_inputs: usize, n_tree_layers: usize) -> usize {
@@ -778,6 +827,30 @@ pub unsafe extern "C" fn verify(
     ed_verifier.verify_vartime()
         && SELENE_GENERATORS().verify(c1_verifier)
         && HELIOS_GENERATORS().verify(c2_verifier)
+}
+
+/// # Safety
+///
+/// This function assumes that the signable tx hash is 32 bytes, the input is heap
+/// allocated via a CResult, key_image is 32 bytes, and sal_proof is FCMP_PP_SAL_PROOF_SIZE_V1 bytes
+#[no_mangle]
+pub unsafe extern "C" fn fcmp_pp_verify_sal(signable_tx_hash: *const u8,
+    input: *const Input,
+    key_image: *const u8,
+    sal_proof: *const u8
+) -> bool {
+    let signable_tx_hash = hash_array_from_bytes(signable_tx_hash);
+    let input = unsafe { *input };
+    let key_image = ed25519_point_from_bytes(key_image);
+    let Ok(sal_proof) = SpendAuthAndLinkability::read(&mut unsafe { core::slice::from_raw_parts(sal_proof, 12*32) }) else { // @TODO: remove magic number
+        return false;
+    };
+
+    let mut ed_verifier = multiexp::BatchVerifier::new(/*capacity: */1);
+
+    sal_proof.verify(&mut OsRng, &mut ed_verifier, signable_tx_hash, &input, key_image);
+
+    ed_verifier.verify_vartime()
 }
 
 // https://github.com/rust-lang/rust/issues/79609
