@@ -37,22 +37,22 @@ namespace tower_cycle
 //----------------------------------------------------------------------------------------------------------------------
 Selene::Point Selene::hash_init_point() const
 {
-    return fcmp_pp_rust::selene_hash_init_point();
+    return ::selene_hash_init_point();
 }
 //----------------------------------------------------------------------------------------------------------------------
 Helios::Point Helios::hash_init_point() const
 {
-    return fcmp_pp_rust::helios_hash_init_point();
+    return ::helios_hash_init_point();
 }
 //----------------------------------------------------------------------------------------------------------------------
 Selene::CycleScalar Selene::point_to_cycle_scalar(const Selene::Point &point) const
 {
-    return fcmp_pp_rust::selene_point_to_helios_scalar(point);
+    return ::selene_point_to_helios_scalar(point);
 }
 //----------------------------------------------------------------------------------------------------------------------
 Helios::CycleScalar Helios::point_to_cycle_scalar(const Helios::Point &point) const
 {
-    return fcmp_pp_rust::helios_point_to_selene_scalar(point);
+    return ::helios_point_to_selene_scalar(point);
 }
 //----------------------------------------------------------------------------------------------------------------------
 Selene::Point Selene::hash_grow(
@@ -61,7 +61,7 @@ Selene::Point Selene::hash_grow(
     const Selene::Scalar &existing_child_at_offset,
     const Selene::Chunk &new_children) const
 {
-    auto result = fcmp_pp_rust::hash_grow_selene(
+    auto result = ::hash_grow_selene(
         existing_hash,
         offset,
         existing_child_at_offset,
@@ -85,7 +85,7 @@ Selene::Point Selene::hash_trim(
     const Selene::Chunk &children,
     const Selene::Scalar &child_to_grow_back) const
 {
-    auto result = fcmp_pp_rust::hash_trim_selene(
+    auto result = ::hash_trim_selene(
         existing_hash,
         offset,
         children,
@@ -109,7 +109,7 @@ Helios::Point Helios::hash_grow(
     const Helios::Scalar &existing_child_at_offset,
     const Helios::Chunk &new_children) const
 {
-    auto result = fcmp_pp_rust::hash_grow_helios(
+    auto result = ::hash_grow_helios(
         existing_hash,
         offset,
         existing_child_at_offset,
@@ -133,7 +133,7 @@ Helios::Point Helios::hash_trim(
     const Helios::Chunk &children,
     const Helios::Scalar &child_to_grow_back) const
 {
-    auto result = fcmp_pp_rust::hash_trim_helios(
+    auto result = ::hash_trim_helios(
         existing_hash,
         offset,
         children,
@@ -153,17 +153,17 @@ Helios::Point Helios::hash_trim(
 //----------------------------------------------------------------------------------------------------------------------
 Selene::Scalar Selene::zero_scalar() const
 {
-    return fcmp_pp_rust::selene_zero_scalar();
+    return ::selene_zero_scalar();
 }
 //----------------------------------------------------------------------------------------------------------------------
 Helios::Scalar Helios::zero_scalar() const
 {
-    return fcmp_pp_rust::helios_zero_scalar();
+    return ::helios_zero_scalar();
 }
 //----------------------------------------------------------------------------------------------------------------------
 crypto::ec_scalar Selene::to_bytes(const Selene::Scalar &scalar) const
 {
-    auto bytes = fcmp_pp_rust::selene_scalar_to_bytes(scalar);
+    auto bytes = ::selene_scalar_to_bytes(scalar);
     crypto::ec_scalar res;
     memcpy(&res, bytes, 32);
     free(bytes);
@@ -172,7 +172,7 @@ crypto::ec_scalar Selene::to_bytes(const Selene::Scalar &scalar) const
 //----------------------------------------------------------------------------------------------------------------------
 crypto::ec_scalar Helios::to_bytes(const Helios::Scalar &scalar) const
 {
-    auto bytes = fcmp_pp_rust::helios_scalar_to_bytes(scalar);
+    auto bytes = ::helios_scalar_to_bytes(scalar);
     crypto::ec_scalar res;
     memcpy(&res, bytes, 32);
     free(bytes);
@@ -181,7 +181,7 @@ crypto::ec_scalar Helios::to_bytes(const Helios::Scalar &scalar) const
 //----------------------------------------------------------------------------------------------------------------------
 crypto::ec_point Selene::to_bytes(const Selene::Point &point) const
 {
-    auto bytes = fcmp_pp_rust::selene_point_to_bytes(point);
+    auto bytes = ::selene_point_to_bytes(point);
     crypto::ec_point res;
     memcpy(&res, bytes, 32);
     free(bytes);
@@ -190,7 +190,7 @@ crypto::ec_point Selene::to_bytes(const Selene::Point &point) const
 //----------------------------------------------------------------------------------------------------------------------
 crypto::ec_point Helios::to_bytes(const Helios::Point &point) const
 {
-    auto bytes = fcmp_pp_rust::helios_point_to_bytes(point);
+    auto bytes = ::helios_point_to_bytes(point);
     crypto::ec_point res;
     memcpy(&res, bytes, 32);
     free(bytes);
@@ -199,12 +199,12 @@ crypto::ec_point Helios::to_bytes(const Helios::Point &point) const
 //----------------------------------------------------------------------------------------------------------------------
 Selene::Point Selene::from_bytes(const crypto::ec_point &bytes) const
 {
-    return fcmp_pp_rust::selene_point_from_bytes(reinterpret_cast<const uint8_t*>(&bytes));
+    return ::selene_point_from_bytes(reinterpret_cast<const uint8_t*>(&bytes));
 }
 //----------------------------------------------------------------------------------------------------------------------
 Helios::Point Helios::from_bytes(const crypto::ec_point &bytes) const
 {
-    return fcmp_pp_rust::helios_point_from_bytes(reinterpret_cast<const uint8_t*>(&bytes));
+    return ::helios_point_from_bytes(reinterpret_cast<const uint8_t*>(&bytes));
 }
 //----------------------------------------------------------------------------------------------------------------------
 std::string Selene::to_string(const typename Selene::Scalar &scalar) const
@@ -232,7 +232,7 @@ std::string Helios::to_string(const typename Helios::Point &point) const
 //----------------------------------------------------------------------------------------------------------------------
 SeleneScalar selene_scalar_from_bytes(const rct::key &scalar)
 {
-    return fcmp_pp_rust::selene_scalar_from_bytes(scalar.bytes);
+    return ::selene_scalar_from_bytes(scalar.bytes);
 }
 //----------------------------------------------------------------------------------------------------------------------
 template<typename C>
@@ -278,8 +278,8 @@ template void extend_scalars_from_cycle_points<Selene, Helios>(const std::unique
     const std::vector<Selene::Point> &points,
     std::vector<Helios::Scalar> &scalars_out);
 //----------------------------------------------------------------------------------------------------------------------
-uint8_t *selene_tree_root(const Selene::Point &point) { return fcmp_pp_rust::selene_tree_root(point); }
-uint8_t *helios_tree_root(const Helios::Point &point) { return fcmp_pp_rust::helios_tree_root(point); }
+uint8_t *selene_tree_root(const Selene::Point &point) { return ::selene_tree_root(point); }
+uint8_t *helios_tree_root(const Helios::Point &point) { return ::helios_tree_root(point); }
 //----------------------------------------------------------------------------------------------------------------------
 } //namespace tower_cycle
 } //namespace fcmp_pp

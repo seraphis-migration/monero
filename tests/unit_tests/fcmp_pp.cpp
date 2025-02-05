@@ -304,7 +304,7 @@ TEST(fcmp_pp, sal_completeness)
     const crypto::hash signable_tx_hash = crypto::rand<crypto::hash>();
 
     // Get the input
-    void *fcmp_input = fcmp_pp_rust::fcmp_input_ref(rerandomized_output);
+    void *fcmp_input = fcmp_input_ref(rerandomized_output);
 
     // Prove
     const fcmp_pp::FcmpPpSalProof sal_proof = fcmp_pp::prove_sal(signable_tx_hash,

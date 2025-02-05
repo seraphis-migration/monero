@@ -40,29 +40,31 @@ namespace fcmp_pp
 //----------------------------------------------------------------------------------------------------------------------
 // Rust types
 //----------------------------------------------------------------------------------------------------------------------
-using SeleneScalar = fcmp_pp_rust::SeleneScalar;
-using HeliosScalar = fcmp_pp_rust::HeliosScalar;
+using SeleneScalar = ::SeleneScalar;
+static_assert(sizeof(SeleneScalar) == 32, "unexpected size of selene scalar");
+using HeliosScalar = ::HeliosScalar;
+static_assert(sizeof(HeliosScalar) == 32, "unexpected size of helios scalar");
 //----------------------------------------------------------------------------------------------------------------------
 struct SeleneT final
 {
     using Scalar       = SeleneScalar;
-    using Point        = fcmp_pp_rust::SelenePoint;
-    using Chunk        = fcmp_pp_rust::SeleneScalarSlice;
+    using Point        = ::SelenePoint;
+    using Chunk        = ::SeleneScalarSlice;
     using CycleScalar  = HeliosScalar;
-    using ScalarChunks = fcmp_pp_rust::SeleneScalarChunks;
+    using ScalarChunks = ::SeleneScalarChunks;
 };
 //----------------------------------------------------------------------------------------------------------------------
 struct HeliosT final
 {
     using Scalar       = HeliosScalar;
-    using Point        = fcmp_pp_rust::HeliosPoint;
-    using Chunk        = fcmp_pp_rust::HeliosScalarSlice;
+    using Point        = ::HeliosPoint;
+    using Chunk        = ::HeliosScalarSlice;
     using CycleScalar  = SeleneScalar;
-    using ScalarChunks = fcmp_pp_rust::HeliosScalarChunks;
+    using ScalarChunks = ::HeliosScalarChunks;
 };
 //----------------------------------------------------------------------------------------------------------------------
-using OutputBytes = fcmp_pp_rust::OutputBytes;
-using OutputChunk = fcmp_pp_rust::OutputSlice;
+using OutputBytes = ::OutputBytes;
+using OutputChunk = ::OutputSlice;
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 // C++ types

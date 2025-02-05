@@ -307,7 +307,7 @@ static bool can_prove_sal(const crypto::secret_key &address_privkey_g,
     sc_add(to_bytes(combined_t), to_bytes(address_privkey_t), to_bytes(sender_extension_t));
 
     // get input
-    void *input = fcmp_pp_rust::fcmp_input_ref(rerandomized_output);
+    void *input = fcmp_input_ref(rerandomized_output);
 
     // make SA/L proof
     const fcmp_pp::FcmpPpSalProof sal_proof = fcmp_pp::prove_sal({}, combined_g, combined_t, rerandomized_output);

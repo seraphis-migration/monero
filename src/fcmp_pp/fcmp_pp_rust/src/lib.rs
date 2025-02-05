@@ -763,7 +763,8 @@ pub extern "C" fn fcmp_pp_proof_size(n_inputs: usize, n_tree_layers: usize) -> u
 #[no_mangle]
 pub unsafe extern "C" fn verify(
     signable_tx_hash: *const u8,
-    proof: Slice<u8>,
+    proof: *const u8,
+    proof_len: usize,
     n_tree_layers: usize,
     tree_root: *const TreeRoot<Selene, Helios>,
     pseudo_outs: Slice<*const u8>,
@@ -774,14 +775,14 @@ pub unsafe extern "C" fn verify(
     if n_inputs == 0 || n_inputs != key_images.len {
         return false;
     }
-    if proof.len != fcmp_pp_proof_size(n_inputs, n_tree_layers) {
+    if proof_len != fcmp_pp_proof_size(n_inputs, n_tree_layers) {
         return false;
     }
 
     let signable_tx_hash = unsafe { core::slice::from_raw_parts(signable_tx_hash, 32) };
     let signable_tx_hash: [u8; 32] = signable_tx_hash.try_into().unwrap();
 
-    let mut proof: &[u8] = proof.into();
+    let mut proof: &[u8] = unsafe { core::slice::from_raw_parts(proof, proof_len) };
 
     // 32 byte pseudo outs
     let pseudo_outs: &[*const u8] = pseudo_outs.into();

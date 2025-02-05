@@ -1,95 +1,69 @@
-#include <cstdarg>
-#include <cstdint>
-#include <cstdlib>
-#include <ostream>
-#include <new>
+// Copyright (c) 2025, The Monero Project
+// 
+// All rights reserved.
+// 
+// Redistribution and use in source and binary forms, with or without modification, are
+// permitted provided that the following conditions are met:
+// 
+// 1. Redistributions of source code must retain the above copyright notice, this list of
+//    conditions and the following disclaimer.
+// 
+// 2. Redistributions in binary form must reproduce the above copyright notice, this list
+//    of conditions and the following disclaimer in the documentation and/or other
+//    materials provided with the distribution.
+// 
+// 3. Neither the name of the copyright holder nor the names of its contributors may be
+//    used to endorse or promote products derived from this software without specific
+//    prior written permission.
+// 
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+// THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+// THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
-
-namespace fcmp_pp_rust
-{
-// ----- deps C bindings -----
+#include "stdbool.h"
+#include "stdint.h"
 
 #define FCMP_PP_SAL_PROOF_SIZE_V1 (12*32)
 
-/// Inner integer type that the [`Limb`] newtype wraps.
-// TODO: test 32-bit platforms
-using Word = uintptr_t;
 
-/// Big integers are represented as an array of smaller CPU word-size integers
-/// called "limbs".
-using Limb = Word;
-
-
-/// Stack-allocated big unsigned integer.
-///
-/// Generic over the given number of `LIMBS`
-///
-/// # Encoding support
-/// This type supports many different types of encodings, either via the
-/// [`Encoding`][`crate::Encoding`] trait or various `const fn` decoding and
-/// encoding functions that can be used with [`Uint`] constants.
-///
-/// Optional crate features for encoding (off-by-default):
-/// - `generic-array`: enables [`ArrayEncoding`][`crate::ArrayEncoding`] trait which can be used to
-///   [`Uint`] as `GenericArray<u8, N>` and a [`ArrayDecoding`][`crate::ArrayDecoding`] trait which
-///   can be used to `GenericArray<u8, N>` as [`Uint`].
-/// - `rlp`: support for [Recursive Length Prefix (RLP)][RLP] encoding.
-///
-/// [RLP]: https://eth.wiki/fundamentals/rlp
-template<uintptr_t LIMBS>
-struct Uint {
-  /// Inner limb array. Stored from least significant to most significant.
-  Limb limbs[LIMBS];
-};
-
-
-/// A residue mod `MOD`, represented using `LIMBS` limbs. The modulus of this residue is constant, so it cannot be set at runtime.
-/// Internally, the value is stored in Montgomery form (multiplied by MOD::R) until it is retrieved.
-template<uintptr_t LIMBS>
-struct Residue {
-  Uint<LIMBS> montgomery_form;
-};
-
+// ----- deps C bindings -----
 
 /// A constant-time implementation of the Ed25519 field.
 struct SeleneScalar {
-  Residue<32 / sizeof(uintptr_t)> _0;
+  uintptr_t _0[32 / sizeof(uintptr_t)];
 };
-static_assert(sizeof(SeleneScalar) == 32, "unexpected size of selene scalar");
-
 
 /// The field novel to Helios/Selene.
 struct HeliosScalar {
-  Residue<32 / sizeof(uintptr_t)> _0;
+  uintptr_t _0[32 / sizeof(uintptr_t)];
 };
-static_assert(sizeof(HeliosScalar) == 32, "unexpected size of helios scalar");
 
 struct HeliosPoint {
-  SeleneScalar x;
-  SeleneScalar y;
-  SeleneScalar z;
+  struct SeleneScalar x;
+  struct SeleneScalar y;
+  struct SeleneScalar z;
 };
 
 struct SelenePoint {
-  HeliosScalar x;
-  HeliosScalar y;
-  HeliosScalar z;
+  struct HeliosScalar x;
+  struct HeliosScalar y;
+  struct HeliosScalar z;
 };
 
 // ----- End deps C bindings -----
 
-struct CResult {
+typedef struct CResult {
   void* value;
   void* err;
-};
-
-template<typename T>
-struct Slice {
-  const T *buf;
-  uintptr_t len;
-};
+} CResult;
 
 struct OutputBytes {
   const uint8_t *O_bytes;
@@ -97,73 +71,102 @@ struct OutputBytes {
   const uint8_t *C_bytes;
 };
 
-using HeliosScalarSlice = Slice<HeliosScalar>;
+struct HeliosScalarSlice
+{
+  const struct HeliosScalar *buf;
+  uintptr_t len;
+};
 
-using SeleneScalarSlice = Slice<SeleneScalar>;
+struct SeleneScalarSlice
+{
+  const struct SeleneScalar *buf;
+  uintptr_t len;
+};
 
-using OutputSlice = Slice<OutputBytes>;
+struct OutputSlice
+{
+  const struct OutputBytes *buf;
+  uintptr_t len;
+};
 
-using HeliosScalarChunks = Slice<HeliosScalarSlice>;
+struct HeliosScalarChunks
+{
+  const struct HeliosScalarSlice *buf;
+  uintptr_t len;
+};
 
-using SeleneScalarChunks = Slice<SeleneScalarSlice>;
+struct SeleneScalarChunks
+{
+  const struct SeleneScalarSlice *buf;
+  uintptr_t len;
+};
 
+struct ObjectSlice
+{
+  const uint8_t * const *buf;
+  uintptr_t len;
+};
+
+#ifdef __cplusplus
 extern "C" {
-HeliosPoint helios_hash_init_point();
+#endif
 
-SelenePoint selene_hash_init_point();
+struct HeliosPoint helios_hash_init_point();
 
-uint8_t *helios_scalar_to_bytes(HeliosScalar helios_scalar);
+struct SelenePoint selene_hash_init_point();
 
-uint8_t *selene_scalar_to_bytes(SeleneScalar selene_scalar);
+uint8_t *helios_scalar_to_bytes(struct HeliosScalar helios_scalar);
 
-uint8_t *helios_point_to_bytes(HeliosPoint helios_point);
+uint8_t *selene_scalar_to_bytes(struct SeleneScalar selene_scalar);
 
-uint8_t *selene_point_to_bytes(SelenePoint selene_point);
+uint8_t *helios_point_to_bytes(struct HeliosPoint helios_point);
 
-HeliosPoint helios_point_from_bytes(const uint8_t *helios_point_bytes);
+uint8_t *selene_point_to_bytes(struct SelenePoint selene_point);
 
-SelenePoint selene_point_from_bytes(const uint8_t *selene_point_bytes);
+struct HeliosPoint helios_point_from_bytes(const uint8_t *helios_point_bytes);
 
-SeleneScalar selene_scalar_from_bytes(const uint8_t *selene_scalar_bytes);
+struct SelenePoint selene_point_from_bytes(const uint8_t *selene_point_bytes);
 
-HeliosScalar selene_point_to_helios_scalar(SelenePoint selene_point);
+struct SeleneScalar selene_scalar_from_bytes(const uint8_t *selene_scalar_bytes);
 
-SeleneScalar helios_point_to_selene_scalar(HeliosPoint helios_point);
+struct HeliosScalar selene_point_to_helios_scalar(struct SelenePoint selene_point);
 
-HeliosScalar helios_zero_scalar();
+struct SeleneScalar helios_point_to_selene_scalar(struct HeliosPoint helios_point);
 
-SeleneScalar selene_zero_scalar();
+struct HeliosScalar helios_zero_scalar();
 
-uint8_t *selene_tree_root(SelenePoint selene_point);
+struct SeleneScalar selene_zero_scalar();
 
-uint8_t *helios_tree_root(HeliosPoint helios_point);
+uint8_t *selene_tree_root(struct SelenePoint selene_point);
 
-CResult hash_grow_helios(HeliosPoint existing_hash,
+uint8_t *helios_tree_root(struct HeliosPoint helios_point);
+
+CResult hash_grow_helios(struct HeliosPoint existing_hash,
                                              uintptr_t offset,
-                                             HeliosScalar existing_child_at_offset,
-                                             HeliosScalarSlice new_children);
+                                             struct HeliosScalar existing_child_at_offset,
+                                             struct HeliosScalarSlice new_children);
 
-CResult hash_trim_helios(HeliosPoint existing_hash,
+CResult hash_trim_helios(struct HeliosPoint existing_hash,
                                              uintptr_t offset,
-                                             HeliosScalarSlice children,
-                                             HeliosScalar child_to_grow_back);
+                                             struct HeliosScalarSlice children,
+                                             struct HeliosScalar child_to_grow_back);
 
-CResult hash_grow_selene(SelenePoint existing_hash,
+CResult hash_grow_selene(struct SelenePoint existing_hash,
                                              uintptr_t offset,
-                                             SeleneScalar existing_child_at_offset,
-                                             SeleneScalarSlice new_children);
+                                             struct SeleneScalar existing_child_at_offset,
+                                             struct SeleneScalarSlice new_children);
 
-CResult hash_trim_selene(SelenePoint existing_hash,
+CResult hash_trim_selene(struct SelenePoint existing_hash,
                                              uintptr_t offset,
-                                             SeleneScalarSlice children,
-                                             SeleneScalar child_to_grow_back);
+                                             struct SeleneScalarSlice children,
+                                             struct SeleneScalar child_to_grow_back);
 
-CResult path_new(OutputSlice leaves,
+CResult path_new(struct OutputSlice leaves,
                                              uintptr_t output_idx,
-                                             HeliosScalarChunks helios_layer_chunks,
-                                             SeleneScalarChunks selene_layer_chunks);
+                                             struct HeliosScalarChunks helios_layer_chunks,
+                                             struct SeleneScalarChunks selene_layer_chunks);
 
-CResult rerandomize_output(OutputBytes output);
+CResult rerandomize_output(struct OutputBytes output);
 
 uint8_t *pseudo_out(const uint8_t *rerandomized_output);
 void *fcmp_input_ref(const uint8_t* rerandomized_output);
@@ -191,11 +194,11 @@ CResult fcmp_prove_input_new(const uint8_t *x,
                                              const uint8_t *rerandomized_output,
                                              const uint8_t *path,
                                              const uint8_t *output_blinds,
-                                             Slice<const uint8_t *>selene_branch_blinds,
-                                             Slice<const uint8_t *>helios_branch_blinds);
+                                             struct ObjectSlice selene_branch_blinds,
+                                             struct ObjectSlice helios_branch_blinds);
 
 CResult prove(const uint8_t *signable_tx_hash,
-                                             Slice<const uint8_t *> fcmp_prove_inputs,
+                                             struct ObjectSlice fcmp_prove_inputs,
                                              uintptr_t n_tree_layers);
 
 /**
@@ -221,11 +224,12 @@ CResult fcmp_pp_prove_sal(const uint8_t signable_tx_hash[32],
 uintptr_t fcmp_pp_proof_size(uintptr_t n_inputs, uintptr_t n_tree_layers);
 
 bool verify(const uint8_t *signable_tx_hash,
-                                             Slice<uint8_t> fcmp_pp_proof_slice,
+                                             const uint8_t *fcmp_pp_proof,
+                                             uintptr_t fcmp_pp_proof_len,
                                              uintptr_t n_tree_layers,
                                              const uint8_t *tree_root,
-                                             Slice<const uint8_t *> pseudo_outs,
-                                             Slice<const uint8_t *> key_images);
+                                             struct ObjectSlice pseudo_outs,
+                                             struct ObjectSlice key_images);
 /**
  * brief: fcmp_pp_verify_sal - Verify a FCMP++ spend auth & linkability proof
  * param: signable_tx_hash - message to verify
@@ -239,5 +243,6 @@ bool fcmp_pp_verify_sal(const uint8_t signable_tx_hash[32],
                                              const uint8_t L[32],
                                              const uint8_t sal_proof[FCMP_PP_SAL_PROOF_SIZE_V1]);
 
-} // extern "C"
-}//namespace fcmp_pp_rust
+#ifdef __cplusplus
+} //extern "C"
+#endif

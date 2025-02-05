@@ -34,7 +34,7 @@ namespace fcmp_pp
 {
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
-static uint8_t *handle_res_ptr(const std::string func, const fcmp_pp_rust::CResult &res)
+static uint8_t *handle_res_ptr(const std::string func, const ::CResult &res)
 {
     if (res.err != nullptr)
     {
@@ -46,13 +46,13 @@ static uint8_t *handle_res_ptr(const std::string func, const fcmp_pp_rust::CResu
 
 uint8_t *rerandomize_output(const OutputBytes output)
 {
-    auto res = fcmp_pp_rust::rerandomize_output(output);
+    auto res = ::rerandomize_output(output);
     return handle_res_ptr(__func__, res);
 }
 
 crypto::ec_point pseudo_out(const uint8_t *rerandomized_output)
 {
-    uint8_t * res_ptr = fcmp_pp_rust::pseudo_out(rerandomized_output);
+    uint8_t * res_ptr = ::pseudo_out(rerandomized_output);
     crypto::ec_point res;
     static_assert(sizeof(crypto::ec_point) == 32, "unexpected size of crypto::ec_point");
     memcpy(&res, res_ptr, sizeof(crypto::ec_point));
@@ -62,49 +62,49 @@ crypto::ec_point pseudo_out(const uint8_t *rerandomized_output)
 
 uint8_t *o_blind(const uint8_t *rerandomized_output)
 {
-    auto result = fcmp_pp_rust::o_blind(rerandomized_output);
+    auto result = ::o_blind(rerandomized_output);
     return handle_res_ptr(__func__, result);
 }
 
 uint8_t *i_blind(const uint8_t *rerandomized_output)
 {
-    auto result = fcmp_pp_rust::i_blind(rerandomized_output);
+    auto result = ::i_blind(rerandomized_output);
     return handle_res_ptr(__func__, result);
 }
 
 uint8_t *i_blind_blind(const uint8_t *rerandomized_output)
 {
-    auto result = fcmp_pp_rust::i_blind_blind(rerandomized_output);
+    auto result = ::i_blind_blind(rerandomized_output);
     return handle_res_ptr(__func__, result);
 }
 
 uint8_t *c_blind(const uint8_t *rerandomized_output)
 {
-    auto result = fcmp_pp_rust::c_blind(rerandomized_output);
+    auto result = ::c_blind(rerandomized_output);
     return handle_res_ptr(__func__, result);
 }
 
 uint8_t *blind_o_blind(const uint8_t *o_blind)
 {
-    auto res = fcmp_pp_rust::blind_o_blind(o_blind);
+    auto res = ::blind_o_blind(o_blind);
     return handle_res_ptr(__func__, res);
 }
 
 uint8_t *blind_i_blind(const uint8_t *i_blind)
 {
-    auto res = fcmp_pp_rust::blind_i_blind(i_blind);
+    auto res = ::blind_i_blind(i_blind);
     return handle_res_ptr(__func__, res);
 }
 
 uint8_t *blind_i_blind_blind(const uint8_t *i_blind_blind)
 {
-    auto res = fcmp_pp_rust::blind_i_blind_blind(i_blind_blind);
+    auto res = ::blind_i_blind_blind(i_blind_blind);
     return handle_res_ptr(__func__, res);
 }
 
 uint8_t *blind_c_blind(const uint8_t *c_blind)
 {
-    auto res = fcmp_pp_rust::blind_c_blind(c_blind);
+    auto res = ::blind_c_blind(c_blind);
     return handle_res_ptr(__func__, res);
 }
 
@@ -113,7 +113,7 @@ uint8_t *path_new(const OutputChunk &leaves,
     const HeliosT::ScalarChunks &helios_layer_chunks,
     const SeleneT::ScalarChunks &selene_layer_chunks)
 {
-    auto res = fcmp_pp_rust::path_new(leaves, output_idx, helios_layer_chunks, selene_layer_chunks);
+    auto res = ::path_new(leaves, output_idx, helios_layer_chunks, selene_layer_chunks);
     return handle_res_ptr(__func__, res);
 }
 
@@ -122,19 +122,19 @@ uint8_t *output_blinds_new(const uint8_t *blinded_o_blind,
     const uint8_t *blinded_i_blind_blind,
     const uint8_t *blinded_c_blind)
 {
-    auto res = fcmp_pp_rust::output_blinds_new(blinded_o_blind, blinded_i_blind, blinded_i_blind_blind, blinded_c_blind);
+    auto res = ::output_blinds_new(blinded_o_blind, blinded_i_blind, blinded_i_blind_blind, blinded_c_blind);
     return handle_res_ptr(__func__, res);
 }
 
 uint8_t *selene_branch_blind()
 {
-    const auto res = fcmp_pp_rust::selene_branch_blind();
+    const auto res = ::selene_branch_blind();
     return handle_res_ptr(__func__, res);
 }
 
 uint8_t *helios_branch_blind()
 {
-    const auto res = fcmp_pp_rust::helios_branch_blind();
+    const auto res = ::helios_branch_blind();
     return handle_res_ptr(__func__, res);
 }
 
@@ -146,7 +146,7 @@ uint8_t *fcmp_prove_input_new(const uint8_t *x,
     const std::vector<const uint8_t *> &selene_branch_blinds,
     const std::vector<const uint8_t *> &helios_branch_blinds)
 {
-    auto res = fcmp_pp_rust::fcmp_prove_input_new(x,
+    auto res = ::fcmp_prove_input_new(x,
         y,
         rerandomized_output,
         path,
@@ -161,7 +161,7 @@ FcmpPpProof prove(const crypto::hash &signable_tx_hash,
     const std::vector<const uint8_t *> &fcmp_prove_inputs,
     const std::size_t n_tree_layers)
 {
-    auto res = fcmp_pp_rust::prove(reinterpret_cast<const uint8_t*>(&signable_tx_hash),
+    auto res = ::prove(reinterpret_cast<const uint8_t*>(&signable_tx_hash),
         {fcmp_prove_inputs.data(), fcmp_prove_inputs.size()},
         n_tree_layers);
 
@@ -174,7 +174,7 @@ FcmpPpProof prove(const crypto::hash &signable_tx_hash,
     // res.value is a void * pointing to a uint8_t *, so cast as a double pointer
     uint8_t **buf = (uint8_t**) res.value;
 
-    const std::size_t proof_size = fcmp_pp_rust::fcmp_pp_proof_size(fcmp_prove_inputs.size(), n_tree_layers);
+    const std::size_t proof_size = ::fcmp_pp_proof_size(fcmp_prove_inputs.size(), n_tree_layers);
     const FcmpPpProof proof{*buf, *buf + proof_size};
 
     // Free both pointers
@@ -192,7 +192,7 @@ FcmpPpSalProof prove_sal(const crypto::hash &signable_tx_hash,
     FcmpPpSalProof p;
     p.resize(FCMP_PP_SAL_PROOF_SIZE_V1);
 
-    const fcmp_pp_rust::CResult res = fcmp_pp_rust::fcmp_pp_prove_sal(to_bytes(signable_tx_hash),
+    const ::CResult res = ::fcmp_pp_prove_sal(to_bytes(signable_tx_hash),
         to_bytes(x),
         to_bytes(y),
         rerandomized_output,
@@ -222,9 +222,10 @@ bool verify(const crypto::hash &signable_tx_hash,
     for (const auto &ki : key_images)
         key_images_ptrs.emplace_back((const uint8_t *)&ki.data);
 
-    return fcmp_pp_rust::verify(
+    return ::verify(
             reinterpret_cast<const uint8_t*>(&signable_tx_hash),
-            {fcmp_pp_proof.data(), fcmp_pp_proof.size()},
+            fcmp_pp_proof.data(),
+            fcmp_pp_proof.size(),
             n_tree_layers,
             tree_root,
             {pseudo_outs_ptrs.data(), pseudo_outs_ptrs.size()},
@@ -240,7 +241,7 @@ bool verify_sal(const crypto::hash &signable_tx_hash,
     if (sal_proof.size() != FCMP_PP_SAL_PROOF_SIZE_V1)
         return false;
 
-    return fcmp_pp_rust::fcmp_pp_verify_sal(to_bytes(signable_tx_hash),
+    return ::fcmp_pp_verify_sal(to_bytes(signable_tx_hash),
         input,
         to_bytes(key_image),
         sal_proof.data());
@@ -249,7 +250,7 @@ bool verify_sal(const crypto::hash &signable_tx_hash,
 std::size_t proof_len(const std::size_t n_inputs, const uint8_t n_tree_layers)
 {
     static_assert(sizeof(std::size_t) >= sizeof(uint8_t), "unexpected size of size_t");
-    return fcmp_pp_rust::fcmp_pp_proof_size(n_inputs, (std::size_t) n_tree_layers);
+    return ::fcmp_pp_proof_size(n_inputs, (std::size_t) n_tree_layers);
 }
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
