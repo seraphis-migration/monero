@@ -61,6 +61,7 @@ target_link_libraries(fcmp_pp
     ${EXTRA_LIBRARIES}
     ${EXTRA_RUST_LIBRARIES})
 
+// Try compiling C file ffi_api_c_compat.c which includes fcmp++.h, and throw an error if C compilation fails
 try_compile(FFI_API_C_COMPAT_RES
   "${CMAKE_CURRENT_BINARY_DIR}/fcmp_ffi_c"
   "${CMAKE_CURRENT_SOURCE_DIR}/ffi_api_c_compat.c"
