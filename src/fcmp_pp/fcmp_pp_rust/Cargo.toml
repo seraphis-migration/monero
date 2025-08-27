@@ -24,6 +24,8 @@ monero-fcmp-plus-plus = { git = "https://github.com/monero-oxide/monero-oxide", 
 
 [patch.crates-io]
 crypto-bigint = { git = "https://github.com/kayabaNerve/crypto-bigint", rev = "78352771313f1e9b8e48abe5ce30d50d6bdd291d" }
+curve25519-dalek = { git = "https://github.com/kayabaNerve/curve25519-dalek", rev = "ae66c6f27f78661721e56c918f4945f5252b7cba" }
+dalek-ff-group = { path = "./dalek-ff-group" }
 
 [profile.dev]
 lto = "off"
