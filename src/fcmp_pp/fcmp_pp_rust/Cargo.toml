@@ -23,7 +23,10 @@ monero-generators = { git = "https://github.com/monero-oxide/monero-oxide", rev 
 monero-fcmp-plus-plus = { git = "https://github.com/monero-oxide/monero-oxide", rev = "50dd3dbc0cc9048247eb734d27eb1d516aecacd2" }
 
 [patch.crates-io]
-crypto-bigint = { git = "https://github.com/kayabaNerve/crypto-bigint", branch = "c-repr" }
+crypto-bigint = { git = "https://github.com/kayabaNerve/crypto-bigint", rev = "78352771313f1e9b8e48abe5ce30d50d6bdd291d" }
+fiat-crypto = { git = "https://github.com/kayabaNerve/fiat-crypto", rev = "df9fd50a432fc43c29d20330599e1c828555a99c" }
+curve25519-dalek = { git = "https://github.com/kayabaNerve/curve25519-dalek", rev = "ae66c6f27f78661721e56c918f4945f5252b7cba" }
+dalek-ff-group = { path = "./dalek-ff-group" }
 
 [profile.dev]
 lto = "off"
