@@ -201,6 +201,7 @@ namespace rct {
             case RCTTypeBulletproof2:
             case RCTTypeCLSAG:
             case RCTTypeBulletproofPlus:
+            case RCTTypeFcmpPlusPlus:
                 return true;
             default:
                 return false;
@@ -225,6 +226,7 @@ namespace rct {
         switch (type)
         {
             case RCTTypeBulletproofPlus:
+            case RCTTypeFcmpPlusPlus:
                 return true;
             default:
                 return false;
@@ -252,6 +254,44 @@ namespace rct {
                 return true;
             default:
                 return false;
+        }
+    }
+
+    bool is_rct_short_amount(int type)
+    {
+        switch (type)
+        {
+            case RCTTypeBulletproof2:
+            case RCTTypeCLSAG:
+            case RCTTypeBulletproofPlus:
+            case RCTTypeFcmpPlusPlus:
+                return true;
+            case RCTTypeNull:
+            case RCTTypeFull:
+            case RCTTypeSimple:
+            case RCTTypeBulletproof:
+                return false;
+            default:
+                CHECK_AND_ASSERT_THROW_MES(false, "unknown rct type = " << type);
+        }
+    }
+
+    bool is_rct_fcmp(int type)
+    {
+        switch (type)
+        {
+            case RCTTypeFcmpPlusPlus:
+                return true;
+            case RCTTypeNull:
+            case RCTTypeFull:
+            case RCTTypeSimple:
+            case RCTTypeBulletproof:
+            case RCTTypeBulletproof2:
+            case RCTTypeCLSAG:
+            case RCTTypeBulletproofPlus:
+                return false;
+            default:
+                CHECK_AND_ASSERT_THROW_MES(false, "unknown rct type = " << type);
         }
     }
 

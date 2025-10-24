@@ -36,6 +36,7 @@
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/difficulty.h"
 #include "crypto/hash.h"
+#include "fcmp_pp/curve_trees.h"
 #include "rpc/rpc_handler.h"
 #include "common/varint.h"
 #include "common/perf_timer.h"
@@ -100,6 +101,7 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
 // whether they can talk to a given daemon without having to know in
 // advance which version they will stop working with
 // Don't go over 32767 for any of these
+// TODO: make sure this matches RPC version expected in wallet2::check_version when FCMP++ is ready
 #define CORE_RPC_VERSION_MAJOR 3
 #define CORE_RPC_VERSION_MINOR 17
 #define MAKE_CORE_RPC_VERSION(major,minor) (((major)<<16)|(minor))
@@ -192,7 +194,7 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
       bool        block_ids_exclusive;
       uint64_t    pool_info_since;
       uint64_t    max_block_count;
-
+      bool        init_tree_sync;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_PARENT(rpc_access_request_base)
         KV_SERIALIZE_OPT(requested_info, (uint8_t)0)
@@ -203,6 +205,7 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
         KV_SERIALIZE_OPT(block_ids_exclusive, false)
         KV_SERIALIZE_OPT(pool_info_since, (uint64_t)0)
         KV_SERIALIZE_OPT(max_block_count, (uint64_t)0)
+        KV_SERIALIZE_OPT(init_tree_sync, false)
       END_KV_SERIALIZE_MAP()
     };
     typedef epee::misc_utils::struct_init<request_t> request;
@@ -245,6 +248,51 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
       FULL = 2
     };
 
+    struct locked_outputs_t
+    {
+      uint64_t last_locked_block;
+      fcmp_pp::UnifiedOutputs outputs;
+
+      bool operator==(const locked_outputs_t& other) const
+      {
+        return last_locked_block == other.last_locked_block && outputs == other.outputs;
+      }
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(last_locked_block)
+        KV_SERIALIZE(outputs)
+      END_KV_SERIALIZE_MAP()
+    };
+
+    struct init_tree_sync_data_t
+    {
+      uint64_t init_block_idx{0};
+      crypto::hash init_block_hash{crypto::null_hash};
+      /// n leaf tuples in the chain when the chain tip was block init_block_idx
+      uint64_t n_leaf_tuples{0};
+      /// the last full path in the tree when the chain tip was block init_block_idx
+      fcmp_pp::CompressedPath last_path;
+      /// outputs created before init_block_idx with last locked block >= init_block_idx
+      std::vector<locked_outputs_t> locked_outputs;
+
+      bool operator==(const init_tree_sync_data_t& other) const
+      {
+        return init_block_idx == other.init_block_idx
+          && init_block_hash  == other.init_block_hash
+          && n_leaf_tuples    == other.n_leaf_tuples
+          && last_path        == other.last_path
+          && locked_outputs   == other.locked_outputs;
+      }
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(init_block_idx)
+        KV_SERIALIZE_VAL_POD_AS_BLOB(init_block_hash)
+        KV_SERIALIZE(n_leaf_tuples)
+        KV_SERIALIZE(last_path)
+        KV_SERIALIZE(locked_outputs)
+      END_KV_SERIALIZE_MAP()
+    };
+
     struct response_t: public rpc_access_response_base
     {
       std::vector<block_complete_entry> blocks;
@@ -257,6 +305,7 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
       std::vector<pool_tx_info> added_pool_txs;
       std::vector<crypto::hash> remaining_added_pool_txids;
       std::vector<crypto::hash> removed_pool_txids;
+      init_tree_sync_data_t init_tree_sync_data;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_PARENT(rpc_access_response_base)
@@ -276,6 +325,7 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
         {
           KV_SERIALIZE_CONTAINER_POD_AS_BLOB(removed_pool_txids)
         }
+        KV_SERIALIZE_OPT(init_tree_sync_data, init_tree_sync_data_t{})
       END_KV_SERIALIZE_MAP()
     };
     typedef epee::misc_utils::struct_init<response_t> response;
@@ -391,6 +441,7 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
       uint64_t block_timestamp;
       uint64_t received_timestamp;
       std::vector<uint64_t> output_indices;
+      std::vector<uint64_t> unified_ids;
       bool relayed;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -408,6 +459,7 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
           KV_SERIALIZE(confirmations)
           KV_SERIALIZE(block_timestamp)
           KV_SERIALIZE(output_indices)
+          KV_SERIALIZE(unified_ids)
         }
         else
         {
@@ -594,6 +646,47 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_PARENT(rpc_access_response_base)
         KV_SERIALIZE(outs)
+      END_KV_SERIALIZE_MAP()
+    };
+    typedef epee::misc_utils::struct_init<response_t> response;
+  };
+  //-----------------------------------------------
+  struct COMMAND_RPC_GET_PATH_BY_UNIFIED_ID_BIN
+  {
+    struct request_t: public rpc_access_request_base
+    {
+      uint64_t as_of_n_blocks;
+      std::vector<uint64_t> unified_ids;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_PARENT(rpc_access_request_base)
+        KV_SERIALIZE_OPT(as_of_n_blocks, (uint64_t)0)
+        KV_SERIALIZE(unified_ids)
+      END_KV_SERIALIZE_MAP()
+    };
+    typedef epee::misc_utils::struct_init<request_t> request;
+
+    struct response_t: public rpc_access_response_base
+    {
+      uint64_t n_leaf_tuples;
+
+      struct path_entry
+      {
+        uint64_t leaf_idx{0};
+        fcmp_pp::CompressedPath path;
+
+        BEGIN_KV_SERIALIZE_MAP()
+          KV_SERIALIZE(leaf_idx)
+          KV_SERIALIZE(path)
+        END_KV_SERIALIZE_MAP()
+      };
+
+      std::vector<path_entry> paths;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_PARENT(rpc_access_response_base)
+        KV_SERIALIZE(n_leaf_tuples)
+        KV_SERIALIZE(paths)
       END_KV_SERIALIZE_MAP()
     };
     typedef epee::misc_utils::struct_init<response_t> response;
@@ -1001,6 +1094,8 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
       uint8_t major_version;
       uint64_t height;
       std::string prev_id;
+      uint8_t fcmp_pp_n_tree_layers;
+      std::string fcmp_pp_tree_root;
       std::string seed_hash;
       std::string difficulty;
       uint64_t median_weight;
@@ -1026,6 +1121,11 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
         KV_SERIALIZE(major_version)
         KV_SERIALIZE(height)
         KV_SERIALIZE(prev_id)
+        if (major_version >= HF_VERSION_FCMP_PLUS_PLUS)
+        {
+          KV_SERIALIZE(fcmp_pp_n_tree_layers)
+          KV_SERIALIZE(fcmp_pp_tree_root)
+        }
         KV_SERIALIZE(seed_hash)
         KV_SERIALIZE(difficulty)
         KV_SERIALIZE(median_weight)
@@ -2176,9 +2276,10 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
         KV_SERIALIZE_PARENT(rpc_response_base)
         KV_SERIALIZE(version)
         KV_SERIALIZE(release)
-        KV_SERIALIZE_OPT(current_height, (uint64_t)0)
-        KV_SERIALIZE_OPT(target_height, (uint64_t)0)
-        KV_SERIALIZE_OPT(hard_forks, std::vector<hf_entry>())
+        // TODO: These can be made KV_SERIALIZE once the HF_VERSION_FCMP_PLUS_PLUS passes
+        KV_SERIALIZE_INCLUDE_OPT(current_height, (uint64_t)0)
+        KV_SERIALIZE_INCLUDE_OPT(target_height, (uint64_t)0)
+        KV_SERIALIZE_INCLUDE_OPT(hard_forks, std::vector<hf_entry>())
       END_KV_SERIALIZE_MAP()
     };
     typedef epee::misc_utils::struct_init<response_t> response;

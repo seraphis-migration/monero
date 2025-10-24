@@ -118,6 +118,47 @@ namespace cryptonote
       if (candidate < next_check.load(std::memory_order_relaxed))
         next_check = candidate;
     }
+
+    // Quick check if inputs were rendered invalid. If false, this does not mean the inputs are still valid. The
+    // tx would still need to go through the full validation flow. But if true, we're sure the inputs are now
+    // invalid. This is helpful to avoid re-relaying invalid txs.
+    bool expect_invalid_tx_inputs(const crypto::hash &txid, const txpool_tx_meta_t &meta, const Blockchain& m_blockchain, std::unordered_map<uint64_t, crypto::ec_point> &tree_roots_by_block_inout)
+    {
+      if (meta.max_used_block_height < m_blockchain.get_earliest_ideal_height_for_version(HF_VERSION_FCMP_PLUS_PLUS + 1))
+        return false;
+
+      // After the FCMP++ fork, the max_used_block_height == tx's used reference_block. That's expected to be the tip of
+      // the chain when constructing a tx. We can use this value to quickly determine if the tx's proof is still
+      // expected to be valid. We couldn't do this quickly with ring signatures, so we start doing it after FCMP++.
+      const uint64_t reference_block = meta.max_used_block_height;
+
+      // If we don't already know this tree root by block index, get it from the db and cache it
+      if (tree_roots_by_block_inout.find(reference_block) == tree_roots_by_block_inout.end())
+      {
+        crypto::ec_point tree_root;
+        try
+        {
+          m_blockchain.get_db().get_tree_root_at_blk_idx(reference_block, tree_root);
+        }
+        catch (...)
+        {
+          MERROR("Failed to get tree root at block " << reference_block);
+          return true;
+        }
+        tree_roots_by_block_inout[reference_block] = tree_root;
+      }
+
+      const crypto::ec_point &tree_root = tree_roots_by_block_inout[reference_block];
+
+      // Warning: this doesn't guarantee the tx inputs are definitely still valid. Need to check the tx's included
+      // n_tree_layers as well, but we don't want to have to parse the full tx blob in here, so we do this spot check.
+      const auto expected_ver_id = make_input_verification_id(txid, tree_root);
+      if (meta.valid_input_verification_id == expected_ver_id)
+        return false;
+
+      MINFO("Tx " << txid << " no longer has a valid input verification id, not re-relaying");
+      return true;
+    }
   }
   //---------------------------------------------------------------------------------
   //---------------------------------------------------------------------------------
@@ -157,21 +198,12 @@ namespace cryptonote
       return false;
     }
 
-    if (version != nic_verified_hf_version && !cryptonote::ver_non_input_consensus(tx, tvc, version))
-    {
-      LOG_PRINT_L1("transaction " << id << " failed non-input consensus rule checks");
-      tvc.m_verifivation_failed = true; // should already be set, but just in case
-      return false;
-    }
-
-    uint64_t fee;
+    const uint64_t fee = get_tx_fee(tx);
     bool fee_good = false;
     try
     {
-      // get_tx_fee() can throw. It shouldn't throw because we check preconditions in
-      // ver_non_input_consensus(), but let's put it in a try block just in case.
-      fee = get_tx_fee(tx);
-      fee_good = kept_by_block || m_blockchain.check_fee(tx_weight, fee);
+      fee_good = kept_by_block ||
+        (check_pool_capacity(id, tx_weight, fee) && m_blockchain.check_fee(tx_weight, fee));
     }
     catch(...) {}
     if (!fee_good) // if fee calculation failed or fee in relayed tx is too low...
@@ -198,6 +230,13 @@ namespace cryptonote
       tvc.m_verifivation_failed = true;
       tvc.m_nonzero_unlock_time = true;
       tvc.m_no_drop_offense = true;
+      return false;
+    }
+
+    if (version != nic_verified_hf_version && !cryptonote::ver_non_input_consensus(tx, tvc, version))
+    {
+      LOG_PRINT_L1("transaction " << id << " failed non-input consensus rule checks");
+      tvc.m_verifivation_failed = true; // should already be set, but just in case
       return false;
     }
 
@@ -237,7 +276,7 @@ namespace cryptonote
         meta.weight = tx_weight;
         meta.fee = fee;
         meta.max_used_block_id = null_hash;
-        meta.max_used_block_height = 0;
+        meta.max_used_block_height = (!tx.pruned && rct::is_rct_fcmp(tx.rct_signatures.type)) ? tx.rct_signatures.p.reference_block : 0;
         meta.last_failed_height = 0;
         meta.last_failed_id = null_hash;
         meta.receive_time = receive_time;
@@ -351,7 +390,7 @@ namespace cryptonote
 
     ++m_cookie;
 
-    MINFO("Transaction added to pool: txid " << id << " weight: " << tx_weight << " fee/byte: " << (fee / (double)(tx_weight ? tx_weight : 1)) << ", count: " << m_added_txs_by_id.size());
+    MINFO("Transaction added to pool: txid " << id << " weight: " << tx_weight << " fee/byte: " << (fee / (double)(tx_weight ? tx_weight : 1)) << ", count: " << m_added_txs_by_id.size() << ", pool total weight: " << m_txpool_weight);
 
     prune(m_txpool_max_weight);
 
@@ -381,6 +420,35 @@ namespace cryptonote
   {
     CRITICAL_REGION_LOCAL(m_transactions_lock);
     m_txpool_max_weight = bytes;
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::check_pool_capacity(const crypto::hash &id, const size_t weight, const uint64_t fee) const
+  {
+    if (weight == 0)
+      return true;
+
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    // If the tx doesn't push the pool over the capacity limit, it fits! We can immediately return true
+    if ((weight + m_txpool_weight) < m_txpool_max_weight)
+      return true;
+
+    // If it does, then see if it pays a higher fee than any txs already in the pool
+    if (m_txs_by_fee_and_receive_time.size() <= 1)
+      return true;
+    const auto it = --m_txs_by_fee_and_receive_time.end();
+    if (it == m_txs_by_fee_and_receive_time.begin())
+      return true;
+
+    const double fee_per_byte = (double) fee / weight;
+    MDEBUG("Check pool capacity for tx " << id << ", fee/byte: " << fee_per_byte << ", pool total weight: " << m_txpool_weight);
+
+    const double lowest_fee_per_byte = it->get_left().first;
+    if (fee_per_byte > lowest_fee_per_byte)
+      return true;
+
+    LOG_PRINT_L1("Pool is at capacity, and tx " << id << " does not pay a high enough fee to enter");
+    return false;
   }
   //---------------------------------------------------------------------------------
   void tx_memory_pool::reduce_txpool_weight(size_t weight)
@@ -794,11 +862,13 @@ namespace cryptonote
     uint64_t next_check = clock::to_time_t(clock::from_time_t(time_t(now)) + max_relayable_check);
     std::vector<std::pair<crypto::hash, txpool_tx_meta_t>> change_timestamps;
 
+    std::unordered_map<uint64_t, crypto::ec_point> tree_roots_by_block;
+
     CRITICAL_REGION_LOCAL(m_transactions_lock);
     CRITICAL_REGION_LOCAL1(m_blockchain);
     LockedTXN lock(m_blockchain.get_db());
     txs.reserve(m_blockchain.get_txpool_tx_count());
-    m_blockchain.for_all_txpool_txes([this, now, &txs, &change_timestamps, &next_check](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata_ref *){
+    m_blockchain.for_all_txpool_txes([this, now, &txs, &change_timestamps, &next_check, &tree_roots_by_block](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata_ref *){
       // 0 fee transactions are never relayed
       if(!meta.pruned && meta.fee > 0 && !meta.do_not_relay)
       {
@@ -831,6 +901,8 @@ namespace cryptonote
         uint64_t max_age = (tx_relay == relay_method::block) ? CRYPTONOTE_MEMPOOL_TX_FROM_ALT_BLOCK_LIVETIME : CRYPTONOTE_MEMPOOL_TX_LIVETIME;
         if (now - meta.receive_time <= max_age / 2)
         {
+          if (expect_invalid_tx_inputs(txid, meta, m_blockchain, tree_roots_by_block))
+            return true; // continue to next tx
           try
           {
             txs.emplace_back(txid, m_blockchain.get_txpool_tx_blob(txid, relay_category::all), tx_relay);
@@ -1435,6 +1507,7 @@ namespace cryptonote
       const std::unordered_map<crypto::hash, std::tuple<bool, tx_verification_context, uint64_t, crypto::hash>>::const_iterator i = m_input_cache.find(txid);
       if (i != m_input_cache.end())
       {
+        MDEBUG("Input cache hit in check_tx_inputs: " << txid);
         max_used_block_height = std::get<2>(i->second);
         max_used_block_id = std::get<3>(i->second);
         tvc = std::get<1>(i->second);

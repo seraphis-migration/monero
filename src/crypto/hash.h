@@ -38,7 +38,6 @@
 #include "generic-ops.h"
 #include "hex.h"
 #include "span.h"
-#include "serialization/wire/traits.h"
 
 namespace crypto {
 
@@ -107,11 +106,8 @@ namespace crypto {
   inline bool operator>(const hash &lhs, const hash &rhs) noexcept { return rhs < lhs; }
 }
 
+inline const unsigned char* to_bytes(const crypto::hash &h) { return &reinterpret_cast<const unsigned char&>(h); }
+inline unsigned char* to_bytes(crypto::hash &h) { return &reinterpret_cast<unsigned char&>(h); }
+
 CRYPTO_MAKE_HASHABLE(hash)
 CRYPTO_MAKE_COMPARABLE(hash8)
-
-namespace wire
-{
-  WIRE_DECLARE_BLOB_NS(crypto::hash);
-  WIRE_DECLARE_BLOB_NS(crypto::hash8);
-}

@@ -87,9 +87,9 @@ public: \
   template<typename T> inline void serialize_default(const T &t, T v) { }
   template<typename T> inline void serialize_default(T &t, T v) { t = v; }
 
-#define KV_SERIALIZE_OPT_N(variable, val_name, default_value) \
+#define KV_SERIALIZE_OPT_N(variable, val_name, default_value, exclude_default_on_write) \
   do { \
-    if (is_store && this_ref.variable == default_value) \
+    if (is_store && this_ref.variable == default_value && exclude_default_on_write) \
       break; \
     if (!epee::serialization::selector<is_store>::serialize(this_ref.variable, stg, hparent_section, val_name)) \
       epee::serialize_default(this_ref.variable, default_value); \
@@ -122,7 +122,8 @@ public: \
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_OPT(varialble, def)  KV_SERIALIZE_VAL_POD_AS_BLOB_OPT_N(varialble, #varialble, def)
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(varialble)     KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, #varialble) //skip is_trivially_copyable and is_standard_layout compile time check
 #define KV_SERIALIZE_CONTAINER_POD_AS_BLOB(varialble)     KV_SERIALIZE_CONTAINER_POD_AS_BLOB_N(varialble, #varialble)
-#define KV_SERIALIZE_OPT(variable,default_value)          KV_SERIALIZE_OPT_N(variable, #variable, default_value)
+#define KV_SERIALIZE_OPT(variable,default_value)          KV_SERIALIZE_OPT_N(variable, #variable, default_value, true)
+#define KV_SERIALIZE_INCLUDE_OPT(variable,default_value)  KV_SERIALIZE_OPT_N(variable, #variable, default_value, false)
 
 }
 
