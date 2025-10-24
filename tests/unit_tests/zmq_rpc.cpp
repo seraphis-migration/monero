@@ -548,6 +548,8 @@ TEST_F(zmq_pub, JsonFullMinerData)
 /*  uint8_t major_version;
     uint64_t height;
     const crypto::hash& prev_id;
+    uint8_t fcmp_pp_n_tree_layers;
+    const crypto::ec_point& fcmp_pp_tree_root;
     const crypto::hash& seed_hash;
     cryptonote::difficulty_type diff;
     uint64_t median_weight;
@@ -560,6 +562,8 @@ TEST_F(zmq_pub, JsonFullMinerData)
     //std::size_t send_miner_data(uint8_t major_version, uint64_t height, const crypto::hash& prev_id, const crypto::hash& seed_hash, difficulty_type diff, uint64_t median_weight, uint64_t already_generated_coins, const std::vector<tx_block_template_backlog_entry>& tx_backlog);
   
   const auto hash = crypto::rand<crypto::hash>();
+  const uint8_t fcmp_pp_n_tree_layers = crypto::rand_range(1, FCMP_PLUS_PLUS_MAX_LAYERS);
+  const crypto::ec_point fcmp_pp_tree_root = crypto::rand<crypto::ec_point>(); // might not be a valid Helios/Selene point
   const auto seed = crypto::rand<crypto::hash>();
   const cryptonote::difficulty_type difficulty = 500;
   const std::vector<cryptonote::tx_block_template_backlog_entry> txs = {
@@ -571,6 +575,8 @@ TEST_F(zmq_pub, JsonFullMinerData)
       "major_version": 100,
       "height": 200,
       "prev_id": ")" + epee::to_hex::string(epee::as_byte_span(hash)) + R"(",
+      "fcmp_pp_n_tree_layers": )" + std::to_string(fcmp_pp_n_tree_layers) + R"(,
+      "fcmp_pp_tree_root": ")" + epee::to_hex::string(epee::as_byte_span(fcmp_pp_tree_root)) + R"(",
       "seed_hash": ")" + epee::to_hex::string(epee::as_byte_span(seed)) + R"(",
       "difficulty": ")" + cryptonote::hex(difficulty) + R"(",
       "median_weight": 400,
@@ -587,14 +593,14 @@ TEST_F(zmq_pub, JsonFullMinerData)
         }
       ]
     })";
-  EXPECT_EQ(1u, pub->send_miner_data(100, 200, hash, seed, difficulty, 400, 10000, txs));
+  EXPECT_EQ(1u, pub->send_miner_data(100, 200, hash, fcmp_pp_n_tree_layers, fcmp_pp_tree_root, seed, difficulty, 400, 10000, txs));
   EXPECT_TRUE(pub->relay_to_pub(relay.get(), dummy_pub.get()));
 
   auto pubs = get_published(dummy_client.get());
   ASSERT_EQ(1u, pubs.size());
   EXPECT_TRUE(compare_miner_data(expected, pubs.front()));
 
-  EXPECT_NO_THROW(cryptonote::listener::zmq_pub::miner_data{pub}(100, 200, hash, seed, difficulty, 400, 10000, txs));
+  EXPECT_NO_THROW(cryptonote::listener::zmq_pub::miner_data{pub}(100, 200, hash, fcmp_pp_n_tree_layers, fcmp_pp_tree_root, seed, difficulty, 400, 10000, txs));
   EXPECT_TRUE(pub->relay_to_pub(relay.get(), dummy_pub.get()));
 
   pubs = get_published(dummy_client.get());

@@ -29,15 +29,12 @@
 #pragma once
 
 //local headers
-#include "common/unordered_containers_boost_serialization.h"
 #include "cryptonote_basic/cryptonote_boost_serialization.h"
 #include "cryptonote_basic/account_boost_serialization.h"
 #include "wallet2_types.h"
 
 //third party headers
 #include <boost/serialization/deque.hpp>
-#include <boost/serialization/set.hpp>
-#include <boost/serialization/vector.hpp>
 
 //standard headers
 
