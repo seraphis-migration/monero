@@ -1610,6 +1610,13 @@ namespace cryptonote
 
           MDEBUG(context << "Block process time (" << blocks.size() << " blocks, " << num_txs << " txs): " << block_process_time_full + transactions_process_time_full << " (" << transactions_process_time_full << "/" << block_process_time_full << ") ms");
 
+          // Grab the span queue check lock so that we make sure we finish writing the block to the db before checking
+          // the span queue again. Otherwise it's possible for the span queue check to read the db height at n-1 in
+          // thread1, then wait for block n to be added and its span removed from the queue in this thread2, then check
+          // the span queue in thread1 and incorrectly think the span starting at block n is missing.
+          // TODO: a better sync protocol.
+          boost::unique_lock<boost::mutex> check_span_lock{m_check_span_queue_mutex};
+
           if (!m_core.cleanup_handle_incoming_blocks())
           {
             LOG_PRINT_CCONTEXT_L0("Failure in cleanup_handle_incoming_blocks");
@@ -1657,7 +1664,10 @@ namespace cryptonote
             MGINFO_YELLOW("Synced " << current_blockchain_height << "/" << target_blockchain_height
                 << progress_message << timing_message);
             if (previous_stripe != current_stripe)
+            {
+              check_span_lock.unlock();
               notify_new_stripe(context, current_stripe);
+            }
           }
         }
       }
@@ -2059,6 +2069,12 @@ skip:
     {
       do
       {
+        // Enforce synchronization when checking the span queue. This is a simple solution to prevent unexpected races
+        // when checking the span queue. It's not ideal and doesn't fully solve all possible races.
+        // This section largely needs to be reworked.
+        // Warning: make sure to unlock this to avoid deadlocks if necessary
+        boost::unique_lock<boost::mutex> check_span_lock{m_check_span_queue_mutex};
+
         const size_t nspans = m_block_queue.get_num_filled_spans();
         const size_t size = m_block_queue.get_data_size();
         const uint64_t bc_height = m_core.get_current_blockchain_height();
@@ -2149,6 +2165,7 @@ skip:
             MLOG_PEER_STATE("resuming");
             context.m_state = cryptonote_connection_context::state_standby;
             ++context.m_callback_request_count;
+            check_span_lock.unlock();
             m_p2p->request_callback(context);
             return true;
           }
