@@ -2058,15 +2058,15 @@ skip:
     {
       do
       {
-        size_t nspans = m_block_queue.get_num_filled_spans();
-        size_t size = m_block_queue.get_data_size();
+        const size_t nspans = m_block_queue.get_num_filled_spans();
+        const size_t size = m_block_queue.get_data_size();
         const uint64_t bc_height = m_core.get_current_blockchain_height();
         const auto next_needed_pruning_stripe = get_next_needed_pruning_stripe();
         const uint32_t add_stripe = tools::get_pruning_stripe(bc_height, context.m_remote_blockchain_height, CRYPTONOTE_PRUNING_LOG_STRIPES);
         const uint32_t peer_stripe = tools::get_pruning_stripe(context.m_pruning_seed);
         const uint32_t local_stripe = tools::get_pruning_stripe(m_core.get_blockchain_pruning_seed());
         const size_t block_queue_size_threshold = m_block_download_max_size ? m_block_download_max_size : BLOCK_QUEUE_SIZE_THRESHOLD;
-        bool queue_proceed_init = (nspans < m_span_limit.load()) && (size < block_queue_size_threshold);
+        const bool queue_proceed_init = (nspans < m_span_limit.load()) && (size < block_queue_size_threshold);
         // get rid of blocks we already requested, or already have
         if (skip_unneeded_hashes(context, true) && context.m_needed_objects.empty() && context.m_num_requested == 0)
         {
@@ -2081,18 +2081,16 @@ skip:
             on_connection_synchronized();
           return true;
         }
-        uint64_t next_needed_height = m_block_queue.get_next_needed_height(bc_height);
-        uint64_t next_block_height;
-        if (context.m_needed_objects.empty())
-          next_block_height = next_needed_height;
-        else
-          next_block_height = context.m_last_response_height - context.m_needed_objects.size() + 1;
-        bool next_height_proceed = next_needed_height < std::max(next_block_height, bc_height + 1);
-        bool stripe_proceed_main = next_height_proceed && ((m_sync_pruned_blocks && local_stripe && add_stripe != local_stripe) || add_stripe == 0 || peer_stripe == 0 || add_stripe == peer_stripe);
-        bool stripe_proceed_secondary = tools::has_unpruned_block(next_block_height, context.m_remote_blockchain_height, context.m_pruning_seed);
+        const uint64_t next_needed_height = m_block_queue.get_next_needed_height(bc_height);
+        const uint64_t next_block_height = context.m_needed_objects.empty()
+          ? next_needed_height
+          : context.m_last_response_height - context.m_needed_objects.size() + 1;
+        const bool next_height_proceed = next_needed_height < std::max(next_block_height, bc_height + 1);
+        const bool stripe_proceed_main = next_height_proceed && ((m_sync_pruned_blocks && local_stripe && add_stripe != local_stripe) || add_stripe == 0 || peer_stripe == 0 || add_stripe == peer_stripe);
+        const bool stripe_proceed_secondary = tools::has_unpruned_block(next_block_height, context.m_remote_blockchain_height, context.m_pruning_seed);
         // override queue_proceed_init if we need the immediate block(s)
-        bool queue_proceed = (next_needed_height == bc_height) ? stripe_proceed_main : queue_proceed_init;
-        bool proceed = queue_proceed && (stripe_proceed_main || stripe_proceed_secondary);
+        const bool queue_proceed = (next_needed_height == bc_height) ? stripe_proceed_main : queue_proceed_init;
+        const bool proceed = queue_proceed && (stripe_proceed_main || stripe_proceed_secondary);
         if (!stripe_proceed_main && !stripe_proceed_secondary && should_drop_connection(context, tools::get_pruning_stripe(next_block_height, context.m_remote_blockchain_height, CRYPTONOTE_PRUNING_LOG_STRIPES)))
         {
           if (!context.m_is_income)
@@ -2105,16 +2103,15 @@ skip:
                << ", peer_stripe : " << peer_stripe
                << ", local_stripe : " << local_stripe
                << ", next_needed_pruning_stripe first-second : " << next_needed_pruning_stripe.first << "-" << next_needed_pruning_stripe.second << " needed"
-               << ", seed " << epee::string_tools::to_string_hex(context.m_pruning_seed));
-        MDEBUG(context << "  - last_response_height " << context.m_last_response_height << ", m_needed_objects size " << context.m_needed_objects.size());
-        MDEBUG("proceed : " << proceed
+               << ", seed " << epee::string_tools::to_string_hex(context.m_pruning_seed)
+               << ", last_response_height " << context.m_last_response_height << ", m_needed_objects size " << context.m_needed_objects.size()
+               << ", proceed : " << proceed
                << ", queue_proceed : " << queue_proceed
                << ", stripe_proceed_main : " << stripe_proceed_main
                << ", stripe_proceed_secondary : " << stripe_proceed_secondary
-               << ", next_height_proceed : " << next_height_proceed);
-        MDEBUG("next_block_height/next_needed_height/bc_height : "
-               << next_block_height << "/" << next_needed_height << "/" << bc_height);
-        MDEBUG("nspans/span_limit : " << nspans << "/" << m_span_limit
+               << ", next_height_proceed : " << next_height_proceed
+               << ", next_block_height/next_needed_height/bc_height : " << next_block_height << "/" << next_needed_height << "/" << bc_height
+               << ", nspans/span_limit : " << nspans << "/" << m_span_limit
                << ", queue size/size_limit : " << size << "/" << block_queue_size_threshold);
 
         // if we're waiting for next span, try to get it before unblocking threads below,
