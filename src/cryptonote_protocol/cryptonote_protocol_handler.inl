@@ -2013,7 +2013,7 @@ skip:
   {
     // take out blocks we already have
     size_t skip = 0;
-    while (skip < context.m_needed_objects.size() && (m_core.have_block(context.m_needed_objects[skip].first) || (check_block_queue && m_block_queue.have(context.m_needed_objects[skip].first))))
+    while (skip < context.m_needed_objects.size() && (m_core.have_block_unlocked(context.m_needed_objects[skip].first) || (check_block_queue && m_block_queue.have(context.m_needed_objects[skip].first))))
     {
       // if we're popping the last hash, record it so we can ask again from that hash,
       // this prevents never being able to progress on peers we get old hash lists from
@@ -2073,6 +2073,8 @@ skip:
         // when checking the span queue. It's not ideal and doesn't fully solve all possible races.
         // This section largely needs to be reworked.
         // Warning: make sure to unlock this to avoid deadlocks if necessary
+        // If any of the functions below acquire the txpool lock (m_transactions_lock), we can deadlock, since
+        // prepare_handle_incoming_blocks acquires it.
         boost::unique_lock<boost::mutex> check_span_lock{m_check_span_queue_mutex};
 
         const size_t nspans = m_block_queue.get_num_filled_spans();
@@ -2094,6 +2096,7 @@ skip:
           }
           MDEBUG(context << "Nothing to get from this peer, and it's not ahead of us, all done");
           context.set_state_normal();
+          check_span_lock.unlock();
           if (m_core.get_current_blockchain_height() >= m_core.get_target_blockchain_height())
             on_connection_synchronized();
           return true;
