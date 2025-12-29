@@ -2073,8 +2073,9 @@ skip:
         // when checking the span queue. It's not ideal and doesn't fully solve all possible races.
         // This section largely needs to be reworked.
         // Warning: make sure to unlock this to avoid deadlocks if necessary
-        // If any of the functions below acquire the txpool lock (m_transactions_lock), we can deadlock, since
-        // prepare_handle_incoming_blocks acquires it.
+        // If any of the functions below acquire the txpool lock (m_transactions_lock) or m_incoming_tx_lock, we can
+        // deadlock, since m_core.prepare_handle_incoming_blocks acquires both and does not release until
+        // m_core.cleanup_handle_incoming_blocks.
         boost::unique_lock<boost::mutex> check_span_lock{m_check_span_queue_mutex};
 
         const size_t nspans = m_block_queue.get_num_filled_spans();
