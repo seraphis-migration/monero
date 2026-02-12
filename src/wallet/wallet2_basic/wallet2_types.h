@@ -235,6 +235,12 @@ struct confirmed_transfer_details
     {}
 };
 
+struct destination_details
+{
+    std::vector<cryptonote::tx_destination_entry> m_dests;
+    crypto::hash m_payment_id{crypto::null_hash};
+};
+
 typedef std::vector<uint64_t> amounts_container;
 struct payment_details
 {

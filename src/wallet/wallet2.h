@@ -967,6 +967,7 @@ private:
       if (version < 3)
         return true;
       FIELD(m_tree_cache)
+      FIELD(m_recoverable_dests)
     END_SERIALIZE()
 
     /*!
@@ -1583,6 +1584,9 @@ private:
     std::vector<std::vector<tools::wallet2::multisig_info>> m_multisig_rescan_info;
     std::vector<std::vector<rct::key>> m_multisig_rescan_k;
     std::unordered_map<crypto::public_key, crypto::key_image> m_cold_key_images;
+
+    // This struct is used to make sure wallets upgrading from pre-FCMP++ to FCMP++ maintain saved destination details
+    std::unordered_map<crypto::hash, wallet2_basic::destination_details> m_recoverable_dests;
 
     uint64_t m_sync_blocks_time_ms;
     uint64_t m_outs_by_last_locked_time_ms;

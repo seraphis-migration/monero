@@ -313,6 +313,13 @@ void serialize(Archive &a, wallet2_basic::confirmed_transfer_details &x, const u
 }
 
 template <class Archive>
+void serialize(Archive &a, wallet2_basic::destination_details &x, const unsigned int ver)
+{
+    a & x.m_dests;
+    a & x.m_payment_id;
+}
+
+template <class Archive>
 void serialize(Archive& a, wallet2_basic::payment_details& x, const unsigned int ver)
 {
     a & x.m_tx_hash;
@@ -423,6 +430,7 @@ BOOST_CLASS_VERSION(wallet2_basic::multisig_info::LR, 0)
 BOOST_CLASS_VERSION(wallet2_basic::multisig_info, 1)
 BOOST_CLASS_VERSION(wallet2_basic::unconfirmed_transfer_details, 8)
 BOOST_CLASS_VERSION(wallet2_basic::confirmed_transfer_details, 6)
+BOOST_CLASS_VERSION(wallet2_basic::destination_details, 0)
 BOOST_CLASS_VERSION(wallet2_basic::payment_details, 5)
 BOOST_CLASS_VERSION(wallet2_basic::pool_payment_details, 1)
 BOOST_CLASS_VERSION(wallet2_basic::address_book_row, 18)

@@ -1048,6 +1048,53 @@ crypto::chacha_key derive_cache_key(const crypto::chacha_key& keys_data_key, con
 
   return cache_key;
 }
+
+void recover_dests(
+  std::unordered_map<crypto::hash, tools::wallet2::unconfirmed_transfer_details> &m_unconfirmed_txs,
+  std::unordered_map<crypto::hash, tools::wallet2::confirmed_transfer_details> &m_confirmed_txs,
+  std::unordered_map<crypto::hash, wallet2_basic::destination_details> &m_recoverable_dests)
+{
+  if (m_recoverable_dests.empty())
+    return;
+
+  for (auto it = m_recoverable_dests.begin(); it != m_recoverable_dests.end();)
+  {
+    auto confirmed_it = m_confirmed_txs.find(it->first);
+    if (confirmed_it != m_confirmed_txs.end())
+    {
+      confirmed_it->second.m_dests = std::move(it->second.m_dests);
+      confirmed_it->second.m_payment_id = it->second.m_payment_id;
+      it = m_recoverable_dests.erase(it);
+      continue;
+    }
+
+    auto unconfirmed_it = m_unconfirmed_txs.find(it->first);
+    if (unconfirmed_it != m_unconfirmed_txs.end())
+    {
+      unconfirmed_it->second.m_dests = std::move(it->second.m_dests);
+      unconfirmed_it->second.m_payment_id = it->second.m_payment_id;
+      it = m_recoverable_dests.erase(it);
+      continue;
+    }
+
+    ++it;
+  }
+}
+
+std::unordered_map<crypto::hash, wallet2_basic::destination_details> save_recoverable_dests(
+  const std::unordered_map<crypto::hash, tools::wallet2::unconfirmed_transfer_details> &m_unconfirmed_txs,
+  const std::unordered_map<crypto::hash, tools::wallet2::confirmed_transfer_details> &m_confirmed_txs)
+{
+  std::unordered_map<crypto::hash, wallet2_basic::destination_details> recoverable_dests;
+
+  for (const auto &unconfirmed_tx : m_unconfirmed_txs)
+    recoverable_dests[unconfirmed_tx.first] = wallet2_basic::destination_details{ .m_dests = unconfirmed_tx.second.m_dests, .m_payment_id = unconfirmed_tx.second.m_payment_id };
+  for (const auto &confirmed_tx : m_confirmed_txs)
+    recoverable_dests[confirmed_tx.first] = wallet2_basic::destination_details{ .m_dests = confirmed_tx.second.m_dests, .m_payment_id = confirmed_tx.second.m_payment_id };
+
+  return recoverable_dests;
+}
+
   //-----------------------------------------------------------------
 } //namespace
 
@@ -4556,6 +4603,9 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
   m_multisig_rescan_k = std::vector<std::vector<rct::key>>{};
 
   LOG_PRINT_L1("Refresh done, blocks received: " << blocks_fetched << ", current sync height: " << m_blockchain.size() << ", balance (all accounts): " << print_money(balance_all(false)) << ", unlocked: " << print_money(unlocked_balance_all(false)));
+
+  // Recover dests if there are any to recover
+  recover_dests(m_unconfirmed_txs, m_confirmed_txs, m_recoverable_dests);
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::refresh(bool trusted_daemon, uint64_t & blocks_fetched, bool& received_money, bool& ok)
@@ -6812,8 +6862,12 @@ void wallet2::load(const std::string& wallet_, const epee::wipeable_string& pass
 
   if (m_tree_cache.n_synced_blocks() == 0 && !m_transfers.empty() && m_has_ever_refreshed_from_node)
   {
-    // clear the wallet so that we re-sync the tree and get received output paths
-    // TODO: may want to warn users that this is happening before doing it, esp. because it'll delete tx dests
+    // We must be upgrading a pre-FCMP++ wallet to a FCMP++ wallet.
+    // Unfortunately, we have to clear the wallet and re-sync from the wallet's restore height, in order to sync the
+    // FCMP++ tree and get received output paths.
+    // But first, we save destination details, so that we don't lose them. We recover any recoverable dests after
+    // refreshing (recovery happens via recover_dests).
+    m_recoverable_dests = save_recoverable_dests(m_unconfirmed_txs, m_confirmed_txs);
     this->clear_soft(true);
   }
 

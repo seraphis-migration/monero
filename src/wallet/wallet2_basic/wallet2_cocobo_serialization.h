@@ -114,6 +114,12 @@ BEGIN_SERIALIZE_OBJECT_FN(confirmed_transfer_details)
     FIELD_F(m_rings)
 END_SERIALIZE()
 
+BEGIN_SERIALIZE_OBJECT_FN(destination_details)
+    VERSION_FIELD(0)
+    FIELD_F(m_dests)
+    FIELD_F(m_payment_id)
+END_SERIALIZE()
+
 BEGIN_SERIALIZE_OBJECT_FN(payment_details)
     VERSION_FIELD(0)
     FIELD_F(m_tx_hash)
