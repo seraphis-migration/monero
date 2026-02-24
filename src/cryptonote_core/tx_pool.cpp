@@ -717,6 +717,8 @@ namespace cryptonote
     CRITICAL_REGION_LOCAL1(m_blockchain);
 
     m_blockchain.for_all_txpool_txes([this, &hashes, &txes](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata_ref*) {
+      if (meta.pruned)
+        return true;
       const auto tx_relay_method = meta.get_relay_method();
       if (tx_relay_method != relay_method::block && tx_relay_method != relay_method::fluff)
         return true;
@@ -731,6 +733,16 @@ namespace cryptonote
             MERROR("Failed to get blob for txpool transaction " << txid);
             return true;
           }
+
+          // If any of the tx's key images have already entered the chain, we shouldn't re-relay it
+          cryptonote::transaction tx;
+          CHECK_AND_ASSERT_MES(parse_and_validate_tx_base_from_blob(bd, tx), true, "Failed to parse pool tx base");
+          if (m_blockchain.have_tx_keyimges_as_spent(tx))
+          {
+            MDEBUG("Not relaying tx " << txid << " since it has key images already spent");
+            return true;
+          }
+
           txes.emplace_back(std::move(bd));
         }
         catch (const std::exception &e)
@@ -860,7 +872,16 @@ namespace cryptonote
         {
           try
           {
-            txs.emplace_back(txid, m_blockchain.get_txpool_tx_blob(txid, relay_category::all), tx_relay);
+            // If any of the tx's key images have already entered the chain, we shouldn't re-relay it
+            cryptonote::blobdata txblob = m_blockchain.get_txpool_tx_blob(txid, relay_category::all);
+            cryptonote::transaction tx;
+            CHECK_AND_ASSERT_MES(parse_and_validate_tx_base_from_blob(txblob, tx), true, "Failed to parse pool tx base");
+            if (m_blockchain.have_tx_keyimges_as_spent(tx))
+            {
+              MDEBUG("Not relaying tx " << txid << " since it has key images already spent");
+              return true;
+            }
+            txs.emplace_back(txid, std::move(txblob), tx_relay);
           }
           catch (const std::exception &e)
           {
