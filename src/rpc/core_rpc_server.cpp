@@ -39,6 +39,7 @@ using namespace epee;
 #include "common/command_line.h"
 #include "common/updates.h"
 #include "common/download.h"
+#include "common/power.h"
 #include "common/util.h"
 #include "common/merge_sorted_vectors.h"
 #include "common/perf_timer.h"
@@ -505,6 +506,89 @@ namespace cryptonote
     return true;
   }
 #define CHECK_CORE_READY() do { if(!check_core_ready()){res.status =  CORE_RPC_STATUS_BUSY;return true;} } while(0)
+
+  //------------------------------------------------------------------------------------------------------------------------------
+  bool core_rpc_server::validate_power(
+    const cryptonote::blobdata& txblob,
+    const std::string& power_block_hash,
+    const std::string& power_solution,
+    uint32_t power_nonce,
+    bool restricted,
+    std::string& status
+  ) {
+    if (!restricted)
+      return true;
+
+    cryptonote::transaction_prefix tx_prefix;
+    if (!cryptonote::parse_and_validate_tx_prefix_from_blob(txblob, tx_prefix))
+    {
+      status = "Failed to parse and validate tx prefix from blob";
+      return false;
+    }
+
+    if (tx_prefix.vin.size() <= tools::power::INPUT_THRESHOLD)
+      return true;
+
+    crypto::hash block_hash;
+    if (power_block_hash.size() != 64 || !string_tools::hex_to_pod(power_block_hash, block_hash))
+    {
+      status = "Failed to decode power_block_hash";
+      return false;
+    }
+
+    tools::power::solution_array solution;
+    if (power_solution.size() != 32 || !string_tools::hex_to_pod(power_solution, solution))
+    {
+      status = "Failed to decode power_solution";
+      return false;
+    }
+
+    const uint64_t height = m_core.get_current_blockchain_height() - 1;
+
+    bool hash_is_recent = false;
+    for (size_t i = 0; i < tools::power::HEIGHT_WINDOW; ++i)
+    {
+      const uint64_t h = height >= i ? height - i : 0;
+
+      if (h == 0)
+      {
+        break;
+      }
+
+      const crypto::hash id = m_core.get_block_id_by_height(h);
+
+      if (id == crypto::null_hash)
+      {
+        status = "power_block_hash was not found";
+        return false;
+      }
+
+      if (id == block_hash)
+      {
+        hash_is_recent = true;
+        break;
+      }
+    }
+
+    if (!hash_is_recent)
+    {
+      status = "power_block_hash is not within the allowed window";
+      return false;
+    }
+
+    if (!tools::power::verify_rpc(
+      get_transaction_prefix_hash(tx_prefix),
+      block_hash,
+      power_nonce,
+      tools::power::DIFFICULTY,
+      solution
+    )) {
+      status = "Invalid PoW solution";
+      return false;
+    }
+
+    return true;
+  }
 
   //------------------------------------------------------------------------------------------------------------------------------
   bool core_rpc_server::on_get_height(const COMMAND_RPC_GET_HEIGHT::request& req, COMMAND_RPC_GET_HEIGHT::response& res, const connection_context *ctx)
@@ -1565,6 +1649,18 @@ namespace cryptonote
       return true;
     }
     res.sanity_check_failed = false;
+
+    if (!validate_power(
+      tx_blob,
+      req.power_block_hash,
+      req.power_solution,
+      req.power_nonce,
+      restricted,
+      res.reason
+    )) {
+      res.status = "Failed";
+      return false;
+    }
 
     crypto::hash txid{};
     if (!skip_validation)

@@ -34,6 +34,7 @@
 
 #include <boost/uuid/nil_generator.hpp>
 #include <boost/utility/string_ref.hpp>
+#include "common/power.h"
 // likely included by daemon_handler.h's includes,
 // but including here for clarity
 #include "cryptonote_core/cryptonote_core.h"
@@ -343,7 +344,7 @@ namespace rpc
 
   void DaemonHandler::handle(const SendRawTx::Request& req, SendRawTx::Response& res)
   {
-    handleTxBlob(cryptonote::tx_to_blob(req.tx), req.relay, res);
+    handleTxBlob(cryptonote::tx_to_blob(req.tx), req.power_block_hash, req.power_solution, req.power_nonce, req.relay, res);
   }
 
   void DaemonHandler::handle(const SendRawTxHex::Request& req, SendRawTxHex::Response& res)
@@ -356,11 +357,81 @@ namespace rpc
       res.error_details = "Invalid hex";
       return;
     }
-    handleTxBlob(std::move(tx_blob), req.relay, res);
+    handleTxBlob(std::move(tx_blob), req.power_block_hash, req.power_solution, req.power_nonce, req.relay, res);
   }
 
-  void DaemonHandler::handleTxBlob(std::string&& tx_blob, bool relay, SendRawTx::Response& res)
-  {
+  bool DaemonHandler::validatePower(
+    const cryptonote::blobdata& tx_blob,
+    const crypto::hash& power_block_hash,
+    const tools::power::solution_array& power_solution,
+    uint32_t power_nonce,
+    std::string& error_details
+  ) {
+    cryptonote::transaction_prefix tx_prefix;
+    if (!cryptonote::parse_and_validate_tx_prefix_from_blob(tx_blob, tx_prefix))
+    {
+      error_details = "Failed to parse and validate tx prefix from blob";
+      return false;
+    }
+
+    if (tx_prefix.vin.size() <= tools::power::INPUT_THRESHOLD)
+      return true;
+
+    const uint64_t height = m_core.get_current_blockchain_height() - 1;
+
+    bool hash_is_recent = false;
+    for (size_t i = 0; i < tools::power::HEIGHT_WINDOW; ++i)
+    {
+      const uint64_t h = height >= i ? height - i : 0;
+
+      if (h == 0)
+      {
+        break;
+      }
+
+      const crypto::hash id = m_core.get_block_id_by_height(h);
+
+      if (id == crypto::null_hash)
+      {
+        error_details = "recent_block_hash was not found";
+        return false;
+      }
+
+      if (id == power_block_hash)
+      {
+        hash_is_recent = true;
+        break;
+      }
+    }
+
+    if (!hash_is_recent)
+    {
+      error_details = "recent_block_hash is not within the allowed window";
+      return false;
+    }
+
+    if (!tools::power::verify_rpc(
+      get_transaction_prefix_hash(tx_prefix),
+      power_block_hash,
+      power_nonce,
+      tools::power::DIFFICULTY,
+      power_solution
+    )) {
+      error_details = "Invalid PoW solution";
+      return false;
+    }
+
+    return true;
+  }
+
+  void DaemonHandler::handleTxBlob(
+    std::string&& tx_blob,
+    const crypto::hash& recent_block_hash,
+    const tools::power::solution_array& power_solution,
+    const uint32_t nonce,
+    bool relay,
+    SendRawTx::Response& res
+  ) {
     if (!m_p2p.get_payload_object().is_synchronized())
     {
       res.status = Message::STATUS_FAILED;
@@ -437,6 +508,14 @@ namespace rpc
       {
         res.error_details = "an unknown issue was found with the transaction";
       }
+
+      return;
+    }
+
+    if (!validatePower(tx_blob, recent_block_hash, power_solution, nonce, res.error_details))
+    {
+      res.relayed = false;
+      res.status = Message::STATUS_OK;
 
       return;
     }

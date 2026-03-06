@@ -41,6 +41,7 @@ set(common_sources
   password.cpp
   perf_timer.cpp
   pruning.cpp
+  power.cpp
   spawn.cpp
   threadpool.cpp
   updates.cpp
@@ -75,6 +76,7 @@ target_link_libraries(common
     ${Boost_REGEX_LIBRARY}
     ${Boost_CHRONO_LIBRARY}
   PRIVATE
+    equix_static
     ${OPENSSL_LIBRARIES}
     ${EXTRA_LIBRARIES})
 target_include_directories(common

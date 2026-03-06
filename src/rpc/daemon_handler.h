@@ -139,7 +139,22 @@ class DaemonHandler : public RpcHandler
 
     bool getBlockHeaderByHash(const crypto::hash& hash_in, cryptonote::rpc::BlockHeaderResponse& response);
 
-    void handleTxBlob(std::string&& tx_blob, bool relay, SendRawTx::Response& res);
+    bool validatePower(
+      const cryptonote::blobdata& tx_blob,
+      const crypto::hash& power_block_hash,
+      const tools::power::solution_array& power_solution,
+      uint32_t power_nonce,
+      std::string& error_details
+    );
+
+    void handleTxBlob(
+      std::string&& tx_blob,
+      const crypto::hash& recent_block_hash,
+      const tools::power::solution_array& power_solution,
+      const uint32_t power_nonce,
+      bool relay,
+      SendRawTx::Response& res
+    );
 
     cryptonote::core& m_core;
     t_p2p& m_p2p;

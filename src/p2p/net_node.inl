@@ -45,6 +45,8 @@
 #include <tuple>
 #include <vector>
 
+#include "common/power.h"
+#include "cryptonote_protocol/cryptonote_protocol_defs.h"
 #include "version.h"
 #include "string_tools.h"
 #include "common/util.h"
@@ -1231,6 +1233,38 @@ namespace nodetool
           hsh_result = false;
           return;
         }
+
+        // Solve PoWER challenge and send to peer.
+        if (rsp.power_challenge.difficulty >= tools::power::MAX_DIFFICULTY)
+        {
+          LOG_WARNING_CC(
+            context,
+            "COMMAND_HANDSHAKE invoked but PoWER difficulty from peer is too high: "
+              << rsp.power_challenge.difficulty
+              << ", dropping connection."
+          );
+          hsh_result = false;
+          return;
+        }
+        tools::power::solution_data s = tools::power::solve_p2p(
+          rsp.power_challenge.seed,
+          rsp.power_challenge.seed_top64,
+          rsp.power_challenge.difficulty
+        );
+        epee::levin::message_writer out{4096};
+        cryptonote::NOTIFY_POWER_SOLUTION::request_t r = { std::vector(s.solution.begin(), s.solution.end()), s.nonce };
+        epee::serialization::store_t_to_binary(r, out.buffer);
+        if (zone.m_net_server
+          .get_config_object()
+          .send(out.finalize_notify(cryptonote::NOTIFY_POWER_SOLUTION::ID), context.m_connection_id)
+        ) {
+          // The peer we are handshaking to does not
+          // need to do PoWER, enable it for them.
+          set_power_enabled(true);
+        } else {
+          LOG_WARNING_CC(context, "COMMAND_HANDSHAKE invoked but NOTIFY_POWER_SOLUTION failed, continuing with degraded tx relay.");
+        }
+
         LOG_INFO_CC(context, "New connection handshaked, pruning seed " << epee::string_tools::to_string_hex(context.m_pruning_seed));
         LOG_DEBUG_CC(context, " COMMAND_HANDSHAKE INVOKED OK");
       }else
@@ -2716,12 +2750,15 @@ namespace nodetool
         flags_context.support_flags = support_flags;
       });
 
+    set_power_challenge({ crypto::rand<uint64_t>(), crypto::rand<uint64_t>(), tools::power::DIFFICULTY });
+
     //fill response
     zone.m_peerlist.get_peerlist_head(rsp.local_peerlist_new, true);
     for (const auto &e: rsp.local_peerlist_new)
       context.sent_addresses.insert(e.adr);
     get_local_node_data(rsp.node_data, zone);
     m_payload_handler.get_payload_sync_data(rsp.payload_data);
+    rsp.power_challenge = get_power_challenge();
     LOG_DEBUG_CC(context, "COMMAND_HANDSHAKE");
     return 1;
   }
@@ -3071,6 +3108,32 @@ namespace nodetool
     MINFO("clearing used stripe peers");
     for (auto &e: m_used_stripe_peers)
       e.clear();
+  }
+
+  template<class t_payload_net_handler>
+  nodetool::power_challenge_data node_server<t_payload_net_handler>::get_power_challenge()
+  {
+    CRITICAL_REGION_LOCAL(m_power_challenge_lock);
+    return m_power_challenge;
+  }
+
+  template<class t_payload_net_handler>
+  void node_server<t_payload_net_handler>::set_power_challenge(const nodetool::power_challenge_data challenge)
+  {
+    CRITICAL_REGION_LOCAL(m_power_challenge_lock);
+    m_power_challenge = challenge;
+  }
+
+  template<class t_payload_net_handler>
+  bool node_server<t_payload_net_handler>::get_power_enabled()
+  {
+    return m_power_enabled;
+  }
+
+  template<class t_payload_net_handler>
+  void node_server<t_payload_net_handler>::set_power_enabled(bool enabled)
+  {
+    m_power_enabled = enabled;
   }
 
   template<class t_payload_net_handler>

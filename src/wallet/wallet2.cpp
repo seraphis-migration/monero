@@ -91,6 +91,7 @@ using namespace epee;
 #include "common/dns_utils.h"
 #include "common/notify.h"
 #include "common/perf_timer.h"
+#include "common/power.h"
 #include "ringct/rctSigs.h"
 #include "ringdb.h"
 #include "device/device_cold.hpp"
@@ -7771,6 +7772,32 @@ void wallet2::commit_tx(pending_tx& ptx)
   req.tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(ptx.tx));
   req.do_not_relay = false;
   req.do_sanity_checks = true;
+
+  // Find PoWER solution if necessary.
+  if (!tools::is_local_address(m_daemon_address) && ptx.tx.vin.size() > tools::power::INPUT_THRESHOLD)
+  {
+    MDEBUG("Finding PoWER solution...");
+
+    THROW_WALLET_EXCEPTION_IF(
+      m_blockchain.size() < 1,
+      error::wallet_internal_error,
+      "Wallet does not have block hashes for PoWER input data"
+    );
+
+    const crypto::hash power_block_hash = m_blockchain[m_blockchain.size() - 1];
+    const crypto::hash tx_prefix_hash = cryptonote::get_transaction_prefix_hash(ptx.tx);
+
+    tools::power::solution_data s = tools::power::solve_rpc(
+      tx_prefix_hash,
+      power_block_hash,
+      tools::power::DIFFICULTY
+    );
+
+    req.power_block_hash = epee::string_tools::pod_to_hex(power_block_hash);
+    req.power_solution = epee::string_tools::pod_to_hex(s.solution);
+    req.power_nonce = s.nonce;
+  }
+
   COMMAND_RPC_SEND_RAW_TX::response daemon_send_resp;
 
   {

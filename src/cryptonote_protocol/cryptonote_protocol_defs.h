@@ -88,6 +88,8 @@ namespace cryptonote
 
     uint8_t address_type;
 
+    bool power_enabled;
+
     BEGIN_KV_SERIALIZE_MAP()
       KV_SERIALIZE(incoming)
       KV_SERIALIZE(localhost)
@@ -114,6 +116,7 @@ namespace cryptonote
       KV_SERIALIZE(height)
       KV_SERIALIZE(pruning_seed)
       KV_SERIALIZE(address_type)
+      KV_SERIALIZE(power_enabled)
     END_KV_SERIALIZE_MAP()
   };
 
@@ -455,4 +458,23 @@ namespace cryptonote
     typedef epee::misc_utils::struct_init<request_t> request;
   };
     
+  /************************************************************************/
+  /*                                                                      */
+  /************************************************************************/
+  struct NOTIFY_POWER_SOLUTION
+  {
+    const static int ID = BC_COMMANDS_POOL_BASE + 13;
+
+    struct request_t
+    {
+      std::vector<uint16_t> solution;
+      uint32_t nonce;
+
+      BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE_CONTAINER_POD_AS_BLOB(solution)
+        KV_SERIALIZE(nonce)
+      END_KV_SERIALIZE_MAP()
+    };
+    typedef epee::misc_utils::struct_init<request_t> request;
+  };
 }

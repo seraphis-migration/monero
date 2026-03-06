@@ -168,6 +168,19 @@ namespace nodetool
       KV_SERIALIZE_OPT(support_flags, (uint32_t)0)
     END_KV_SERIALIZE_MAP()
   };
+
+  struct power_challenge_data
+  {
+    uint64_t seed;
+    uint64_t seed_top64;
+    uint32_t difficulty;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(seed)
+      KV_SERIALIZE(seed_top64)
+      KV_SERIALIZE(difficulty)
+    END_KV_SERIALIZE_MAP()
+  };
   
 
 #define P2P_COMMANDS_POOL_BASE 1000
@@ -196,11 +209,13 @@ namespace nodetool
     {
       basic_node_data node_data;
       t_playload_type payload_data;
+      power_challenge_data power_challenge;
       std::vector<peerlist_entry> local_peerlist_new;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(node_data)
         KV_SERIALIZE(payload_data)
+        KV_SERIALIZE(power_challenge)
         KV_SERIALIZE(local_peerlist_new)
       END_KV_SERIALIZE_MAP()
     };

@@ -102,6 +102,7 @@ namespace cryptonote
       HANDLE_NOTIFY_T2(NOTIFY_GET_TXPOOL_COMPLEMENT, &cryptonote_protocol_handler::handle_notify_get_txpool_complement)
       HANDLE_NOTIFY_T2(NOTIFY_TX_POOL_HASH, &cryptonote_protocol_handler::handle_notify_tx_pool_hash)
       HANDLE_NOTIFY_T2(NOTIFY_REQUEST_TX_POOL_TXS, &cryptonote_protocol_handler::handle_request_tx_pool_txs)
+      HANDLE_NOTIFY_T2(NOTIFY_POWER_SOLUTION, &cryptonote_protocol_handler::handle_notify_power_solution)
     END_INVOKE_MAP2()
 
     bool on_idle();
@@ -163,6 +164,7 @@ namespace cryptonote
     int handle_notify_get_txpool_complement(int command, NOTIFY_GET_TXPOOL_COMPLEMENT::request& arg, cryptonote_connection_context& context);
     int handle_notify_tx_pool_hash(int command, NOTIFY_TX_POOL_HASH::request& arg, cryptonote_connection_context& context);
     int handle_request_tx_pool_txs(int command, NOTIFY_REQUEST_TX_POOL_TXS::request& arg, cryptonote_connection_context& context);
+    int handle_notify_power_solution(int command, NOTIFY_POWER_SOLUTION::request& arg, cryptonote_connection_context& context);
 		
     //----------------- i_bc_protocol_layout ---------------------------------------
     virtual bool relay_block(NOTIFY_NEW_FLUFFY_BLOCK::request& arg, cryptonote_connection_context& exclude_context);

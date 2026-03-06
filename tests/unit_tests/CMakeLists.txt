@@ -86,6 +86,7 @@ set(unit_tests_sources
   output_distribution.cpp
   parse_amount.cpp
   pruning.cpp
+  power.cpp
   random.cpp
   request_manager.cpp
   rolling_median.cpp
@@ -148,6 +149,7 @@ target_link_libraries(unit_tests
     wallet
     p2p
     version
+    equix_static
     ${Boost_CHRONO_LIBRARY}
     ${Boost_THREAD_LIBRARY}
     ${GTEST_LIBRARIES}

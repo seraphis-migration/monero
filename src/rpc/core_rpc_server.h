@@ -292,6 +292,29 @@ private:
     bool use_bootstrap_daemon_if_necessary(const invoke_http_mode &mode, const std::string &command_name, const typename COMMAND_TYPE::request& req, typename COMMAND_TYPE::response& res, bool &r);
     bool get_block_template(const account_public_address &address, const crypto::hash *prev_block, const cryptonote::blobdata &extra_nonce, size_t &reserved_offset, cryptonote::difficulty_type &difficulty, uint64_t &height, uint64_t &expected_reward, uint64_t& cumulative_weight, block &b, uint64_t &seed_height, crypto::hash &seed_hash, crypto::hash &next_seed_hash, epee::json_rpc::error &error_resp);
     bool check_payment(const std::string &client, uint64_t payment, const std::string &rpc, bool same_ts, std::string &message, uint64_t &credits, std::string &top_hash);
+
+    /**
+    * @brief Validate PoWER for RPC requests.
+    *
+    * @param txblob        Raw transaction blob from request.
+    * @param block_hash    Hex encoded recent block hash from request.
+    * @param solution      Hex encoded Equi-X solution from request.
+    * @param nonce         Nonce value from request.
+    *
+    * @param restricted    `true` if the endpoint is restricted, otherwise `false`.
+    * @param status        `status` field from request type.
+    *
+    * @return true  – PoW is either not required or the solution is valid.
+    * @return false – an error was detected; `status`, `code`, and `message` should propagate to the RPC response.
+    */
+    bool validate_power(
+      const cryptonote::blobdata& txblob,
+      const std::string& block_hash,
+      const std::string& solution,
+      uint32_t nonce,
+      bool restricted,
+      std::string& status
+    );
     
     core& m_core;
     nodetool::node_server<cryptonote::t_cryptonote_protocol_handler<cryptonote::core> >& m_p2p;

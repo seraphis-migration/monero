@@ -33,6 +33,7 @@
 #include <vector>
 
 #include "byte_stream.h"
+#include "common/power.h"
 #include "message.h"
 #include "cryptonote_protocol/cryptonote_protocol_defs.h"
 #include "rpc/message_data_structs.h"
@@ -167,6 +168,9 @@ END_RPC_MESSAGE_CLASS;
 BEGIN_RPC_MESSAGE_CLASS(SendRawTx);
   BEGIN_RPC_MESSAGE_REQUEST;
     RPC_MESSAGE_MEMBER(cryptonote::transaction, tx);
+    RPC_MESSAGE_MEMBER(crypto::hash, power_block_hash);
+    RPC_MESSAGE_MEMBER(tools::power::solution_array, power_solution);
+    RPC_MESSAGE_MEMBER(uint32_t, power_nonce);
     RPC_MESSAGE_MEMBER(bool, relay);
   END_RPC_MESSAGE_REQUEST;
   BEGIN_RPC_MESSAGE_RESPONSE;
@@ -177,6 +181,9 @@ END_RPC_MESSAGE_CLASS;
 BEGIN_RPC_MESSAGE_CLASS(SendRawTxHex);
   BEGIN_RPC_MESSAGE_REQUEST;
     RPC_MESSAGE_MEMBER(std::string, tx_as_hex);
+    RPC_MESSAGE_MEMBER(crypto::hash, power_block_hash);
+    RPC_MESSAGE_MEMBER(tools::power::solution_array, power_solution);
+    RPC_MESSAGE_MEMBER(uint32_t, power_nonce);
     RPC_MESSAGE_MEMBER(bool, relay);
   END_RPC_MESSAGE_REQUEST;
   using Response = SendRawTx::Response;

@@ -726,12 +726,18 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
     struct request_t: public rpc_access_request_base
     {
       std::string tx_as_hex;
+      std::string power_block_hash;
+      std::string power_solution;
+      uint32_t power_nonce;
       bool do_not_relay;
       bool do_sanity_checks;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_PARENT(rpc_access_request_base)
         KV_SERIALIZE(tx_as_hex)
+        KV_SERIALIZE(power_block_hash)
+        KV_SERIALIZE(power_solution)
+        KV_SERIALIZE(power_nonce)
         KV_SERIALIZE_OPT(do_not_relay, false)
         KV_SERIALIZE_OPT(do_sanity_checks, true)
       END_KV_SERIALIZE_MAP()

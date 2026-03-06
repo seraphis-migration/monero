@@ -21,3 +21,6 @@
 	path = external/mx25519
 	url = https://github.com/jeffro256/mx25519
 	branch = unclamped
+[submodule "external/equix"]
+	path = external/equix
+	url = https://github.com/tevador/equix
