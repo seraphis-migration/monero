@@ -5081,6 +5081,19 @@ bool Blockchain::update_next_cumulative_weight_limit(uint64_t *long_term_effecti
   const uint8_t hf_version = get_current_hard_fork_version();
   const uint64_t full_reward_zone = get_min_block_weight(hf_version);
 
+  // Long-term block weight median window is reduced for stressnet for quicker scaling tests
+  // However, mainnet's long-term block weight window should still be 100,000
+  // https://libera.monerologs.net/monero-research-lab/20260114#c645360
+  const bool use_stressnet_lt_window = m_nettype == network_type::TESTNET;
+  if (use_stressnet_lt_window)
+  {
+    // Always set on stressnet, even before v17, to handle reorgs.
+    // The window should only be reduced after the FCMP++ fork to avoid premature HFs w/ testnet.
+    const bool short_lt_window = hf_version >= HF_VERSION_2026_SCALING;
+    m_long_term_block_weights_window = short_lt_window
+      ? CRYPTONOTE_STRESSNET_BLOCK_WEIGHT_WINDOW_SIZE : CRYPTONOTE_LONG_TERM_BLOCK_WEIGHT_WINDOW_SIZE;
+  }
+
   if (hf_version < HF_VERSION_LONG_TERM_BLOCK_WEIGHT)
   {
     std::vector<uint64_t> weights;
