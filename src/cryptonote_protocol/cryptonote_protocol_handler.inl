@@ -736,7 +736,7 @@ namespace cryptonote
         need_tx_indices.reserve(new_block.tx_hashes.size());
 
         // Collect need_tx_indices by polling blockchain storage and mempool storage
-        for (size_t tx_idx = 0; tx_idx < new_block.tx_hashes.size(); ++tx_idx)
+        for (size_t tx_idx = 0; tx_idx < new_block.tx_hashes.size() && need_tx_indices.size() < MAX_FLUFFY_MISSING_TX_REQUEST_COUNT; ++tx_idx)
         {
           const crypto::hash &tx_hash = new_block.tx_hashes[tx_idx];
 
@@ -752,7 +752,7 @@ namespace cryptonote
         }
 
         // Make request form
-        MDEBUG("We are missing " << need_tx_indices.size() << " txes for this fluffy block");
+        MDEBUG("We are missing at least " << need_tx_indices.size() << " txes for this fluffy block");
         for (auto txidx: need_tx_indices)
           MDEBUG("  tx " << new_block.tx_hashes[txidx]);
         NOTIFY_REQUEST_FLUFFY_MISSING_TX::request missing_tx_req;
@@ -865,6 +865,10 @@ namespace cryptonote
         drop_connection(context, false, false);
         return 1;
       }
+
+      // Older daemons might exceed the max count
+      if (txids.size() >= MAX_FLUFFY_MISSING_TX_REQUEST_COUNT)
+        break;
     }    
 
     std::vector<cryptonote::transaction> txs;
