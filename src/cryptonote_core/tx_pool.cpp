@@ -271,6 +271,8 @@ namespace cryptonote
         LOG_PRINT_L1("tx used wrong inputs, rejected");
         tvc.m_verifivation_failed = true;
         tvc.m_invalid_input = true;
+        if (tvc.m_double_spend)
+          tvc.m_no_drop_offense = true;
         return false;
       }
     }else
