@@ -2846,7 +2846,7 @@ static bool batch_verify_fcmp_pp_txs(const BlockchainDB *db,
   return true;
 }
 //------------------------------------------------------------------
-static void handle_fcmp_tree(BlockchainDB *db, const uint64_t block_idx, const uint64_t first_unified_id, const std::vector<std::reference_wrapper<const transaction>> &tx_refs, const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments)
+void cryptonote::handle_fcmp_tree(BlockchainDB *db, const uint64_t block_idx, const uint64_t first_unified_id, const std::vector<std::reference_wrapper<const transaction>> &tx_refs, const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments)
 {
   // Collect outs by last locked block to add to the db
   OutsByLastLockedBlockMeta new_locked_outs = cryptonote::get_outs_by_last_locked_block(tx_refs, transparent_amount_commitments, first_unified_id, block_idx);

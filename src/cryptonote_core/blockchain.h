@@ -72,6 +72,12 @@ namespace cryptonote
   class tx_memory_pool;
   struct test_options;
 
+  void handle_fcmp_tree(BlockchainDB *db,
+      uint64_t block_idx,
+      uint64_t first_unified_id,
+      const std::vector<std::reference_wrapper<const transaction>> &tx_refs,
+      const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments);
+
   /** Declares ways in which the BlockchainDB backend should be told to sync
    *
    */
