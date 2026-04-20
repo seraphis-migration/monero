@@ -7107,6 +7107,7 @@ void BlockchainLMDB::migrate_5_6()
 
       i = 0;
       const uint64_t n_outputs = this->num_outputs();
+      std::size_t progress_width = 0;
       MDB_cursor_op op = MDB_FIRST;
       while (1)
       {
@@ -7117,7 +7118,10 @@ void BlockchainLMDB::migrate_5_6()
             LOGIF(el::Level::Info)
             {
               const uint64_t percent = std::min((i * 100) / n_outputs, (uint64_t)99);
-              std::cout << i << " / " << n_outputs << " outputs (" << percent << "% of step 1/2)\r" << std::flush;
+              const std::string progress_line = std::to_string(i) + " / " + std::to_string(n_outputs) +
+                " outputs (" + std::to_string(percent) + "% of step 1/2)";
+              std::cout << '\r' << std::string(progress_width, ' ') << '\r' << progress_line << std::flush;
+              progress_width = std::max(progress_width, progress_line.size());
             }
 
             // Update last output read
@@ -7206,8 +7210,8 @@ void BlockchainLMDB::migrate_5_6()
           if (result)
             throw0(DB_ERROR(lmdb_error("Failed to update max output id: ", result).c_str()));
 
-          if (i)
-            std::cout << "\r                                                           \r" << std::flush; // erase the % print
+          if (progress_width)
+            std::cout << '\r' << std::string(progress_width, ' ') << '\r' << std::flush;
           //std::cout << "  150000000 / 150000000 outputs (100% of step 1/2)\r" << std::flush; // just showing that chars are erased effectively
           batch_stop();
           break;
@@ -7313,6 +7317,7 @@ void BlockchainLMDB::migrate_5_6()
 
       i = 0;
       const uint64_t n_blocks = height();
+      std::size_t progress_width = 0;
       while (i < n_blocks)
       {
         if (!(i % BATCH_SIZE))
@@ -7322,7 +7327,10 @@ void BlockchainLMDB::migrate_5_6()
             LOGIF(el::Level::Info)
             {
               const uint64_t percent = std::min((i * 100) / n_blocks, (uint64_t)99);
-              std::cout << i << " / " << n_blocks << " blocks (" << percent << "% of step 2/2)\r" << std::flush;
+              const std::string progress_line = std::to_string(i) + " / " + std::to_string(n_blocks) +
+                " blocks (" + std::to_string(percent) + "% of step 2/2)";
+              std::cout << '\r' << std::string(progress_width, ' ') << '\r' << progress_line << std::flush;
+              progress_width = std::max(progress_width, progress_line.size());
             }
 
             batch_stop();
@@ -7373,8 +7381,8 @@ void BlockchainLMDB::migrate_5_6()
 
         ++i;
         if (i == n_blocks)
-          std::cout << "\r                                                           \r" << std::flush; // erase the % print
-        //std::cout << "  3000000 / 3000000 blocks (100% of step 2/2)\r" << std::flush; // just showing that chars are erased effectively
+          if (progress_width)
+            std::cout << '\r' << std::string(progress_width, ' ') << '\r' << std::flush;
       }
       batch_stop();
     }
