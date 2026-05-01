@@ -936,67 +936,17 @@ cryptonote::transaction finalize_fcmps_and_range_proofs(
             "FCMP path c2 layers mismatch");
     }
     const size_t n_tree_layers = first_fcmp_path.c1_layers.size() + first_fcmp_path.c2_layers.size();
-    const bool root_is_c1 = n_tree_layers % 2 == 1;
-    const size_t num_c1_blinds = first_fcmp_path.c1_layers.size() - size_t(root_is_c1);
-    const size_t num_c2_blinds = first_fcmp_path.c2_layers.size() - size_t(!root_is_c1);
-    LOG_PRINT_L3("n_tree_layers: " << n_tree_layers);
-    LOG_PRINT_L3("num_c1_blinds: " << num_c1_blinds);
-    LOG_PRINT_L3("num_c2_blinds: " << num_c2_blinds);
 
-    // start threadpool and waiter
-    tools::threadpool& tpool = tools::threadpool::getInstanceForCompute();
-    tools::threadpool::waiter pre_membership_waiter(tpool);
-
-    LOG_PRINT_L3("Starting proof jobs...");
-    LOG_PRINT_L3("Will submit a total of " << n_inputs * (4 + num_c1_blinds + num_c2_blinds) << " blind calculations");
-
-    // Submit blinds calculation jobs
-    std::vector<fcmp_pp::BlindedOBlind> blinded_o_blinds(n_inputs);
-    std::vector<fcmp_pp::BlindedIBlind> blinded_i_blinds(n_inputs);
-    std::vector<fcmp_pp::BlindedIBlindBlind> blinded_i_blind_blinds(n_inputs);
-    std::vector<fcmp_pp::BlindedCBlind> blinded_c_blinds(n_inputs);
-
-    std::vector<fcmp_pp::SeleneBranchBlind> flat_selene_branch_blinds(num_c1_blinds * n_inputs);
-    std::vector<fcmp_pp::HeliosBranchBlind> flat_helios_branch_blinds(num_c2_blinds * n_inputs);
-    for (size_t i = 0; i < n_inputs; ++i)
-    {
-        const FcmpRerandomizedOutputCompressed &rerandomized_output = sorted_rerandomized_outputs.at(i);
-        tpool.submit(&pre_membership_waiter, [&rerandomized_output, &blinded_o_blinds, i]() {
-            PERF_TIMER(blind_o_blind);
-            blinded_o_blinds[i] = fcmp_pp::blind_o_blind(fcmp_pp::o_blind(rerandomized_output));});
-        tpool.submit(&pre_membership_waiter, [&rerandomized_output, &blinded_i_blinds, i]() {
-            PERF_TIMER(blind_i_blind);
-            blinded_i_blinds[i] = fcmp_pp::blind_i_blind(fcmp_pp::i_blind(rerandomized_output));});
-        tpool.submit(&pre_membership_waiter, [&rerandomized_output, &blinded_i_blind_blinds, i]() {
-            PERF_TIMER(blind_i_blind_blind);
-            blinded_i_blind_blinds[i] = fcmp_pp::blind_i_blind_blind(fcmp_pp::i_blind_blind(rerandomized_output));});
-        tpool.submit(&pre_membership_waiter, [&rerandomized_output, &blinded_c_blinds, i]() {
-            PERF_TIMER(blind_c_blind);
-            blinded_c_blinds[i] = fcmp_pp::blind_c_blind(fcmp_pp::c_blind(rerandomized_output));});
-        for (size_t j = 0; j < num_c1_blinds; ++j)
-        {
-            tpool.submit(&pre_membership_waiter, [&flat_selene_branch_blinds, num_c1_blinds, i, j]() {
-                PERF_TIMER(selene_branch_blind);
-                flat_selene_branch_blinds[(i * num_c1_blinds) + j] = fcmp_pp::gen_selene_branch_blind();});
-        }
-        for (size_t j = 0; j < num_c2_blinds; ++j)
-        {
-            tpool.submit(&pre_membership_waiter, [&flat_helios_branch_blinds, num_c2_blinds, i, j]() {
-                PERF_TIMER(helios_branch_blind);
-                flat_helios_branch_blinds[(i * num_c2_blinds) + j] = fcmp_pp::gen_helios_branch_blind();});
-        }
-    }
-
-    // Submit BP+ job
+    // Prove BP+ range on outputs
     rct::BulletproofPlus bpp;
-    tpool.submit(&pre_membership_waiter, [&output_enote_proposals, &output_amount_blinding_factors, &bpp]() {
+    {
         PERF_TIMER(bulletproof_plus_PROVE);
         std::vector<rct::xmr_amount> output_amounts;
         output_amounts.reserve(output_enote_proposals.size());
         for (const carrot::RCTOutputEnoteProposal &output_enote_proposal : output_enote_proposals)
             output_amounts.push_back(output_enote_proposal.amount);
         bpp = rct::bulletproof_plus_PROVE(output_amounts, output_amount_blinding_factors);
-    });
+    }
 
     const uint64_t n_tree_synced_blocks = tree_cache.n_synced_blocks();
     CHECK_AND_ASSERT_THROW_MES(n_tree_synced_blocks > 0,
@@ -1038,51 +988,12 @@ cryptonote::transaction finalize_fcmps_and_range_proofs(
         fee,
         encrypted_payment_id);
 
-    // wait for pre-membership jobs to complete
-    LOG_PRINT_L3("Waiting on jobs...");
-    CHECK_AND_ASSERT_THROW_MES(pre_membership_waiter.wait(),
-        "some prove jobs failed");
-
-    // collect FCMP Rust API proving structures
-    std::vector<fcmp_pp::FcmpPpProveMembershipInput> membership_proving_inputs;
-    membership_proving_inputs.reserve(n_inputs);
-    for (size_t i = 0; i < n_inputs; ++i)
-    {
-        const fcmp_pp::Path &path_rust = fcmp_paths_rust.at(i);
-        const fcmp_pp::OutputBlinds output_blinds = fcmp_pp::output_blinds_new(
-            blinded_o_blinds.at(i),
-            blinded_i_blinds.at(i),
-            blinded_i_blind_blinds.at(i),
-            blinded_c_blinds.at(i));
-
-        std::vector<fcmp_pp::SeleneBranchBlind> selene_branch_blinds;
-        for (size_t j = 0; j < num_c1_blinds; ++j)
-        {
-            const size_t flat_idx = (i * num_c1_blinds) + j;
-            selene_branch_blinds.emplace_back(std::move(flat_selene_branch_blinds.at(flat_idx)));
-        }
-
-        std::vector<fcmp_pp::HeliosBranchBlind> helios_branch_blinds;
-        for (size_t j = 0; j < num_c2_blinds; ++j)
-        {
-            const size_t flat_idx = (i * num_c2_blinds) + j;
-            helios_branch_blinds.emplace_back(std::move(flat_helios_branch_blinds.at(flat_idx)));
-        }
-
-        membership_proving_inputs.push_back(fcmp_pp::fcmp_pp_prove_input_new(
-            path_rust,
-            output_blinds,
-            selene_branch_blinds,
-            helios_branch_blinds));
-    }
-
     // prove membership
-    PERF_TIMER(prove_membership);
-    const fcmp_pp::FcmpMembershipProof membership_proof = fcmp_pp::prove_membership(membership_proving_inputs,
-        n_tree_layers);
-    PERF_TIMER_PAUSE(prove_membership);
-    CHECK_AND_ASSERT_THROW_MES(membership_proof.size() == fcmp_pp::membership_proof_len(n_inputs, n_tree_layers),
-        "unexpected FCMP membership proof length");
+    fcmp_pp::FcmpMembershipProof membership_proof;
+    carrot::generate_fcmp_blinds_and_prove_membership(epee::to_span(sorted_rerandomized_outputs),
+        epee::to_span(fcmp_paths_rust),
+        n_tree_layers,
+        membership_proof);
 
     // store proofs
     tx.rct_signatures.p = carrot::store_fcmp_proofs_to_rct_prunable_v1(std::move(bpp),
@@ -1240,18 +1151,12 @@ cryptonote::transaction finalize_all_fcmp_pp_proofs(
         input_amount_blinding_factors,
         output_amount_blinding_factors,
         rerandomized_outputs);
-    std::unordered_map<crypto::public_key, FcmpRerandomizedOutputCompressed> rerandomized_outputs_by_ota;
-    for (std::size_t input_idx = 0; input_idx < rerandomized_outputs.size(); ++input_idx)
-    {
-        const crypto::public_key onetime_address = onetime_address_ref(tx_proposal.input_proposals.at(input_idx));
-        rerandomized_outputs_by_ota[onetime_address] = rerandomized_outputs.at(input_idx);
-    }
 
     // call spend device to do SA/L proofs for each input
     crypto::hash signable_tx_hash;
     carrot::spend_device::signed_input_set_t signed_inputs;
     const bool sign_success = spend_dev.try_sign_carrot_transaction_proposal_v1(tx_proposal,
-        rerandomized_outputs_by_ota,
+        rerandomized_outputs,
         signable_tx_hash,
         signed_inputs);
     CHECK_AND_ASSERT_THROW_MES(sign_success, "Device declined to sign inputs");

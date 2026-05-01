@@ -34,19 +34,22 @@
 #include "carrot_core/output_set_finalization.h"
 #include "carrot_core/payment_proposal.h"
 #include "carrot_impl/format_utils.h"
+#include "carrot_impl/input_selection.h"
+#include "carrot_impl/knowledge_proofs.h"
 #include "carrot_impl/multi_tx_proposal_utils.h"
 #include "carrot_impl/tx_builder_outputs.h"
 #include "carrot_impl/tx_proposal_utils.h"
-#include "carrot_impl/input_selection.h"
 #include "carrot_mock_helpers.h"
 #include "crypto/generators.h"
 #include "cryptonote_basic/account.h"
 #include "cryptonote_basic/subaddress_index.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_core/blockchain.h"
+#include "enote_utils.h"
 #include "ringct/bulletproofs_plus.h"
 #include "ringct/rctOps.h"
 #include "ringct/rctSigs.h"
+#include "scan.h"
 
 using namespace carrot;
 
@@ -1843,5 +1846,240 @@ TEST(carrot_impl, make_multiple_carrot_transaction_proposals_sweep_1)
         }
         EXPECT_EQ(n_input_enote_amounts, seen_ota.size());
     }
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(carrot_impl, tx_proof_main_address_normal)
+{
+    CarrotDestinationV1 main_address;
+    {
+        mock::mock_carrot_and_legacy_keys bob;
+        bob.generate();
+        main_address = bob.cryptonote_address();
+    }
+
+    const CarrotPaymentProposalV1 proposal = CarrotPaymentProposalV1{
+        .destination = main_address,
+        .amount = crypto::rand<rct::xmr_amount>(),
+        .randomness = gen_janus_anchor()
+    };
+
+    const crypto::key_image tx_first_key_image = rct::rct2ki(rct::pkGen()); 
+    const input_context_t input_context = make_carrot_input_context(tx_first_key_image);
+
+    RCTOutputEnoteProposal enote_proposal;
+    encrypted_payment_id_t encrypted_payment_id;
+    get_output_proposal_normal_v1(proposal,
+        tx_first_key_image,
+        enote_proposal,
+        encrypted_payment_id);
+
+    ASSERT_EQ(proposal.amount, enote_proposal.amount);
+    const rct::key recomputed_amount_commitment = rct::commit(enote_proposal.amount, rct::sk2rct(enote_proposal.amount_blinding_factor));
+    ASSERT_EQ(enote_proposal.enote.amount_commitment, recomputed_amount_commitment);
+
+    // d_e = H_n(anchor_norm, input_context, K^j_s, pid))
+    const crypto::secret_key enote_ephemeral_privkey = get_enote_ephemeral_privkey(proposal, input_context);
+
+    // s_sr = d_e ConvertPointE(K^j_v)
+    mx25519_pubkey s_sender_receiver_unctx;
+    try_make_carrot_shared_key_sender(enote_ephemeral_privkey,
+        main_address.address_view_pubkey,
+        s_sender_receiver_unctx);
+
+    const crypto::hash prefix_hash = crypto::rand<crypto::hash>();
+
+    // prove
+    crypto::signature tx_proof;
+    generate_carrot_tx_proof_normal(prefix_hash, main_address.address_view_pubkey,
+        std::nullopt, enote_ephemeral_privkey, tx_proof);
+
+    // verify
+    EXPECT_TRUE(check_carrot_tx_proof_normal(prefix_hash, enote_proposal.enote.enote_ephemeral_pubkey,
+        main_address.address_view_pubkey, std::nullopt, s_sender_receiver_unctx, tx_proof));
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(carrot_impl, tx_proof_subaddress_normal)
+{
+    CarrotDestinationV1 subaddress;
+    {
+        mock::mock_carrot_and_legacy_keys bob;
+        bob.generate();
+        subaddress = bob.subaddress(mock::gen_subaddress_index_extended());
+    }
+
+    const CarrotPaymentProposalV1 proposal = CarrotPaymentProposalV1{
+        .destination = subaddress,
+        .amount = crypto::rand<rct::xmr_amount>(),
+        .randomness = gen_janus_anchor()
+    };
+
+    const crypto::key_image tx_first_key_image = rct::rct2ki(rct::pkGen()); 
+    const input_context_t input_context = make_carrot_input_context(tx_first_key_image);
+
+    RCTOutputEnoteProposal enote_proposal;
+    encrypted_payment_id_t encrypted_payment_id;
+    get_output_proposal_normal_v1(proposal,
+        tx_first_key_image,
+        enote_proposal,
+        encrypted_payment_id);
+
+    ASSERT_EQ(proposal.amount, enote_proposal.amount);
+    const rct::key recomputed_amount_commitment = rct::commit(enote_proposal.amount, rct::sk2rct(enote_proposal.amount_blinding_factor));
+    ASSERT_EQ(enote_proposal.enote.amount_commitment, recomputed_amount_commitment);
+
+    // d_e = H_n(anchor_norm, input_context, K^j_s, pid))
+    const crypto::secret_key enote_ephemeral_privkey = get_enote_ephemeral_privkey(proposal, input_context);
+
+    // s_sr = d_e ConvertPointE(K^j_v)
+    mx25519_pubkey s_sender_receiver_unctx;
+    try_make_carrot_shared_key_sender(enote_ephemeral_privkey,
+        subaddress.address_view_pubkey,
+        s_sender_receiver_unctx);
+
+    const crypto::hash prefix_hash = crypto::rand<crypto::hash>();
+
+    // prove
+    crypto::signature tx_proof;
+    generate_carrot_tx_proof_normal(prefix_hash, subaddress.address_view_pubkey,
+        subaddress.address_spend_pubkey, enote_ephemeral_privkey, tx_proof);
+
+    // verify
+    EXPECT_TRUE(check_carrot_tx_proof_normal(prefix_hash, enote_proposal.enote.enote_ephemeral_pubkey,
+        subaddress.address_view_pubkey, subaddress.address_spend_pubkey, s_sender_receiver_unctx, tx_proof));
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(carrot_impl, tx_proof_coinbase)
+{
+    CarrotDestinationV1 main_address;
+    {
+        mock::mock_carrot_and_legacy_keys bob;
+        bob.generate();
+        main_address = bob.cryptonote_address();
+    }
+
+    const CarrotPaymentProposalV1 proposal = CarrotPaymentProposalV1{
+        .destination = main_address,
+        .amount = crypto::rand<rct::xmr_amount>(),
+        .randomness = gen_janus_anchor()
+    };
+
+    const std::uint64_t block_index = mock::gen_block_index();
+    const input_context_t input_context = make_carrot_input_context_coinbase(block_index);
+
+    CarrotCoinbaseEnoteV1 enote;
+    get_coinbase_enote_v1(proposal,
+        block_index,
+        enote);
+
+    // d_e = H_n(anchor_norm, input_context, K^j_s, pid))
+    const crypto::secret_key enote_ephemeral_privkey = get_enote_ephemeral_privkey(proposal, input_context);
+
+    // s_sr = d_e ConvertPointE(K^j_v)
+    mx25519_pubkey s_sender_receiver_unctx;
+    try_make_carrot_shared_key_sender(enote_ephemeral_privkey,
+        main_address.address_view_pubkey,
+        s_sender_receiver_unctx);
+
+    const crypto::hash prefix_hash = crypto::rand<crypto::hash>();
+
+    // prove
+    crypto::signature tx_proof;
+    generate_carrot_tx_proof_normal(prefix_hash, main_address.address_view_pubkey,
+        std::nullopt, enote_ephemeral_privkey, tx_proof);
+
+    // verify
+    EXPECT_TRUE(check_carrot_tx_proof_normal(prefix_hash, enote.enote_ephemeral_pubkey,
+        main_address.address_view_pubkey, std::nullopt, s_sender_receiver_unctx, tx_proof));
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(carrot_impl, tx_proof_main_address_special)
+{
+    mock::mock_carrot_and_legacy_keys bob;
+    bob.generate();
+    const CarrotDestinationV1 main_address = bob.cryptonote_address();
+
+    const CarrotPaymentProposalSelfSendV1 proposal{
+        .destination_address_spend_pubkey = main_address.address_spend_pubkey,
+        .amount = crypto::rand<rct::xmr_amount>(),
+        .enote_type = CarrotEnoteType::CHANGE,
+        .enote_ephemeral_pubkey = gen_x25519_pubkey()
+    };
+
+    const crypto::key_image tx_first_key_image = rct::rct2ki(rct::pkGen());
+
+    RCTOutputEnoteProposal enote_proposal;
+    get_output_proposal_special_v1(proposal,
+        bob.k_view_incoming_dev,
+        tx_first_key_image,
+        /*other_enote_ephemeral_pubkey=*/{},
+        enote_proposal);
+
+    ASSERT_EQ(proposal.amount, enote_proposal.amount);
+    const rct::key recomputed_amount_commitment = rct::commit(enote_proposal.amount, rct::sk2rct(enote_proposal.amount_blinding_factor));
+    ASSERT_EQ(enote_proposal.enote.amount_commitment, recomputed_amount_commitment);
+
+    // s_sr = d_e ConvertPointE(K^j_v)
+    mx25519_pubkey s_sender_receiver_unctx;
+    try_make_carrot_shared_key_receiver(bob.k_view_incoming_dev,
+        enote_proposal.enote.enote_ephemeral_pubkey,
+        s_sender_receiver_unctx);
+
+    const crypto::hash prefix_hash = crypto::rand<crypto::hash>();
+
+    // prove
+    crypto::signature tx_proof;
+    generate_carrot_tx_proof_receiver(prefix_hash,
+        enote_proposal.enote.enote_ephemeral_pubkey,
+        std::nullopt,
+        bob.legacy_acb.get_keys().m_view_secret_key,
+        tx_proof);
+
+    // verify
+    EXPECT_TRUE(check_carrot_tx_proof_receiver(prefix_hash, enote_proposal.enote.enote_ephemeral_pubkey,
+        main_address.address_view_pubkey, std::nullopt, s_sender_receiver_unctx, tx_proof));
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(carrot_impl, tx_proof_subaddress_special)
+{
+    mock::mock_carrot_and_legacy_keys bob;
+    bob.generate();
+    const CarrotDestinationV1 subaddress = bob.subaddress(mock::gen_subaddress_index_extended());
+
+    const CarrotPaymentProposalSelfSendV1 proposal{
+        .destination_address_spend_pubkey = subaddress.address_spend_pubkey,
+        .amount = crypto::rand<rct::xmr_amount>(),
+        .enote_type = CarrotEnoteType::CHANGE,
+        .enote_ephemeral_pubkey = gen_x25519_pubkey()
+    };
+
+    const crypto::key_image tx_first_key_image = rct::rct2ki(rct::pkGen()); 
+
+    RCTOutputEnoteProposal enote_proposal;
+    get_output_proposal_special_v1(proposal,
+        bob.k_view_incoming_dev,
+        tx_first_key_image,
+        /*other_enote_ephemeral_pubkey=*/{},
+        enote_proposal);
+
+    ASSERT_EQ(proposal.amount, enote_proposal.amount);
+    const rct::key recomputed_amount_commitment = rct::commit(enote_proposal.amount, rct::sk2rct(enote_proposal.amount_blinding_factor));
+    ASSERT_EQ(enote_proposal.enote.amount_commitment, recomputed_amount_commitment);
+
+    // s_sr = d_e ConvertPointE(K^j_v)
+    mx25519_pubkey s_sender_receiver_unctx;
+    try_make_carrot_shared_key_receiver(bob.k_view_incoming_dev,
+        enote_proposal.enote.enote_ephemeral_pubkey,
+        s_sender_receiver_unctx);
+
+    const crypto::hash prefix_hash = crypto::rand<crypto::hash>();
+
+    // prove
+    crypto::signature tx_proof;
+    generate_carrot_tx_proof_receiver(prefix_hash, enote_proposal.enote.enote_ephemeral_pubkey,
+        subaddress.address_spend_pubkey, bob.legacy_acb.get_keys().m_view_secret_key, tx_proof);
+
+    // verify
+    EXPECT_TRUE(check_carrot_tx_proof_receiver(prefix_hash, enote_proposal.enote.enote_ephemeral_pubkey,
+        subaddress.address_view_pubkey, subaddress.address_spend_pubkey, s_sender_receiver_unctx, tx_proof));
 }
 //----------------------------------------------------------------------------------------------------------------------

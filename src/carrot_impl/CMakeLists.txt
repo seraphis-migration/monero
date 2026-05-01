@@ -34,6 +34,8 @@ set(carrot_impl_sources
   input_selection.cpp
   key_image_device_composed.cpp
   key_image_device_precomputed.cpp
+  knowledge_proof_device_ram_borrowed.cpp
+  knowledge_proofs.cpp
   multi_tx_proposal_utils.cpp
   output_opening_types.cpp
   spend_device_ram_borrowed.cpp

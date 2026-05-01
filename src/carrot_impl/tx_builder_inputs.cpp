@@ -34,8 +34,11 @@
 #include "carrot_core/address_utils.h"
 #include "carrot_core/config.h"
 #include "carrot_core/enote_utils.h"
+#include "carrot_core/exceptions.h"
 #include "carrot_core/scan.h"
 #include "carrot_impl/address_utils.h"
+#include "common/perf_timer.h"
+#include "common/threadpool.h"
 #include "crypto/generators.h"
 #include "fcmp_pp/prove.h"
 #include "misc_log_ex.h"
@@ -47,7 +50,7 @@
 #include <algorithm>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
-#define MONERO_DEFAULT_LOG_CATEGORY "carrot_impl"
+#define MONERO_DEFAULT_LOG_CATEGORY "carrot_impl.tx_builder_inputs"
 
 namespace carrot
 {
@@ -320,6 +323,137 @@ void make_sal_proof_any_to_hybrid_v1(const crypto::hash &signable_tx_hash,
         s_view_balance_dev,
         sal_proof_out,
         key_image_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void generate_fcmp_blinds(
+    const epee::span<const FcmpRerandomizedOutputCompressed> rerandomized_outputs,
+    const epee::span<fcmp_pp::OutputBlinds> &output_blinds_out,
+    const epee::span<fcmp_pp::SeleneBranchBlind> &selene_branch_blinds_out,
+    const epee::span<fcmp_pp::HeliosBranchBlind> &helios_branch_blinds_out)
+{
+    CARROT_CHECK_AND_THROW(rerandomized_outputs.size() == output_blinds_out.size(),
+        carrot_logic_error, "Wrong size of output span output_blinds_out");
+
+    // start threadpool and waiter
+    tools::threadpool& tpool = tools::threadpool::getInstanceForCompute();
+    tools::threadpool::waiter waiter(tpool);
+
+    LOG_PRINT_L3("Starting FCMP blind jobs...");
+    const std::size_t n_outputs = output_blinds_out.size();
+    const std::size_t n_jobs = 4 * n_outputs + selene_branch_blinds_out.size() + helios_branch_blinds_out.size();
+    LOG_PRINT_L3("Will submit a total of " << n_jobs << " blind calculations");
+
+    // Submit blinds calculation jobs
+    std::vector<fcmp_pp::BlindedOBlind> blinded_o_blinds(n_outputs);
+    std::vector<fcmp_pp::BlindedIBlind> blinded_i_blinds(n_outputs);
+    std::vector<fcmp_pp::BlindedIBlindBlind> blinded_i_blind_blinds(n_outputs);
+    std::vector<fcmp_pp::BlindedCBlind> blinded_c_blinds(n_outputs);
+
+    for (size_t i = 0; i < n_outputs; ++i)
+    {
+        const FcmpRerandomizedOutputCompressed &rerandomized_output = rerandomized_outputs[i];
+        tpool.submit(&waiter, [&rerandomized_output, &blinded_o_blinds, i]() {
+            PERF_TIMER(blind_o_blind);
+            blinded_o_blinds[i] = fcmp_pp::blind_o_blind(fcmp_pp::o_blind(rerandomized_output));});
+        tpool.submit(&waiter, [&rerandomized_output, &blinded_i_blinds, i]() {
+            PERF_TIMER(blind_i_blind);
+            blinded_i_blinds[i] = fcmp_pp::blind_i_blind(fcmp_pp::i_blind(rerandomized_output));});
+        tpool.submit(&waiter, [&rerandomized_output, &blinded_i_blind_blinds, i]() {
+            PERF_TIMER(blind_i_blind_blind);
+            blinded_i_blind_blinds[i] = fcmp_pp::blind_i_blind_blind(fcmp_pp::i_blind_blind(rerandomized_output));});
+        tpool.submit(&waiter, [&rerandomized_output, &blinded_c_blinds, i]() {
+            PERF_TIMER(blind_c_blind);
+            blinded_c_blinds[i] = fcmp_pp::blind_c_blind(fcmp_pp::c_blind(rerandomized_output));});
+    }
+
+    for (fcmp_pp::SeleneBranchBlind &selene_branch_blind : selene_branch_blinds_out)
+    {
+        tpool.submit(&waiter, [&selene_branch_blind]() {
+            PERF_TIMER(selene_branch_blind);
+            selene_branch_blind = fcmp_pp::gen_selene_branch_blind();
+        });
+    }
+
+    for (fcmp_pp::HeliosBranchBlind &helios_branch_blind : helios_branch_blinds_out)
+    {
+        tpool.submit(&waiter, [&helios_branch_blind]() {
+            PERF_TIMER(helios_branch_blind);
+            helios_branch_blind = fcmp_pp::gen_helios_branch_blind();
+        });
+    }
+
+    // wait for jobs to complete
+    LOG_PRINT_L3("Waiting onDCMP blind jobs...");
+    CHECK_AND_ASSERT_THROW_MES(waiter.wait(), "some FCMP blind jobs failed");
+
+    for (size_t i = 0; i < n_outputs; ++i)
+    {
+        output_blinds_out[i] = fcmp_pp::output_blinds_new(
+            blinded_o_blinds.at(i),
+            blinded_i_blinds.at(i),
+            blinded_i_blind_blinds.at(i),
+            blinded_c_blinds.at(i));
+    }
+}
+//-------------------------------------------------------------------------------------------------------------------
+void generate_fcmp_blinds_and_prove_membership(
+    epee::span<const FcmpRerandomizedOutputCompressed> rerandomized_outputs,
+    epee::span<const fcmp_pp::Path> paths,
+    const std::uint8_t n_tree_layers,
+    fcmp_pp::FcmpMembershipProof &membership_proof_out)
+{
+    const std::size_t n_inputs = rerandomized_outputs.size();
+    CARROT_CHECK_AND_THROW(paths.size() == n_inputs, carrot_logic_error, "Wrong size of span paths");
+
+    CARROT_CHECK_AND_THROW(n_tree_layers > 0, carrot_logic_error, "n_tree_layers must be non-zero");
+    CARROT_CHECK_AND_THROW(n_tree_layers <= FCMP_PLUS_PLUS_MAX_LAYERS,
+        carrot_logic_error, "n_tree_layers must be less than or equal to FCMP_PLUS_PLUS_MAX_LAYERS");
+
+    const std::uint8_t n_c1_blinds = n_tree_layers / 2;       // per-input, not total
+    const std::uint8_t n_c2_blinds = (n_tree_layers - 1) / 2; // per-input, not total
+
+    std::vector<fcmp_pp::OutputBlinds> output_blinds(n_inputs);
+    std::vector<fcmp_pp::SeleneBranchBlind> selene_branch_blinds(n_inputs * n_c1_blinds);
+    std::vector<fcmp_pp::HeliosBranchBlind> helios_branch_blinds(n_inputs * n_c2_blinds);
+    generate_fcmp_blinds(rerandomized_outputs,
+        epee::to_mut_span(output_blinds),
+        epee::to_mut_span(selene_branch_blinds),
+        epee::to_mut_span(helios_branch_blinds));
+
+    std::vector<fcmp_pp::SeleneBranchBlind> selene_branch_blinds_tmp;
+    selene_branch_blinds_tmp.reserve(n_c1_blinds);
+    std::vector<fcmp_pp::HeliosBranchBlind> helios_branch_blinds_tmp;
+    helios_branch_blinds_tmp.reserve(n_c2_blinds);
+    std::vector<fcmp_pp::FcmpPpProveMembershipInput> membership_proving_inputs;
+    membership_proving_inputs.reserve(n_inputs);
+    for (size_t i = 0; i < n_inputs; ++i)
+    {
+        selene_branch_blinds_tmp.clear();
+        for (size_t j = 0; j < n_c1_blinds; ++j)
+        {
+            const size_t flat_idx = (i * n_c1_blinds) + j;
+            selene_branch_blinds_tmp.emplace_back(std::move(selene_branch_blinds.at(flat_idx)));
+        }
+
+        helios_branch_blinds_tmp.clear();
+        for (size_t j = 0; j < n_c2_blinds; ++j)
+        {
+            const size_t flat_idx = (i * n_c2_blinds) + j;
+            helios_branch_blinds_tmp.emplace_back(std::move(helios_branch_blinds.at(flat_idx)));
+        }
+
+        membership_proving_inputs.push_back(fcmp_pp::fcmp_pp_prove_input_new(
+            paths[i],
+            output_blinds.at(i),
+            selene_branch_blinds_tmp,
+            helios_branch_blinds_tmp));
+    }
+
+    PERF_TIMER(prove_membership);
+    membership_proof_out = fcmp_pp::prove_membership(membership_proving_inputs, n_tree_layers);
+    PERF_TIMER_PAUSE(prove_membership);
+    CARROT_CHECK_AND_THROW(membership_proof_out.size() == fcmp_pp::membership_proof_len(n_inputs, n_tree_layers),
+        carrot_logic_error, "unexpected FCMP membership proof length");
 }
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace carrot

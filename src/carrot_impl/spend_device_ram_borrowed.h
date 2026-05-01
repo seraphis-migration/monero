@@ -38,13 +38,17 @@
 //standard headers
 
 //forward declarations
+namespace carrot
+{
+struct cryptonote_view_incoming_key_device;
+}
 
 namespace carrot
 {
 class spend_device_ram_borrowed: public spend_device
 {
 public:
-    /// @brief device composed (except k_s, k_ps, k_gi)
+    /// @brief device composed, carrot XOR legacy, plus ram-borrowed G/T openings to K_s
     spend_device_ram_borrowed(std::shared_ptr<view_incoming_key_device> k_view_incoming_dev,
         std::shared_ptr<view_balance_secret_device> s_view_balance_dev,
         std::shared_ptr<address_device> address_dev,
@@ -55,7 +59,7 @@ public:
     spend_device_ram_borrowed(const crypto::secret_key &k_spend, const crypto::secret_key &k_view);
 
     bool try_sign_carrot_transaction_proposal_v1(const CarrotTransactionProposalV1 &tx_proposal,
-        const std::unordered_map<crypto::public_key, FcmpRerandomizedOutputCompressed> &rerandomized_outputs,
+        const std::vector<FcmpRerandomizedOutputCompressed> &rerandomized_outputs,
         crypto::hash &signable_tx_hash_out,
         signed_input_set_t &signed_inputs_out
     ) const override;
@@ -68,10 +72,20 @@ public:
         const bool use_biased) const override;
 
 protected:
-    std::shared_ptr<view_incoming_key_device> m_k_view_incoming_dev;
-    std::shared_ptr<view_balance_secret_device> m_s_view_balance_dev;
-    std::shared_ptr<address_device> m_address_dev;
+    void sign_raw_v1(const crypto::hash &prefix_hash,
+        const epee::span<const FcmpRerandomizedOutputCompressed> rerandomized_outputs,
+        const epee::span<const OutputOpeningHintVariant> opening_hints,
+        signed_input_set_t &signed_inputs_out) const;
+
+    const std::shared_ptr<view_incoming_key_device> m_k_view_incoming_dev;
+    const std::shared_ptr<view_balance_secret_device> m_s_view_balance_dev;
+    const std::shared_ptr<address_device> m_address_dev;
+    const std::shared_ptr<key_image_device> m_key_image_dev;
     const crypto::secret_key &m_privkey_g;
     const crypto::secret_key &m_privkey_t;
+
+private:
+    spend_device_ram_borrowed(const crypto::secret_key &k_spend,
+        std::shared_ptr<cryptonote_view_incoming_key_device> k_view_incoming_dev);
 };
 } //namespace carrot

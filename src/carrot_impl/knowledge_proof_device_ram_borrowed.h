@@ -29,8 +29,8 @@
 #pragma once
 
 //local headers
-#include "key_image_device.h"
-#include "tx_proposal.h"
+#include "knowledge_proofs.h"
+#include "spend_device_ram_borrowed.h"
 
 //third party headers
 
@@ -40,17 +40,30 @@
 
 namespace carrot
 {
-struct spend_device: virtual public key_image_device
+struct knowledge_proof_ram_borrowed_device:
+    public spend_device_ram_borrowed,
+    public knowledge_proof_device
 {
-    // maps KI -> (OTA, SA/L) in consensus ordering
-    using signed_input_set_t = std::map<crypto::key_image,
-        std::pair<crypto::public_key, fcmp_pp::FcmpPpSalProof>,
-        std::greater<crypto::key_image>>;
+    /// @brief device composed, carrot XOR legacy, plus ram-borrowed G/T openings to K_s
+    knowledge_proof_ram_borrowed_device(std::shared_ptr<view_incoming_key_device> k_view_incoming_dev,
+        std::shared_ptr<view_balance_secret_device> s_view_balance_dev,
+        std::shared_ptr<address_device> address_dev,
+        const crypto::secret_key &privkey_g,
+        const crypto::secret_key &privkey_t);
 
-    virtual bool try_sign_carrot_transaction_proposal_v1(const CarrotTransactionProposalV1 &tx_proposal,
+    bool try_sign_fcmp_spend_proof_v1(const crypto::hash &txid,
+        const epee::span<const std::uint8_t> message,
+        const std::vector<OutputOpeningHintVariant> &opening_hints,
         const std::vector<FcmpRerandomizedOutputCompressed> &rerandomized_outputs,
-        crypto::hash &signable_tx_hash_out,
-        signed_input_set_t &signed_inputs_out
-    ) const = 0;
+        crypto::hash &prefix_hash_out,
+        knowledge_proof_device::signed_input_set_t &signed_inputs_out
+    ) const override;
+
+    bool try_sign_fcmp_reserve_proof_v1(const rct::xmr_amount threshold_amount,
+        const std::vector<OutputOpeningHintVariant> &opening_hints,
+        const std::vector<FcmpRerandomizedOutputCompressed> &rerandomized_outputs,
+        crypto::hash &prefix_hash_out,
+        knowledge_proof_device::signed_input_set_t &signed_inputs_out
+    ) const override;
 };
 } //namespace carrot

@@ -31,7 +31,7 @@
 //local headers
 #include "address_device_hierarchies.h"
 #include "carrot_core/carrot_enote_types.h"
-#include "fcmp_pp/curve_trees.h"
+#include "fcmp_pp/fcmp_pp_types.h"
 #include "output_opening_types.h"
 #include "span.h"
 #include "tx_proposal.h"
@@ -89,5 +89,20 @@ void make_sal_proof_any_to_hybrid_v1(const crypto::hash &signable_tx_hash,
     const address_device &addr_dev,
     fcmp_pp::FcmpPpSalProof &sal_proof_out,
     crypto::key_image &key_image_out);
-
+/**
+ * brief: multi-threaded generate FCMP blinds for outputs and given number of selene / helios branches
+ */
+void generate_fcmp_blinds(
+    epee::span<const FcmpRerandomizedOutputCompressed> rerandomized_outputs,
+    epee::span<fcmp_pp::OutputBlinds> &output_blinds_out,
+    epee::span<fcmp_pp::SeleneBranchBlind> &selene_branch_blinds_out,
+    epee::span<fcmp_pp::HeliosBranchBlind> &helios_branch_blinds_out);
+/**
+ * 
+ */
+void generate_fcmp_blinds_and_prove_membership(
+    epee::span<const FcmpRerandomizedOutputCompressed> rerandomized_outputs,
+    epee::span<const fcmp_pp::Path> paths,
+    const std::uint8_t n_tree_layers,
+    fcmp_pp::FcmpMembershipProof &membership_proof_out);
 } //namespace carrot

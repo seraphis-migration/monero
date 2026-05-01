@@ -75,4 +75,8 @@ static constexpr const unsigned char CARROT_DOMAIN_SEP_SUBADDRESS_SCALAR[] = "Ca
 // Carrot misc constants
 static constexpr const unsigned int CARROT_MIN_TX_OUTPUTS = 2;
 static constexpr const unsigned int CARROT_MIN_TX_INPUTS = 1;
+
+// Knowledge proof domain separators
+static constexpr const unsigned char CARROT_DOMAIN_SEP_SPEND_PROOF_PREFIX[] = "Carrot spend proof prefix";
+static constexpr const unsigned char CARROT_DOMAIN_SEP_RESERVE_PROOF_PREFIX[] = "Carrot reserve proof prefix";
 } //namespace carrot
