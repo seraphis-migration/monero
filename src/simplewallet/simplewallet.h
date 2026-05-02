@@ -84,6 +84,7 @@ namespace cryptonote
     std::string get_commands_str();
     std::string get_command_usage(const std::vector<std::string> &args);
   private:
+    std::pair<std::string, std::string> get_command_documentation(const std::vector<std::string> &args);
 
     enum ResetType { ResetNone, ResetSoft, ResetHard, ResetSoftKeepKI };
 

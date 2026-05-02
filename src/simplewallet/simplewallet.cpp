@@ -197,12 +197,12 @@ namespace
   const char* USAGE_INCOMING_TRANSFERS("incoming_transfers [available|unavailable] [verbose] [uses] [index=<N1>[,<N2>[,...]]]");
   const char* USAGE_PAYMENTS("payments <PID_1> [<PID_2> ... <PID_N>]");
   const char* USAGE_PAYMENT_ID("payment_id");
-  const char* USAGE_TRANSFER("transfer [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] (<URI> | <address> <amount>) [subtractfeefrom=<D0>[,<D1>,all,...]] [<payment_id>]");
-  const char* USAGE_SWEEP_ALL("sweep_all [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
-  const char* USAGE_SWEEP_ACCOUNT("sweep_account <account> [index=<N1>[,<N2>,...] | index=all] [<priority>] [<ring_size>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
-  const char* USAGE_SWEEP_BELOW("sweep_below <amount_threshold> [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] <address> [<payment_id (obsolete)>]");
-  const char* USAGE_SWEEP_SINGLE("sweep_single [<priority>] [<ring_size>] [outputs=<N>] <key_image> <address> [<payment_id (obsolete)>]");
-  const char* USAGE_DONATE("donate [index=<N1>[,<N2>,...]] [<priority>] [<ring_size>] <amount> [<payment_id (obsolete)>]");
+  const char* USAGE_TRANSFER("transfer [index=<N1>[,<N2>,...]] [<priority>] (<URI> | <address> <amount>) [subtractfeefrom=<D0>[,<D1>,all,...]] [<payment_id>]");
+  const char* USAGE_SWEEP_ALL("sweep_all [index=<N1>[,<N2>,...] | index=all] [<priority>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
+  const char* USAGE_SWEEP_ACCOUNT("sweep_account <account> [index=<N1>[,<N2>,...] | index=all] [<priority>] [outputs=<N>] <address> [<payment_id (obsolete)>]");
+  const char* USAGE_SWEEP_BELOW("sweep_below <amount_threshold> [index=<N1>[,<N2>,...]] [<priority>] <address> [<payment_id (obsolete)>]");
+  const char* USAGE_SWEEP_SINGLE("sweep_single [<priority>] [outputs=<N>] <key_image> <address> [<payment_id (obsolete)>]");
+  const char* USAGE_DONATE("donate [index=<N1>[,<N2>,...]] [<priority>] <amount> [<payment_id (obsolete)>]");
   const char* USAGE_SIGN_TRANSFER("sign_transfer [export_raw] [<filename>]");
   const char* USAGE_SET_LOG("set_log <level>|{+,-,}<categories>");
   const char* USAGE_ACCOUNT("account\n"
@@ -613,6 +613,99 @@ namespace
     return true;
   }
 
+  bool uses_legacy_ring_signature_ux(tools::wallet2 *w2)
+  {
+    if (!w2)
+      return true;
+    try
+    {
+      return !w2->use_fork_rules(HF_VERSION_FCMP_PLUS_PLUS, 0);
+    }
+    catch (const std::exception &)
+    {
+      return !w2->use_fork_rules_offline(HF_VERSION_FCMP_PLUS_PLUS, 0);
+    }
+  }
+
+  std::string get_set_variable_description(bool legacy_ring_ux)
+  {
+    std::string description = tr("Available options:\n "
+                                 "seed language\n "
+                                 "  Set the wallet's seed language.\n "
+                                 "always-confirm-transfers <1|0>\n "
+                                 "  Whether to confirm unsplit txes.\n ");
+    if (legacy_ring_ux)
+    {
+      description += tr("print-ring-members <1|0>\n "
+                        "  Whether to print detailed information about ring members during confirmation.\n ");
+    }
+    description += tr("store-tx-info <1|0>\n "
+                      "  Whether to store outgoing tx info (destination address, payment ID, tx secret key) for future reference.\n "
+                      "auto-refresh <1|0>\n "
+                      "  Whether to automatically synchronize new blocks from the daemon.\n "
+                      "refresh-type <full|optimize-coinbase|no-coinbase|default>\n "
+                      "  Set the wallet's refresh behaviour.\n "
+                      "priority [0|1|2|3|4|5]\n "
+                      "  Set the fee to default/unimportant/normal/elevated/priority/max.\n "
+                      "confirm-missing-payment-id <1|0> (obsolete)\n "
+                      "ask-password <0|1|2   (or never|action|decrypt)>\n "
+                      "  action: ask the password before many actions such as transfer, etc\n "
+                      "  decrypt: same as action, but keeps the spend key encrypted in memory when not needed\n "
+                      "unit <monero|millinero|micronero|nanonero|piconero>\n "
+                      "  Set the default monero (sub-)unit.\n "
+                      "max-reorg-depth <unsigned int>\n "
+                      "  Set the maximum amount of blocks to accept in a reorg.\n "
+                      "min-outputs-count [n]\n "
+                      "  Try to keep at least that many outputs of value at least min-outputs-value.\n "
+                      "min-outputs-value [n]\n "
+                      "  Try to keep at least min-outputs-count outputs of at least that value.\n "
+                      "merge-destinations <1|0>\n "
+                      "  Whether to merge multiple payments to the same destination address.\n "
+                      "confirm-backlog <1|0>\n "
+                      "  Whether to warn if there is transaction backlog.\n "
+                      "confirm-backlog-threshold [n]\n "
+                      "  Set a threshold for confirm-backlog to only warn if the transaction backlog is greater than n blocks.\n "
+                      "confirm-export-overwrite <1|0>\n "
+                      "  Whether to warn if the file to be exported already exists.\n "
+                      "refresh-from-block-height [n]\n "
+                      "  Set the height before which to ignore blocks.\n "
+                      "auto-low-priority <1|0>\n "
+                      "  Whether to automatically use the low priority fee level when it's safe to do so.\n "
+                      "segregate-pre-fork-outputs <1|0>\n "
+                      "  Set this if you intend to spend outputs on both Monero AND a key reusing fork.\n "
+                      "key-reuse-mitigation2 <1|0>\n "
+                      "  Set this if you are not sure whether you will spend on a key reusing Monero fork later.\n "
+                      "subaddress-lookahead <major>:<minor>\n "
+                      "  Set the lookahead sizes for the subaddress hash table.\n "
+                      "segregation-height <n>\n "
+                      "  Set to the height of a key reusing fork you want to use, 0 to use default.\n "
+                      "ignore-fractional-outputs <1|0>\n "
+                      "  Whether to ignore fractional outputs that result in net loss when spending due to fee.\n "
+                      "ignore-outputs-above <amount>\n "
+                      "  Ignore outputs of amount above this threshold when spending. Value 0 is translated to the maximum value (18 million) which disables this filter.\n "
+                      "ignore-outputs-below <amount>\n "
+                      "  Ignore outputs of amount below this threshold when spending.\n "
+                      "track-uses <1|0>\n "
+                      "  Whether to keep track of owned outputs uses.\n "
+                      "background-sync <off|reuse-wallet-password|custom-background-password>\n "
+                      "  Set this to enable scanning in the background with just the view key while the wallet is locked.\n "
+                      "setup-background-mining <1|0>\n "
+                      "  Whether to enable background mining. Set this to support the network and to get a chance to receive new monero.\n "
+                      "device-name <device_name[:device_spec]>\n "
+                      "  Device name for hardware wallet.\n "
+                      "export-format <\"binary\"|\"ascii\">\n "
+                      "  Save all exported files as binary (cannot be copied and pasted) or ascii (can be).\n "
+                      "load-deprecated-formats <1|0>\n "
+                      "  Whether to enable importing data in deprecated formats.\n "
+                      "show-wallet-name-when-locked <1|0>\n "
+                      "  Set this if you would like to display the wallet name when locked.\n "
+                      "enable-multisig-experimental <1|0>\n "
+                      "  Set this to allow multisig commands. Multisig may currently be exploitable if parties do not trust each other.\n "
+                      "inactivity-lock-timeout <unsigned int>\n "
+                      "  How many seconds to wait before locking the wallet (0 to disable).");
+    return description;
+  }
+
   bool get_fake_outs_count(const std::unique_ptr<tools::wallet2> &w2, std::vector<std::string> &local_args, size_t &fake_outs_count)
   {
     const size_t min_ring_size = w2->get_min_ring_size();
@@ -630,10 +723,7 @@ namespace
       else if (min_ring_size == 0 && w2->get_max_ring_size() == 0)
       {
         if (ring_size != 0)
-        {
-          fail_msg_writer() << tr("Ring size must be 0");
-          return false;
-        }
+          message_writer() << tr("Warning: provided ring_size will be ignored for FCMP++ transactions.");
         fake_outs_count = 0;
         local_args.erase(local_args.begin());
         return true;
@@ -836,16 +926,37 @@ std::string simple_wallet::get_commands_str()
 {
   std::stringstream ss;
   ss << tr("Commands: ") << ENDL;
-  std::string usage = m_cmd_binder.get_usage();
-  boost::replace_all(usage, "\n", "\n  ");
-  usage.insert(0, "  ");
-  ss << usage << ENDL;
+  const std::vector<std::string> all_commands = m_cmd_binder.get_command_list();
+  for (const auto &command : all_commands)
+  {
+    const std::vector<std::string> cmd{command};
+    const auto documentation = get_command_documentation(cmd);
+    if (!documentation.first.empty())
+      ss << "  " << documentation.first << ENDL;
+  }
   return ss.str();
+}
+
+std::pair<std::string, std::string> simple_wallet::get_command_documentation(const std::vector<std::string> &args)
+{
+  std::pair<std::string, std::string> documentation = m_cmd_binder.get_documentation(args);
+  if (documentation.first.empty())
+    return documentation;
+
+  if (args.size() != 1 || args.front() != "set")
+    return documentation;
+
+  if (!uses_legacy_ring_signature_ux(m_wallet.get()))
+  {
+    documentation.second = get_set_variable_description(false);
+  }
+
+  return documentation;
 }
 
 std::string simple_wallet::get_command_usage(const std::vector<std::string> &args)
 {
-  std::pair<std::string, std::string> documentation = m_cmd_binder.get_documentation(args);
+  std::pair<std::string, std::string> documentation = get_command_documentation(args);
   std::stringstream ss;
   if(documentation.first.empty())
   {
@@ -1809,11 +1920,38 @@ bool simple_wallet::print_ring(const std::vector<std::string> &args)
   std::vector<std::pair<crypto::key_image, std::vector<uint64_t>>> rings;
   try
   {
+    bool found_ring_data = false;
     if (m_wallet->get_ring(key_image, ring))
-      rings.push_back({key_image, ring});
-    else if (!m_wallet->get_rings(txid, rings))
     {
-      fail_msg_writer() << tr("Key image either not spent, or spent with ring size 1");
+      rings.push_back({key_image, ring});
+      found_ring_data = !ring.empty();
+    }
+    else if (m_wallet->get_rings(txid, rings))
+    {
+      for (const auto &entry: rings)
+      {
+        if (!entry.second.empty())
+        {
+          found_ring_data = true;
+          break;
+        }
+      }
+    }
+    else
+    {
+      if (uses_legacy_ring_signature_ux(m_wallet.get()))
+        fail_msg_writer() << tr("Key image either not spent, or spent with ring size 1");
+      else
+        fail_msg_writer() << tr("Key image either not spent, or is an FCMP++ transaction (no ring data)");
+      return true;
+    }
+
+    if (!found_ring_data)
+    {
+      if (uses_legacy_ring_signature_ux(m_wallet.get()))
+        fail_msg_writer() << tr("Key image either not spent, or spent with ring size 1");
+      else
+        fail_msg_writer() << tr("Key image either not spent, or is an FCMP++ transaction (no ring data)");
       return true;
     }
 
@@ -3151,7 +3289,26 @@ bool simple_wallet::apropos(const std::vector<std::string> &args)
     PRINT_USAGE(USAGE_APROPOS);
     return true;
   }
-  const std::vector<std::string>& command_list = m_cmd_binder.get_command_list(args);
+  const std::vector<std::string> all_commands = m_cmd_binder.get_command_list();
+  std::vector<std::string> command_list;
+  for (const auto &command: all_commands)
+  {
+    const std::vector<std::string> cmd{command};
+    const std::pair<std::string, std::string> documentation = get_command_documentation(cmd);
+    bool take = true;
+    for (const auto &keyword: args)
+    {
+      const bool in_usage = documentation.first.find(keyword) != std::string::npos;
+      const bool in_description = documentation.second.find(keyword) != std::string::npos;
+      if (!(in_usage || in_description))
+      {
+        take = false;
+        break;
+      }
+    }
+    if (take)
+      command_list.push_back(command);
+  }
   if (command_list.empty())
   {
     fail_msg_writer() << tr("No commands found mentioning keyword(s)");
@@ -3163,7 +3320,7 @@ bool simple_wallet::apropos(const std::vector<std::string> &args)
   {
     std::vector<std::string> cmd;
     cmd.push_back(command);
-    std::pair<std::string, std::string> documentation = m_cmd_binder.get_documentation(cmd);
+    std::pair<std::string, std::string> documentation = get_command_documentation(cmd);
     success_msg_writer() << "  " << documentation.first;
   }
   success_msg_writer() << "";
@@ -3261,7 +3418,7 @@ simple_wallet::simple_wallet()
                            tr("Show the blockchain height."));
   m_cmd_binder.set_handler("transfer", boost::bind(&simple_wallet::on_command, this, &simple_wallet::transfer, _1),
                            tr(USAGE_TRANSFER),
-                           tr("Transfer <amount> <address>. If the parameter \"index=<N1>[,<N2>,...]\" is specified, the wallet uses outputs received by addresses of those indices. If omitted, the wallet randomly chooses address indices to be used. In any case, it tries its best not to combine outputs across multiple addresses. <priority> is the priority of the transaction. The higher the priority, the higher the transaction fee. Valid values in priority order (from lowest to highest) are: unimportant, normal, elevated, priority, max. If omitted, the default value (see the command \"set priority\") is used. <ring_size> is the number of inputs to include for untraceability. Multiple payments can be made at once by adding URI_2 or <address_2> <amount_2> etcetera (before the payment ID, if it's included). The \"subtractfeefrom=\" list allows you to choose which destinations to fund the tx fee from instead of the change output. The fee will be split across the chosen destinations proportionally equally. For example, to make 3 transfers where the fee is taken from the first and third destinations, one could do: \"transfer <addr1> 3 <addr2> 0.5 <addr3> 1 subtractfeefrom=0,2\". Let's say the tx fee is 0.1. The balance would drop by exactly 4.5 XMR including fees, and addr1 & addr3 would receive 2.925 & 0.975 XMR, respectively. Use \"subtractfeefrom=all\" to spread the fee across all destinations."));
+                           tr("Transfer <amount> <address>. If the parameter \"index=<N1>[,<N2>,...]\" is specified, the wallet uses outputs received by addresses of those indices. If omitted, the wallet randomly chooses address indices to be used. In any case, it tries its best not to combine outputs across multiple addresses. <priority> is the priority of the transaction. The higher the priority, the higher the transaction fee. Valid values in priority order (from lowest to highest) are: unimportant, normal, elevated, priority, max. If omitted, the default value (see the command \"set priority\") is used. Multiple payments can be made at once by adding URI_2 or <address_2> <amount_2> etcetera (before the payment ID, if it's included). The \"subtractfeefrom=\" list allows you to choose which destinations to fund the tx fee from instead of the change output. The fee will be split across the chosen destinations proportionally equally. For example, to make 3 transfers where the fee is taken from the first and third destinations, one could do: \"transfer <addr1> 3 <addr2> 0.5 <addr3> 1 subtractfeefrom=0,2\". Let's say the tx fee is 0.1. The balance would drop by exactly 4.5 XMR including fees, and addr1 & addr3 would receive 2.925 & 0.975 XMR, respectively. Use \"subtractfeefrom=all\" to spread the fee across all destinations."));
   m_cmd_binder.set_handler("sweep_unmixable",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::sweep_unmixable, _1),
                            tr("Send all unmixable outputs to yourself with ring_size 1"));
@@ -3338,77 +3495,7 @@ simple_wallet::simple_wallet()
   m_cmd_binder.set_handler("set",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::set_variable, _1),
                            tr(USAGE_SET_VARIABLE),
-                           tr("Available options:\n "
-                                  "seed language\n "
-                                  "  Set the wallet's seed language.\n "
-                                  "always-confirm-transfers <1|0>\n "
-                                  "  Whether to confirm unsplit txes.\n "
-                                  "print-ring-members <1|0>\n "
-                                  "  Whether to print detailed information about ring members during confirmation.\n "
-                                  "store-tx-info <1|0>\n "
-                                  "  Whether to store outgoing tx info (destination address, payment ID, tx secret key) for future reference.\n "
-                                  "auto-refresh <1|0>\n "
-                                  "  Whether to automatically synchronize new blocks from the daemon.\n "
-                                  "refresh-type <full|optimize-coinbase|no-coinbase|default>\n "
-                                  "  Set the wallet's refresh behaviour.\n "
-                                  "priority [0|1|2|3|4|5]\n "
-                                  "  Set the fee to default/unimportant/normal/elevated/priority/max.\n "
-                                  "confirm-missing-payment-id <1|0> (obsolete)\n "
-                                  "ask-password <0|1|2   (or never|action|decrypt)>\n "
-                                  "  action: ask the password before many actions such as transfer, etc\n "
-                                  "  decrypt: same as action, but keeps the spend key encrypted in memory when not needed\n "
-                                  "unit <monero|millinero|micronero|nanonero|piconero>\n "
-                                  "  Set the default monero (sub-)unit.\n "
-                                  "max-reorg-depth <unsigned int>\n "
-                                  "  Set the maximum amount of blocks to accept in a reorg.\n "
-                                  "min-outputs-count [n]\n "
-                                  "  Try to keep at least that many outputs of value at least min-outputs-value.\n "
-                                  "min-outputs-value [n]\n "
-                                  "  Try to keep at least min-outputs-count outputs of at least that value.\n "
-                                  "merge-destinations <1|0>\n "
-                                  "  Whether to merge multiple payments to the same destination address.\n "
-                                  "confirm-backlog <1|0>\n "
-                                  "  Whether to warn if there is transaction backlog.\n "
-                                  "confirm-backlog-threshold [n]\n "
-                                  "  Set a threshold for confirm-backlog to only warn if the transaction backlog is greater than n blocks.\n "
-                                  "confirm-export-overwrite <1|0>\n "
-                                  "  Whether to warn if the file to be exported already exists.\n "
-                                  "refresh-from-block-height [n]\n "
-                                  "  Set the height before which to ignore blocks.\n "
-                                  "auto-low-priority <1|0>\n "
-                                  "  Whether to automatically use the low priority fee level when it's safe to do so.\n "
-                                  "segregate-pre-fork-outputs <1|0>\n "
-                                  "  Set this if you intend to spend outputs on both Monero AND a key reusing fork.\n "
-                                  "key-reuse-mitigation2 <1|0>\n "
-                                  "  Set this if you are not sure whether you will spend on a key reusing Monero fork later.\n "
-                                  "subaddress-lookahead <major>:<minor>\n "
-                                  "  Set the lookahead sizes for the subaddress hash table.\n "
-                                  "segregation-height <n>\n "
-                                  "  Set to the height of a key reusing fork you want to use, 0 to use default.\n "
-                                  "ignore-fractional-outputs <1|0>\n "
-                                  "  Whether to ignore fractional outputs that result in net loss when spending due to fee.\n "
-                                  "ignore-outputs-above <amount>\n "
-                                  "  Ignore outputs of amount above this threshold when spending. Value 0 is translated to the maximum value (18 million) which disables this filter.\n "
-                                  "ignore-outputs-below <amount>\n "
-                                  "  Ignore outputs of amount below this threshold when spending.\n "
-                                  "track-uses <1|0>\n "
-                                  "  Whether to keep track of owned outputs uses.\n "
-                                  "background-sync <off|reuse-wallet-password|custom-background-password>\n "
-                                  "  Set this to enable scanning in the background with just the view key while the wallet is locked.\n "
-                                  "setup-background-mining <1|0>\n "
-                                  "  Whether to enable background mining. Set this to support the network and to get a chance to receive new monero.\n "
-                                  "device-name <device_name[:device_spec]>\n "
-                                  "  Device name for hardware wallet.\n "
-                                  "export-format <\"binary\"|\"ascii\">\n "
-                                  "  Save all exported files as binary (cannot be copied and pasted) or ascii (can be).\n "
-                                  "load-deprecated-formats <1|0>\n "
-                                  "  Whether to enable importing data in deprecated formats.\n "
-                                  "show-wallet-name-when-locked <1|0>\n "
-                                  "  Set this if you would like to display the wallet name when locked.\n "
-                                  "enable-multisig-experimental <1|0>\n "
-                                  "  Set this to allow multisig commands. Multisig may currently be exploitable if parties do not trust each other.\n "
-                                  "inactivity-lock-timeout <unsigned int>\n "
-                                  "  How many seconds to wait before locking the wallet (0 to disable)."));
+                           get_set_variable_description(true));
   m_cmd_binder.set_handler("encrypted_seed",
                            boost::bind(&simple_wallet::on_command, this, &simple_wallet::encrypted_seed, _1),
                            tr("Display the encrypted Electrum-style mnemonic seed."));
@@ -3748,6 +3835,7 @@ bool simple_wallet::set_variable(const std::vector<std::string> &args)
 {
   if (args.empty())
   {
+    const bool legacy_ring_ux = uses_legacy_ring_signature_ux(m_wallet.get());
     std::string seed_language = m_wallet->get_seed_language();
     if (m_use_english_language_names)
       seed_language = crypto::ElectrumWords::get_english_name_for(seed_language);
@@ -3771,9 +3859,11 @@ bool simple_wallet::set_variable(const std::vector<std::string> &args)
     }
     success_msg_writer() << "seed = " << seed_language;
     success_msg_writer() << "always-confirm-transfers = " << m_wallet->always_confirm_transfers();
-    success_msg_writer() << "print-ring-members = " << m_wallet->print_ring_members();
+    if (legacy_ring_ux)
+      success_msg_writer() << "print-ring-members = " << m_wallet->print_ring_members();
     success_msg_writer() << "store-tx-info = " << m_wallet->store_tx_info();
-    success_msg_writer() << "default-ring-size = " << (m_wallet->default_mixin() ? m_wallet->default_mixin() + 1 : 0);
+    if (legacy_ring_ux)
+      success_msg_writer() << "default-ring-size = " << (m_wallet->default_mixin() ? m_wallet->default_mixin() + 1 : 0);
     success_msg_writer() << "auto-refresh = " << m_wallet->auto_refresh();
     success_msg_writer() << "refresh-type = " << get_refresh_type_name(m_wallet->get_refresh_type());
     success_msg_writer() << "priority = " << priority_index << " (" << priority_string << ")";
@@ -3813,6 +3903,7 @@ bool simple_wallet::set_variable(const std::vector<std::string> &args)
   else
   {
     CHECK_IF_BACKGROUND_SYNCING("cannot change wallet settings");
+    const bool legacy_ring_ux = uses_legacy_ring_signature_ux(m_wallet.get());
 
 #define CHECK_SIMPLE_VARIABLE(name, f, help) do \
   if (args[0] == name) { \
@@ -3842,7 +3933,8 @@ bool simple_wallet::set_variable(const std::vector<std::string> &args)
       }
     }
     CHECK_SIMPLE_VARIABLE("always-confirm-transfers", set_always_confirm_transfers, tr("0 or 1"));
-    CHECK_SIMPLE_VARIABLE("print-ring-members", set_print_ring_members, tr("0 or 1"));
+    if (legacy_ring_ux)
+      CHECK_SIMPLE_VARIABLE("print-ring-members", set_print_ring_members, tr("0 or 1"));
     CHECK_SIMPLE_VARIABLE("store-tx-info", set_store_tx_info, tr("0 or 1"));
     CHECK_SIMPLE_VARIABLE("auto-refresh", set_auto_refresh, tr("0 or 1"));
     CHECK_SIMPLE_VARIABLE("refresh-type", set_refresh_type, tr("full (slowest, no assumptions); optimize-coinbase (fast, assumes the whole coinbase is paid to a single address); no-coinbase (fastest, assumes we receive no coinbase transaction), default (same as optimize-coinbase)"));
@@ -6315,6 +6407,10 @@ bool simple_wallet::process_ring_members(const std::vector<tools::wallet2::pendi
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::prompt_if_old(const std::vector<tools::wallet2::pending_tx> &ptx_vector)
 {
+  // FCMP++ txs don't use ring signatures, so output age doesn't affect privacy
+  if (!ptx_vector.empty() && ptx_vector[0].tx.rct_signatures.type >= rct::RCTTypeFcmpPlusPlus)
+    return true;
+
   // count the number of old outputs
   std::string err;
   uint64_t bc_height = get_daemon_blockchain_height(err);
@@ -7041,23 +7137,17 @@ bool simple_wallet::sweep_main(uint32_t account, uint64_t below, const std::vect
   bool payment_id_seen = false;
   if (local_args.size() >= 2)
   {
-    std::string payment_id_str = local_args.back();
-
     crypto::hash payment_id;
-    bool r = tools::wallet2::parse_long_payment_id(payment_id_str, payment_id);
-    if(r)
+    if (tools::wallet2::parse_long_payment_id(local_args.back(), payment_id))
     {
       LONG_PAYMENT_ID_SUPPORT_CHECK();
     }
+  }
 
-    if(!r && local_args.size() == 3)
-    {
-      fail_msg_writer() << tr("payment id has invalid format, expected 16 or 64 character hex string: ") << payment_id_str;
-      print_usage();
-      return true;
-    }
-    if (payment_id_seen)
-      local_args.pop_back();
+  if (local_args.size() != 1)
+  {
+    print_usage();
+    return true;
   }
 
   cryptonote::address_parse_info info;
@@ -7261,25 +7351,10 @@ bool simple_wallet::sweep_single(const std::vector<std::string> &args_)
   if (local_args.size() == 3)
   {
     crypto::hash payment_id;
-    std::string extra_nonce;
     if (tools::wallet2::parse_long_payment_id(local_args.back(), payment_id))
     {
       LONG_PAYMENT_ID_SUPPORT_CHECK();
     }
-    else
-    {
-      fail_msg_writer() << tr("failed to parse Payment ID");
-      return true;
-    }
-
-    if (!add_extra_nonce_to_tx_extra(extra, extra_nonce))
-    {
-      fail_msg_writer() << tr("failed to set up payment id, though it was decoded correctly");
-      return true;
-    }
-
-    local_args.pop_back();
-    payment_id_seen = true;
   }
 
   if (local_args.size() != 2)
