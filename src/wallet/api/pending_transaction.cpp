@@ -113,9 +113,12 @@ bool PendingTransactionImpl::commit(const std::string &filename, bool overwrite)
 
         const bool tx_cold_signed = m_wallet.m_wallet->get_account().get_device().has_tx_cold_sign();
         if (tx_cold_signed){
+          wallet2_basic::transfer_container transfers;
+          m_wallet.m_wallet->get_transfers(transfers);
+
           std::unordered_set<size_t> selected_transfers;
           for(const tools::wallet2::pending_tx & ptx : m_pending_tx){
-            for(size_t s : ptx.selected_transfers){
+            for(size_t s : tools::wallet::collect_selected_transfer_indices(ptx.construction_data, transfers)){
               selected_transfers.insert(s);
             }
           }

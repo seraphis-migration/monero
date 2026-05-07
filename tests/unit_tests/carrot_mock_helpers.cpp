@@ -49,6 +49,8 @@ static void reassign_non_borrowed_devices(carrot::mock::mock_carrot_and_legacy_k
     auto k_view_incoming_dev = std::make_shared<carrot::cryptonote_view_incoming_key_ram_borrowed_device>(
         keys.k_view_incoming_dev);
 
+    keys.cn_addr_dev = {k_view_incoming_dev, keys.legacy_acb.get_keys().m_account_address.m_spend_public_key};
+
     keys.addr_dev.reset(new carrot::hybrid_hierarchy_address_device(
         std::make_shared<carrot::carrot_hierarchy_address_device>(
             std::make_shared<carrot::generate_address_secret_ram_borrowed_device>(keys.s_generate_address_dev),
@@ -106,6 +108,8 @@ mock_carrot_and_legacy_keys::mock_carrot_and_legacy_keys():
     k_generate_image_dev(k_generate_image),
     k_spend_generate_image_dev(legacy_acb.get_keys().m_spend_secret_key),
     s_generate_address_dev(s_generate_address),
+    cn_addr_dev(std::make_shared<cryptonote_view_incoming_key_ram_borrowed_device>(k_view_incoming_dev),
+        legacy_acb.get_keys().m_account_address.m_spend_public_key),
     addr_dev(),
     key_image_dev()
 {}
@@ -116,6 +120,8 @@ mock_carrot_and_legacy_keys::mock_carrot_and_legacy_keys(const mock_carrot_and_l
     k_generate_image_dev(k_generate_image),
     k_spend_generate_image_dev(legacy_acb.get_keys().m_spend_secret_key),
     s_generate_address_dev(s_generate_address),
+    cn_addr_dev(std::make_shared<cryptonote_view_incoming_key_ram_borrowed_device>(k_view_incoming_dev),
+        legacy_acb.get_keys().m_account_address.m_spend_public_key),
     addr_dev(),
     key_image_dev()
 {

@@ -75,4 +75,10 @@ static constexpr const unsigned char CARROT_DOMAIN_SEP_SUBADDRESS_SCALAR[] = "Ca
 // Carrot misc constants
 static constexpr const unsigned int CARROT_MIN_TX_OUTPUTS = 2;
 static constexpr const unsigned int CARROT_MIN_TX_INPUTS = 1;
+
+// Downstream hot/cold protocol domain separators
+static constexpr const unsigned char HOT_COLD_DOMAIN_SEP_NORMAL_JANUS_ANCHOR[] = "Carrot Hot-cold normal janus anchor";
+static constexpr const unsigned char HOT_COLD_DOMAIN_SEP_SPECIAL_EPHEM[] = "Carrot Hot-cold special ephemeral privkey";
+static constexpr const unsigned char HOT_COLD_DOMAIN_SEP_DUMMY_PID[] = "Carrot Hot-cold dummy encrypted payment id";
+static constexpr const unsigned char HOT_COLD_DOMAIN_SEP_RERANDOMIZATION[] = "Carrot Hot-cold rerandomization scalar";
 } //namespace carrot

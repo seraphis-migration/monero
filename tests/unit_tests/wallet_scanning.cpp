@@ -660,7 +660,7 @@ TEST(wallet_scanning, burned_zombie)
     bc.refresh_wallet(w);
     ASSERT_EQ(amount_a, w.balance_all(true));
     uint64_t key_image_offset;
-    std::vector<std::pair<crypto::key_image, crypto::signature>> exported_key_images;
+    std::vector<std::pair<crypto::key_image, tools::wallet::cold::KeyImageProofVariant>> exported_key_images;
     std::tie(key_image_offset, exported_key_images) = w.export_key_images(/*all=*/true);
     ASSERT_EQ(0, key_image_offset);
     ASSERT_EQ(2, exported_key_images.size());

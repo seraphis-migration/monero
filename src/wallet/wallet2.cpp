@@ -105,7 +105,7 @@ using namespace epee;
 #include "fcmp_pp/fcmp_pp_types.h"
 #include "tx_builder.h"
 #include "tx_builder_serialization.h"
-#include "hot_cold_serialization.h" //! @TODO: remove line after #52 is merged
+#include "misc_wallet_utils.h"
 
 extern "C"
 {
@@ -125,8 +125,6 @@ using namespace cryptonote;
 // used to target a given block weight (additional outputs may be added on top to build fee)
 #define TX_WEIGHT_TARGET(bytes) (bytes*2/3)
 
-#define UNSIGNED_TX_PREFIX "Monero unsigned tx set\005"
-#define SIGNED_TX_PREFIX "Monero signed tx set\005"
 #define MULTISIG_UNSIGNED_TX_PREFIX "Monero multisig unsigned tx set\001"
 
 #define RECENT_OUTPUT_RATIO (0.5) // 50% of outputs are from the recent zone
@@ -142,11 +140,7 @@ using namespace cryptonote;
 #define SUBADDRESS_LOOKAHEAD_MAJOR 50
 #define SUBADDRESS_LOOKAHEAD_MINOR 200
 
-#define KEY_IMAGE_EXPORT_FILE_MAGIC "Monero key image export\003"
-
 #define MULTISIG_EXPORT_FILE_MAGIC "Monero multisig export\001"
-
-#define OUTPUT_EXPORT_FILE_MAGIC "Monero output export\004"
 
 #define SEGREGATION_FORK_HEIGHT 99999999
 #define TESTNET_SEGREGATION_FORK_HEIGHT 99999999
@@ -933,7 +927,7 @@ static tools::wallet::pending_tx finalize_all_proofs_from_transfer_details_as_pe
     const carrot::CarrotTransactionProposalV1 &tx_proposal,
     const tools::wallet2 &w)
 {
-  tools::wallet::pending_tx ptx = tools::wallet::finalize_all_fcmp_pp_proofs_as_pending_tx(
+  return tools::wallet::finalize_all_fcmp_pp_proofs_as_pending_tx(
     tx_proposal,
     w.get_tree_cache_ref(),
     w.get_curve_trees_ref(),
@@ -941,8 +935,6 @@ static tools::wallet::pending_tx finalize_all_proofs_from_transfer_details_as_pe
     *w.get_view_incoming_key_device(),
     w.get_view_balance_secret_device().get(),
     *w.get_spend_device());
-  ptx.selected_transfers = tools::wallet::collect_selected_transfer_indices(ptx.construction_data, get_transfers(w));
-  return ptx;
 }
 
 uint64_t get_outgoing_amount(const cryptonote::transaction &tx, const uint64_t amount_spent)
@@ -950,20 +942,24 @@ uint64_t get_outgoing_amount(const cryptonote::transaction &tx, const uint64_t a
   return tx.version == 1 ? get_outs_money_amount(tx) : (amount_spent - tx.rct_signatures.txnFee);
 }
 
-static const tools::wallet2::tx_construction_data &get_construction_data(const tools::wallet2::pending_tx &ptx)
+static std::vector<tools::wallet::pending_tx> carrot_tx_proposals_to_pending_txs(
+  const std::vector<carrot::CarrotTransactionProposalV1> &tx_proposals,
+  const tools::wallet2 &w)
 {
-  THROW_WALLET_EXCEPTION_IF(!std::holds_alternative<tools::wallet2::tx_construction_data>(ptx.construction_data),
-    tools::error::wallet_internal_error,
-    "Getting pre-carrot construction data only works for pre-carrot pending txs");
-  return std::get<tools::wallet2::tx_construction_data>(ptx.construction_data);
-}
+  using namespace tools::wallet;
 
-static tools::wallet2::tx_construction_data &get_construction_data(tools::wallet2::pending_tx &ptx)
-{
-  THROW_WALLET_EXCEPTION_IF(!std::holds_alternative<tools::wallet2::tx_construction_data>(ptx.construction_data),
-    tools::error::wallet_internal_error,
-    "Getting pre-carrot construction data only works for pre-carrot pending txs");
-  return std::get<tools::wallet2::tx_construction_data>(ptx.construction_data);
+  const carrot::view_incoming_key_ram_borrowed_device k_view_dev(w.get_account().get_keys().m_view_secret_key);
+
+  std::vector<pending_tx> ptx_vector;
+  ptx_vector.reserve(tx_proposals.size());
+  for (const carrot::CarrotTransactionProposalV1 &tx_proposal : tx_proposals)
+  {
+    if (w.watch_only())
+      ptx_vector.push_back(make_pending_carrot_tx(tx_proposal, /*sorted_input_key_images=*/{}, k_view_dev));
+    else
+      ptx_vector.push_back(::finalize_all_proofs_from_transfer_details_as_pending_tx(tx_proposal, w));
+  }
+  return ptx_vector;
 }
 
 uint32_t get_subaddress_clamped_sum(uint32_t idx, uint32_t extra)
@@ -2296,18 +2292,23 @@ bool wallet2::frozen(const multisig_tx_set& txs) const
   std::unordered_set<crypto::key_image> kis_to_sign;
   for (const auto& ptx : txs.m_ptx)
   {
-    const tools::wallet2::tx_construction_data& cd = get_construction_data(ptx);
-    CHECK_AND_ASSERT_THROW_MES(cd.sources.size() == ptx.tx.vin.size(), "mismatched multisg tx set source sizes");
-    for (size_t src_idx = 0; src_idx < cd.sources.size(); ++src_idx)
+    const std::size_t n_inputs = ptx.tx.vin.size();
+    const auto *cd = std::get_if<tools::wallet2::tx_construction_data>(&ptx.construction_data);
+    CHECK_AND_ASSERT_THROW_MES(cd == nullptr || cd->sources.size() == n_inputs,
+      "mismatched multisg tx set source sizes");
+    for (std::size_t src_idx = 0; src_idx < n_inputs; ++src_idx)
     {
       // Extract keys images from tx vin and construction data
-      const crypto::key_image multisig_ki = rct::rct2ki(cd.sources[src_idx].multisig_kLRki.ki);
       CHECK_AND_ASSERT_THROW_MES(ptx.tx.vin[src_idx].type() == typeid(cryptonote::txin_to_key), "multisig tx cannot be miner");
       const crypto::key_image& vin_ki = boost::get<cryptonote::txin_to_key>(ptx.tx.vin[src_idx]).k_image;
-
-      // Add key images to set (there will be some overlap)
-      kis_to_sign.insert(multisig_ki);
       kis_to_sign.insert(vin_ki);
+
+      // Extract keys images from construction data (there will be some overlap)
+      if (cd != nullptr)
+      {
+        const crypto::key_image multisig_ki = rct::rct2ki(cd->sources.at(src_idx).multisig_kLRki.ki);
+        kis_to_sign.insert(multisig_ki);
+      }
     }
   }
   // Step 2. Scan all transfers for frozen key images
@@ -7877,14 +7878,7 @@ void wallet2::commit_tx(pending_tx& ptx)
     THROW_ON_RPC_RESPONSE_ERROR(r, {}, daemon_send_resp, "sendrawtransaction", error::tx_rejected, ptx.tx, get_rpc_status(m_trusted_daemon, daemon_send_resp.status), get_text_reason(daemon_send_resp));
   }
 
-  // sanity checks
-  for (size_t idx: ptx.selected_transfers)
-  {
-    THROW_WALLET_EXCEPTION_IF(idx >= m_transfers.size(), error::wallet_internal_error,
-        "Bad output index in selected transfers: " + boost::lexical_cast<std::string>(idx));
-  }
   crypto::hash txid;
-
   txid = get_transaction_hash(ptx.tx);
 
   // if it's already processed, bail
@@ -7904,24 +7898,9 @@ void wallet2::commit_tx(pending_tx& ptx)
     return;
   }
 
-  // collect subaddr account and subaddr indices
-  std::optional<std::uint32_t> subaddr_account_opt;
-  std::set<std::uint32_t> subaddr_indices;
-  for (const size_t selected_transfer : ptx.selected_transfers)
-  {
-    const transfer_details &td = m_transfers.at(selected_transfer);
-    if (subaddr_account_opt && *subaddr_account_opt != td.m_subaddr_index.major)
-    {
-      MWARNING("Mismatched subaddr accounts in inputs: " << *subaddr_account_opt << " vs " << td.m_subaddr_index.major);
-    }
-    else
-    {
-      subaddr_account_opt = td.m_subaddr_index.major;
-    }
-
-    subaddr_indices.insert(td.m_subaddr_index.minor);
-  }
-  const std::uint32_t subaddr_account = subaddr_account_opt.value_or(0);
+  const std::uint32_t subaddr_account = ptx.subaddr_account;
+  const std::set<std::uint32_t> &subaddr_indices = ptx.subaddr_indices;
+  const std::vector<std::size_t> selected_transfers = wallet::collect_selected_transfer_indices(ptx.construction_data, m_transfers);
 
   crypto::hash payment_id = crypto::null_hash;
   std::vector<cryptonote::tx_destination_entry> dests;
@@ -7931,7 +7910,7 @@ void wallet2::commit_tx(pending_tx& ptx)
     const crypto::hash8 payment_id_8 = wallet::short_payment_id(ptx.construction_data).value_or(crypto::null_hash8);
     memcpy(&payment_id, &payment_id_8, sizeof(crypto::hash8));
     dests = ptx.dests;
-    for(size_t idx: ptx.selected_transfers)
+    for(size_t idx: selected_transfers)
       amount_in += m_transfers[idx].amount();
   }
   add_unconfirmed_tx(txid, ptx.tx, amount_in, dests, payment_id, ptx.change_dts.amount, subaddr_account, subaddr_indices);
@@ -7939,17 +7918,23 @@ void wallet2::commit_tx(pending_tx& ptx)
   {
     m_tx_keys[txid] = ptx.tx_key;
     m_additional_tx_keys[txid] = ptx.additional_tx_keys;
+    if (rct::is_rct_fcmp(ptx.tx.rct_signatures.type))
+    {
+      const crypto::hash signable_tx_hash = carrot::calculate_signable_fcmp_pp_transaction_hash(ptx.tx);
+      m_tx_keys[signable_tx_hash] = ptx.tx_key;
+      m_additional_tx_keys[signable_tx_hash] = ptx.additional_tx_keys;
+    }
   }
 
   LOG_PRINT_L2("transaction " << txid << " generated ok and sent to daemon, key_images: [" << ptx.key_images << "]");
 
-  for(size_t idx: ptx.selected_transfers)
+  for(size_t idx: selected_transfers)
   {
     set_spent(idx, 0);
   }
 
   // tx generated, get rid of used k values
-  for (size_t idx: ptx.selected_transfers)
+  for (size_t idx: selected_transfers)
   {
     memwipe(m_transfers[idx].m_multisig_k.data(), m_transfers[idx].m_multisig_k.size() * sizeof(m_transfers[idx].m_multisig_k[0]));
     m_transfers[idx].m_multisig_k.clear();
@@ -7983,32 +7968,23 @@ bool wallet2::save_tx(const std::vector<pending_tx>& ptx_vector, const std::stri
 std::string wallet2::dump_tx_to_str(const std::vector<pending_tx> &ptx_vector) const
 {
   LOG_PRINT_L0("saving " << ptx_vector.size() << " transactions");
-  unsigned_tx_set txs;
-  for (auto &tx: ptx_vector)
-  {
-    // Save tx construction_data to unsigned_tx_set
-    txs.txes.push_back(get_construction_data(tx));
-  }
-  
-  txs.new_transfers = export_outputs();
-  // save as binary
-  std::ostringstream oss;
-  binary_archive<true> ar(oss);
-  try
-  {
-    if (!::serialization::serialize(ar, txs))
-      return std::string();
-  }
-  catch (...)
-  {
-    return std::string();
-  }
-  LOG_PRINT_L2("Saving unsigned tx data: " << oss.str());
-  std::string ciphertext = encrypt_with_view_secret_key(oss.str());
-  return std::string(UNSIGNED_TX_PREFIX) + ciphertext;
+
+  wallet::cold::UnsignedTransactionSetVariant txs = wallet::cold::generate_unsigned_tx_set_from_pending_txs(
+    ptx_vector,
+    m_transfers,
+    /*resend_tx_proposals=*/true,
+    *get_cryptonote_address_device());
+
+  std::string unsigned_tx_str;
+  wallet::cold::encrypt_unsigned_tx_set(txs,
+    m_account.get_keys().m_view_secret_key,
+    m_kdf_rounds,
+    unsigned_tx_str);
+  return unsigned_tx_str;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::load_unsigned_tx(const std::string &unsigned_filename, unsigned_tx_set &exported_txs) const
+bool wallet2::load_unsigned_tx(const std::string &unsigned_filename,
+  wallet::cold::UnsignedTransactionSetVariant &exported_txs) const
 {
   std::string s;
   boost::system::error_code errcode;
@@ -8027,60 +8003,44 @@ bool wallet2::load_unsigned_tx(const std::string &unsigned_filename, unsigned_tx
   return parse_unsigned_tx_from_str(s, exported_txs);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::parse_unsigned_tx_from_str(const std::string &unsigned_tx_st, unsigned_tx_set &exported_txs) const
+bool wallet2::parse_unsigned_tx_from_str(const std::string &unsigned_tx_st,
+  wallet::cold::UnsignedTransactionSetVariant &exported_txs) const
 {
-  std::string s = unsigned_tx_st;
-  const size_t magiclen = strlen(UNSIGNED_TX_PREFIX) - 1;
-  if (strncmp(s.c_str(), UNSIGNED_TX_PREFIX, magiclen))
+  try
   {
-    LOG_PRINT_L0("Bad magic from unsigned tx");
+    wallet::cold::decrypt_unsigned_tx_set(unsigned_tx_st,
+      m_account.get_keys().m_view_secret_key,
+      m_kdf_rounds,
+      exported_txs);
+  }
+  catch (const std::exception &e)
+  {
+    LOG_PRINT_L0("Failed to parse data from unsigned tx: " << e.what());
     return false;
   }
-  s = s.substr(magiclen);
-  const char version = s[0];
-  s = s.substr(1);
-  if (version == '\003')
-  {
-      LOG_PRINT_L0("Not loading deprecated format");
-      return false;
-  }
-  else if (version == '\004')
-  {
-      LOG_PRINT_L0("Not loading deprecated format");
-      return false;
-  }
-  else if (version == '\005')
-  {
-    try { s = decrypt_with_view_secret_key(s); }
-    catch(const std::exception &e) { LOG_PRINT_L0("Failed to decrypt unsigned tx: " << e.what()); return false; }
-    try
-    {
-      binary_archive<false> ar{epee::strspan<std::uint8_t>(s)};
-      if (!::serialization::serialize(ar, exported_txs))
-      {
-        LOG_PRINT_L0("Failed to parse data from unsigned tx");
-        return false;
-      }
-    }
-    catch (...)
-    {
-      LOG_PRINT_L0("Failed to parse data from unsigned tx");
-      return false;
-    }
-  }
-  else
-  {
-    LOG_PRINT_L0("Unsupported version in unsigned tx");
-    return false;
-  }
-  LOG_PRINT_L1("Loaded tx unsigned data from binary: " << exported_txs.txes.size() << " transactions");
 
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::sign_tx(const std::string &unsigned_filename, const std::string &signed_filename, std::vector<wallet2::pending_tx> &txs, std::function<bool(const unsigned_tx_set&)> accept_func, bool export_raw)
+bool wallet2::get_transaction_proposals_from_unsigned_tx(const wallet::cold::UnsignedTransactionSetVariant &exported_txs, std::vector<wallet::tx_reconstruct_variant_t> &tx_proposals_out) const
 {
-  unsigned_tx_set exported_txs;
+  try
+  {
+    tx_proposals_out = wallet::cold::get_transaction_proposals_from_unsigned_tx_set(exported_txs,
+      wallet::cold::make_supplemental_input_proposals_fetcher(m_transfers),
+      *get_cryptonote_address_device());
+  }
+  catch (...)
+  {
+    return false;
+  }
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::sign_tx(const std::string &unsigned_filename, const std::string &signed_filename, std::vector<wallet2::pending_tx> &txs, std::function<bool(const wallet::cold::UnsignedTransactionSetVariant&)> accept_func, bool export_raw)
+{
+  wallet::cold::UnsignedTransactionSetVariant exported_txs;
   if(!load_unsigned_tx(unsigned_filename, exported_txs))
     return false;
   
@@ -8092,7 +8052,35 @@ bool wallet2::sign_tx(const std::string &unsigned_filename, const std::string &s
   return sign_tx(exported_txs, signed_filename, txs, export_raw);
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pending_tx> &txs, signed_tx_set &signed_txes)
+bool wallet2::sign_tx(const wallet::cold::UnsignedTransactionSetVariant &exported_txs, std::vector<wallet2::pending_tx> &ptx, wallet::cold::SignedTransactionSetVariant &signed_txs)
+{
+  struct sign_tx_visitor
+  {
+    bool operator()(const wallet::cold::UnsignedPreCarrotTransactionSet &u) const
+    {
+      wallet::cold::SignedFullTransactionSet s;
+      const bool r = self.sign_tx(u, ptx, s);
+      signed_txs = std::move(s);
+      return r;
+    }
+    bool operator()(const wallet::cold::UnsignedCarrotTransactionSetV1 &u) const
+    {
+      ptx.clear();
+      wallet::cold::SignedCarrotTransactionSetV1 s;
+      const bool r = self.sign_tx(u, s);
+      signed_txs = std::move(s);
+      return r;
+    }
+  
+    wallet2 &self;
+    std::vector<wallet2::pending_tx> &ptx;
+    wallet::cold::SignedTransactionSetVariant &signed_txs;
+  };
+
+  return std::visit(sign_tx_visitor{*this, ptx, signed_txs}, exported_txs);
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::sign_tx(const wallet::cold::UnsignedPreCarrotTransactionSet &exported_txs, std::vector<wallet2::pending_tx> &txs, wallet::cold::SignedFullTransactionSet &signed_txes)
 {
   if (!std::get<2>(exported_txs.new_transfers).empty())
     import_outputs(exported_txs.new_transfers);
@@ -8100,114 +8088,26 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pendin
     import_outputs(exported_txs.transfers);
 
   // sign the transactions
-  for (size_t n = 0; n < exported_txs.txes.size(); ++n)
+  std::unordered_map<crypto::hash, crypto::secret_key> tx_keys;
+  std::unordered_map<crypto::hash, std::vector<crypto::secret_key>> additional_tx_keys;
+  wallet::cold::sign_pre_carrot_tx_set(exported_txs, m_account.get_keys(),
+    m_subaddresses,
+    m_nettype,
+    signed_txes,
+    tx_keys,
+    additional_tx_keys);
+
+  // save ephemeral tx privkeys
+  m_tx_keys.merge(tx_keys);
+  m_additional_tx_keys.merge(additional_tx_keys);
+
+  // populate pending txs list, copied from signed_txs.ptx, but containing tx privkeys
+  txs = signed_txes.ptx;
+  for (pending_tx &ptx : txs)
   {
-    tools::wallet2::tx_construction_data &sd = exported_txs.txes[n];
-    THROW_WALLET_EXCEPTION_IF(sd.sources.empty(), error::wallet_internal_error, "Empty sources");
-    THROW_WALLET_EXCEPTION_IF(sd.unlock_time, error::nonzero_unlock_time);
-    LOG_PRINT_L1(" " << (n+1) << ": " << sd.sources.size() << " inputs, ring size " << sd.sources[0].outputs.size());
-    signed_txes.ptx.push_back(pending_tx());
-    tools::wallet2::pending_tx &ptx = signed_txes.ptx.back();
-    rct::RCTConfig rct_config = sd.rct_config;
-    crypto::secret_key tx_key;
-    std::vector<crypto::secret_key> additional_tx_keys;
-    bool r = cryptonote::construct_tx_and_get_tx_key(m_account.get_keys(), m_subaddresses, sd.sources, sd.splitted_dsts, sd.change_dts.addr, sd.extra, ptx.tx, tx_key, additional_tx_keys, sd.use_rct, rct_config, sd.use_view_tags);
-    THROW_WALLET_EXCEPTION_IF(!r, error::tx_not_constructed, sd.sources, sd.splitted_dsts, m_nettype);
-    // we don't test tx size, because we don't know the current limit, due to not having a blockchain,
-    // and it's a bit pointless to fail there anyway, since it'd be a (good) guess only. We sign anyway,
-    // and if we really go over limit, the daemon will reject when it gets submitted. Chances are it's
-    // OK anyway since it was generated in the first place, and rerolling should be within a few bytes.
-
-    // normally, the tx keys are saved in commit_tx, when the tx is actually sent to the daemon.
-    // we can't do that here since the tx will be sent from the compromised wallet, which we don't want
-    // to see that info, so we save it here
-    if (store_tx_info() && tx_key != crypto::null_skey)
-    {
-      const crypto::hash txid = get_transaction_hash(ptx.tx);
-      m_tx_keys[txid] = tx_key;
-      m_additional_tx_keys[txid] = additional_tx_keys;
-    }
-
-    std::string key_images;
-    bool all_are_txin_to_key = std::all_of(ptx.tx.vin.begin(), ptx.tx.vin.end(), [&](const txin_v& s_e) -> bool
-    {
-      CHECKED_GET_SPECIFIC_VARIANT(s_e, const txin_to_key, in, false);
-      key_images += boost::to_string(in.k_image) + " ";
-      return true;
-    });
-    THROW_WALLET_EXCEPTION_IF(!all_are_txin_to_key, error::unexpected_txin_type, ptx.tx);
-
-    ptx.key_images = key_images;
-    ptx.fee = 0;
-    for (const auto &i: sd.sources) ptx.fee += i.amount;
-    for (const auto &i: sd.splitted_dsts) ptx.fee -= i.amount;
-    ptx.dust = 0;
-    ptx.dust_added_to_fee = false;
-    ptx.change_dts = sd.change_dts;
-    ptx.selected_transfers = sd.selected_transfers;
-    ptx.tx_key = rct::rct2sk(rct::identity()); // don't send it back to the untrusted view wallet
-    ptx.dests = sd.dests;
-    ptx.construction_data = sd;
-
-    txs.push_back(ptx);
-
-    // add tx keys only to ptx
-    txs.back().tx_key = tx_key;
-    txs.back().additional_tx_keys = additional_tx_keys;
-  }
-
-  // add key image mapping for these txes
-  const account_keys &keys = get_account().get_keys();
-  hw::device &hwdev = m_account.get_device();
-  for (size_t n = 0; n < exported_txs.txes.size(); ++n)
-  {
-    const cryptonote::transaction &tx = signed_txes.ptx[n].tx;
-
-    crypto::key_derivation derivation;
-    std::vector<crypto::key_derivation> additional_derivations;
-
-    crypto::public_key tx_pub_key = get_tx_pub_key_from_extra(tx);
-    std::vector<crypto::public_key> additional_tx_pub_keys;
-    for (const crypto::secret_key &skey: txs[n].additional_tx_keys)
-    {
-      additional_tx_pub_keys.resize(additional_tx_pub_keys.size() + 1);
-      crypto::secret_key_to_public_key(skey, additional_tx_pub_keys.back());
-    }
-
-    // compute derivations
-    hwdev.set_mode(hw::device::TRANSACTION_PARSE);
-    if (!hwdev.generate_key_derivation(tx_pub_key, keys.m_view_secret_key, derivation))
-    {
-      MWARNING("Failed to generate key derivation from tx pubkey in " << cryptonote::get_transaction_hash(tx) << ", skipping");
-      static_assert(sizeof(derivation) == sizeof(rct::key), "Mismatched sizes of key_derivation and rct::key");
-      memcpy(&derivation, rct::identity().bytes, sizeof(derivation));
-    }
-    for (size_t i = 0; i < additional_tx_pub_keys.size(); ++i)
-    {
-      additional_derivations.push_back({});
-      if (!hwdev.generate_key_derivation(additional_tx_pub_keys[i], keys.m_view_secret_key, additional_derivations.back()))
-      {
-        MWARNING("Failed to generate key derivation from additional tx pubkey in " << cryptonote::get_transaction_hash(tx) << ", skipping");
-        memcpy(&additional_derivations.back(), rct::identity().bytes, sizeof(crypto::key_derivation));
-      }
-    }
-
-    for (size_t i = 0; i < tx.vout.size(); ++i)
-    {
-      crypto::public_key output_public_key;
-      if (!get_output_public_key(tx.vout[i], output_public_key))
-        continue;
-
-      // if this output is back to this wallet, we can calculate its key image already
-      if (!is_out_to_acc_precomp(m_subaddresses, output_public_key, derivation, additional_derivations, i, hwdev, get_output_view_tag(tx.vout[i])))
-        continue;
-      crypto::key_image ki;
-      cryptonote::keypair in_ephemeral;
-      if (generate_key_image_helper(keys, m_subaddresses, output_public_key, tx_pub_key, additional_tx_pub_keys, i, in_ephemeral, ki, hwdev))
-        signed_txes.tx_key_images[output_public_key] = ki;
-      else
-        MERROR("Failed to calculate key image");
-    }
+    const crypto::hash txid = get_transaction_hash(ptx.tx);
+    ptx.tx_key = m_tx_keys.at(txid);
+    ptx.additional_tx_keys = m_additional_tx_keys.at(txid);
   }
 
   // add key images
@@ -8222,10 +8122,69 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pendin
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool wallet2::sign_tx(unsigned_tx_set &exported_txs, const std::string &signed_filename, std::vector<wallet2::pending_tx> &txs, bool export_raw)
+bool wallet2::sign_tx(const wallet::cold::UnsignedCarrotTransactionSetV1 &exported_txs,
+  wallet::cold::SignedCarrotTransactionSetV1 &signed_txs)
+{
+  signed_txs = wallet::cold::SignedCarrotTransactionSetV1();
+
+  // devices
+  const auto addr_dev = this->get_cryptonote_address_device();
+  const auto key_image_dev = this->get_key_image_device();
+
+  // expand and import exported outputs, send key images back
+  const std::size_t n_new_transfers = exported_txs.new_transfers.size();
+  if (n_new_transfers)
+  {
+    wallet2_basic::transfer_container exported_transfers;
+    exported_transfers.reserve(n_new_transfers);
+    for (const wallet::cold::exported_transfer_details_variant &etd : exported_txs.new_transfers)
+    {
+      // expand
+      wallet2_basic::transfer_details &td = exported_transfers.emplace_back();
+      td = wallet::cold::import_cold_output(etd, *addr_dev, *key_image_dev);
+      // key image
+      signed_txs.other_key_images.emplace(td.get_public_key(), td.m_key_image);
+    }
+
+    // import
+    import_outputs({exported_txs.starting_transfer_index,
+      exported_txs.starting_transfer_index + n_new_transfers,
+      std::move(exported_transfers)});
+  }
+
+  // sign the transactions
+  std::unordered_map<crypto::hash, std::vector<crypto::secret_key>> additional_tx_keys;
+  wallet::cold::sign_carrot_tx_set_v1(exported_txs,
+    wallet::cold::make_supplemental_input_proposals_fetcher(m_transfers),
+    *addr_dev,
+    *this->get_spend_device(),
+    signed_txs,
+    additional_tx_keys);
+
+  // split ephemeral tx privkeys into "main" and "additional" similar to pre-Carrot, save to wallet cache
+  std::unordered_map<crypto::hash, crypto::secret_key> main_tx_keys;
+  for (auto txkey_it = additional_tx_keys.cbegin(); txkey_it != additional_tx_keys.cend();)
+  {
+    if (txkey_it->second.size() == 1)
+    {
+      main_tx_keys.emplace(txkey_it->first, txkey_it->second.at(0));
+      txkey_it = additional_tx_keys.erase(txkey_it);
+    }
+    else
+    {
+      ++txkey_it;
+    }
+  }
+  m_tx_keys.merge(main_tx_keys);
+  m_additional_tx_keys.merge(additional_tx_keys);
+
+  return true;
+}
+//----------------------------------------------------------------------------------------------------
+bool wallet2::sign_tx(const wallet::cold::UnsignedTransactionSetVariant &exported_txs, const std::string &signed_filename, std::vector<wallet2::pending_tx> &txs, bool export_raw)
 {
   // sign the transactions
-  signed_tx_set signed_txes;
+  wallet::cold::SignedTransactionSetVariant signed_txes;
   std::string ciphertext = sign_tx_dump_to_str(exported_txs, txs, signed_txes);
   if (ciphertext.empty())
   {
@@ -8241,10 +8200,10 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, const std::string &signed_f
   // export signed raw tx without encryption
   if (export_raw)
   {
-    for (size_t i = 0; i < signed_txes.ptx.size(); ++i)
+    for (size_t i = 0; i < txs.size(); ++i)
     {
-      std::string tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(signed_txes.ptx[i].tx));
-      std::string raw_filename = signed_filename + "_raw" + (signed_txes.ptx.size() == 1 ? "" : ("_" + std::to_string(i)));
+      std::string tx_as_hex = epee::string_tools::buff_to_hex_nodelimer(tx_to_blob(txs.at(i).tx));
+      std::string raw_filename = signed_filename + "_raw" + (txs.size() == 1 ? "" : ("_" + std::to_string(i)));
       if (!save_to_file(raw_filename, tx_as_hex))
       {
         LOG_PRINT_L0("Failed to save file to " << raw_filename);
@@ -8255,7 +8214,7 @@ bool wallet2::sign_tx(unsigned_tx_set &exported_txs, const std::string &signed_f
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-std::string wallet2::sign_tx_dump_to_str(unsigned_tx_set &exported_txs, std::vector<wallet2::pending_tx> &ptx, signed_tx_set &signed_txes)
+std::string wallet2::sign_tx_dump_to_str(const wallet::cold::UnsignedTransactionSetVariant &exported_txs, std::vector<wallet2::pending_tx> &ptx, wallet::cold::SignedTransactionSetVariant &signed_txes)
 {
   // sign the transactions
   bool r = sign_tx(exported_txs, ptx, signed_txes);
@@ -8265,28 +8224,15 @@ std::string wallet2::sign_tx_dump_to_str(unsigned_tx_set &exported_txs, std::vec
     return std::string();
   }
 
-  // save as binary
-  std::ostringstream oss;
-  binary_archive<true> ar(oss);
-  try
-  {
-    if (!::serialization::serialize(ar, signed_txes))
-      return std::string();
-  }
-  catch(...)
-  {
-    return std::string();
-  }
-  LOG_PRINT_L3("Saving signed tx data (with encryption): " << oss.str());
-  std::string ciphertext = encrypt_with_view_secret_key(oss.str());
-  return std::string(SIGNED_TX_PREFIX) + ciphertext;
+  std::string signed_txs_str;
+  wallet::cold::encrypt_signed_tx_set(signed_txes, m_account.get_keys().m_view_secret_key, m_kdf_rounds, signed_txs_str);
+  return signed_txs_str;
 }
 //----------------------------------------------------------------------------------------------------
 bool wallet2::load_tx(const std::string &signed_filename, std::vector<tools::wallet2::pending_tx> &ptx, std::function<bool(const signed_tx_set&)> accept_func)
 {
   std::string s;
   boost::system::error_code errcode;
-  signed_tx_set signed_txs;
 
   if (!boost::filesystem::exists(signed_filename, errcode))
   {
@@ -8305,70 +8251,55 @@ bool wallet2::load_tx(const std::string &signed_filename, std::vector<tools::wal
 //----------------------------------------------------------------------------------------------------
 bool wallet2::parse_tx_from_str(const std::string &signed_tx_st, std::vector<tools::wallet2::pending_tx> &ptx, std::function<bool(const signed_tx_set &)> accept_func)
 {
-  std::string s = signed_tx_st;
-  signed_tx_set signed_txs;
+  ptx.clear();
 
-  const size_t magiclen = strlen(SIGNED_TX_PREFIX) - 1;
-  if (strncmp(s.c_str(), SIGNED_TX_PREFIX, magiclen))
+  // decrypt and deserialize signed tx set of any type
+  wallet::cold::SignedTransactionSetVariant signed_txs_v;
+  wallet::cold::decrypt_signed_tx_set(signed_tx_st, m_account.get_keys().m_view_secret_key, m_kdf_rounds, signed_txs_v);
+
+  // if needed, finalize into a full transaction set by completing necessary proofs
+  wallet::cold::SignedFullTransactionSet signed_txs;
+  struct parse_tx_from_str_convert_full_visitor
   {
-    LOG_PRINT_L0("Bad magic from signed transaction");
-    return false;
-  }
-  s = s.substr(magiclen);
-  const char version = s[0];
-  s = s.substr(1);
-  if (version == '\003')
-  {
-      LOG_PRINT_L0("Not loading deprecated format");
-      return false;
-  }
-  else if (version == '\004')
-  {
-      LOG_PRINT_L0("Not loading deprecated format");
-      return false;
-  }
-  else if (version == '\005')
-  {
-    try { s = decrypt_with_view_secret_key(s); }
-    catch (const std::exception &e) { LOG_PRINT_L0("Failed to decrypt signed transaction: " << e.what()); return false; }
-    try
+    void operator()(wallet::cold::SignedFullTransactionSet &s) const
     {
-      binary_archive<false> ar{epee::strspan<std::uint8_t>(s)};
-      if (!::serialization::serialize(ar, signed_txs))
-      {
-        LOG_PRINT_L0("Failed to deserialize signed transaction");
-        return false;
-      }
+      signed_txs = std::move(s);
     }
-    catch (const std::exception &e)
+
+    void operator()(wallet::cold::SignedCarrotTransactionSetV1 &s) const
     {
-      LOG_PRINT_L0("Failed to decrypt signed transaction: " << e.what());
-      return false;
+      signed_txs = wallet::cold::finalize_signed_carrot_tx_set_v1_into_full_set(s, nullptr,
+        wallet::cold::make_supplemental_input_proposals_fetcher(w.m_transfers),
+        *w.get_cryptonote_address_device(), w.get_tree_cache_ref(), w.get_curve_trees_ref());
     }
-  }
-  else
-  {
-    LOG_PRINT_L0("Unsupported version in signed transaction");
-    return false;
-  }
+
+    wallet::cold::SignedFullTransactionSet &signed_txs;
+    const wallet2 &w;
+  };
+  std::visit(parse_tx_from_str_convert_full_visitor{signed_txs, *this}, signed_txs_v);
+
+  // print info about full signed tx set
   LOG_PRINT_L0("Loaded signed tx data from binary: " << signed_txs.ptx.size() << " transactions");
   for (auto &c_ptx: signed_txs.ptx) LOG_PRINT_L0(cryptonote::obj_to_json_str(c_ptx.tx));
 
+  // accept or reject
   if (accept_func && !accept_func(signed_txs))
   {
     LOG_PRINT_L1("Transactions rejected by callback");
     return false;
   }
 
-  // import key images
-  bool r = import_key_images(signed_txs.key_images);
-  if (!r) return false;
+  // import contiguous `m_transfers`-indexed key images, if available
+  if (!signed_txs.key_images.empty())
+    if (!import_key_images(signed_txs.key_images))
+      return false;
 
+  // import one-time address -> key image associations, for previous transactions and to
   // remember key images for this tx, for when we get those txes from the blockchain
-  for (const auto &e: signed_txs.tx_key_images)
-    m_cold_key_images.insert(e);
+  if (!signed_txs.tx_key_images.empty())
+    import_key_images(signed_txs.tx_key_images);
 
-  ptx = signed_txs.ptx;
+  ptx = std::move(signed_txs.ptx);
 
   return true;
 }
@@ -8379,7 +8310,7 @@ std::string wallet2::save_multisig_tx(multisig_tx_set txs)
 
   // txes generated, get rid of used k values
   for (size_t n = 0; n < txs.m_ptx.size(); ++n)
-    for (size_t idx: get_construction_data(txs.m_ptx[n]).selected_transfers)
+    for (size_t idx: tools::wallet::collect_selected_transfer_indices(txs.m_ptx[n].construction_data, m_transfers))
     {
       memwipe(m_transfers[idx].m_multisig_k.data(), m_transfers[idx].m_multisig_k.size() * sizeof(m_transfers[idx].m_multisig_k[0]));
       m_transfers[idx].m_multisig_k.clear();
@@ -8388,13 +8319,15 @@ std::string wallet2::save_multisig_tx(multisig_tx_set txs)
   // zero out some data we don't want to share
   for (auto &ptx: txs.m_ptx)
   {
-    for (auto &e: get_construction_data(ptx).sources)
+    auto *pre_carrot_ctx_data = std::get_if<tx_construction_data>(&ptx.construction_data);
+    if (nullptr == pre_carrot_ctx_data) continue;
+    for (cryptonote::tx_source_entry &e: pre_carrot_ctx_data->sources)
       memwipe(&e.multisig_kLRki.k, sizeof(e.multisig_kLRki.k));
   }
 
   for (auto &ptx: txs.m_ptx)
   {
-    ptx.construction_data = get_construction_data(ptx);
+    ptx.construction_data = std::get<wallet::PreCarrotTransactionProposal>(ptx.construction_data);
   }
 
   // save as binary
@@ -8486,13 +8419,18 @@ bool wallet2::parse_multisig_tx_from_str(std::string multisig_tx_st, multisig_tx
   // sanity checks
   for (const auto &ptx: exported_txs.m_ptx)
   {
-    CHECK_AND_ASSERT_MES(ptx.selected_transfers.size() == ptx.tx.vin.size(), false, "Mismatched selected_transfers/vin sizes");
-    for (size_t idx: ptx.selected_transfers)
+    const auto *pre_carrot_ctx_data = std::get_if<wallet::PreCarrotTransactionProposal>(&ptx.construction_data);
+    if (nullptr == pre_carrot_ctx_data)
+      continue;
+    CHECK_AND_ASSERT_MES(pre_carrot_ctx_data->selected_transfers.size() == ptx.tx.vin.size(), false, "Mismatched cd selected_transfers/vin sizes");
+    for (size_t idx: pre_carrot_ctx_data->selected_transfers)
       CHECK_AND_ASSERT_MES(idx < m_transfers.size(), false, "Transfer index out of range");
-    CHECK_AND_ASSERT_MES(get_construction_data(ptx).selected_transfers.size() == ptx.tx.vin.size(), false, "Mismatched cd selected_transfers/vin sizes");
-    for (size_t idx: get_construction_data(ptx).selected_transfers)
+    CHECK_AND_ASSERT_MES(pre_carrot_ctx_data->selected_transfers.size() == ptx.tx.vin.size(), false, "Mismatched cd selected_transfers/vin sizes");
+    for (size_t idx: pre_carrot_ctx_data->selected_transfers)
       CHECK_AND_ASSERT_MES(idx < m_transfers.size(), false, "Transfer index out of range");
-    CHECK_AND_ASSERT_MES(get_construction_data(ptx).sources.size() == ptx.tx.vin.size(), false, "Mismatched sources/vin sizes");
+    CHECK_AND_ASSERT_MES(pre_carrot_ctx_data->sources.size() == ptx.tx.vin.size(), false, "Mismatched sources/vin sizes");
+    CHECK_AND_ASSERT_MES(!ptx.tx.vin.empty(), false, "Multisig tx has no inputs");
+    CHECK_AND_ASSERT_MES(!pre_carrot_ctx_data->sources.empty(), false, "Multisig tx has no sources");
   }
 
   return true;
@@ -8580,7 +8518,10 @@ bool wallet2::sign_multisig_tx(multisig_tx_set &exported_txs, std::vector<crypto
   {
     tools::wallet2::pending_tx &ptx = exported_txs.m_ptx[n];
     THROW_WALLET_EXCEPTION_IF(ptx.multisig_sigs.empty(), error::wallet_internal_error, "No signatures found in multisig tx");
-    tools::wallet2::tx_construction_data &sd = get_construction_data(ptx);
+    const tx_construction_data *psd = std::get_if<tx_construction_data>(&ptx.construction_data);
+    THROW_WALLET_EXCEPTION_IF(nullptr == psd, error::wallet_internal_error,
+      "Expected to parse pre-Carrot tx contruction data in multisig tx set");
+    tx_construction_data sd = *psd;
     LOG_PRINT_L1(" " << (n+1) << ": " << sd.sources.size() << " inputs, ring size " << (sd.sources[0].outputs.size()) <<
         ", signed by " << exported_txs.m_signers.size() << "/" << m_multisig_threshold);
 
@@ -8670,8 +8611,11 @@ bool wallet2::sign_multisig_tx(multisig_tx_set &exported_txs, std::vector<crypto
         if (sig.ignore.find(local_signer) == sig.ignore.end() && !keys_intersect(sig.ignore, exported_txs.m_signers))
         {
           THROW_WALLET_EXCEPTION_IF(found, error::wallet_internal_error, "More than one transaction is final");
+          const auto *pre_carrot_ctx_data = std::get_if<tx_construction_data>(&ptx.construction_data);
+          THROW_WALLET_EXCEPTION_IF(nullptr == pre_carrot_ctx_data, error::wallet_internal_error,
+            "error: was expecting pre-carrot tx construction variant in pending multisig tx");
           THROW_WALLET_EXCEPTION_IF(
-            not multisig_tx_builder.finalize_tx(get_construction_data(ptx).sources, sig.c_0, sig.s, ptx.tx),
+            not multisig_tx_builder.finalize_tx(pre_carrot_ctx_data->sources, sig.c_0, sig.s, ptx.tx),
             error::wallet_internal_error,
             "error: multisig::signing::tx_builder_ringct_t::finalize_tx"
           );
@@ -8693,7 +8637,7 @@ bool wallet2::sign_multisig_tx(multisig_tx_set &exported_txs, std::vector<crypto
   // signatures generated, get rid of any unused k values (must do export_multisig() to make more tx attempts with the
   //   inputs in the transactions worked on here)
   for (size_t n = 0; n < exported_txs.m_ptx.size(); ++n)
-    for (size_t idx: get_construction_data(exported_txs.m_ptx[n]).selected_transfers)
+    for (const size_t idx: tools::wallet::collect_selected_transfer_indices(exported_txs.m_ptx.at(n).construction_data, m_transfers))
     {
       memwipe(m_transfers[idx].m_multisig_k.data(), m_transfers[idx].m_multisig_k.size() * sizeof(m_transfers[idx].m_multisig_k[0]));
       m_transfers[idx].m_multisig_k.clear();
@@ -10156,7 +10100,6 @@ void wallet2::transfer_selected(const std::vector<cryptonote::tx_destination_ent
   ptx.dust_added_to_fee = dust_policy.add_to_fee;
   ptx.tx = tx;
   ptx.change_dts = change_dts;
-  ptx.selected_transfers = selected_transfers;
   ptx.tx_key = tx_key;
   ptx.additional_tx_keys = additional_tx_keys;
   ptx.dests = dsts;
@@ -10513,8 +10456,6 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   ptx.dust_added_to_fee = false;
   ptx.tx = tx;
   ptx.change_dts = change_dts;
-  ptx.selected_transfers = selected_transfers;
-  tools::apply_permutation(ins_order, ptx.selected_transfers);
   ptx.tx_key = tx_key;
   ptx.additional_tx_keys = additional_tx_keys;
   ptx.dests = dsts;
@@ -10524,7 +10465,8 @@ void wallet2::transfer_selected_rct(std::vector<cryptonote::tx_destination_entry
   pre_carrot_construction_data.sources = sources_copy;
   pre_carrot_construction_data.change_dts = change_dts;
   pre_carrot_construction_data.splitted_dsts = splitted_dsts;
-  pre_carrot_construction_data.selected_transfers = ptx.selected_transfers;
+  pre_carrot_construction_data.selected_transfers = selected_transfers;
+  tools::apply_permutation(ins_order, pre_carrot_construction_data.selected_transfers);
   pre_carrot_construction_data.extra = extra;
   pre_carrot_construction_data.unlock_time = 0;
   pre_carrot_construction_data.use_rct = true;
@@ -10719,11 +10661,8 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_2(
       max_n_inputs,
       subtract_fee_from_outputs,
       get_top_block_index(*this));
-    std::vector<pending_tx> ptx_vector;
-    ptx_vector.reserve(tx_proposals.size());
-    for (const auto &tx_proposal : tx_proposals)
-      ptx_vector.push_back(::finalize_all_proofs_from_transfer_details_as_pending_tx(tx_proposal, *this));
-    return ptx_vector;
+
+    return carrot_tx_proposals_to_pending_txs(tx_proposals, *this);
   }
 
   auto original_dsts = dsts;
@@ -11441,7 +11380,7 @@ bool wallet2::sanity_check(const std::vector<wallet2::pending_tx> &ptx_vector, c
   uint64_t change = 0;
   for (const auto &ptx: ptx_vector)
   {
-    for (size_t idx: ptx.selected_transfers)
+    for (size_t idx: wallet::collect_selected_transfer_indices(ptx.construction_data, m_transfers))
       change += m_transfers[idx].amount();
     change -= ptx.fee;
   }
@@ -11505,11 +11444,8 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_all(uint64_t below
       subaddr_account,
       subaddr_indices,
       get_top_block_index(*this));
-    std::vector<pending_tx> ptx_vector;
-    ptx_vector.reserve(tx_proposals.size());
-    for (const auto &tx_proposal : tx_proposals)
-      ptx_vector.push_back(::finalize_all_proofs_from_transfer_details_as_pending_tx(tx_proposal, *this));
-    return ptx_vector;
+
+    return carrot_tx_proposals_to_pending_txs(tx_proposals, *this);
   }
 
   std::vector<size_t> unused_transfers_indices;
@@ -11591,19 +11527,16 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_single(const crypt
   if (do_carrot_tx_construction)
   {
     const auto tx_proposals = tools::wallet::make_carrot_transaction_proposals_wallet2_sweep(::get_transfers(*this),
-        carrot::subaddress_map_legacy(m_subaddresses),
-        {ki},
-        address,
-        is_subaddress,
-        outputs,
-        get_fee_per_weight_from_priority(priority, *this),
-        extra,
-        get_top_block_index(*this));
-    std::vector<pending_tx> ptx_vector;
-    ptx_vector.reserve(tx_proposals.size());
-    for (const auto &tx_proposal : tx_proposals)
-      ptx_vector.push_back(::finalize_all_proofs_from_transfer_details_as_pending_tx(tx_proposal, *this));
-    return ptx_vector;
+      carrot::subaddress_map_legacy(m_subaddresses),
+      {ki},
+      address,
+      is_subaddress,
+      outputs,
+      get_fee_per_weight_from_priority(priority, *this),
+      extra,
+      get_top_block_index(*this));
+
+    return carrot_tx_proposals_to_pending_txs(tx_proposals, *this);
   }
 
   std::vector<size_t> unused_transfers_indices;
@@ -11648,11 +11581,7 @@ std::vector<wallet2::pending_tx> wallet2::create_transactions_from(const crypton
         extra,
         get_top_block_index(*this));
 
-    std::vector<pending_tx> ptx_vector;
-    ptx_vector.reserve(tx_proposals.size());
-    for (const auto &tx_proposal : tx_proposals)
-      ptx_vector.push_back(::finalize_all_proofs_from_transfer_details_as_pending_tx(tx_proposal, *this));
-    return ptx_vector;
+    return carrot_tx_proposals_to_pending_txs(tx_proposals, *this);
   }
 
   //ensure device is let in NONE mode in any case
@@ -11890,17 +11819,17 @@ void wallet2::cold_tx_aux_import(const std::vector<pending_tx> & ptx, const std:
   }
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::cold_sign_tx(const std::vector<pending_tx>& ptx_vector, signed_tx_set &exported_txs, std::vector<cryptonote::address_parse_info> &dsts_info, std::vector<std::string> & tx_device_aux)
+void wallet2::cold_sign_tx(const std::vector<pending_tx>& ptx_vector, wallet::cold::SignedFullTransactionSet &exported_txs, std::vector<cryptonote::address_parse_info> &dsts_info, std::vector<std::string> & tx_device_aux)
 {
   auto & hwdev = get_account().get_device();
   if (!hwdev.has_tx_cold_sign()){
     throw std::invalid_argument("Device does not support cold sign protocol");
   }
 
-  unsigned_tx_set txs;
+  wallet::cold::UnsignedPreCarrotTransactionSet txs;
   for (auto &tx: ptx_vector)
   {
-    txs.txes.push_back(get_construction_data(tx));
+    txs.txes.push_back(std::get<wallet::PreCarrotTransactionProposal>(tx.construction_data));
   }
   txs.transfers = std::make_tuple(0, m_transfers.size(), m_transfers);
 
@@ -11927,11 +11856,16 @@ uint64_t wallet2::cold_key_image_sync(uint64_t &spent, uint64_t &unspent) {
   auto dev_cold = dynamic_cast<::hw::device_cold*>(&hwdev);
   CHECK_AND_ASSERT_THROW_MES(dev_cold, "Device does not implement cold signing interface");
 
-  std::vector<std::pair<crypto::key_image, crypto::signature>> ski;
+  std::vector<std::pair<crypto::key_image, crypto::signature>> ski_old;
   hw::wallet_shim wallet_shim;
   setup_shim(&wallet_shim, this);
 
-  dev_cold->ki_sync(&wallet_shim, m_transfers, ski);
+  dev_cold->ki_sync(&wallet_shim, m_transfers, ski_old);
+
+  std::vector<std::pair<crypto::key_image, wallet::cold::KeyImageProofVariant>> ski;
+  ski.reserve(ski_old.size());
+  for (auto &p : ski_old)
+    ski.emplace_back(p.first, std::move(p.second));
 
   // Call COMMAND_RPC_IS_KEY_IMAGE_SPENT only if daemon is trusted.
   uint64_t import_res = import_key_images(ski, 0, spent, unspent, is_trusted_daemon());
@@ -13558,6 +13492,8 @@ bool wallet2::verify_with_public_key(const std::string &data, const crypto::publ
 //----------------------------------------------------------------------------------------------------
 crypto::public_key wallet2::get_tx_pub_key_from_received_outs(const tools::wallet2::transfer_details &td) const
 {
+  LOG_PRINT_L1("get_tx_pub_key_from_received_outs tx: " << cryptonote::obj_to_json_str(const_cast<transaction_prefix&>(td.m_tx)));
+
   THROW_WALLET_EXCEPTION_IF(carrot::is_carrot_transaction_v1(td.m_tx),
     error::wallet_internal_error,
     "get_tx_pub_key_from_received_outs is not relevant for Carrot txs");
@@ -13586,37 +13522,25 @@ crypto::public_key wallet2::get_tx_pub_key_from_received_outs(const tools::walle
 bool wallet2::export_key_images(const std::string &filename, bool all) const
 {
   PERF_TIMER(export_key_images);
-  std::pair<uint64_t, std::vector<std::pair<crypto::key_image, crypto::signature>>> ski = export_key_images(all);
-  std::string magic(KEY_IMAGE_EXPORT_FILE_MAGIC, strlen(KEY_IMAGE_EXPORT_FILE_MAGIC));
-  const cryptonote::account_public_address &keys = get_account().get_keys().m_account_address;
-  const uint32_t offset = ski.first;
+  auto ski = export_key_images(all);
 
-  std::string data;
-  data.reserve(4 + ski.second.size() * (sizeof(crypto::key_image) + sizeof(crypto::signature)) + 2 * sizeof(crypto::public_key));
-  data.resize(4);
-  data[0] = offset & 0xff;
-  data[1] = (offset >> 8) & 0xff;
-  data[2] = (offset >> 16) & 0xff;
-  data[3] = (offset >> 24) & 0xff;
-  data += std::string((const char *)&keys.m_spend_public_key, sizeof(crypto::public_key));
-  data += std::string((const char *)&keys.m_view_public_key, sizeof(crypto::public_key));
-  for (const auto &i: ski.second)
-  {
-    data += std::string((const char *)&i.first, sizeof(crypto::key_image));
-    data += std::string((const char *)&i.second, sizeof(crypto::signature));
-  }
+  // serialize and encrypt
+  std::string ki_payload;
+  wallet::cold::encrypt_key_images(ski.first,
+    ski.second,
+    m_account.get_keys().m_account_address.m_spend_public_key,
+    m_account.get_keys().m_view_secret_key,
+    m_kdf_rounds,
+    ki_payload);
 
-  // encrypt data, keep magic plaintext
-  PERF_TIMER(export_key_images_encrypt);
-  std::string ciphertext = encrypt_with_view_secret_key(data);
-  return save_to_file(filename, magic + ciphertext);
+  return save_to_file(filename, ki_payload);
 }
 
 //----------------------------------------------------------------------------------------------------
-std::pair<uint64_t, std::vector<std::pair<crypto::key_image, crypto::signature>>> wallet2::export_key_images(bool all) const
+std::pair<uint64_t, std::vector<std::pair<crypto::key_image, wallet::cold::KeyImageProofVariant>>> wallet2::export_key_images(bool all) const
 {
   PERF_TIMER(export_key_images_raw);
-  std::vector<std::pair<crypto::key_image, crypto::signature>> ski;
+  std::vector<std::pair<crypto::key_image, wallet::cold::KeyImageProofVariant>> ski;
 
   size_t offset = 0;
   if (!all)
@@ -13625,43 +13549,20 @@ std::pair<uint64_t, std::vector<std::pair<crypto::key_image, crypto::signature>>
       ++offset;
   }
 
+  const auto addr_dev = get_cryptonote_address_device();
+
   ski.reserve(m_transfers.size() - offset);
   for (size_t n = offset; n < m_transfers.size(); ++n)
   {
     const transfer_details &td = m_transfers[n];
+    const carrot::OutputOpeningHintVariant opening_hint = wallet::make_sal_opening_hint_from_transfer_details(td);
 
-    // get ephemeral public key
-    const crypto::public_key pkey = td.get_public_key();
-
-    // get tx pub key
-    std::vector<tx_extra_field> tx_extra_fields;
-    if(!parse_tx_extra(td.m_tx.extra, tx_extra_fields))
-    {
-      // Extra may only be partially parsed, it's OK if tx_extra_fields contains public key
-    }
-
-    crypto::public_key tx_pub_key = get_tx_pub_key_from_received_outs(td);
-    const std::vector<crypto::public_key> additional_tx_pub_keys = get_additional_tx_pub_keys_from_extra(td.m_tx);
-
-    // generate ephemeral secret key
-    crypto::key_image ki;
-    cryptonote::keypair in_ephemeral;
-    bool r = cryptonote::generate_key_image_helper(m_account.get_keys(), m_subaddresses, pkey, tx_pub_key, additional_tx_pub_keys, td.m_internal_output_index, in_ephemeral, ki, m_account.get_device());
-    THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
-
-    THROW_WALLET_EXCEPTION_IF(td.m_key_image_known && !td.m_key_image_partial && ki != td.m_key_image,
-        error::wallet_internal_error, "key_image generated not matched with cached key image");
-    THROW_WALLET_EXCEPTION_IF(in_ephemeral.pub != pkey,
-        error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key");
-
-    // sign the key image with the output secret key
-    crypto::signature signature;
-    std::vector<const crypto::public_key*> key_ptrs;
-    key_ptrs.push_back(&pkey);
-
-    crypto::generate_ring_signature((const crypto::hash&)td.m_key_image, td.m_key_image, key_ptrs, in_ephemeral.sec, 0, &signature);
-
-    ski.push_back(std::make_pair(td.m_key_image, signature));
+    std::pair<crypto::key_image, wallet::cold::KeyImageProofVariant> &eki = ski.emplace_back();
+    wallet::cold::prove_key_image_proof(opening_hint,
+      *addr_dev,
+      m_account.get_keys().m_spend_secret_key,
+      eki.second,
+      eki.first);
   }
   return std::make_pair(offset, ski);
 }
@@ -13672,57 +13573,28 @@ uint64_t wallet2::import_key_images(const std::string &filename, uint64_t &spent
   std::string data;
   bool r = load_from_file(filename, data);
 
-  THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, std::string(tr("failed to read file ")) + filename);
+  std::vector<std::pair<crypto::key_image, wallet::cold::KeyImageProofVariant>> ski;
+  std::uint64_t offset;
+  wallet::cold::decrypt_key_images(data,
+    m_account.get_keys().m_account_address.m_spend_public_key,
+    m_account.get_keys().m_view_secret_key,
+    m_kdf_rounds,
+    offset,
+    ski);
 
-  const size_t magiclen = strlen(KEY_IMAGE_EXPORT_FILE_MAGIC);
-  if (data.size() < magiclen || memcmp(data.data(), KEY_IMAGE_EXPORT_FILE_MAGIC, magiclen))
-  {
-    THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Bad key image export file magic in ") + filename);
-  }
-
-  try
-  {
-    PERF_TIMER(import_key_images_decrypt);
-    data = decrypt_with_view_secret_key(std::string(data, magiclen));
-  }
-  catch (const std::exception &e)
-  {
-    THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Failed to decrypt ") + filename + ": " + e.what());
-  }
-
-  const size_t headerlen = 4 + 2 * sizeof(crypto::public_key);
-  THROW_WALLET_EXCEPTION_IF(data.size() < headerlen, error::wallet_internal_error, std::string("Bad data size from file ") + filename);
-  const uint32_t offset = (uint8_t)data[0] | (((uint8_t)data[1]) << 8) | (((uint8_t)data[2]) << 16) | (((uint8_t)data[3]) << 24);
-  const crypto::public_key &public_spend_key = *(const crypto::public_key*)&data[4];
-  const crypto::public_key &public_view_key = *(const crypto::public_key*)&data[4 + sizeof(crypto::public_key)];
-  const cryptonote::account_public_address &keys = get_account().get_keys().m_account_address;
-  if (public_spend_key != keys.m_spend_public_key || public_view_key != keys.m_view_public_key)
-  {
-    THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string( "Key images from ") + filename + " are for a different account");
-  }
-  THROW_WALLET_EXCEPTION_IF(offset > m_transfers.size(), error::wallet_internal_error, "Offset larger than known outputs");
-
-  const size_t record_size = sizeof(crypto::key_image) + sizeof(crypto::signature);
-  THROW_WALLET_EXCEPTION_IF((data.size() - headerlen) % record_size,
-      error::wallet_internal_error, std::string("Bad data size from file ") + filename);
-  size_t nki = (data.size() - headerlen) / record_size;
-
-  std::vector<std::pair<crypto::key_image, crypto::signature>> ski;
-  ski.reserve(nki);
-  for (size_t n = 0; n < nki; ++n)
-  {
-    crypto::key_image key_image = *reinterpret_cast<const crypto::key_image*>(&data[headerlen + n * record_size]);
-    crypto::signature signature = *reinterpret_cast<const crypto::signature*>(&data[headerlen + n * record_size + sizeof(crypto::key_image)]);
-
-    ski.push_back(std::make_pair(key_image, signature));
-  }
-  
   return import_key_images(ski, offset, spent, unspent);
 }
 
 //----------------------------------------------------------------------------------------------------
-uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_image, crypto::signature>> &signed_key_images, size_t offset, uint64_t &spent, uint64_t &unspent, bool check_spent)
+uint64_t wallet2::import_key_images(
+  const std::vector<std::pair<crypto::key_image, wallet::cold::KeyImageProofVariant>> &signed_key_images,
+  const size_t offset,
+  uint64_t &spent,
+  uint64_t &unspent,
+  const bool check_spent)
 {
+  using namespace tools::wallet::cold;
+
   PERF_TIMER(import_key_images_lots);
   COMMAND_RPC_IS_KEY_IMAGE_SPENT::request req = AUTO_VAL_INIT(req);
   COMMAND_RPC_IS_KEY_IMAGE_SPENT::response daemon_resp = AUTO_VAL_INIT(daemon_resp);
@@ -13745,23 +13617,17 @@ uint64_t wallet2::import_key_images(const std::vector<std::pair<crypto::key_imag
   {
     const transfer_details &td = m_transfers[n + offset];
     const crypto::key_image &key_image = signed_key_images[n].first;
-    const crypto::signature &signature = signed_key_images[n].second;
+    const KeyImageProofVariant &signature = signed_key_images[n].second;
 
     // get ephemeral public key
     const crypto::public_key pkey = td.get_public_key();
 
     if (!td.m_key_image_known || !(key_image == td.m_key_image))
     {
-      std::vector<const crypto::public_key*> pkeys;
-      pkeys.push_back(&pkey);
-      THROW_WALLET_EXCEPTION_IF(!(rct::scalarmultKey(rct::ki2rct(key_image), rct::curveOrder()) == rct::identity()),
-          error::wallet_internal_error, "Key image out of validity domain: input " + boost::lexical_cast<std::string>(n + offset) + "/"
-          + boost::lexical_cast<std::string>(signed_key_images.size()) + ", key image " + epee::string_tools::pod_to_hex(key_image));
-
-      THROW_WALLET_EXCEPTION_IF(!crypto::check_ring_signature((const crypto::hash&)key_image, key_image, pkeys, &signature),
+      THROW_WALLET_EXCEPTION_IF(!validate_key_image_proof(pkey, key_image, signature),
           error::signature_check_failed, boost::lexical_cast<std::string>(n + offset) + "/"
           + boost::lexical_cast<std::string>(signed_key_images.size()) + ", key image " + epee::string_tools::pod_to_hex(key_image)
-          + ", signature " + epee::string_tools::pod_to_hex(signature) + ", pubkey " + epee::string_tools::pod_to_hex(*pkeys[0]));
+          + ", signature " + key_image_proof_to_readable_string(signature)  + ", pubkey " + epee::string_tools::pod_to_hex(pkey));
     }
     req.key_images.push_back(epee::string_tools::pod_to_hex(key_image));
   }
@@ -13998,14 +13864,41 @@ bool wallet2::import_key_images(std::vector<crypto::key_image> key_images, size_
   return true;
 }
 
-bool wallet2::import_key_images(signed_tx_set & signed_tx, size_t offset, bool only_selected_transfers)
+void wallet2::import_key_images(std::unordered_map<crypto::public_key, crypto::key_image> key_image_by_ota)
+{
+  // update key images in transfer details with provided (one-time address, key image) pairs
+  for (std::size_t transfer_idx = 0; transfer_idx < m_transfers.size(); ++transfer_idx)
+  {
+    wallet2_basic::transfer_details &td = m_transfers[transfer_idx];
+    const crypto::public_key ota = td.get_public_key();
+    const auto ki_it = key_image_by_ota.find(ota);
+    if (ki_it == key_image_by_ota.cend())
+      continue;
+    td.m_key_image = ki_it->second;
+    td.m_key_image_known = true;
+    td.m_key_image_partial = false;
+    td.m_key_image_request = false;
+    m_key_images[td.m_key_image] = transfer_idx;
+    m_pub_keys[ota] = transfer_idx;
+  }
+
+  // erase entries from `key_image_by_ota` with known one-time addresses
+  // this isn't done in the previous loop b/c of the existence of the burning bug
+  for (const auto &p : m_pub_keys)
+    key_image_by_ota.erase(p.first);
+
+  // save the remaining entries in `m_cold_key_images` for future use during scanning
+  m_cold_key_images.merge(key_image_by_ota);
+}
+
+bool wallet2::import_key_images(wallet::cold::SignedFullTransactionSet & signed_tx, size_t offset, bool only_selected_transfers)
 {
   std::unordered_set<size_t> selected_transfers;
   if (only_selected_transfers)
   {
     for (const pending_tx & ptx : signed_tx.ptx)
     {
-      for (const size_t s: ptx.selected_transfers)
+      for (const size_t s: wallet::collect_selected_transfer_indices(ptx.construction_data, m_transfers))
         selected_transfers.insert(s);
     }
   }
@@ -14483,10 +14376,10 @@ void wallet2::import_blockchain(const std::tuple<size_t, crypto::hash, std::vect
   // FIXME: the above is only checking genesis not syncing. This function also needs to import tree elems to work correctly
 }
 //----------------------------------------------------------------------------------------------------
-std::tuple<uint64_t, uint64_t, std::vector<tools::wallet2::exported_transfer_details>> wallet2::export_outputs(bool all, uint32_t start, uint32_t count) const
+std::tuple<uint64_t, uint64_t, std::vector<wallet::cold::exported_transfer_details_variant>> wallet2::export_outputs(bool all, uint32_t start, uint32_t count) const
 {
   PERF_TIMER(export_outputs);
-  std::vector<tools::wallet2::exported_transfer_details> outs;
+  std::vector<wallet::cold::exported_transfer_details_variant> outs;
 
   // invalid cases
   THROW_WALLET_EXCEPTION_IF(count == 0, error::wallet_internal_error, "Nothing requested");
@@ -14504,29 +14397,14 @@ std::tuple<uint64_t, uint64_t, std::vector<tools::wallet2::exported_transfer_det
   else
     offset = start;
 
+  const auto addr_dev = get_cryptonote_address_device();
+
   outs.reserve(m_transfers.size() - offset);
   for (size_t n = offset; n < m_transfers.size() && n - offset < count; ++n)
   {
     const transfer_details &td = m_transfers[n];
-
-    exported_transfer_details etd;
-    etd.m_pubkey = td.get_public_key();
-    etd.m_tx_pubkey = get_tx_pub_key_from_extra(td.m_tx, td.m_pk_index);
-    etd.m_internal_output_index = td.m_internal_output_index;
-    etd.m_global_output_index = td.m_global_output_index;
-    etd.m_flags.flags = 0;
-    etd.m_flags.m_spent = td.m_spent;
-    etd.m_flags.m_frozen = td.m_frozen;
-    etd.m_flags.m_rct = td.m_rct;
-    etd.m_flags.m_key_image_known = td.m_key_image_known;
-    etd.m_flags.m_key_image_request = td.m_key_image_request;
-    etd.m_flags.m_key_image_partial = td.m_key_image_partial;
-    etd.m_amount = td.m_amount;
-    etd.m_additional_tx_keys = get_additional_tx_pub_keys_from_extra(td.m_tx);
-    etd.m_subaddr_index_major = td.m_subaddr_index.major;
-    etd.m_subaddr_index_minor = td.m_subaddr_index.minor;
-
-    outs.push_back(etd);
+    wallet::cold::exported_transfer_details_variant &etd = outs.emplace_back();
+    etd = wallet::cold::export_cold_output(td, *addr_dev);
   }
 
   return std::make_tuple(offset, m_transfers.size(), outs);
@@ -14536,22 +14414,20 @@ std::string wallet2::export_outputs_to_str(bool all, uint32_t start, uint32_t co
 {
   PERF_TIMER(export_outputs_to_str);
 
-  std::stringstream oss;
-  binary_archive<true> ar(oss);
   auto outputs = export_outputs(all, start, count);
-  THROW_WALLET_EXCEPTION_IF(!::serialization::serialize(ar, outputs), error::wallet_internal_error, "Failed to serialize output data");
 
-  std::string magic(OUTPUT_EXPORT_FILE_MAGIC, strlen(OUTPUT_EXPORT_FILE_MAGIC));
-  const cryptonote::account_public_address &keys = get_account().get_keys().m_account_address;
-  std::string header;
-  header += std::string((const char *)&keys.m_spend_public_key, sizeof(crypto::public_key));
-  header += std::string((const char *)&keys.m_view_public_key, sizeof(crypto::public_key));
-  PERF_TIMER(export_outputs_encryption);
-  std::string ciphertext = encrypt_with_view_secret_key(header + oss.str());
-  return magic + ciphertext;
+  std::string outputs_str;
+  wallet::cold::encrypt_exported_outputs(std::get<0>(outputs),
+    std::get<1>(outputs),
+    std::get<2>(outputs),
+    m_account.get_keys().m_account_address.m_spend_public_key,
+    m_account.get_keys().m_view_secret_key,
+    m_kdf_rounds,
+    outputs_str);
+  return outputs_str;
 }
 //----------------------------------------------------------------------------------------------------
-size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<tools::wallet2::transfer_details>> &outputs)
+size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<transfer_details>> &outputs)
 {
   PERF_TIMER(import_outputs);
 
@@ -14602,24 +14478,31 @@ size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<
 process:
 
     // the hot wallet wouldn't have known about key images (except if we already exported them)
-    cryptonote::keypair in_ephemeral;
-
-    THROW_WALLET_EXCEPTION_IF(td.m_tx.vout.empty(), error::wallet_internal_error, "tx with no outputs at index " + boost::lexical_cast<std::string>(i + offset));
-    crypto::public_key tx_pub_key = get_tx_pub_key_from_received_outs(td);
-    const std::vector<crypto::public_key> additional_tx_pub_keys = get_additional_tx_pub_keys_from_extra(td.m_tx);
-
-    THROW_WALLET_EXCEPTION_IF(td.m_internal_output_index >= td.m_tx.vout.size(),
-        error::wallet_internal_error, "Internal index is out of range");
-    crypto::public_key out_key = td.get_public_key();
-    if (should_expand(td.m_subaddr_index))
-      create_one_off_subaddress(td.m_subaddr_index);
-    bool r = cryptonote::generate_key_image_helper(m_account.get_keys(), m_subaddresses, out_key, tx_pub_key, additional_tx_pub_keys, td.m_internal_output_index, in_ephemeral, td.m_key_image, m_account.get_device());
-    THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
-    td.m_key_image_known = true;
     td.m_key_image_request = true;
     td.m_key_image_partial = false;
-    THROW_WALLET_EXCEPTION_IF(in_ephemeral.pub != out_key,
-        error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key at index " + boost::lexical_cast<std::string>(i + offset));
+    if (should_expand(td.m_subaddr_index))
+        create_one_off_subaddress(td.m_subaddr_index);
+    if (!td.m_key_image_known)
+    {
+      // generate pre-Carrot key image if not known
+
+      cryptonote::keypair in_ephemeral;
+
+      THROW_WALLET_EXCEPTION_IF(td.m_tx.vout.empty(), error::wallet_internal_error, "tx with no outputs at index " + boost::lexical_cast<std::string>(i + offset));
+      crypto::public_key tx_pub_key = get_tx_pub_key_from_received_outs(td);
+      const std::vector<crypto::public_key> additional_tx_pub_keys = get_additional_tx_pub_keys_from_extra(td.m_tx);
+
+      THROW_WALLET_EXCEPTION_IF(td.m_internal_output_index >= td.m_tx.vout.size(),
+          error::wallet_internal_error, "Internal index is out of range");
+      crypto::public_key out_key = td.get_public_key();
+      bool r = cryptonote::generate_key_image_helper(m_account.get_keys(), m_subaddresses, out_key, tx_pub_key, additional_tx_pub_keys, td.m_internal_output_index, in_ephemeral, td.m_key_image, m_account.get_device());
+      THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
+      td.m_key_image_known = true;
+      THROW_WALLET_EXCEPTION_IF(in_ephemeral.pub != out_key,
+          error::wallet_internal_error, "key_image generated ephemeral public key not matched with output_key at index " + boost::lexical_cast<std::string>(i + offset));
+    }
+    if (should_expand(td.m_subaddr_index))
+      expand_subaddresses(td.m_subaddr_index);
 
     m_key_images[td.m_key_image] = i + offset;
     m_pub_keys[td.get_public_key()] = i + offset;
@@ -14629,7 +14512,7 @@ process:
   return m_transfers.size();
 }
 //----------------------------------------------------------------------------------------------------
-size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<tools::wallet2::exported_transfer_details>> &outputs)
+size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<wallet::cold::exported_pre_carrot_transfer_details>> &outputs)
 {
   PERF_TIMER(import_outputs);
 
@@ -14639,7 +14522,7 @@ size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<
   // we can now import piecemeal
   const size_t offset = std::get<0>(outputs);
   const size_t num_outputs = std::get<1>(outputs);
-  const std::vector<tools::wallet2::exported_transfer_details> &output_array = std::get<2>(outputs);
+  const std::vector<wallet::cold::exported_pre_carrot_transfer_details> &output_array = std::get<2>(outputs);
 
   THROW_WALLET_EXCEPTION_IF(offset > m_transfers.size(), error::wallet_internal_error,
       "Imported outputs omit more outputs that we know of. Try using export_outputs all.");
@@ -14655,7 +14538,7 @@ size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<
 
   for (size_t i = 0; i < output_array.size(); ++i)
   {
-    exported_transfer_details etd = output_array[i];
+    wallet::cold::exported_pre_carrot_transfer_details etd = output_array[i];
     transfer_details &td = m_transfers[i + offset];
 
     // setup td with "cheap" loaded data
@@ -14699,7 +14582,8 @@ size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<
     cryptonote::tx_out out;
     out.amount = etd.m_amount;
     out.target = tk;
-    td.m_tx.vout.resize(etd.m_internal_output_index);
+    const cryptonote::tx_out fake_out{.target = cryptonote::txout_to_key{}};
+    td.m_tx.vout.resize(etd.m_internal_output_index, fake_out);
     td.m_tx.vout.push_back(out);
 
     td.m_pk_index = 0;
@@ -14717,6 +14601,8 @@ size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<
       create_one_off_subaddress(td.m_subaddr_index);
     bool r = cryptonote::generate_key_image_helper(m_account.get_keys(), m_subaddresses, out_key, tx_pub_key, additional_tx_pub_keys, td.m_internal_output_index, in_ephemeral, td.m_key_image, m_account.get_device());
     THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, "Failed to generate key image");
+    if (should_expand(td.m_subaddr_index))
+      expand_subaddresses(td.m_subaddr_index);
     td.m_key_image_known = true;
     td.m_key_image_request = true;
     td.m_key_image_partial = false;
@@ -14730,75 +14616,39 @@ size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<
   return m_transfers.size();
 }
 //----------------------------------------------------------------------------------------------------
+size_t wallet2::import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<wallet::cold::exported_transfer_details_variant>> &outputs)
+{
+  // expand cold outputs
+  wallet2_basic::transfer_container expanded_outputs;
+  expanded_outputs.reserve(std::get<2>(outputs).size());
+  for (const wallet::cold::exported_transfer_details_variant &cold_output : std::get<2>(outputs))
+    expanded_outputs.push_back(wallet::cold::import_cold_output(cold_output,
+      *this->get_cryptonote_address_device(),
+      *this->get_key_image_device()));
+
+  // import in `wallet2_basic::transfer_details` form
+  return import_outputs({std::get<0>(outputs), std::get<1>(outputs), std::move(expanded_outputs)});
+}
+//----------------------------------------------------------------------------------------------------
 size_t wallet2::import_outputs_from_str(const std::string &outputs_st)
 {
   PERF_TIMER(import_outputs_from_str);
-  std::string data = outputs_st;
-  const size_t magiclen = strlen(OUTPUT_EXPORT_FILE_MAGIC);
-  if (data.size() < magiclen || memcmp(data.data(), OUTPUT_EXPORT_FILE_MAGIC, magiclen))
-  {
-    THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Bad magic from outputs"));
-  }
-
-  try
-  {
-    PERF_TIMER(import_outputs_decrypt);
-    data = decrypt_with_view_secret_key(std::string(data, magiclen));
-  }
-  catch (const std::exception &e)
-  {
-    THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Failed to decrypt outputs: ") + e.what());
-  }
-
-  const size_t headerlen = 2 * sizeof(crypto::public_key);
-  if (data.size() < headerlen)
-  {
-    THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Bad data size for outputs"));
-  }
-  const crypto::public_key &public_spend_key = *(const crypto::public_key*)&data[0];
-  const crypto::public_key &public_view_key = *(const crypto::public_key*)&data[sizeof(crypto::public_key)];
-  const cryptonote::account_public_address &keys = get_account().get_keys().m_account_address;
-  if (public_spend_key != keys.m_spend_public_key || public_view_key != keys.m_view_public_key)
-  {
-    THROW_WALLET_EXCEPTION(error::wallet_internal_error, std::string("Outputs from are for a different account"));
-  }
 
   size_t imported_outputs = 0;
-  bool loaded = false;
   try
   {
-    std::string body(data, headerlen);
+    // decrypt payload
+    std::tuple<uint64_t, uint64_t, std::vector<wallet::cold::exported_transfer_details_variant>> cold_outputs;
+    wallet::cold::decrypt_exported_outputs(outputs_st,
+      m_account.get_keys().m_account_address.m_spend_public_key,
+      m_account.get_keys().m_view_secret_key,
+      m_kdf_rounds,
+      std::get<0>(cold_outputs),
+      std::get<1>(cold_outputs),
+      std::get<2>(cold_outputs));
 
-    std::tuple<uint64_t, uint64_t, std::vector<tools::wallet2::exported_transfer_details>> new_outputs;
-    try
-    {
-      binary_archive<false> ar{epee::strspan<std::uint8_t>(body)};
-      if (::serialization::serialize(ar, new_outputs))
-        if (::serialization::check_stream_state(ar))
-          loaded = true;
-    }
-    catch (...) {}
-    if (!loaded)
-      std::get<2>(new_outputs).clear();
-
-    std::tuple<uint64_t, uint64_t, std::vector<tools::wallet2::transfer_details>> outputs;
-    if (!loaded) try
-    {
-      binary_archive<false> ar{epee::strspan<std::uint8_t>(body)};
-      if (::serialization::serialize(ar, outputs))
-        if (::serialization::check_stream_state(ar))
-          loaded = true;
-    }
-    catch (...) {}
-
-    if (!loaded)
-    {
-      std::get<0>(outputs) = 0;
-      std::get<1>(outputs) = 0;
-      std::get<2>(outputs) = {};
-    }
-
-    imported_outputs = !std::get<2>(new_outputs).empty() ? import_outputs(new_outputs) : !std::get<2>(outputs).empty() ? import_outputs(outputs) : 0;
+    // import
+    imported_outputs = import_outputs(cold_outputs);
   }
   catch (const std::exception &e)
   {
@@ -15136,23 +14986,7 @@ size_t wallet2::import_multisig(std::vector<cryptonote::blobdata> blobs, bool re
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::encrypt(const char *plaintext, size_t len, const crypto::secret_key &skey, bool authenticated) const
 {
-  crypto::chacha_key key;
-  crypto::generate_chacha_key(&skey, sizeof(skey), key, m_kdf_rounds);
-  std::string ciphertext;
-  crypto::chacha_iv iv = crypto::rand<crypto::chacha_iv>();
-  ciphertext.resize(len + sizeof(iv) + (authenticated ? sizeof(crypto::signature) : 0));
-  crypto::chacha20(plaintext, len, key, iv, &ciphertext[sizeof(iv)]);
-  memcpy(&ciphertext[0], &iv, sizeof(iv));
-  if (authenticated)
-  {
-    crypto::hash hash;
-    crypto::cn_fast_hash(ciphertext.data(), ciphertext.size() - sizeof(signature), hash);
-    crypto::public_key pkey;
-    crypto::secret_key_to_public_key(skey, pkey);
-    crypto::signature &signature = *(crypto::signature*)&ciphertext[ciphertext.size() - sizeof(crypto::signature)];
-    crypto::generate_signature(hash, pkey, skey, signature);
-  }
-  return ciphertext;
+  return wallet::encrypt_with_ec_key(plaintext, len, skey, authenticated, m_kdf_rounds);
 }
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::encrypt(const epee::span<char> &plaintext, const crypto::secret_key &skey, bool authenticated) const
@@ -15175,37 +15009,16 @@ std::string wallet2::encrypt_with_view_secret_key(const std::string &plaintext, 
   return encrypt(plaintext, get_account().get_keys().m_view_secret_key, authenticated);
 }
 //----------------------------------------------------------------------------------------------------
-template<typename T>
-T wallet2::decrypt(const std::string &ciphertext, const crypto::secret_key &skey, bool authenticated) const
+epee::wipeable_string wallet2::decrypt(const std::string &ciphertext, const crypto::secret_key &skey, bool authenticated) const
 {
-  const size_t prefix_size = sizeof(chacha_iv) + (authenticated ? sizeof(crypto::signature) : 0);
-  THROW_WALLET_EXCEPTION_IF(ciphertext.size() < prefix_size,
-    error::wallet_internal_error, "Unexpected ciphertext size");
-
-  crypto::chacha_key key;
-  crypto::generate_chacha_key(&skey, sizeof(skey), key, m_kdf_rounds);
-  const crypto::chacha_iv &iv = *(const crypto::chacha_iv*)&ciphertext[0];
-  if (authenticated)
-  {
-    crypto::hash hash;
-    crypto::cn_fast_hash(ciphertext.data(), ciphertext.size() - sizeof(signature), hash);
-    crypto::public_key pkey;
-    crypto::secret_key_to_public_key(skey, pkey);
-    const crypto::signature &signature = *(const crypto::signature*)&ciphertext[ciphertext.size() - sizeof(crypto::signature)];
-    THROW_WALLET_EXCEPTION_IF(!crypto::check_signature(hash, pkey, signature),
-      error::wallet_internal_error, "Failed to authenticate ciphertext");
-  }
-  std::unique_ptr<char[]> buffer{new char[ciphertext.size() - prefix_size]};
-  auto wiper = epee::misc_utils::create_scope_leave_handler([&]() { memwipe(buffer.get(), ciphertext.size() - prefix_size); });
-  crypto::chacha20(ciphertext.data() + sizeof(iv), ciphertext.size() - prefix_size, key, iv, buffer.get());
-  return T(buffer.get(), ciphertext.size() - prefix_size);
+  return wallet::decrypt_with_ec_key(ciphertext.data(), ciphertext.size(), skey, authenticated, m_kdf_rounds);
 }
-//----------------------------------------------------------------------------------------------------
-template epee::wipeable_string wallet2::decrypt(const std::string &ciphertext, const crypto::secret_key &skey, bool authenticated) const;
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::decrypt_with_view_secret_key(const std::string &ciphertext, bool authenticated) const
 {
-  return decrypt(ciphertext, get_account().get_keys().m_view_secret_key, authenticated);
+  const epee::wipeable_string pt = decrypt(ciphertext, get_account().get_keys().m_view_secret_key, authenticated);
+  std::string pt_str(pt.data(), pt.size());
+  return pt_str;
 }
 //----------------------------------------------------------------------------------------------------
 std::string wallet2::make_uri(const std::string &address, const std::string &payment_id, uint64_t amount, const std::string &tx_description, const std::string &recipient_name, std::string &error) const

@@ -269,7 +269,6 @@ private:
     };
 
     using transfer_details = wallet2_basic::transfer_details;
-    using exported_transfer_details = wallet::cold::exported_pre_carrot_transfer_details;
 
     typedef std::vector<uint64_t> amounts_container;
     using payment_details = wallet2_basic::payment_details;
@@ -292,8 +291,6 @@ private:
 
     using multisig_sig = wallet::multisig_sig;
     using pending_tx = wallet::pending_tx;
-
-    using unsigned_tx_set = wallet::cold::UnsignedPreCarrotTransactionSet;
     using signed_tx_set = wallet::cold::SignedFullTransactionSet;
 
     struct multisig_tx_set
@@ -694,16 +691,19 @@ private:
     bool save_multisig_tx(const std::vector<pending_tx>& ptx_vector, const std::string &filename);
     multisig_tx_set make_multisig_tx_set(const std::vector<pending_tx>& ptx_vector) const;
     // load unsigned tx from file and sign it. Takes confirmation callback as argument. Used by the cli wallet
-    bool sign_tx(const std::string &unsigned_filename, const std::string &signed_filename, std::vector<wallet2::pending_tx> &ptx, std::function<bool(const unsigned_tx_set&)> accept_func = NULL, bool export_raw = false);
+    bool sign_tx(const std::string &unsigned_filename, const std::string &signed_filename, std::vector<wallet2::pending_tx> &ptx, std::function<bool(const wallet::cold::UnsignedTransactionSetVariant&)> accept_func = NULL, bool export_raw = false);
     // sign unsigned tx. Takes unsigned_tx_set as argument. Used by GUI
-    bool sign_tx(unsigned_tx_set &exported_txs, const std::string &signed_filename, std::vector<wallet2::pending_tx> &ptx, bool export_raw = false);
-    bool sign_tx(unsigned_tx_set &exported_txs, std::vector<wallet2::pending_tx> &ptx, signed_tx_set &signed_txs);
-    std::string sign_tx_dump_to_str(unsigned_tx_set &exported_txs, std::vector<wallet2::pending_tx> &ptx, signed_tx_set &signed_txes);
+    bool sign_tx(const wallet::cold::UnsignedTransactionSetVariant &exported_txs, const std::string &signed_filename, std::vector<wallet2::pending_tx> &ptx, bool export_raw = false);
+    bool sign_tx(const wallet::cold::UnsignedTransactionSetVariant &exported_txs, std::vector<wallet2::pending_tx> &ptx, wallet::cold::SignedTransactionSetVariant &signed_txs);
+    bool sign_tx(const wallet::cold::UnsignedPreCarrotTransactionSet &exported_txs, std::vector<wallet2::pending_tx> &ptx, wallet::cold::SignedFullTransactionSet &signed_txs);
+    bool sign_tx(const wallet::cold::UnsignedCarrotTransactionSetV1 &exported_txs, wallet::cold::SignedCarrotTransactionSetV1 &signed_txs);
+    std::string sign_tx_dump_to_str(const wallet::cold::UnsignedTransactionSetVariant &exported_txs, std::vector<wallet2::pending_tx> &ptx, wallet::cold::SignedTransactionSetVariant &signed_txes);
     // load unsigned_tx_set from file. 
-    bool load_unsigned_tx(const std::string &unsigned_filename, unsigned_tx_set &exported_txs) const;
-    bool parse_unsigned_tx_from_str(const std::string &unsigned_tx_st, unsigned_tx_set &exported_txs) const;
-    bool load_tx(const std::string &signed_filename, std::vector<tools::wallet2::pending_tx> &ptx, std::function<bool(const signed_tx_set&)> accept_func = NULL);
-    bool parse_tx_from_str(const std::string &signed_tx_st, std::vector<tools::wallet2::pending_tx> &ptx, std::function<bool(const signed_tx_set &)> accept_func);
+    bool load_unsigned_tx(const std::string &unsigned_filename, wallet::cold::UnsignedTransactionSetVariant &exported_txs) const;
+    bool parse_unsigned_tx_from_str(const std::string &unsigned_tx_st, wallet::cold::UnsignedTransactionSetVariant &exported_txs) const;
+    bool get_transaction_proposals_from_unsigned_tx(const wallet::cold::UnsignedTransactionSetVariant &exported_txs, std::vector<wallet::tx_reconstruct_variant_t> &tx_proposals_out) const;
+    bool load_tx(const std::string &signed_filename, std::vector<tools::wallet2::pending_tx> &ptx, std::function<bool(const wallet::cold::SignedFullTransactionSet&)> accept_func = NULL);
+    bool parse_tx_from_str(const std::string &signed_tx_st, std::vector<tools::wallet2::pending_tx> &ptx, std::function<bool(const signed_tx_set&)> accept_func);
     /**
      * brief: create_transactions_2: create "transfer" style txs (or tx proposals in hot/cold & multisig wallets)
      * param: dsts - list of (address, amount) payments to fulfill
@@ -759,7 +759,7 @@ private:
 
     bool sanity_check(const std::vector<wallet2::pending_tx> &ptx_vector, const std::vector<cryptonote::tx_destination_entry>& dsts, const unique_index_container& subtract_fee_from_outputs = {}) const;
     void cold_tx_aux_import(const std::vector<pending_tx>& ptx, const std::vector<std::string>& tx_device_aux);
-    void cold_sign_tx(const std::vector<pending_tx>& ptx_vector, signed_tx_set &exported_txs, std::vector<cryptonote::address_parse_info> &dsts_info, std::vector<std::string> & tx_device_aux);
+    void cold_sign_tx(const std::vector<pending_tx>& ptx_vector, wallet::cold::SignedFullTransactionSet &exported_txs, std::vector<cryptonote::address_parse_info> &dsts_info, std::vector<std::string> & tx_device_aux);
     uint64_t cold_key_image_sync(uint64_t &spent, uint64_t &unspent);
     void device_show_address(uint32_t account_index, uint32_t address_index, const boost::optional<crypto::hash8> &payment_id);
     bool parse_multisig_tx_from_str(std::string multisig_tx_st, multisig_tx_set &exported_txs) const;
@@ -1188,9 +1188,10 @@ private:
     bool verify_with_public_key(const std::string &data, const crypto::public_key &public_key, const std::string &signature) const;
 
     // Import/Export wallet data
-    std::tuple<uint64_t, uint64_t, std::vector<tools::wallet2::exported_transfer_details>> export_outputs(bool all = false, uint32_t start = 0, uint32_t count = 0xffffffff) const;
+    std::tuple<uint64_t, uint64_t, std::vector<wallet::cold::exported_transfer_details_variant>> export_outputs(bool all = false, uint32_t start = 0, uint32_t count = 0xffffffff) const;
     std::string export_outputs_to_str(bool all = false, uint32_t start = 0, uint32_t count = 0xffffffff) const;
-    size_t import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<tools::wallet2::exported_transfer_details>> &outputs);
+    size_t import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<wallet::cold::exported_pre_carrot_transfer_details>> &outputs);
+    size_t import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<wallet::cold::exported_transfer_details_variant>> &outputs);
     size_t import_outputs(const std::tuple<uint64_t, uint64_t, std::vector<tools::wallet2::transfer_details>> &outputs);
     size_t import_outputs_from_str(const std::string &outputs_st);
     payment_container export_payments() const;
@@ -1199,11 +1200,12 @@ private:
     std::tuple<size_t, crypto::hash, std::vector<crypto::hash>> export_blockchain() const;
     void import_blockchain(const std::tuple<size_t, crypto::hash, std::vector<crypto::hash>> &bc);
     bool export_key_images(const std::string &filename, bool all = false) const;
-    std::pair<uint64_t, std::vector<std::pair<crypto::key_image, crypto::signature>>> export_key_images(bool all = false) const;
-    uint64_t import_key_images(const std::vector<std::pair<crypto::key_image, crypto::signature>> &signed_key_images, size_t offset, uint64_t &spent, uint64_t &unspent, bool check_spent = true);
+    std::pair<uint64_t, std::vector<std::pair<crypto::key_image, wallet::cold::KeyImageProofVariant>>> export_key_images(bool all = false) const;
+    uint64_t import_key_images(const std::vector<std::pair<crypto::key_image, wallet::cold::KeyImageProofVariant>> &signed_key_images, size_t offset, uint64_t &spent, uint64_t &unspent, bool check_spent = true);
     uint64_t import_key_images(const std::string &filename, uint64_t &spent, uint64_t &unspent);
     bool import_key_images(std::vector<crypto::key_image> key_images, size_t offset=0, boost::optional<std::unordered_set<size_t>> selected_transfers=boost::none);
-    bool import_key_images(signed_tx_set & signed_tx, size_t offset=0, bool only_selected_transfers=false);
+    void import_key_images(std::unordered_map<crypto::public_key, crypto::key_image> key_image_by_ota);
+    bool import_key_images(wallet::cold::SignedFullTransactionSet & signed_tx, size_t offset=0, bool only_selected_transfers=false);
     crypto::public_key get_tx_pub_key_from_received_outs(const tools::wallet2::transfer_details &td) const;
 
     void update_pool_state(std::vector<std::tuple<cryptonote::transaction, crypto::hash, bool>> &process_txs);
@@ -1215,7 +1217,7 @@ private:
     std::string encrypt(const std::string &plaintext, const crypto::secret_key &skey, bool authenticated = true) const;
     std::string encrypt(const epee::wipeable_string &plaintext, const crypto::secret_key &skey, bool authenticated = true) const;
     std::string encrypt_with_view_secret_key(const std::string &plaintext, bool authenticated = true) const;
-    template<typename T=std::string> T decrypt(const std::string &ciphertext, const crypto::secret_key &skey, bool authenticated = true) const;
+    epee::wipeable_string decrypt(const std::string &ciphertext, const crypto::secret_key &skey, bool authenticated = true) const;
     std::string decrypt_with_view_secret_key(const std::string &ciphertext, bool authenticated = true) const;
 
     std::string make_uri(const std::string &address, const std::string &payment_id, uint64_t amount, const std::string &tx_description, const std::string &recipient_name, std::string &error) const;

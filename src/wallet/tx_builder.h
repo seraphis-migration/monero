@@ -33,14 +33,13 @@
 #include "carrot_impl/input_selection.h"
 #include "carrot_impl/spend_device.h"
 #include "carrot_impl/subaddress_map.h"
-#include "fee_priority.h"
 #include "fcmp_pp/tree_cache.h"
+#include "ringct/rctTypes.h"
 #include "wallet2_basic/wallet2_types.h"
 
 //third party headers
 
 //standard headers
-#include <functional>
 #include <unordered_map>
 
 //forward declarations
@@ -110,10 +109,15 @@ std::optional<crypto::hash8> short_payment_id(const tx_reconstruct_variant_t&);
 std::optional<crypto::hash> long_payment_id(const tx_reconstruct_variant_t&);
 /// "true-spend" one-time addresses in inputs (in proposal order, not final tx order)
 std::vector<crypto::public_key> spent_onetime_addresses(const tx_reconstruct_variant_t&);
-/// sum total of input amounts
-boost::multiprecision::uint128_t input_amount_total(const tx_reconstruct_variant_t&);
+/// input amounts (in proposal order, not final tx order)
+std::vector<rct::xmr_amount> input_amounts(const tx_reconstruct_variant_t&,
+    const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const carrot::view_incoming_key_device *k_view_incoming_dev,
+    const carrot::view_balance_secret_device *s_view_balance_dev);
 /// ring sizes (in proposal order, not final tx order)
 std::vector<std::uint64_t> ring_sizes(const tx_reconstruct_variant_t&);
+/// sum total of input amounts
+boost::multiprecision::uint128_t input_amount_total(const tx_reconstruct_variant_t&);
 /// unlock time
 std::uint64_t unlock_time(const tx_reconstruct_variant_t&);
 /// extra tx fields (includes PIDs and enote ephemeral pubkeys in pre-Carrot ONLY)
@@ -128,7 +132,6 @@ struct pending_tx
     uint64_t dust, fee;
     bool dust_added_to_fee;
     cryptonote::tx_destination_entry change_dts;
-    std::vector<size_t> selected_transfers;
     std::string key_images;
     crypto::secret_key tx_key;
     std::vector<crypto::secret_key> additional_tx_keys;
@@ -284,7 +287,7 @@ std::vector<std::size_t> collect_selected_transfer_indices(const tx_reconstruct_
 cryptonote::transaction finalize_fcmps_and_range_proofs(
     const std::vector<crypto::key_image> &sorted_input_key_images,
     const std::vector<FcmpRerandomizedOutputCompressed> &sorted_rerandomized_outputs,
-    const fcmp_pp::OutputPair &sorted_output_pairs,
+    const std::vector<fcmp_pp::OutputPair> &sorted_output_pairs,
     const std::vector<fcmp_pp::FcmpPpSalProof> &sorted_sal_proofs,
     const std::vector<carrot::RCTOutputEnoteProposal> &output_enote_proposals,
     const carrot::encrypted_payment_id_t &encrypted_payment_id,

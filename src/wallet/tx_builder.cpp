@@ -38,6 +38,7 @@
 #include "carrot_impl/multi_tx_proposal_utils.h"
 #include "carrot_impl/tx_builder_inputs.h"
 #include "carrot_impl/tx_builder_outputs.h"
+#include "carrot_impl/tx_proposal.h"
 #include "common/apply_permutation.h"
 #include "common/perf_timer.h"
 #include "common/threadpool.h"
@@ -383,6 +384,74 @@ std::vector<crypto::public_key> spent_onetime_addresses(const tx_reconstruct_var
     return std::visit(spent_onetime_addresses_visitor{}, v);
 }
 //-------------------------------------------------------------------------------------------------------------------
+std::vector<rct::xmr_amount> input_amounts(const tx_reconstruct_variant_t &v,
+    const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const carrot::view_incoming_key_device *k_view_incoming_dev,
+    const carrot::view_balance_secret_device *s_view_balance_dev)
+{
+    struct input_amounts_visitor
+    {
+        std::vector<rct::xmr_amount> operator()(const PreCarrotTransactionProposal &p) const
+        {
+            std::vector<rct::xmr_amount> res;
+            res.reserve(p.sources.size());
+            for (const cryptonote::tx_source_entry &src : p.sources)
+                res.push_back(src.amount);
+            return res;
+        }
+
+        std::vector<rct::xmr_amount> operator()(const carrot::CarrotTransactionProposalV1 &p) const
+        {
+            std::vector<rct::xmr_amount> res;
+            res.reserve(p.input_proposals.size());
+            for (const carrot::InputProposalV1 &input_proposal : p.input_proposals)
+            {
+                rct::key amount_blinding_factor;
+                const bool scan_success = carrot::try_scan_opening_hint_amount(
+                    input_proposal,
+                    main_address_spend_pubkeys,
+                    k_view_incoming_dev,
+                    s_view_balance_dev,
+                    res.emplace_back(),
+                    amount_blinding_factor);
+                CARROT_CHECK_AND_THROW(scan_success,
+                    carrot::unexpected_scan_failure, "Failed to scan output opening hint for amount");
+            }
+            return res;
+        }
+
+        const epee::span<const crypto::public_key> main_address_spend_pubkeys;
+        const carrot::view_incoming_key_device *k_view_incoming_dev;
+        const carrot::view_balance_secret_device *s_view_balance_dev;
+    };
+    return std::visit(input_amounts_visitor{
+            main_address_spend_pubkeys, 
+            k_view_incoming_dev,
+            s_view_balance_dev},
+        v);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<std::uint64_t> ring_sizes(const tx_reconstruct_variant_t &v)
+{
+    struct ring_sizes_visitor
+    {
+        std::vector<std::uint64_t> operator()(const PreCarrotTransactionProposal &p) const
+        {
+            std::vector<std::uint64_t> res;
+            res.reserve(p.sources.size());
+            for (const cryptonote::tx_source_entry &src : p.sources)
+                res.push_back(src.outputs.size());
+            return res;
+        }
+
+        std::vector<std::uint64_t> operator()(const carrot::CarrotTransactionProposalV1 &p) const
+        {
+            return std::vector<std::uint64_t>(p.input_proposals.size());
+        }
+    };
+    return std::visit(ring_sizes_visitor{}, v);
+}
+//-------------------------------------------------------------------------------------------------------------------
 boost::multiprecision::uint128_t input_amount_total(const tx_reconstruct_variant_t &v)
 {
     struct input_amount_total_visitor
@@ -406,27 +475,6 @@ boost::multiprecision::uint128_t input_amount_total(const tx_reconstruct_variant
         }
     };
     return std::visit(input_amount_total_visitor{}, v);
-}
-//-------------------------------------------------------------------------------------------------------------------
-std::vector<std::uint64_t> ring_sizes(const tx_reconstruct_variant_t &v)
-{
-    struct ring_sizes_visitor
-    {
-        std::vector<std::uint64_t> operator()(const PreCarrotTransactionProposal &p) const
-        {
-            std::vector<std::uint64_t> res;
-            res.reserve(p.sources.size());
-            for (const cryptonote::tx_source_entry &src : p.sources)
-                res.push_back(src.outputs.size());
-            return res;
-        }
-
-        std::vector<std::uint64_t> operator()(const carrot::CarrotTransactionProposalV1 &p) const
-        {
-            return std::vector<std::uint64_t>(p.input_proposals.size());
-        }
-    };
-    return std::visit(ring_sizes_visitor{}, v);
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::uint64_t unlock_time(const tx_reconstruct_variant_t &v)

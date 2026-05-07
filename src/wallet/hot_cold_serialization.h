@@ -30,6 +30,7 @@
 
 //local headers
 #include "hot_cold.h"
+#include "serialization/binary_archive.h"
 #include "tx_builder_serialization.h"
 
 //third party headers
@@ -86,6 +87,56 @@ static bool handle_version_passthrough(Archive<W> &ar,
     }
     return min_version <= version_inout && version_inout <= max_version;
 }
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+struct outputs_message_v5
+{
+    crypto::public_key main_address_spend_pubkey;
+    crypto::public_key main_address_view_pubkey;
+    std::uint64_t transfers_offset; 
+    std::uint64_t transfers_size;
+    std::vector<exported_transfer_details_variant> outputs;
+
+    BEGIN_SERIALIZE_OBJECT()
+        FIELD(main_address_spend_pubkey)
+        FIELD(main_address_view_pubkey)
+        FIELD(transfers_offset)
+        FIELD(transfers_size)
+        FIELD(outputs)
+    END_SERIALIZE()
+};
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+struct key_image_message_v3
+{
+    std::uint64_t offset;
+    crypto::public_key main_address_spend_pubkey;
+    crypto::public_key main_address_view_pubkey;
+    std::vector<std::pair<crypto::key_image, crypto::signature>> univariate_key_images;
+
+    BEGIN_SERIALIZE_OBJECT()
+        FIELD(offset)
+        FIELD(main_address_spend_pubkey)
+        FIELD(main_address_view_pubkey)
+        FIELD(univariate_key_images)
+    END_SERIALIZE()
+};
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
+struct key_image_message_v4
+{
+    std::uint64_t offset;
+    crypto::public_key main_address_spend_pubkey;
+    crypto::public_key main_address_view_pubkey;
+    std::vector<std::pair<crypto::key_image, KeyImageProofVariant>> key_images;
+
+    BEGIN_SERIALIZE_OBJECT()
+        FIELD(offset)
+        FIELD(main_address_spend_pubkey)
+        FIELD(main_address_view_pubkey)
+        FIELD(key_images)
+    END_SERIALIZE()
+};
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 BEGIN_SERIALIZE_OBJECT_FN(exported_pre_carrot_transfer_details, uint32_t version = (uint32_t)-1)
@@ -163,11 +214,48 @@ BEGIN_SERIALIZE_OBJECT_FN(UnsignedPreCarrotTransactionSet, uint32_t version = (u
     FIELD_F(new_transfers)
 END_SERIALIZE()
 //-------------------------------------------------------------------------------------------------------------------
+BEGIN_SERIALIZE_OBJECT_FN(HotColdCarrotPaymentProposalV1)
+    FIELD_F(destination)
+    VARINT_FIELD_F(amount)
+END_SERIALIZE()
+//-------------------------------------------------------------------------------------------------------------------
+BEGIN_SERIALIZE_OBJECT_FN(HotColdCarrotPaymentProposalVerifiableSelfSendV1)
+    FIELD_F(subaddr_index)
+    VARINT_FIELD_F(amount)
+    VARINT_FIELD_F(enote_type)
+END_SERIALIZE()
+//-------------------------------------------------------------------------------------------------------------------
+BEGIN_SERIALIZE_OBJECT_FN(HotColdCarrotTransactionProposalV1)
+    FIELD_F(hot_cold_seed)
+    FIELD_F(input_onetime_addresses)
+    FIELD_F(normal_payment_proposals)
+    FIELD_F(selfsend_payment_proposals)
+    VARINT_FIELD_F(addr_derive_type)
+    VARINT_FIELD_F(fee)
+    FIELD_F(extra)
+END_SERIALIZE()
+//-------------------------------------------------------------------------------------------------------------------
+BEGIN_SERIALIZE_OBJECT_FN(UnsignedCarrotTransactionSetV1, uint32_t version = (uint32_t)-1)
+    PASSTHROUGH_VERSION(3, 3)
+    FIELD_F(tx_proposals)
+    FIELD_F(new_transfers)
+    VARINT_FIELD_F(starting_transfer_index)
+    FIELD_F(resend_tx_proposals)
+END_SERIALIZE()
+//-------------------------------------------------------------------------------------------------------------------
 BEGIN_SERIALIZE_OBJECT_FN(SignedFullTransactionSet, uint32_t version = (uint32_t)-1)
     PASSTHROUGH_VERSION(0, 0)
     FIELD_F(ptx)
     FIELD_F(key_images)
     FIELD_F(tx_key_images)
+END_SERIALIZE()
+//-------------------------------------------------------------------------------------------------------------------
+BEGIN_SERIALIZE_OBJECT_FN(SignedCarrotTransactionSetV1, uint32_t version = (uint32_t)-1)
+    PASSTHROUGH_VERSION(1, 1)
+    FIELD_F(tx_proposals)
+    FIELD_F(tx_input_proposals)
+    FIELD_F(signed_inputs)
+    FIELD_F(other_key_images)
 END_SERIALIZE()
 //-------------------------------------------------------------------------------------------------------------------
 } //namespace cold
@@ -185,4 +273,31 @@ BEGIN_SERIALIZE_VERSIONED_VARIANT(tools::wallet::cold::exported_transfer_details
     else
         LOAD_VARIANT_AS_OBJECT_OF_TYPE(exported_carrot_transfer_details)
 END_SERIALIZE_VERSIONED_VARIANT()
+//-------------------------------------------------------------------------------------------------------------------
+BEGIN_SERIALIZE_VERSIONED_VARIANT(tools::wallet::cold::UnsignedTransactionSetVariant)
+    using namespace tools::wallet::cold;
+    VERSION_FIELD(0)
+    if (version > 3)
+        return false;
+
+    if (version == 3)
+        LOAD_VARIANT_AS_OBJECT_OF_TYPE(UnsignedCarrotTransactionSetV1)
+    else
+        LOAD_VARIANT_AS_OBJECT_OF_TYPE(UnsignedPreCarrotTransactionSet)
+END_SERIALIZE_VERSIONED_VARIANT()
+//-------------------------------------------------------------------------------------------------------------------
+BEGIN_SERIALIZE_VERSIONED_VARIANT(tools::wallet::cold::SignedTransactionSetVariant)
+    using namespace tools::wallet::cold;
+    VERSION_FIELD(0)
+    if (version > 1)
+        return false;
+
+    if (version == 1)
+        LOAD_VARIANT_AS_OBJECT_OF_TYPE(SignedCarrotTransactionSetV1)
+    else
+        LOAD_VARIANT_AS_OBJECT_OF_TYPE(SignedFullTransactionSet)
+END_SERIALIZE_VERSIONED_VARIANT()
+//-------------------------------------------------------------------------------------------------------------------
+VARIANT_TAG(binary_archive, crypto::signature, 0x23);
+VARIANT_TAG(binary_archive, fcmp_pp::FcmpPpSalProof, 0x24);
 //-------------------------------------------------------------------------------------------------------------------

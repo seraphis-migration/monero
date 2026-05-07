@@ -102,6 +102,7 @@ struct mock_carrot_and_legacy_keys
     generate_image_key_ram_borrowed_device k_generate_image_dev;
     generate_image_key_ram_borrowed_device k_spend_generate_image_dev;
     generate_address_secret_ram_borrowed_device s_generate_address_dev;
+    cryptonote_hierarchy_address_device cn_addr_dev;
     std::shared_ptr<address_device> addr_dev;
     std::shared_ptr<key_image_device> key_image_dev;
 

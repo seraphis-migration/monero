@@ -33,6 +33,7 @@
 //third party headers
 #include "carrot_core/carrot_enote_types.h"
 #include "fcmp_pp/fcmp_pp_types.h"
+#include "ringct/rctTypes.h"
 #include "span.h"
 #include "subaddress_index.h"
 

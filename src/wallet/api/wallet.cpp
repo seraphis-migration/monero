@@ -1126,12 +1126,23 @@ UnsignedTransaction *WalletImpl::loadUnsignedTx(const std::string &unsigned_file
 
     return transaction;
   }
+
+  // expand into tx proposals at load time for useful information later
+  if (!m_wallet->get_transaction_proposals_from_unsigned_tx(transaction->m_unsigned_tx_set, transaction->m_tx_proposals))
+  {
+    setStatusError(tr("Failed to expand unsigned transaction set into its usable transaction proposals"));
+    transaction->m_status = UnsignedTransaction::Status::Status_Error;
+    transaction->m_errorString = errorString();
+
+    return transaction;
+  }
   
   // Check tx data and construct confirmation message
   std::string extra_message;
-  if (!std::get<2>(transaction->m_unsigned_tx_set.transfers).empty())
-    extra_message = (boost::format("%u outputs to import. ") % (unsigned)std::get<2>(transaction->m_unsigned_tx_set.transfers).size()).str();
-  transaction->checkLoadedTx([&transaction](){return transaction->m_unsigned_tx_set.txes.size();}, [&transaction](size_t n)->const tools::wallet2::tx_construction_data&{return transaction->m_unsigned_tx_set.txes[n];}, extra_message);
+  const std::size_t n_new_outputs = num_new_outputs_ref(transaction->m_unsigned_tx_set);
+  if (n_new_outputs)
+    extra_message = (boost::format("%u outputs to import. ") % (unsigned)n_new_outputs).str();
+  transaction->checkLoadedTx(extra_message);
   setStatus(transaction->status(), transaction->errorString());
     
   return transaction;

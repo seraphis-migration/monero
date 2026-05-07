@@ -5054,7 +5054,7 @@ boost::optional<epee::wipeable_string> simple_wallet::new_wallet(const boost::pr
       crypto::secret_key key;
       crypto::cn_slow_hash(seed_pass.data(), seed_pass.size(), (crypto::hash&)key);
       sc_reduce32((unsigned char*)key.data);
-      const epee::wipeable_string &msig_keys = m_wallet->decrypt<epee::wipeable_string>(std::string(multisig_keys.data(), multisig_keys.size()), key, true);
+      const epee::wipeable_string &msig_keys = m_wallet->decrypt(std::string(multisig_keys.data(), multisig_keys.size()), key, true);
       m_wallet->generate(m_wallet_file, std::move(rc.second).password(), msig_keys, create_address_file);
     }
     const multisig::multisig_account_status ms_status{m_wallet->get_multisig_status()};
@@ -6223,7 +6223,10 @@ bool simple_wallet::process_ring_members(const std::vector<tools::wallet2::pendi
     const cryptonote::transaction& tx = ptx_vector[n].tx;
     if (tx.rct_signatures.type >= rct::RCTTypeFcmpPlusPlus)
       continue;
-    const auto& construction_data = std::get<tools::wallet2::tx_construction_data>(ptx_vector[n].construction_data);
+    const auto *pre_carrot_ctx_data = std::get_if<tools::wallet2::tx_construction_data>(&ptx_vector[n].construction_data);
+    if (nullptr == pre_carrot_ctx_data)
+      continue;
+    const tools::wallet2::tx_construction_data &construction_data = *pre_carrot_ctx_data;
     if (verbose)
       ostr << boost::format(tr("\nTransaction %llu/%llu: txid=%s")) % (n + 1) % ptx_vector.size() % cryptonote::get_transaction_hash(tx);
     // for each input
@@ -6321,6 +6324,9 @@ bool simple_wallet::prompt_if_old(const std::vector<tools::wallet2::pending_tx> 
   if (!err.empty())
     return true;
 
+  wallet2_basic::transfer_container transfers;
+  m_wallet->get_transfers(transfers);
+
   int max_n_old = 0;
   for (const auto &ptx: ptx_vector)
   {
@@ -6329,7 +6335,7 @@ bool simple_wallet::prompt_if_old(const std::vector<tools::wallet2::pending_tx> 
       continue;
 
     int n_old = 0;
-    for (const auto i: ptx.selected_transfers)
+    for (const auto i: tools::wallet::collect_selected_transfer_indices(ptx.construction_data, transfers))
     {
       const tools::wallet2::transfer_details &td = m_wallet->get_transfer_details(i);
       uint64_t age = bc_height - td.m_block_height;
@@ -6700,14 +6706,16 @@ bool simple_wallet::transfer_main(const std::vector<std::string> &args_, bool ca
         uint64_t total_fee = 0;
         uint64_t dust_not_in_fee = 0;
         uint64_t dust_in_fee = 0;
-        uint64_t change = 0;
+
+        wallet2_basic::transfer_container transfers;
+        m_wallet->get_transfers(transfers);
+
         for (size_t n = 0; n < ptx_vector.size(); ++n)
         {
           total_fee += ptx_vector[n].fee;
-          for (auto i: ptx_vector[n].selected_transfers)
+          for (auto i: tools::wallet::collect_selected_transfer_indices(ptx_vector.at(n).construction_data, transfers))
             total_sent += m_wallet->get_transfer_details(i).amount();
           total_sent -= ptx_vector[n].change_dts.amount + ptx_vector[n].fee;
-          change += ptx_vector[n].change_dts.amount;
 
           if (ptx_vector[n].dust_added_to_fee)
             dust_in_fee += ptx_vector[n].dust;
@@ -6719,9 +6727,7 @@ bool simple_wallet::transfer_main(const std::vector<std::string> &args_, bool ca
         for (size_t n = 0; n < ptx_vector.size(); ++n)
         {
           prompt << tr("\nTransaction ") << (n + 1) << "/" << ptx_vector.size() << ":\n";
-          subaddr_indices.clear();
-          for (const std::size_t selected_transfer : ptx_vector.at(n).selected_transfers)
-            subaddr_indices.insert(m_wallet->get_transfer_details(selected_transfer).m_subaddr_index.minor);
+          subaddr_indices = ptx_vector.at(n).subaddr_indices;
           for (uint32_t i : subaddr_indices)
             prompt << boost::format(tr("Spending from address index %d\n")) % i;
           if (subaddr_indices.size() > 1)
@@ -6873,12 +6879,15 @@ bool simple_wallet::sweep_unmixable(const std::vector<std::string> &args_)
       return true;
     }
 
+    wallet2_basic::transfer_container transfers;
+    m_wallet->get_transfers(transfers);
+
     // give user total and fee, and prompt to confirm
     uint64_t total_fee = 0, total_unmixable = 0;
     for (size_t n = 0; n < ptx_vector.size(); ++n)
     {
       total_fee += ptx_vector[n].fee;
-      for (auto i: ptx_vector[n].selected_transfers)
+      for (auto i: tools::wallet::collect_selected_transfer_indices(ptx_vector.at(n).construction_data, transfers))
         total_unmixable += m_wallet->get_transfer_details(i).amount();
     }
 
@@ -7106,12 +7115,15 @@ bool simple_wallet::sweep_main(uint32_t account, uint64_t below, const std::vect
       return false;
     }
 
+    wallet2_basic::transfer_container transfers;
+    m_wallet->get_transfers(transfers);
+
     // give user total and fee, and prompt to confirm
     uint64_t total_fee = 0, total_sent = 0;
     for (size_t n = 0; n < ptx_vector.size(); ++n)
     {
       total_fee += ptx_vector[n].fee;
-      for (auto i: ptx_vector[n].selected_transfers)
+      for (auto i: tools::wallet::collect_selected_transfer_indices(ptx_vector.at(n).construction_data, transfers))
         total_sent += m_wallet->get_transfer_details(i).amount();
     }
 
@@ -7120,7 +7132,7 @@ bool simple_wallet::sweep_main(uint32_t account, uint64_t below, const std::vect
     {
       prompt << tr("\nTransaction ") << (n + 1) << "/" << ptx_vector.size() << ":\n";
       subaddr_indices.clear();
-      for (const std::size_t selected_transfer : ptx_vector.at(n).selected_transfers)
+      for (const std::size_t selected_transfer : tools::wallet::collect_selected_transfer_indices(ptx_vector.at(n).construction_data, transfers))
         subaddr_indices.insert(m_wallet->get_transfer_details(selected_transfer).m_subaddr_index.minor);
       for (uint32_t i : subaddr_indices)
         prompt << boost::format(tr("Spending from address index %d\n")) % i;
@@ -7337,7 +7349,11 @@ bool simple_wallet::sweep_single(const std::vector<std::string> &args_)
       fail_msg_writer() << tr("Multiple transactions are created, which is not supposed to happen");
       return true;
     }
-    if (ptx_vector[0].selected_transfers.size() != 1)
+    wallet2_basic::transfer_container transfers;
+    m_wallet->get_transfers(transfers);
+    const std::vector<std::size_t> selected_transfer_indices = tools::wallet::collect_selected_transfer_indices(
+      ptx_vector.at(0).construction_data, transfers);
+    if (selected_transfer_indices.size() != 1)
     {
       fail_msg_writer() << tr("The transaction uses multiple or no inputs, which is not supposed to happen");
       return true;
@@ -7345,7 +7361,7 @@ bool simple_wallet::sweep_single(const std::vector<std::string> &args_)
 
     // give user total and fee, and prompt to confirm
     uint64_t total_fee = ptx_vector[0].fee;
-    uint64_t total_sent = m_wallet->get_transfer_details(ptx_vector[0].selected_transfers.front()).amount();
+    const uint64_t total_sent = transfers.at(selected_transfer_indices.at(0)).amount();
     std::ostringstream prompt;
     if (fake_outs_count > 0 && !process_ring_members(ptx_vector, prompt, m_wallet->print_ring_members()))
       return true;
@@ -7540,74 +7556,64 @@ bool simple_wallet::donate(const std::vector<std::string> &args_)
   return true;
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::accept_loaded_tx(const std::function<size_t()> get_num_txes, const std::function<const tools::wallet2::tx_construction_data&(size_t)> &get_tx, const std::string &extra_message)
+bool simple_wallet::accept_loaded_tx(const std::function<size_t()> get_num_txes, const std::function<tools::wallet::tx_reconstruct_variant_t(size_t)> &get_tx, const std::string &extra_message)
 {
   CHECK_IF_BACKGROUND_SYNCING("cannot load tx");
+
+  const auto addr_dev = m_wallet->get_cryptonote_address_device();
+
   // gather info to ask the user
   uint64_t amount = 0, amount_to_dests = 0, change = 0;
   size_t min_ring_size = ~0;
   std::unordered_map<cryptonote::account_public_address, std::pair<std::string, uint64_t>> dests;
-  int first_known_non_zero_change_index = -1;
+  std::optional<cryptonote::tx_destination_entry> first_known_non_zero_change_dst;
   std::string payment_id_string = "";
   for (size_t n = 0; n < get_num_txes(); ++n)
   {
-    const tools::wallet2::tx_construction_data &cd = get_tx(n);
+    const tools::wallet::tx_reconstruct_variant_t cd = get_tx(n);
 
-    std::vector<tx_extra_field> tx_extra_fields;
-    bool has_encrypted_payment_id = false;
-    crypto::hash8 payment_id8 = crypto::null_hash8;
-    if (cryptonote::parse_tx_extra(cd.extra, tx_extra_fields))
+    const auto finalized_dsts = finalized_destinations(cd, *addr_dev);
+
+    const std::optional<crypto::hash8> payment_id8 = short_payment_id(cd);
+    const std::optional<crypto::hash> payment_id32 = long_payment_id(cd);
+    if (payment_id8)
     {
-      tx_extra_nonce extra_nonce;
-      if (find_tx_extra_field_by_type(tx_extra_fields, extra_nonce))
+      // if none of the addresses are integrated addresses, it's a dummy one
+      bool is_dummy = true;
+      for (const auto &e: finalized_dsts)
+        if (e.is_integrated)
+          is_dummy = false;
+
+      if (is_dummy)
       {
-        crypto::hash payment_id;
-        if(get_encrypted_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id8))
-        {
-          if (!payment_id_string.empty())
-            payment_id_string += ", ";
-
-          // if none of the addresses are integrated addresses, it's a dummy one
-          bool is_dummy = true;
-          for (const auto &e: cd.dests)
-            if (e.is_integrated)
-              is_dummy = false;
-
-          if (is_dummy)
-          {
-            payment_id_string += std::string("dummy encrypted payment ID");
-          }
-          else
-          {
-            payment_id_string += std::string("encrypted payment ID ") + epee::string_tools::pod_to_hex(payment_id8);
-            has_encrypted_payment_id = true;
-          }
-        }
-        else if (get_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id))
-        {
-          if (!payment_id_string.empty())
-            payment_id_string += ", ";
-          payment_id_string += std::string("unencrypted payment ID ") + epee::string_tools::pod_to_hex(payment_id);
-          payment_id_string += " (OBSOLETE)";
-        }
+        payment_id_string += std::string("dummy encrypted payment ID");
+      }
+      else
+      {
+        payment_id_string += std::string("encrypted payment ID ") + epee::string_tools::pod_to_hex(*payment_id8);
       }
     }
-
-    for (size_t s = 0; s < cd.sources.size(); ++s)
+    else if (payment_id32)
     {
-      amount += cd.sources[s].amount;
-      size_t ring_size = cd.sources[s].outputs.size();
+      if (!payment_id_string.empty())
+        payment_id_string += ", ";
+      payment_id_string += std::string("unencrypted payment ID ") + epee::string_tools::pod_to_hex(*payment_id32);
+      payment_id_string += " (OBSOLETE)";
+    }
+
+    for (const std::uint64_t ring_size : ring_sizes(cd))
       if (ring_size < min_ring_size)
         min_ring_size = ring_size;
-    }
-    for (size_t d = 0; d < cd.splitted_dsts.size(); ++d)
+
+    amount += boost::numeric_cast<rct::xmr_amount>(input_amount_total(cd));
+
+    for (const tx_destination_entry &entry : finalized_dsts)
     {
-      const tx_destination_entry &entry = cd.splitted_dsts[d];
       std::string address, standard_address = get_account_address_as_str(m_wallet->nettype(), entry.is_subaddress, entry.addr);
-      if (has_encrypted_payment_id && !entry.is_subaddress && standard_address != entry.original)
+      if (payment_id8 && !entry.is_subaddress && standard_address != entry.original)
       {
-        address = get_account_integrated_address_as_str(m_wallet->nettype(), entry.addr, payment_id8);
-        address += std::string(" (" + standard_address + " with encrypted payment id " + epee::string_tools::pod_to_hex(payment_id8) + ")");
+        address = get_account_integrated_address_as_str(m_wallet->nettype(), entry.addr, *payment_id8);
+        address += std::string(" (" + standard_address + " with encrypted payment id " + epee::string_tools::pod_to_hex(*payment_id8) + ")");
       }
       else
         address = standard_address;
@@ -7618,33 +7624,34 @@ bool simple_wallet::accept_loaded_tx(const std::function<size_t()> get_num_txes,
         i->second.second += entry.amount;
       amount_to_dests += entry.amount;
     }
-    if (cd.change_dts.amount > 0)
+    const cryptonote::tx_destination_entry change_dst = change_destination(cd, *addr_dev);
+    if (change_dst.amount > 0)
     {
-      auto it = dests.find(cd.change_dts.addr);
+      auto it = dests.find(change_dst.addr);
       if (it == dests.end())
       {
         fail_msg_writer() << tr("Claimed change does not go to a paid address");
         return false;
       }
-      if (it->second.second < cd.change_dts.amount)
+      if (it->second.second < change_dst.amount)
       {
         fail_msg_writer() << tr("Claimed change is larger than payment to the change address");
         return false;
       }
-      if (cd.change_dts.amount > 0)
+      if (change_dst.amount > 0)
       {
-        if (first_known_non_zero_change_index == -1)
-          first_known_non_zero_change_index = n;
-        if (memcmp(&cd.change_dts.addr, &get_tx(first_known_non_zero_change_index).change_dts.addr, sizeof(cd.change_dts.addr)))
+        if (!first_known_non_zero_change_dst)
+          first_known_non_zero_change_dst = change_dst;
+        if (change_dst.addr != first_known_non_zero_change_dst->addr)
         {
           fail_msg_writer() << tr("Change goes to more than one address");
           return false;
         }
       }
-      change += cd.change_dts.amount;
-      it->second.second -= cd.change_dts.amount;
+      change += change_dst.amount;
+      it->second.second -= change_dst.amount;
       if (it->second.second == 0)
-        dests.erase(cd.change_dts.addr);
+        dests.erase(change_dst.addr);
     }
   }
 
@@ -7677,7 +7684,9 @@ bool simple_wallet::accept_loaded_tx(const std::function<size_t()> get_num_txes,
   std::string change_string;
   if (change > 0)
   {
-    std::string address = get_account_address_as_str(m_wallet->nettype(), get_tx(0).subaddr_account > 0, get_tx(0).change_dts.addr);
+    std::string address = get_account_address_as_str(m_wallet->nettype(),
+      first_known_non_zero_change_dst->is_subaddress,
+      first_known_non_zero_change_dst->addr);
     change_string += (boost::format(tr("%s change to %s")) % print_money(change) % address).str();
   }
   else
@@ -7688,14 +7697,35 @@ bool simple_wallet::accept_loaded_tx(const std::function<size_t()> get_num_txes,
   return command_line::is_yes(input_line(prompt_str, true));
 }
 //----------------------------------------------------------------------------------------------------
-bool simple_wallet::accept_loaded_tx(const tools::wallet2::unsigned_tx_set &txs)
+bool simple_wallet::accept_loaded_tx(const tools::wallet::cold::UnsignedPreCarrotTransactionSet &txs)
 {
   std::string extra_message;
   if (!std::get<2>(txs.new_transfers).empty())
     extra_message = (boost::format("%u outputs to import. ") % (unsigned)std::get<2>(txs.new_transfers).size()).str();
   else if (!std::get<2>(txs.transfers).empty())
     extra_message = (boost::format("%u outputs to import. ") % (unsigned)std::get<2>(txs.transfers).size()).str();
-  return accept_loaded_tx([&txs](){return txs.txes.size();}, [&txs](size_t n)->const tools::wallet2::tx_construction_data&{return txs.txes[n];}, extra_message);
+  return accept_loaded_tx([&txs](){return txs.txes.size();},
+    [&txs](size_t n)->tools::wallet::tx_reconstruct_variant_t{return txs.txes.at(n);},
+    extra_message);
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::accept_loaded_tx(const tools::wallet::cold::UnsignedCarrotTransactionSetV1 &txs)
+{
+  const std::string extra_message = (boost::format("%u outputs to import. ") % txs.new_transfers.size()).str();
+  std::vector<tools::wallet::tx_reconstruct_variant_t> expanded_tx_proposals;
+  if (!m_wallet->get_transaction_proposals_from_unsigned_tx(txs, expanded_tx_proposals))
+  {
+    fail_msg_writer() << tr("Failed to expand unsigned transaction set");
+    return false;
+  }
+  return accept_loaded_tx([&](){return expanded_tx_proposals.size();},
+    [&](size_t n)->tools::wallet::tx_reconstruct_variant_t {return expanded_tx_proposals.at(n);},
+    extra_message);
+}
+//----------------------------------------------------------------------------------------------------
+bool simple_wallet::accept_loaded_tx(const tools::wallet::cold::UnsignedTransactionSetVariant &txs)
+{
+  return std::visit([this](const auto &u) { return accept_loaded_tx(u); }, txs);
 }
 //----------------------------------------------------------------------------------------------------
 bool simple_wallet::accept_loaded_tx(const tools::wallet2::signed_tx_set &txs)
@@ -7705,7 +7735,7 @@ bool simple_wallet::accept_loaded_tx(const tools::wallet2::signed_tx_set &txs)
     extra_message = (boost::format("%u key images to import. ") % (unsigned)txs.key_images.size()).str();
   return accept_loaded_tx(
     [&txs](){return txs.ptx.size();},
-    [&txs](size_t n)->const auto&{return std::get<tools::wallet2::tx_construction_data>(txs.ptx[n].construction_data);},
+    [&txs](size_t n)->const auto&{return txs.ptx[n].construction_data;},
     extra_message);
 }
 //----------------------------------------------------------------------------------------------------
@@ -7753,7 +7783,11 @@ bool simple_wallet::sign_transfer(const std::vector<std::string> &args_)
   std::vector<tools::wallet2::pending_tx> ptx;
   try
   {
-    bool r = m_wallet->sign_tx(unsigned_filename, "signed_monero_tx", ptx, [&](const tools::wallet2::unsigned_tx_set &tx){ return accept_loaded_tx(tx); }, export_raw);
+    bool r = m_wallet->sign_tx(unsigned_filename,
+      "signed_monero_tx",
+      ptx,
+      [&](const tools::wallet::cold::UnsignedTransactionSetVariant &tx){ return accept_loaded_tx(tx); },
+      export_raw);
     if (!r)
     {
       fail_msg_writer() << tr("Failed to sign transaction");

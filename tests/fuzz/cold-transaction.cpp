@@ -33,7 +33,6 @@
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "wallet/hot_cold_serialization.h"
 #include "wallet/wallet2.h"
-#include "wallet/wallet2_basic/wallet2_cocobo_serialization.h"
 #include "fuzzer.h"
 
 static tools::wallet2 *wallet = NULL;
@@ -52,7 +51,7 @@ BEGIN_INIT_SIMPLE_FUZZER()
 END_INIT_SIMPLE_FUZZER()
 
 BEGIN_SIMPLE_FUZZER()
-  tools::wallet2::unsigned_tx_set exported_txs;
+  tools::wallet::cold::UnsignedTransactionSetVariant exported_txs;
   binary_archive<false> ar{{buf, len}};
   ::serialization::serialize(ar, exported_txs);
   std::vector<tools::wallet2::pending_tx> ptx;
