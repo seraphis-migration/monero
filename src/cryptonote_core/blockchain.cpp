@@ -3897,20 +3897,25 @@ bool Blockchain::check_tx_inputs(transaction& tx,
     sig_index++;
   }
 
-  // enforce min output age
-  if (hf_version >= HF_VERSION_ENFORCE_MIN_AGE)
+  crypto::ec_point ref_tree_root{};
+  if (rct::is_rct_fcmp(tx.rct_signatures.type))
   {
+    if (pmax_used_block_height)
+      *pmax_used_block_height = tx.rct_signatures.p.reference_block;
+
+    // Read the db for the tree root for FCMP tx. Enforces that the ref block is in the chain
+    if (!get_fcmp_tx_tree_root(m_db, tx, ref_tree_root))
+    {
+      // We might not be synced yet and an honest synced peer may have sent us the tx, so we make this a no-drop-offense
+      tvc.m_no_drop_offense = true;
+      return false;
+    }
+  }
+  else if (hf_version >= HF_VERSION_ENFORCE_MIN_AGE)
+  {
+    // enforce min output age on rings
     CHECK_AND_ASSERT_MES(*pmax_used_block_height + CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE <= m_db->height(),
         false, "Transaction spends at least one output which is too young");
-  }
-
-  // Read the db for the tree root for FCMP txs
-  crypto::ec_point ref_tree_root{};
-  if (rct::is_rct_fcmp(tx.rct_signatures.type) && !get_fcmp_tx_tree_root(m_db, tx, ref_tree_root))
-  {
-    // We might not be synced yet and an honest synced peer may have sent us the tx, so we make this a no-drop-offense
-    tvc.m_no_drop_offense = true;
-    return false;
   }
 
   const crypto::hash txid = get_transaction_hash(tx);
