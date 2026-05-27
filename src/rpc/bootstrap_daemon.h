@@ -9,6 +9,7 @@
 #include <boost/utility/string_ref.hpp>
 
 #include "net/http.h"
+#include "core_rpc_server_commands_defs.h"
 #include "storages/http_abstract_invoke.h"
 
 #include "bootstrap_node_selector.h"
@@ -20,10 +21,12 @@ namespace cryptonote
   {
   public:
     bootstrap_daemon(
+      const cryptonote::network_type &nettype,
       std::function<std::map<std::string, bool>()> get_public_nodes,
       bool rpc_payment_enabled,
       const std::string &proxy);
     bootstrap_daemon(
+      const cryptonote::network_type &nettype,
       const std::string &address,
       boost::optional<epee::net_utils::http::login> credentials,
       bool rpc_payment_enabled,
@@ -78,9 +81,11 @@ namespace cryptonote
 
   private:
     bool set_server(const std::string &address, const boost::optional<epee::net_utils::http::login> &credentials = boost::none);
+    boost::optional<cryptonote::COMMAND_RPC_GET_VERSION::response> get_version();
     bool switch_server_if_needed();
 
   private:
+    const cryptonote::network_type m_nettype;
     net::http::client m_http_client;
     const bool m_rpc_payment_enabled;
     const std::unique_ptr<bootstrap_node::selector> m_selector;

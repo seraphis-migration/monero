@@ -130,3 +130,59 @@ const hardfork_t stagenet_hard_forks[] = {
   { 16, 1151720, 0, 1656629118 },
 };
 const size_t num_stagenet_hard_forks = sizeof(stagenet_hard_forks) / sizeof(stagenet_hard_forks[0]);
+
+bool check_fork_version_compatibility(
+    const cryptonote::network_type &nettype,
+    const std::vector<std::pair<uint8_t, uint64_t>> &daemon_hard_forks,
+    const uint64_t height,
+    const uint64_t target_height,
+    bool *client_is_outdated,
+    bool *daemon_is_outdated)
+{
+  const size_t client_num_hard_forks = nettype == cryptonote::network_type::TESTNET ? num_testnet_hard_forks
+    : nettype == cryptonote::network_type::STAGENET ? num_stagenet_hard_forks : num_mainnet_hard_forks;
+  const hardfork_t *client_hard_forks = nettype == cryptonote::network_type::TESTNET ? testnet_hard_forks
+    : nettype == cryptonote::network_type::STAGENET ? stagenet_hard_forks : mainnet_hard_forks;
+
+  // Make sure we're pointing to an FCMP++ compatible daemon in order for client
+  // to sync the FCMP++ tree.
+  if (daemon_hard_forks.empty() || daemon_hard_forks.back().first < HF_VERSION_FCMP_PLUS_PLUS)
+  {
+    if (daemon_is_outdated)
+      *daemon_is_outdated = true;
+    return false;
+  }
+
+  // Check if client or daemon is outdated (whether either are unaware of a hard
+  // fork). Then check if fork has passed rendering versions incompatible.
+  const bool daemon_outdated = daemon_hard_forks.size() < client_num_hard_forks;
+  const bool client_outdated = daemon_hard_forks.size() > client_num_hard_forks;
+
+  if (daemon_is_outdated)
+    *daemon_is_outdated = daemon_outdated;
+  if (client_is_outdated)
+    *client_is_outdated = client_outdated;
+
+  if (daemon_outdated)
+  {
+    uint64_t daemon_missed_fork_height = client_hard_forks[daemon_hard_forks.size()].height;
+
+    // If the daemon missed the fork, then technically it is no longer part of
+    // the Monero network. Don't connect.
+    bool daemon_missed_fork = height >= daemon_missed_fork_height || target_height >= daemon_missed_fork_height;
+    if (daemon_missed_fork)
+      return false;
+  }
+  else if (client_outdated)
+  {
+    uint64_t client_missed_fork_height = daemon_hard_forks[client_num_hard_forks].second;
+
+    // If the client missed the fork, then technically it is no longer able
+    // to communicate with the Monero network. Don't connect.
+    bool client_missed_fork = height >= client_missed_fork_height || target_height >= client_missed_fork_height;
+    if (client_missed_fork)
+      return false;
+  }
+
+  return true;
+}

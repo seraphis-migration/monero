@@ -164,6 +164,7 @@ target_link_libraries(daemon_rpc_server
     rpc_pub
     cryptonote_core
     cryptonote_protocol
+    hardforks
     version
     daemon_messages
     serialization

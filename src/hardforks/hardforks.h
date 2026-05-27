@@ -28,8 +28,12 @@
 
 #pragma once
 
+#include "cryptonote_config.h"
+
 #include <stdint.h>
 #include <time.h>
+#include <utility>
+#include <vector>
 
 struct hardfork_t
 {
@@ -50,3 +54,11 @@ extern const size_t num_testnet_hard_forks;
 
 extern const hardfork_t stagenet_hard_forks[];
 extern const size_t num_stagenet_hard_forks;
+
+bool check_fork_version_compatibility(
+    const cryptonote::network_type &nettype,
+    const std::vector<std::pair<uint8_t, uint64_t>> &daemon_hard_forks,
+    const uint64_t height,
+    const uint64_t target_height,
+    bool *client_is_outdated,
+    bool *daemon_is_outdated);
