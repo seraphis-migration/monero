@@ -8475,9 +8475,14 @@ bool simple_wallet::get_transfers(std::vector<std::string>& local_args, std::vec
           if (bh >= last_block_height)
             locked_msg = std::to_string(bh - last_block_height) + " blks";
         }
+        else if (m_wallet->use_fork_rules(HF_VERSION_FCMP_PLUS_PLUS, 0))
+        {
+          const uint64_t last_locked = cryptonote::get_last_locked_block_index(pd.m_unlock_time, pd.m_block_height);
+          if (last_locked + 1 > last_block_height)
+            locked_msg = std::to_string(last_locked + 1 - last_block_height) + " blks";
+        }
         else
         {
-          // FIXME: update for FCMP++
           const uint64_t adjusted_time = m_wallet->get_daemon_adjusted_time();
           uint64_t threshold = adjusted_time + (m_wallet->use_fork_rules(2, 0) ? CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V2 : CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V1);
           if (threshold < pd.m_unlock_time)
@@ -10221,9 +10226,16 @@ bool simple_wallet::show_transfer(const std::vector<std::string> &args)
         else
           success_msg_writer() << std::to_string(last_block_height - bh) << " confirmations";
       }
+      else if (m_wallet->use_fork_rules(HF_VERSION_FCMP_PLUS_PLUS, 0))
+      {
+        const uint64_t last_locked = cryptonote::get_last_locked_block_index(pd.m_unlock_time, pd.m_block_height);
+        if (last_locked + 1 > last_block_height)
+          success_msg_writer() << "Locked: " << (last_locked + 1 - last_block_height) << " blocks to unlock";
+        else
+          success_msg_writer() << (last_block_height - last_locked - 1) << " confirmations";
+      }
       else
       {
-        // FIXME: update for FCMP++
         const uint64_t adjusted_time = m_wallet->get_daemon_adjusted_time();
         uint64_t threshold = adjusted_time + (m_wallet->use_fork_rules(2, 0) ? CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V2 : CRYPTONOTE_LOCKED_TX_ALLOWED_DELTA_SECONDS_V1);
         if (threshold >= pd.m_unlock_time)
