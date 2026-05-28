@@ -31,6 +31,7 @@
 #include "crypto/hash.h"
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/difficulty.h"
+#include "fcmp_pp/curve_trees.h"
 #include "ringct/rctSigs.h"
 #include "rpc/rpc_handler.h"
 
@@ -184,6 +185,7 @@ namespace rpc
     uint64_t tx_pool_size;
     uint64_t alt_blocks_count;
     uint64_t outgoing_connections_count;
+
     uint64_t incoming_connections_count;
     uint64_t white_peerlist_size;
     uint64_t grey_peerlist_size;
@@ -208,6 +210,19 @@ namespace rpc
     output_distribution_data data;
     uint64_t amount;
     bool cumulative;
+  };
+
+  struct output_map
+  {
+    output_amount_and_index legacy;
+    std::uint64_t unified_id;
+  };
+
+  struct path_response
+  {
+    std::uint64_t unified_id;
+    std::uint64_t leaf_idx;
+    fcmp_pp::CompressedPath path;
   };
 }  // namespace rpc
 

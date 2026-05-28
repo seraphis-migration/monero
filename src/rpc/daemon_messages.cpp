@@ -82,6 +82,7 @@ void GetBlocksFast::Response::doToJson(rapidjson::Writer<epee::byte_stream>& des
   INSERT_INTO_JSON_OBJECT(dest, start_height, start_height);
   INSERT_INTO_JSON_OBJECT(dest, current_height, current_height);
   INSERT_INTO_JSON_OBJECT(dest, output_indices, output_indices);
+  INSERT_INTO_JSON_OBJECT(dest, unified_indices, unified_indices);
 }
 
 void GetBlocksFast::Response::fromJson(const rapidjson::Value& val)
@@ -95,6 +96,8 @@ void GetBlocksFast::Response::fromJson(const rapidjson::Value& val)
   GET_FROM_JSON_OBJECT(val, start_height, start_height);
   GET_FROM_JSON_OBJECT(val, current_height, current_height);
   GET_FROM_JSON_OBJECT(val, output_indices, output_indices);
+  if (val.HasMember("unified_indices"))
+    GET_FROM_JSON_OBJECT(val, unified_indices, unified_indices);
 }
 
 
@@ -810,6 +813,74 @@ void GetOutputDistribution::Response::fromJson(const rapidjson::Value& val)
 
   GET_FROM_JSON_OBJECT(val, status, status);
   GET_FROM_JSON_OBJECT(val, distributions, distributions);
+}
+
+void GetUnifiedId::Request::doToJson(rapidjson::Writer<epee::byte_stream>& dest) const
+{
+  INSERT_INTO_JSON_OBJECT(dest, legacy_ids, legacy_ids);
+}
+
+void GetUnifiedId::Request::fromJson(const rapidjson::Value& val)
+{
+  if (!val.IsObject())
+  {
+    throw json::WRONG_TYPE("json object");
+  }
+
+  GET_FROM_JSON_OBJECT(val, legacy_ids, legacy_ids);
+}
+
+void GetUnifiedId::Response::doToJson(rapidjson::Writer<epee::byte_stream>& dest) const
+{
+  INSERT_INTO_JSON_OBJECT(dest, output_ids, output_ids);
+}
+
+void GetUnifiedId::Response::fromJson(const rapidjson::Value& val)
+{
+  if (!val.IsObject())
+  {
+    throw json::WRONG_TYPE("json object");
+  }
+
+  GET_FROM_JSON_OBJECT(val, output_ids, output_ids);
+}
+
+void GetTreePaths::Request::doToJson(rapidjson::Writer<epee::byte_stream>& dest) const
+{
+  INSERT_INTO_JSON_OBJECT(dest, output_ids, output_ids);
+}
+
+void GetTreePaths::Request::fromJson(const rapidjson::Value& val)
+{
+  if (!val.IsObject())
+  {
+    throw json::WRONG_TYPE("json object");
+  }
+
+  GET_FROM_JSON_OBJECT(val, output_ids, output_ids);
+}
+
+void GetTreePaths::Response::doToJson(rapidjson::Writer<epee::byte_stream>& dest) const
+{
+  INSERT_INTO_JSON_OBJECT(dest, paths, paths);
+  INSERT_INTO_JSON_OBJECT(dest, top_block_height, top_block_height);
+  INSERT_INTO_JSON_OBJECT(dest, n_leaf_tuples, n_leaf_tuples);
+  INSERT_INTO_JSON_OBJECT(dest, last_path, last_path);
+  INSERT_INTO_JSON_OBJECT(dest, top_block_hash, top_block_hash);
+}
+
+void GetTreePaths::Response::fromJson(const rapidjson::Value& val)
+{
+  if (!val.IsObject())
+  {
+    throw json::WRONG_TYPE("json object");
+  }
+
+  GET_FROM_JSON_OBJECT(val, paths, paths);
+  GET_FROM_JSON_OBJECT(val, top_block_height, top_block_height);
+  GET_FROM_JSON_OBJECT(val, n_leaf_tuples, n_leaf_tuples);
+  GET_FROM_JSON_OBJECT(val, last_path, last_path);
+  GET_FROM_JSON_OBJECT(val, top_block_hash, top_block_hash);
 }
 
 }  // namespace rpc

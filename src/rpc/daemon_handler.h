@@ -133,6 +133,10 @@ class DaemonHandler : public RpcHandler
 
     void handle(const GetOutputDistribution::Request& req, GetOutputDistribution::Response& res);
 
+    void handle(const GetTreePaths::Request& req, GetTreePaths::Response& res);
+
+    void handle(const GetUnifiedId::Request& req, GetUnifiedId::Response& res);
+
     epee::byte_slice handle(std::string&& request) override final;
 
   private:

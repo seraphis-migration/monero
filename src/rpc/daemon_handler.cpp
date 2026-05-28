@@ -107,7 +107,9 @@ namespace rpc
       {u8"get_rpc_version", handle_message<GetRPCVersion>},
       {u8"get_transaction_pool", handle_message<GetTransactionPool>},
       {u8"get_transactions", handle_message<GetTransactions>},
+      {u8"get_tree_paths", handle_message<GetTreePaths>},
       {u8"get_tx_global_output_indices", handle_message<GetTxGlobalOutputIndices>},
+      {u8"get_unified_ids", handle_message<GetUnifiedId>},
       {u8"hard_fork_info", handle_message<HardForkInfo>},
       {u8"key_images_spent", handle_message<KeyImagesSpent>},
       {u8"mining_status", handle_message<MiningStatus>},
@@ -149,10 +151,11 @@ namespace rpc
     }
 
     res.blocks.resize(blocks.size());
-    res.output_indices.resize(blocks.size());
 
     auto it = blocks.begin();
 
+    bool use_unified = false;
+    std::optional<std::uint64_t> unified;
     uint64_t block_count = 0;
     while (it != blocks.end())
     {
@@ -167,6 +170,12 @@ namespace rpc
         return;
       }
 
+      if (!block_count)
+        use_unified = (HF_VERSION_FCMP_PLUS_PLUS <= bwt.block.major_version);
+
+      auto& block_indices = use_unified ? res.unified_indices : res.output_indices;
+      block_indices.resize(blocks.size());
+
       if (it->second.size() != bwt.block.tx_hashes.size())
       {
           res.blocks.clear();
@@ -176,7 +185,7 @@ namespace rpc
           return;
       }
 
-      cryptonote::rpc::block_output_indices& indices = res.output_indices[block_count];
+      cryptonote::rpc::block_output_indices& indices = block_indices[block_count];
 
       // miner tx output indices
       {
@@ -186,6 +195,15 @@ namespace rpc
           res.status = Message::STATUS_FAILED;
           res.error_details = "core::get_tx_outputs_gindexs() returned false";
           return;
+        }
+
+        if (use_unified && !unified && !tx_indices.empty())
+          unified = m_core.get_blockchain_storage().get_db().get_output_key(0, tx_indices[0], false).unified_id - tx_indices[0];
+
+        if (unified)
+        {
+          for (std::uint64_t& indice : tx_indices)
+            indice += *unified;
         }
         indices.push_back(std::move(tx_indices));
       }
@@ -215,6 +233,15 @@ namespace rpc
           res.status = Message::STATUS_FAILED;
           res.error_details = "core::get_tx_outputs_gindexs() returned false";
           return;
+        }
+
+        if (use_unified && !unified && !tx_indices.empty())
+          unified = m_core.get_blockchain_storage().get_db().get_output_key(0, tx_indices[0], false).unified_id - tx_indices[0];
+
+        if (unified)
+        {
+          for (std::uint64_t& indice : tx_indices)
+            indice += *unified;
         }
 
         indices.push_back(std::move(tx_indices));
@@ -944,6 +971,55 @@ namespace rpc
     catch (const std::exception& e)
     {
       res.distributions.clear();
+      res.status = Message::STATUS_FAILED;
+      res.error_details = e.what();
+    }
+  }
+
+  void DaemonHandler::handle(const GetUnifiedId::Request& req, GetUnifiedId::Response& res)
+  {
+    try
+    {
+      res.output_ids.clear();
+      res.output_ids.reserve(req.legacy_ids.size());
+      for (const auto& legacy : req.legacy_ids)
+      {
+        const auto info = m_core.get_blockchain_storage().get_db().get_output_key(legacy.amount, legacy.index, false);
+        res.output_ids.push_back({.legacy = legacy, .unified_id = info.unified_id});
+      }  
+    }
+    catch (const std::exception& e)
+    {
+      MERROR("Failed to get output ids: " << e.what());
+      res.status = Message::STATUS_FAILED;
+      res.error_details = e.what();
+    }
+  }
+
+  void DaemonHandler::handle(const GetTreePaths::Request& req, GetTreePaths::Response& res)
+  {
+    try
+    {
+      res.top_block_hash = m_core.get_blockchain_storage().get_db().top_block_hash(&res.top_block_height);
+      auto last = m_core.get_blockchain_storage().get_db().get_last_path(res.top_block_height);
+      res.n_leaf_tuples = last.first;
+      res.last_path = std::move(last.second);
+
+      std::vector<std::uint64_t> leaf_idxs;
+      std::vector<fcmp_pp::CompressedPath> paths;
+      res.paths.resize(req.output_ids.size());
+      m_core.get_blockchain_storage().get_db().get_path_by_unified_id(req.output_ids, res.top_block_height, leaf_idxs, paths);
+      for (std::size_t i = 0; i < paths.size(); ++i)
+      {
+        auto& elem = res.paths.at(i);
+        elem.unified_id = req.output_ids.at(i);
+        elem.leaf_idx = leaf_idxs.at(i);
+        elem.path = std::move(paths.at(i));
+      }
+    }
+    catch (const std::exception& e)
+    {
+      MERROR("Failed to get output path data: " << e.what());
       res.status = Message::STATUS_FAILED;
       res.error_details = e.what();
     }

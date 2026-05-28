@@ -99,6 +99,7 @@ BEGIN_RPC_MESSAGE_CLASS(GetBlocksFast);
     RPC_MESSAGE_MEMBER(uint64_t, current_height);
     RPC_MESSAGE_MEMBER(crypto::hash, top_block_hash);
     RPC_MESSAGE_MEMBER(std::vector<cryptonote::rpc::block_output_indices>, output_indices);
+    RPC_MESSAGE_MEMBER(std::vector<cryptonote::rpc::block_output_indices>, unified_indices);
     RPC_MESSAGE_MEMBER(uint64_t, max_block_count);
   END_RPC_MESSAGE_RESPONSE;
 END_RPC_MESSAGE_CLASS;
@@ -442,6 +443,28 @@ BEGIN_RPC_MESSAGE_CLASS(GetOutputDistribution);
   END_RPC_MESSAGE_REQUEST;
   BEGIN_RPC_MESSAGE_RESPONSE;
     RPC_MESSAGE_MEMBER(std::vector<output_distribution>, distributions);
+  END_RPC_MESSAGE_RESPONSE;
+END_RPC_MESSAGE_CLASS;
+
+BEGIN_RPC_MESSAGE_CLASS(GetUnifiedId);
+  BEGIN_RPC_MESSAGE_REQUEST;
+    RPC_MESSAGE_MEMBER(std::vector<output_amount_and_index>, legacy_ids);
+  END_RPC_MESSAGE_REQUEST;
+  BEGIN_RPC_MESSAGE_RESPONSE;
+    RPC_MESSAGE_MEMBER(std::vector<output_map>, output_ids);
+  END_RPC_MESSAGE_RESPONSE;
+END_RPC_MESSAGE_CLASS;
+
+BEGIN_RPC_MESSAGE_CLASS(GetTreePaths);
+  BEGIN_RPC_MESSAGE_REQUEST;
+    RPC_MESSAGE_MEMBER(std::vector<std::uint64_t>, output_ids);
+  END_RPC_MESSAGE_RESPONSE;
+  BEGIN_RPC_MESSAGE_RESPONSE;
+    RPC_MESSAGE_MEMBER(std::vector<rpc::path_response>, paths);
+    RPC_MESSAGE_MEMBER(std::uint64_t, top_block_height);
+    RPC_MESSAGE_MEMBER(std::uint64_t, n_leaf_tuples);
+    RPC_MESSAGE_MEMBER(fcmp_pp::CompressedPath, last_path);
+    RPC_MESSAGE_MEMBER(crypto::hash, top_block_hash);
   END_RPC_MESSAGE_RESPONSE;
 END_RPC_MESSAGE_CLASS;
 

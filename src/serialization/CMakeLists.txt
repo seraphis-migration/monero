@@ -50,6 +50,9 @@ target_link_libraries(serialization
     ${Boost_SYSTEM_LIBRARY}
     ${Boost_THREAD_LIBRARY}
     ${EXTRA_LIBRARIES})
+target_include_directories(serialization
+  PUBLIC
+    ${MX25519_INCLUDE})
 add_dependencies(serialization
   version)
 
