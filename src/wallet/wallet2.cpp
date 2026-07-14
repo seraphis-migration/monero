@@ -4917,8 +4917,8 @@ boost::optional<wallet2::keys_file_data> wallet2::get_keys_file_data(const crypt
 
   if (m_ask_password == AskPasswordToDecrypt && !m_unattended && !m_watch_only)
   {
-    account.encrypt_viewkey(key);
-    account.decrypt_keys(key);
+    // since view key is already decrypted, we exclude it.
+    account.decrypt_keys_except_viewkey(key);
   }
 
   if (watch_only || background_keys_file)
@@ -5147,8 +5147,8 @@ void wallet2::setup_keys(const epee::wipeable_string &password)
   // re-encrypt, but keep viewkey unencrypted
   if (m_ask_password == AskPasswordToDecrypt && !m_unattended && !m_watch_only)
   {
-    m_account.encrypt_keys(key);
-    m_account.decrypt_viewkey(key);
+    // we don't encrypt the view key since its used for scanning.
+    m_account.encrypt_keys_except_viewkey(key);
   }
 
   m_cache_key = derive_cache_key(key, config::HASH_KEY_WALLET_CACHE);
@@ -5789,16 +5789,14 @@ bool wallet2::is_key_encryption_enabled() const
 
 void wallet2::encrypt_keys(const crypto::chacha_key &key)
 {
-  m_account.encrypt_keys(key);
-  m_account.decrypt_viewkey(key);
+  m_account.encrypt_keys_except_viewkey(key);
 }
 
 void wallet2::decrypt_keys(const crypto::chacha_key &key)
 {
   verify_password_with_cached_key(key);
 
-  m_account.encrypt_viewkey(key);
-  m_account.decrypt_keys(key);
+  m_account.decrypt_keys_except_viewkey(key);
 }
 
 void wallet2::encrypt_keys(const epee::wipeable_string &password)
