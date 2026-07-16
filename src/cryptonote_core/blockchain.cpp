@@ -4954,6 +4954,7 @@ leave:
   catch (const std::exception& e)
   {
     LOG_ERROR("Failed to advance tree at block with hash: " << id << ", what = " << e.what());
+    m_batch_success = false;
     bvc.m_verifivation_failed = true;
     return false;
   }
