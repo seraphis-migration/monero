@@ -36,6 +36,7 @@
 #include "cryptonote_basic/blobdatatype.h"
 #include "byte_slice.h"
 #include "storages/portable_storage_template_helper.h"
+#include "net/net_ssl.h"
 
 namespace cryptonote
 {
@@ -51,7 +52,7 @@ namespace cryptonote
     bool incoming;
     bool localhost;
     bool local_ip;
-    bool ssl;
+    epee::net_utils::ssl_support_t ssl;
 
     std::string address;
     std::string host;
@@ -89,9 +90,11 @@ namespace cryptonote
     uint8_t address_type;
 
     BEGIN_KV_SERIALIZE_MAP()
+      uint8_t ssl_i = uint8_t(ssl);
       KV_SERIALIZE(incoming)
       KV_SERIALIZE(localhost)
       KV_SERIALIZE(local_ip)
+      epee::serialization::selector<is_store>::serialize(ssl_i, stg, hparent_section, "ssl");
       KV_SERIALIZE(address)
       KV_SERIALIZE(host)
       KV_SERIALIZE(ip)
@@ -114,6 +117,7 @@ namespace cryptonote
       KV_SERIALIZE(height)
       KV_SERIALIZE(pruning_seed)
       KV_SERIALIZE(address_type)
+      ssl = epee::net_utils::ssl_support_t(ssl_i);
     END_KV_SERIALIZE_MAP()
   };
 

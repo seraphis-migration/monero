@@ -177,7 +177,7 @@ namespace
             handler_(std::addressof(endpoint_), connections, context_)
         {
             using base_type = epee::net_utils::connection_context_base;
-            static_cast<base_type&>(context_) = base_type{random_generator(), {}, is_incoming, false};
+            static_cast<base_type&>(context_) = base_type{random_generator(), {}, is_incoming, epee::net_utils::ssl_support_t::e_ssl_support_disabled};
             context_.m_state = cryptonote::cryptonote_connection_context::state_normal;
             handler_.after_init_connection();
         }
@@ -406,7 +406,7 @@ TEST(make_header, expect_return)
 
 TEST(message_writer, invoke_with_empty_payload)
 {
-    const epee::byte_slice message = epee::levin::message_writer{}.finalize_invoke(443);
+    const epee::byte_slice message = epee::levin::message_writer{}.finalize_invoke(443, false);
     const epee::levin::bucket_head2 header =
         epee::levin::make_header(443, 0, LEVIN_PACKET_REQUEST, true);
     ASSERT_EQ(sizeof(header), message.size());
@@ -421,7 +421,7 @@ TEST(message_writer, invoke_with_payload)
     epee::levin::message_writer writer{};
     writer.buffer.write(epee::to_span(bytes));
 
-    const epee::byte_slice message = writer.finalize_invoke(443);
+    const epee::byte_slice message = writer.finalize_invoke(443, false);
     const epee::levin::bucket_head2 header =
         epee::levin::make_header(443, bytes.size(), LEVIN_PACKET_REQUEST, true);
 
@@ -432,7 +432,7 @@ TEST(message_writer, invoke_with_payload)
 
 TEST(message_writer, notify_with_empty_payload)
 {
-    const epee::byte_slice message = epee::levin::message_writer{}.finalize_notify(443);
+    const epee::byte_slice message = epee::levin::message_writer{}.finalize_notify(443, false);
     const epee::levin::bucket_head2 header =
         epee::levin::make_header(443, 0, LEVIN_PACKET_REQUEST, false);
     ASSERT_EQ(sizeof(header), message.size());
@@ -447,7 +447,7 @@ TEST(message_writer, notify_with_payload)
     epee::levin::message_writer writer{};
     writer.buffer.write(epee::to_span(bytes));
 
-    const epee::byte_slice message = writer.finalize_notify(443);
+    const epee::byte_slice message = writer.finalize_notify(443, false);
     const epee::levin::bucket_head2 header =
         epee::levin::make_header(443, bytes.size(), LEVIN_PACKET_REQUEST, false);
 
@@ -458,7 +458,7 @@ TEST(message_writer, notify_with_payload)
 
 TEST(message_writer, response_with_empty_payload)
 {
-    const epee::byte_slice message = epee::levin::message_writer{}.finalize_response(443, 1);
+    const epee::byte_slice message = epee::levin::message_writer{}.finalize_response(443, 1, false);
     epee::levin::bucket_head2 header =
         epee::levin::make_header(443, 0, LEVIN_PACKET_RESPONSE, false);
     header.m_return_code = SWAP32LE(1);
@@ -474,7 +474,7 @@ TEST(message_writer, response_with_payload)
     epee::levin::message_writer writer{};
     writer.buffer.write(epee::to_span(bytes));
 
-    const epee::byte_slice message = writer.finalize_response(443, 6450);
+    const epee::byte_slice message = writer.finalize_response(443, 6450, false);
     epee::levin::bucket_head2 header =
         epee::levin::make_header(443, bytes.size(), LEVIN_PACKET_RESPONSE, false);
     header.m_return_code = SWAP32LE(6450);
@@ -489,9 +489,9 @@ TEST(message_writer, error)
     epee::levin::message_writer writer{};
     writer.buffer.clear();
 
-    EXPECT_THROW(writer.finalize_invoke(0), std::runtime_error);
-    EXPECT_THROW(writer.finalize_notify(0), std::runtime_error);
-    EXPECT_THROW(writer.finalize_response(0, 0), std::runtime_error);
+    EXPECT_THROW(writer.finalize_invoke(0, false), std::runtime_error);
+    EXPECT_THROW(writer.finalize_notify(0, false), std::runtime_error);
+    EXPECT_THROW(writer.finalize_response(0, 0, false), std::runtime_error);
 }
 
 TEST(make_noise, invalid)
@@ -608,6 +608,10 @@ TEST_F(levin_notify, defaulted)
     txs[0].resize(100, 'e');
     EXPECT_FALSE(notifier.send_txs(std::move(txs), mock_tx_hashes(txs.size()), random_generator_(), cryptonote::relay_method::local));
 }
+
+/* Padding is now performed at the protocol level instead of payload. This
+ provides a quicker and more accurate padding. It is performed in
+ `contrib/epee/include/net/levin_base.h`. */
 
 TEST_F(levin_notify, fluff_without_padding)
 {
@@ -1077,7 +1081,7 @@ TEST_F(levin_notify, fluff_with_padding)
         {
             auto notification = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
             EXPECT_EQ(txs, notification.txs);
-            EXPECT_FALSE(notification._.empty());
+            EXPECT_TRUE(notification._.empty());
             EXPECT_TRUE(notification.dandelionpp_fluff);
         }
     }
@@ -1142,7 +1146,7 @@ TEST_F(levin_notify, stem_with_padding)
         {
             auto notification = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
             EXPECT_EQ(txs, notification.txs);
-            EXPECT_FALSE(notification._.empty());
+            EXPECT_TRUE(notification._.empty());
             EXPECT_EQ(!is_stem, notification.dandelionpp_fluff);
         }
 
@@ -1205,7 +1209,7 @@ TEST_F(levin_notify, stem_no_outs_with_padding)
     {
         auto notification = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
         EXPECT_EQ(sorted_txs, notification.txs);
-        EXPECT_FALSE(notification._.empty());
+        EXPECT_TRUE(notification._.empty());
         EXPECT_TRUE(notification.dandelionpp_fluff);
     }
 }
@@ -1274,7 +1278,7 @@ TEST_F(levin_notify, local_with_padding)
         {
             auto notification = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
             EXPECT_EQ(their_txs, notification.txs);
-            EXPECT_FALSE(notification._.empty());
+            EXPECT_TRUE(notification._.empty());
             EXPECT_EQ(!is_stem, notification.dandelionpp_fluff);
         }
 
@@ -1303,7 +1307,7 @@ TEST_F(levin_notify, local_with_padding)
         EXPECT_EQ(1u, receiver_.notified_size());
         auto notification = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
         EXPECT_EQ(my_txs, notification.txs);
-        EXPECT_FALSE(notification._.empty());
+        EXPECT_TRUE(notification._.empty());
         EXPECT_TRUE(!notification.dandelionpp_fluff);
 
         has_stemmed |= is_stem;
@@ -1371,7 +1375,7 @@ TEST_F(levin_notify, forward_with_padding)
         {
             auto notification = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
             EXPECT_EQ(txs, notification.txs);
-            EXPECT_FALSE(notification._.empty());
+            EXPECT_TRUE(notification._.empty());
             EXPECT_EQ(!is_stem, notification.dandelionpp_fluff);
         }
 
@@ -1764,7 +1768,7 @@ TEST_F(levin_notify, private_fluff_with_padding)
         {
             auto notification = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
             EXPECT_EQ(txs, notification.txs);
-            EXPECT_FALSE(notification._.empty());
+            EXPECT_TRUE(notification._.empty());
             EXPECT_TRUE(notification.dandelionpp_fluff);
         }
     }
@@ -1816,7 +1820,7 @@ TEST_F(levin_notify, private_stem_with_padding)
         {
             auto notification = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
             EXPECT_EQ(txs, notification.txs);
-            EXPECT_FALSE(notification._.empty());
+            EXPECT_TRUE(notification._.empty());
             EXPECT_TRUE(notification.dandelionpp_fluff);
         }
     }
@@ -1868,7 +1872,7 @@ TEST_F(levin_notify, private_local_with_padding)
         {
             auto notification = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
             EXPECT_EQ(txs, notification.txs);
-            EXPECT_FALSE(notification._.empty());
+            EXPECT_TRUE(notification._.empty());
             EXPECT_TRUE(notification.dandelionpp_fluff);
         }
     }
@@ -1920,7 +1924,7 @@ TEST_F(levin_notify, private_forward_with_padding)
         {
             auto notification = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
             EXPECT_EQ(txs, notification.txs);
-            EXPECT_FALSE(notification._.empty());
+            EXPECT_TRUE(notification._.empty());
             EXPECT_TRUE(notification.dandelionpp_fluff);
         }
     }
@@ -2451,7 +2455,7 @@ TEST_F(levin_notify, command_max_bytes)
     {
         epee::levin::message_writer dest{};
         dest.buffer.write(epee::to_span(payload));
-        bytes = dest.finalize_notify(ping_command);
+        bytes = dest.finalize_notify(ping_command, false);
     }
 
     EXPECT_EQ(1, get_connections().send(bytes.clone(), contexts_.front().get_id()));
@@ -2467,7 +2471,7 @@ TEST_F(levin_notify, command_max_bytes)
         payload.push_back('h');
         epee::levin::message_writer dest{};
         dest.buffer.write(epee::to_span(payload));
-        bytes = dest.finalize_notify(ping_command);
+        bytes = dest.finalize_notify(ping_command, true);
     }
 
     EXPECT_EQ(1, get_connections().send(std::move(bytes), contexts_.front().get_id()));

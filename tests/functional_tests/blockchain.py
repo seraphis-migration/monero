@@ -286,7 +286,9 @@ class BlockchainTest():
 
             # Disconnect the daemons from their peers
             daemon0.out_peers(0)
+            daemon0.in_peers(0)
             daemon1.out_peers(0)
+            daemon1.in_peers(0)
 
             # Generate blocks on each daemon, have the second daemon mine 1 extra block so it has the heavier chain
             # Note: these two calls could be concurrent to speed this test up
@@ -302,7 +304,9 @@ class BlockchainTest():
 
             # Now re-connect the daemons and wait until daemon0 gets onto daemon1's heavier chain
             daemon0.out_peers(12)
+            daemon0.in_peers(12)
             daemon1.out_peers(12)
+            daemon1.in_peers(12)
 
             (res0_info, res1_info) = wait_until_same_chain()
             assert res0_info.height == (genblocks1_res.height + 1)

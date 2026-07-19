@@ -162,16 +162,11 @@ namespace levin
       return get_out_connections(p2p, get_blockchain_height(p2p, core));
     }
 
-    epee::levin::message_writer make_tx_message(std::vector<blobdata>&& txs, const bool pad, const bool fluff)
+    epee::levin::message_writer make_tx_message(std::vector<blobdata>&& txs, const bool fluff)
     {
       NOTIFY_NEW_TRANSACTIONS::request request{};
       request.txs = std::move(txs);
       request.dandelionpp_fluff = fluff;
-
-      if (pad)
-      {
-        pad_tx_request(request);
-      }
 
       epee::levin::message_writer out;
       if (!epee::serialization::store_t_to_binary(request, out.buffer))
@@ -194,14 +189,14 @@ namespace levin
 
     bool make_payload_send_txs(connections& p2p, std::vector<blobdata>&& txs, const boost::uuids::uuid& destination, const bool pad, const bool fluff)
     {
-      epee::byte_slice blob = make_tx_message(std::move(txs), pad, fluff).finalize_notify(NOTIFY_NEW_TRANSACTIONS::ID);
+      epee::byte_slice blob = make_tx_message(std::move(txs), fluff).finalize_notify(NOTIFY_NEW_TRANSACTIONS::ID, pad);
       return p2p.send(std::move(blob), destination);
     }
 
     // TODO: do we want to pad to avoid revealing definitive n txs in the req?
-    bool make_payload_send_txs_relay_v2(connections& p2p, std::vector<crypto::hash>&& txs, const boost::uuids::uuid& destination)
+    bool make_payload_send_txs_relay_v2(connections& p2p, std::vector<crypto::hash>&& txs, const boost::uuids::uuid& destination, const bool pad)
     {
-      epee::byte_slice blob = make_tx_hash_message(std::move(txs)).finalize_notify(NOTIFY_TX_POOL_HASH::ID);
+      epee::byte_slice blob = make_tx_hash_message(std::move(txs)).finalize_notify(NOTIFY_TX_POOL_HASH::ID, pad);
       return p2p.send(std::move(blob), destination);
     }
 
@@ -408,7 +403,7 @@ namespace levin
                  return std::memcmp(&lhs, &rhs, sizeof(lhs)) < 0;
                });
           connection.first.erase(unique(connection.first.begin(), connection.first.end()), connection.first.end());
-          make_payload_send_txs_relay_v2(*zone_->p2p, std::move(connection.first), connection.second);
+          make_payload_send_txs_relay_v2(*zone_->p2p, std::move(connection.first), connection.second, zone_->pad_txs);
         }
 
         for (auto& connection : connections)
@@ -880,7 +875,7 @@ namespace levin
       // Padding is not useful when using noise mode. Send as stem so receiver
       // forwards in Dandelion++ mode.
       epee::byte_slice message = epee::levin::make_fragmented_notify(
-        zone_->noise.size(), NOTIFY_NEW_TRANSACTIONS::ID, make_tx_message(std::move(txs), false, false)
+        zone_->noise.size(), NOTIFY_NEW_TRANSACTIONS::ID, make_tx_message(std::move(txs), false)
       );
       if (CRYPTONOTE_MAX_FRAGMENTS * zone_->noise.size() < message.size())
       {

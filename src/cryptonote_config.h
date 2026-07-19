@@ -161,6 +161,7 @@
 #define P2P_DEFAULT_LIMIT_RATE_DOWN                     32768       // kB/s
 #define P2P_REQUEST_FAILURE_THRESHOLD_PERCENTAGE        70          // if more than 70% of requests fail, the peer is dropped
 #define P2P_MIN_SAMPLE_SIZE_FOR_DROPPING                5          // minimum number of requests to consider dropping a peer for failed requests
+#define P2P_MAX_LEVIN_PAD_BYTES                         8192
 
 #define P2P_FAILED_ADDR_FORGET_SECONDS                  (60)     //1 minute
 #define P2P_IP_BLOCKTIME                                (60*2)  //2 minutes
