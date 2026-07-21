@@ -1432,10 +1432,11 @@ namespace cryptonote
      *
      * @param alt_chain the chain to switch to
      * @param discard_disconnected_chain whether or not to keep the old chain as an alternate
+     * @param bvc
      *
      * @return false if the reorganization fails, otherwise true
      */
-    bool switch_to_alternative_blockchain(std::list<block_extended_info>& alt_chain, bool discard_disconnected_chain);
+    bool switch_to_alternative_blockchain(std::list<block_extended_info>& alt_chain, bool discard_disconnected_chain, block_verification_context& bvc);
 
     /**
      * @brief removes the most recent block from the blockchain

@@ -752,18 +752,41 @@ namespace cryptonote
             need_tx_indices.push_back(tx_idx);
         }
 
-        // Make request form
         MDEBUG("We are missing " << need_tx_indices.size() << " txes for this fluffy block");
         for (auto txidx: need_tx_indices)
           MDEBUG("  tx " << new_block.tx_hashes[txidx]);
-        NOTIFY_REQUEST_FLUFFY_MISSING_TX::request missing_tx_req;
-        missing_tx_req.block_hash = new_block_hash;
-        missing_tx_req.current_blockchain_height = arg.current_blockchain_height;
-        missing_tx_req.missing_tx_indices = std::move(need_tx_indices);
 
-        // Post NOTIFY_REQUEST_FLUFFY_MISSING_TX request to peer
-        MLOG_P2P_MESSAGE("-->>NOTIFY_REQUEST_FLUFFY_MISSING_TX: missing_tx_indices.size()=" << missing_tx_req.missing_tx_indices.size() );
-        post_notify<NOTIFY_REQUEST_FLUFFY_MISSING_TX>(missing_tx_req, context);
+        // need_tx_indices only covers this block but we might have failed due to a missing tx
+        // from an ancestor block in case we just re-orged above and alt chain txs are dropped
+        // from mempool.
+        if (!need_tx_indices.empty()) {
+          NOTIFY_REQUEST_FLUFFY_MISSING_TX::request missing_tx_req;
+          missing_tx_req.block_hash = new_block_hash;
+          missing_tx_req.current_blockchain_height = arg.current_blockchain_height;
+          missing_tx_req.missing_tx_indices = std::move(need_tx_indices);
+
+          // Post NOTIFY_REQUEST_FLUFFY_MISSING_TX request to peer
+          MLOG_P2P_MESSAGE("-->>NOTIFY_REQUEST_FLUFFY_MISSING_TX: missing_tx_indices.size()=" << missing_tx_req.missing_tx_indices.size() );
+          post_notify<NOTIFY_REQUEST_FLUFFY_MISSING_TX>(missing_tx_req, context);
+        }
+        else
+        {
+          // we just re-orged and ancestor alt block's txs were removed from our pool
+          // so resync these blocks with its txs.
+          MDEBUG("Reorg for fluffy block " << new_block_hash << " needs txs we don't have for an "
+            "ancestor block; requesting chain to re-sync the alternative chain with its txs");
+          context.m_needed_objects.clear();
+          context.m_state = cryptonote_connection_context::state_synchronizing;
+          NOTIFY_REQUEST_CHAIN::request r = {};
+          m_core.get_short_chain_history(r.block_ids, context.m_expect_height);
+          handler_request_blocks_history( r.block_ids );
+          r.prune = m_sync_pruned_blocks;
+          context.m_last_request_time = boost::posix_time::microsec_clock::universal_time();
+          context.m_expect_response = NOTIFY_RESPONSE_CHAIN_ENTRY::ID;
+          MLOG_P2P_MESSAGE("-->>NOTIFY_REQUEST_CHAIN: m_block_ids.size()=" << r.block_ids.size() );
+          post_notify<NOTIFY_REQUEST_CHAIN>(r, context);
+          MLOG_PEER_STATE("requesting chain");
+        }
       }
       else // failure for some other reason besides missing txs...
       {
