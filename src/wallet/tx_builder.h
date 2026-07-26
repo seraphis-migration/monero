@@ -313,7 +313,8 @@ cryptonote::transaction finalize_fcmps_and_range_proofs(
     const carrot::encrypted_payment_id_t &encrypted_payment_id,
     const rct::xmr_amount fee,
     const fcmp_pp::curve_trees::TreeCacheV1 &tree_cache,
-    const fcmp_pp::curve_trees::CurveTreesV1 &curve_trees);
+    const fcmp_pp::curve_trees::CurveTreesV1 &curve_trees,
+    bool rel_lock = false);
 /**
  * @brief Finalize FCMPs, BP+ range proofs for outputs amounts, and SA/L proofs for Carrot/FCMP++ txs
  * @param tx_proposal -

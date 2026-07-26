@@ -102,5 +102,8 @@ struct CarrotTransactionProposalV1
     /// This field is truly "extra". It should contain only tx.extra fields that aren't present in a
     /// normal Carrot transaction, i.e. NOT ephemeral pubkeys nor encrypted PIDs
     std::vector<std::uint8_t> extra;
+
+    /// If true, the transaction's unlock_time is set to FCMP_RELATIVE_LOCK
+    bool rel_lock = false;
 };
 } //namespace carrot

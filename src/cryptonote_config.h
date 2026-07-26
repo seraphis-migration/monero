@@ -47,6 +47,9 @@
 #define CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT              60*60*2
 #define CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE             10
 
+#define FCMP_RELATIVE_LOCK                              1
+#define FCMP_RELATIVE_LOCK_DURATION                     2160
+
 #define BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW               60
 
 // MONEY_SUPPLY - total number coins to be generated
@@ -210,6 +213,7 @@
 #define HF_VERSION_2026_SCALING                 17
 #define HF_VERSION_POW_COMMITMENT               17
 #define HF_VERSION_RANDOMX_V2                   17
+#define HF_VERSION_RELATIVE_LOCK                18
 #define MAX_HF_VERSION                          18
 
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8

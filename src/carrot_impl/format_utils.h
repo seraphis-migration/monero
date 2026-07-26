@@ -124,12 +124,14 @@ bool try_load_carrot_extra_v1(
  * @param key_images -
  * @param fee -
  * @param encrypted_payment_id pid_enc
+ * @param rel_lock - if true, unlock_time is set to FCMP_RELATIVE_LOCK
  * @return A fully populated, pruned, non-coinbase transaction containing given Carrot v1 information
  */
 cryptonote::transaction store_carrot_to_transaction_v1(const std::vector<CarrotEnoteV1> &enotes,
     const std::vector<crypto::key_image> &key_images,
     const xmr_amount fee,
-    const encrypted_payment_id_t encrypted_payment_id);
+    const encrypted_payment_id_t encrypted_payment_id,
+    bool rel_lock = false);
 /**
  * @brief Load one non-coinbase Carrot enote from a cryptonote::transaction, at given local output index
  * @param tx -

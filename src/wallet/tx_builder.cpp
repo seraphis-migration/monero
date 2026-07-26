@@ -993,7 +993,8 @@ cryptonote::transaction finalize_fcmps_and_range_proofs(
     const carrot::encrypted_payment_id_t &encrypted_payment_id,
     const rct::xmr_amount fee,
     const fcmp_pp::curve_trees::TreeCacheV1 &tree_cache,
-    const fcmp_pp::curve_trees::CurveTreesV1 &curve_trees)
+    const fcmp_pp::curve_trees::CurveTreesV1 &curve_trees,
+    bool rel_lock)
 {
     const size_t n_inputs = sorted_input_key_images.size();
     const size_t n_outputs = output_enote_proposals.size();
@@ -1168,7 +1169,8 @@ cryptonote::transaction finalize_fcmps_and_range_proofs(
     cryptonote::transaction tx = carrot::store_carrot_to_transaction_v1(enotes,
         sorted_input_key_images,
         fee,
-        encrypted_payment_id);
+        encrypted_payment_id,
+        rel_lock);
 
     // wait for pre-membership jobs to complete
     LOG_PRINT_L3("Waiting on jobs...");
@@ -1363,7 +1365,8 @@ cryptonote::transaction finalize_all_fcmp_pp_proofs(
         encrypted_payment_id,
         tx_proposal.fee,
         tree_cache,
-        curve_trees);
+        curve_trees,
+        tx_proposal.rel_lock);
 }
 //-------------------------------------------------------------------------------------------------------------------
 pending_tx make_pending_carrot_tx(const carrot::CarrotTransactionProposalV1 &tx_proposal,
