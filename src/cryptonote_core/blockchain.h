@@ -75,8 +75,8 @@ namespace cryptonote
   void handle_fcmp_tree(BlockchainDB *db,
       uint64_t block_idx,
       uint64_t first_unified_id,
-      const std::vector<std::reference_wrapper<const transaction>> &tx_refs,
-      const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments);
+      const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments,
+      OutsByLastLockedBlockMeta &&new_locked_outs);
 
   /** Declares ways in which the BlockchainDB backend should be told to sync
    *

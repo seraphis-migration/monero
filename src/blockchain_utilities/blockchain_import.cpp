@@ -490,13 +490,15 @@ int import_from_file(cryptonote::core& core, const std::string& import_file_path
 
           const uint64_t first_unified_id = core.get_blockchain_storage().get_db().num_outputs();
           std::unordered_map<uint64_t, rct::key> transparent_amount_commitments;
-          const auto tx_refs = cryptonote::collect_transparent_amount_commitments(b.miner_tx, txs, transparent_amount_commitments);
+          cryptonote::collect_transparent_amount_commitments(b.miner_tx, txs, transparent_amount_commitments);
+          OutsByLastLockedBlockMeta new_locked_outs = cryptonote::get_outs_by_last_locked_block(b.miner_tx, txs, transparent_amount_commitments, first_unified_id, h);
 
           try
           {
             uint64_t long_term_block_weight = core.get_blockchain_storage().get_next_long_term_block_weight(block_weight);
             const uint64_t new_height = core.get_blockchain_storage().get_db().add_block(std::make_pair(b, block_to_blob(b)), block_weight, long_term_block_weight, cumulative_difficulty, coins_generated, txs, transparent_amount_commitments);
-            cryptonote::handle_fcmp_tree(&core.get_blockchain_storage().get_db(), new_height - 1, first_unified_id, tx_refs, transparent_amount_commitments);
+            CHECK_AND_ASSERT_THROW_MES(h == (new_height-1), "Unexpected height");
+            cryptonote::handle_fcmp_tree(&core.get_blockchain_storage().get_db(), new_height-1, first_unified_id, transparent_amount_commitments, std::move(new_locked_outs));
           }
           catch (const std::exception& e)
           {

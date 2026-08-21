@@ -2846,11 +2846,8 @@ static bool batch_verify_fcmp_pp_txs(const BlockchainDB *db,
   return true;
 }
 //------------------------------------------------------------------
-void cryptonote::handle_fcmp_tree(BlockchainDB *db, const uint64_t block_idx, const uint64_t first_unified_id, const std::vector<std::reference_wrapper<const transaction>> &tx_refs, const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments)
+void cryptonote::handle_fcmp_tree(BlockchainDB *db, const uint64_t block_idx, const uint64_t first_unified_id, const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments, OutsByLastLockedBlockMeta &&new_locked_outs)
 {
-  // Collect outs by last locked block to add to the db
-  OutsByLastLockedBlockMeta new_locked_outs = cryptonote::get_outs_by_last_locked_block(tx_refs, transparent_amount_commitments, first_unified_id, block_idx);
-
   // Get the outputs with default last locked block
   const uint64_t default_last_locked_block = cryptonote::get_default_last_locked_block_index(block_idx);
   auto new_default_locked_outs_it = new_locked_outs.outs_by_last_locked_block.find(default_last_locked_block);
@@ -4856,7 +4853,7 @@ leave:
   TIME_MEASURE_START(tac);
 
   // Collect all remaining transparent amount commitments
-  const auto tx_refs = collect_transparent_amount_commitments(bl.miner_tx, txs, transparent_amount_commitments);
+  collect_transparent_amount_commitments(bl.miner_tx, txs, transparent_amount_commitments);
 
   TIME_MEASURE_FINISH(tac);
 
@@ -4890,7 +4887,9 @@ leave:
   if(precomputed)
     block_processing_time += m_fake_pow_calc_time;
 
+  // Collect new locked outputs we're adding to the db
   const uint64_t first_unified_id = m_db->num_outputs();
+  OutsByLastLockedBlockMeta new_locked_outs = cryptonote::get_outs_by_last_locked_block(bl.miner_tx, txs, transparent_amount_commitments, first_unified_id, blockchain_height);
 
   rtxn_guard.stop();
   TIME_MEASURE_START(addblock);
@@ -4926,9 +4925,9 @@ leave:
     LOG_ERROR("Blocks that failed verification should not reach here");
   }
 
-  if (new_height == 0)
+  if (new_height == 0 || (new_height-1) != blockchain_height)
   {
-    LOG_ERROR("handle_block_to_main_chain: unexpected new_height == 0");
+    LOG_ERROR("handle_block_to_main_chain: unexpected new_height: " << new_height << " , expected: " << blockchain_height+1);
     bvc.m_verifivation_failed = true;
     return false;
   }
@@ -4945,7 +4944,7 @@ leave:
 
   TIME_MEASURE_START(advance_tree);
 
-  try { handle_fcmp_tree(m_db, new_height-1, first_unified_id, tx_refs, transparent_amount_commitments); }
+  try { handle_fcmp_tree(m_db, new_height-1, first_unified_id, transparent_amount_commitments, std::move(new_locked_outs)); }
   catch (const std::exception& e)
   {
     LOG_ERROR("Failed to advance tree at block with hash: " << id << ", what = " << e.what());
