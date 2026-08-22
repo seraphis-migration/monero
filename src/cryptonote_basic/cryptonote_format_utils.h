@@ -295,7 +295,15 @@ namespace cryptonote
   };
 
   OutsByLastLockedBlockMeta get_outs_by_last_locked_block(
-    const std::vector<std::reference_wrapper<const cryptonote::transaction>> &txs,
+    const cryptonote::transaction &miner_tx,
+    const std::vector<cryptonote::transaction> &txs,
+    const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments,
+    const uint64_t first_unified_id,
+    const uint64_t block_idx);
+
+  OutsByLastLockedBlockMeta get_outs_by_last_locked_block(
+    const cryptonote::transaction &miner_tx,
+    const std::vector<std::pair<transaction, blobdata>> &tx_pairs,
     const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments,
     const uint64_t first_unified_id,
     const uint64_t block_idx);

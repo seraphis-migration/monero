@@ -156,6 +156,29 @@ namespace cryptonote
     return tx.vout.size();
   }
   //---------------------------------------------------------------
+  static OutsByLastLockedBlockMeta get_outs_by_last_locked_block(
+    const std::vector<std::reference_wrapper<const cryptonote::transaction>> &txs,
+    const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments,
+    const uint64_t first_unified_id,
+    const uint64_t block_idx)
+  {
+    OutsByLastLockedBlockMeta outs;
+    outs.next_unified_id = first_unified_id;
+
+    for (const auto &tx : txs)
+    {
+      outs.next_unified_id += set_tx_outs_by_last_locked_block(
+        tx.get(),
+        transparent_amount_commitments,
+        outs.next_unified_id,
+        block_idx,
+        outs.outs_by_last_locked_block,
+        outs.timelocked_outputs);
+    }
+
+    return outs;
+  }
+  //---------------------------------------------------------------
 }
 
 namespace cryptonote
@@ -1986,26 +2009,33 @@ namespace cryptonote
   }
   //---------------------------------------------------------------
   OutsByLastLockedBlockMeta get_outs_by_last_locked_block(
-    const std::vector<std::reference_wrapper<const cryptonote::transaction>> &txs,
+    const cryptonote::transaction &miner_tx,
+    const std::vector<cryptonote::transaction> &txs,
     const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments,
     const uint64_t first_unified_id,
     const uint64_t block_idx)
   {
-    OutsByLastLockedBlockMeta outs_by_last_locked_block_meta_out;
-    outs_by_last_locked_block_meta_out.next_unified_id = first_unified_id;
-
+    std::vector<std::reference_wrapper<const transaction>> tx_refs;
+    tx_refs.reserve(1 + txs.size());
+    tx_refs.push_back(std::cref(miner_tx));
     for (const auto &tx : txs)
-    {
-      outs_by_last_locked_block_meta_out.next_unified_id += set_tx_outs_by_last_locked_block(
-        tx.get(),
-        transparent_amount_commitments,
-        outs_by_last_locked_block_meta_out.next_unified_id,
-        block_idx,
-        outs_by_last_locked_block_meta_out.outs_by_last_locked_block,
-        outs_by_last_locked_block_meta_out.timelocked_outputs);
-    }
+      tx_refs.push_back(std::cref(tx));
+    return get_outs_by_last_locked_block(tx_refs, transparent_amount_commitments, first_unified_id, block_idx);
+  }
 
-    return outs_by_last_locked_block_meta_out;
+  OutsByLastLockedBlockMeta get_outs_by_last_locked_block(
+    const cryptonote::transaction &miner_tx,
+    const std::vector<std::pair<transaction, blobdata>> &tx_pairs,
+    const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments,
+    const uint64_t first_unified_id,
+    const uint64_t block_idx)
+  {
+    std::vector<std::reference_wrapper<const transaction>> tx_refs;
+    tx_refs.reserve(1 + tx_pairs.size());
+    tx_refs.push_back(std::cref(miner_tx));
+    for (const auto &tx : tx_pairs)
+      tx_refs.push_back(std::cref(tx.first));
+    return get_outs_by_last_locked_block(tx_refs, transparent_amount_commitments, first_unified_id, block_idx);
   }
   //---------------------------------------------------------------
   fcmp_pp::OutputPair to_output_pair(const cryptonote::txout_target_v &tx_out, const rct::key &commitment)

@@ -323,8 +323,8 @@ bool gen_fcmp_pp_tx_validation_base::generate_with(std::vector<test_event_entry>
       blk_idx == pre_rct_tx_block_idx ? std::vector<transaction>{pre_rct_tx}
       : blk_idx == bpp_block_idx ? std::vector<transaction>{bpp_tx}
       : std::vector<transaction>{};
-    const auto tx_refs = cryptonote::collect_transparent_amount_commitments(blk.miner_tx, txs, transparent_amount_commitments);
-    auto outs_meta = cryptonote::get_outs_by_last_locked_block(tx_refs, transparent_amount_commitments, first_unified_id, blk_idx);
+    cryptonote::collect_transparent_amount_commitments(blk.miner_tx, txs, transparent_amount_commitments);
+    auto outs_meta = cryptonote::get_outs_by_last_locked_block(blk.miner_tx, txs, transparent_amount_commitments, first_unified_id, blk_idx);
     outs_by_last_locked_blocks.emplace_back(std::move(outs_meta.outs_by_last_locked_block));
     first_unified_id = outs_meta.next_unified_id;
   }

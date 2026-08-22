@@ -472,6 +472,28 @@ static bool collect_fcmp_pp_tx_verify_input(cryptonote::transaction &tx,
     return true;
 }
 
+static void collect_transparent_amount_commitments_static(
+    const std::vector<std::reference_wrapper<const transaction>> &tx_refs,
+    std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments_inout)
+{
+    // Note: we do not clear transparent_amount_commitments_inout because it may be a rolling cache
+
+    for (const auto &tx_ref : tx_refs)
+    {
+        const auto &tx = tx_ref.get();
+
+        // We only need commitments for transparent amounts, which are tx version 1 || coinbase txs
+        if (tx.version > 1 && !cryptonote::is_coinbase(tx))
+            continue;
+        for (const auto &tx_out : tx.vout)
+        {
+            const uint64_t amount = tx_out.amount;
+            if (transparent_amount_commitments_inout.find(amount) == transparent_amount_commitments_inout.end())
+                transparent_amount_commitments_inout[amount] = rct::zeroCommitVartime(amount);
+        }
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace cryptonote
@@ -504,28 +526,6 @@ bool collect_points_for_torsion_check(const transaction& tx,
 }
 
 void collect_transparent_amount_commitments(
-    const std::vector<std::reference_wrapper<const transaction>> &txs,
-    std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments_inout)
-{
-    // Note: we do not clear transparent_amount_commitments_inout because it may be a rolling cache
-
-    for (const auto &tx_ref : txs)
-    {
-        const auto &tx = tx_ref.get();
-
-        // We only need commitments for transparent amounts, which are tx version 1 || coinbase txs
-        if (tx.version > 1 && !cryptonote::is_coinbase(tx))
-            continue;
-        for (const auto &tx_out : tx.vout)
-        {
-            const uint64_t amount = tx_out.amount;
-            if (transparent_amount_commitments_inout.find(amount) == transparent_amount_commitments_inout.end())
-                transparent_amount_commitments_inout[amount] = rct::zeroCommitVartime(amount);
-        }
-    }
-}
-
-std::vector<std::reference_wrapper<const transaction>> collect_transparent_amount_commitments(
     const transaction &miner_tx,
     const std::vector<std::pair<transaction, blobdata>> &tx_pairs,
     std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments_inout)
@@ -535,11 +535,10 @@ std::vector<std::reference_wrapper<const transaction>> collect_transparent_amoun
     tx_refs.push_back(std::cref(miner_tx));
     for (const auto &tx : tx_pairs)
         tx_refs.push_back(std::cref(tx.first));
-    collect_transparent_amount_commitments(tx_refs, transparent_amount_commitments_inout);
-    return tx_refs;
+    collect_transparent_amount_commitments_static(tx_refs, transparent_amount_commitments_inout);
 }
 
-std::vector<std::reference_wrapper<const transaction>> collect_transparent_amount_commitments(
+void collect_transparent_amount_commitments(
     const transaction &miner_tx,
     const std::vector<transaction> &txs,
     std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments_inout)
@@ -549,8 +548,7 @@ std::vector<std::reference_wrapper<const transaction>> collect_transparent_amoun
     tx_refs.push_back(std::cref(miner_tx));
     for (const auto &tx : txs)
         tx_refs.push_back(std::cref(tx));
-    collect_transparent_amount_commitments(tx_refs, transparent_amount_commitments_inout);
-    return tx_refs;
+    collect_transparent_amount_commitments_static(tx_refs, transparent_amount_commitments_inout);
 }
 
 void collect_transparent_amount_commitments(
@@ -561,7 +559,7 @@ void collect_transparent_amount_commitments(
     tx_refs.reserve(txs_by_txid.size());
     for (const auto &tx_pair : txs_by_txid)
       tx_refs.push_back(std::cref(tx_pair.second.first));
-    collect_transparent_amount_commitments(tx_refs, transparent_amount_commitments_inout);
+    collect_transparent_amount_commitments_static(tx_refs, transparent_amount_commitments_inout);
 }
 
 uint64_t get_non_coinbase_tx_weight_limit(const uint8_t hf_version)
@@ -925,7 +923,7 @@ bool ver_non_input_consensus(const transaction& tx, tx_verification_context& tvc
 {
     // Get tx's transparent amount commitments
     std::unordered_map<uint64_t, rct::key> transparent_amount_commitments;
-    collect_transparent_amount_commitments({std::cref(tx)}, transparent_amount_commitments);
+    collect_transparent_amount_commitments_static({std::cref(tx)}, transparent_amount_commitments);
 
     return ver_non_input_consensus_templated(&tx, &tx + 1, transparent_amount_commitments, tvc, hf_version);
 }

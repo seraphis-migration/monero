@@ -3205,8 +3205,8 @@ static void prepare_tree_state_change(const TreeSyncStartParams &tree_sync_start
     new_block_hashes_out.push_back(parsed_blocks[i].block.hash);
 
     // Slow: collect transparent amount commitments
-    const auto tx_refs = cryptonote::collect_transparent_amount_commitments(parsed_blocks[i].block.miner_tx, parsed_blocks[i].txes, transparent_amount_commitments);
-    auto res = cryptonote::get_outs_by_last_locked_block(tx_refs, transparent_amount_commitments, first_unified_id, created_block_idx);
+    cryptonote::collect_transparent_amount_commitments(parsed_blocks[i].block.miner_tx, parsed_blocks[i].txes, transparent_amount_commitments);
+    auto res = cryptonote::get_outs_by_last_locked_block(parsed_blocks[i].block.miner_tx, parsed_blocks[i].txes, transparent_amount_commitments, first_unified_id, created_block_idx);
 
     outs_by_last_locked_blocks.emplace_back(std::move(res.outs_by_last_locked_block));
     first_unified_id = res.next_unified_id;
