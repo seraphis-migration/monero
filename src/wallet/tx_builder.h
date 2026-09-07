@@ -261,6 +261,7 @@ std::vector<carrot::CarrotTransactionProposalV1> make_carrot_transaction_proposa
 carrot::OutputOpeningHintVariant make_sal_opening_hint_from_transfer_details(const wallet2_basic::transfer_details &td);
 /**
  * @brief Get index into transfers list of spent enotes in a potential transaction
+ * @param onetime_addresses -
  * @param tx_construction_data -
  * @param transfers -
  * @return list of spent input enotes indices in construction-specified order, not necessarily final transaction order
@@ -273,6 +274,8 @@ carrot::OutputOpeningHintVariant make_sal_opening_hint_from_transfer_details(con
  * to store openings for the pseudo output amount commitments. This isn't an issue w/ spending
  * Carrot enotes since Carrot mitigates the burning bug statelessly.
  */
+std::vector<std::size_t> collect_selected_transfer_indices(epee::span<const crypto::public_key> onetime_address,
+    const wallet2_basic::transfer_container &transfers);
 std::vector<std::size_t> collect_selected_transfer_indices(const tx_reconstruct_variant_t &tx_construction_data,
     const wallet2_basic::transfer_container &transfers);
 /**

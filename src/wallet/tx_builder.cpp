@@ -899,23 +899,29 @@ carrot::OutputOpeningHintVariant make_sal_opening_hint_from_transfer_details(con
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::vector<std::size_t> collect_selected_transfer_indices(const tx_reconstruct_variant_t &tx_construction_data,
+std::vector<std::size_t> collect_selected_transfer_indices(epee::span<const crypto::public_key> onetime_address,
     const wallet2_basic::transfer_container &transfers)
 {
     const auto best_transfer_by_ota = collect_non_burned_transfers_by_onetime_address(transfers);
 
-    const std::vector<crypto::public_key> spent_otas = spent_onetime_addresses(tx_construction_data);
     std::vector<std::size_t> selected_transfer_indices;
-    selected_transfer_indices.reserve(spent_otas.size());
-    for (const crypto::public_key &spent_onetime_address : spent_otas)
+    selected_transfer_indices.reserve(onetime_address.size());
+    for (const crypto::public_key &onetime_address : onetime_address)
     {
-        const auto ota_it = best_transfer_by_ota.find(spent_onetime_address);
+        const auto ota_it = best_transfer_by_ota.find(onetime_address);
         CARROT_CHECK_AND_THROW(ota_it != best_transfer_by_ota.cend(),
-            carrot::missing_components, "missing proposed spent onetime address in transfers list");
+            carrot::missing_components, "missing one-time address in transfers list");
         selected_transfer_indices.push_back(ota_it->second);
     }
 
     return selected_transfer_indices;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<std::size_t> collect_selected_transfer_indices(const tx_reconstruct_variant_t &tx_construction_data,
+    const wallet2_basic::transfer_container &transfers)
+{
+    const std::vector<crypto::public_key> spent_otas = spent_onetime_addresses(tx_construction_data);
+    return collect_selected_transfer_indices(epee::to_span(spent_otas), transfers);
 }
 //-------------------------------------------------------------------------------------------------------------------
 void collect_selected_transfer_subaddress_info(const tx_reconstruct_variant_t &tx_construction_data,

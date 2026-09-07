@@ -145,10 +145,12 @@ struct key_image_message_v3
         FIELD(offset)
         FIELD(main_address_spend_pubkey)
         FIELD(main_address_view_pubkey)
-        constexpr size_t elem_size = sizeof(crypto::key_image) + sizeof(crypto::signature);
+
+        // key images and proofs are serialized as a linear byte buffer with no length prefix
         ar.tag("univariate_key_image_proofs");
         if constexpr (!typename Archive<W>::is_saving())
         {
+            constexpr size_t elem_size = sizeof(crypto::key_image) + sizeof(crypto::signature);
             const size_t n_bytes_remaining = ar.remaining_bytes();
             if (n_bytes_remaining % elem_size)
                 return false;
@@ -174,7 +176,7 @@ struct key_image_message_v4
     std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> key_image_proofs;
 
     BEGIN_SERIALIZE_OBJECT()
-        FIELD(offset)
+        VARINT_FIELD(offset)
         FIELD(main_address_spend_pubkey)
         FIELD(main_address_view_pubkey)
         FIELD(key_image_proofs)

@@ -8234,11 +8234,27 @@ bool wallet2::parse_tx_from_str(const std::string &signed_tx_st, std::vector<too
 
   // if needed, finalize into a full transaction set by completing necessary proofs
   wallet::cold::SignedFullTransactionSet signed_txs;
+  std::function<bool()> import_key_images_cb;
   struct parse_tx_from_str_convert_full_visitor
   {
     void operator()(wallet::cold::SignedFullTransactionSet &s) const
     {
       signed_txs = std::move(s);
+
+      import_key_images_cb = [&signed_txs = signed_txs, &w = w]() -> bool
+      {
+        // import contiguous `m_transfers`-indexed key images, if available
+        if (!signed_txs.key_images.empty())
+          if (!w.import_key_images(signed_txs.key_images))
+            return false;
+
+        // import one-time address -> key image associations, for previous transactions and to
+        // remember key images for this tx, for when we get those txes from the blockchain
+        if (!signed_txs.tx_key_images.empty())
+          w.import_key_images(signed_txs.tx_key_images);
+
+        return true;
+      };
     }
 
     void operator()(wallet::cold::SignedCarrotTransactionSetV1 &s) const
@@ -8246,12 +8262,34 @@ bool wallet2::parse_tx_from_str(const std::string &signed_tx_st, std::vector<too
       signed_txs = wallet::cold::finalize_signed_carrot_tx_set_v1_into_full_set(s, nullptr,
         wallet::cold::make_supplemental_input_proposals_fetcher(w.m_transfers),
         *w.get_cryptonote_address_device(), w.get_tree_cache_ref(), w.get_curve_trees_ref());
+
+      import_key_images_cb = [&s = s, &w = w]() -> bool
+      {
+        if (!s.other_key_images.empty())
+        {
+          std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> signed_key_images;
+          std::vector<crypto::public_key> associated_onetime_addresses;
+          signed_key_images.reserve(s.other_key_images.size());
+          associated_onetime_addresses.reserve(s.other_key_images.size());
+          for (const auto &p : s.other_key_images)
+          {
+            signed_key_images.push_back(p.second);
+            associated_onetime_addresses.push_back(p.first);
+          }
+          uint64_t spent, unspent;
+          w.import_key_images(signed_key_images, associated_onetime_addresses, spent, unspent, /*check_spent=*/true);
+        }
+        return true;
+      };
     }
 
     wallet::cold::SignedFullTransactionSet &signed_txs;
-    const wallet2 &w;
+    std::function<bool()> &import_key_images_cb;
+    wallet2 &w;
   };
-  std::visit(parse_tx_from_str_convert_full_visitor{signed_txs, *this}, signed_txs_v);
+  std::visit(
+    parse_tx_from_str_convert_full_visitor{signed_txs, import_key_images_cb, *this},
+    signed_txs_v);
 
   // print info about full signed tx set
   LOG_PRINT_L0("Loaded signed tx data from binary: " << signed_txs.ptx.size() << " transactions");
@@ -8264,17 +8302,11 @@ bool wallet2::parse_tx_from_str(const std::string &signed_tx_st, std::vector<too
     return false;
   }
 
-  // import contiguous `m_transfers`-indexed key images, if available
-  if (!signed_txs.key_images.empty())
-    if (!import_key_images(signed_txs.key_images))
-      return false;
-
-  // import one-time address -> key image associations, for previous transactions and to
-  // remember key images for this tx, for when we get those txes from the blockchain
-  if (!signed_txs.tx_key_images.empty())
-    import_key_images(signed_txs.tx_key_images);
-
   ptx = std::move(signed_txs.ptx);
+
+  const bool imported_kis = import_key_images_cb();
+  if (!imported_kis)
+    return false;
 
   return true;
 }
@@ -13481,7 +13513,7 @@ uint64_t wallet2::import_key_images(const std::string &filename, uint64_t &spent
 //----------------------------------------------------------------------------------------------------
 uint64_t wallet2::import_key_images(
   const std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> &signed_key_images,
-  const size_t offset,
+  const std::vector<crypto::public_key> &associated_onetime_addresses,
   uint64_t &spent,
   uint64_t &unspent,
   const bool check_spent)
@@ -13492,23 +13524,26 @@ uint64_t wallet2::import_key_images(
   COMMAND_RPC_IS_KEY_IMAGE_SPENT::request req = AUTO_VAL_INIT(req);
   COMMAND_RPC_IS_KEY_IMAGE_SPENT::response daemon_resp = AUTO_VAL_INIT(daemon_resp);
 
-  THROW_WALLET_EXCEPTION_IF(offset > m_transfers.size(), error::wallet_internal_error, "Offset larger than known outputs");
-  THROW_WALLET_EXCEPTION_IF(signed_key_images.size() > m_transfers.size() - offset, error::wallet_internal_error,
-      "The blockchain is out of date compared to the signed key images");
+  THROW_WALLET_EXCEPTION_IF(signed_key_images.size() != associated_onetime_addresses.size(),
+    error::wallet_internal_error, "Wrong size for associated one-time addresses during key image import");
 
-  if (signed_key_images.empty() && offset == 0)
+  if (signed_key_images.empty())
   {
     spent = 0;
     unspent = 0;
     return 0;
   }
 
+  const std::vector<std::size_t> associated_transfer_indices
+    = tools::wallet::collect_selected_transfer_indices(epee::to_span(associated_onetime_addresses), m_transfers);
+
   req.key_images.reserve(signed_key_images.size());
 
   PERF_TIMER_START(import_key_images_A);
   for (size_t n = 0; n < signed_key_images.size(); ++n)
   {
-    const transfer_details &td = m_transfers[n + offset];
+    const size_t transfer_idx = associated_transfer_indices.at(n);
+    const transfer_details &td = m_transfers.at(transfer_idx);
     const crypto::key_image &key_image = signed_key_images[n].first;
     const carrot::KeyImageProofVariant &signature = signed_key_images[n].second;
 
@@ -13520,7 +13555,7 @@ uint64_t wallet2::import_key_images(
       const bool use_biased_hash_to_point
         = carrot::use_biased_hash_to_point(wallet::make_sal_opening_hint_from_transfer_details(td));
       THROW_WALLET_EXCEPTION_IF(!carrot::validate_key_image_proof(pkey, use_biased_hash_to_point, key_image, signature),
-          error::signature_check_failed, boost::lexical_cast<std::string>(n + offset) + "/"
+          error::signature_check_failed, boost::lexical_cast<std::string>(transfer_idx) + "/"
           + boost::lexical_cast<std::string>(signed_key_images.size()) + ", key image " + epee::string_tools::pod_to_hex(key_image)
           + ", signature " + carrot::key_image_proof_to_readable_string(signature)  + ", pubkey " + epee::string_tools::pod_to_hex(pkey));
     }
@@ -13531,11 +13566,13 @@ uint64_t wallet2::import_key_images(
   PERF_TIMER_START(import_key_images_B);
   for (size_t n = 0; n < signed_key_images.size(); ++n)
   {
-    m_transfers[n + offset].m_key_image = signed_key_images[n].first;
-    m_key_images[m_transfers[n + offset].m_key_image] = n + offset;
-    m_transfers[n + offset].m_key_image_known = true;
-    m_transfers[n + offset].m_key_image_request = false;
-    m_transfers[n + offset].m_key_image_partial = false;
+    const size_t transfer_idx = associated_transfer_indices.at(n);
+    transfer_details &td = m_transfers.at(transfer_idx);
+    td.m_key_image = signed_key_images[n].first;
+    m_key_images[td.m_key_image] = transfer_idx;
+    td.m_key_image_known = true;
+    td.m_key_image_request = false;
+    td.m_key_image_partial = false;
   }
   PERF_TIMER_STOP(import_key_images_B);
 
@@ -13553,7 +13590,8 @@ uint64_t wallet2::import_key_images(
 
     for (size_t n = 0; n < daemon_resp.spent_status.size(); ++n)
     {
-      transfer_details &td = m_transfers[n + offset];
+      const size_t transfer_idx = associated_transfer_indices.at(n);
+      transfer_details &td = m_transfers.at(transfer_idx);
       td.m_spent = daemon_resp.spent_status[n] != COMMAND_RPC_IS_KEY_IMAGE_SPENT::UNSPENT;
     }
   }
@@ -13575,12 +13613,15 @@ uint64_t wallet2::import_key_images(
   }
   PERF_TIMER_STOP(import_key_images_C);
 
-  // accumulate outputs before the updated data
-  for(size_t i = 0; i < offset; ++i)
+  // accumulate non-updated outputs before the updated data
+  const std::unordered_set<crypto::public_key> selected_otas(associated_onetime_addresses.cbegin(),
+    associated_onetime_addresses.cend());
+  for (const transfer_details &td : m_transfers)
   {
-    const transfer_details &td = m_transfers[i];
     if (td.m_frozen)
       continue;
+    else if (selected_otas.count(td.get_public_key()))
+      continue; // skip entries which share a one-time address with an updated entry
     uint64_t amount = td.amount();
     if (td.m_spent)
       spent += amount;
@@ -13591,7 +13632,7 @@ uint64_t wallet2::import_key_images(
   PERF_TIMER_START(import_key_images_D);
   for(size_t i = 0; i < signed_key_images.size(); ++i)
   {
-    const transfer_details &td = m_transfers[i + offset];
+    const transfer_details &td = m_transfers.at(associated_transfer_indices.at(i));
     if (td.m_frozen)
       continue;
     uint64_t amount = td.amount();
@@ -13729,7 +13770,39 @@ uint64_t wallet2::import_key_images(
   }
 
   // this can be 0 if we do not know the height
-  return m_transfers[signed_key_images.size() + offset - 1].m_block_height;
+  const size_t last_updated_index = *std::max_element(associated_transfer_indices.cbegin(),
+    associated_transfer_indices.cend());
+  return m_transfers.at(last_updated_index).m_block_height;
+}
+
+uint64_t wallet2::import_key_images(
+  const std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> &signed_key_images,
+  const size_t offset,
+  uint64_t &spent,
+  uint64_t &unspent,
+  const bool check_spent)
+{
+  THROW_WALLET_EXCEPTION_IF(offset > m_transfers.size(), error::wallet_internal_error, "Offset larger than known outputs");
+  THROW_WALLET_EXCEPTION_IF(signed_key_images.size() > m_transfers.size() - offset, error::wallet_internal_error,
+      "The blockchain is out of date compared to the signed key images");
+
+  if (signed_key_images.empty() && offset == 0)
+  {
+    spent = 0;
+    unspent = 0;
+    return 0;
+  }
+
+  // collect OTAs from contiguous slice of m_transfers
+  std::vector<crypto::public_key> asscociated_onetime_addresses;
+  asscociated_onetime_addresses.reserve(signed_key_images.size());
+  for (size_t i = 0; i < signed_key_images.size(); ++i)
+  {
+    const transfer_details &td = m_transfers.at(i + offset);
+    asscociated_onetime_addresses.push_back(td.get_public_key());
+  }
+
+  return import_key_images(signed_key_images, asscociated_onetime_addresses, spent, unspent, check_spent);
 }
 
 bool wallet2::import_key_images(std::vector<crypto::key_image> key_images, size_t offset, boost::optional<std::unordered_set<size_t>> selected_transfers)
