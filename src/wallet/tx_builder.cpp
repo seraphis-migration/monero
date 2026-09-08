@@ -513,7 +513,8 @@ const std::vector<std::uint8_t> &extra_ref(const tx_reconstruct_variant_t &v)
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::unordered_map<crypto::public_key, size_t> collect_non_burned_transfers_by_onetime_address(
-    const wallet2_basic::transfer_container &transfers)
+    const wallet2_basic::transfer_container &transfers,
+    const bool include_spent)
 {
     std::unordered_set<crypto::public_key> spent;
 
@@ -522,10 +523,13 @@ std::unordered_map<crypto::public_key, size_t> collect_non_burned_transfers_by_o
     {
         const wallet2_basic::transfer_details &td = transfers.at(i);
         const crypto::public_key ota = td.get_public_key();
-        if (td.m_spent)
-            spent.insert(ota);
-        if (spent.count(ota))
-            continue;
+        if (!include_spent)
+        {
+            if (td.m_spent)
+                spent.insert(ota);
+            if (spent.count(ota))
+                continue;
+        }
         const auto it = best_transfer_by_ota.find(ota);
         if (it == best_transfer_by_ota.end())
         {
@@ -902,7 +906,8 @@ carrot::OutputOpeningHintVariant make_sal_opening_hint_from_transfer_details(con
 std::vector<std::size_t> collect_selected_transfer_indices(epee::span<const crypto::public_key> onetime_address,
     const wallet2_basic::transfer_container &transfers)
 {
-    const auto best_transfer_by_ota = collect_non_burned_transfers_by_onetime_address(transfers);
+    const auto best_transfer_by_ota = collect_non_burned_transfers_by_onetime_address(transfers,
+        /*include_spent=*/true);
 
     std::vector<std::size_t> selected_transfer_indices;
     selected_transfer_indices.reserve(onetime_address.size());

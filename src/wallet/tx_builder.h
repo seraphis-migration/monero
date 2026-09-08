@@ -149,9 +149,12 @@ struct pending_tx
 /**
  * @brief Index transfers by OTA, including a burning bug filter
  * @param transfers -
+ * @param include_spent whether to include entries whose OTA is marked as spent
+ * @return map of one-time address -> index inside of `transfers` to best entry for given OTA
  */
 std::unordered_map<crypto::public_key, size_t> collect_non_burned_transfers_by_onetime_address(
-    const wallet2_basic::transfer_container &transfers);
+    const wallet2_basic::transfer_container &transfers,
+    const bool include_spent = false);
 /**
  * @brief Filter and convert wallet2 transfer contain into carrot input candidates
  * @param transfers wallet2 incoming transfers list
