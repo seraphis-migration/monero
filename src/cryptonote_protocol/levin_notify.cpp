@@ -32,11 +32,15 @@
 #include <boost/asio/post.hpp>
 #include <boost/asio/steady_timer.hpp>
 #include <boost/system/system_error.hpp>
+#include <boost/thread/lock_guard.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/asio/bind_executor.hpp>
+#include <algorithm>
 #include <chrono>
 #include <deque>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 
 #include "byte_slice.h"
@@ -302,6 +306,30 @@ namespace levin
       const epee::net_utils::zone nzone;         //!< Zone is public ipv4/ipv6 connections, or i2p or tor
       const bool pad_txs;                        //!< Pad txs to the next boundary for privacy
       bool fluffing;                             //!< Zone is in Dandelion++ fluff epoch
+
+      //! Prevents unnecessary duplicate tx notifies
+      class notify_tx_queue
+      {
+      public:
+        // Enqueues txs not already in the queue. Returns true iff any tx(s) were added to the queue.
+        // Note: this modifies the passed in txs and tx_hashes, removing any txs from those containers
+        // that are already in the queue. Any remaining txs should be relayed.
+        bool enqueue(const relay_method tx_relay, std::vector<blobdata> &txs, std::vector<crypto::hash> &tx_hashes);
+
+        // Dequeues txs from the queue. Returns true if all given txs were already in the queue.
+        bool dequeue(const std::vector<crypto::hash> &tx_hashes, const relay_method tx_relay);
+      private:
+        // Returns true if the tx is added to the queue, false if it was already in the queue.
+        bool enqueue(const crypto::hash &tx, const relay_method tx_relay);
+
+        // Returns true if the tx was already in the in queue and gets removed.
+        bool dequeue(const crypto::hash &tx, const relay_method tx_relay);
+      private:
+        std::unordered_map<crypto::hash, std::vector<relay_method>> m_queue;
+        boost::recursive_mutex m_mutex;
+      };
+
+      notify_tx_queue tx_queue;
     };
   } // detail
 
@@ -570,7 +598,7 @@ namespace levin
       std::vector<blobdata> txs_;
       std::vector<crypto::hash> tx_hashes_;
       boost::uuids::uuid source_;
-      relay_method tx_relay;
+      const relay_method tx_relay;
 
       //! \pre Called in `zone_->strand`
       void operator()()
@@ -589,6 +617,8 @@ namespace levin
               /* Source is intentionally omitted in debug log for privacy - a
                  nil uuid indicates source is that node. */
               MDEBUG("Sent " << txs_.size() << " transaction(s) to " << destination << " using Dandelion++ stem");
+              if (!zone_->tx_queue.dequeue(tx_hashes_, tx_relay))
+                MWARNING("Some expected tx(s) weren't in the notify queue");
               return;
             }
 
@@ -600,6 +630,8 @@ namespace levin
         }
 
         core_->on_transactions_relayed(epee::to_span(txs_), relay_method::fluff);
+        if (!zone_->tx_queue.dequeue(tx_hashes_, tx_relay))
+          MWARNING("Some expected tx(s) weren't in the notify queue");
         fluff_notify::run(std::move(zone_), epee::to_span(txs_), epee::to_span(tx_hashes_), source_);
       }
     };
@@ -739,6 +771,88 @@ namespace levin
       }
     };
   } // anonymous
+
+  bool detail::zone::notify_tx_queue::enqueue(const relay_method tx_relay, std::vector<blobdata> &txs, std::vector<crypto::hash> &tx_hashes)
+  {
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    CHECK_AND_ASSERT_MES(txs.size() == tx_hashes.size(), false, "Expected txs == tx_hashes");
+    if (txs.empty())
+      return false;
+
+    std::vector<blobdata> notify_txs;
+    std::vector<crypto::hash> notify_tx_hashes;
+    notify_txs.reserve(txs.size());
+    notify_tx_hashes.reserve(tx_hashes.size());
+
+    auto it_txs = txs.begin();
+    auto it_hashes = tx_hashes.begin();
+    while (it_txs != txs.end() && it_hashes != tx_hashes.end())
+    {
+      if (this->enqueue(*it_hashes, tx_relay))
+      {
+        notify_txs.emplace_back(std::move(*it_txs));
+        notify_tx_hashes.emplace_back(std::move(*it_hashes));
+      }
+      ++it_txs;
+      ++it_hashes;
+    }
+
+    txs = std::move(notify_txs);
+    tx_hashes = std::move(notify_tx_hashes);
+    return txs.size() > 0;
+  }
+
+  bool detail::zone::notify_tx_queue::dequeue(const std::vector<crypto::hash> &tx_hashes, const relay_method tx_relay)
+  {
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+    if (tx_hashes.empty())
+      return true;
+
+    bool all_dequeued = true;
+    for (auto it = tx_hashes.begin(); it != tx_hashes.end(); ++it)
+      all_dequeued = this->dequeue(*it, tx_relay) && all_dequeued;
+    return all_dequeued;
+  }
+
+  bool detail::zone::notify_tx_queue::enqueue(const crypto::hash &tx, const relay_method tx_relay)
+  {
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    auto it = m_queue.emplace(tx, std::vector<relay_method>{tx_relay});
+    if (it.second)
+      return true;
+
+    auto &relay_methods = it.first->second;
+    const auto relay_it = std::find(relay_methods.begin(), relay_methods.end(), tx_relay);
+    if (relay_it == relay_methods.end())
+    {
+      relay_methods.push_back(tx_relay);
+      return true;
+    }
+
+    // Tx is already in the queue
+    return false;
+  }
+
+  bool detail::zone::notify_tx_queue::dequeue(const crypto::hash &tx, const relay_method tx_relay)
+  {
+    boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    auto it = m_queue.find(tx);
+    if (it == m_queue.end())
+      return false;
+
+    const auto vec_it = std::find(it->second.begin(), it->second.end(), tx_relay);
+    if (vec_it == it->second.end())
+      return false;
+
+    it->second.erase(vec_it);
+    if (it->second.empty())
+      m_queue.erase(it);
+
+    return true;
+  }
 
   notify::notify(boost::asio::io_context& service, std::shared_ptr<connections> p2p, epee::byte_slice noise, epee::net_utils::zone zone, const bool pad_txs, i_core_events& core)
     : zone_(std::make_shared<detail::zone>(service, std::move(p2p), std::move(noise), zone, pad_txs))
@@ -908,6 +1022,11 @@ namespace levin
         case relay_method::local:
           if (zone_->nzone == epee::net_utils::zone::public_)
           {
+            if (!zone_->tx_queue.enqueue(tx_relay, txs, tx_hashes))
+            {
+              MDEBUG("Tx(s) already in the notify queue");
+              return true;
+            }
             // this will change a local/forward tx to stem or fluff ...
             boost::asio::dispatch(
               zone_->strand,
