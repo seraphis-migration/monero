@@ -390,8 +390,18 @@ static bool ver_non_input_consensus_templated(TxForwardIt tx_begin,
         if (tx.version >= 2)
             rvv.push_back(&tx.rct_signatures);
 
+        // Check if we need to do the torsion check on this tx's outs
+        bool do_torsion_check = false;
+        for (const auto &out : tx.vout)
+        {
+            if (!cryptonote::output_checked_for_torsion(out.target))
+                continue;
+            do_torsion_check = true;
+            break;
+        }
+
         // Collect pubkeys and commitments for torsion check
-        if (!collect_points_for_torsion_check(tx, transparent_amount_commitments, pubkeys_and_commitments))
+        if (do_torsion_check && !collect_pubkeys_and_commitments(tx, transparent_amount_commitments, pubkeys_and_commitments))
         {
             tvc.m_verifivation_failed = true;
             return false;
@@ -477,16 +487,12 @@ static bool collect_fcmp_pp_tx_verify_input(cryptonote::transaction &tx,
 namespace cryptonote
 {
 
-bool collect_points_for_torsion_check(const transaction& tx,
+bool collect_pubkeys_and_commitments(const transaction& tx,
     const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments,
     std::vector<rct::key> &pubkeys_and_commitments_inout)
 {
     for (std::size_t i = 0; i < tx.vout.size(); ++i)
     {
-        // Don't need to collect points if we're not checking the tx outs for torsion
-        if (!cryptonote::output_checked_for_torsion(tx.vout[i].target))
-            continue;
-
         crypto::public_key output_pubkey;
         if (!cryptonote::get_output_public_key(tx.vout[i], output_pubkey))
             return false;

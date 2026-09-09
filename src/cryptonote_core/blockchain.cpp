@@ -95,7 +95,10 @@ DISABLE_VS_WARNINGS(4267)
 namespace
 {
 //------------------------------------------------------------------
-static bool get_fcmp_tx_tree_root(const BlockchainDB *db, const cryptonote::transaction &tx, crypto::ec_point &tree_root_out)
+static bool get_fcmp_tx_tree_root(const BlockchainDB *db,
+  const HardFork *m_hardfork,
+  const cryptonote::transaction &tx,
+  crypto::ec_point &tree_root_out)
 {
   tree_root_out = crypto::ec_point{};
   if (!rct::is_rct_fcmp(tx.rct_signatures.type))
@@ -105,6 +108,11 @@ static bool get_fcmp_tx_tree_root(const BlockchainDB *db, const cryptonote::tran
   // Make sure reference block exists in the chain
   CHECK_AND_NO_ASSERT_MES_L1(tx.rct_signatures.p.reference_block < db->height(), false,
       "tx " << get_transaction_hash(tx) << " included reference block that was too high");
+
+  // Make sure the reference block is from the block immediately before the FCMP++ fork height or higher.
+  // This allows wallets to start constructing FCMP++ txs that can land in the first fork block.
+  CHECK_AND_NO_ASSERT_MES_L1((tx.rct_signatures.p.reference_block + 1) >= m_hardfork->get_earliest_ideal_height_for_version(HF_VERSION_FCMP_PLUS_PLUS), false,
+      "tx " << get_transaction_hash(tx) << " included reference block that was too low");
 
   // Get the tree root and n tree layers at provided block
   const uint8_t n_tree_layers = db->get_tree_root_at_blk_idx(tx.rct_signatures.p.reference_block, tree_root_out);
@@ -740,7 +748,7 @@ block Blockchain::pop_block_from_blockchain()
       else if (rct::is_rct_fcmp(tx.rct_signatures.type))
       {
         crypto::ec_point ref_tree_root{};
-        if (get_fcmp_tx_tree_root(m_db, tx, ref_tree_root))
+        if (get_fcmp_tx_tree_root(m_db, m_hardfork, tx, ref_tree_root))
         {
           valid_input_verification_id = make_input_verification_id(get_transaction_hash(tx), ref_tree_root, tx.rct_signatures.p.n_tree_layers);
         }
@@ -1515,17 +1523,24 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
     base_reward = money_in_use - fee;
   }
 
-  if (version >= HF_VERSION_FCMP_PLUS_PLUS)
+  // From FCMP++ fork, we want to guarantee every output that enters the chain is a valid output with no torsion.
+  if (version >= HF_VERSION_FCMP_PLUS_PLUS || b.miner_tx.unlock_time >= m_hardfork->get_earliest_ideal_height_for_version(HF_VERSION_FCMP_PLUS_PLUS))
   {
+    // We start requiring at least 1 coinbase out and valid outs as soon as unlock_time >= FCMP++ height,
+    // so that we guarantee every usable tree root is unique, since at least 1 new out will be appended to the tree.
+    CHECK_AND_ASSERT_MES(b.miner_tx.vout.size() > 0, false, "miner transaction must have outputs");
+
     // Collect pubkeys and commitments for torsion check
     std::vector<rct::key> pubkeys_and_commitments;
     pubkeys_and_commitments.reserve(b.miner_tx.vout.size() * 2);
 
-    if (!collect_points_for_torsion_check(b.miner_tx, transparent_amount_commitments, pubkeys_and_commitments))
+    if (!collect_pubkeys_and_commitments(b.miner_tx, transparent_amount_commitments, pubkeys_and_commitments))
     {
         MERROR_VER("failed to collect pubkeys and commitments from miner tx");
         return false;
     }
+    CHECK_AND_ASSERT_MES(pubkeys_and_commitments.size() == (b.miner_tx.vout.size() * 2), false,
+      "missing collected pubkeys and commitments from miner tx");
 
     if (!rct::verPointsForTorsion(pubkeys_and_commitments))
     {
@@ -2785,6 +2800,7 @@ static bool fill(BlockchainDB *db, const crypto::hash &tx_hash, tx_blob_entry &t
 }
 //------------------------------------------------------------------
 static bool set_fcmp_tx_tree_root(const BlockchainDB *db,
+  const HardFork *m_hardfork,
   const cryptonote::transaction &tx,
   std::unordered_map<uint64_t, std::pair<crypto::ec_point, uint8_t>> &tree_root_by_block_idx_inout)
 {
@@ -2808,7 +2824,7 @@ static bool set_fcmp_tx_tree_root(const BlockchainDB *db,
 
   // Get ref block's tree root from the db
   crypto::ec_point tree_root;
-  if (!get_fcmp_tx_tree_root(db, tx, tree_root))
+  if (!get_fcmp_tx_tree_root(db, m_hardfork, tx, tree_root))
   {
     MERROR_VER("Failed to get referenced tree root");
     return false;
@@ -2819,6 +2835,7 @@ static bool set_fcmp_tx_tree_root(const BlockchainDB *db,
 }
 //------------------------------------------------------------------
 static bool batch_verify_fcmp_pp_txs(const BlockchainDB *db,
+  const HardFork *m_hardfork,
   pool_supplement &extra_block_txs,
   std::unordered_map<crypto::hash, crypto::hash> &valid_input_verification_id_by_txid_out)
 {
@@ -2829,7 +2846,7 @@ static bool batch_verify_fcmp_pp_txs(const BlockchainDB *db,
   for (const auto &extra_tx : extra_block_txs.txs_by_txid)
   {
     const cryptonote::transaction &tx = extra_tx.second.first;
-    if (!set_fcmp_tx_tree_root(db, tx, tree_root_by_block_idx))
+    if (!set_fcmp_tx_tree_root(db, m_hardfork, tx, tree_root_by_block_idx))
     {
       MERROR_VER("Failed to set FCMP tx tree root");
       return false;
@@ -3904,7 +3921,7 @@ bool Blockchain::check_tx_inputs(transaction& tx,
       *pmax_used_block_height = tx.rct_signatures.p.reference_block;
 
     // Read the db for the tree root for FCMP tx. Enforces that the ref block is in the chain
-    if (!get_fcmp_tx_tree_root(m_db, tx, ref_tree_root))
+    if (!get_fcmp_tx_tree_root(m_db, m_hardfork, tx, ref_tree_root))
     {
       // We might not be synced yet and an honest synced peer may have sent us the tx, so we make this a no-drop-offense
       tvc.m_no_drop_offense = true;
@@ -4635,7 +4652,7 @@ leave:
   if (!fast_check)
 #endif
   {
-    if (!batch_verify_fcmp_pp_txs(m_db, extra_block_txs, batched_fcmp_valid_input_verification_id_by_txid))
+    if (!batch_verify_fcmp_pp_txs(m_db, m_hardfork, extra_block_txs, batched_fcmp_valid_input_verification_id_by_txid))
     {
       MERROR_VER("Failed to batch verify FCMP++ txs");
       bvc.m_verifivation_failed = true;

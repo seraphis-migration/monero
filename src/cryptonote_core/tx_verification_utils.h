@@ -44,7 +44,7 @@ namespace cryptonote
  * @param pubkeys_and_commitments_inout the collection by ref
  * @return successful insert
  */
-bool collect_points_for_torsion_check(const transaction& tx,
+bool collect_pubkeys_and_commitments(const transaction& tx,
     const std::unordered_map<uint64_t, rct::key> &transparent_amount_commitments,
     std::vector<rct::key> &pubkeys_and_commitments_inout);
 
