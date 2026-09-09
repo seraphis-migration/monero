@@ -1455,11 +1455,19 @@ namespace cryptonote
     }
     res.sanity_check_failed = false;
 
+    transaction tx{};
     crypto::hash txid{};
+    if (!parse_and_validate_tx_from_blob(tx_blob, tx, txid, true))
+    {
+      res.status = "Failed";
+      res.reason = "Failed to parse tx";
+      return true;
+    }
+
     if (!skip_validation)
     {
       tx_verification_context tvc{};
-      if(!m_core.handle_incoming_tx(tx_blob, tvc, (req.do_not_relay ? relay_method::none : relay_method::local), false, txid) || tvc.m_verifivation_failed)
+      if(!m_core.handle_incoming_tx(tx_blob, tx, txid, tvc, (req.do_not_relay ? relay_method::none : relay_method::local), false) || tvc.m_verifivation_failed)
       {
         res.status = "Failed";
         std::string reason = "";
@@ -1501,16 +1509,6 @@ namespace cryptonote
         res.reason = "Not relayed";
         res.not_relayed = true;
         res.status = CORE_RPC_STATUS_OK;
-        return true;
-      }
-    }
-    else
-    {
-      transaction tx;
-      if (!parse_and_validate_tx_from_blob(tx_blob, tx, txid))
-      {
-        res.status = "Failed";
-        res.reason = "Failed to parse tx";
         return true;
       }
     }
