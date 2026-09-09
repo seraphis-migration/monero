@@ -781,7 +781,7 @@ namespace cryptonote
     return true;
   }
   //-----------------------------------------------------------------------------------------------
-  bool core::handle_incoming_tx(const blobdata& tx_blob, tx_verification_context& tvc, relay_method tx_relay, bool relayed, crypto::hash& txid)
+  bool core::handle_incoming_tx(const blobdata& tx_blob, transaction& tx, const crypto::hash& txid, tx_verification_context& tvc, relay_method tx_relay, bool relayed)
   {
     tvc = {};
 
@@ -794,14 +794,6 @@ namespace cryptonote
       LOG_PRINT_L1("WRONG TRANSACTION BLOB, too big size " << tx_blob.size() << ", rejected");
       tvc.m_verifivation_failed = true;
       tvc.m_too_big = true;
-      return false;
-    }
-
-    transaction tx;
-    if (!parse_and_validate_tx_from_blob(tx_blob, tx, txid))
-    {
-      LOG_PRINT_L1("Incoming transactions failed to parse, rejected");
-      tvc.m_verifivation_failed = true;
       return false;
     }
 
@@ -1217,7 +1209,7 @@ namespace cryptonote
 
     for (std::size_t i = 0; i < tx_blobs.size(); ++i)
     {
-      if (!parse_and_validate_tx_from_blob(tx_blobs[i], txs[i], tx_hashes[i]))
+      if (!parse_and_validate_tx_from_blob(tx_blobs[i], txs[i], tx_hashes[i], true))
       {
         LOG_ERROR("Failed to parse relayed transaction");
         return;
