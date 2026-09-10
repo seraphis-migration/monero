@@ -215,6 +215,7 @@ namespace
     {
         std::deque<received_message> invoked_;
         std::deque<received_message> notified_;
+        bool next_connection_tx_relay_v2_;
 
         template<typename T>
         static std::pair<boost::uuids::uuid, typename T::request> get_message(std::deque<received_message>& queue)
@@ -267,8 +268,10 @@ namespace
 
         virtual void on_connection_new(cryptonote::levin::detail::p2p_context& context) override final
         {
+            const bool tx_relay_v2 = next_connection_tx_relay_v2_;
+            next_connection_tx_relay_v2_ = false;
             if (notifier)
-                notifier->on_handshake_complete(context.m_connection_id, context.m_is_income, false);
+                notifier->on_handshake_complete(context.m_connection_id, context.m_is_income, tx_relay_v2);
         }
 
         virtual void on_connection_close(cryptonote::levin::detail::p2p_context& context) override final
@@ -281,7 +284,8 @@ namespace
         test_receiver()
           : epee::levin::levin_commands_handler<cryptonote::levin::detail::p2p_context>(),
             invoked_(),
-            notified_()
+            notified_(),
+            next_connection_tx_relay_v2_(false)
         {}
 
         virtual ~test_receiver() noexcept override final{}
@@ -311,6 +315,11 @@ namespace
         received_message get_raw_notification()
         {
             return get_raw_message(notified_);
+        }
+
+        void set_next_connection_tx_relay_v2(const bool tx_relay_v2) noexcept
+        {
+            next_connection_tx_relay_v2_ = tx_relay_v2;
         }
 
         std::shared_ptr<cryptonote::levin::notify> notifier{};
@@ -344,8 +353,9 @@ namespace
 
         cryptonote::levin::connections& get_connections() noexcept { return *connections_; }
 
-        void add_connection(const bool is_incoming)
+        void add_connection(const bool is_incoming, const bool tx_relay_v2 = false)
         {
+            receiver_.set_next_connection_tx_relay_v2(tx_relay_v2);
             contexts_.emplace_back(io_service_, *connections_, random_generator_, is_incoming);
             EXPECT_TRUE(connection_ids_.emplace(contexts_.back().get_id()).second);
             EXPECT_EQ(connection_ids_.size(), connections_->get_connections_count());
@@ -1599,6 +1609,69 @@ TEST_F(levin_notify, private_local_without_padding)
             EXPECT_TRUE(notification.dandelionpp_fluff);
         }
     }
+}
+
+TEST_F(levin_notify, fluff_mixed_relay_versions)
+{
+    std::shared_ptr<cryptonote::levin::notify> notifier_ptr = make_notifier(0, true, false);
+    auto &notifier = *notifier_ptr;
+
+    add_connection(true);        // source
+    add_connection(false);       // legacy destination
+    add_connection(false, true); // relay-v2 destination
+    io_service_.poll();
+
+    std::vector<cryptonote::blobdata> first_txs(2);
+    first_txs[0].resize(100, 'e');
+    first_txs[1].resize(200, 'f');
+
+    std::vector<cryptonote::blobdata> second_txs(2);
+    second_txs[0] = first_txs[1];
+    second_txs[1].resize(300, 'g');
+
+    const std::vector<crypto::hash> expected_hashes = mock_tx_hashes(3);
+    std::vector<cryptonote::blobdata> expected_relayed = first_txs;
+    expected_relayed.insert(expected_relayed.end(), second_txs.begin(), second_txs.end());
+
+    EXPECT_TRUE(notifier.send_txs(
+        first_txs,
+        {expected_hashes[0], expected_hashes[1]},
+        contexts_[0].get_id(),
+        cryptonote::relay_method::fluff
+    ));
+    io_service_.restart();
+    ASSERT_LT(0u, io_service_.poll());
+
+    EXPECT_TRUE(notifier.send_txs(
+        second_txs,
+        {expected_hashes[1], expected_hashes[2]},
+        contexts_[0].get_id(),
+        cryptonote::relay_method::fluff
+    ));
+    io_service_.restart();
+    ASSERT_LT(0u, io_service_.poll());
+
+    notifier.run_fluff();
+    io_service_.restart();
+    ASSERT_LT(0u, io_service_.poll());
+
+    EXPECT_EQ(expected_relayed, events_.take_relayed(cryptonote::relay_method::fluff));
+    EXPECT_EQ(0u, contexts_[0].process_send_queue());
+
+    ASSERT_EQ(1u, contexts_[1].process_send_queue());
+    ASSERT_EQ(1u, receiver_.notified_size());
+    auto legacy = receiver_.get_notification<cryptonote::NOTIFY_NEW_TRANSACTIONS>().second;
+    std::vector<cryptonote::blobdata> expected_txs = expected_relayed;
+    std::sort(expected_txs.begin(), expected_txs.end());
+    expected_txs.erase(std::unique(expected_txs.begin(), expected_txs.end()), expected_txs.end());
+    EXPECT_EQ(expected_txs, legacy.txs);
+    EXPECT_TRUE(legacy._.empty());
+    EXPECT_TRUE(legacy.dandelionpp_fluff);
+
+    ASSERT_EQ(1u, contexts_[2].process_send_queue());
+    ASSERT_EQ(1u, receiver_.notified_size());
+    auto relay_v2 = receiver_.get_notification<cryptonote::NOTIFY_TX_POOL_HASH>().second;
+    EXPECT_EQ(expected_hashes, relay_v2.t);
 }
 
 TEST_F(levin_notify, private_forward_without_padding)
