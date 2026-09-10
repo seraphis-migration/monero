@@ -31,6 +31,7 @@
 //local headers
 #include "carrot_impl/address_device_hierarchies.h"
 #include "carrot_impl/key_image_device.h"
+#include "carrot_impl/knowledge_proof_types.h"
 #include "carrot_impl/spend_device.h"
 #include "carrot_impl/subaddress_index.h"
 #include "tx_builder.h"
