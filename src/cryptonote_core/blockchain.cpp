@@ -1210,7 +1210,7 @@ bool Blockchain::rollback_blockchain_switching(std::list<block>& original_chain,
 //------------------------------------------------------------------
 // This function attempts to switch to an alternate chain, returning
 // boolean based on success therein.
-bool Blockchain::switch_to_alternative_blockchain(std::list<block_extended_info>& alt_chain, bool discard_disconnected_chain)
+bool Blockchain::switch_to_alternative_blockchain(std::list<block_extended_info>& alt_chain, bool discard_disconnected_chain, block_verification_context& bvc)
 {
   LOG_PRINT_L3("Blockchain::" << __func__);
   CRITICAL_REGION_LOCAL(m_blockchain_lock);
@@ -1219,12 +1219,18 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<block_extended_info>
   m_reset_timestamps_and_difficulties_height = true;
 
   // if empty alt chain passed (not sure how that could happen), return false
-  CHECK_AND_ASSERT_MES(alt_chain.size(), false, "switch_to_alternative_blockchain: empty chain passed");
+  if (!alt_chain.size())
+  {
+    bvc.m_verifivation_failed = true;
+    MERROR("switch_to_alternative_blockchain: empty chain passed");
+    return false;
+  }
 
   // verify that main chain has front of alt chain's parent block
   if (!m_db->block_exists(alt_chain.front().bl.prev_id))
   {
     LOG_ERROR("Attempting to move to an alternate chain, but it doesn't appear to connect to the main chain!");
+    bvc.m_verifivation_failed = true;
     return false;
   }
 
@@ -1244,17 +1250,23 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<block_extended_info>
   for(auto alt_ch_iter = alt_chain.begin(); alt_ch_iter != alt_chain.end(); alt_ch_iter++)
   {
     const auto &bei = *alt_ch_iter;
-    block_verification_context bvc = {};
+    block_verification_context block_bvc = {};
 
     // add block to main chain
-    bool r = handle_block_to_main_chain(bei.bl, bvc);
-
+    bool r = handle_block_to_main_chain(bei.bl, block_bvc);
+ 
     // if adding block to main chain failed, rollback to previous state and
     // return false
-    if(!r || !bvc.m_added_to_main_chain)
+    if(!r || !block_bvc.m_added_to_main_chain)
     {
       MERROR("Failed to switch to alternative blockchain");
 
+      // set bvc.m_missing_txs so that
+      // it'll re-requests the tx or re-fetches the alt chain
+      // instead of banning peer
+      bvc.m_verifivation_failed = true;
+      bvc.m_missing_txs = block_bvc.m_missing_txs;
+      
       // rollback_blockchain_switching should be moved to two different
       // functions: rollback and apply_chain, but for now we pretend it is
       // just the latter (because the rollback was done above).
@@ -1281,9 +1293,9 @@ bool Blockchain::switch_to_alternative_blockchain(std::list<block_extended_info>
     //pushing old chain as alternative chain
     for (auto& old_ch_ent : disconnected_chain)
     {
-      block_verification_context bvc = {};
+      block_verification_context old_bvc = {};
       pool_supplement ps{};
-      bool r = handle_alternative_block(old_ch_ent, get_block_hash(old_ch_ent), bvc, ps);
+      bool r = handle_alternative_block(old_ch_ent, get_block_hash(old_ch_ent), old_bvc, ps);
       if(!r)
       {
         MERROR("Failed to push ex-main chain blocks to alternative chain ");
@@ -2286,11 +2298,9 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       //do reorganize!
       MGINFO_GREEN("###### REORGANIZE on height: " << alt_chain.front().height << " of " << m_db->height() - 1 << ", checkpoint is found in alternative chain on height " << bei.height);
 
-      bool r = switch_to_alternative_blockchain(alt_chain, true);
+      bool r = switch_to_alternative_blockchain(alt_chain, true, bvc);
 
       if(r) bvc.m_added_to_main_chain = true;
-      else bvc.m_verifivation_failed = true;
-
       return r;
     }
     else if(main_chain_cumulative_difficulty < bei.cumulative_difficulty) //check if difficulty bigger then in main chain
@@ -2298,11 +2308,9 @@ bool Blockchain::handle_alternative_block(const block& b, const crypto::hash& id
       //do reorganize!
       MGINFO_GREEN("###### REORGANIZE on height: " << alt_chain.front().height << " of " << m_db->height() - 1 << " with cum_difficulty " << m_db->get_block_cumulative_difficulty(m_db->height() - 1) << std::endl << " alternative blockchain size: " << alt_chain.size() << " with cum_difficulty " << bei.cumulative_difficulty);
 
-      bool r = switch_to_alternative_blockchain(alt_chain, false);
+      bool r = switch_to_alternative_blockchain(alt_chain, false, bvc);
       if (r)
         bvc.m_added_to_main_chain = true;
-      else
-        bvc.m_verifivation_failed = true;
       return r;
     }
     else
