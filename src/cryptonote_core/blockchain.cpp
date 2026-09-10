@@ -1621,7 +1621,7 @@ uint64_t Blockchain::get_long_term_block_weight_median(uint64_t start_height, si
 
   MTRACE("requesting " << count << " from " << start_height << ", uncached");
   const std::vector<uint64_t> weights = m_db->get_long_term_block_weights(start_height, count);
-  assert(weights.size() == std::min(count, blockchain_height - start_height));
+  assert(weights.size() == std::min(static_cast<uint64_t>(count), blockchain_height - start_height));
   m_long_term_block_weights_cache_tip_hash = tip_hash;
   for (const uint64_t w: weights)
     m_long_term_block_weights_cache_rolling_median.insert(w);

@@ -109,7 +109,10 @@ namespace epee
     {
       //go to loop
       MINFO("Run net_service loop( " << threads_count << " threads)...");
-      if(!m_net_server.run_server(threads_count, wait))
+      // set stack size
+      boost::thread::attributes attrs;
+      attrs.set_stack_size(THREAD_STACK_SIZE);
+      if(!m_net_server.run_server(threads_count, wait, attrs))
       {
         LOG_ERROR("Failed to run net tcp server!");
       }
