@@ -36,7 +36,7 @@
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/difficulty.h"
 #include "crypto/hash.h"
-#include "fcmp_pp/curve_trees.h"
+#include "fcmp_pp/fcmp_pp_types.h"
 #include "rpc/rpc_handler.h"
 #include "common/varint.h"
 #include "common/perf_timer.h"
@@ -669,23 +669,15 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
     struct response_t: public rpc_access_response_base
     {
       uint64_t n_leaf_tuples;
-
-      struct path_entry
-      {
-        uint64_t leaf_idx{0};
-        fcmp_pp::CompressedPath path;
-
-        BEGIN_KV_SERIALIZE_MAP()
-          KV_SERIALIZE(leaf_idx)
-          KV_SERIALIZE(path)
-        END_KV_SERIALIZE_MAP()
-      };
-
-      std::vector<path_entry> paths;
+      std::vector<uint64_t> unassigned_unified_ids;
+      std::vector<uint64_t> leaf_idxs;
+      fcmp_pp::ConsolidatedPaths paths;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE_PARENT(rpc_access_response_base)
         KV_SERIALIZE(n_leaf_tuples)
+        KV_SERIALIZE(unassigned_unified_ids)
+        KV_SERIALIZE(leaf_idxs)
         KV_SERIALIZE(paths)
       END_KV_SERIALIZE_MAP()
     };

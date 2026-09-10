@@ -392,6 +392,94 @@ struct PathIndexes final
     Range leaf_range;
     std::vector<Range> layers;
 };
+
+// "Assigned" means the leaf is a member of the tree
+struct AssignedLeafIdx final
+{
+    bool assigned_leaf_idx{false};
+    uint64_t leaf_idx{0};
+
+    void assign_leaf(const uint64_t idx) { leaf_idx = idx; assigned_leaf_idx = true; }
+    void unassign_leaf() { leaf_idx = 0; assigned_leaf_idx = false; }
+
+    BEGIN_KV_SERIALIZE_MAP()
+        KV_SERIALIZE(assigned_leaf_idx)
+        KV_SERIALIZE(leaf_idx)
+    END_KV_SERIALIZE_MAP()
+};
+
+// Contains minimum path elems necessary for multiple paths (e.g. only contains the root once)
+struct ConsolidatedPaths final
+{
+    std::unordered_map<uint64_t, std::vector<UnifiedOutput>> leaves_by_chunk_idx;
+    std::vector<std::unordered_map<uint64_t, CompressedChunk>> layer_chunks_by_chunk_idx;
+
+    // Serializable helper types
+    struct LayerEntry
+    {
+        std::vector<uint64_t> chunk_idxs;
+        std::vector<CompressedChunk> chunks;
+
+        BEGIN_KV_SERIALIZE_MAP()
+            KV_SERIALIZE(chunk_idxs)
+            KV_SERIALIZE(chunks)
+            if (chunk_idxs.size() != chunks.size())
+                return false;
+        END_KV_SERIALIZE_MAP()
+    };
+
+    BEGIN_KV_SERIALIZE_MAP()
+        std::vector<uint64_t> leaf_chunk_idxs;
+        std::vector<UnifiedOutputs> leaves_by_chunk_idx_vec;
+        std::vector<LayerEntry> layer_chunks_by_chunk_idx_vec;
+
+        // Writing
+        if (is_store)
+        {
+            leaf_chunk_idxs.reserve(leaves_by_chunk_idx.size());
+            leaves_by_chunk_idx_vec.reserve(leaves_by_chunk_idx.size());
+            for (const auto &leaf_chunk : leaves_by_chunk_idx)
+            {
+                leaf_chunk_idxs.push_back(leaf_chunk.first);
+                leaves_by_chunk_idx_vec.push_back(UnifiedOutputs(leaf_chunk.second));
+            }
+
+            layer_chunks_by_chunk_idx_vec.reserve(layer_chunks_by_chunk_idx.size());
+            for (const auto &layer : layer_chunks_by_chunk_idx)
+            {
+                auto &last = layer_chunks_by_chunk_idx_vec.emplace_back();
+                last.chunk_idxs.reserve(layer.size());
+                last.chunks.reserve(layer.size());
+                for (const auto &layer_chunk : layer)
+                {
+                    last.chunk_idxs.push_back(layer_chunk.first);
+                    last.chunks.push_back(layer_chunk.second);
+                }
+            }
+        }
+
+        epee::serialization::selector<is_store>::serialize(leaf_chunk_idxs, stg, hparent_section, "leaf_chunk_idxs");
+        epee::serialization::selector<is_store>::serialize(leaves_by_chunk_idx_vec, stg, hparent_section, "leaves_by_chunk_idx");
+        epee::serialization::selector<is_store>::serialize(layer_chunks_by_chunk_idx_vec, stg, hparent_section, "layer_chunks_by_chunk_idx");
+
+        // Reading
+        if (!is_store)
+        {
+            if (leaf_chunk_idxs.size() != leaves_by_chunk_idx_vec.size())
+                return false;
+            for (std::size_t i = 0; i < leaf_chunk_idxs.size(); ++i)
+                leaves_by_chunk_idx[leaf_chunk_idxs[i]] = leaves_by_chunk_idx_vec.at(i).to_unified_outputs_vec();
+            layer_chunks_by_chunk_idx.resize(layer_chunks_by_chunk_idx_vec.size());
+            for (std::size_t i = 0; i < layer_chunks_by_chunk_idx.size(); ++i)
+            {
+                auto &this_layer = layer_chunks_by_chunk_idx[i];
+                auto &read_layer = layer_chunks_by_chunk_idx_vec.at(i);
+                for (std::size_t j = 0; j < read_layer.chunk_idxs.size(); ++j )
+                    this_layer[read_layer.chunk_idxs[j]] = std::move(read_layer.chunks.at(j));
+            }
+        }
+    END_KV_SERIALIZE_MAP()
+};
 //----------------------------------------------------------------------------------------------------------------------
 //   FCMP++ prove/verify types
 //----------------------------------------------------------------------------------------------------------------------

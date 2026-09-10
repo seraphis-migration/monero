@@ -48,7 +48,7 @@ using namespace epee;
 #include "cryptonote_basic/cryptonote_basic_impl.h"
 #include "cryptonote_basic/merge_mining.h"
 #include "cryptonote_core/tx_sanity_check.h"
-#include "fcmp_pp/curve_trees.h"
+#include "fcmp_pp/fcmp_pp_types.h"
 #include "misc_language.h"
 #include "net/local_ip.h"
 #include "net/parse.h"
@@ -1031,12 +1031,19 @@ namespace cryptonote
 
     try
     {
-      std::vector<uint64_t> leaf_idxs;
-      std::vector<fcmp_pp::CompressedPath> paths;
-      res.n_leaf_tuples = m_core.get_blockchain_storage().get_db().get_path_by_unified_id(req.unified_ids, req.as_of_n_blocks, leaf_idxs, paths);
-      res.paths.reserve(leaf_idxs.size());
-      for (std::size_t i = 0; i < leaf_idxs.size(); ++i)
-        res.paths.emplace_back(COMMAND_RPC_GET_PATH_BY_UNIFIED_ID_BIN::response::path_entry{ leaf_idxs.at(i), std::move(paths.at(i)) });
+      std::vector<fcmp_pp::AssignedLeafIdx> leaf_idxs;
+      res.n_leaf_tuples = m_core.get_blockchain_storage().get_db().get_path_by_unified_id(req.unified_ids, req.as_of_n_blocks, leaf_idxs, res.paths);
+
+      // Collect leaf idxs and their assigned status for response. Order is important so the client can tell which
+      // global output id corresponds to which leaf idx.
+      CHECK_AND_ASSERT_MES(req.unified_ids.size() == leaf_idxs.size(), true, "Unexpected mismatch unified ids <> leaf idxs");
+      for (std::size_t i = 0; i < req.unified_ids.size(); ++i)
+      {
+        if (!leaf_idxs.at(i).assigned_leaf_idx)
+          res.unassigned_unified_ids.push_back(req.unified_ids.at(i));
+        else
+          res.leaf_idxs.push_back(leaf_idxs.at(i).leaf_idx);
+      }
     }
     catch (...)
     {

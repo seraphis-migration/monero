@@ -41,18 +41,18 @@ namespace fcmp_pp
 namespace curve_trees
 {
 //----------------------------------------------------------------------------------------------------------------------
-static OutputRefHash get_output_ref_hash(const OutputPair &o_variant)
+static OutputRefHash get_output_ref_hash(const OutputPair &output_pair)
 {
-    const crypto::public_key &output_pubkey = output_pubkey_cref(o_variant);
-    const crypto::ec_point &commitment = commitment_cref(o_variant);
+    const crypto::public_key &output_pubkey = output_pubkey_cref(output_pair);
+    const crypto::ec_point &commitment = commitment_cref(output_pair);
 
     static_assert(sizeof(output_pubkey) == sizeof(commitment), "unexpected size of output pubkey & commitment");
 
     // Hash the type info as well
     crypto::public_key type = crypto::null_pkey;
-    const std::size_t variant_index = o_variant.index();
-    static_assert(sizeof(type) >= sizeof(variant_index), "variant index type is too large");
-    memcpy(&type, &variant_index, sizeof(variant_index));
+    const fcmp_pp::OutputPairType _type = fcmp_pp::output_pair_type(output_pair);
+    static_assert(sizeof(type) >= sizeof(_type), "OutputPairType is too large");
+    memcpy(&type, &_type, sizeof(_type));
 
     static constexpr std::size_t N_HASH_ELEMS = 3;
     const crypto::public_key data[N_HASH_ELEMS] = {
@@ -747,7 +747,7 @@ bool TreeCache<C1, C2>::register_output(const OutputPair &output)
 
     MDEBUG("Registered output " << fcmp_pp::output_pubkey_cref(output)
         << " , commitment "     << fcmp_pp::commitment_cref(output)
-        << " , type: "          << output.index()
+        << " , type: "          << fcmp_pp::output_pair_type(output)
         << " , output ref: "    << output_ref_hash);
 
     return true;

@@ -2070,9 +2070,10 @@ void wallet2::handle_needed_path_data(const uint64_t n_blocks_synced,
   THROW_WALLET_EXCEPTION_IF(output_pairs.size() != unified_ids.size(), error::wallet_internal_error, "Mismatched number of output pairs to global output id's");
 
   // Get all the paths from daemon using collected global output id's
-  // TODO: get consolidated paths
-  std::vector<cryptonote::COMMAND_RPC_GET_PATH_BY_UNIFIED_ID_BIN::response::path_entry> paths;
+  std::vector<fcmp_pp::CompressedPath> paths;
+  std::vector<uint64_t> leaf_idxs;
   paths.reserve(unified_ids.size());
+  leaf_idxs.reserve(unified_ids.size());
   static constexpr std::size_t N_PATHS_PER_REQ = 50; // MAX_RESTRICTED_PATHS_COUNT
   uint64_t n_leaf_tuples = 0;
   for (std::size_t i = 0; i < unified_ids.size(); i += N_PATHS_PER_REQ)
@@ -2092,31 +2093,39 @@ void wallet2::handle_needed_path_data(const uint64_t n_blocks_synced,
     {
       const boost::lock_guard<boost::recursive_mutex> lock{m_daemon_rpc_mutex};
       bool r = net_utils::invoke_http_bin("/get_path_by_unified_id.bin", req, res, *m_http_client, rpc_timeout);
-      THROW_WALLET_EXCEPTION_IF(!r || res.status != CORE_RPC_STATUS_OK, error::wallet_internal_error, "Failed to get paths by global output id from daemon");
-      THROW_WALLET_EXCEPTION_IF(res.paths.size() != req.unified_ids.size(), error::wallet_internal_error, "Mismatched number of paths in request for paths by global output id");
+      THROW_WALLET_EXCEPTION_IF(!r || res.status != CORE_RPC_STATUS_OK, error::wallet_internal_error, "Failed to get paths by unified id from daemon");
+      THROW_WALLET_EXCEPTION_IF(res.leaf_idxs.size() != req.unified_ids.size(), error::wallet_internal_error, "Mismatched leaf idxs to unified");
+      THROW_WALLET_EXCEPTION_IF(res.unassigned_unified_ids.size(), error::wallet_internal_error, "Expected all leaves to be assigned");
       THROW_WALLET_EXCEPTION_IF(n_leaf_tuples > 0 && n_leaf_tuples != res.n_leaf_tuples, error::wallet_internal_error, "Unexpected different n_leaf_tuples across responses");
       n_leaf_tuples = res.n_leaf_tuples;
     }
 
-    for (auto &path_entry : res.paths)
+    // Collect all the assigned leaf idxs
+    std::vector<fcmp_pp::AssignedLeafIdx> res_leaf_idxs;
+    res_leaf_idxs.reserve(res.leaf_idxs.size());
+    for (std::size_t j = 0; j < res.leaf_idxs.size(); ++j)
     {
-      // Since all requested paths should be for outputs that are unlocked, we expect non-empty paths in the resp
-      THROW_WALLET_EXCEPTION_IF(path_entry.path.leaves.empty() || path_entry.path.layer_chunks.empty(), error::wallet_internal_error, "Unexpected empty path");
-      paths.emplace_back(std::move(path_entry));
+      res_leaf_idxs.emplace_back(fcmp_pp::AssignedLeafIdx{.assigned_leaf_idx = true, .leaf_idx = res.leaf_idxs.at(j)});
+      leaf_idxs.push_back(res.leaf_idxs.at(j));
     }
+
+    // De-consolidate the paths
+    auto res_paths = m_curve_trees->deconsolidate_paths(n_leaf_tuples, res_leaf_idxs, res.paths);
+    paths.insert(paths.end(), std::make_move_iterator(res_paths.begin()), std::make_move_iterator(res_paths.end()));
   }
-  THROW_WALLET_EXCEPTION_IF(paths.size() != unified_ids.size(), error::wallet_internal_error, "Mismatched number of paths to global output id's");
+  THROW_WALLET_EXCEPTION_IF(paths.size() != unified_ids.size(), error::wallet_internal_error, "Mismatched number of paths to unified id's");
+  THROW_WALLET_EXCEPTION_IF(leaf_idxs.size() != unified_ids.size(), error::wallet_internal_error, "Mismatched number of leaf_idxs to unified id's");
 
   // Now process paths returned above
   for (std::size_t i = 0; i < paths.size(); ++i)
   {
     // Audit each path returned by daemon
-    const auto path = m_curve_trees->path_bytes_to_path(paths.at(i).path);
+    const auto path = m_curve_trees->path_bytes_to_path(paths.at(i));
     THROW_WALLET_EXCEPTION_IF(!m_curve_trees->audit_path(path, output_pairs.at(i), n_leaf_tuples),
       error::wallet_internal_error, "Path returned by daemon failed audit");
 
     // Add the output's path to the tree cache
-    m_tree_cache.force_add_output_path(output_pairs.at(i), paths.at(i).leaf_idx, paths.at(i).path, n_leaf_tuples);
+    m_tree_cache.force_add_output_path(output_pairs.at(i), leaf_idxs.at(i), paths.at(i), n_leaf_tuples);
   }
 }
 //----------------------------------------------------------------------------------------------------
