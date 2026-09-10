@@ -346,7 +346,8 @@ static bool ver_non_input_consensus_templated(TxForwardIt tx_begin,
         }
 
         // Rule 8
-        if (hf_version >= HF_VERSION_REJECT_UNLOCK_TIME && tx.unlock_time != 0)
+        // Allow relative locks
+        if (hf_version >= HF_VERSION_REJECT_UNLOCK_TIME && tx.unlock_time > FCMP_RELATIVE_LOCK)
         {
             tvc.m_verifivation_failed = true;
             tvc.m_nonzero_unlock_time = true;
