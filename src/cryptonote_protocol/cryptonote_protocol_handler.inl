@@ -993,7 +993,11 @@ namespace cryptonote
       {
         txs.push_back(std::move(tx_blob));
       }
-      // If tx is not in the pool, then ignore it (do not penalize peer)
+      else
+      {
+        // If tx is not in the pool, then ignore it (do not penalize peer)
+        LOG_DEBUG_CC(context, "Received request for pool tx " << tx_hash << " and it's not in our pool");
+      }
     }
 
     // Send response if any txs found
