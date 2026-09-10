@@ -59,12 +59,14 @@ namespace cryptonote
     void decrypt(const crypto::chacha_key &key);
     void encrypt_viewkey(const crypto::chacha_key &key);
     void decrypt_viewkey(const crypto::chacha_key &key);
+    void encrypt_except_viewkey(const crypto::chacha_key &key);
+    void decrypt_except_viewkey(const crypto::chacha_key &key);
 
     hw::device& get_device()  const ;
     void set_device( hw::device &hwdev) ;
 
   private:
-    void xor_with_key_stream(const crypto::chacha_key &key);
+    void xor_with_key_stream(const crypto::chacha_key &key, bool skip_viewkey = false);
   };
 
   /************************************************************************/
@@ -102,6 +104,8 @@ namespace cryptonote
     void decrypt_keys(const crypto::chacha_key &key) { m_keys.decrypt(key); }
     void encrypt_viewkey(const crypto::chacha_key &key) { m_keys.encrypt_viewkey(key); }
     void decrypt_viewkey(const crypto::chacha_key &key) { m_keys.decrypt_viewkey(key); }
+    void encrypt_keys_except_viewkey(const crypto::chacha_key &key) { m_keys.encrypt_except_viewkey(key); }
+    void decrypt_keys_except_viewkey(const crypto::chacha_key &key) { m_keys.decrypt_except_viewkey(key); }
 
     template <class t_archive>
     inline void serialize(t_archive &a, const unsigned int /*ver*/)

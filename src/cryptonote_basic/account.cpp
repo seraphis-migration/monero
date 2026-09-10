@@ -84,15 +84,18 @@ DISABLE_VS_WARNINGS(4244 4345)
     return buffer1;
   }
   //-----------------------------------------------------------------
-  void account_keys::xor_with_key_stream(const crypto::chacha_key &key)
+  void account_keys::xor_with_key_stream(const crypto::chacha_key &key, bool skip_viewkey)
   {
     // encrypt a large enough byte stream with chacha20
     epee::wipeable_string key_stream = get_key_stream(key, m_encryption_iv, sizeof(crypto::secret_key) * (2 + m_multisig_keys.size()));
     const char *ptr = key_stream.data();
     for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
       m_spend_secret_key.data[i] ^= *ptr++;
-    for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
-      m_view_secret_key.data[i] ^= *ptr++;
+    if (skip_viewkey)
+      ptr += sizeof(crypto::secret_key);
+    else
+      for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
+        m_view_secret_key.data[i] ^= *ptr++;
     for (crypto::secret_key &k: m_multisig_keys)
     {
       for (size_t i = 0; i < sizeof(crypto::secret_key); ++i)
@@ -124,6 +127,17 @@ DISABLE_VS_WARNINGS(4244 4345)
   void account_keys::decrypt_viewkey(const crypto::chacha_key &key)
   {
     encrypt_viewkey(key);
+  }
+  //-----------------------------------------------------------------
+  void account_keys::encrypt_except_viewkey(const crypto::chacha_key &key)
+  {
+    m_encryption_iv = crypto::rand<crypto::chacha_iv>();
+    xor_with_key_stream(key, /*skip_viewkey=*/true);
+  }
+  //-----------------------------------------------------------------
+  void account_keys::decrypt_except_viewkey(const crypto::chacha_key &key)
+  {
+    xor_with_key_stream(key, /*skip_viewkey=*/true);
   }
   //-----------------------------------------------------------------
   account_base::account_base()
