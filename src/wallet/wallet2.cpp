@@ -3649,6 +3649,7 @@ void wallet2::process_parsed_blocks(const uint64_t start_height, const uint64_t 
     wallet::view_incoming_scan_transaction(tx,
       *k_view_incoming_dev,
       {&m_account.get_keys().m_account_address.m_spend_public_key, 1}, //! @TODO: Carrot
+      m_account.get_keys().m_account_address.m_view_public_key,
       carrot::subaddress_map_legacy{this->m_subaddresses},
       {&enote_scan_infos[0] + tx_output_idx, tx.vout.size()});
 
@@ -13475,6 +13476,7 @@ crypto::public_key wallet2::get_tx_pub_key_from_received_outs(const tools::walle
     td.m_internal_output_index,
     *k_view_incoming_dev,
     {&m_account.get_keys().m_account_address.m_spend_public_key, 1}, //! @TODO: Carrot
+    m_account.get_keys().m_account_address.m_view_public_key,
     carrot::subaddress_map_legacy{m_subaddresses});
 
   const size_t main_tx_pubkey_index = enote_scan_info ? enote_scan_info->main_tx_pubkey_index : 0;

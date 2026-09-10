@@ -1,4 +1,4 @@
-// Copyright (c) 2025, The Monero Project
+// Copyright (c) 2025-2026, The Monero Project
 //
 // All rights reserved.
 //
@@ -107,7 +107,9 @@ void cryptonote_hierarchy_address_device::get_address_spend_pubkey(const subaddr
 
     // decompress K_S
     ge_p3 account_spend_pubkey_p3;
-    ge_frombytes_vartime(&account_spend_pubkey_p3, to_bytes(this->m_cryptonote_account_spend_pubkey)); // discard result
+    [[maybe_unused]] int r = 1;
+    r = ge_frombytes_vartime(&account_spend_pubkey_p3, to_bytes(this->m_cryptonote_account_spend_pubkey));
+    assert(0 == r);
     ge_cached account_spend_pubkey_cached;
     ge_p3_to_cached(&account_spend_pubkey_cached, &account_spend_pubkey_p3);
 
@@ -204,11 +206,13 @@ void cryptonote_hierarchy_address_device::assert_derive_type(const subaddress_in
 carrot_hierarchy_address_device::carrot_hierarchy_address_device(
     std::shared_ptr<generate_address_secret_device> s_generate_address_dev,
     const crypto::public_key &carrot_account_spend_pubkey,
-    const crypto::public_key &carrot_account_view_pubkey)
+    const crypto::public_key &carrot_account_view_pubkey,
+    const crypto::public_key &carrot_main_address_view_pubkey)
 :
     m_s_generate_address_dev(std::move(s_generate_address_dev)),
     m_carrot_account_spend_pubkey(carrot_account_spend_pubkey),
-    m_carrot_account_view_pubkey(carrot_account_view_pubkey)
+    m_carrot_account_view_pubkey(carrot_account_view_pubkey),
+    m_carrot_main_address_view_pubkey(carrot_main_address_view_pubkey)
 {
     assert(this->m_s_generate_address_dev);
 }
@@ -228,7 +232,9 @@ void carrot_hierarchy_address_device::get_address_spend_pubkey(const subaddress_
 
     // decompress K_s
     ge_p3 account_spend_pubkey_p3;
-    ge_frombytes_vartime(&account_spend_pubkey_p3, to_bytes(this->m_carrot_account_spend_pubkey));
+    [[maybe_unused]] int r = 1;
+    r = ge_frombytes_vartime(&account_spend_pubkey_p3, to_bytes(this->m_carrot_account_spend_pubkey));
+    assert(0 == r);
 
     // K^j_s = k^j_subscal K_s
     ge_p2 tmp_p2;
@@ -245,7 +251,7 @@ void carrot_hierarchy_address_device::get_address_pubkeys(const subaddress_index
     if (!subaddr_index.index.is_subaddress())
     {
         address_spend_pubkey_out = this->m_carrot_account_spend_pubkey;
-        address_view_pubkey_out = this->m_carrot_account_view_pubkey;
+        address_view_pubkey_out = this->m_carrot_main_address_view_pubkey;
         return;
     }
 
@@ -253,7 +259,8 @@ void carrot_hierarchy_address_device::get_address_pubkeys(const subaddress_index
 
     // decompress K_s
     ge_p3 tmp_p3;
-    ge_frombytes_vartime(&tmp_p3, to_bytes(this->m_carrot_account_spend_pubkey));
+    [[maybe_unused]] int r = ge_frombytes_vartime(&tmp_p3, to_bytes(this->m_carrot_account_spend_pubkey));
+    assert(0 == r);
 
     // K^j_s = k^j_subscal K_s
     ge_p2 tmp_p2;
@@ -261,7 +268,8 @@ void carrot_hierarchy_address_device::get_address_pubkeys(const subaddress_index
     ge_tobytes(to_bytes(address_spend_pubkey_out), &tmp_p2);
 
     // decompress K_v
-    ge_frombytes_vartime(&tmp_p3, to_bytes(this->m_carrot_account_view_pubkey));
+    r = ge_frombytes_vartime(&tmp_p3, to_bytes(this->m_carrot_account_view_pubkey));
+    assert(0 == r);
 
     // K^j_v = k^j_subscal K_v
     ge_scalarmult(&tmp_p2, to_bytes(subaddress_scalar), &tmp_p3);

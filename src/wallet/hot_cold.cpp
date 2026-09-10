@@ -32,7 +32,6 @@
 //local headers
 #include "carrot_core/device_ram_borrowed.h"
 #include "carrot_core/enote_utils.h"
-#include "carrot_core/output_set_finalization.h"
 #include "carrot_core/scan.h"
 #include "carrot_core/scan_unsafe.h"
 #include "carrot_impl/address_device_ram_borrowed.h"
@@ -180,9 +179,10 @@ exported_carrot_transfer_details export_cold_carrot_output(const wallet2_basic::
     // 10. C_a = k_a G + a H
     const rct::key amount_commitment = rct::commit(td.amount(), td.m_mask);
 
-    // 11. derive K^j_s from j
+    // 11. derive (K^j_s, K^j_v) from j
     crypto::public_key address_spend_pubkey;
-    addr_dev.get_address_spend_pubkey({etd.subaddr_index}, address_spend_pubkey); //! @TODO: Carrot/hybrid hierarchy
+    crypto::public_key address_view_pubkey;
+    addr_dev.get_address_pubkeys({etd.subaddr_index}, address_spend_pubkey, address_view_pubkey);
     const bool is_subaddress = !td.m_subaddr_index.is_zero();
 
     // 12. calc k_a assuming enote_type="change": k_a' = H_n(s^ctx_sr, a, K^j_s, "change")
@@ -208,6 +208,7 @@ exported_carrot_transfer_details export_cold_carrot_output(const wallet2_basic::
         CHECK_AND_ASSERT_THROW_MES(
             carrot::verify_carrot_normal_janus_protection(input_context,
                 address_spend_pubkey,
+                address_view_pubkey,
                 is_subaddress,
                 enote_ephemeral_pubkey,
                 etd.janus_anchor,

@@ -286,6 +286,7 @@ static std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_carrot_
     const carrot::CarrotCoinbaseEnoteV1 &enote,
     const mx25519_pubkey &s_sender_receiver,
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const crypto::public_key &main_address_view_pubkey,
     const carrot::subaddress_map &subaddress_map)
 {
     enote_view_incoming_scan_info_t res;
@@ -293,6 +294,7 @@ static std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_carrot_
     if (!carrot::try_scan_carrot_coinbase_enote_receiver(enote,
             s_sender_receiver,
             main_address_spend_pubkeys,
+            main_address_view_pubkey,
             res.sender_extension_g,
             res.sender_extension_t,
             res.address_spend_pubkey))
@@ -482,7 +484,7 @@ bool try_load_pre_carrot_enote_from_transaction_prefix(const cryptonote::transac
     return true;
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
+static std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
     const MoneroEnoteVariant &enote,
     const std::size_t local_output_index,
     const cryptonote::blobdata &tx_extra_nonce,
@@ -491,6 +493,7 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
     const cryptonote::account_public_address &address,
     const carrot::view_incoming_key_device *k_view_incoming_dev,
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const crypto::public_key &main_address_view_pubkey,
     const carrot::subaddress_map &subaddress_map)
 {
     CHECK_AND_ASSERT_MES(!main_derivations.empty() || !additional_derivations.empty(),
@@ -539,6 +542,7 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
                 scan_as_sender
                     ? epee::span<const crypto::public_key>(&address.m_spend_public_key, 1)
                     : main_address_spend_pubkeys,
+                scan_as_sender ? address.m_view_public_key : main_address_view_pubkey,
                 subaddress_map);
         }
 
@@ -576,6 +580,7 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
         const cryptonote::account_public_address &address;
         const carrot::view_incoming_key_device *k_view_incoming_dev;
         const epee::span<const crypto::public_key> main_address_spend_pubkeys;
+        const crypto::public_key &main_address_view_pubkey;
         const carrot::subaddress_map &subaddress_map;
     };
 
@@ -588,12 +593,13 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
             address,
             k_view_incoming_dev,
             main_address_spend_pubkeys,
+            main_address_view_pubkey,
             subaddress_map
         },
         enote);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
+static std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
     const cryptonote::transaction &tx,
     const std::size_t local_output_index,
     const epee::span<const crypto::public_key> main_tx_ephemeral_pubkeys,
@@ -604,6 +610,7 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
     const cryptonote::account_public_address &address,
     const carrot::view_incoming_key_device *k_view_incoming_dev,
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const crypto::public_key &main_address_view_pubkey,
     const carrot::subaddress_map &subaddress_map)
 {
     MoneroEnoteVariant enote;
@@ -661,6 +668,7 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
         address,
         k_view_incoming_dev,
         main_address_spend_pubkeys,
+        main_address_view_pubkey,
         subaddress_map);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -671,6 +679,7 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote_from_pre
     const std::size_t local_output_index,
     const carrot::view_incoming_key_device &k_view_incoming_dev,
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const crypto::public_key &main_address_view_pubkey,
     const carrot::subaddress_map &subaddress_map)
 {
     const bool is_carrot = carrot::is_carrot_transaction_v1(tx_prefix);
@@ -722,6 +731,7 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote_from_pre
         /*address=*/{},
         &k_view_incoming_dev,
         main_address_spend_pubkeys,
+        main_address_view_pubkey,
         subaddress_map);
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -734,6 +744,7 @@ void view_incoming_scan_transaction(
     const epee::span<const crypto::key_derivation> additional_derivations,
     const carrot::view_incoming_key_device &k_view_incoming_dev,
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const crypto::public_key &main_address_view_pubkey,
     const carrot::subaddress_map &subaddress_map,
     const epee::span<std::optional<enote_view_incoming_scan_info_t>> enote_scan_infos_out)
 {
@@ -755,6 +766,7 @@ void view_incoming_scan_transaction(
             /*address=*/{},
             &k_view_incoming_dev,
             main_address_spend_pubkeys,
+            main_address_view_pubkey,
             subaddress_map);
     }
 }
@@ -763,6 +775,7 @@ void view_incoming_scan_transaction(
     const cryptonote::transaction &tx,
     const carrot::view_incoming_key_device &k_view_incoming_dev,
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const crypto::public_key &main_address_view_pubkey,
     const carrot::subaddress_map &subaddress_map,
     const epee::span<std::optional<enote_view_incoming_scan_info_t>> enote_scan_infos_out)
 {
@@ -805,6 +818,7 @@ void view_incoming_scan_transaction(
         epee::to_span(additional_derivations),
         k_view_incoming_dev,
         main_address_spend_pubkeys,
+        main_address_view_pubkey,
         subaddress_map,
         enote_scan_infos_out);
 }
@@ -816,10 +830,12 @@ std::vector<std::optional<enote_view_incoming_scan_info_t>> view_incoming_scan_t
     const carrot::subaddress_map &subaddress_map)
 {
     crypto::public_key main_address_spend_pubkeys[2];
+    crypto::public_key main_address_view_pubkey;
+    addr_dev.get_address_pubkeys({}, main_address_spend_pubkeys[0], main_address_view_pubkey);
     std::vector<std::optional<enote_view_incoming_scan_info_t>> res(tx.vout.size());
     view_incoming_scan_transaction(tx, k_view_incoming_dev,
         carrot::get_all_main_address_spend_pubkeys_span(addr_dev, main_address_spend_pubkeys),
-        subaddress_map, epee::to_mut_span(res));
+        main_address_view_pubkey, subaddress_map, epee::to_mut_span(res));
     return res;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -859,6 +875,7 @@ std::vector<std::optional<enote_view_incoming_scan_info_t>> view_incoming_scan_t
             address,
             /*k_view_incoming_dev=*/nullptr,
             /*main_address_spend_pubkeys=*/{},
+            address.m_view_public_key,
             carrot::subaddress_map_legacy{{{address.m_spend_public_key, {}}}});
     }
 

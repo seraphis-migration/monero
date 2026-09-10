@@ -117,7 +117,8 @@ public:
     carrot_hierarchy_address_device(
         std::shared_ptr<generate_address_secret_device> s_generate_address_dev,
         const crypto::public_key &carrot_account_spend_pubkey,
-        const crypto::public_key &carrot_account_view_pubkey);
+        const crypto::public_key &carrot_account_view_pubkey,
+        const crypto::public_key &carrot_main_address_view_pubkey);
 
 //address_device
     void get_address_spend_pubkey(const subaddress_index_extended &subaddr_index,
@@ -138,6 +139,7 @@ private:
     std::shared_ptr<generate_address_secret_device> m_s_generate_address_dev;
     crypto::public_key m_carrot_account_spend_pubkey;
     crypto::public_key m_carrot_account_view_pubkey;
+    crypto::public_key m_carrot_main_address_view_pubkey;
 
 //member functions
     crypto::secret_key get_subaddress_scalar(const subaddress_index &subaddr_index) const;

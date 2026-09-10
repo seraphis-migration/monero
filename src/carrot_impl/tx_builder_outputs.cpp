@@ -209,7 +209,7 @@ void get_enote_ephemeral_privkeys_from_proposal_v1(
         }
         else
         {
-            // d_e = H_n(anchor_norm, input_context, K^j_s, pid)
+            // d_e = H_n(anchor_norm, input_context, K^j_s, K^j_v, pid)
             enote_ephemeral_privkey = get_enote_ephemeral_privkey(
                 normal_payment_proposals.at(payment_proposal_idx.second),
                 make_carrot_input_context(tx_first_key_image));

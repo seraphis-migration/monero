@@ -103,6 +103,7 @@ using MoneroEnoteVariant = std::variant<PreCarrotEnote,
  * @param local_output_index i
  * @param k_view_incoming_dev k_v
  * @param main_address_spend_pubkeys [K_s, ...]
+ * @param main_address_view_pubkey K^0_v
  * @param subaddress_map -
  * @return std::nullopt if scan failed, otherwise enote scan info on success
  */
@@ -113,6 +114,7 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote_from_pre
     const std::size_t local_output_index,
     const carrot::view_incoming_key_device &k_view_incoming_dev,
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const crypto::public_key &main_address_view_pubkey,
     const carrot::subaddress_map &subaddress_map);
 
 /**
@@ -125,6 +127,7 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote_from_pre
  * @param additional_derivations sender-receiver ECDHs against additional ephemeral pubkeys
  * @param k_view_incoming_dev device for k_v
  * @param main_address_spend_pubkeys [K_s, ...]
+ * @param main_address_view_pubkey K^0_v
  * @param subaddress_map -
  * @param[out] enote_scan_infos_out - mutable span to enote scan infos of size N, where N is number of `tx`'s outputs
  */
@@ -137,12 +140,14 @@ void view_incoming_scan_transaction(
     const epee::span<const crypto::key_derivation> additional_derivations,
     const carrot::view_incoming_key_device &k_view_incoming_dev,
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const crypto::public_key &main_address_view_pubkey,
     const carrot::subaddress_map &subaddress_map,
     const epee::span<std::optional<enote_view_incoming_scan_info_t>> enote_scan_infos_out);
 void view_incoming_scan_transaction(
     const cryptonote::transaction &tx,
     const carrot::view_incoming_key_device &k_view_incoming_dev,
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
+    const crypto::public_key &main_address_view_pubkey,
     const carrot::subaddress_map &subaddress_map,
     const epee::span<std::optional<enote_view_incoming_scan_info_t>> enote_scan_infos_out);
 std::vector<std::optional<enote_view_incoming_scan_info_t>> view_incoming_scan_transaction(

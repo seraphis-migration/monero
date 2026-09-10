@@ -253,9 +253,13 @@ static bool try_scan_opening_hint(const OutputOpeningHintVariant &opening_hint,
                 s_sender_receiver))
             {
                 crypto::public_key dummy_address_spend_pubkey;
+                crypto::public_key main_address_view_pubkey;
+                addr_dev.get_address_pubkeys({}, dummy_address_spend_pubkey, main_address_view_pubkey);
+                
                 return try_scan_carrot_coinbase_enote_receiver(hint.source_enote,
                     s_sender_receiver,
                     main_address_spend_pubkeys,
+                    main_address_view_pubkey,
                     sender_extension_g_out,
                     sender_extension_t_out,
                     dummy_address_spend_pubkey);
