@@ -31,6 +31,7 @@
 //local headers
 #include "hot_cold.h"
 #include "serialization/binary_archive.h"
+#include "serialization/serialization.h"
 #include "tx_builder_serialization.h"
 
 //third party headers
@@ -81,10 +82,7 @@ namespace carrot
 BEGIN_SERIALIZE_OBJECT_FN(FcmpPpTxKeyImageProofV1)
     FIELD_F(signable_tx_hash)
     FIELD_F(input)
-    if (typename Archive<W>::is_saving() && v.sal.size() != FCMP_PP_SAL_PROOF_SIZE_V1)
-        return false;
-    else if constexpr (!typename Archive<W>::is_saving())
-        v.sal.resize(FCMP_PP_SAL_PROOF_SIZE_V1);
+    PREPARE_CUSTOM_VECTOR_SERIALIZATION(FCMP_PP_SAL_PROOF_SIZE_V1, v.sal); //! @TODO: refactor after #11206 is merged
     ar.tag("sal");
     ar.serialize_blob(v.sal.data(), v.sal.size());
     FIELD_F(r_o);
