@@ -8259,25 +8259,29 @@ bool wallet2::parse_tx_from_str(const std::string &signed_tx_st, std::vector<too
 
     void operator()(wallet::cold::SignedCarrotTransactionSetV1 &s) const
     {
+      std::unordered_map<crypto::public_key, std::pair<crypto::key_image, carrot::KeyImageProofVariant>> ki_proofs;
       signed_txs = wallet::cold::finalize_signed_carrot_tx_set_v1_into_full_set(s, nullptr,
         wallet::cold::make_supplemental_input_proposals_fetcher(w.m_transfers),
-        *w.get_cryptonote_address_device(), w.get_tree_cache_ref(), w.get_curve_trees_ref());
+        *w.get_cryptonote_address_device(), w.get_tree_cache_ref(), w.get_curve_trees_ref(),
+        ki_proofs);
 
-      import_key_images_cb = [&s = s, &w = w]() -> bool
+      import_key_images_cb = [ki_proofs = std::move(ki_proofs), &w = w]() -> bool
       {
-        if (!s.other_key_images.empty())
+        if (!ki_proofs.empty())
         {
+          // collect {KI -> (OTA, KIAP)} into [(KI, KIAP)], [OTA]
           std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> signed_key_images;
           std::vector<crypto::public_key> associated_onetime_addresses;
-          signed_key_images.reserve(s.other_key_images.size());
-          associated_onetime_addresses.reserve(s.other_key_images.size());
-          for (const auto &p : s.other_key_images)
+          signed_key_images.reserve(ki_proofs.size());
+          associated_onetime_addresses.reserve(ki_proofs.size());
+          for (const auto &p : ki_proofs)
           {
             signed_key_images.push_back(p.second);
             associated_onetime_addresses.push_back(p.first);
           }
+
           uint64_t spent, unspent;
-          w.import_key_images(signed_key_images, associated_onetime_addresses, spent, unspent, /*check_spent=*/true);
+          w.import_key_images(signed_key_images, associated_onetime_addresses, spent, unspent, /*check_spent=*/false);
         }
         return true;
       };
@@ -13498,6 +13502,8 @@ uint64_t wallet2::import_key_images(const std::string &filename, uint64_t &spent
   std::string data;
   bool r = load_from_file(filename, data);
 
+  THROW_WALLET_EXCEPTION_IF(!r, error::wallet_internal_error, std::string(tr("failed to read file ")) + filename);
+
   std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> ski;
   std::uint64_t offset;
   wallet::cold::decrypt_key_image_proofs(data,
@@ -13534,6 +13540,7 @@ uint64_t wallet2::import_key_images(
     return 0;
   }
 
+  // [index in m_tranfers], corresponding to position in `associated_onetime_addresses`
   const std::vector<std::size_t> associated_transfer_indices
     = tools::wallet::collect_selected_transfer_indices(epee::to_span(associated_onetime_addresses), m_transfers);
 
@@ -13564,11 +13571,20 @@ uint64_t wallet2::import_key_images(
   PERF_TIMER_STOP(import_key_images_A);
 
   PERF_TIMER_START(import_key_images_B);
-  for (size_t n = 0; n < signed_key_images.size(); ++n)
+   // {OTA -> (index in `associated_onetime_addresses`)}
+  std::unordered_map<crypto::public_key, std::size_t> ota_index_by_ota;
+  for (std::size_t i = 0; i < associated_onetime_addresses.size(); ++i)
+    ota_index_by_ota.emplace(associated_onetime_addresses.at(i), i);
+  // Iterate through *all* transfers, and if the one-time address has a proven key image, set it.
+  // We do all transfers, instead of just the ones in `associated_transfer_indices` so even burnt
+  // e-notes are marked as known, so we don't keep re-exporting over and over again.
+  for (std::size_t transfer_idx = 0; transfer_idx < m_transfers.size(); ++transfer_idx)
   {
-    const size_t transfer_idx = associated_transfer_indices.at(n);
     transfer_details &td = m_transfers.at(transfer_idx);
-    td.m_key_image = signed_key_images[n].first;
+    const auto ota_it = ota_index_by_ota.find(td.get_public_key());
+    if (ota_it == ota_index_by_ota.cend())
+      continue;
+    td.m_key_image = signed_key_images.at(ota_it->second).first;
     m_key_images[td.m_key_image] = transfer_idx;
     td.m_key_image_known = true;
     td.m_key_image_request = false;

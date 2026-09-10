@@ -75,6 +75,23 @@
         return true;                                             \
     } while (0);
 
+namespace carrot
+{
+//-------------------------------------------------------------------------------------------------------------------
+BEGIN_SERIALIZE_OBJECT_FN(FcmpPpTxKeyImageProofV1)
+    FIELD_F(signable_tx_hash)
+    FIELD_F(input)
+    if (typename Archive<W>::is_saving() && v.sal.size() != FCMP_PP_SAL_PROOF_SIZE_V1)
+        return false;
+    else if constexpr (!typename Archive<W>::is_saving())
+        v.sal.resize(FCMP_PP_SAL_PROOF_SIZE_V1);
+    ar.tag("sal");
+    ar.serialize_blob(v.sal.data(), v.sal.size());
+    FIELD_F(r_o);
+END_SERIALIZE()
+//-------------------------------------------------------------------------------------------------------------------
+}
+
 namespace tools
 {
 namespace wallet
@@ -344,4 +361,7 @@ END_SERIALIZE_VERSIONED_VARIANT()
 //-------------------------------------------------------------------------------------------------------------------
 VARIANT_TAG(binary_archive, crypto::signature, 0x23);
 VARIANT_TAG(binary_archive, fcmp_pp::FcmpPpSalProof, 0x24);
+VARIANT_TAG(binary_archive, carrot::FcmpPpTxKeyImageProofV1, 0x25);
+//-------------------------------------------------------------------------------------------------------------------
+BLOB_SERIALIZER(FcmpInputCompressed);
 //-------------------------------------------------------------------------------------------------------------------
