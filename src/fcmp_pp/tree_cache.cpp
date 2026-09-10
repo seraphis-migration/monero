@@ -739,7 +739,7 @@ template<typename C1, typename C2>
 bool TreeCache<C1, C2>::register_output(const OutputPair &output)
 {
     auto output_ref_hash = get_output_ref_hash(output);
-    CHECK_AND_ASSERT_MES(m_registered_outputs.find(output_ref_hash) == m_registered_outputs.end(), false,
+    CHECK_AND_NO_ASSERT_MES_L1(m_registered_outputs.find(output_ref_hash) == m_registered_outputs.end(), false,
         "output is already registered");
 
     // Add to registered outputs container

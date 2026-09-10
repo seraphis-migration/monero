@@ -2654,7 +2654,8 @@ void wallet2::process_new_scanned_transaction(
       continue;
     const cryptonote::txin_to_key &in_to_key = boost::get<cryptonote::txin_to_key>(in);
     auto it = m_key_images.find(in_to_key.k_image);
-    if(it != m_key_images.end())
+    const bool key_image_known = it != m_key_images.end();
+    if(key_image_known)
     {
       transfer_details& td = m_transfers[it->second];
       uint64_t amount = in_to_key.amount;
@@ -2691,7 +2692,9 @@ void wallet2::process_new_scanned_transaction(
       }
     }
 
-    if (!pool && (m_track_uses || (m_background_syncing && it == m_key_images.end())))
+    const bool check_if_possibly_spent = !pool && (m_track_uses ||
+      (!key_image_known && (m_background_syncing || m_multisig)));
+    if (check_if_possibly_spent)
     {
       const uint64_t amount = in_to_key.amount;
       std::vector<uint64_t> offsets = cryptonote::relative_output_offsets_to_absolute(in_to_key.key_offsets);
@@ -2717,12 +2720,12 @@ void wallet2::process_new_scanned_transaction(
   const bool possibly_involved_with_tx = received_an_output || recognized_owned_possibly_spent_enote;
   const bool should_cache_bg_tx = possibly_involved_with_tx
     && !pool
-    && m_background_syncing
+    && (m_background_syncing || m_multisig)
     && !m_background_sync_data.txs.count(txid);
   if (should_cache_bg_tx)
   {
-    // we're going to re-process this receive when background sync is disabled
-    if (m_background_syncing && m_background_sync_data.txs.find(txid) == m_background_sync_data.txs.end())
+    // we're going to re-process this tx when we can generate the key images for receives
+    if (m_background_sync_data.txs.find(txid) == m_background_sync_data.txs.end())
     {
       size_t bgs_idx = m_background_sync_data.txs.size();
       background_synced_tx_t bgs_tx = {
@@ -2733,7 +2736,7 @@ void wallet2::process_new_scanned_transaction(
         .block_timestamp               = ts,
         .double_spend_seen             = double_spend_seen
       };
-      LOG_PRINT_L2("Adding received tx " << txid << " to background sync data (idx=" << bgs_idx << ")");
+      LOG_PRINT_L2("Adding tx " << txid << " to background sync data (idx=" << bgs_idx << ")");
       m_background_sync_data.txs.insert({txid, std::move(bgs_tx)});
     }
   }
@@ -4605,7 +4608,7 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
   }
 
   m_first_refresh_done = true;
-  if (m_background_syncing || m_is_background_wallet)
+  if (m_background_syncing || m_is_background_wallet || m_multisig)
     m_background_sync_data.first_refresh_done = true;
 
   m_multisig_rescan_info = std::vector<std::vector<tools::wallet2::multisig_info>>{};
@@ -5999,6 +6002,7 @@ void wallet2::generate(const std::string& wallet_, const epee::wipeable_string& 
 
   create_keys_file(wallet_, false, password, m_nettype != MAINNET || create_address_file);
   setup_new_blockchain();
+  reset_background_sync_data(m_background_sync_data);
 
   if (!wallet_.empty())
     store();
@@ -6331,6 +6335,7 @@ std::string wallet2::make_multisig(const epee::wipeable_string &password,
     this->create_keys_file(m_wallet_file, false, password, boost::filesystem::exists(m_wallet_file + ".address.txt"));
 
   this->setup_new_blockchain();
+  this->reset_background_sync_data(m_background_sync_data);
 
   if (!m_wallet_file.empty())
     this->store();
@@ -6560,7 +6565,7 @@ void wallet2::rewrite(const std::string& wallet_name, const epee::wipeable_strin
     store_background_keys(m_custom_background_key.get());
     store_background_cache(m_custom_background_key.get(), true/*do_reset_background_sync_data*/);
   }
-  else if (m_background_sync_type == BackgroundSyncReusePassword)
+  else if (m_background_sync_type == BackgroundSyncReusePassword || m_multisig)
   {
     reset_background_sync_data(m_background_sync_data);
   }
@@ -6875,8 +6880,7 @@ void wallet2::load(const std::string& wallet_, const epee::wipeable_string& pass
 
   try
   {
-    if (use_fs)
-      process_background_cache_on_open();
+    process_background_cache_on_open();
   }
   catch (const std::exception &e)
   {
@@ -7007,6 +7011,12 @@ void wallet2::load_wallet_cache(const bool use_fs, const std::string& cache_buf)
 //----------------------------------------------------------------------------------------------------
 void wallet2::process_background_cache_on_open()
 {
+  if (m_multisig)
+  {
+    if (!m_background_sync_data.first_refresh_done)
+      reset_background_sync_data(m_background_sync_data);
+    return;
+  }
   if (m_wallet_file.empty())
     return;
   if (m_background_syncing || m_is_background_wallet)
@@ -8469,14 +8479,15 @@ bool wallet2::parse_multisig_tx_from_str(std::string multisig_tx_st, multisig_tx
   for (const auto &ptx: exported_txs.m_ptx)
   {
     CHECK_AND_ASSERT_MES(ptx.selected_transfers.size() == ptx.tx.vin.size(), false, "Mismatched selected_transfers/vin sizes");
+    const tools::wallet2::tx_construction_data &sd = get_construction_data(ptx);
     for (size_t idx: ptx.selected_transfers)
       CHECK_AND_ASSERT_MES(idx < m_transfers.size(), false, "Transfer index out of range");
-    CHECK_AND_ASSERT_MES(get_construction_data(ptx).selected_transfers.size() == ptx.tx.vin.size(), false, "Mismatched cd selected_transfers/vin sizes");
-    for (size_t idx: get_construction_data(ptx).selected_transfers)
+    CHECK_AND_ASSERT_MES(sd.selected_transfers.size() == ptx.tx.vin.size(), false, "Mismatched cd selected_transfers/vin sizes");
+    for (size_t idx: sd.selected_transfers)
       CHECK_AND_ASSERT_MES(idx < m_transfers.size(), false, "Transfer index out of range");
-    CHECK_AND_ASSERT_MES(get_construction_data(ptx).sources.size() == ptx.tx.vin.size(), false, "Mismatched sources/vin sizes");
+    CHECK_AND_ASSERT_MES(sd.sources.size() == ptx.tx.vin.size(), false, "Mismatched sources/vin sizes");
     CHECK_AND_ASSERT_MES(!ptx.tx.vin.empty(), false, "Multisig tx has no inputs");
-    CHECK_AND_ASSERT_MES(!get_construction_data(ptx).sources.empty(), false, "Multisig tx has no sources");
+    CHECK_AND_ASSERT_MES(!sd.sources.empty(), false, "Multisig tx has no sources");
   }
 
   return true;
@@ -13960,7 +13971,7 @@ void wallet2::process_background_cache(const background_sync_data_t &background_
     m_processing_background_cache = false;
   });
 
-  if (m_background_syncing || m_multisig || m_watch_only || key_on_device())
+  if (m_background_syncing || m_watch_only || key_on_device())
     return;
 
   if (!background_sync_data.first_refresh_done)
@@ -15088,31 +15099,34 @@ size_t wallet2::import_multisig(std::vector<cryptonote::blobdata> blobs, bool re
     std::sort(m_multisig_rescan_info.begin(), m_multisig_rescan_info.end(), [](const std::vector<tools::wallet2::multisig_info> &i0, const std::vector<tools::wallet2::multisig_info> &i1){ return memcmp(&i0[0].m_signer, &i1[0].m_signer, sizeof(i0[0].m_signer)) < 0; });
   }
 
-  // first pass to determine where to detach the blockchain
-  for (size_t n = 0; n < n_outputs; ++n)
-  {
-    const transfer_details &td = m_transfers[n];
-    if (!td.m_key_image_partial)
-      continue;
-    // FIXME: if we need to pop more blocks from the tree cache than the reorg depth, and the wallet has received
-    // outputs from before the detach height, then the wallet won't be able to correct those prior output paths.
-    // Some solutions:
-    // A) restart sync from the wallet's first received output height.
-    // B) re-request output paths from the daemon.
-    // C) multisig wallet should stop syncing upon identifying a receive.
-    MINFO("Multisig info importing from block height " << td.m_block_height);
-    auto output_tracker_cache = create_output_tracker_cache();
-    handle_reorg(td.m_block_height, output_tracker_cache);
-    break;
-  }
-
   for (size_t n = 0; n < n_outputs && n < m_transfers.size(); ++n)
   {
     update_multisig_rescan_info(m_multisig_rescan_k, m_multisig_rescan_info, n);
   }
 
-  if (refresh_after_import)
-    refresh(false);
+  // The background cache should have all txs saved which need to be rescanned, including potential spends. We process
+  // the background cache with multisig info loaded.
+  const background_sync_data_t background_sync_data = m_background_sync_data;
+  const hashchain blockchain = m_blockchain;
+  const TreeCacheV1 tree_cache = m_tree_cache;
+  process_background_cache(background_sync_data, blockchain, m_last_block_reward, tree_cache);
+
+  // Once all key images are known and we've processed the background cache, any txs present in the background
+  // cache are no longer useful to us. They've been processed, we can remove them.
+  bool all_kis_known = true;
+  for (const auto &td : m_transfers)
+  {
+    if (td.m_key_image_known)
+      continue;
+    all_kis_known = false;
+    break;
+  }
+
+  if (all_kis_known)
+  {
+    MDEBUG("All key images are known, clearing background sync data since we don't need it anymore");
+    reset_background_sync_data(m_background_sync_data);
+  }
 
   return n_outputs;
 }
