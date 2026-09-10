@@ -3914,6 +3914,7 @@ void wallet2::pull_and_parse_next_blocks(bool check_pool, uint64_t &blocks_start
         const std::size_t expected_sync_end_height = m_blockchain.size();
         THROW_WALLET_EXCEPTION_IF(blocks_start_height >= expected_sync_end_height, error::wallet_internal_error, "expected higher synced height than first returned block");
         const std::size_t grow_tree_n_blocks = expected_sync_end_height - blocks_start_height;
+        THROW_WALLET_EXCEPTION_IF(grow_tree_n_blocks > parsed_blocks.size(), error::wallet_internal_error, "daemon returned fewer blocks than needed to grow the tree to the synced height");
         const std::vector<parsed_block> blocks_slice(parsed_blocks.begin(), parsed_blocks.begin() + grow_tree_n_blocks);
 
         const TreeSyncStartParams tree_sync_start_params{
