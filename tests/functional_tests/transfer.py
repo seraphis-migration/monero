@@ -328,6 +328,33 @@ class TransferTest():
         assert e.fee == fee
 
         daemon.generateblocks('42ey1afDFnn4886T7196doS9GPMzexD9gXpsZJDwVjeRVdFCSoHnv7KPbBeGpzJBzHRCAs9UxqeoyFQMYbqSWYTfJJQAWDm', 1)
+        full_res = daemon.get_transactions([txid], decode_as_json = True, prune = False, split = False)
+        split_res = daemon.get_transactions([txid], decode_as_json = True, prune = False, split = True)
+        assert len(full_res.txs) == 1
+        assert len(split_res.txs) == 1
+        full_tx = full_res.txs[0]
+        split_tx = split_res.txs[0]
+        assert full_tx.tx_hash == txid
+        assert split_tx.tx_hash == txid
+        assert not full_tx.in_pool
+        assert not split_tx.in_pool
+        assert full_tx.confirmations > 0
+        assert split_tx.confirmations > 0
+        assert full_tx.as_hex == tx_blob
+        assert split_tx.as_hex == ''
+        assert split_tx.pruned_as_hex
+        assert len(split_tx.pruned_as_hex) % 2 == 0
+        assert split_tx.prunable_as_hex
+        assert len(split_tx.prunable_as_hex) % 2 == 0
+        assert split_tx.pruned_as_hex + split_tx.prunable_as_hex == full_tx.as_hex == tx_blob
+        assert full_tx.prunable_hash == split_tx.prunable_hash
+        assert full_tx.prunable_hash != '0' * 64
+        full_json = json.loads(full_tx.as_json)
+        split_json = json.loads(split_tx.as_json)
+        assert full_json == split_json
+        assert full_json['version'] == 2
+        assert full_json['vout']
+        assert all('carrot_v1' in output['target'] for output in full_json['vout'])
         res = daemon.getlastblockheader()
         running_balances[0] += res.block_header.reward
         self.wallet[1].refresh()
