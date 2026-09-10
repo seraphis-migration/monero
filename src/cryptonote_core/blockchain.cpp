@@ -3900,8 +3900,11 @@ bool Blockchain::check_tx_inputs(transaction& tx,
   crypto::ec_point ref_tree_root{};
   if (rct::is_rct_fcmp(tx.rct_signatures.type))
   {
-    if (pmax_used_block_height)
-      *pmax_used_block_height = tx.rct_signatures.p.reference_block;
+    // Set max used block height to the youngest block which contains outputs in the referenced FCMP tree
+    static_assert(CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE >= 1);
+    assert(nullptr != pmax_used_block_height); // set earlier
+    *pmax_used_block_height = tx.rct_signatures.p.reference_block
+      - std::min<std::uint64_t>(tx.rct_signatures.p.reference_block, CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE - 1);
 
     // Read the db for the tree root for FCMP tx. Enforces that the ref block is in the chain
     if (!get_fcmp_tx_tree_root(m_db, tx, ref_tree_root))
