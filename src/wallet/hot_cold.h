@@ -31,7 +31,6 @@
 //local headers
 #include "carrot_impl/address_device_hierarchies.h"
 #include "carrot_impl/key_image_device.h"
-#include "carrot_impl/knowledge_proof_types.h"
 #include "carrot_impl/spend_device.h"
 #include "carrot_impl/subaddress_index.h"
 #include "tx_builder.h"
@@ -445,13 +444,12 @@ void sign_carrot_tx_set_v1(const UnsignedCarrotTransactionSetV1 &unsigned_txs,
 /**
  * @brief Construct FCMPs and range proofs for signed Carrot/FCMP++ txs
  * @param signed_txs -
- * @param supplemental_tx_proposals fetcher of one-time address -> tx proposal
+ * @param supplemental_tx_proposals fetcher of one-time address -> hot-cold tx proposal
  * @param supplemental_input_proposals fetcher of one-time address -> input proposal
  * @param addr_dev -
  * @param tree_cache -
  * @param curve_trees -
  * @param[out] expanded_tx_proposals_out -
- * @param[out] rerandomized_outputs_out -
  * @param[out] txs_out -
  */
 void finalize_proofs_for_signed_carrot_tx_set_v1(const SignedCarrotTransactionSetV1 &signed_txs,
@@ -461,17 +459,15 @@ void finalize_proofs_for_signed_carrot_tx_set_v1(const SignedCarrotTransactionSe
     const fcmp_pp::curve_trees::TreeCacheV1 &tree_cache,
     const fcmp_pp::curve_trees::CurveTreesV1 &curve_trees,
     std::vector<carrot::CarrotTransactionProposalV1> &expanded_tx_proposals_out,
-    std::vector<std::vector<FcmpRerandomizedOutputCompressed>> &rerandomized_outputs_out,
     std::vector<cryptonote::transaction> &txs_out);
 /**
  * @brief Construct FCMPs and range proofs for signed Carrot/FCMP++ txs
  * @param signed_txs -
- * @param supplemental_tx_proposals -
- * @param supplemental_input_proposals -
+ * @param supplemental_tx_proposals fetcher of one-time address -> hot-cold tx proposal
+ * @param supplemental_input_proposals fetcher of one-time address -> input proposal
  * @param addr_dev -
  * @param tree_cache -
  * @param curve_trees -
- * @param[out] ki_proofs_out explicit key image proofs from the signed tx set, as well as signed inputs
  * @return Signed full transaction set with proven Carrot/FCMP++ txs and given SA/Ls
  */
 SignedFullTransactionSet finalize_signed_carrot_tx_set_v1_into_full_set(
@@ -480,8 +476,7 @@ SignedFullTransactionSet finalize_signed_carrot_tx_set_v1_into_full_set(
     const std::function<carrot::InputProposalV1(const crypto::public_key&)> &supplemental_input_proposals,
     const carrot::cryptonote_hierarchy_address_device &addr_dev,
     const fcmp_pp::curve_trees::TreeCacheV1 &tree_cache,
-    const fcmp_pp::curve_trees::CurveTreesV1 &curve_trees,
-    std::unordered_map<crypto::public_key, std::pair<crypto::key_image, carrot::KeyImageProofVariant>> &ki_proofs_out);
+    const fcmp_pp::curve_trees::CurveTreesV1 &curve_trees);
 /**
  * @brief Encode and encrypt (to k_v) exported output information
  * @param transfers_offset index into transfers list that export starts at

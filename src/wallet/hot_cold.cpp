@@ -46,7 +46,6 @@
 #include "carrot_impl/tx_proposal.h"
 #include "common/apply_permutation.h"
 #include "crypto/crypto.h"
-#include "crypto/generators.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "fcmp_pp/prove.h"
 #include "hot_cold_serialization.h"
@@ -1330,13 +1329,11 @@ void finalize_proofs_for_signed_carrot_tx_set_v1(const SignedCarrotTransactionSe
     const fcmp_pp::curve_trees::TreeCacheV1 &tree_cache,
     const fcmp_pp::curve_trees::CurveTreesV1 &curve_trees,
     std::vector<carrot::CarrotTransactionProposalV1> &expanded_tx_proposals_out,
-    std::vector<std::vector<FcmpRerandomizedOutputCompressed>> &rerandomized_outputs_out,
     std::vector<cryptonote::transaction> &txs_out)
 {
     using signed_input_t = std::pair<crypto::key_image, std::pair<crypto::public_key, fcmp_pp::FcmpPpSalProof>>;
 
     expanded_tx_proposals_out.clear();
-    rerandomized_outputs_out.clear();
     txs_out.clear();
 
     // collect key images by one-time address provided in tx set
@@ -1390,9 +1387,10 @@ void finalize_proofs_for_signed_carrot_tx_set_v1(const SignedCarrotTransactionSe
 
     // expand cold tx proposals, using either in-tx-set opening hints or supplemental
     std::vector<std::vector<crypto::key_image>> input_key_images;
+    std::vector<std::vector<FcmpRerandomizedOutputCompressed>> rerandomized_outputs;
     std::vector<std::vector<fcmp_pp::OutputPair>> input_pairs;
     input_key_images.reserve(n_txs);
-    rerandomized_outputs_out.reserve(n_txs);
+    rerandomized_outputs.reserve(n_txs);
     input_pairs.reserve(n_txs);
     expanded_tx_proposals_out.reserve(n_txs);
     for (const HotColdCarrotTransactionProposalV1 &cold_tx_proposal : cold_tx_proposals)
@@ -1404,7 +1402,7 @@ void finalize_proofs_for_signed_carrot_tx_set_v1(const SignedCarrotTransactionSe
             key_image_dev,
             expanded_tx_proposal,
             input_key_images.emplace_back(),
-            rerandomized_outputs_out.emplace_back());
+            rerandomized_outputs.emplace_back());
 
         std::vector<fcmp_pp::OutputPair> &input_pairs_tx = input_pairs.emplace_back();
         for (const carrot::InputProposalV1 &input_proposal : expanded_tx_proposal.input_proposals)
@@ -1419,8 +1417,7 @@ void finalize_proofs_for_signed_carrot_tx_set_v1(const SignedCarrotTransactionSe
         const std::size_t n_inputs = tx_proposal.input_proposals.size();
         const std::vector<signed_input_t> &tx_signed_inputs = signed_inputs.at(tx_idx);
         const std::vector<crypto::key_image> &tx_input_key_images = input_key_images.at(tx_idx);
-        const std::vector<FcmpRerandomizedOutputCompressed> &tx_rerandomized_outputs
-            = rerandomized_outputs_out.at(tx_idx);
+        const std::vector<FcmpRerandomizedOutputCompressed> &tx_rerandomized_outputs = rerandomized_outputs.at(tx_idx);
         const std::vector<fcmp_pp::OutputPair> &tx_input_pairs = input_pairs.at(tx_idx);
 
         // collect SA/Ls per tx
@@ -1458,13 +1455,9 @@ SignedFullTransactionSet finalize_signed_carrot_tx_set_v1_into_full_set(
     const std::function<carrot::InputProposalV1(const crypto::public_key&)> &supplemental_input_proposals,
     const carrot::cryptonote_hierarchy_address_device &addr_dev,
     const fcmp_pp::curve_trees::TreeCacheV1 &tree_cache,
-    const fcmp_pp::curve_trees::CurveTreesV1 &curve_trees,
-    std::unordered_map<crypto::public_key, std::pair<crypto::key_image, carrot::KeyImageProofVariant>> &ki_proofs_out)
+    const fcmp_pp::curve_trees::CurveTreesV1 &curve_trees)
 {
-    ki_proofs_out = signed_txs.other_key_images;
-
     std::vector<carrot::CarrotTransactionProposalV1> expanded_tx_proposals;
-    std::vector<std::vector<FcmpRerandomizedOutputCompressed>> rerandomized_outputs;
     std::vector<cryptonote::transaction> txs;
     finalize_proofs_for_signed_carrot_tx_set_v1(signed_txs,
         supplemental_tx_proposals,
@@ -1473,7 +1466,6 @@ SignedFullTransactionSet finalize_signed_carrot_tx_set_v1_into_full_set(
         tree_cache,
         curve_trees,
         expanded_tx_proposals,
-        rerandomized_outputs,
         txs);
 
     const std::size_t n_txs = txs.size();
@@ -1491,60 +1483,17 @@ SignedFullTransactionSet finalize_signed_carrot_tx_set_v1_into_full_set(
         for (const cryptonote::txin_v &in : tx.vin)
             sorted_input_key_images.push_back(boost::get<cryptonote::txin_to_key>(in).k_image);
 
-        // get tx signable hash
-        const crypto::hash signable_tx_hash = carrot::calculate_signable_fcmp_pp_transaction_hash(tx);
-
-        // get proof parts from tx
-        std::vector<crypto::ec_point> pseudo_outs(tx.rct_signatures.p.pseudoOuts.size());
-        memcpy(pseudo_outs.data(), tx.rct_signatures.p.pseudoOuts.data(),
-            pseudo_outs.size() * sizeof(crypto::ec_point));
-        fcmp_pp::FcmpMembershipProof membership_proof;
-        std::vector<fcmp_pp::FcmpPpSalProof> sal_proofs;
-        std::vector<FcmpInputCompressed> fcmp_raw_inputs;
-        fcmp_pp::fcmp_pp_parts_from_proof_v1(
-            tx.rct_signatures.p.fcmp_pp,
-            pseudo_outs,
-            tx.rct_signatures.p.n_tree_layers,
-            membership_proof,
-            sal_proofs,
-            fcmp_raw_inputs);
-
-        // add key image proof for each SA/L proof
-        for (std::size_t input_idx = 0; input_idx < tx.vin.size(); ++input_idx)
-        {
-            // collect SA/L tx key image proof info
-            const auto &rerandomized_output = rerandomized_outputs.at(tx_idx).at(input_idx);
-            const FcmpInputCompressed &fcmp_input = rerandomized_output.input;
-            crypto::secret_key r_o;
-            memcpy(r_o.data, rerandomized_output.r_o, sizeof(r_o));
-
-            // calc O = O~ - r_o T
-            crypto::public_key onetime_address;
-            {
-                unsigned char neg_r_o[32]; // -r_o
-                sc_sub(neg_r_o, rct::Z.bytes, to_bytes(r_o));
-                ge_p3 tmp1;
-                ge_frombytes_vartime(&tmp1, fcmp_input.O_tilde);
-                fcmp_pp::scalarmult_and_add(to_bytes(onetime_address), tmp1, neg_r_o, crypto::get_T_p3());
-            }
-
-            ki_proofs_out[onetime_address] = {
-                sorted_input_key_images.at(input_idx),
-                carrot::FcmpPpTxKeyImageProofV1{
-                    .signable_tx_hash = signable_tx_hash,
-                    .input = fcmp_input,
-                    .sal = sal_proofs.at(input_idx),
-                    .r_o = r_o
-                }
-            };
-        }
-
         pending_tx &ptx = full_signed_txs.ptx.emplace_back(make_pending_carrot_tx(expanded_tx_proposals.at(tx_idx),
             sorted_input_key_images, addr_dev));
         ptx.tx = std::move(tx);
         ptx.tx_key = rct::rct2sk(rct::identity());
         ptx.additional_tx_keys.clear();
     }
+
+    // collect other key images, stripping proofs ;(
+    full_signed_txs.tx_key_images.reserve(signed_txs.other_key_images.size());
+    for (const auto &p : signed_txs.other_key_images)
+        full_signed_txs.tx_key_images.emplace(p.first, p.second.first);
 
     return full_signed_txs;
 }

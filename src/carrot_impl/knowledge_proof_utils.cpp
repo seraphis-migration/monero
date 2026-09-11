@@ -38,7 +38,6 @@ extern "C"
 {
 #include "crypto/crypto-ops.h"
 }
-#include "crypto/generators.h"
 #include "fcmp_pp/prove.h"
 #include "misc_log_ex.h"
 #include "string_tools.h"
@@ -55,24 +54,11 @@ namespace carrot
 {
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
-constexpr std::size_t FCMP_PP_TX_KEY_IMAGE_PROOF_V1_SIZE = 6 * 32 + FCMP_PP_SAL_PROOF_SIZE_V1;
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
 static crypto::hash ki2hash(const crypto::key_image &ki)
 {
     crypto::hash res;
     memcpy(res.data, ki.data, sizeof(res));
     return res;
-}
-//-------------------------------------------------------------------------------------------------------------------
-//-------------------------------------------------------------------------------------------------------------------
-template <typename T>
-static T load_from_bytes(const unsigned char *b)
-{
-    static_assert(std::has_unique_object_representations_v<T> || std::is_same_v<T, crypto::secret_key>);
-    T v;
-    memcpy(&v, b, sizeof(v));
-    return v;
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -249,37 +235,7 @@ bool validate_key_image_proof(const crypto::public_key &onetime_address,
             return validate_ring_signature_key_image_proof(onetime_address, key_image, p);
         }
         bool operator()(const fcmp_pp::FcmpPpSalProof &p) const
-        {
-            return validate_fcmp_pp_sal_key_image_proof(onetime_address, use_biased_hash_to_point, key_image,
-                p);
-        }
-        bool operator()(const FcmpPpTxKeyImageProofV1 &p) const
-        {
-            // verify SA/L for O~
-            if (!fcmp_pp::verify_sal(p.signable_tx_hash, p.input, key_image, p.sal))
-                return false;
-
-            // check that O~ ?= O + r_o T
-            // i.e. that O~ has the same key image
-            ge_p3 tmp1;
-            if (0 != ge_frombytes_vartime(&tmp1, to_bytes(onetime_address)))
-                return false;
-            ge_cached tmp2;
-            ge_p3_to_cached(&tmp2, &tmp1);
-            static const ge_p3 T_p3 = crypto::get_T_p3(); //! @TODO: remove once #10963 is merged
-            ge_scalarmult_p3(&tmp1, to_bytes(p.r_o), &T_p3);
-            ge_p1p1 tmp3;
-            ge_add(&tmp3, &tmp1, &tmp2);
-            ge_p2 tmp4;
-            ge_p1p1_to_p2(&tmp4, &tmp3);
-            unsigned char recomputed_O_tilde[32];
-            ge_tobytes(recomputed_O_tilde, &tmp4);
-            return 0 == memcmp(recomputed_O_tilde, p.input.O_tilde, 32);
-
-            //! @WARN: I assume above that `p.input.O_tilde` is a valid point since it passes SA/L verification.
-            //!        Check that this assumption is true
-            //! @WARN: Like validate_fcmp_pp_sal_key_image_proof(), check that SA/L prove() checks the KI domain.
-        }
+        { return validate_fcmp_pp_sal_key_image_proof(onetime_address, use_biased_hash_to_point, key_image, p);}
 
         const crypto::public_key &onetime_address;
         const bool use_biased_hash_to_point;
@@ -299,17 +255,6 @@ std::string key_image_proof_to_readable_string(const KeyImageProofVariant &ki_pr
         { return epee::string_tools::pod_to_hex(s); }
         std::string operator()(const fcmp_pp::FcmpPpSalProof &s) const
         { return epee::to_hex::string(epee::to_span(s) ); }
-        std::string operator()(const FcmpPpTxKeyImageProofV1 &s) const
-        {
-            std::string res;
-            res.reserve(FCMP_PP_TX_KEY_IMAGE_PROOF_V1_SIZE);
-            res.append(s.signable_tx_hash.data, crypto::HASH_SIZE);
-            res.append(reinterpret_cast<const char*>(&s.input), sizeof(s.input));
-            res.append(reinterpret_cast<const char*>(s.sal.data()), s.sal.size());
-            res.append(s.r_o.data, sizeof(s.r_o.data));
-            assert(res.size() == FCMP_PP_TX_KEY_IMAGE_PROOF_V1_SIZE);
-            return res;
-        }
     };
     return std::visit(key_image_proof_to_readable_string_visitor{}, ki_proof);
 }
@@ -335,14 +280,6 @@ bool try_key_image_proof_from_readable_string(const std::string &str, KeyImagePr
         break;
     case FCMP_PP_SAL_PROOF_SIZE_V1:
         ki_proof_out = std::move(bytes);
-        break;
-    case FCMP_PP_TX_KEY_IMAGE_PROOF_V1_SIZE:
-        ki_proof_out = FcmpPpTxKeyImageProofV1{
-            .signable_tx_hash = load_from_bytes<crypto::hash>(bytes.data()),
-            .input = load_from_bytes<FcmpInputCompressed>(bytes.data() + 32),
-            .sal = fcmp_pp::FcmpPpSalProof(bytes.cbegin() + 160, bytes.cbegin() + 160 + FCMP_PP_SAL_PROOF_SIZE_V1),
-            .r_o = load_from_bytes<crypto::secret_key>(bytes.data() + 160 + FCMP_PP_SAL_PROOF_SIZE_V1)
-        };
         break;
     default:
         return false;

@@ -8259,22 +8259,29 @@ bool wallet2::parse_tx_from_str(const std::string &signed_tx_st, std::vector<too
 
     void operator()(wallet::cold::SignedCarrotTransactionSetV1 &s) const
     {
-      std::unordered_map<crypto::public_key, std::pair<crypto::key_image, carrot::KeyImageProofVariant>> ki_proofs;
       signed_txs = wallet::cold::finalize_signed_carrot_tx_set_v1_into_full_set(s, nullptr,
         wallet::cold::make_supplemental_input_proposals_fetcher(w.m_transfers),
-        *w.get_cryptonote_address_device(), w.get_tree_cache_ref(), w.get_curve_trees_ref(),
-        ki_proofs);
+        *w.get_cryptonote_address_device(), w.get_tree_cache_ref(), w.get_curve_trees_ref());
 
-      import_key_images_cb = [ki_proofs = std::move(ki_proofs), &w = w]() -> bool
+      import_key_images_cb = [&s = s, &w = w]() -> bool
       {
-        if (!ki_proofs.empty())
+        if (!s.other_key_images.empty())
         {
-          // collect {KI -> (OTA, KIAP)} into [(KI, KIAP)], [OTA]
+          // from signed inputs, import {OTA -> KI} associations.
+          // we proved these to ourself by virute of A) expanding the
+          // re-randomized outputs and B) verifying the SA/Ls in
+          // finalize_signed_carrot_tx_set_v1_into_full_set().
+          std::unordered_map<crypto::public_key, crypto::key_image> signed_key_image_by_ota;
+          for (const auto &signed_input : s.signed_inputs)
+            signed_key_image_by_ota.emplace(signed_input.second.first, signed_input.first);
+          w.import_key_images(signed_key_image_by_ota);
+
+          // from signed tx set's other key images, collect {KI -> (OTA, KIAP)} into [(KI, KIAP)], [OTA]
           std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> signed_key_images;
           std::vector<crypto::public_key> associated_onetime_addresses;
-          signed_key_images.reserve(ki_proofs.size());
-          associated_onetime_addresses.reserve(ki_proofs.size());
-          for (const auto &p : ki_proofs)
+          signed_key_images.reserve(s.other_key_images.size());
+          associated_onetime_addresses.reserve(s.other_key_images.size());
+          for (const auto &p : s.other_key_images)
           {
             signed_key_images.push_back(p.second);
             associated_onetime_addresses.push_back(p.first);
@@ -13571,7 +13578,7 @@ uint64_t wallet2::import_key_images(
   PERF_TIMER_STOP(import_key_images_A);
 
   PERF_TIMER_START(import_key_images_B);
-   // {OTA -> (index in `associated_onetime_addresses`)}
+  // {OTA -> (index in `associated_onetime_addresses`)}
   std::unordered_map<crypto::public_key, std::size_t> ota_index_by_ota;
   for (std::size_t i = 0; i < associated_onetime_addresses.size(); ++i)
     ota_index_by_ota.emplace(associated_onetime_addresses.at(i), i);

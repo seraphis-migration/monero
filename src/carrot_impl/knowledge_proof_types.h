@@ -41,23 +41,11 @@
 namespace carrot
 {
 /**
- * @brief An FCMP++ SA/L proof, its re-reandomized input, and the O~ opening can be used to prove OTA<->KI association
- */
-struct FcmpPpTxKeyImageProofV1
-{
-    crypto::hash signable_tx_hash;
-    FcmpInputCompressed input;
-    fcmp_pp::FcmpPpSalProof sal;
-    crypto::secret_key r_o; // r_o s.t. O~ = O + r_o T
-};
-
-/**
  * @brief Variation between any key image association proof
  */
 using KeyImageProofVariant = std::variant<
         crypto::signature,       // prove L = x Hp(O), s.t. O = x G
-        fcmp_pp::FcmpPpSalProof, // prove L = x Hp(O), s.t. O = x G + y T
-        FcmpPpTxKeyImageProofV1  // like previous, but with user-provided prefix and rerandomized input
+        fcmp_pp::FcmpPpSalProof  // prove L = x Hp(O), s.t. O = x G + y T
         //! @TODO: variant which allows k_gi proving without knowledge of k_ps
     >;
 } //namespace carrot

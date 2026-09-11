@@ -31,7 +31,6 @@
 //local headers
 #include "hot_cold.h"
 #include "serialization/binary_archive.h"
-#include "serialization/serialization.h"
 #include "tx_builder_serialization.h"
 
 //third party headers
@@ -75,20 +74,6 @@
         v = std::move(vv);                                       \
         return true;                                             \
     } while (0);
-
-namespace carrot
-{
-//-------------------------------------------------------------------------------------------------------------------
-BEGIN_SERIALIZE_OBJECT_FN(FcmpPpTxKeyImageProofV1)
-    FIELD_F(signable_tx_hash)
-    FIELD_F(input)
-    PREPARE_CUSTOM_VECTOR_SERIALIZATION(FCMP_PP_SAL_PROOF_SIZE_V1, v.sal); //! @TODO: refactor after #11206 is merged
-    ar.tag("sal");
-    ar.serialize_blob(v.sal.data(), v.sal.size());
-    FIELD_F(r_o);
-END_SERIALIZE()
-//-------------------------------------------------------------------------------------------------------------------
-}
 
 namespace tools
 {
@@ -359,7 +344,4 @@ END_SERIALIZE_VERSIONED_VARIANT()
 //-------------------------------------------------------------------------------------------------------------------
 VARIANT_TAG(binary_archive, crypto::signature, 0x23);
 VARIANT_TAG(binary_archive, fcmp_pp::FcmpPpSalProof, 0x24);
-VARIANT_TAG(binary_archive, carrot::FcmpPpTxKeyImageProofV1, 0x25);
-//-------------------------------------------------------------------------------------------------------------------
-BLOB_SERIALIZER(FcmpInputCompressed);
 //-------------------------------------------------------------------------------------------------------------------
