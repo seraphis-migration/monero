@@ -113,9 +113,12 @@ bool PendingTransactionImpl::commit(const std::string &filename, bool overwrite)
 
         const bool tx_cold_signed = m_wallet.m_wallet->get_account().get_device().has_tx_cold_sign();
         if (tx_cold_signed){
+          wallet2_basic::transfer_container transfers;
+          m_wallet.m_wallet->get_transfers(transfers);
+
           std::unordered_set<size_t> selected_transfers;
           for(const tools::wallet2::pending_tx & ptx : m_pending_tx){
-            for(size_t s : ptx.selected_transfers){
+            for(size_t s : tools::wallet::collect_selected_transfer_indices(ptx.construction_data, transfers)){
               selected_transfers.insert(s);
             }
           }
@@ -198,28 +201,32 @@ uint64_t PendingTransactionImpl::txCount() const
 
 std::vector<uint32_t> PendingTransactionImpl::subaddrAccount() const
 {
+    wallet2_basic::transfer_container incoming_transfers;
+    m_wallet.m_wallet->get_transfers(incoming_transfers);
+
     std::vector<uint32_t> result;
+    result.reserve(m_pending_tx.size());
     for (const auto& ptx : m_pending_tx)
     {
-        const auto *pre_carrot_constr_data = std::get_if<tools::wallet2::tx_construction_data>(&ptx.construction_data);
-        if (nullptr != pre_carrot_constr_data)
-            result.push_back(pre_carrot_constr_data->subaddr_account);
-        else
-            result.push_back(ptx.subaddr_account);
+        std::set<uint32_t> subaddr_indices{};
+        tools::wallet::collect_selected_transfer_subaddress_info(ptx.construction_data,
+            incoming_transfers, result.emplace_back(), subaddr_indices);
     }
     return result;
 }
 
 std::vector<std::set<uint32_t>> PendingTransactionImpl::subaddrIndices() const
 {
+    wallet2_basic::transfer_container incoming_transfers;
+    m_wallet.m_wallet->get_transfers(incoming_transfers);
+
     std::vector<std::set<uint32_t>> result;
+    result.reserve(m_pending_tx.size());
     for (const auto& ptx : m_pending_tx)
     {
-        const auto *pre_carrot_constr_data = std::get_if<tools::wallet2::tx_construction_data>(&ptx.construction_data);
-        if (nullptr != pre_carrot_constr_data)
-            result.push_back(pre_carrot_constr_data->subaddr_indices);
-        else
-            result.push_back(ptx.subaddr_indices);
+        std::uint32_t subaddr_account{};
+        tools::wallet::collect_selected_transfer_subaddress_info(ptx.construction_data,
+            incoming_transfers, subaddr_account, result.emplace_back());
     }
     return result;
 }

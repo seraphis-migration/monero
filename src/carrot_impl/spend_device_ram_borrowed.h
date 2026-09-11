@@ -63,6 +63,10 @@ public:
         signed_input_set_t &signed_inputs_out
     ) const override;
 
+    bool try_make_key_image_association_proof(const OutputOpeningHintVariant &opening_hint,
+        crypto::key_image &key_image_out,
+        KeyImageProofVariant &ki_proof_out) const override;
+
     crypto::key_image derive_key_image(const OutputOpeningHintVariant &opening_hint) const override;
 
     crypto::key_image derive_key_image_prescanned(const crypto::secret_key &sender_extension_g,

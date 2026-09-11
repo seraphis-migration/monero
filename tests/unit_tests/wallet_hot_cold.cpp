@@ -28,14 +28,24 @@
 
 #include "gtest/gtest.h"
 
+#include "carrot_impl/format_utils.h"
+#include "carrot_impl/key_image_device_precomputed.h"
+#include "carrot_impl/spend_device_ram_borrowed.h"
+#include "carrot_impl/tx_builder_inputs.h"
+#include "carrot_impl/tx_builder_outputs.h"
 #include "carrot_mock_helpers.h"
+#include "fcmp_pp/prove.h"
+#include "output_opening_types.h"
 #include "tx_construction_helpers.h"
-#include "wallet/hot_cold.h"
+#include "wallet/hot_cold_serialization.h"
+#include "wallet/tx_builder.h"
 #include "wallet/scanning_tools.h"
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "unit_tests.wallet_hot_cold"
 
+namespace
+{
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 static std::vector<wallet2_basic::transfer_details> hot_scan_into_transfer_details(
@@ -45,7 +55,8 @@ static std::vector<wallet2_basic::transfer_details> hot_scan_into_transfer_detai
     const std::uint64_t global_output_index = 0)
 {
     const auto enote_scan_infos = tools::wallet::view_incoming_scan_transaction(tx,
-        bob.legacy_acb.get_keys(),
+        bob.k_view_incoming_dev,
+        *bob.addr_dev,
         bob.subaddress_map);
     std::vector<wallet2_basic::transfer_details> res;
     for (std::size_t local_output_index = 0; local_output_index < enote_scan_infos.size(); ++local_output_index)
@@ -57,7 +68,7 @@ static std::vector<wallet2_basic::transfer_details> hot_scan_into_transfer_detai
         wallet2_basic::transfer_details &td = res.emplace_back();
         td.m_block_height = block_index;
         td.m_tx = tx;
-        td.m_txid = cryptonote::get_transaction_hash(tx);
+        td.m_txid = crypto::rand<crypto::hash>(),
         td.m_internal_output_index = local_output_index;
         td.m_global_output_index = global_output_index;
         td.m_spent = false;
@@ -82,16 +93,116 @@ static std::vector<wallet2_basic::transfer_details> hot_scan_into_transfer_detai
 }
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
+enum class AddressType
+{
+    MAIN = 0,
+    INTEGRATED = 1,
+    SUBADDRESS = 2,
+    MIN = MAIN,
+    MAX = SUBADDRESS
+};
+static inline AddressType operator++(AddressType &a)
+{
+    a = static_cast<AddressType>((static_cast<std::underlying_type_t<AddressType>>(a) + 1));
+    return a;
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static carrot::CarrotDestinationV1 gen_destination_to(
+    const carrot::mock::mock_carrot_and_legacy_keys &bob,
+    const AddressType addr_type,
+    const carrot::AddressDeriveType addr_derive_type = carrot::AddressDeriveType::Auto)
+{
+    const carrot::subaddress_index subaddr_index = (addr_type == AddressType::SUBADDRESS)
+        ? carrot::mock::gen_subaddress_index() : carrot::subaddress_index{0, 0};
+
+    switch (addr_type)
+    {
+    case AddressType::MAIN:
+        return bob.cryptonote_address({}, addr_derive_type);
+    case AddressType::INTEGRATED:
+        return bob.cryptonote_address(carrot::gen_payment_id(), addr_derive_type);
+    case AddressType::SUBADDRESS:
+        return bob.subaddress({subaddr_index, addr_derive_type});
+    default:
+        ASSERT_MES_AND_THROW("unrecognized address type");
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static wallet2_basic::transfer_details gen_transfer_details_to(
+    const carrot::mock::mock_carrot_and_legacy_keys &bob,
+    const AddressType addr_type,
+    const rct::xmr_amount amount,
+    const uint8_t hf_version,
+    const bool is_coinbase,
+    const bool is_unmixable_sweep = false,
+    const carrot::AddressDeriveType addr_derive_type = carrot::AddressDeriveType::Auto)
+{
+    cryptonote::transaction tx;
+    const carrot::CarrotDestinationV1 bob_destination = gen_destination_to(bob, addr_type, addr_derive_type);
+    if (is_coinbase)
+    {
+        const cryptonote::account_public_address addr
+            = carrot::mock::convert_destination_v1(bob.cryptonote_address({}, addr_derive_type), 0).addr;
+        tx = mock::construct_miner_tx_fake_reward_1out(carrot::mock::gen_block_index(),
+            amount, addr, hf_version);
+    }
+    if (hf_version < HF_VERSION_FCMP_PLUS_PLUS)
+    {
+        std::vector<cryptonote::tx_destination_entry> dst{
+            carrot::mock::convert_destination_v1(bob_destination, amount)};
+        tx = mock::construct_pre_carrot_tx_with_fake_inputs(dst, 2304, hf_version, is_unmixable_sweep);
+    }
+    else if (hf_version <= HF_VERSION_FCMP_PLUS_PLUS + 1)
+    {
+        cryptonote::account_base aether;
+        aether.generate();
+        std::vector<carrot::CarrotPaymentProposalV1> normal_payment_proposals{carrot::CarrotPaymentProposalV1{
+            .destination = bob_destination,
+            .amount = amount,
+            .randomness = carrot::gen_janus_anchor()
+        }};
+        tx = mock::construct_carrot_pruned_transaction_fake_inputs(normal_payment_proposals, {}, aether.get_keys());
+    }
+    else
+    {
+        ASSERT_MES_AND_THROW("unrecognized HF version: " << hf_version);
+    }
+
+    const wallet2_basic::transfer_container scanned_transfers = hot_scan_into_transfer_details(bob, tx);
+    CHECK_AND_ASSERT_THROW_MES(scanned_transfers.size() == 1, "unexpected scanned transfers size");
+    return scanned_transfers.at(0);
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 static carrot::mock::mock_carrot_and_legacy_keys make_hot_keys(const carrot::mock::mock_carrot_and_legacy_keys &cold)
 {
     carrot::mock::mock_carrot_and_legacy_keys hot = cold;
-    hot.legacy_acb.set_spend_key(crypto::null_skey);
+    hot.legacy_acb.forget_spend_key();
     hot.k_prove_spend = crypto::null_skey;
     return hot;
 }
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
-TEST(wallet_hot_cold, scan_export_import_simple)
+//                                  hf ver, miner, unmix sweep
+static const std::vector<std::tuple<uint8_t, bool, bool>> enote_types_to_test{
+    {1, true, false},
+    {1, false, false},
+    {1, false, true},
+    {HF_VERSION_DYNAMIC_FEE, true, false},
+    {HF_VERSION_DYNAMIC_FEE, false, false},
+    {HF_VERSION_SMALLER_BP, false, false},
+    {HF_VERSION_VIEW_TAGS, true, false},
+    {HF_VERSION_VIEW_TAGS, false, true},
+    {HF_VERSION_VIEW_TAGS, false, false},
+    {HF_VERSION_CARROT, true, false},
+    {HF_VERSION_CARROT, false, false},
+};
+} //anonymous namespace
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_hot_cold, export_import_simple)
 {
     // Test that hot wallet can scan enotes, export to cold wallet, and generate key images:
     //   a. pre-ringct coinbase
@@ -106,309 +217,1380 @@ TEST(wallet_hot_cold, scan_export_import_simple)
     //   j. carrot v1 normal
     //   k. carrot v1 special
     //   l. carrot v1 internal (@TODO)
+    //   m. carrot v1 normal subaddress
+    //   n. carrot v1 normal integrated
+    //   o. carrot v1 special subaddress
+    //   p. carrot v1 internal subaddress (@TODO)
     //
-    // All enotes are addressed to the main address in 2-out noin-coinbase txs or 1-out coinbase txs.
+    // All enotes are addressed to the main address in 2-out non-coinbase txs or 1-out coinbase txs.
     // We also don't test reorgs here.
 
-    carrot::mock::mock_carrot_and_legacy_keys bob;
-    bob.generate();
+    carrot::mock::mock_carrot_and_legacy_keys bob_cold;
+    bob_cold.generate();
+    const cryptonote::account_public_address bob_addr = bob_cold.legacy_acb.get_keys().m_account_address;
 
+    carrot::mock::mock_carrot_and_legacy_keys bob_hot = make_hot_keys(bob_cold);
 
-    size_t old_num_m_transfers = 0;
-    const auto verify_sals_of_recent_transfers = [&w, &old_num_m_transfers]() -> bool
+    const auto verify_cold_sal = [&bob_cold](const wallet2_basic::transfer_details &td)
+        -> std::optional<crypto::key_image>
     {
-        // assert m_transfers is monotonic (may change if internal design of wallet2 changes)
-        size_t prev_blk_idx = 0;
-        size_t prev_rct_output_idx = 0;
-        for (const tools::wallet2::transfer_details &td : w.m_transfers)
-        {
-            CHECK_AND_ASSERT_THROW_MES(td.m_block_height >= prev_blk_idx, "m_transfers not monotonic");
-            prev_blk_idx = td.m_block_height;
-            if (td.m_rct)
-            {
-                CHECK_AND_ASSERT_THROW_MES(td.m_global_output_index >= prev_rct_output_idx, "m_transfers not monotonic");
-                prev_rct_output_idx = td.m_global_output_index;
-            }
-        }
-
         const crypto::hash signable_tx_hash = crypto::rand<crypto::hash>();
 
-        // note: will skip reorged transfers unless we set num_m_transfers
-        const size_t new_num_m_transfers = w.m_transfers.size();
-        for (size_t i = old_num_m_transfers; i < new_num_m_transfers; ++i)
+        const carrot::OutputOpeningHintVariant opening_hint
+            = tools::wallet::make_sal_opening_hint_from_transfer_details(td);
+
+        const FcmpRerandomizedOutputCompressed rerandomized_output = fcmp_pp::rerandomize_output(
+            onetime_address_ref(opening_hint),
+            amount_commitment_ref(opening_hint),
+            carrot::use_biased_hash_to_point(opening_hint));
+
+        fcmp_pp::FcmpPpSalProof sal_proof;
+        crypto::key_image spent_key_image;
+        try
         {
-            old_num_m_transfers = new_num_m_transfers; // skip failed SA/Ls for future calls
-
-            LOG_PRINT_L2("Creating & verifying SA/L proof on m_transfers.at(" << i << ")");
-            const tools::wallet2::transfer_details &td = w.m_transfers.at(i);
-
-            const cryptonote::account_keys &acc = w.get_account().get_keys();
-
-            const carrot::OutputOpeningHintVariant opening_hint =
-                tools::wallet::make_sal_opening_hint_from_transfer_details(
-                    td,
-                    acc.m_view_secret_key,
-                    acc.get_device());
-
-            const FcmpRerandomizedOutputCompressed rerandomized_output = fcmp_pp::rerandomize_output(
-                onetime_address_ref(opening_hint),
-                rct::rct2pt(amount_commitment_ref(opening_hint)));
-
-            const carrot::CarrotOpenableRerandomizedOutputV1 openable_rerandomized_output{
-                .rerandomized_output = rerandomized_output,
-                .opening_hint = opening_hint
-            };
-
-            //! @TODO: carrot hierarchy
-            const carrot::cryptonote_hierarchy_address_device_ram_borrowed addr_dev(
-                acc.m_account_address.m_spend_public_key,
-                acc.m_view_secret_key);
-
-            fcmp_pp::FcmpPpSalProof sal_proof;
-            crypto::key_image spent_key_image;
             carrot::make_sal_proof_any_to_legacy_v1(signable_tx_hash,
-                openable_rerandomized_output,
-                acc.m_spend_secret_key,
-                addr_dev,
+                rerandomized_output,
+                opening_hint,
+                bob_cold.legacy_acb.get_keys().m_spend_secret_key,
+                bob_cold.cn_addr_dev,
                 sal_proof,
                 spent_key_image);
-
-            if (spent_key_image != td.m_key_image)
-                return false; // fail verify
-
-            if (!fcmp_pp::verify_sal(signable_tx_hash,
-                    rerandomized_output.input,
-                    spent_key_image,
-                    sal_proof))
-                return false; // fail verify
+        }
+        catch (...)
+        {
+            return std::nullopt;
         }
 
-        return true;
+        if (!fcmp_pp::verify_sal(signable_tx_hash,
+                rerandomized_output.input,
+                spent_key_image,
+                sal_proof))
+            return std::nullopt;
+
+        return spent_key_image;
     };
 
-    // a. push block containing a pre-ringct coinbase output to wallet
-    bc.add_block(1, {}, main_addr);
-
     // a. scan pre-ringct coinbase tx
-    auto balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(mock::fake_pruned_blockchain::miner_reward, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
-
-    // b. construct and push a pre-ringct tx
-    const rct::xmr_amount amount_b = rct::randXmrAmount(COIN);
     {
-        const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount reward = 42;
+        const std::uint64_t global_output_index = 300;
+        const cryptonote::transaction tx = mock::construct_miner_tx_fake_reward_1out(
+            block_index,
+            reward,
+            bob_addr,
+            /*hf_version=*/1,
+            /*num_tx_outputs=*/1
+        );
+        ASSERT_EQ(1, tx.version);
+        ASSERT_EQ(block_index + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
+    }
+
+    // b. pre-ringct tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const rct::xmr_amount fee = 42;
+        const std::uint64_t global_output_index = 400;
         std::vector<cryptonote::tx_destination_entry> dests = {
-            cryptonote::tx_destination_entry(amount_b, acc_keys.m_account_address, false)};
-        cryptonote::transaction curr_tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(
             dests,
             fee,
             /*hf_version=*/1);
-        ASSERT_FALSE(cryptonote::is_coinbase(curr_tx));
-        ASSERT_EQ(1, curr_tx.version);
-        ASSERT_EQ(rct::RCTTypeNull, curr_tx.rct_signatures.type);
-        ASSERT_EQ(typeid(cryptonote::txout_to_key), curr_tx.vout.at(0).target.type());
-        ASSERT_EQ(amount_b, curr_tx.vout.at(0).amount);
-        bc.add_block(1, {std::move(curr_tx)}, mock::null_addr);
+        ASSERT_EQ(1, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
-    // b. scan pre-ringct tx
-    balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(amount_b, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
-
-    // c. construct and push a ringct coinbase tx
-    bc.add_block(HF_VERSION_DYNAMIC_FEE, {}, main_addr);
+    // c. ringct coinbase tx
     {
-        auto top_block = bc.get_parsed_block(bc.height() - 1);
-        const cryptonote::transaction &top_miner_tx = top_block.block.miner_tx;
-        ASSERT_EQ(2, top_miner_tx.version);
-        ASSERT_NE(0, top_miner_tx.vout.size());
-        ASSERT_EQ(rct::RCTTypeNull, top_miner_tx.rct_signatures.type);
-        ASSERT_EQ(0, top_miner_tx.signatures.size());
-        ASSERT_EQ(mock::fake_pruned_blockchain::miner_reward, top_miner_tx.vout.at(0).amount);
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount reward = 42;
+        const std::uint64_t global_output_index = 500;
+        const cryptonote::transaction tx = mock::construct_miner_tx_fake_reward_1out(
+            block_index,
+            reward,
+            bob_addr,
+            /*hf_version=*/HF_VERSION_DYNAMIC_FEE,
+            /*num_tx_outputs=*/1
+        );
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(block_index + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
-    // c. scan ringct coinbase tx
-    balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(mock::fake_pruned_blockchain::miner_reward, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
-
-    // d. construct and push a ringct long-amount tx
-    const rct::xmr_amount amount_d = rct::randXmrAmount(COIN);
+    // d. ringct long-amount tx
     {
-        const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const rct::xmr_amount fee = 42;
+        const std::uint64_t global_output_index = 600;
         std::vector<cryptonote::tx_destination_entry> dests = {
-            cryptonote::tx_destination_entry(amount_d, acc_keys.m_account_address, false)};
-        cryptonote::transaction curr_tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(
             dests,
             fee,
             HF_VERSION_DYNAMIC_FEE);
-        ASSERT_FALSE(cryptonote::is_coinbase(curr_tx));
-        ASSERT_EQ(2, curr_tx.version);
-        ASSERT_EQ(rct::RCTTypeFull, curr_tx.rct_signatures.type);
-        ASSERT_EQ(typeid(cryptonote::txout_to_key), curr_tx.vout.at(0).target.type());
-        ASSERT_EQ(0, curr_tx.vout.at(0).amount);
-        bc.add_block(HF_VERSION_DYNAMIC_FEE, {std::move(curr_tx)}, mock::null_addr);
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
-    // d. scan ringct long-amount tx
-    balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(amount_d, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
-
-    // e. construct and push a ringct short-amount tx
-    const rct::xmr_amount amount_e = rct::randXmrAmount(COIN);
+    // e. ringct short-amount tx
     {
-        const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const rct::xmr_amount fee = 42;
+        const std::uint64_t global_output_index = 700;
         std::vector<cryptonote::tx_destination_entry> dests = {
-            cryptonote::tx_destination_entry(amount_e, acc_keys.m_account_address, false)};
-        cryptonote::transaction curr_tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(
             dests,
             fee,
             HF_VERSION_SMALLER_BP);
-        ASSERT_FALSE(cryptonote::is_coinbase(curr_tx));
-        ASSERT_EQ(2, curr_tx.version);
-        ASSERT_EQ(rct::RCTTypeBulletproof2, curr_tx.rct_signatures.type);
-        ASSERT_EQ(typeid(cryptonote::txout_to_key), curr_tx.vout.at(0).target.type());
-        ASSERT_EQ(0, curr_tx.vout.at(0).amount);
-        bc.add_block(HF_VERSION_SMALLER_BP, {std::move(curr_tx)}, mock::null_addr);
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
-    // e. scan ringct short-amount tx
-    balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(amount_e, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
-
-    // f. construct and push a view-tagged ringct coinbase tx
-    bc.add_block(HF_VERSION_VIEW_TAGS, {}, main_addr);
+    // f. view-tagged ringct coinbase tx
     {
-        auto top_block = bc.get_parsed_block(bc.height() - 1);
-        const cryptonote::transaction &top_miner_tx = top_block.block.miner_tx;
-        ASSERT_EQ(2, top_miner_tx.version);
-        ASSERT_EQ(1, top_miner_tx.vout.size());
-        ASSERT_EQ(rct::RCTTypeNull, top_miner_tx.rct_signatures.type);
-        ASSERT_EQ(0, top_miner_tx.signatures.size());
-        ASSERT_EQ(typeid(cryptonote::txout_to_tagged_key), top_miner_tx.vout.at(0).target.type());
-        ASSERT_EQ(mock::fake_pruned_blockchain::miner_reward, top_miner_tx.vout.at(0).amount);
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount reward = 42;
+        const std::uint64_t global_output_index = 800;
+        const cryptonote::transaction tx = mock::construct_miner_tx_fake_reward_1out(
+            block_index,
+            reward,
+            bob_addr,
+            /*hf_version=*/HF_VERSION_VIEW_TAGS,
+            /*num_tx_outputs=*/1
+        );
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(block_index + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
-    // f. scan view-tagged ringct coinbase tx
-    balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(mock::fake_pruned_blockchain::miner_reward, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
-
-    // g. construct and push a view-tagged pre-ringct (only possible in unmixable sweep txs) tx
-    const rct::xmr_amount amount_g = rct::randXmrAmount(COIN);
+    // g. view-tagged pre-ringct (only possible in unmixable sweep txs) tx
     {
-        const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const rct::xmr_amount fee = 42;
+        const std::uint64_t global_output_index = 900;
         std::vector<cryptonote::tx_destination_entry> dests = {
-            cryptonote::tx_destination_entry(amount_g, acc_keys.m_account_address, false)};
-        cryptonote::transaction curr_tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(
             dests,
             fee,
             HF_VERSION_VIEW_TAGS,
             /*sweep_unmixable_override=*/true);
-        ASSERT_FALSE(cryptonote::is_coinbase(curr_tx));
-        ASSERT_EQ(1, curr_tx.version);
-        ASSERT_EQ(rct::RCTTypeNull, curr_tx.rct_signatures.type);
-        ASSERT_EQ(typeid(cryptonote::txout_to_tagged_key), curr_tx.vout.at(0).target.type());
-        ASSERT_EQ(amount_g, curr_tx.vout.at(0).amount);
-        bc.add_block(HF_VERSION_VIEW_TAGS, {std::move(curr_tx)}, mock::null_addr);
+        ASSERT_EQ(1, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
-    // g. scan view-tagged pre-ringct (only possible in unmixable sweep txs) tx
-    balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(amount_g, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
-
-    // h. construct and push a view-tagged ringct tx
-    const rct::xmr_amount amount_h = rct::randXmrAmount(COIN);
+    // h. view-tagged ringct tx
     {
-        const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const rct::xmr_amount fee = 42;
+        const std::uint64_t global_output_index = 1000;
         std::vector<cryptonote::tx_destination_entry> dests = {
-            cryptonote::tx_destination_entry(amount_h, acc_keys.m_account_address, false)};
-        cryptonote::transaction curr_tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(
             dests,
             fee,
-            HF_VERSION_VIEW_TAGS);
-        ASSERT_FALSE(cryptonote::is_coinbase(curr_tx));
-        ASSERT_EQ(2, curr_tx.version);
-        ASSERT_EQ(rct::RCTTypeBulletproofPlus, curr_tx.rct_signatures.type);
-        ASSERT_EQ(typeid(cryptonote::txout_to_tagged_key), curr_tx.vout.at(0).target.type());
-        ASSERT_EQ(0, curr_tx.vout.at(0).amount);
-        bc.add_block(HF_VERSION_VIEW_TAGS, {std::move(curr_tx)}, mock::null_addr);
+            HF_VERSION_VIEW_TAGS,
+            /*sweep_unmixable_override=*/false);
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
-    // h. scan ringct view-tagged ringct tx
-    balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(amount_h, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
-
-    // i. construct and push a carrot v1 coinbase tx
-    bc.add_block(HF_VERSION_CARROT, {}, main_addr);
+    // i. carrot v1 coinbase tx
     {
-        auto top_block = bc.get_parsed_block(bc.height() - 1);
-        const cryptonote::transaction &top_miner_tx = top_block.block.miner_tx;
-        ASSERT_EQ(2, top_miner_tx.version);
-        ASSERT_EQ(1, top_miner_tx.vout.size());
-        ASSERT_EQ(rct::RCTTypeNull, top_miner_tx.rct_signatures.type);
-        ASSERT_EQ(0, top_miner_tx.signatures.size());
-        ASSERT_EQ(typeid(cryptonote::txout_to_carrot_v1), top_miner_tx.vout.at(0).target.type());
-        ASSERT_EQ(mock::fake_pruned_blockchain::miner_reward, top_miner_tx.vout.at(0).amount);
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount reward = 42;
+        const std::uint64_t global_output_index = 1100;
+        const cryptonote::transaction tx = mock::construct_miner_tx_fake_reward_1out(
+            block_index,
+            reward,
+            bob_addr,
+            /*hf_version=*/HF_VERSION_CARROT,
+            /*num_tx_outputs=*/1
+        );
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(block_index + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
-    // i. scan carrot v1 coinbase tx
-    balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(mock::fake_pruned_blockchain::miner_reward, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
-
-    // j. construct and push a carrot v1 normal tx
-    const rct::xmr_amount amount_j = rct::randXmrAmount(COIN);
+    // j. carrot v1 normal tx
     {
+        cryptonote::account_base aether;
+        aether.generate();
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const std::uint64_t global_output_index = 1000;
         std::vector<cryptonote::tx_destination_entry> dests = {
-            cryptonote::tx_destination_entry(amount_j, acc_keys.m_account_address, false)};
-        cryptonote::transaction curr_tx = mock::construct_carrot_pruned_transaction_fake_inputs(
-            {carrot::mock::convert_normal_payment_proposal_v1(dests.front())},
-            /*selfsend_payment_proposals=*/{},
-            acc_keys);
-        ASSERT_FALSE(cryptonote::is_coinbase(curr_tx));
-        ASSERT_EQ(2, curr_tx.version);
-        ASSERT_EQ(rct::RCTTypeFcmpPlusPlus, curr_tx.rct_signatures.type);
-        ASSERT_EQ(typeid(cryptonote::txout_to_carrot_v1), curr_tx.vout.at(0).target.type());
-        ASSERT_EQ(0, curr_tx.vout.at(0).amount);
-        bc.add_block(HF_VERSION_CARROT, {std::move(curr_tx)}, mock::null_addr);
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            {{carrot::mock::convert_normal_payment_proposal_v1(dests.front()), /*main*/}},
+            {},
+            aether.get_keys());
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(2, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
-    // j. scan carrot v1 normal tx
-    balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(amount_j, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
-
-    // k. construct and push a carrot v1 special tx
-    const rct::xmr_amount amount_k = rct::randXmrAmount(COIN);
+    // k. carrot v1 special tx
     {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const std::uint64_t global_output_index = 1000;
         std::vector<cryptonote::tx_destination_entry> dests = {
-            cryptonote::tx_destination_entry(amount_k, acc_keys.m_account_address, false)};
-        cryptonote::transaction curr_tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
             /*normal_payment_proposals=*/{},
-            {{carrot::mock::convert_selfsend_payment_proposal_v1(dests.front()), {/*main*/}}},
-            acc_keys);
-        ASSERT_FALSE(cryptonote::is_coinbase(curr_tx));
-        ASSERT_EQ(2, curr_tx.version);
-        ASSERT_EQ(rct::RCTTypeFcmpPlusPlus, curr_tx.rct_signatures.type);
-        ASSERT_EQ(2, curr_tx.vout.size());
-        ASSERT_EQ(typeid(cryptonote::txout_to_carrot_v1), curr_tx.vout.at(0).target.type());
-        ASSERT_EQ(0, curr_tx.vout.at(0).amount);
-        bc.add_block(HF_VERSION_CARROT, {std::move(curr_tx)}, mock::null_addr);
+            {selfsend_core_to_verifiable_v1(carrot::mock::convert_selfsend_payment_proposal_v1(dests.front()), {})},
+            bob_hot.legacy_acb.get_keys());
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(2, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(2, scanned_enotes.size()); // b/c transfer always adds a self-send
+        const wallet2_basic::transfer_details &dest_enote = (scanned_enotes.front().amount() == amount)
+            ? scanned_enotes.front() : scanned_enotes.back();
+        EXPECT_TRUE(verify_cold_sal(dest_enote));
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(dest_enote, bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
-    // k. scan carrot v1 special tx
-    balance_diff = wallet_process_new_blocks();
-    EXPECT_EQ(amount_k, balance_diff);
-    EXPECT_TRUE(verify_sals_of_recent_transfers());
+    // l. carrot v1 internal (@TODO)
 
-    // assert we did all SA/L proving
-    ASSERT_EQ(w.m_transfers.size(), old_num_m_transfers);
+    // m. carrot v1 normal tx subaddress
+    {
+        cryptonote::account_base aether;
+        aether.generate();
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const std::uint64_t global_output_index = 1000;
+        const carrot::subaddress_index_extended bob_subaddr_index{
+            .index = carrot::mock::gen_subaddress_index(),
+            .derive_type = carrot::AddressDeriveType::PreCarrot};
+        const carrot::CarrotDestinationV1 bob_subaddr = bob_hot.subaddress(bob_subaddr_index);
+        const cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            {{bob_subaddr, amount, carrot::gen_janus_anchor()}},
+            {},
+            aether.get_keys());
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(2, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
+    }
+
+    // n. carrot v1 normal integrated
+    {
+        cryptonote::account_base aether;
+        aether.generate();
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const std::uint64_t global_output_index = 1000;
+        const carrot::CarrotDestinationV1 bob_integrated_addr = bob_hot.cryptonote_address(carrot::gen_payment_id(),
+            carrot::AddressDeriveType::PreCarrot);
+        const cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            {{bob_integrated_addr, amount, carrot::gen_janus_anchor()}},
+            {},
+            aether.get_keys());
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(2, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
+    }
+
+    // o. carrot v1 special subaddress
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const std::uint64_t global_output_index = 1000;
+        const carrot::subaddress_index_extended bob_subaddr_index{
+            .index = carrot::mock::gen_subaddress_index(),
+            .derive_type = carrot::AddressDeriveType::PreCarrot};
+        const carrot::CarrotDestinationV1 bob_subaddr = bob_hot.subaddress(bob_subaddr_index);
+        const carrot::CarrotPaymentProposalVerifiableSelfSendV1 selfsend_proposal{
+            .destination_address_spend_pubkey = bob_subaddr.address_spend_pubkey,
+            .subaddr_index = bob_subaddr_index,
+            .amount = amount,
+            .enote_type = carrot::CarrotEnoteType::PAYMENT
+        };
+        const cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            /*normal_payment_proposals=*/{},
+            {selfsend_proposal},
+            bob_hot.legacy_acb.get_keys());
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(2, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(2, scanned_enotes.size()); // b/c transfer always adds a self-send
+        const wallet2_basic::transfer_details &dest_enote = (scanned_enotes.front().amount() == amount)
+            ? scanned_enotes.front() : scanned_enotes.back();
+        EXPECT_TRUE(verify_cold_sal(dest_enote));
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(dest_enote, bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_cold_sal(imported_td));
+    }
+
+    // p. carrot v1 internal subaddress (@TODO)
 }
-//----------------------------------------------------------------------------------------------------------------------
+
+namespace
+{
+template <typename T>
+static bool verify_serialization_completeness(T v)
+{
+    std::stringstream ss;
+    binary_archive<true> sar(ss);
+    if (!::serialization::serialize(sar, v))
+        return false;
+    const std::string blob = ss.str();
+    binary_archive<false> lar(epee::to_byte_span(epee::to_span(blob)));
+    T lv;
+    if (!::serialization::serialize(lar, lv))
+        return false;
+    return lv == v;
+}
+}
+
+TEST(wallet_hot_cold, export_serialization_completeness)
+{
+    // Test serialization completeness for the following exported enote types:
+    //   a. pre-ringct coinbase
+    //   b. pre-ringct
+    //   c. ringct coinbase
+    //   d. ringct long-amount
+    //   e. ringct short-amount
+    //   f. view-tagged ringct coinbase
+    //   g. view-tagged pre-ringct (only possible in unmixable sweep txs)
+    //   h. view-tagged ringct
+    //   i. carrot v1 coinbase
+    //   j. carrot v1 normal
+    //   k. carrot v1 special
+    //   l. carrot v1 internal (@TODO)
+    //   m. carrot v1 normal subaddress
+    //   n. carrot v1 normal integrated
+    //   o. carrot v1 special subaddress
+    //   p. carrot v1 internal subaddress (@TODO)
+
+    carrot::mock::mock_carrot_and_legacy_keys bob_cold;
+    bob_cold.generate();
+    const cryptonote::account_public_address bob_addr = bob_cold.legacy_acb.get_keys().m_account_address;
+
+    carrot::mock::mock_carrot_and_legacy_keys bob_hot = make_hot_keys(bob_cold);
+
+    // a. scan pre-ringct coinbase tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount reward = 42;
+        const std::uint64_t global_output_index = 300;
+        const cryptonote::transaction tx = mock::construct_miner_tx_fake_reward_1out(
+            block_index,
+            reward,
+            bob_addr,
+            /*hf_version=*/1,
+            /*num_tx_outputs=*/1
+        );
+        ASSERT_EQ(1, tx.version);
+        ASSERT_EQ(block_index + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // b. pre-ringct tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const rct::xmr_amount fee = 42;
+        const std::uint64_t global_output_index = 400;
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            /*hf_version=*/1);
+        ASSERT_EQ(1, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // c. ringct coinbase tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount reward = 42;
+        const std::uint64_t global_output_index = 500;
+        const cryptonote::transaction tx = mock::construct_miner_tx_fake_reward_1out(
+            block_index,
+            reward,
+            bob_addr,
+            /*hf_version=*/HF_VERSION_DYNAMIC_FEE,
+            /*num_tx_outputs=*/1
+        );
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(block_index + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // d. ringct long-amount tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const rct::xmr_amount fee = 42;
+        const std::uint64_t global_output_index = 600;
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            HF_VERSION_DYNAMIC_FEE);
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // e. ringct short-amount tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const rct::xmr_amount fee = 42;
+        const std::uint64_t global_output_index = 700;
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            HF_VERSION_SMALLER_BP);
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // f. view-tagged ringct coinbase tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount reward = 42;
+        const std::uint64_t global_output_index = 800;
+        const cryptonote::transaction tx = mock::construct_miner_tx_fake_reward_1out(
+            block_index,
+            reward,
+            bob_addr,
+            /*hf_version=*/HF_VERSION_VIEW_TAGS,
+            /*num_tx_outputs=*/1
+        );
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(block_index + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // g. view-tagged pre-ringct (only possible in unmixable sweep txs) tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const rct::xmr_amount fee = 42;
+        const std::uint64_t global_output_index = 900;
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            HF_VERSION_VIEW_TAGS,
+            /*sweep_unmixable_override=*/true);
+        ASSERT_EQ(1, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // h. view-tagged ringct tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const rct::xmr_amount fee = 42;
+        const std::uint64_t global_output_index = 1000;
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            HF_VERSION_VIEW_TAGS,
+            /*sweep_unmixable_override=*/false);
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_pre_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // i. carrot v1 coinbase tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount reward = 42;
+        const std::uint64_t global_output_index = 1100;
+        const cryptonote::transaction tx = mock::construct_miner_tx_fake_reward_1out(
+            block_index,
+            reward,
+            bob_addr,
+            /*hf_version=*/HF_VERSION_CARROT,
+            /*num_tx_outputs=*/1
+        );
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(block_index + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(1, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // j. carrot v1 normal tx
+    {
+        cryptonote::account_base aether;
+        aether.generate();
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const std::uint64_t global_output_index = 1000;
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            {{carrot::mock::convert_normal_payment_proposal_v1(dests.front()), /*main*/}},
+            {},
+            aether.get_keys());
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(2, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // k. carrot v1 special tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const std::uint64_t global_output_index = 1000;
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount, bob_addr, false)};
+        const cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            /*normal_payment_proposals=*/{},
+            {selfsend_core_to_verifiable_v1(carrot::mock::convert_selfsend_payment_proposal_v1(dests.front()), {})},
+            bob_hot.legacy_acb.get_keys());
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(2, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(2, scanned_enotes.size()); // b/c transfer always adds a self-send
+        const wallet2_basic::transfer_details &dest_enote = (scanned_enotes.front().amount() == amount)
+            ? scanned_enotes.front() : scanned_enotes.back();
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(dest_enote, bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // l. carrot v1 internal (@TODO)
+
+    // m. carrot v1 normal subaddress tx
+    {
+        cryptonote::account_base aether;
+        aether.generate();
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const std::uint64_t global_output_index = 1000;
+        const carrot::subaddress_index_extended bob_subaddr_index{
+            .index = carrot::mock::gen_subaddress_index(),
+            .derive_type = carrot::AddressDeriveType::PreCarrot};
+        const carrot::CarrotDestinationV1 bob_subaddr = bob_hot.subaddress(bob_subaddr_index);
+        const cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            {{bob_subaddr, amount, carrot::gen_janus_anchor()}},
+            {},
+            aether.get_keys());
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(2, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // n. carrot v1 normal integrated tx
+    {
+        cryptonote::account_base aether;
+        aether.generate();
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const std::uint64_t global_output_index = 1000;
+        const carrot::CarrotDestinationV1 bob_integrated_addr = bob_hot.cryptonote_address(carrot::gen_payment_id(),
+            carrot::AddressDeriveType::PreCarrot);
+        const cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            {{bob_integrated_addr, amount, carrot::gen_janus_anchor()}},
+            {},
+            aether.get_keys());
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(2, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(1, scanned_enotes.size());
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // o. carrot v1 special subaddress tx
+    {
+        const std::uint64_t block_index = 21;
+        const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+        const std::uint64_t global_output_index = 1000;
+        const carrot::subaddress_index_extended bob_subaddr_index{
+            .index = carrot::mock::gen_subaddress_index(),
+            .derive_type = carrot::AddressDeriveType::PreCarrot};
+        const carrot::CarrotDestinationV1 bob_subaddr = bob_hot.subaddress(bob_subaddr_index);
+        const carrot::CarrotPaymentProposalVerifiableSelfSendV1 selfsend_proposal{
+            .destination_address_spend_pubkey = bob_subaddr.address_spend_pubkey,
+            .subaddr_index = bob_subaddr_index,
+            .amount = amount,
+            .enote_type = carrot::CarrotEnoteType::PAYMENT
+        };
+        const cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            /*normal_payment_proposals=*/{},
+            {selfsend_proposal},
+            bob_hot.legacy_acb.get_keys());
+        ASSERT_EQ(2, tx.version);
+        ASSERT_EQ(0, tx.unlock_time);
+        ASSERT_EQ(1, tx.vin.size());
+        ASSERT_EQ(2, tx.vout.size());
+        const wallet2_basic::transfer_container scanned_enotes =
+            hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
+        ASSERT_EQ(2, scanned_enotes.size()); // b/c transfer always adds a self-send
+        const wallet2_basic::transfer_details &dest_enote = (scanned_enotes.front().amount() == amount)
+            ? scanned_enotes.front() : scanned_enotes.back();
+        const tools::wallet::cold::exported_carrot_transfer_details etd
+            = tools::wallet::cold::export_cold_carrot_output(dest_enote, bob_hot.cn_addr_dev);
+        const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
+            bob_cold.cn_addr_dev,
+            bob_cold.key_image_dev.get());
+        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(verify_serialization_completeness(etd));
+    }
+
+    // p. carrot v1 internal subaddress tx (@TODO)
+}
+
+TEST(wallet_hot_cold, sign_transfer_stateless_1in_cryptonote_spender)
+{
+    // For all input enote types, all input address types, and all output address types, do the following:
+    //    1. Alice (hot): Create a transfer-type tx proposal from Alice to Bob
+    //    2. Alice (hot): Make an unsigned tx set
+    //    3. Alice (cold): Sign tx set
+    //    4. Alice (hot): Finalize enotes into pruned tx
+    //    5. Bob: Verify SA/Ls
+    //    6. Bob: Scan enotes
+
+    carrot::mock::mock_carrot_and_legacy_keys alice;
+    alice.generate();
+    carrot::mock::mock_carrot_and_legacy_keys bob;
+    bob.generate();
+
+    // input: [1, 2) XMR
+    // output: [0, 1] XMR
+    const rct::xmr_amount input_amount = COIN + rct::randXmrAmount(COIN);
+    const rct::xmr_amount output_amount = rct::randXmrAmount(COIN);
+
+    // for all input enotes type...
+    for (const auto &input_enote_type : enote_types_to_test)
+    {
+        const std::uint8_t input_hf_version = std::get<0>(input_enote_type);
+        const bool input_is_coinbase = std::get<1>(input_enote_type);
+        const bool input_is_unmixable_sweep = std::get<2>(input_enote_type);
+        // for all address types to the input enote...
+        for (AddressType input_addr_type = AddressType::MIN; input_addr_type <= AddressType::MAX; ++input_addr_type)
+        {
+            if (input_is_coinbase && input_addr_type != AddressType::MAIN)
+                continue;
+
+            const wallet2_basic::transfer_details alice_input_transfer = gen_transfer_details_to(alice,
+                input_addr_type,
+                input_amount,
+                input_hf_version,
+                input_is_coinbase,
+                input_is_unmixable_sweep,
+                carrot::AddressDeriveType::PreCarrot);
+            const carrot::OutputOpeningHintVariant alice_input_proposal = tools::wallet::make_sal_opening_hint_from_transfer_details(alice_input_transfer);
+            ASSERT_EQ(input_hf_version >= HF_VERSION_CARROT, std::holds_alternative<carrot::CarrotOutputOpeningHintV2>(alice_input_proposal));
+
+            // for all address types to the output enote...
+            for (AddressType output_addr_type = AddressType::MIN; output_addr_type <= AddressType::MAX; ++output_addr_type)
+            {
+                MDEBUG("wallet_hot_cold.sign_transfer_stateless_1in_cryptonote_spender:");
+                MDEBUG("    input-enote-hf-version  : " << (int)input_hf_version);
+                MDEBUG("    input-is-coinbase       : " << input_is_coinbase);
+                MDEBUG("    input-is-unmixable-sweep: " << input_is_unmixable_sweep);
+                MDEBUG("    input-addr-type         : " << (int)input_addr_type);
+                MDEBUG("    output-addr-type        : " << (int)output_addr_type);
+                MDEBUG("");
+
+                // 1. Alice (hot): Create a transfer-type tx proposal from Alice to Bob
+                const carrot::CarrotDestinationV1 bob_destination = gen_destination_to(bob, output_addr_type, carrot::AddressDeriveType::PreCarrot);
+                const carrot::CarrotPaymentProposalV1 bob_payment_proposal = carrot::CarrotPaymentProposalV1{
+                    .destination = bob_destination,
+                    .amount = output_amount,
+                    .randomness = carrot::gen_janus_anchor()
+                };
+                carrot::CarrotTransactionProposalV1 og_tx_proposal;
+                carrot::make_carrot_transaction_proposal_v1_transfer({bob_payment_proposal},
+                    /*selfsend_payment_proposals=*/{},
+                    mock::fake_fee_per_weight,
+                    /*extra=*/{},
+                    carrot::select_inputs_func_t([&](const boost::multiprecision::uint128_t&,
+                        const std::map<std::size_t, rct::xmr_amount>&,
+                        const std::size_t,
+                        const std::size_t,
+                        std::vector<carrot::CarrotSelectedInput> &selected_in)
+                        { selected_in = {{input_amount, alice_input_proposal}}; }),
+                    alice.legacy_acb.get_keys().m_account_address.m_spend_public_key,
+                    {{0, 0}, carrot::AddressDeriveType::PreCarrot},
+                    /*subtractable_normal_payment_proposals=*/{},
+                    /*subtractable_selfsend_payment_proposals=*/{},
+                    og_tx_proposal);
+
+                // 2. Alice (hot): Make an unsigned tx set
+                const auto cold_tx_proposal = tools::wallet::cold::compress_carrot_transaction_proposal_lossy(
+                    og_tx_proposal, crypto::rand<tools::wallet::cold::HotColdSeed>());
+                const tools::wallet::cold::UnsignedCarrotTransactionSetV1 unsigned_tx_set{
+                    .tx_proposals = {cold_tx_proposal},
+                    .new_transfers = {tools::wallet::cold::export_cold_output(alice_input_transfer, alice.cn_addr_dev)},
+                    .starting_transfer_index = 0,
+                    .resend_tx_proposals = true
+                };
+
+                // 3. Alice (cold): Sign tx set
+                const crypto::secret_key &alice_k_s = alice.legacy_acb.get_keys().m_spend_secret_key;
+                const crypto::secret_key &alice_k_v = alice.legacy_acb.get_keys().m_view_secret_key;
+                tools::wallet::cold::SignedCarrotTransactionSetV1 signed_tx_set;
+                std::unordered_map<crypto::hash, std::vector<crypto::secret_key>> ephemeral_tx_privkeys;
+                tools::wallet::cold::sign_carrot_tx_set_v1(unsigned_tx_set,
+                    {},
+                    alice.cn_addr_dev,
+                    carrot::spend_device_ram_borrowed(alice_k_s, alice_k_v),
+                    signed_tx_set,
+                    ephemeral_tx_privkeys);
+
+                // 4. Alice (hot): Finalize enotes into pruned tx
+                ASSERT_EQ(1, signed_tx_set.tx_proposals.size());
+                ASSERT_EQ(1, signed_tx_set.signed_inputs.size());
+                const auto &signed_input = *signed_tx_set.signed_inputs.cbegin();
+                ASSERT_EQ(onetime_address_ref(alice_input_proposal), signed_input.second.first);
+                std::unordered_map<crypto::public_key, crypto::key_image> cold_kis{
+                    {onetime_address_ref(alice_input_proposal), signed_input.first}};
+                const carrot::key_image_device_precompted precomputed_ki_dev(std::move(cold_kis));
+                carrot::CarrotTransactionProposalV1 expanded_tx_proposal;
+                std::vector<crypto::key_image> input_key_images;
+                std::vector<FcmpRerandomizedOutputCompressed> rerandomized_outputs;
+                tools::wallet::cold::expand_carrot_transaction_proposal_and_rerandomized_outputs (signed_tx_set.tx_proposals.at(0),
+                    [&](const auto &){ return alice_input_proposal; },
+                    alice.cn_addr_dev,
+                    precomputed_ki_dev,
+                    expanded_tx_proposal,
+                    input_key_images,
+                    rerandomized_outputs);
+                ASSERT_EQ(1, input_key_images.size());
+                ASSERT_EQ(1, rerandomized_outputs.size());
+                const FcmpInputCompressed &input = rerandomized_outputs.at(0).input;
+                cryptonote::transaction pruned_tx;
+                carrot::make_pruned_transaction_from_proposal_v1(expanded_tx_proposal,
+                    nullptr,
+                    &alice.cn_addr_dev,
+                    input_key_images,
+                    pruned_tx);
+
+                // 5. Bob: Verify SA/Ls
+                const crypto::hash signable_tx_hash = carrot::calculate_signable_fcmp_pp_transaction_hash(pruned_tx);
+                ASSERT_TRUE(fcmp_pp::verify_sal(signable_tx_hash,
+                    input,
+                    boost::get<cryptonote::txin_to_key>(pruned_tx.vin.at(0)).k_image,
+                    signed_input.second.second));
+
+                // 6. Bob: Scan enotes
+                const auto bob_output_transfers = hot_scan_into_transfer_details(bob, pruned_tx);
+                ASSERT_EQ(1, bob_output_transfers.size());
+                ASSERT_EQ(output_amount, bob_output_transfers.at(0).amount());
+            }
+        }
+    }
+}
+
+TEST(wallet_hot_cold, sign_transfer_noresend_1in_cryptonote_spender)
+{
+    // For all input enote types, all input address types, and all output address types, do the following:
+    //    1. Alice (hot): Create a transfer-type tx proposal from Alice to Bob
+    //    2. Alice (hot): Make an unsigned tx set
+    //    3. Alice (hot): Remember tx proposal
+    //    4. Alice (cold): Sign tx set (and do not resend tx proposal)
+    //    5. Alice (hot): Finalize enotes into pruned tx
+    //    6. Bob: Verify SA/Ls
+    //    7. Bob: Scan enotes
+
+    carrot::mock::mock_carrot_and_legacy_keys alice;
+    alice.generate();
+    carrot::mock::mock_carrot_and_legacy_keys bob;
+    bob.generate();
+
+    // input: [1, 2) XMR
+    // output: [0, 1] XMR
+    const rct::xmr_amount input_amount = COIN + rct::randXmrAmount(COIN);
+    const rct::xmr_amount output_amount = rct::randXmrAmount(COIN);
+
+    // for all input enotes type...
+    for (const auto &input_enote_type : enote_types_to_test)
+    {
+        const std::uint8_t input_hf_version = std::get<0>(input_enote_type);
+        const bool input_is_coinbase = std::get<1>(input_enote_type);
+        const bool input_is_unmixable_sweep = std::get<2>(input_enote_type);
+        // for all address types to the input enote...
+        for (AddressType input_addr_type = AddressType::MIN; input_addr_type <= AddressType::MAX; ++input_addr_type)
+        {
+            if (input_is_coinbase && input_addr_type != AddressType::MAIN)
+                continue;
+
+            const wallet2_basic::transfer_details alice_input_transfer = gen_transfer_details_to(alice,
+                input_addr_type,
+                input_amount,
+                input_hf_version,
+                input_is_coinbase,
+                input_is_unmixable_sweep,
+                carrot::AddressDeriveType::PreCarrot);
+            const carrot::OutputOpeningHintVariant alice_input_proposal = tools::wallet::make_sal_opening_hint_from_transfer_details(alice_input_transfer);
+            ASSERT_EQ(input_hf_version >= HF_VERSION_CARROT, std::holds_alternative<carrot::CarrotOutputOpeningHintV2>(alice_input_proposal));
+
+            // for all address types to the output enote...
+            for (AddressType output_addr_type = AddressType::MIN; output_addr_type <= AddressType::MAX; ++output_addr_type)
+            {
+                MDEBUG("wallet_hot_cold.sign_transfer_noresend_1in_cryptonote_spender:");
+                MDEBUG("    input-enote-hf-version  : " << (int)input_hf_version);
+                MDEBUG("    input-is-coinbase       : " << input_is_coinbase);
+                MDEBUG("    input-is-unmixable-sweep: " << input_is_unmixable_sweep);
+                MDEBUG("    input-addr-type         : " << (int)input_addr_type);
+                MDEBUG("    output-addr-type        : " << (int)output_addr_type);
+                MDEBUG("");
+
+                // 1. Alice (hot): Create a transfer-type tx proposal from Alice to Bob
+                const carrot::CarrotDestinationV1 bob_destination = gen_destination_to(bob, output_addr_type, carrot::AddressDeriveType::PreCarrot);
+                const carrot::CarrotPaymentProposalV1 bob_payment_proposal = carrot::CarrotPaymentProposalV1{
+                    .destination = bob_destination,
+                    .amount = output_amount,
+                    .randomness = carrot::gen_janus_anchor()
+                };
+                carrot::CarrotTransactionProposalV1 og_tx_proposal;
+                carrot::make_carrot_transaction_proposal_v1_transfer({bob_payment_proposal},
+                    /*selfsend_payment_proposals=*/{},
+                    mock::fake_fee_per_weight,
+                    /*extra=*/{},
+                    carrot::select_inputs_func_t([&](const boost::multiprecision::uint128_t&,
+                        const std::map<std::size_t, rct::xmr_amount>&,
+                        const std::size_t,
+                        const std::size_t,
+                        std::vector<carrot::CarrotSelectedInput> &selected_in)
+                        { selected_in = {{input_amount, alice_input_proposal}}; }),
+                    alice.legacy_acb.get_keys().m_account_address.m_spend_public_key,
+                    {{0, 0}, carrot::AddressDeriveType::PreCarrot},
+                    /*subtractable_normal_payment_proposals=*/{},
+                    /*subtractable_selfsend_payment_proposals=*/{},
+                    og_tx_proposal);
+
+                // 2. Alice (hot): Make an unsigned tx set
+                const auto cold_tx_proposal = tools::wallet::cold::compress_carrot_transaction_proposal_lossy(
+                    og_tx_proposal, crypto::rand<tools::wallet::cold::HotColdSeed>());
+                const tools::wallet::cold::UnsignedCarrotTransactionSetV1 unsigned_tx_set{
+                    .tx_proposals = {cold_tx_proposal},
+                    .new_transfers = {tools::wallet::cold::export_cold_output(alice_input_transfer, alice.cn_addr_dev)},
+                    .starting_transfer_index = 0,
+                    .resend_tx_proposals = false //! @note: this param differentiates this test from previous tests
+                };
+
+                // 3. Alice (hot): Remember tx proposal
+                // *Alice thinks very hard...*
+
+                // 4. Alice (cold): Sign tx set
+                const crypto::secret_key &alice_k_s = alice.legacy_acb.get_keys().m_spend_secret_key;
+                const crypto::secret_key &alice_k_v = alice.legacy_acb.get_keys().m_view_secret_key;
+                tools::wallet::cold::SignedCarrotTransactionSetV1 signed_tx_set;
+                std::unordered_map<crypto::hash, std::vector<crypto::secret_key>> ephemeral_tx_privkeys;
+                tools::wallet::cold::sign_carrot_tx_set_v1(unsigned_tx_set,
+                    {},
+                    alice.cn_addr_dev,
+                    carrot::spend_device_ram_borrowed(alice_k_s, alice_k_v),
+                    signed_tx_set,
+                    ephemeral_tx_privkeys);
+
+                // 5. Alice (hot): Finalize enotes into pruned tx
+                ASSERT_EQ(0, signed_tx_set.tx_proposals.size()); // no resend
+                ASSERT_EQ(1, signed_tx_set.signed_inputs.size());
+                const auto &signed_input = *signed_tx_set.signed_inputs.cbegin();
+                ASSERT_EQ(onetime_address_ref(alice_input_proposal), signed_input.second.first);
+                std::unordered_map<crypto::public_key, crypto::key_image> cold_kis{
+                    {onetime_address_ref(alice_input_proposal), signed_input.first}};
+                const carrot::key_image_device_precompted precomputed_ki_dev(std::move(cold_kis));
+                carrot::CarrotTransactionProposalV1 expanded_tx_proposal;
+                std::vector<crypto::key_image> input_key_images;
+                std::vector<FcmpRerandomizedOutputCompressed> rerandomized_outputs;
+                tools::wallet::cold::expand_carrot_transaction_proposal_and_rerandomized_outputs (
+                    cold_tx_proposal,
+                    [&](const auto &){ return alice_input_proposal; },
+                    alice.cn_addr_dev,
+                    precomputed_ki_dev,
+                    expanded_tx_proposal,
+                    input_key_images,
+                    rerandomized_outputs);
+                ASSERT_EQ(1, input_key_images.size());
+                ASSERT_EQ(1, rerandomized_outputs.size());
+                const FcmpInputCompressed &input = rerandomized_outputs.at(0).input;
+                cryptonote::transaction pruned_tx;
+                carrot::make_pruned_transaction_from_proposal_v1(expanded_tx_proposal,
+                    nullptr,
+                    &alice.cn_addr_dev,
+                    input_key_images,
+                    pruned_tx);
+
+                // 6. Bob: Verify SA/Ls
+                const crypto::hash signable_tx_hash = carrot::calculate_signable_fcmp_pp_transaction_hash(pruned_tx);
+                ASSERT_TRUE(fcmp_pp::verify_sal(signable_tx_hash,
+                    input,
+                    boost::get<cryptonote::txin_to_key>(pruned_tx.vin.at(0)).k_image,
+                    signed_input.second.second));
+
+                // 7. Bob: Scan enotes
+                const auto bob_output_transfers = hot_scan_into_transfer_details(bob, pruned_tx);
+                ASSERT_EQ(1, bob_output_transfers.size());
+                ASSERT_EQ(output_amount, bob_output_transfers.at(0).amount());
+            }
+        }
+    }
+}
+
+TEST(wallet_hot_cold, sign_transfer_coldinit_1in_cryptonote_spender)
+{
+    // For all input enote types, all input address types, and all output address types, do the following:
+    //    1. Alice (hot): Generate input transfers
+    //    2. Alice (hot): Export transfers to cold
+    //    3. Alice (cold): Make tx proposal and sign
+    //    4. Alice (hot): Finalize enotes into pruned tx
+    //    5. Bob: Verify SA/Ls
+    //    6. Bob: Scan enotes
+    // This tests "cold-side initiated" transaction construction
+
+    carrot::mock::mock_carrot_and_legacy_keys alice_cold;
+    alice_cold.generate();
+    carrot::mock::mock_carrot_and_legacy_keys alice_hot = make_hot_keys(alice_cold);
+    carrot::mock::mock_carrot_and_legacy_keys bob;
+    bob.generate();
+
+    // input: [1, 2) XMR
+    // output: [0, 1] XMR
+    const rct::xmr_amount input_amount = COIN + rct::randXmrAmount(COIN);
+    const rct::xmr_amount output_amount = rct::randXmrAmount(COIN);
+
+    // for all input enotes type...
+    for (const auto &input_enote_type : enote_types_to_test)
+    {
+        const std::uint8_t input_hf_version = std::get<0>(input_enote_type);
+        const bool input_is_coinbase = std::get<1>(input_enote_type);
+        const bool input_is_unmixable_sweep = std::get<2>(input_enote_type);
+        // for all address types to the input enote...
+        for (AddressType input_addr_type = AddressType::MIN; input_addr_type <= AddressType::MAX; ++input_addr_type)
+        {
+            if (input_is_coinbase && input_addr_type != AddressType::MAIN)
+                continue;
+
+            // 1. Alice (hot): Generate input transfers
+            // 2. Alice (hot): Export transfers to cold
+            const auto exported_output = tools::wallet::cold::export_cold_output(
+                gen_transfer_details_to(
+                    alice_hot,
+                    input_addr_type,
+                    input_amount,
+                    input_hf_version,
+                    input_is_coinbase,
+                    input_is_unmixable_sweep,
+                    carrot::AddressDeriveType::PreCarrot),
+                alice_hot.cn_addr_dev);            
+            // import output
+            const wallet2_basic::transfer_details alice_imported_transfer = tools::wallet::cold::import_cold_output(
+                exported_output, alice_cold.cn_addr_dev, alice_cold.key_image_dev.get());
+
+            // for all address types to the output enote...
+            for (AddressType output_addr_type = AddressType::MIN; output_addr_type <= AddressType::MAX; ++output_addr_type)
+            {
+                MDEBUG("wallet_hot_cold.sign_transfer_stateless_1in_cryptonote_spender:");
+                MDEBUG("    input-enote-hf-version  : " << (int)input_hf_version);
+                MDEBUG("    input-is-coinbase       : " << input_is_coinbase);
+                MDEBUG("    input-is-unmixable-sweep: " << input_is_unmixable_sweep);
+                MDEBUG("    input-addr-type         : " << (int)input_addr_type);
+                MDEBUG("    output-addr-type        : " << (int)output_addr_type);
+                MDEBUG("");
+
+                // 3. Alice (cold): Make tx proposal and sign
+                const carrot::CarrotDestinationV1 bob_destination = gen_destination_to(bob,
+                    output_addr_type, carrot::AddressDeriveType::PreCarrot);
+                const carrot::CarrotPaymentProposalV1 bob_payment_proposal = carrot::CarrotPaymentProposalV1{
+                    .destination = bob_destination,
+                    .amount = output_amount,
+                    .randomness = carrot::gen_janus_anchor()
+                };
+                const carrot::InputProposalV1 alice_input_proposal =
+                    tools::wallet::make_sal_opening_hint_from_transfer_details(alice_imported_transfer);
+                carrot::CarrotTransactionProposalV1 og_tx_proposal;
+                carrot::make_carrot_transaction_proposal_v1_transfer({bob_payment_proposal},
+                    /*selfsend_payment_proposals=*/{},
+                    mock::fake_fee_per_weight,
+                    /*extra=*/{},
+                    carrot::select_inputs_func_t([input_amount, &alice_input_proposal](
+                        const boost::multiprecision::uint128_t&,
+                        const std::map<std::size_t, rct::xmr_amount>&,
+                        const std::size_t,
+                        const std::size_t,
+                        std::vector<carrot::CarrotSelectedInput> &selected_in)
+                        { selected_in = {
+                            {input_amount, alice_input_proposal}}; }),
+                    alice_cold.legacy_acb.get_keys().m_account_address.m_spend_public_key,
+                    {{0, 0}, carrot::AddressDeriveType::PreCarrot},
+                    /*subtractable_normal_payment_proposals=*/{},
+                    /*subtractable_selfsend_payment_proposals=*/{},
+                    og_tx_proposal);
+                const tools::wallet::cold::HotColdCarrotTransactionProposalV1 cold_tx_proposal =
+                    tools::wallet::cold::compress_carrot_transaction_proposal_lossy(
+                        og_tx_proposal,
+                        crypto::rand<tools::wallet::cold::HotColdSeed>());
+                tools::wallet::cold::UnsignedCarrotTransactionSetV1 unsigned_tx_set{
+                    .tx_proposals = {cold_tx_proposal},
+                    .resend_tx_proposals = true
+                };
+                const crypto::secret_key &alice_k_s = alice_cold.legacy_acb.get_keys().m_spend_secret_key;
+                const crypto::secret_key &alice_k_v = alice_cold.legacy_acb.get_keys().m_view_secret_key;
+                tools::wallet::cold::SignedCarrotTransactionSetV1 signed_tx_set;
+                std::unordered_map<crypto::hash, std::vector<crypto::secret_key>> ephemeral_tx_privkeys;
+                tools::wallet::cold::sign_carrot_tx_set_v1(unsigned_tx_set,
+                    [&alice_input_proposal](auto){return alice_input_proposal;},
+                    alice_cold.cn_addr_dev,
+                    carrot::spend_device_ram_borrowed(alice_k_s, alice_k_v),
+                    signed_tx_set,
+                    ephemeral_tx_privkeys);
+
+                // 4. Alice (hot): Finalize enotes into pruned tx
+                ASSERT_EQ(1, signed_tx_set.tx_proposals.size());
+                ASSERT_EQ(1, signed_tx_set.signed_inputs.size());
+                const auto &signed_input = *signed_tx_set.signed_inputs.cbegin();
+                ASSERT_EQ(onetime_address_ref(alice_input_proposal), signed_input.second.first);
+                std::unordered_map<crypto::public_key, crypto::key_image> cold_kis{
+                    {onetime_address_ref(alice_input_proposal), signed_input.first}};
+                const carrot::key_image_device_precompted precomputed_ki_dev(std::move(cold_kis));
+                carrot::CarrotTransactionProposalV1 expanded_tx_proposal;
+                std::vector<crypto::key_image> input_key_images;
+                std::vector<FcmpRerandomizedOutputCompressed> rerandomized_outputs;
+                tools::wallet::cold::expand_carrot_transaction_proposal_and_rerandomized_outputs (signed_tx_set.tx_proposals.at(0),
+                    [&](const auto &){ return alice_input_proposal; },
+                    alice_hot.cn_addr_dev,
+                    precomputed_ki_dev,
+                    expanded_tx_proposal,
+                    input_key_images,
+                    rerandomized_outputs);
+                ASSERT_EQ(1, input_key_images.size());
+                ASSERT_EQ(1, rerandomized_outputs.size());
+                const FcmpInputCompressed &input = rerandomized_outputs.at(0).input;
+                cryptonote::transaction pruned_tx;
+                carrot::make_pruned_transaction_from_proposal_v1(expanded_tx_proposal,
+                    nullptr,
+                    &alice_hot.cn_addr_dev,
+                    input_key_images,
+                    pruned_tx);
+
+                // 5. Bob: Verify SA/Ls
+                const crypto::hash signable_tx_hash = carrot::calculate_signable_fcmp_pp_transaction_hash(pruned_tx);
+                ASSERT_TRUE(fcmp_pp::verify_sal(signable_tx_hash,
+                    input,
+                    boost::get<cryptonote::txin_to_key>(pruned_tx.vin.at(0)).k_image,
+                    signed_input.second.second));
+
+                // 6. Bob: Scan enotes
+                const auto bob_output_transfers = hot_scan_into_transfer_details(bob, pruned_tx);
+                ASSERT_EQ(1, bob_output_transfers.size());
+                ASSERT_EQ(output_amount, bob_output_transfers.at(0).amount());
+            }
+        }
+    }
+}

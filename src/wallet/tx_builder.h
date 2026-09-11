@@ -34,6 +34,7 @@
 #include "carrot_impl/spend_device.h"
 #include "carrot_impl/subaddress_map.h"
 #include "fcmp_pp/tree_cache.h"
+#include "ringct/rctTypes.h"
 #include "wallet2_basic/wallet2_types.h"
 
 //third party headers
@@ -94,6 +95,9 @@ using tx_reconstruct_variant_t = std::variant<
         PreCarrotTransactionProposal,
         carrot::CarrotTransactionProposalV1
     >;
+/// original user-supplied destinations (AKA not split and no change) [requires view-incoming key]
+std::vector<cryptonote::tx_destination_entry> user_destinations(const tx_reconstruct_variant_t&,
+    const carrot::view_incoming_key_device &k_view_dev);
 /// destinations for finalized enote (AKA split and w/ change) [requires view-incoming key]
 std::vector<cryptonote::tx_destination_entry> finalized_destinations(const tx_reconstruct_variant_t&,
     const carrot::view_incoming_key_device &k_view_dev);
@@ -108,10 +112,15 @@ std::optional<crypto::hash8> short_payment_id(const tx_reconstruct_variant_t&);
 std::optional<crypto::hash> long_payment_id(const tx_reconstruct_variant_t&);
 /// "true-spend" one-time addresses in inputs (in proposal order, not final tx order)
 std::vector<crypto::public_key> spent_onetime_addresses(const tx_reconstruct_variant_t&);
-/// sum total of input amounts
-boost::multiprecision::uint128_t input_amount_total(const tx_reconstruct_variant_t&);
+/// input amounts (in proposal order, not final tx order)
+std::vector<rct::xmr_amount> input_amounts(const tx_reconstruct_variant_t&,
+    const carrot::address_device &addr_dev,
+    const carrot::view_balance_secret_device *s_view_balance_dev,
+    const carrot::view_incoming_key_device *k_view_incoming_dev);
 /// ring sizes (in proposal order, not final tx order)
 std::vector<std::uint64_t> ring_sizes(const tx_reconstruct_variant_t&);
+/// sum total of input amounts
+boost::multiprecision::uint128_t input_amount_total(const tx_reconstruct_variant_t&);
 /// unlock time
 std::uint64_t unlock_time(const tx_reconstruct_variant_t&);
 /// extra tx fields (includes PIDs and enote ephemeral pubkeys in pre-Carrot ONLY)
@@ -133,8 +142,6 @@ struct pending_tx
     std::vector<cryptonote::tx_destination_entry> dests;
     std::vector<multisig_sig> multisig_sigs;
     crypto::secret_key multisig_tx_key_entropy;
-    uint32_t subaddr_account;            // subaddress account of your wallet to be used in this transfer
-    std::set<uint32_t> subaddr_indices;  // set of address indices used as inputs in this transfer
 
     tx_reconstruct_variant_t construction_data;
 };
@@ -142,9 +149,12 @@ struct pending_tx
 /**
  * @brief Index transfers by OTA, including a burning bug filter
  * @param transfers -
+ * @param include_spent whether to include entries whose OTA is marked as spent
+ * @return map of one-time address -> index inside of `transfers` to best entry for given OTA
  */
 std::unordered_map<crypto::public_key, size_t> collect_non_burned_transfers_by_onetime_address(
-    const wallet2_basic::transfer_container &transfers);
+    const wallet2_basic::transfer_container &transfers,
+    const bool include_spent = false);
 /**
  * @brief Filter and convert wallet2 transfer contain into carrot input candidates
  * @param transfers wallet2 incoming transfers list
@@ -254,6 +264,7 @@ std::vector<carrot::CarrotTransactionProposalV1> make_carrot_transaction_proposa
 carrot::OutputOpeningHintVariant make_sal_opening_hint_from_transfer_details(const wallet2_basic::transfer_details &td);
 /**
  * @brief Get index into transfers list of spent enotes in a potential transaction
+ * @param onetime_addresses -
  * @param tx_construction_data -
  * @param transfers -
  * @return list of spent input enotes indices in construction-specified order, not necessarily final transaction order
@@ -266,8 +277,22 @@ carrot::OutputOpeningHintVariant make_sal_opening_hint_from_transfer_details(con
  * to store openings for the pseudo output amount commitments. This isn't an issue w/ spending
  * Carrot enotes since Carrot mitigates the burning bug statelessly.
  */
+std::vector<std::size_t> collect_selected_transfer_indices(epee::span<const crypto::public_key> onetime_address,
+    const wallet2_basic::transfer_container &transfers);
 std::vector<std::size_t> collect_selected_transfer_indices(const tx_reconstruct_variant_t &tx_construction_data,
     const wallet2_basic::transfer_container &transfers);
+/**
+ * @brief Collect subaddress index info about selected transfers for a tx proposal
+ * @param tx_construction_data tx proposal to pull input info from
+ * @param transfers existing transfer list used for `tx_construction_data` (optional for Carrot)
+ * @param[out] subaddr_account major subaddress index shared b/t inputs
+ * @param[out] subaddr_indices set of minor subaddress indices used in inputs
+ * @throw if 0 inputs, mixed major subaddress indices, or cannot find pre-Carrot info in `transfers`
+ */
+void collect_selected_transfer_subaddress_info(const tx_reconstruct_variant_t &tx_construction_data,
+    const wallet2_basic::transfer_container &transfers,
+    std::uint32_t &subaddr_account,
+    std::set<std::uint32_t> &subaddr_indices);
 /**
  * @brief Finalize FCMPs and BP+ range proofs for output amounts for Carrot/FCMP++ txs
  * @param sorted_input_key_images - key images in input order
@@ -282,7 +307,7 @@ std::vector<std::size_t> collect_selected_transfer_indices(const tx_reconstruct_
 cryptonote::transaction finalize_fcmps_and_range_proofs(
     const std::vector<crypto::key_image> &sorted_input_key_images,
     const std::vector<FcmpRerandomizedOutputCompressed> &sorted_rerandomized_outputs,
-    const fcmp_pp::OutputPair &sorted_output_pairs,
+    const std::vector<fcmp_pp::OutputPair> &sorted_output_pairs,
     const std::vector<fcmp_pp::FcmpPpSalProof> &sorted_sal_proofs,
     const std::vector<carrot::RCTOutputEnoteProposal> &output_enote_proposals,
     const carrot::encrypted_payment_id_t &encrypted_payment_id,

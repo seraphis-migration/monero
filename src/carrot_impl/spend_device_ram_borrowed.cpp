@@ -34,6 +34,7 @@
 #include "carrot_core/device_ram_borrowed.h"
 #include "carrot_core/exceptions.h"
 #include "key_image_device_composed.h"
+#include "knowledge_proof_utils.h"
 #include "misc_log_ex.h"
 #include "tx_builder_inputs.h"
 #include "tx_builder_outputs.h"
@@ -164,6 +165,17 @@ bool spend_device_ram_borrowed::try_sign_carrot_transaction_proposal_v1(
         CARROT_CHECK_AND_THROW(ki == p.first,
             carrot::component_out_of_order, "key image mismatch during SA/L proving")
     }
+
+    return true;
+}
+//-------------------------------------------------------------------------------------------------------------------
+bool spend_device_ram_borrowed::try_make_key_image_association_proof(const OutputOpeningHintVariant &opening_hint,
+    crypto::key_image &key_image_out,
+    KeyImageProofVariant &ki_proof_out) const
+{
+    prove_key_image_proof(opening_hint, *this->m_address_dev, this->m_s_view_balance_dev.get(),
+        *this->m_k_view_incoming_dev, this->m_privkey_g, this->m_privkey_t, ki_proof_out,
+        key_image_out);
 
     return true;
 }

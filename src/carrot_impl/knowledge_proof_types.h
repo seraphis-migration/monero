@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2024, The Monero Project
+// Copyright (c) 2026, The Monero Project
 //
 // All rights reserved.
 //
@@ -25,50 +25,27 @@
 // INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-// Parts of this file are originally copyright (c) 2012-2013 The Cryptonote developers
 
-#include "wallet/api/wallet2_api.h"
-#include "wallet/hot_cold.h"
+#pragma once
 
-#include <string>
-#include <vector>
+//local headers
+#include "fcmp_pp/fcmp_pp_types.h"
 
+//third party headers
 
-namespace Monero {
+//standard headers
+#include <variant>
 
-class WalletImpl;
-class UnsignedTransactionImpl : public UnsignedTransaction
+//forward declarations
+
+namespace carrot
 {
-public:
-    UnsignedTransactionImpl(WalletImpl &wallet);
-    ~UnsignedTransactionImpl();
-    int status() const override;
-    std::string errorString() const override;
-    std::vector<uint64_t> amount() const override;
-    std::vector<uint64_t> fee() const override;
-    std::vector<uint64_t> mixin() const override;
-    std::vector<std::string> paymentId() const override;
-    std::vector<std::string> recipientAddress() const override;
-    uint64_t txCount() const override;
-    // sign txs and save to file
-    bool sign(const std::string &signedFileName) override;
-    std::string confirmationMessage() const override {return m_confirmationMessage;}
-    uint64_t minMixinCount() const override;
-
-private:
-    // Callback function to check all loaded tx's and generate confirmationMessage
-    void checkLoadedTx(const std::string &extra_message);
-
-    friend class WalletImpl;
-    WalletImpl &m_wallet;
-
-    int  m_status;
-    std::string m_errorString;
-    tools::wallet::cold::UnsignedTransactionSetVariant m_unsigned_tx_set;
-    std::vector<tools::wallet::tx_reconstruct_variant_t> m_tx_proposals;
-    std::string m_confirmationMessage;
-};
-
-
-}
+/**
+ * @brief Variation between any key image association proof
+ */
+using KeyImageProofVariant = std::variant<
+        crypto::signature,       // prove L = x Hp(O), s.t. O = x G
+        fcmp_pp::FcmpPpSalProof  // prove L = x Hp(O), s.t. O = x G + y T
+        //! @TODO: variant which allows k_gi proving without knowledge of k_ps
+    >;
+} //namespace carrot

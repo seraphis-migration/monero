@@ -358,6 +358,7 @@ cryptonote::transaction construct_pre_carrot_tx_with_fake_inputs(
     std::vector<stripped_down_tx_source_entry_t> &&stripped_sources,
     std::vector<cryptonote::tx_destination_entry> &destinations,
     const boost::optional<cryptonote::account_public_address> &change_addr,
+    const crypto::hash &payment_id,
     const rct::xmr_amount fee,
     const uint8_t hf_version,
     const bool sweep_unmixable_override)
@@ -369,7 +370,7 @@ cryptonote::transaction construct_pre_carrot_tx_with_fake_inputs(
         std::forward<std::vector<stripped_down_tx_source_entry_t>>(stripped_sources),
         destinations,
         change_addr,
-        crypto::null_hash,
+        payment_id,
         fee,
         hf_version,
         dummy_main_tx_privkey,
@@ -379,6 +380,7 @@ cryptonote::transaction construct_pre_carrot_tx_with_fake_inputs(
 //----------------------------------------------------------------------------------------------------------------------
 cryptonote::transaction construct_pre_carrot_tx_with_fake_inputs(
     std::vector<cryptonote::tx_destination_entry> &destinations,
+    const crypto::hash &payment_id,
     const rct::xmr_amount fee,
     const uint8_t hf_version,
     const bool sweep_unmixable_override)
@@ -394,6 +396,20 @@ cryptonote::transaction construct_pre_carrot_tx_with_fake_inputs(
         /*stripped_sources=*/{},
         destinations,
         /*change_addr*/boost::none,
+        payment_id,
+        fee,
+        hf_version,
+        sweep_unmixable_override);
+}
+//----------------------------------------------------------------------------------------------------------------------
+cryptonote::transaction construct_pre_carrot_tx_with_fake_inputs(
+    std::vector<cryptonote::tx_destination_entry> &destinations,
+    const rct::xmr_amount fee,
+    const uint8_t hf_version,
+    const bool sweep_unmixable_override)
+{
+    return construct_pre_carrot_tx_with_fake_inputs(destinations,
+        crypto::null_hash,
         fee,
         hf_version,
         sweep_unmixable_override);

@@ -1,4 +1,4 @@
-# Copyright (c) 2024, The Monero Project
+# Copyright (c) 2024-2026, The Monero Project
 #
 # All rights reserved.
 #
@@ -34,6 +34,7 @@ set(carrot_impl_sources
   input_selection.cpp
   key_image_device_composed.cpp
   key_image_device_precomputed.cpp
+  knowledge_proof_utils.cpp
   multi_tx_proposal_utils.cpp
   output_opening_types.cpp
   spend_device_ram_borrowed.cpp
