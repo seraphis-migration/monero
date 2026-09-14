@@ -38,6 +38,7 @@
 #include "carrot_impl/multi_tx_proposal_utils.h"
 #include "carrot_impl/tx_builder_inputs.h"
 #include "carrot_impl/tx_builder_outputs.h"
+#include "carrot_impl/tx_proposal.h"
 #include "common/apply_permutation.h"
 #include "common/perf_timer.h"
 #include "common/threadpool.h"
@@ -242,6 +243,25 @@ static carrot::InputCandidate make_input_candidate(const wallet2_basic::transfer
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+std::vector<cryptonote::tx_destination_entry> user_destinations(const tx_reconstruct_variant_t &v,
+    const carrot::view_incoming_key_device &k_view_dev)
+{
+    struct user_destinations_visitor
+    {
+        std::vector<cryptonote::tx_destination_entry> operator()(const PreCarrotTransactionProposal &p) const
+        {
+            return p.dests;
+        }
+        std::vector<cryptonote::tx_destination_entry> operator()(const carrot::CarrotTransactionProposalV1 &p) const
+        {
+            std::vector<crypto::key_image> fake_key_images(p.input_proposals.size());
+            return make_pending_carrot_tx(p, fake_key_images, k_view_dev).dests;
+        }
+        const carrot::view_incoming_key_device &k_view_dev;
+    };
+    return std::visit(user_destinations_visitor{k_view_dev}, v);
+}
+//-------------------------------------------------------------------------------------------------------------------
 std::vector<cryptonote::tx_destination_entry> finalized_destinations(const tx_reconstruct_variant_t &v,
     const carrot::view_incoming_key_device &k_view_dev)
 {
@@ -381,6 +401,74 @@ std::vector<crypto::public_key> spent_onetime_addresses(const tx_reconstruct_var
     return std::visit(spent_onetime_addresses_visitor{}, v);
 }
 //-------------------------------------------------------------------------------------------------------------------
+std::vector<rct::xmr_amount> input_amounts(const tx_reconstruct_variant_t &v,
+    const carrot::address_device &addr_dev,
+    const carrot::view_balance_secret_device *s_view_balance_dev,
+    const carrot::view_incoming_key_device *k_view_incoming_dev)
+{
+    struct input_amounts_visitor
+    {
+        std::vector<rct::xmr_amount> operator()(const PreCarrotTransactionProposal &p) const
+        {
+            std::vector<rct::xmr_amount> res;
+            res.reserve(p.sources.size());
+            for (const cryptonote::tx_source_entry &src : p.sources)
+                res.push_back(src.amount);
+            return res;
+        }
+
+        std::vector<rct::xmr_amount> operator()(const carrot::CarrotTransactionProposalV1 &p) const
+        {
+            std::vector<rct::xmr_amount> res;
+            res.reserve(p.input_proposals.size());
+            for (const carrot::InputProposalV1 &input_proposal : p.input_proposals)
+            {
+                crypto::secret_key amount_blinding_factor;
+                const bool scan_success = carrot::try_scan_opening_hint_amount(
+                    input_proposal,
+                    addr_dev,
+                    s_view_balance_dev,
+                    k_view_incoming_dev,
+                    res.emplace_back(),
+                    amount_blinding_factor);
+                CARROT_CHECK_AND_THROW(scan_success,
+                    carrot::unexpected_scan_failure, "Failed to scan output opening hint for amount");
+            }
+            return res;
+        }
+
+        const carrot::address_device &addr_dev;
+        const carrot::view_balance_secret_device *s_view_balance_dev;
+        const carrot::view_incoming_key_device *k_view_incoming_dev;
+    };
+    return std::visit(input_amounts_visitor{
+            addr_dev,
+            s_view_balance_dev,
+            k_view_incoming_dev,},
+        v);
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<std::uint64_t> ring_sizes(const tx_reconstruct_variant_t &v)
+{
+    struct ring_sizes_visitor
+    {
+        std::vector<std::uint64_t> operator()(const PreCarrotTransactionProposal &p) const
+        {
+            std::vector<std::uint64_t> res;
+            res.reserve(p.sources.size());
+            for (const cryptonote::tx_source_entry &src : p.sources)
+                res.push_back(src.outputs.size());
+            return res;
+        }
+
+        std::vector<std::uint64_t> operator()(const carrot::CarrotTransactionProposalV1 &p) const
+        {
+            return std::vector<std::uint64_t>(p.input_proposals.size());
+        }
+    };
+    return std::visit(ring_sizes_visitor{}, v);
+}
+//-------------------------------------------------------------------------------------------------------------------
 boost::multiprecision::uint128_t input_amount_total(const tx_reconstruct_variant_t &v)
 {
     struct input_amount_total_visitor
@@ -406,27 +494,6 @@ boost::multiprecision::uint128_t input_amount_total(const tx_reconstruct_variant
     return std::visit(input_amount_total_visitor{}, v);
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::vector<std::uint64_t> ring_sizes(const tx_reconstruct_variant_t &v)
-{
-    struct ring_sizes_visitor
-    {
-        std::vector<std::uint64_t> operator()(const PreCarrotTransactionProposal &p) const
-        {
-            std::vector<std::uint64_t> res;
-            res.reserve(p.sources.size());
-            for (const cryptonote::tx_source_entry &src : p.sources)
-                res.push_back(src.outputs.size());
-            return res;
-        }
-
-        std::vector<std::uint64_t> operator()(const carrot::CarrotTransactionProposalV1 &p) const
-        {
-            return std::vector<std::uint64_t>(p.input_proposals.size());
-        }
-    };
-    return std::visit(ring_sizes_visitor{}, v);
-}
-//-------------------------------------------------------------------------------------------------------------------
 std::uint64_t unlock_time(const tx_reconstruct_variant_t &v)
 {
     const PreCarrotTransactionProposal *p = std::get_if<PreCarrotTransactionProposal>(&v);
@@ -446,7 +513,8 @@ const std::vector<std::uint8_t> &extra_ref(const tx_reconstruct_variant_t &v)
 }
 //-------------------------------------------------------------------------------------------------------------------
 std::unordered_map<crypto::public_key, size_t> collect_non_burned_transfers_by_onetime_address(
-    const wallet2_basic::transfer_container &transfers)
+    const wallet2_basic::transfer_container &transfers,
+    const bool include_spent)
 {
     std::unordered_set<crypto::public_key> spent;
 
@@ -455,10 +523,13 @@ std::unordered_map<crypto::public_key, size_t> collect_non_burned_transfers_by_o
     {
         const wallet2_basic::transfer_details &td = transfers.at(i);
         const crypto::public_key ota = td.get_public_key();
-        if (td.m_spent)
-            spent.insert(ota);
-        if (spent.count(ota))
-            continue;
+        if (!include_spent)
+        {
+            if (td.m_spent)
+                spent.insert(ota);
+            if (spent.count(ota))
+                continue;
+        }
         const auto it = best_transfer_by_ota.find(ota);
         if (it == best_transfer_by_ota.end())
         {
@@ -832,23 +903,85 @@ carrot::OutputOpeningHintVariant make_sal_opening_hint_from_transfer_details(con
     }
 }
 //-------------------------------------------------------------------------------------------------------------------
-std::vector<std::size_t> collect_selected_transfer_indices(const tx_reconstruct_variant_t &tx_construction_data,
+std::vector<std::size_t> collect_selected_transfer_indices(epee::span<const crypto::public_key> onetime_address,
     const wallet2_basic::transfer_container &transfers)
 {
-    const auto best_transfer_by_ota = collect_non_burned_transfers_by_onetime_address(transfers);
+    const auto best_transfer_by_ota = collect_non_burned_transfers_by_onetime_address(transfers,
+        /*include_spent=*/true);
 
-    const std::vector<crypto::public_key> spent_otas = spent_onetime_addresses(tx_construction_data);
     std::vector<std::size_t> selected_transfer_indices;
-    selected_transfer_indices.reserve(spent_otas.size());
-    for (const crypto::public_key &spent_onetime_address : spent_otas)
+    selected_transfer_indices.reserve(onetime_address.size());
+    for (const crypto::public_key &onetime_address : onetime_address)
     {
-        const auto ota_it = best_transfer_by_ota.find(spent_onetime_address);
+        const auto ota_it = best_transfer_by_ota.find(onetime_address);
         CARROT_CHECK_AND_THROW(ota_it != best_transfer_by_ota.cend(),
-            carrot::missing_components, "missing proposed spent onetime address in transfers list");
+            carrot::missing_components, "missing one-time address in transfers list");
         selected_transfer_indices.push_back(ota_it->second);
     }
 
     return selected_transfer_indices;
+}
+//-------------------------------------------------------------------------------------------------------------------
+std::vector<std::size_t> collect_selected_transfer_indices(const tx_reconstruct_variant_t &tx_construction_data,
+    const wallet2_basic::transfer_container &transfers)
+{
+    const std::vector<crypto::public_key> spent_otas = spent_onetime_addresses(tx_construction_data);
+    return collect_selected_transfer_indices(epee::to_span(spent_otas), transfers);
+}
+//-------------------------------------------------------------------------------------------------------------------
+void collect_selected_transfer_subaddress_info(const tx_reconstruct_variant_t &tx_construction_data,
+    const wallet2_basic::transfer_container &transfers,
+    std::uint32_t &subaddr_account,
+    std::set<std::uint32_t> &subaddr_indices)
+{
+    using namespace carrot;
+
+    subaddr_account = 0;
+    subaddr_indices.clear();
+
+    std::vector<subaddress_index> subaddr_indices_list;
+    struct collect_selected_transfer_subaddress_info_visitor
+    {
+        void operator()(const PreCarrotTransactionProposal &p) const
+        {
+            const std::vector<std::size_t> selected_transfer_indices = collect_selected_transfer_indices(p, transfers);
+            subaddr_indices_list.reserve(selected_transfer_indices.size());
+            for (const std::size_t i : selected_transfer_indices)
+            {
+                const cryptonote::subaddress_index &subaddr_index = transfers.at(i).m_subaddr_index;
+                subaddr_indices_list.push_back({subaddr_index.major, subaddr_index.minor});
+            }
+        }
+
+        void operator()(const CarrotTransactionProposalV1 &p) const
+        {
+            AddressDeriveType derive_type = AddressDeriveType::Auto;
+            subaddr_indices_list.reserve(p.input_proposals.size());
+            for (const InputProposalV1 &input_proposal : p.input_proposals)
+            {
+                const subaddress_index_extended subaddr_index = subaddress_index_ref(input_proposal);
+                const bool mixed = subaddr_index.derive_type != derive_type && derive_type != AddressDeriveType::Auto;
+                derive_type = subaddr_index.derive_type;
+                CARROT_CHECK_AND_THROW(!mixed, carrot_runtime_error, "Mixed address derivation types in tx proposal");
+                subaddr_indices_list.push_back(subaddr_index.index);
+            }
+        }
+
+        std::vector<subaddress_index> &subaddr_indices_list;
+        const wallet2_basic::transfer_container &transfers;
+    };
+    std::visit(collect_selected_transfer_subaddress_info_visitor{subaddr_indices_list, transfers},
+        tx_construction_data);
+
+    CARROT_CHECK_AND_THROW(!subaddr_indices_list.empty(), too_few_inputs, "Tx proposal contains no inputs");
+    for (size_t input_idx = 0; input_idx < subaddr_indices_list.size(); ++input_idx)
+    {
+        const subaddress_index &subaddr_index = subaddr_indices_list.at(input_idx);
+        CARROT_CHECK_AND_THROW(input_idx == 0 || subaddr_account == subaddr_index.major,
+            carrot_runtime_error, "Mixed account index in tx proposal");
+        subaddr_account = subaddr_index.major;
+        subaddr_indices.insert(subaddr_index.minor);
+    }
 }
 //-------------------------------------------------------------------------------------------------------------------
 cryptonote::transaction finalize_fcmps_and_range_proofs(
@@ -1335,8 +1468,6 @@ pending_tx make_pending_carrot_tx(const carrot::CarrotTransactionProposalV1 &tx_
     ptx.dests = std::move(dests);
     ptx.multisig_sigs = {};
     ptx.multisig_tx_key_entropy = {};
-    ptx.subaddr_account = subaddr_account;
-    ptx.subaddr_indices = std::move(subaddr_indices);
     ptx.construction_data = tx_proposal;
     return ptx;
 }

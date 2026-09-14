@@ -75,6 +75,26 @@ bool verify_rerandomized_output_basic(const FcmpRerandomizedOutputCompressed &re
     const amount_commitment_t &amount_commitment,
     const bool use_biased_hash_to_point);
 /**
+ * @brief Get full openings for one-time address O = x g + y T given account private keys
+ * @param opening_hint -
+ * @param addr_dev address device
+ * @param s_view_balance_dev device for s_vb (optional)
+ * @param k_view_incoming_dev device for k_v
+ * @param account_privkey_g [legacy] k_s [carrot] k_gi
+ * @param account_privkey_t [legacy] 0 [carrot] k_ps
+ * @param[out] x_out x
+ * @param[out] y_out y
+ * @throw if scannot scan opening hint, or if full openings don't re-compute correctly
+ */
+void get_onetime_address_full_openings(const OutputOpeningHintVariant &opening_hint,
+    const address_device &addr_dev,
+    const view_balance_secret_device *s_view_balance_dev,
+    const view_incoming_key_device &k_view_incoming_dev,
+    const crypto::secret_key &account_privkey_g,
+    const crypto::secret_key &account_privkey_t,
+    crypto::secret_key &x_out,
+    crypto::secret_key &y_out);
+/**
  * @brief Prove FCMP++ SA/L signature for an enote addressed to legacy key hierarchy
  * @param signable_tx_hash FCMP++/Carrot v1 signable tx hash
  * @param rerandomized_output rerandomization of output represented by `opening_hint`

@@ -265,8 +265,10 @@ namespace cryptonote
     uint64_t get_daemon_blockchain_height(std::string& err);
     bool try_connect_to_daemon(bool silent = false, uint32_t* version = nullptr);
     bool ask_wallet_create_if_needed();
-    bool accept_loaded_tx(const std::function<size_t()> get_num_txes, const std::function<const tools::wallet2::tx_construction_data&(size_t)> &get_tx, const std::string &extra_message = std::string());
-    bool accept_loaded_tx(const tools::wallet2::unsigned_tx_set &txs);
+    bool accept_loaded_tx(const std::function<size_t()> get_num_txes, const std::function<tools::wallet::tx_reconstruct_variant_t(size_t)> &get_tx, const std::string &extra_message = std::string());
+    bool accept_loaded_tx(const tools::wallet::cold::UnsignedPreCarrotTransactionSet &txs);
+    bool accept_loaded_tx(const tools::wallet::cold::UnsignedCarrotTransactionSetV1 &txs);
+    bool accept_loaded_tx(const tools::wallet::cold::UnsignedTransactionSetVariant &txs);
     bool accept_loaded_tx(const tools::wallet2::signed_tx_set &txs);
     bool process_ring_members(const std::vector<tools::wallet2::pending_tx>& ptx_vector, std::ostream& ostr, bool verbose);
     std::string get_prompt() const;

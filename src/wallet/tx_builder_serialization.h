@@ -97,34 +97,31 @@ BEGIN_SERIALIZE_OBJECT_FN(PreCarrotTransactionProposal)
 END_SERIALIZE()
 //-------------------------------------------------------------------------------------------------------------------
 BEGIN_SERIALIZE_OBJECT_FN(pending_tx)
-    VERSION_FIELD(2)
+    VERSION_FIELD(1)
     FIELD_F(tx)
     FIELD_F(dust)
     FIELD_F(fee)
     FIELD_F(dust_added_to_fee)
     FIELD_F(change_dts)
-    if (version < 2)
-    {
-        std::vector<std::size_t> selected_transfers;
-        FIELD(selected_transfers)
-    }
+    FIELD_F(selected_transfers)
     FIELD_F(key_images)
     FIELD_F(tx_key)
     FIELD_F(additional_tx_keys)
     FIELD_F(dests)
-    if (version < 2)
+    const bool legacy_ctx_data = v.tx.version == 1
+        || (v.tx.version == 2 && v.tx.rct_signatures.type < rct::RCTTypeFcmpPlusPlus);
+    if (legacy_ctx_data)
     {
-        PreCarrotTransactionProposal pre_carrot_construction_data;
-        FIELD_N("construction_data", pre_carrot_construction_data)
-        v.construction_data = pre_carrot_construction_data;
-        v.subaddr_account = pre_carrot_construction_data.subaddr_account;
-        v.subaddr_indices = pre_carrot_construction_data.subaddr_indices;
+        PreCarrotTransactionProposal *pconstruction_data = typename Archive<W>::is_saving()
+            ? std::get_if<PreCarrotTransactionProposal>(&v.construction_data)
+            : &v.construction_data.emplace<PreCarrotTransactionProposal>();
+        if (nullptr == pconstruction_data)
+            return false;
+        FIELD_N("construction_data", *pconstruction_data)
     }
-    else // version >= 2
+    else
     {
         FIELD_F(construction_data)
-        FIELD_F(subaddr_account)
-        FIELD_F(subaddr_indices)
     }
     FIELD_F(multisig_sigs)
     if (version < 1)

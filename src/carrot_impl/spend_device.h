@@ -30,6 +30,7 @@
 
 //local headers
 #include "key_image_device.h"
+#include "knowledge_proof_types.h"
 #include "tx_proposal.h"
 
 //third party headers
@@ -60,12 +61,26 @@ struct spend_device: public key_image_device
      * @param rerandomized_outputs map of (one-time address -> rerandomized output)
      * @param[out] signable_tx_hash_out signable transaction hash (mainly useful for checking parity with device)
      * @param[out] signed_inputs_out signed input set containing key images and FCMP++ SA/L signatures
-     * @return false if spend-side user confirmation is denied or signing otherwise fails, true if signed
+     * @return false if spend-side user confirmation is denied, true if accepted and signed
      */
     virtual bool try_sign_carrot_transaction_proposal_v1(const CarrotTransactionProposalV1 &tx_proposal,
         const std::unordered_map<crypto::public_key, FcmpRerandomizedOutputCompressed> &rerandomized_outputs,
         crypto::hash &signable_tx_hash_out,
         signed_input_set_t &signed_inputs_out
     ) const = 0;
+
+    /**
+     * @brief Attempt to request key image association proof for given input
+     * @param opening_hint -
+     * @param[out] key_image_out key image associated to one-time address in `opening_hint`
+     * @param[out] ki_proof_out key image association proof for `key_image_out` and `opening_hint`
+     * @return false if spend-side user confirmation is denied, true if accepted and signed
+     *
+     * @TODO: Move this interface to `key_image_device` once there is code to prove key image
+     *        associations without knowledge of the spend key
+     */
+    virtual bool try_make_key_image_association_proof(const OutputOpeningHintVariant &opening_hint,
+        crypto::key_image &key_image_out,
+        KeyImageProofVariant &ki_proof_out) const = 0;
 };
 } //namespace carrot

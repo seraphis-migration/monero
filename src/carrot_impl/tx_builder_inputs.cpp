@@ -66,45 +66,20 @@ static void make_sal_proof_nominal_address(const crypto::hash &signable_tx_hash,
     const OutputOpeningHintVariant &opening_hint,
     const address_device &addr_dev,
     const view_balance_secret_device *s_view_balance_dev,
-    const view_incoming_key_device *k_view_incoming_dev,
+    const view_incoming_key_device &k_view_incoming_dev,
     fcmp_pp::FcmpPpSalProof &sal_proof_out,
     crypto::key_image &key_image_out)
 {
-    // O = x G + y T
     CHECK_AND_ASSERT_THROW_MES(verify_rerandomized_output_basic(rerandomized_output,
             onetime_address_ref(opening_hint),
             amount_commitment_ref(opening_hint),
             use_biased_hash_to_point(opening_hint)),
         "Could not make SA/L proof: failed to verify rerandomized output against opening hint");
 
-    // scan k^g_o, k^t_o
-    crypto::secret_key sender_extension_g;
-    crypto::secret_key sender_extension_t;
-    CHECK_AND_ASSERT_THROW_MES(try_scan_opening_hint_sender_extensions(opening_hint,
-            addr_dev,
-            s_view_balance_dev,
-            k_view_incoming_dev,
-            sender_extension_g,
-            sender_extension_t),
-        "Could not make SA/L proof: failed to scan opening hint");
-
-    // get address openings
-    crypto::secret_key address_extension_g;
-    crypto::secret_key address_scalar;
-    addr_dev.get_address_openings(subaddress_index_ref(opening_hint),
-        address_extension_g,
-        address_scalar);
-
-    // x = `account_privkey_g` * k^j_subscal + k^j_{g,addr} + k^g_o
     crypto::secret_key x;
-    sc_muladd(to_bytes(x), to_bytes(account_privkey_g),
-        to_bytes(address_scalar), to_bytes(sender_extension_g));
-    sc_add(to_bytes(x), to_bytes(x), to_bytes(address_extension_g));
-
-    // y = `account_privkey_t` * k^j_subscal + k^t_o
     crypto::secret_key y;
-    sc_muladd(to_bytes(y), to_bytes(account_privkey_t),
-        to_bytes(address_scalar), to_bytes(sender_extension_t));
+    get_onetime_address_full_openings(opening_hint, addr_dev, s_view_balance_dev,
+        k_view_incoming_dev, account_privkey_g, account_privkey_t, x, y);
 
     std::tie(sal_proof_out, key_image_out) = fcmp_pp::prove_sal(signable_tx_hash,
         x,
@@ -188,6 +163,43 @@ bool verify_rerandomized_output_basic(const FcmpRerandomizedOutputCompressed &re
     return 0 == memcmp(&recomputed_input, &rerandomized_output.input, sizeof(FcmpInputCompressed));
 }
 //-------------------------------------------------------------------------------------------------------------------
+void get_onetime_address_full_openings(const OutputOpeningHintVariant &opening_hint,
+    const address_device &addr_dev,
+    const view_balance_secret_device *s_view_balance_dev,
+    const view_incoming_key_device &k_view_incoming_dev,
+    const crypto::secret_key &account_privkey_g,
+    const crypto::secret_key &account_privkey_t,
+    crypto::secret_key &x_out,
+    crypto::secret_key &y_out)
+{
+    // scan k^g_o, k^t_o
+    crypto::secret_key sender_extension_g;
+    crypto::secret_key sender_extension_t;
+    CHECK_AND_ASSERT_THROW_MES(try_scan_opening_hint_sender_extensions(opening_hint,
+            addr_dev,
+            s_view_balance_dev,
+            &k_view_incoming_dev,
+            sender_extension_g,
+            sender_extension_t),
+        "Could not make SA/L proof: failed to scan opening hint");
+
+    // get address openings
+    crypto::secret_key address_extension_g;
+    crypto::secret_key address_scalar;
+    addr_dev.get_address_openings(subaddress_index_ref(opening_hint),
+        address_extension_g,
+        address_scalar);
+
+    // x = `account_privkey_g` * k^j_subscal + k^j_{g,addr} + k^g_o
+    sc_muladd(to_bytes(x_out), to_bytes(account_privkey_g),
+        to_bytes(address_scalar), to_bytes(sender_extension_g));
+    sc_add(to_bytes(x_out), to_bytes(x_out), to_bytes(address_extension_g));
+
+    // y = `account_privkey_t` * k^j_subscal + k^t_o
+    sc_muladd(to_bytes(y_out), to_bytes(account_privkey_t),
+        to_bytes(address_scalar), to_bytes(sender_extension_t));
+}
+//-------------------------------------------------------------------------------------------------------------------
 void make_sal_proof_any_to_legacy_v1(const crypto::hash &signable_tx_hash,
     const FcmpRerandomizedOutputCompressed &rerandomized_output,
     const OutputOpeningHintVariant &opening_hint,
@@ -203,7 +215,7 @@ void make_sal_proof_any_to_legacy_v1(const crypto::hash &signable_tx_hash,
         opening_hint,
         addr_dev,
         /*s_view_balance_dev=*/nullptr,
-        &addr_dev,
+        addr_dev,
         sal_proof_out,
         key_image_out);
 }
@@ -226,7 +238,7 @@ void make_sal_proof_any_to_carrot_v1(const crypto::hash &signable_tx_hash,
         opening_hint,
         addr_dev,
         &s_view_balance_dev,
-        &k_view_incoming_dev,
+        k_view_incoming_dev,
         sal_proof_out,
         key_image_out);
 }
@@ -249,7 +261,7 @@ void make_sal_proof_any_to_hybrid_v1(const crypto::hash &signable_tx_hash,
         opening_hint,
         addr_dev,
         s_view_balance_dev,
-        &k_view_incoming_dev,
+        k_view_incoming_dev,
         sal_proof_out,
         key_image_out);
 }

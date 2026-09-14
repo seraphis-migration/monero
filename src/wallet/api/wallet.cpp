@@ -546,8 +546,8 @@ bool WalletImpl::createWatchOnly(const std::string &path, const std::string &pas
         view_wallet->generate(path, password, address, viewkey);
 
         // Export/Import outputs
-        auto outputs = m_wallet->export_outputs(true/*all*/);
-        view_wallet->import_outputs(outputs);
+        const std::string outputs_str = m_wallet->export_outputs_to_str(/*all=*/true);
+        view_wallet->import_outputs_from_str(outputs_str);
 
         // Copy scanned blockchain
         auto bc = m_wallet->export_blockchain();
@@ -1126,12 +1126,23 @@ UnsignedTransaction *WalletImpl::loadUnsignedTx(const std::string &unsigned_file
 
     return transaction;
   }
+
+  // expand into tx proposals at load time for useful information later
+  if (!m_wallet->get_transaction_proposals_from_unsigned_tx(transaction->m_unsigned_tx_set, transaction->m_tx_proposals))
+  {
+    setStatusError(tr("Failed to expand unsigned transaction set into its usable transaction proposals"));
+    transaction->m_status = UnsignedTransaction::Status::Status_Error;
+    transaction->m_errorString = errorString();
+
+    return transaction;
+  }
   
   // Check tx data and construct confirmation message
   std::string extra_message;
-  if (!std::get<2>(transaction->m_unsigned_tx_set.transfers).empty())
-    extra_message = (boost::format("%u outputs to import. ") % (unsigned)std::get<2>(transaction->m_unsigned_tx_set.transfers).size()).str();
-  transaction->checkLoadedTx([&transaction](){return transaction->m_unsigned_tx_set.txes.size();}, [&transaction](size_t n)->const tools::wallet2::tx_construction_data&{return transaction->m_unsigned_tx_set.txes[n];}, extra_message);
+  const std::size_t n_new_outputs = num_new_outputs_ref(transaction->m_unsigned_tx_set);
+  if (n_new_outputs)
+    extra_message = (boost::format("%u outputs to import. ") % (unsigned)n_new_outputs).str();
+  transaction->checkLoadedTx(extra_message);
   setStatus(transaction->status(), transaction->errorString());
     
   return transaction;
@@ -1143,7 +1154,7 @@ bool WalletImpl::submitTransaction(const string &fileName) {
     return false;
   std::unique_ptr<PendingTransactionImpl> transaction(new PendingTransactionImpl(*this));
 
-  bool r = m_wallet->load_tx(fileName, transaction->m_pending_tx);
+  bool r = m_wallet->prepare_tx_from_signed(fileName, transaction->m_pending_tx);
   if (!r) {
     setStatus(Status_Ok, tr("Failed to load transaction from file"));
     return false;

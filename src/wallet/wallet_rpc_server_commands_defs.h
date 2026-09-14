@@ -847,9 +847,11 @@ namespace wallet_rpc
     struct response_t
     {
       std::list<std::string> tx_hash_list;
+      std::list<std::string> signable_tx_hash_list;
 
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(tx_hash_list)
+        KV_SERIALIZE_OPT(signable_tx_hash_list, std::list<std::string>())
       END_KV_SERIALIZE_MAP()
     };
     typedef epee::misc_utils::struct_init<response_t> response;
@@ -1789,6 +1791,17 @@ namespace wallet_rpc
     typedef epee::misc_utils::struct_init<response_t> response;
   };
 
+  struct signed_key_image
+  {
+    std::string key_image;
+    std::string signature;
+
+    BEGIN_KV_SERIALIZE_MAP()
+      KV_SERIALIZE(key_image)
+      KV_SERIALIZE(signature)
+    END_KV_SERIALIZE_MAP()
+  };
+
   struct COMMAND_RPC_EXPORT_KEY_IMAGES
   {
     struct request_t
@@ -1801,16 +1814,7 @@ namespace wallet_rpc
     };
     typedef epee::misc_utils::struct_init<request_t> request;
 
-    struct signed_key_image
-    {
-      std::string key_image;
-      std::string signature;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(key_image)
-        KV_SERIALIZE(signature)
-      END_KV_SERIALIZE_MAP()
-    };
+    using signed_key_image = wallet_rpc::signed_key_image;
 
     struct response_t
     {
@@ -1827,16 +1831,7 @@ namespace wallet_rpc
 
   struct COMMAND_RPC_IMPORT_KEY_IMAGES
   {
-    struct signed_key_image
-    {
-      std::string key_image;
-      std::string signature;
-
-      BEGIN_KV_SERIALIZE_MAP()
-        KV_SERIALIZE(key_image)
-        KV_SERIALIZE(signature)
-      END_KV_SERIALIZE_MAP()
-    };
+    using signed_key_image = wallet_rpc::signed_key_image;
 
     struct request_t
     {
