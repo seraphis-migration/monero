@@ -8265,31 +8265,30 @@ bool wallet2::parse_tx_from_str(const std::string &signed_tx_st, std::vector<too
 
       import_key_images_cb = [&s = s, &w = w]() -> bool
       {
-        if (!s.other_key_images.empty())
-        {
-          // from signed inputs, import {OTA -> KI} associations.
-          // we proved these to ourself by virute of A) expanding the
-          // re-randomized outputs and B) verifying the SA/Ls in
-          // finalize_signed_carrot_tx_set_v1_into_full_set().
-          std::unordered_map<crypto::public_key, crypto::key_image> signed_key_image_by_ota;
-          for (const auto &signed_input : s.signed_inputs)
-            signed_key_image_by_ota.emplace(signed_input.second.first, signed_input.first);
+        // from signed inputs, import {OTA -> KI} associations.
+        // we proved these to ourself by virute of A) expanding the
+        // re-randomized outputs and B) verifying the SA/Ls in
+        // finalize_signed_carrot_tx_set_v1_into_full_set().
+        std::unordered_map<crypto::public_key, crypto::key_image> signed_key_image_by_ota;
+        for (const auto &signed_input : s.signed_inputs)
+          signed_key_image_by_ota.emplace(signed_input.second.first, signed_input.first);
+        if (!signed_key_image_by_ota.empty())
           w.import_key_images(signed_key_image_by_ota);
 
-          // from signed tx set's other key images, collect {KI -> (OTA, KIAP)} into [(KI, KIAP)], [OTA]
-          std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> signed_key_images;
-          std::vector<crypto::public_key> associated_onetime_addresses;
-          signed_key_images.reserve(s.other_key_images.size());
-          associated_onetime_addresses.reserve(s.other_key_images.size());
-          for (const auto &p : s.other_key_images)
-          {
-            signed_key_images.push_back(p.second);
-            associated_onetime_addresses.push_back(p.first);
-          }
-
-          uint64_t spent, unspent;
-          w.import_key_images(signed_key_images, associated_onetime_addresses, spent, unspent, /*check_spent=*/false);
+        // from signed tx set's other key images, collect {KI -> (OTA, KIAP)} into [(KI, KIAP)], [OTA]
+        std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> signed_key_images;
+        std::vector<crypto::public_key> associated_onetime_addresses;
+        signed_key_images.reserve(s.other_key_images.size());
+        associated_onetime_addresses.reserve(s.other_key_images.size());
+        for (const auto &p : s.other_key_images)
+        {
+          signed_key_images.push_back(p.second);
+          associated_onetime_addresses.push_back(p.first);
         }
+
+        uint64_t spent, unspent;
+        if (!signed_key_images.empty())
+          w.import_key_images(signed_key_images, associated_onetime_addresses, spent, unspent, /*check_spent=*/false);
         return true;
       };
     }
