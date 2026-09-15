@@ -34,6 +34,8 @@
 #include <algorithm>
 #include <sstream>
 
+#include "curve_trees.h"
+#include "fcmp_pp/prove.h"
 #include "ringct/rctTypes.h"
 #include "ringct/rctSigs.h"
 #include "ringct/rctOps.h"
@@ -44,6 +46,12 @@ using namespace std;
 using namespace crypto;
 using namespace rct;
 
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static constexpr rct::xmr_amount MAX_AMOUNT_FCMP_PP = MONEY_SUPPLY /
+  (FCMP_PLUS_PLUS_MAX_INPUTS + FCMP_PLUS_PLUS_MAX_OUTPUTS + 1);
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
 TEST(ringct, Borromean)
 {
     int j = 0;

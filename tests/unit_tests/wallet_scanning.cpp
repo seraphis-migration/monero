@@ -1,0 +1,1081 @@
+// Copyright (c) 2023-2026, The Monero Project
+//
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without modification, are
+// permitted provided that the following conditions are met:
+//
+// 1. Redistributions of source code must retain the above copyright notice, this list of
+//    conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright notice, this list
+//    of conditions and the following disclaimer in the documentation and/or other
+//    materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its contributors may be
+//    used to endorse or promote products derived from this software without specific
+//    prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY
+// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+// MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+// THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+// STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF
+// THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+#include "gtest/gtest.h"
+
+#include "carrot_impl/address_device_ram_borrowed.h"
+#include "carrot_impl/subaddress_map_legacy.h"
+#include "carrot_impl/tx_builder_inputs.h"
+#include "carrot_mock_helpers.h"
+#include "crypto/generators.h"
+#include "cryptonote_basic/cryptonote_basic_impl.h"
+#include "fake_pruned_blockchain.h"
+#include "fcmp_pp/prove.h"
+#include "tx_construction_helpers.h"
+#include "wallet/tx_builder.h"
+
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "unit_tests.wallet_scanning"
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+namespace
+{
+/**
+ * @brief Verify that K_o ?= K^j_s + k^g_o G + k^t_o T, where K^j_s, k^g_o, and k^t_o are given by `enote_scan_info`
+ */
+bool verify_enote_scan_info_sender_extensions(const tools::wallet::enote_view_incoming_scan_info_t &enote_scan_info,
+    const cryptonote::tx_out &tx_out)
+{
+    // k^g_o G
+    ge_p3 tmp1;
+    ge_scalarmult_base(&tmp1, to_bytes(enote_scan_info.sender_extension_g));
+    ge_cached tmp2;
+    ge_p3_to_cached(&tmp2, &tmp1);
+
+    // k^t_o T
+    tmp1 = crypto::get_T_p3();
+    ge_scalarmult_p3(&tmp1, to_bytes(enote_scan_info.sender_extension_t), &tmp1);
+
+    // k^g_o G + k^t_o T
+    ge_p1p1 tmp3;
+    ge_add(&tmp3, &tmp1, &tmp2);
+    ge_p1p1_to_p3(&tmp1, &tmp3);
+    ge_p3_to_cached(&tmp2, &tmp1);
+
+    // K^j_s
+    if (0 != ge_frombytes_vartime(&tmp1, to_bytes(enote_scan_info.address_spend_pubkey)))
+        return false;
+
+    // K^j_s + k^g_o G + k^t_o T
+    crypto::public_key recomputed_onetime_address;
+    ge_add(&tmp3, &tmp1, &tmp2);
+    ge_p1p1_to_p3(&tmp1, &tmp3);
+    ge_p3_tobytes(to_bytes(recomputed_onetime_address), &tmp1);
+
+    // K_o ?= K^j_s + k^g_o G + k^t_o T
+    crypto::public_key onetime_address;
+    if (!cryptonote::get_output_public_key(tx_out, onetime_address))
+        return false;
+    return recomputed_onetime_address == onetime_address;
+}
+} //anonymous namespace
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, view_scan_as_sender_mainaddr)
+{
+    cryptonote::account_base aether;
+    aether.generate();
+
+    cryptonote::account_base bob;
+    bob.generate();
+    const cryptonote::account_public_address bob_main_addr = bob.get_keys().m_account_address;
+    const crypto::public_key bob_main_spend_pubkey = bob_main_addr.m_spend_public_key;
+
+    const rct::xmr_amount amount = rct::randXmrAmount(10 * COIN);
+
+    const rct::xmr_amount fee = 565678;
+
+    for (uint8_t hf_version = 1; hf_version < HF_VERSION_FCMP_PLUS_PLUS; ++hf_version)
+    {
+        MDEBUG("view_scan_as_sender_mainaddr: hf_version=" << static_cast<int>(hf_version));
+
+        std::vector<cryptonote::tx_destination_entry> destinations{
+            cryptonote::tx_destination_entry(amount, bob_main_addr, false)};
+
+        crypto::secret_key main_tx_privkey;
+        std::vector<crypto::secret_key> additional_tx_privkeys;
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(aether.get_keys(),
+            {{aether.get_keys().m_account_address.m_spend_public_key, {0, 0}}},
+            {},
+            destinations,
+            {},
+            crypto::null_hash,
+            fee,
+            hf_version,
+            main_tx_privkey,
+            additional_tx_privkeys);
+
+        ASSERT_EQ(0, additional_tx_privkeys.size());
+        ASSERT_GT(tx.vout.size(), 0);
+
+        // do K_d = 8 * r * K^j_v
+        crypto::key_derivation main_derivation;
+        ASSERT_TRUE(crypto::generate_key_derivation(bob_main_addr.m_view_public_key,
+            main_tx_privkey,
+            main_derivation));
+
+        aether.generate();
+
+        // call view_incoming_scan_transaction with no meaningful key nor subaddresses maps,
+        // just with the proper ECDH
+        const auto enote_scan_infos =  tools::wallet::view_incoming_scan_transaction_as_sender(tx,
+            {&main_derivation, 1},
+            {},
+            bob_main_addr);
+
+        bool matched = false;
+        for (const auto &enote_scan_info : enote_scan_infos)
+        {
+            if (enote_scan_info)
+            {
+                ASSERT_FALSE(matched);
+                ASSERT_EQ(amount, enote_scan_info->amount);
+                ASSERT_EQ(bob_main_spend_pubkey, enote_scan_info->address_spend_pubkey);
+                matched = true;
+            }
+        }
+        ASSERT_TRUE(matched);
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, view_scan_long_payment_id)
+{
+    cryptonote::account_base aether;
+    aether.generate();
+
+    cryptonote::account_base bob;
+    bob.generate();
+    const cryptonote::account_public_address bob_main_addr = bob.get_keys().m_account_address;
+    const crypto::public_key bob_main_spend_pubkey = bob_main_addr.m_spend_public_key;
+    const carrot::cryptonote_hierarchy_address_device bob_addr_dev(
+        std::make_shared<carrot::cryptonote_view_incoming_key_ram_borrowed_device>(bob.get_keys().m_view_secret_key),
+        bob_main_addr.m_spend_public_key);
+
+    const rct::xmr_amount amount = rct::randXmrAmount(10 * COIN);
+
+    const rct::xmr_amount fee = 565678;
+
+    const crypto::hash payment_id = crypto::rand<crypto::hash>();
+
+    for (uint8_t hf_version = 1; hf_version < HF_VERSION_FCMP_PLUS_PLUS; ++hf_version)
+    {
+        MDEBUG("view_scan_as_sender_mainaddr: hf_version=" << static_cast<int>(hf_version));
+
+        std::vector<cryptonote::tx_destination_entry> destinations{
+            cryptonote::tx_destination_entry(amount, bob_main_addr, false)};
+        destinations.front().is_integrated = true;
+
+        crypto::secret_key main_tx_privkey;
+        std::vector<crypto::secret_key> additional_tx_privkeys;
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(aether.get_keys(),
+            {{aether.get_keys().m_account_address.m_spend_public_key, {0, 0}}},
+            {},
+            destinations,
+            {},
+            payment_id,
+            fee,
+            hf_version,
+            main_tx_privkey,
+            additional_tx_privkeys);
+
+        ASSERT_EQ(0, additional_tx_privkeys.size());
+        ASSERT_GT(tx.vout.size(), 0);
+
+        // parse tx_extra and check for long payment ID field
+        std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+        ASSERT_TRUE(cryptonote::parse_tx_extra(tx.extra, tx_extra_fields));
+        cryptonote::tx_extra_nonce tx_extra_nonce;
+        ASSERT_TRUE(cryptonote::find_tx_extra_field_by_type(tx_extra_fields, tx_extra_nonce));
+        crypto::hash parsed_payment_id;
+        ASSERT_TRUE(cryptonote::get_payment_id_from_tx_extra_nonce(tx_extra_nonce.nonce, parsed_payment_id));
+        ASSERT_EQ(payment_id, parsed_payment_id);
+
+        // call view_incoming_scan_transaction with no meaningful key nor subaddresses maps,
+        // just with the proper ECDH
+        std::vector<std::optional<tools::wallet::enote_view_incoming_scan_info_t>> enote_scan_infos = 
+            tools::wallet::view_incoming_scan_transaction(tx,
+                bob_addr_dev,
+                bob_addr_dev,
+                carrot::subaddress_map_legacy{{{bob_main_spend_pubkey, {}}}}); // use a fake subaddress map with just the provided address in it
+
+        bool matched = false;
+        for (const auto &enote_scan_info : enote_scan_infos)
+        {
+            if (enote_scan_info)
+            {
+                ASSERT_FALSE(matched);
+                ASSERT_EQ(amount, enote_scan_info->amount);
+                ASSERT_EQ(bob_main_spend_pubkey, enote_scan_info->address_spend_pubkey);
+                ASSERT_EQ(payment_id, enote_scan_info->payment_id);
+                matched = true;
+            }
+        }
+        ASSERT_TRUE(matched);
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, view_scan_short_payment_id)
+{
+    cryptonote::account_base aether;
+    aether.generate();
+
+    cryptonote::account_base bob;
+    bob.generate();
+    const cryptonote::account_public_address bob_main_addr = bob.get_keys().m_account_address;
+    const crypto::public_key bob_main_spend_pubkey = bob_main_addr.m_spend_public_key;
+    const carrot::cryptonote_hierarchy_address_device bob_addr_dev(
+        std::make_shared<carrot::cryptonote_view_incoming_key_ram_borrowed_device>(bob.get_keys().m_view_secret_key),
+        bob_main_addr.m_spend_public_key);
+
+    const rct::xmr_amount amount = rct::randXmrAmount(10 * COIN);
+
+    const rct::xmr_amount fee = 565678;
+
+    const crypto::hash8 pid_8 = crypto::rand<crypto::hash8>();
+    crypto::hash payment_id = crypto::null_hash;
+    memcpy(&payment_id, &pid_8, sizeof(pid_8));
+
+    ASSERT_FALSE(tools::wallet::is_long_payment_id(payment_id));
+    ASSERT_NE(crypto::null_hash, payment_id);
+
+    for (uint8_t hf_version = 1; hf_version < HF_VERSION_FCMP_PLUS_PLUS; ++hf_version)
+    {
+        MDEBUG("view_scan_as_sender_mainaddr: hf_version=" << static_cast<int>(hf_version));
+
+        std::vector<cryptonote::tx_destination_entry> destinations{
+            cryptonote::tx_destination_entry(amount, bob_main_addr, false)};
+        destinations.front().is_integrated = true;
+
+        crypto::secret_key main_tx_privkey;
+        std::vector<crypto::secret_key> additional_tx_privkeys;
+        const cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(aether.get_keys(),
+            {{aether.get_keys().m_account_address.m_spend_public_key, {0, 0}}},
+            {},
+            destinations,
+            {},
+            payment_id,
+            fee,
+            hf_version,
+            main_tx_privkey,
+            additional_tx_privkeys);
+
+        ASSERT_EQ(0, additional_tx_privkeys.size());
+        ASSERT_GT(tx.vout.size(), 0);
+
+        // parse tx_extra and check that a short payment ID field exists
+        std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+        ASSERT_TRUE(cryptonote::parse_tx_extra(tx.extra, tx_extra_fields));
+        cryptonote::tx_extra_nonce tx_extra_nonce;
+        ASSERT_TRUE(cryptonote::find_tx_extra_field_by_type(tx_extra_fields, tx_extra_nonce));
+        crypto::hash8 pid_enc_8;
+        ASSERT_TRUE(cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(tx_extra_nonce.nonce, pid_enc_8));
+
+        // call view_incoming_scan_transaction with no meaningful key nor subaddresses maps,
+        // just with the proper ECDH
+        std::vector<std::optional<tools::wallet::enote_view_incoming_scan_info_t>> enote_scan_infos = 
+            tools::wallet::view_incoming_scan_transaction(tx,
+                bob_addr_dev,
+                bob_addr_dev,
+                carrot::subaddress_map_legacy{{{bob_main_spend_pubkey, {}}}}); // use a fake subaddress map with just the provided address in it
+
+        bool matched = false;
+        for (const auto &enote_scan_info : enote_scan_infos)
+        {
+            if (enote_scan_info)
+            {
+                ASSERT_FALSE(matched);
+                ASSERT_EQ(amount, enote_scan_info->amount);
+                ASSERT_EQ(bob_main_spend_pubkey, enote_scan_info->address_spend_pubkey);
+                ASSERT_EQ(payment_id, enote_scan_info->payment_id);
+                matched = true;
+            }
+        }
+        ASSERT_TRUE(matched);
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, positive_smallout_main_addr_all_types_outputs)
+{
+    // Test that wallet can scan enotes and prove SA/L for following types:
+    //   a. pre-ringct coinbase
+    //   b. pre-ringct
+    //   c. ringct coinbase
+    //   d. ringct long-amount
+    //   e. ringct short-amount
+    //   f. view-tagged ringct coinbase
+    //   g. view-tagged pre-ringct (only possible in unmixable sweep txs)
+    //   h. view-tagged ringct
+    //   i. carrot v1 coinbase
+    //   j. carrot v1 normal
+    //   k. carrot v1 special
+    //   l. carrot v1 internal (@TODO)
+    //
+    // All enotes are addressed to the main address in 2-out noin-coinbase txs or 1-out coinbase txs.
+    // We also don't test reorgs here.
+
+    // init blockchain
+    mock::fake_pruned_blockchain bc(0);
+
+    // generate wallet
+    tools::wallet2 w(cryptonote::MAINNET, /*kdf_rounds=*/1, /*unattended=*/true);
+    w.generate("", "");
+    const cryptonote::account_keys &acc_keys = w.get_account().get_keys();
+    const cryptonote::account_public_address main_addr = w.get_account().get_keys().m_account_address;
+    ASSERT_EQ(0, w.balance(0, true));
+    bc.init_wallet_for_starting_block(w); // needed b/c internal logic
+
+    uint64_t refresh_height = 0;
+    const auto wallet_process_new_blocks = [&w, &bc, &refresh_height]() -> boost::multiprecision::int128_t
+    {
+        const boost::multiprecision::int128_t old_balance = w.balance(0, true);
+
+        // note: doesn't handle reorgs
+        bc.refresh_wallet(w);
+
+        // update refresh_height
+        refresh_height = bc.height();
+
+        // return amount of money received
+        return boost::multiprecision::int128_t(w.balance(0, true)) - old_balance;
+    };
+
+    size_t old_num_m_transfers = 0;
+    const auto verify_sals_of_recent_transfers = [&w, &old_num_m_transfers]() -> bool
+    {
+        // assert m_transfers is monotonic (may change if internal design of wallet2 changes)
+        size_t prev_blk_idx = 0;
+        size_t prev_rct_output_idx = 0;
+        for (const tools::wallet2::transfer_details &td : w.m_transfers)
+        {
+            CHECK_AND_ASSERT_THROW_MES(td.m_block_height >= prev_blk_idx, "m_transfers not monotonic");
+            prev_blk_idx = td.m_block_height;
+            if (td.m_rct)
+            {
+                CHECK_AND_ASSERT_THROW_MES(td.m_global_output_index >= prev_rct_output_idx, "m_transfers not monotonic");
+                prev_rct_output_idx = td.m_global_output_index;
+            }
+        }
+
+        const crypto::hash signable_tx_hash = crypto::rand<crypto::hash>();
+
+        // note: will skip reorged transfers unless we set num_m_transfers
+        const size_t new_num_m_transfers = w.m_transfers.size();
+        for (size_t i = old_num_m_transfers; i < new_num_m_transfers; ++i)
+        {
+            old_num_m_transfers = new_num_m_transfers; // skip failed SA/Ls for future calls
+
+            LOG_PRINT_L2("Creating & verifying SA/L proof on m_transfers.at(" << i << ")");
+            const tools::wallet2::transfer_details &td = w.m_transfers.at(i);
+
+            const cryptonote::account_keys &acc = w.get_account().get_keys();
+
+            const carrot::OutputOpeningHintVariant opening_hint
+                = tools::wallet::make_sal_opening_hint_from_transfer_details(td);
+
+            const FcmpRerandomizedOutputCompressed rerandomized_output = fcmp_pp::rerandomize_output(
+                onetime_address_ref(opening_hint),
+                amount_commitment_ref(opening_hint),
+                carrot::use_biased_hash_to_point(opening_hint));
+
+            fcmp_pp::FcmpPpSalProof sal_proof;
+            crypto::key_image spent_key_image;
+            carrot::make_sal_proof_any_to_legacy_v1(signable_tx_hash,
+                rerandomized_output,
+                opening_hint,
+                acc.m_spend_secret_key,
+                *w.get_cryptonote_address_device(),
+                sal_proof,
+                spent_key_image);
+
+            if (spent_key_image != td.m_key_image)
+                return false; // fail verify
+
+            if (!fcmp_pp::verify_sal(signable_tx_hash,
+                    rerandomized_output.input,
+                    spent_key_image,
+                    sal_proof))
+                return false; // fail verify
+        }
+
+        return true;
+    };
+
+    // a. push block containing a pre-ringct coinbase output to wallet
+    bc.add_block(1, {}, main_addr);
+
+    // a. scan pre-ringct coinbase tx
+    auto balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(mock::fake_pruned_blockchain::miner_reward, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // b. construct and push a pre-ringct tx
+    const rct::xmr_amount amount_b = rct::randXmrAmount(COIN);
+    {
+        const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount_b, acc_keys.m_account_address, false)};
+        cryptonote::transaction curr_tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            /*hf_version=*/1);
+        ASSERT_FALSE(curr_tx.is_coinbase());
+        ASSERT_EQ(1, curr_tx.version);
+        ASSERT_EQ(rct::RCTTypeNull, curr_tx.rct_signatures.type);
+        ASSERT_EQ(typeid(cryptonote::txout_to_key), curr_tx.vout.at(0).target.type());
+        ASSERT_EQ(amount_b, curr_tx.vout.at(0).amount);
+        bc.add_block(1, {std::move(curr_tx)}, mock::null_addr);
+    }
+
+    // b. scan pre-ringct tx
+    balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(amount_b, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // c. construct and push a ringct coinbase tx
+    bc.add_block(HF_VERSION_DYNAMIC_FEE, {}, main_addr);
+    {
+        auto top_block = bc.get_parsed_block(bc.height() - 1);
+        const cryptonote::transaction &top_miner_tx = top_block.block.miner_tx;
+        ASSERT_EQ(2, top_miner_tx.version);
+        ASSERT_NE(0, top_miner_tx.vout.size());
+        ASSERT_EQ(rct::RCTTypeNull, top_miner_tx.rct_signatures.type);
+        ASSERT_EQ(0, top_miner_tx.signatures.size());
+        ASSERT_EQ(mock::fake_pruned_blockchain::miner_reward, top_miner_tx.vout.at(0).amount);
+    }
+
+    // c. scan ringct coinbase tx
+    balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(mock::fake_pruned_blockchain::miner_reward, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // d. construct and push a ringct long-amount tx
+    const rct::xmr_amount amount_d = rct::randXmrAmount(COIN);
+    {
+        const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount_d, acc_keys.m_account_address, false)};
+        cryptonote::transaction curr_tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            HF_VERSION_DYNAMIC_FEE);
+        ASSERT_FALSE(curr_tx.is_coinbase());
+        ASSERT_EQ(2, curr_tx.version);
+        ASSERT_EQ(rct::RCTTypeFull, curr_tx.rct_signatures.type);
+        ASSERT_EQ(typeid(cryptonote::txout_to_key), curr_tx.vout.at(0).target.type());
+        ASSERT_EQ(0, curr_tx.vout.at(0).amount);
+        bc.add_block(HF_VERSION_DYNAMIC_FEE, {std::move(curr_tx)}, mock::null_addr);
+    }
+
+    // d. scan ringct long-amount tx
+    balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(amount_d, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // e. construct and push a ringct short-amount tx
+    const rct::xmr_amount amount_e = rct::randXmrAmount(COIN);
+    {
+        const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount_e, acc_keys.m_account_address, false)};
+        cryptonote::transaction curr_tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            HF_VERSION_SMALLER_BP);
+        ASSERT_FALSE(curr_tx.is_coinbase());
+        ASSERT_EQ(2, curr_tx.version);
+        ASSERT_EQ(rct::RCTTypeBulletproof2, curr_tx.rct_signatures.type);
+        ASSERT_EQ(typeid(cryptonote::txout_to_key), curr_tx.vout.at(0).target.type());
+        ASSERT_EQ(0, curr_tx.vout.at(0).amount);
+        bc.add_block(HF_VERSION_SMALLER_BP, {std::move(curr_tx)}, mock::null_addr);
+    }
+
+    // e. scan ringct short-amount tx
+    balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(amount_e, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // f. construct and push a view-tagged ringct coinbase tx
+    bc.add_block(HF_VERSION_VIEW_TAGS, {}, main_addr);
+    {
+        auto top_block = bc.get_parsed_block(bc.height() - 1);
+        const cryptonote::transaction &top_miner_tx = top_block.block.miner_tx;
+        ASSERT_EQ(2, top_miner_tx.version);
+        ASSERT_EQ(1, top_miner_tx.vout.size());
+        ASSERT_EQ(rct::RCTTypeNull, top_miner_tx.rct_signatures.type);
+        ASSERT_EQ(0, top_miner_tx.signatures.size());
+        ASSERT_EQ(typeid(cryptonote::txout_to_tagged_key), top_miner_tx.vout.at(0).target.type());
+        ASSERT_EQ(mock::fake_pruned_blockchain::miner_reward, top_miner_tx.vout.at(0).amount);
+    }
+
+    // f. scan view-tagged ringct coinbase tx
+    balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(mock::fake_pruned_blockchain::miner_reward, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // g. construct and push a view-tagged pre-ringct (only possible in unmixable sweep txs) tx
+    const rct::xmr_amount amount_g = rct::randXmrAmount(COIN);
+    {
+        const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount_g, acc_keys.m_account_address, false)};
+        cryptonote::transaction curr_tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            HF_VERSION_VIEW_TAGS,
+            /*sweep_unmixable_override=*/true);
+        ASSERT_FALSE(curr_tx.is_coinbase());
+        ASSERT_EQ(1, curr_tx.version);
+        ASSERT_EQ(rct::RCTTypeNull, curr_tx.rct_signatures.type);
+        ASSERT_EQ(typeid(cryptonote::txout_to_tagged_key), curr_tx.vout.at(0).target.type());
+        ASSERT_EQ(amount_g, curr_tx.vout.at(0).amount);
+        bc.add_block(HF_VERSION_VIEW_TAGS, {std::move(curr_tx)}, mock::null_addr);
+    }
+
+    // g. scan view-tagged pre-ringct (only possible in unmixable sweep txs) tx
+    balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(amount_g, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // h. construct and push a view-tagged ringct tx
+    const rct::xmr_amount amount_h = rct::randXmrAmount(COIN);
+    {
+        const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount_h, acc_keys.m_account_address, false)};
+        cryptonote::transaction curr_tx = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            HF_VERSION_VIEW_TAGS);
+        ASSERT_FALSE(curr_tx.is_coinbase());
+        ASSERT_EQ(2, curr_tx.version);
+        ASSERT_EQ(rct::RCTTypeBulletproofPlus, curr_tx.rct_signatures.type);
+        ASSERT_EQ(typeid(cryptonote::txout_to_tagged_key), curr_tx.vout.at(0).target.type());
+        ASSERT_EQ(0, curr_tx.vout.at(0).amount);
+        bc.add_block(HF_VERSION_VIEW_TAGS, {std::move(curr_tx)}, mock::null_addr);
+    }
+
+    // h. scan ringct view-tagged ringct tx
+    balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(amount_h, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // i. construct and push a carrot v1 coinbase tx
+    bc.add_block(HF_VERSION_CARROT, {}, main_addr);
+    {
+        auto top_block = bc.get_parsed_block(bc.height() - 1);
+        const cryptonote::transaction &top_miner_tx = top_block.block.miner_tx;
+        ASSERT_EQ(2, top_miner_tx.version);
+        ASSERT_EQ(1, top_miner_tx.vout.size());
+        ASSERT_EQ(rct::RCTTypeNull, top_miner_tx.rct_signatures.type);
+        ASSERT_EQ(0, top_miner_tx.signatures.size());
+        ASSERT_EQ(typeid(cryptonote::txout_to_carrot_v1), top_miner_tx.vout.at(0).target.type());
+        ASSERT_EQ(mock::fake_pruned_blockchain::miner_reward, top_miner_tx.vout.at(0).amount);
+    }
+
+    // i. scan carrot v1 coinbase tx
+    balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(mock::fake_pruned_blockchain::miner_reward, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // j. construct and push a carrot v1 normal tx
+    const rct::xmr_amount amount_j = rct::randXmrAmount(COIN);
+    {
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount_j, acc_keys.m_account_address, false)};
+        cryptonote::transaction curr_tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            {carrot::mock::convert_normal_payment_proposal_v1(dests.front())},
+            /*selfsend_payment_proposals=*/{},
+            acc_keys);
+        ASSERT_FALSE(curr_tx.is_coinbase());
+        ASSERT_EQ(2, curr_tx.version);
+        ASSERT_EQ(rct::RCTTypeFcmpPlusPlus, curr_tx.rct_signatures.type);
+        ASSERT_EQ(typeid(cryptonote::txout_to_carrot_v1), curr_tx.vout.at(0).target.type());
+        ASSERT_EQ(0, curr_tx.vout.at(0).amount);
+        bc.add_block(HF_VERSION_CARROT, {std::move(curr_tx)}, mock::null_addr);
+    }
+
+    // j. scan carrot v1 normal tx
+    balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(amount_j, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // k. construct and push a carrot v1 special tx
+    const rct::xmr_amount amount_k = rct::randXmrAmount(COIN);
+    {
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount_k, acc_keys.m_account_address, false)};
+        cryptonote::transaction curr_tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+            /*normal_payment_proposals=*/{},
+            {selfsend_core_to_verifiable_v1(carrot::mock::convert_selfsend_payment_proposal_v1(dests.front()), {})},
+            acc_keys);
+        ASSERT_FALSE(curr_tx.is_coinbase());
+        ASSERT_EQ(2, curr_tx.version);
+        ASSERT_EQ(rct::RCTTypeFcmpPlusPlus, curr_tx.rct_signatures.type);
+        ASSERT_EQ(2, curr_tx.vout.size());
+        ASSERT_EQ(typeid(cryptonote::txout_to_carrot_v1), curr_tx.vout.at(0).target.type());
+        ASSERT_EQ(0, curr_tx.vout.at(0).amount);
+        bc.add_block(HF_VERSION_CARROT, {std::move(curr_tx)}, mock::null_addr);
+    }
+
+    // k. scan carrot v1 special tx
+    balance_diff = wallet_process_new_blocks();
+    EXPECT_EQ(amount_k, balance_diff);
+    EXPECT_TRUE(verify_sals_of_recent_transfers());
+
+    // assert we did all SA/L proving
+    ASSERT_EQ(w.m_transfers.size(), old_num_m_transfers);
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, burned_zombie)
+{
+    // Check that a wallet which receives attempted burn outputs counts all outputs of the same key
+    // image spent when that key image is spent. Those with the same key image which aren't marked
+    // as spent are "burned zombies": they aren't burn and not usable, but they shuffle around in
+    // the internal state and inflate the balance or attract input selection.
+
+    // init blockchain
+    mock::fake_pruned_blockchain bc(0);
+
+    // generate wallet
+    tools::wallet2 w(cryptonote::MAINNET, /*kdf_rounds=*/1, /*unattended=*/true);
+    w.set_offline(true);
+    w.generate("", "");
+    const cryptonote::account_keys &acc_keys = w.get_account().get_keys();
+    const cryptonote::account_public_address main_addr = w.get_account().get_keys().m_account_address;
+    ASSERT_EQ(0, w.balance(0, true));
+    bc.init_wallet_for_starting_block(w); // needed b/c internal logic
+
+    const rct::xmr_amount amount_a = rct::randXmrAmount(COIN) + 1;
+    const rct::xmr_amount amount_b = rct::randXmrAmount(amount_a - 1);
+    const rct::xmr_amount fee = rct::randXmrAmount(COIN);
+
+    // make incoming pre-ringct tx to wallet with amount a
+    cryptonote::transaction incoming_tx_a;
+    {
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(amount_a, main_addr, false)};
+            incoming_tx_a = mock::construct_pre_carrot_tx_with_fake_inputs(
+            dests,
+            fee,
+            /*hf_version=*/1);
+        ASSERT_FALSE(incoming_tx_a.is_coinbase());
+        ASSERT_EQ(1, incoming_tx_a.version);
+        ASSERT_EQ(rct::RCTTypeNull, incoming_tx_a.rct_signatures.type);
+        ASSERT_EQ(typeid(cryptonote::txout_to_key), incoming_tx_a.vout.at(0).target.type());
+        ASSERT_EQ(amount_a, incoming_tx_a.vout.at(0).amount);
+    }
+
+    // make a burn transaction with amount b < a
+    cryptonote::transaction incoming_tx_b = incoming_tx_a;
+    boost::get<cryptonote::txin_to_key>(incoming_tx_b.vin.at(0)).k_image = rct::rct2ki(rct::pkGen());
+    incoming_tx_b.vout[0].amount = amount_b;
+
+    // submit burning transaction first
+    bc.add_block(1, {incoming_tx_b}, mock::null_addr);
+
+    // then submit original transaction
+    bc.add_block(1, {incoming_tx_a}, mock::null_addr);
+
+    // add 10 blocks to put space between sending outgoing tx
+    const cryptonote::tx_out dummy_output{.amount = 5, .target = cryptonote::txout_to_key(rct::rct2pk(rct::pkGen()))};
+    cryptonote::transaction dummy_tx; //! @TODO: remove dummy as prop fixing another bug
+    dummy_tx.version = 1;
+    dummy_tx.unlock_time = 0;
+    dummy_tx.vout.push_back(dummy_output);
+    for (size_t i = 0; i < CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE - 1; ++i)
+        bc.add_block(1, {dummy_tx}, mock::null_addr);
+
+    // scan, assert balance is amount a, (NOT a + b) and get key image to received output
+    bc.refresh_wallet(w);
+    ASSERT_EQ(amount_a, w.balance_all(true));
+    uint64_t key_image_offset;
+    std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> exported_key_images;
+    std::tie(key_image_offset, exported_key_images) = w.export_key_images(/*all=*/true);
+    ASSERT_EQ(0, key_image_offset);
+    ASSERT_EQ(2, exported_key_images.size());
+    const crypto::key_image &received_key_image = exported_key_images.at(0).first;
+    ASSERT_EQ(received_key_image, exported_key_images.at(1).first);
+
+    // make "outgoing" transaction by including this key image in an input
+    cryptonote::transaction outgoing_tx;
+    {
+        const rct::xmr_amount outgoing_amount = rct::randXmrAmount(amount_a);
+        const rct::xmr_amount outgoing_fee = amount_a - outgoing_amount;
+        std::vector<cryptonote::tx_destination_entry> dests = {
+            cryptonote::tx_destination_entry(outgoing_amount, mock::null_addr, false)};
+        crypto::secret_key main_tx_privkey;
+        std::vector<crypto::secret_key> additional_tx_privkeys;
+        tools::wallet2::transfer_container transfers;
+        w.get_transfers(transfers);
+        ASSERT_EQ(2, transfers.size());
+        const tools::wallet2::transfer_details &input_td = transfers.at(1);
+        const mock::stripped_down_tx_source_entry_t input_src{
+            .is_rct = false,
+            .global_output_index = input_td.m_global_output_index,
+            .onetime_address = input_td.get_public_key(),
+            .real_out_tx_key = cryptonote::get_tx_pub_key_from_extra(input_td.m_tx, input_td.m_pk_index),
+            .local_output_index = 0,
+            .amount = amount_a,
+            .mask = rct::I
+        };
+        outgoing_tx = mock::construct_pre_carrot_tx_with_fake_inputs(acc_keys,
+            w.m_subaddresses,
+            {input_src},
+            dests,
+            /*change_addr=*/{},
+            crypto::null_hash,
+            outgoing_fee,
+            /*hf_version=*/1,
+            main_tx_privkey,
+            additional_tx_privkeys);
+        ASSERT_FALSE(outgoing_tx.is_coinbase());
+        ASSERT_EQ(1, outgoing_tx.version);
+        ASSERT_EQ(1, outgoing_tx.vin.size());
+        ASSERT_EQ(1, outgoing_tx.vout.size());
+        ASSERT_EQ(received_key_image, boost::get<cryptonote::txin_to_key>(outgoing_tx.vin.at(0)).k_image);
+        ASSERT_EQ(rct::RCTTypeNull, outgoing_tx.rct_signatures.type);
+        ASSERT_EQ(typeid(cryptonote::txout_to_key), outgoing_tx.vout.at(0).target.type());
+        ASSERT_EQ(amount_a, boost::get<cryptonote::txin_to_key>(outgoing_tx.vin.at(0)).amount);
+        ASSERT_EQ(outgoing_amount, outgoing_tx.vout.at(0).amount);
+        ASSERT_EQ(outgoing_fee, cryptonote::get_tx_fee(outgoing_tx));
+    }
+
+    // add outgoing tx to chain and wallet scans it
+    bc.add_block(1, {outgoing_tx}, mock::null_addr);
+    bc.refresh_wallet(w);
+
+    // check that the balance drops to 0 and that all transfers are marked spent
+    ASSERT_EQ(0, w.balance_all(true));
+    tools::wallet2::transfer_container post_spend_transfers;
+    w.get_transfers(post_spend_transfers);
+    ASSERT_EQ(2, post_spend_transfers.size());
+    for (const tools::wallet2::transfer_details &td : post_spend_transfers)
+        ASSERT_TRUE(td.m_spent);
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, scanning_tools_hybrid_view_incoming_scanning)
+{
+    carrot::mock::mock_carrot_and_legacy_keys alice;
+    alice.generate();
+    carrot::mock::mock_carrot_and_legacy_keys bob;
+    bob.generate();
+
+    const std::vector<carrot::AddressDeriveType> derive_types_to_test = {
+        carrot::AddressDeriveType::PreCarrot,
+        carrot::AddressDeriveType::Carrot,
+    };
+
+    for (const carrot::AddressDeriveType alice_derive_type : derive_types_to_test)
+    {
+        for (const carrot::AddressDeriveType bob_derive_type : derive_types_to_test)
+        {
+            // get addresses
+            const carrot::subaddress_index_extended alice_subaddr_index{carrot::mock::gen_subaddress_index_extended(alice_derive_type)};
+            const carrot::CarrotDestinationV1 alice_subaddr = alice.subaddress(alice_subaddr_index);
+            const carrot::subaddress_index_extended bob_subaddr_index{carrot::mock::gen_subaddress_index_extended(bob_derive_type)};
+            const carrot::CarrotDestinationV1 bob_subaddr = bob.subaddress(bob_subaddr_index);
+
+            // sanity
+            ASSERT_TRUE(alice_subaddr_index.index.is_subaddress());
+            ASSERT_EQ(alice_derive_type, alice_subaddr_index.derive_type);
+            ASSERT_EQ(alice_subaddr.address_spend_pubkey, alice.subaddress_map.get_address_spend_pubkey_for_index(alice_subaddr_index));
+            ASSERT_TRUE(bob_subaddr_index.index.is_subaddress());
+            ASSERT_EQ(bob_derive_type, bob_subaddr_index.derive_type);
+            ASSERT_EQ(bob_subaddr.address_spend_pubkey, bob.subaddress_map.get_address_spend_pubkey_for_index(bob_subaddr_index));
+
+            // make a Carrot transaction from Alice to Bob
+            const rct::xmr_amount amount = rct::randXmrAmount(COIN);
+            const carrot::CarrotPaymentProposalV1 normal_payment_proposal{
+                .destination = bob_subaddr,
+                .amount = amount,
+                .randomness = carrot::gen_janus_anchor()
+            };
+            cryptonote::transaction tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+                {normal_payment_proposal},
+                /*selfsend_payment_proposals=*/{},
+                alice_subaddr.address_spend_pubkey,
+                alice_subaddr_index,
+                nullptr, // even though alice has a s_vb, pretend she doesn't so tx builder uses special change enotes
+                alice.k_view_incoming_dev);
+            ASSERT_FALSE(tx.is_coinbase());
+            ASSERT_EQ(2, tx.version);
+            ASSERT_EQ(rct::RCTTypeFcmpPlusPlus, tx.rct_signatures.type);
+            ASSERT_EQ(2, tx.vout.size());
+            ASSERT_EQ(typeid(cryptonote::txout_to_carrot_v1), tx.vout.at(0).target.type());
+            ASSERT_EQ(0, tx.vout.at(0).amount);
+
+            const auto alice_enote_scan_infos = tools::wallet::view_incoming_scan_transaction(tx,
+                alice.k_view_incoming_dev,
+                *alice.addr_dev,
+                alice.subaddress_map);
+            const auto bob_enote_scan_infos = tools::wallet::view_incoming_scan_transaction(tx,
+                bob.k_view_incoming_dev,
+                *bob.addr_dev,
+                bob.subaddress_map);
+
+            // check counts and positions of Alice/Bob scanned enotes
+            ASSERT_EQ(2, alice_enote_scan_infos.size());
+            ASSERT_EQ(2, bob_enote_scan_infos.size());
+            const bool alice_first_enote = bool(alice_enote_scan_infos.at(0));
+            const std::size_t alice_enote_idx = alice_first_enote ? 0 : 1;
+            const std::size_t bob_enote_idx = alice_first_enote ? 1 : 0;
+            ASSERT_TRUE(alice_enote_scan_infos.at(alice_enote_idx));
+            ASSERT_FALSE(alice_enote_scan_infos.at(bob_enote_idx));
+            const auto &alice_enote_scan_info = *alice_enote_scan_infos.at(alice_enote_idx);
+            ASSERT_TRUE(bob_enote_scan_infos.at(bob_enote_idx));
+            ASSERT_FALSE(bob_enote_scan_infos.at(alice_enote_idx));
+            const auto &bob_enote_scan_info = *bob_enote_scan_infos.at(bob_enote_idx);
+
+            // check Bob scan info
+            EXPECT_EQ(amount, bob_enote_scan_info.amount);
+            EXPECT_EQ(crypto::null_hash, bob_enote_scan_info.payment_id);
+            EXPECT_EQ(bob_subaddr.address_spend_pubkey, bob_enote_scan_info.address_spend_pubkey);
+            EXPECT_EQ(bob_subaddr_index, bob_enote_scan_info.subaddr_index);
+            EXPECT_EQ(0, bob_enote_scan_info.main_tx_pubkey_index);
+            EXPECT_TRUE(bob.can_open_fcmp_onetime_address(bob_enote_scan_info.address_spend_pubkey,
+                bob_enote_scan_info.sender_extension_g,
+                bob_enote_scan_info.sender_extension_t,
+                boost::get<cryptonote::txout_to_carrot_v1>(tx.vout.at(bob_enote_idx).target).key));
+            const std::optional<crypto::key_image> bob_key_image = tools::wallet::try_derive_enote_key_image(
+                bob_enote_scan_info,
+                *bob.key_image_dev);
+            ASSERT_TRUE(bob_key_image);
+
+            // check Alice scan info
+            EXPECT_EQ(0, alice_enote_scan_info.amount);
+            EXPECT_EQ(crypto::null_hash, alice_enote_scan_info.payment_id);
+            EXPECT_EQ(alice_subaddr.address_spend_pubkey, alice_enote_scan_info.address_spend_pubkey);
+            EXPECT_EQ(alice_subaddr_index, alice_enote_scan_info.subaddr_index);
+            EXPECT_EQ(0, alice_enote_scan_info.main_tx_pubkey_index);
+            EXPECT_TRUE(alice.can_open_fcmp_onetime_address(alice_enote_scan_info.address_spend_pubkey,
+                alice_enote_scan_info.sender_extension_g,
+                alice_enote_scan_info.sender_extension_t,
+                boost::get<cryptonote::txout_to_carrot_v1>(tx.vout.at(alice_enote_idx).target).key));
+            const std::optional<crypto::key_image> alice_key_image = tools::wallet::try_derive_enote_key_image(
+                alice_enote_scan_info,
+                *alice.key_image_dev);
+            ASSERT_TRUE(alice_key_image);
+        }
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, pre_carrot_switched_enote_pubkeys)
+{
+    // Test that non-standard, but previously scannable positions for ephemeral tx pubkeys is still
+    // supported in new scanning code, and that attempting to make opening hints to those enotes
+    // works.
+
+    // Gen Bob
+    cryptonote::account_base bob;
+    bob.generate();
+    const auto bob_k_view_dev = std::make_shared<carrot::cryptonote_view_incoming_key_ram_borrowed_device>(
+        bob.get_keys().m_view_secret_key);
+    const carrot::cryptonote_hierarchy_address_device bob_addr_dev(bob_k_view_dev,
+        bob.get_keys().m_account_address.m_spend_public_key);
+
+    // Bob addresses
+    const cryptonote::account_public_address &bob_main_addr = bob.get_keys().m_account_address;
+    const cryptonote::subaddress_index subaddr_index{0, 1};
+    const cryptonote::account_public_address bob_subaddr = bob.get_device().get_subaddress(bob.get_keys(),
+        subaddr_index);
+    const std::unordered_map<crypto::public_key, cryptonote::subaddress_index> bob_subaddress_map{
+        {bob_main_addr.m_spend_public_key, {}},
+        {bob_subaddr.m_spend_public_key, subaddr_index}
+    };
+
+    // Construct to Bob
+    constexpr carrot::xmr_amount main_amount = COIN;
+    constexpr carrot::xmr_amount subaddr_amount = 2 * COIN;
+    std::vector<cryptonote::tx_destination_entry> dests{
+        cryptonote::tx_destination_entry(main_amount, bob_main_addr, false),
+        cryptonote::tx_destination_entry(subaddr_amount, bob_subaddr, true),
+        carrot::mock::convert_destination_v1(carrot::gen_carrot_main_address_v1(), COIN / 7)
+    };
+    constexpr uint8_t hf_version = HF_VERSION_CLSAG + 1;
+    cryptonote::transaction tx = mock::construct_pre_carrot_tx_with_fake_inputs(dests,
+        COIN / 100, hf_version);
+    ASSERT_EQ(3, tx.vout.size());
+    const crypto::hash og_txid = cryptonote::get_transaction_hash(tx);
+
+    size_t bob_main_local_output_index = tx.vout.size();
+    size_t bob_subaddr_local_output_index = tx.vout.size();
+    for (int swap_K_e = 0; swap_K_e < 2; ++swap_K_e)
+    {
+        LOG_PRINT_L1("pre_carrot_switched_enote_pubkeys: " << (swap_K_e ? "" : "un") << "modified pass");
+
+        if (swap_K_e)
+        {
+            // Replace the main tx pubkey with Bob's subaddress additional publey, and Bob's main
+            // additional pubkey with the original main tx pubkey
+
+            std::vector<cryptonote::tx_extra_field> tx_extra_fields;
+            ASSERT_TRUE(cryptonote::parse_tx_extra(tx.extra, tx_extra_fields));
+            ASSERT_EQ(2, tx_extra_fields.size()); // main & additional pubkeys, no dummy payment ID in >2-out tx
+            cryptonote::tx_extra_pub_key main_tx_pubkey_field;
+            ASSERT_TRUE(cryptonote::find_tx_extra_field_by_type(tx_extra_fields, main_tx_pubkey_field));
+            ASSERT_NE(crypto::null_pkey, main_tx_pubkey_field.pub_key);
+            cryptonote::tx_extra_additional_pub_keys additional_tx_pubkeys_field;
+            ASSERT_TRUE(cryptonote::find_tx_extra_field_by_type(tx_extra_fields, additional_tx_pubkeys_field));
+            ASSERT_EQ(tx.vout.size(), additional_tx_pubkeys_field.data.size());
+
+            std::swap(main_tx_pubkey_field.pub_key, additional_tx_pubkeys_field.data.at(bob_main_local_output_index));
+            std::swap(main_tx_pubkey_field.pub_key, additional_tx_pubkeys_field.data.at(bob_subaddr_local_output_index));
+            tx.extra.clear();
+            ASSERT_TRUE(cryptonote::add_tx_pub_key_to_extra(tx, main_tx_pubkey_field.pub_key));
+            ASSERT_TRUE(cryptonote::add_additional_tx_pub_keys_to_extra(tx.extra, additional_tx_pubkeys_field.data));
+            ASSERT_TRUE(cryptonote::sort_tx_extra(tx.extra, tx.extra));
+            tx.invalidate_hashes();
+            ASSERT_NE(og_txid, cryptonote::get_transaction_hash(tx));
+        }
+
+        // Bob scans
+        const auto enote_scan_infos = tools::wallet::view_incoming_scan_transaction(tx,
+            *bob_k_view_dev,
+            bob_addr_dev,
+            carrot::subaddress_map_legacy(bob_subaddress_map));
+        ASSERT_EQ(tx.vout.size(), enote_scan_infos.size());
+
+        // Bob has 2 scannble outputs, find tx-local output indices for each
+        size_t local_output_index = 0;
+        for (const auto &enote_scan_info : enote_scan_infos)
+        {
+            if (enote_scan_info)
+            {
+                if (enote_scan_info->address_spend_pubkey == bob_main_addr.m_spend_public_key)
+                {
+                    ASSERT_TRUE(bob_main_local_output_index >= tx.vout.size()
+                        || bob_main_local_output_index == local_output_index);
+                    bob_main_local_output_index = local_output_index;
+                }
+                else
+                {
+                    ASSERT_TRUE(bob_subaddr_local_output_index >= tx.vout.size()
+                        || bob_subaddr_local_output_index == local_output_index);
+                    bob_subaddr_local_output_index = local_output_index;
+                }
+            }
+            ++local_output_index;
+        }
+        ASSERT_LT(bob_main_local_output_index, tx.vout.size());
+        ASSERT_LT(bob_subaddr_local_output_index, tx.vout.size());
+        ASSERT_NE(bob_main_local_output_index, bob_subaddr_local_output_index);
+
+        // Check main addr scan results
+        const auto &enote_scan_info_main = enote_scan_infos.at(bob_main_local_output_index);
+        ASSERT_TRUE(enote_scan_info_main->use_biased_hash_to_point);
+        ASSERT_EQ(bob_main_addr.m_spend_public_key, enote_scan_info_main->address_spend_pubkey);
+        ASSERT_EQ(crypto::null_hash, enote_scan_info_main->payment_id);
+        ASSERT_TRUE(enote_scan_info_main->subaddr_index);
+        ASSERT_EQ(carrot::subaddress_index{}, enote_scan_info_main->subaddr_index.value().index);
+        ASSERT_EQ(main_amount, enote_scan_info_main->amount);
+        ASSERT_EQ(0, enote_scan_info_main->main_tx_pubkey_index);
+        ASSERT_TRUE(verify_enote_scan_info_sender_extensions(*enote_scan_info_main,
+            tx.vout.at(bob_main_local_output_index)));
+
+        // Check subaddr scan results
+        const auto &enote_scan_info_sub = enote_scan_infos.at(bob_subaddr_local_output_index);
+        ASSERT_TRUE(enote_scan_info_sub->use_biased_hash_to_point);
+        ASSERT_EQ(bob_subaddr.m_spend_public_key, enote_scan_info_sub->address_spend_pubkey);
+        ASSERT_EQ(crypto::null_hash, enote_scan_info_sub->payment_id);
+        ASSERT_TRUE(enote_scan_info_sub->subaddr_index);
+        ASSERT_EQ(carrot::subaddress_index({subaddr_index.major, subaddr_index.minor}),
+            enote_scan_info_sub->subaddr_index.value().index);
+        ASSERT_EQ(subaddr_amount, enote_scan_info_sub->amount);
+        ASSERT_EQ(0, enote_scan_info_sub->main_tx_pubkey_index);
+        ASSERT_TRUE(verify_enote_scan_info_sender_extensions(*enote_scan_info_sub,
+            tx.vout.at(bob_subaddr_local_output_index)));
+
+        // Create Bob wallet and blockchain instance
+        tools::wallet2 w(cryptonote::MAINNET, /*kdf_rounds=*/1, /*unattended=*/true);
+        w.set_offline(true);
+        w.generate("", "", bob.get_keys().m_spend_secret_key, /*recover=*/true);
+        mock::fake_pruned_blockchain bc;
+        bc.init_wallet_for_starting_block(w);
+
+        // Add block containing tx and refresh wallet
+        const cryptonote::account_public_address random_addr{rct::rct2pk(rct::pkGen()), rct::rct2pk(rct::pkGen())};
+        bc.add_block(hf_version, {tx}, random_addr);
+        bc.refresh_wallet(w);
+    
+        // Check transfer container info
+        wallet2_basic::transfer_container transfers;
+        w.get_transfers(transfers);
+        ASSERT_EQ(2, transfers.size());
+        const auto &main_td = transfers.at(bob_main_local_output_index > bob_subaddr_local_output_index);
+        ASSERT_TRUE(main_td.m_subaddr_index.is_zero());
+        ASSERT_EQ(main_amount, main_td.amount());
+        const auto &subaddr_td = transfers.at(bob_main_local_output_index < bob_subaddr_local_output_index);
+        ASSERT_FALSE(subaddr_td.m_subaddr_index.is_zero());
+        ASSERT_EQ(subaddr_index, subaddr_td.m_subaddr_index);
+        ASSERT_EQ(subaddr_amount, subaddr_td.amount());
+
+        // Make opening hints from transfer details and check info
+        const carrot::OutputOpeningHintVariant main_opening_hint
+            = tools::wallet::make_sal_opening_hint_from_transfer_details(main_td);
+        {
+            crypto::secret_key ohint_k_g_o, ohint_k_t_o;
+            ASSERT_TRUE(carrot::try_scan_opening_hint_sender_extensions(main_opening_hint,
+                bob_addr_dev,
+                nullptr,
+                bob_k_view_dev.get(),
+                ohint_k_g_o,
+                ohint_k_t_o));
+            ASSERT_EQ(enote_scan_info_main->sender_extension_g, ohint_k_g_o);
+            ASSERT_EQ(enote_scan_info_main->sender_extension_t, ohint_k_t_o);
+            ASSERT_EQ(main_td.get_public_key(), onetime_address_ref(main_opening_hint));
+            ASSERT_FALSE(subaddress_index_ref(main_opening_hint).index.is_subaddress());
+            carrot::xmr_amount ohint_amount;
+            crypto::secret_key ohint_k_a;
+            ASSERT_TRUE(carrot::try_scan_opening_hint_amount(main_opening_hint,
+                bob_addr_dev,
+                nullptr,
+                bob_k_view_dev.get(),
+                ohint_amount,
+                ohint_k_a));
+            ASSERT_EQ(main_td.amount(), ohint_amount);
+            ASSERT_EQ(main_td.m_mask, rct::sk2rct(ohint_k_a));
+        }
+        const carrot::OutputOpeningHintVariant subaddr_opening_hint
+            = tools::wallet::make_sal_opening_hint_from_transfer_details(subaddr_td);
+        {
+            crypto::secret_key ohint_k_g_o, ohint_k_t_o;
+            ASSERT_TRUE(carrot::try_scan_opening_hint_sender_extensions(subaddr_opening_hint,
+                bob_addr_dev,
+                nullptr,
+                bob_k_view_dev.get(),
+                ohint_k_g_o,
+                ohint_k_t_o));
+            ASSERT_EQ(enote_scan_info_sub->sender_extension_g, ohint_k_g_o);
+            ASSERT_EQ(enote_scan_info_sub->sender_extension_t, ohint_k_t_o);
+            ASSERT_EQ(subaddr_td.get_public_key(), onetime_address_ref(subaddr_opening_hint));
+            ASSERT_TRUE(subaddress_index_ref(subaddr_opening_hint).index.is_subaddress());
+            ASSERT_EQ(enote_scan_info_sub->subaddr_index->index, subaddress_index_ref(subaddr_opening_hint).index);
+            carrot::xmr_amount ohint_amount;
+            crypto::secret_key ohint_k_a;
+            ASSERT_TRUE(carrot::try_scan_opening_hint_amount(subaddr_opening_hint,
+                bob_addr_dev,
+                nullptr,
+                bob_k_view_dev.get(),
+                ohint_amount,
+                ohint_k_a));
+            ASSERT_EQ(subaddr_td.amount(), ohint_amount);
+            ASSERT_EQ(subaddr_td.m_mask, rct::sk2rct(ohint_k_a));
+        }
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------

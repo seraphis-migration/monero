@@ -37,6 +37,7 @@
 
 namespace crypto {
 
+
 #include "hash-def.h"
 
 #pragma pack(push, 1)
@@ -76,6 +77,9 @@ namespace crypto {
   inline bool operator<(const hash &lhs, const hash &rhs) noexcept { return memcmp(&lhs, &rhs, sizeof(hash)) < 0; }
   inline bool operator>(const hash &lhs, const hash &rhs) noexcept { return rhs < lhs; }
 }
+
+inline const unsigned char* to_bytes(const crypto::hash &h) { return &reinterpret_cast<const unsigned char&>(h); }
+inline unsigned char* to_bytes(crypto::hash &h) { return &reinterpret_cast<unsigned char&>(h); }
 
 CRYPTO_MAKE_HASHABLE(hash)
 CRYPTO_MAKE_COMPARABLE(hash8)

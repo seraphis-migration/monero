@@ -105,7 +105,7 @@ int main(int argc, char* argv[])
   SL(tools::wallet2::confirmed_transfer_details);
   SL(tools::wallet2::tx_construction_data);
   SL(tools::wallet2::pending_tx);
-  SL(tools::wallet2::unsigned_tx_set);
+  SL(tools::wallet::cold::UnsignedTransactionSetVariant);
   SL(tools::wallet2::signed_tx_set);
 
   SL(Monero::WalletImpl);

@@ -43,6 +43,8 @@
 #include "serialization/debug_archive.h"
 #include "serialization/crypto.h"
 #include "serialization/keyvalue_serialization.h" // eepe named serialization
+#include "carrot_core/core_types.h"
+#include "carrot_impl/carrot_chain_serialization.h"
 #include "cryptonote_config.h"
 #include "crypto/crypto.h"
 #include "crypto/hash.h"
@@ -72,9 +74,20 @@ namespace cryptonote
     END_SERIALIZE()
   };
 
-  struct txout_to_scripthash
+  struct txout_to_carrot_v1
   {
-    crypto::hash hash;
+    crypto::public_key key;                                  // K_o
+    carrot::view_tag_t view_tag;                             // vt
+    carrot::encrypted_janus_anchor_t encrypted_janus_anchor; // anchor_enc
+
+    // Encrypted amount a_enc and amount commitment C_a are stored in rct::rctSigBase
+    // This allows for reuse of this output type between coinbase and non-coinbase txs
+
+    BEGIN_SERIALIZE_OBJECT()
+      FIELD(key)
+      FIELD(view_tag)
+      FIELD(encrypted_janus_anchor)
+    END_SERIALIZE()
   };
 
   // outputs <= HF_VERSION_VIEW_TAGS
@@ -154,7 +167,7 @@ namespace cryptonote
 
   typedef boost::variant<txin_gen, txin_to_script, txin_to_scripthash, txin_to_key> txin_v;
 
-  typedef boost::variant<txout_to_script, txout_to_scripthash, txout_to_key, txout_to_tagged_key> txout_target_v;
+  typedef boost::variant<txout_to_script, txout_to_carrot_v1, txout_to_key, txout_to_tagged_key> txout_target_v;
 
   struct tx_out
   {
@@ -168,6 +181,22 @@ namespace cryptonote
 
 
   };
+
+  inline const crypto::public_key &output_pubkey_cref(const txout_target_v &tx_out)
+  {
+    struct tx_out_visitor
+    {
+      const crypto::public_key &operator()(const cryptonote::txout_to_script&) const
+      { throw std::runtime_error("Unexpected usage of txout to script"); }
+      const crypto::public_key &operator()(const cryptonote::txout_to_carrot_v1 &out) const
+      { return out.key; }
+      const crypto::public_key &operator()(const cryptonote::txout_to_tagged_key &out) const
+      { return out.key; }
+      const crypto::public_key &operator()(const cryptonote::txout_to_key &out) const
+      { return out.key; }
+    };
+    return boost::apply_visitor(tx_out_visitor{}, tx_out);
+  }
 
   class transaction_prefix
   {
@@ -401,7 +430,8 @@ namespace cryptonote
             ar.tag("rctsig_prunable");
             ar.begin_object();
             r = rct_signatures.p.serialize_rctsig_prunable(ar, rct_signatures.type, vin.size(), vout.size(),
-                vin.size() > 0 && vin[0].type() == typeid(txin_to_key) ? boost::get<txin_to_key>(vin[0]).key_offsets.size() - 1 : 0);
+                (vin.empty() || vin[0].type() != typeid(txin_to_key) || rct_signatures.type == rct::RCTTypeFcmpPlusPlus)
+                ? 0 : boost::get<txin_to_key>(vin[0]).key_offsets.size() - 1);
             if (!r || !ar.good()) return false;
             ar.end_object();
           }
@@ -605,6 +635,8 @@ namespace cryptonote
       hash_valid(b.is_hash_valid()),
       miner_tx(b.miner_tx),
       tx_hashes(b.tx_hashes),
+      fcmp_pp_n_tree_layers(b.fcmp_pp_n_tree_layers),
+      fcmp_pp_tree_root(b.fcmp_pp_tree_root),
       hash(b.hash)
     {}
     block(block &&b):
@@ -612,6 +644,8 @@ namespace cryptonote
       hash_valid(b.is_hash_valid()),
       miner_tx(std::move(b.miner_tx)),
       tx_hashes(std::move(b.tx_hashes)),
+      fcmp_pp_n_tree_layers(std::move(b.fcmp_pp_n_tree_layers)),
+      fcmp_pp_tree_root(std::move(b.fcmp_pp_tree_root)),
       hash(std::move(b.hash))
     {
       b.miner_tx.set_null();
@@ -625,6 +659,8 @@ namespace cryptonote
         hash_valid = b.is_hash_valid();
         miner_tx = b.miner_tx;
         tx_hashes = b.tx_hashes;
+        fcmp_pp_n_tree_layers = b.fcmp_pp_n_tree_layers;
+        fcmp_pp_tree_root = b.fcmp_pp_tree_root;
         hash = b.hash;
       }
       return *this;
@@ -637,6 +673,8 @@ namespace cryptonote
         hash_valid = b.is_hash_valid();
         miner_tx = std::move(b.miner_tx);
         tx_hashes = std::move(b.tx_hashes);
+        fcmp_pp_n_tree_layers = b.fcmp_pp_n_tree_layers;
+        fcmp_pp_tree_root = b.fcmp_pp_tree_root;
         hash = std::move(b.hash);
         b.miner_tx.set_null();
         b.tx_hashes.clear();
@@ -651,6 +689,10 @@ namespace cryptonote
     transaction miner_tx;
     std::vector<crypto::hash> tx_hashes;
 
+    // We include both n tree layers and the root so SPV nodes can verify FCMP++ proofs
+    uint8_t fcmp_pp_n_tree_layers;
+    crypto::ec_point fcmp_pp_tree_root;
+
     // hash cash
     mutable crypto::hash hash;
 
@@ -663,6 +705,13 @@ namespace cryptonote
       FIELD(tx_hashes)
       if (tx_hashes.size() > CRYPTONOTE_MAX_TX_PER_BLOCK)
         return false;
+      if (major_version >= HF_VERSION_FCMP_PLUS_PLUS)
+      {
+        FIELD(fcmp_pp_n_tree_layers)
+        if (fcmp_pp_n_tree_layers > FCMP_PLUS_PLUS_MAX_LAYERS)
+          return false;
+        FIELD(fcmp_pp_tree_root)
+      }
     END_SERIALIZE()
   };
 
@@ -729,14 +778,13 @@ namespace std {
 }
 
 BLOB_SERIALIZER(cryptonote::txout_to_key);
-BLOB_SERIALIZER(cryptonote::txout_to_scripthash);
 
 VARIANT_TAG(binary_archive, cryptonote::txin_gen, 0xff);
 VARIANT_TAG(binary_archive, cryptonote::txin_to_script, 0x0);
 VARIANT_TAG(binary_archive, cryptonote::txin_to_scripthash, 0x1);
 VARIANT_TAG(binary_archive, cryptonote::txin_to_key, 0x2);
 VARIANT_TAG(binary_archive, cryptonote::txout_to_script, 0x0);
-VARIANT_TAG(binary_archive, cryptonote::txout_to_scripthash, 0x1);
+VARIANT_TAG(binary_archive, cryptonote::txout_to_carrot_v1, 0x1);
 VARIANT_TAG(binary_archive, cryptonote::txout_to_key, 0x2);
 VARIANT_TAG(binary_archive, cryptonote::txout_to_tagged_key, 0x3);
 VARIANT_TAG(binary_archive, cryptonote::transaction, 0xcc);
@@ -747,7 +795,7 @@ VARIANT_TAG(json_archive, cryptonote::txin_to_script, "script");
 VARIANT_TAG(json_archive, cryptonote::txin_to_scripthash, "scripthash");
 VARIANT_TAG(json_archive, cryptonote::txin_to_key, "key");
 VARIANT_TAG(json_archive, cryptonote::txout_to_script, "script");
-VARIANT_TAG(json_archive, cryptonote::txout_to_scripthash, "scripthash");
+VARIANT_TAG(json_archive, cryptonote::txout_to_carrot_v1, "carrot_v1");
 VARIANT_TAG(json_archive, cryptonote::txout_to_key, "key");
 VARIANT_TAG(json_archive, cryptonote::txout_to_tagged_key, "tagged_key");
 VARIANT_TAG(json_archive, cryptonote::transaction, "tx");
@@ -758,7 +806,7 @@ VARIANT_TAG(debug_archive, cryptonote::txin_to_script, "script");
 VARIANT_TAG(debug_archive, cryptonote::txin_to_scripthash, "scripthash");
 VARIANT_TAG(debug_archive, cryptonote::txin_to_key, "key");
 VARIANT_TAG(debug_archive, cryptonote::txout_to_script, "script");
-VARIANT_TAG(debug_archive, cryptonote::txout_to_scripthash, "scripthash");
+VARIANT_TAG(debug_archive, cryptonote::txout_to_carrot_v1, "carrot_v1");
 VARIANT_TAG(debug_archive, cryptonote::txout_to_key, "key");
 VARIANT_TAG(debug_archive, cryptonote::txout_to_tagged_key, "tagged_key");
 VARIANT_TAG(debug_archive, cryptonote::transaction, "tx");

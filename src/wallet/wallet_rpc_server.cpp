@@ -40,6 +40,8 @@
 #include "version.h"
 #include "wallet_rpc_server.h"
 #include "wallet/wallet_args.h"
+#include "carrot_impl/format_utils.h"
+#include "carrot_impl/knowledge_proof_utils.h"
 #include "common/command_line.h"
 #include "common/i18n.h"
 #include "common/scoped_message_writer.h"
@@ -56,6 +58,7 @@
 #include "rpc/core_rpc_server_commands_defs.h"
 #include "daemonizer/daemonizer.h"
 #include "fee_priority.h"
+#include "tx_builder_serialization.h"
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "wallet.rpc"
@@ -180,6 +183,7 @@ namespace
     }
     else
     {
+      // FIXME: update for FCMP++
       const uint64_t now = time(NULL);
       if (unlock_time > now)
         entry.suggested_confirmations_threshold = std::max(entry.suggested_confirmations_threshold, (unlock_time - now + DIFFICULTY_TARGET_V2 - 1) / DIFFICULTY_TARGET_V2);
@@ -247,7 +251,7 @@ namespace tools
       try
       {
         bool received_money = false;
-        if (m_wallet) m_wallet->refresh(m_wallet->is_trusted_daemon(), 0, blocks_fetched, received_money, true, true, REFRESH_INDICATIVE_BLOCK_CHUNK_SIZE);
+        if (m_wallet) m_wallet->refresh(m_wallet->is_trusted_daemon(), 0, blocks_fetched, received_money, true, REFRESH_INDICATIVE_BLOCK_CHUNK_SIZE);
         refresh_success = true;
       }
       catch (const std::exception& ex)
@@ -635,7 +639,7 @@ namespace tools
         unlocked_balance_per_subaddress_per_account[req.account_index] = m_wallet->unlocked_balance_per_subaddress(req.account_index, req.strict);
       }
       std::vector<tools::wallet2::transfer_details> transfers;
-      m_wallet->get_transfers(transfers);
+      m_wallet->get_transfers(transfers, false/*include_all*/);
       for (const auto& p : balance_per_subaddress_per_account)
       {
         uint32_t account_index = p.first;
@@ -694,7 +698,7 @@ namespace tools
         req_address_index = req.address_index;
       }
       tools::wallet2::transfer_container transfers;
-      m_wallet->get_transfers(transfers);
+      m_wallet->get_transfers(transfers, false/*include_all*/);
       for (uint32_t i : req_address_index)
       {
         THROW_WALLET_EXCEPTION_IF(i >= m_wallet->get_num_subaddresses(req.account_index), error::address_index_outofbound);
@@ -1183,7 +1187,9 @@ namespace tools
     {
       if (get_tx_key)
       {
-        epee::wipeable_string s = epee::to_hex::wipeable_string(ptx.tx_key);
+        epee::wipeable_string s;
+        if (ptx.tx_key != crypto::null_skey)
+          s += epee::to_hex::wipeable_string(ptx.tx_key);
         for (const crypto::secret_key& additional_tx_key : ptx.additional_tx_keys)
           s += epee::to_hex::wipeable_string(additional_tx_key);
         fill(tx_key, std::string(s.data(), s.size()));
@@ -1259,23 +1265,25 @@ namespace tools
     std::vector<uint8_t> extra;
 
     LOG_PRINT_L3("on_transfer starts");
+    if (!m_wallet) return not_open(er);
+    const fee_algorithm fee_algo = m_wallet->get_fee_algorithm();
     if (m_restricted)
     {
       er.code = WALLET_RPC_ERROR_CODE_DENIED;
       er.message = "Command unavailable in restricted mode.";
       return false;
     }
-    if (!m_wallet) return not_open(er);
-    else if (req.unlock_time)
+    if (req.unlock_time)
     {
       er.code = WALLET_RPC_ERROR_CODE_NONZERO_UNLOCK_TIME;
       er.message = "Transaction cannot have non-zero unlock time";
       return false;
     }
-    else if (!fee_priority_utilities::is_valid(req.priority))
+    else if (!fee_priority_utilities::is_valid(req.priority, fee_algo))
     {
       er.code = WALLET_RPC_ERROR_CODE_INVALID_FEE_PRIORITY;
-      er.message = "Invalid priority value. Must be between 0 and 4.";
+      const uint32_t max_priority = fee_priority_utilities::as_integral(fee_priority_utilities::max_priority(fee_algo));
+      er.message = "Invalid priority value. Must be between 0 and " + std::to_string(max_priority);
       return false;
     }
 
@@ -1290,7 +1298,7 @@ namespace tools
     try
     {
       uint64_t mixin = m_wallet->adjust_mixin(req.ring_size ? req.ring_size - 1 : 0);
-      const fee_priority priority = m_wallet->adjust_priority(fee_priority_utilities::from_integral(req.priority));
+      const fee_priority priority = m_wallet->adjust_priority(fee_priority_utilities::from_integral(req.priority, fee_algo));
       std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, mixin, priority, extra, req.account_index, req.subaddr_indices, req.subtract_fee_from_outputs);
 
       if (ptx_vector.empty())
@@ -1325,23 +1333,25 @@ namespace tools
     std::vector<cryptonote::tx_destination_entry> dsts;
     std::vector<uint8_t> extra;
 
+    if (!m_wallet) return not_open(er);
+    const fee_algorithm fee_algo = m_wallet->get_fee_algorithm();
     if (m_restricted)
     {
       er.code = WALLET_RPC_ERROR_CODE_DENIED;
       er.message = "Command unavailable in restricted mode.";
       return false;
     }
-    if (!m_wallet) return not_open(er);
-    else if (req.unlock_time)
+    if (req.unlock_time)
     {
       er.code = WALLET_RPC_ERROR_CODE_NONZERO_UNLOCK_TIME;
       er.message = "Transaction cannot have non-zero unlock time";
       return false;
     }
-    else if (!fee_priority_utilities::is_valid(req.priority))
+    else if (!fee_priority_utilities::is_valid(req.priority, fee_algo))
     {
       er.code = WALLET_RPC_ERROR_CODE_INVALID_FEE_PRIORITY;
-      er.message = "Invalid priority value. Must be between 0 and 4.";
+      const uint32_t max_priority = fee_priority_utilities::as_integral(fee_priority_utilities::max_priority(fee_algo));
+      er.message = "Invalid priority value. Must be between 0 and " + std::to_string(max_priority);
       return false;
     }
 
@@ -1356,7 +1366,7 @@ namespace tools
     try
     {
       uint64_t mixin = m_wallet->adjust_mixin(req.ring_size ? req.ring_size - 1 : 0);
-      const fee_priority priority = m_wallet->adjust_priority(fee_priority_utilities::from_integral(req.priority));
+      const fee_priority priority = m_wallet->adjust_priority(fee_priority_utilities::from_integral(req.priority, fee_algo));
       LOG_PRINT_L2("on_transfer_split calling create_transactions_2");
       std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_2(dsts, mixin, priority, extra, req.account_index, req.subaddr_indices);
       LOG_PRINT_L2("on_transfer_split called create_transactions_2");
@@ -1412,7 +1422,7 @@ namespace tools
       return false;
     }
 
-    tools::wallet2::unsigned_tx_set exported_txs;
+    tools::wallet::cold::UnsignedTransactionSetVariant exported_txs;
     if(!m_wallet->parse_unsigned_tx_from_str(blob, exported_txs))
     {
       er.code = WALLET_RPC_ERROR_CODE_BAD_UNSIGNED_TX_DATA;
@@ -1423,7 +1433,7 @@ namespace tools
     std::vector<tools::wallet2::pending_tx> ptxs;
     try
     {
-      tools::wallet2::signed_tx_set signed_txs;
+      tools::wallet::cold::SignedTransactionSetVariant signed_txs;
       std::string ciphertext = m_wallet->sign_tx_dump_to_str(exported_txs, ptxs, signed_txs);
       if (ciphertext.empty())
       {
@@ -1492,11 +1502,11 @@ namespace tools
       return false;
     }
 
-    std::vector <wallet2::tx_construction_data> tx_constructions;
+    std::vector<tools::wallet::tx_reconstruct_variant_t> tx_constructions;
     std::vector<uint64_t> tx_weights;
     if (!req.unsigned_txset.empty()) {
       try {
-        tools::wallet2::unsigned_tx_set exported_txs;
+        tools::wallet::cold::UnsignedTransactionSetVariant exported_txs;
         cryptonote::blobdata blob;
         if (!epee::string_tools::parse_hexstr_to_binbuff(req.unsigned_txset, blob)) {
           er.code = WALLET_RPC_ERROR_CODE_BAD_HEX;
@@ -1508,9 +1518,15 @@ namespace tools
           er.message = "cannot load unsigned_txset";
           return false;
         }
-        tx_constructions = exported_txs.txes;
         // An unsigned txset does not contain a transaction with an exact weight yet.
-        tx_weights.resize(tx_constructions.size());
+        tx_weights.resize(tools::wallet::cold::num_unsigned_txs_ref(exported_txs));
+
+        if (!m_wallet->get_transaction_proposals_from_unsigned_tx(exported_txs, tx_constructions))
+        {
+          er.code = WALLET_RPC_ERROR_CODE_BAD_UNSIGNED_TX_DATA;
+          er.message = "unsigned tx set could not be expanded into full transaction proposals, probably needs re-scan";
+          return false;
+        }
       }
       catch (const std::exception &e) {
         er.code = WALLET_RPC_ERROR_CODE_BAD_UNSIGNED_TX_DATA;
@@ -1533,7 +1549,7 @@ namespace tools
         }
 
         for (size_t n = 0; n < exported_txs.m_ptx.size(); ++n) {
-          tx_constructions.push_back(exported_txs.m_ptx[n].construction_data);
+          tx_constructions.push_back(std::get<wallet2::tx_construction_data>(exported_txs.m_ptx[n].construction_data));
           tx_weights.push_back(cryptonote::get_transaction_weight(exported_txs.m_ptx[n].tx));
         }
       }
@@ -1544,69 +1560,71 @@ namespace tools
       }
     }
 
+    const auto addr_dev = m_wallet->get_cryptonote_address_device();
+    assert(!addr_dev->supports_address_derive_type(carrot::AddressDeriveType::Carrot)); //!@TODO: Carrot
+    crypto::public_key main_address_spend_pubkey;
+    addr_dev->get_address_spend_pubkey({}, main_address_spend_pubkey);
+
     try
     {
       // gather info to ask the user
       std::unordered_map<cryptonote::account_public_address, std::pair<std::string, uint64_t>> tx_dests;
       std::unordered_map<cryptonote::account_public_address, std::pair<std::string, uint64_t>> all_dests;
-      int first_known_non_zero_change_index = -1;
+      std::optional<cryptonote::tx_destination_entry> first_known_non_zero_change_dst;
       res.summary.amount_in = 0;
       res.summary.amount_out = 0;
       res.summary.change_amount = 0;
       res.summary.fee = 0;
       for (size_t n = 0; n < tx_constructions.size(); ++n)
       {
-        const tools::wallet2::tx_construction_data &cd = tx_constructions[n];
+        const auto &cd = tx_constructions.at(n);
         res.desc.push_back({0, 0, std::numeric_limits<uint32_t>::max(), 0, {}, {}, "", 0, "", 0, 0, 0, ""});
         wallet_rpc::COMMAND_RPC_DESCRIBE_TRANSFER::transfer_description &desc = res.desc.back();
         desc.weight = tx_weights[n];
         // Clear the recipients collection ready for this loop iteration
         tx_dests.clear();
 
-        std::vector<cryptonote::tx_extra_field> tx_extra_fields;
-        bool has_encrypted_payment_id = false;
-        crypto::hash8 payment_id8 = crypto::null_hash8;
-        if (cryptonote::parse_tx_extra(cd.extra, tx_extra_fields))
-        {
-          cryptonote::tx_extra_nonce extra_nonce;
-          if (find_tx_extra_field_by_type(tx_extra_fields, extra_nonce))
-          {
-            crypto::hash payment_id;
-            if(cryptonote::get_encrypted_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id8))
-            {
-              if (payment_id8 != crypto::null_hash8)
-              {
-                desc.payment_id = epee::string_tools::pod_to_hex(payment_id8);
-                has_encrypted_payment_id = true;
-              }
-            }
-            else if (cryptonote::get_payment_id_from_tx_extra_nonce(extra_nonce.nonce, payment_id))
-            {
-              desc.payment_id = epee::string_tools::pod_to_hex(payment_id);
-            }
-          }
-        }
+        const std::optional<crypto::hash8> payment_id8 = short_payment_id(cd);
+        const std::optional<crypto::hash> payment_id32 = long_payment_id(cd);
+        if (payment_id8)
+          desc.payment_id = epee::string_tools::pod_to_hex(*payment_id8);
+        else if (payment_id32)
+          desc.payment_id = epee::string_tools::pod_to_hex(*payment_id32);
 
-        for (size_t s = 0; s < cd.sources.size(); ++s)
+        const std::vector<crypto::public_key> spent_otas = spent_onetime_addresses(cd);
+        const std::vector<rct::xmr_amount> inp_amounts = wallet::input_amounts(cd,
+          *addr_dev, nullptr, addr_dev.get());
+        const std::vector<std::uint64_t> input_ring_sizes = ring_sizes(cd);
+        for (std::size_t input_idx = 0; input_idx < spent_otas.size(); ++input_idx)
         {
-          const cryptonote::tx_source_entry &src_in = cd.sources[s];
-          const cryptonote::tx_source_entry::output_entry &real_ring_member = src_in.outputs.at(src_in.real_output);
           wallet_rpc::COMMAND_RPC_DESCRIBE_TRANSFER::source &src_out = desc.sources.emplace_back();
-          src_out.amount = src_in.amount;
-          src_out.global_index = real_ring_member.first;
-          src_out.rct = src_in.rct;
-          src_out.pubkey = epee::string_tools::pod_to_hex(real_ring_member.second);
-          desc.amount_in += src_in.amount;
-          size_t ring_size = src_in.outputs.size();
+
+          const auto pre_carrot_proposal = std::get_if<wallet::PreCarrotTransactionProposal>(&cd);
+          if (pre_carrot_proposal)
+          {
+            const cryptonote::tx_source_entry &src_in = pre_carrot_proposal->sources.at(input_idx);
+            src_out.global_index = src_in.outputs.at(src_in.real_output).first;
+            src_out.rct = src_in.rct;
+          }
+          else
+          {
+            src_out.global_index = std::numeric_limits<decltype(src_out.global_index)>::max();
+            src_out.rct = true;
+          }
+
+          src_out.amount = inp_amounts.at(input_idx);
+          src_out.pubkey = epee::string_tools::pod_to_hex(spent_otas.at(input_idx));
+          desc.amount_in += src_out.amount;
+          const std::uint64_t ring_size = input_ring_sizes.at(input_idx);
           if (ring_size < desc.ring_size)
             desc.ring_size = ring_size;
         }
-        for (size_t d = 0; d < cd.splitted_dsts.size(); ++d)
+
+        for (const cryptonote::tx_destination_entry &entry : finalized_destinations(cd, *addr_dev))
         {
-          const cryptonote::tx_destination_entry &entry = cd.splitted_dsts[d];
           std::string address = cryptonote::get_account_address_as_str(m_wallet->nettype(), entry.is_subaddress, entry.addr);
-          if (has_encrypted_payment_id && !entry.is_subaddress)
-            address = cryptonote::get_account_integrated_address_as_str(m_wallet->nettype(), entry.addr, payment_id8);
+          if (payment_id8 && !entry.is_subaddress && address != entry.original)
+            address = cryptonote::get_account_integrated_address_as_str(m_wallet->nettype(), entry.addr, *payment_id8);
           auto i = tx_dests.find(entry.addr);
           if (i == tx_dests.end())
             tx_dests.insert(std::make_pair(entry.addr, std::make_pair(address, entry.amount)));
@@ -1614,37 +1632,36 @@ namespace tools
             i->second.second += entry.amount;
           desc.amount_out += entry.amount;
         }
-        if (cd.change_dts.amount > 0)
+        const cryptonote::tx_destination_entry change_dst = change_destination(cd, *addr_dev);
+        if (change_dst.amount > 0)
         {
-          auto it = tx_dests.find(cd.change_dts.addr);
+          auto it = tx_dests.find(change_dst.addr);
           if (it == tx_dests.end())
           {
             er.code = WALLET_RPC_ERROR_CODE_BAD_UNSIGNED_TX_DATA;
             er.message = "Claimed change does not go to a paid address";
             return false;
           }
-          if (it->second.second < cd.change_dts.amount)
+          if (it->second.second < change_dst.amount)
           {
             er.code = WALLET_RPC_ERROR_CODE_BAD_UNSIGNED_TX_DATA;
             er.message = "Claimed change is larger than payment to the change address";
             return false;
           }
-          if (cd.change_dts.amount > 0)
           {
-            if (first_known_non_zero_change_index == -1)
-              first_known_non_zero_change_index = n;
-            const tools::wallet2::tx_construction_data &cdn = tx_constructions[first_known_non_zero_change_index];
-            if (memcmp(&cd.change_dts.addr, &cdn.change_dts.addr, sizeof(cd.change_dts.addr)))
+            if (!first_known_non_zero_change_dst)
+              first_known_non_zero_change_dst = change_dst;
+            if (change_dst.addr != first_known_non_zero_change_dst->addr)
             {
               er.code = WALLET_RPC_ERROR_CODE_BAD_UNSIGNED_TX_DATA;
               er.message = "Change goes to more than one address";
               return false;
             }
           }
-          desc.change_amount += cd.change_dts.amount;
-          it->second.second -= cd.change_dts.amount;
+          desc.change_amount += change_dst.amount;
+          it->second.second -= change_dst.amount;
           if (it->second.second == 0)
-            tx_dests.erase(cd.change_dts.addr);
+            tx_dests.erase(change_dst.addr);
         }
 
         for (auto i = tx_dests.begin(); i != tx_dests.end(); ++i)
@@ -1664,13 +1681,15 @@ namespace tools
 
         if (desc.change_amount > 0)
         {
-          desc.change_address = get_account_address_as_str(m_wallet->nettype(), cd.subaddr_account > 0, cd.change_dts.addr);
+          desc.change_address = get_account_address_as_str(m_wallet->nettype(),
+            first_known_non_zero_change_dst->is_subaddress,
+            first_known_non_zero_change_dst->addr);
           res.summary.change_address = desc.change_address;
         }
 
         desc.fee = desc.amount_in - desc.amount_out;
-        desc.unlock_time = cd.unlock_time;
-        desc.extra = epee::to_hex::string({cd.extra.data(), cd.extra.size()});
+        desc.unlock_time = unlock_time(cd);
+        desc.extra = epee::to_hex::string(epee::to_span(extra_ref(cd)));
 
         // Update summary items
         res.summary.amount_in += desc.amount_in;
@@ -1687,7 +1706,7 @@ namespace tools
     catch (const std::exception &e)
     {
       er.code = WALLET_RPC_ERROR_CODE_BAD_UNSIGNED_TX_DATA;
-      er.message = "failed to parse unsigned transfers";
+      er.message = std::string("failed to parse unsigned transfers: ") + e.what();
       return false;
     }
 
@@ -1742,6 +1761,11 @@ namespace tools
       {
         m_wallet->commit_tx(ptx);
         res.tx_hash_list.push_back(epee::string_tools::pod_to_hex(cryptonote::get_transaction_hash(ptx.tx)));
+        if (rct::is_rct_fcmp(ptx.tx.rct_signatures.type))
+        {
+          const crypto::hash signable_tx_hash = carrot::calculate_signable_fcmp_pp_transaction_hash(ptx.tx);
+          res.signable_tx_hash_list.push_back(epee::string_tools::pod_to_hex(signable_tx_hash));
+        }
       }
     }
     catch (const std::exception &e)
@@ -1787,23 +1811,25 @@ namespace tools
     std::vector<cryptonote::tx_destination_entry> dsts;
     std::vector<uint8_t> extra;
 
+    if (!m_wallet) return not_open(er);
+    const fee_algorithm fee_algo = m_wallet->get_fee_algorithm();
     if (m_restricted)
     {
       er.code = WALLET_RPC_ERROR_CODE_DENIED;
       er.message = "Command unavailable in restricted mode.";
       return false;
     }
-    if (!m_wallet) return not_open(er);
-    else if (req.unlock_time)
+    if (req.unlock_time)
     {
       er.code = WALLET_RPC_ERROR_CODE_NONZERO_UNLOCK_TIME;
       er.message = "Transaction cannot have non-zero unlock time";
       return false;
     }
-    else if (!fee_priority_utilities::is_valid(req.priority))
+    else if (!fee_priority_utilities::is_valid(req.priority, fee_algo))
     {
       er.code = WALLET_RPC_ERROR_CODE_INVALID_FEE_PRIORITY;
-      er.message = "Invalid priority value. Must be between 0 and 4.";
+      const uint32_t max_priority = fee_priority_utilities::as_integral(fee_priority_utilities::max_priority(fee_algo));
+      er.message = "Invalid priority value. Must be between 0 and " + std::to_string(max_priority);
       return false;
     }
 
@@ -1840,7 +1866,7 @@ namespace tools
     try
     {
       uint64_t mixin = m_wallet->adjust_mixin(req.ring_size ? req.ring_size - 1 : 0);
-      const fee_priority priority = m_wallet->adjust_priority(fee_priority_utilities::from_integral(req.priority));
+      const fee_priority priority = m_wallet->adjust_priority(fee_priority_utilities::from_integral(req.priority, fee_algo));
       std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_all(req.below_amount, dsts[0].addr, dsts[0].is_subaddress, req.outputs, mixin, priority, extra, req.account_index, subaddr_indices);
 
       return fill_response(ptx_vector, req.get_tx_keys, res.tx_key_list, res.amount_list, res.amounts_by_dest_list, res.fee_list, res.weight_list, res.multisig_txset, res.unsigned_txset, req.do_not_relay,
@@ -1859,23 +1885,25 @@ namespace tools
     std::vector<cryptonote::tx_destination_entry> dsts;
     std::vector<uint8_t> extra;
 
+    if (!m_wallet) return not_open(er);
+    const fee_algorithm fee_algo = m_wallet->get_fee_algorithm();
     if (m_restricted)
     {
       er.code = WALLET_RPC_ERROR_CODE_DENIED;
       er.message = "Command unavailable in restricted mode.";
       return false;
     }
-    if (!m_wallet) return not_open(er);
-    else if (req.unlock_time)
+    if (req.unlock_time)
     {
       er.code = WALLET_RPC_ERROR_CODE_NONZERO_UNLOCK_TIME;
       er.message = "Transaction cannot have non-zero unlock time";
       return false;
     }
-    else if (!fee_priority_utilities::is_valid(req.priority))
+    else if (!fee_priority_utilities::is_valid(req.priority, fee_algo))
     {
       er.code = WALLET_RPC_ERROR_CODE_INVALID_FEE_PRIORITY;
-      er.message = "Invalid priority value. Must be between 0 and 4.";
+      const uint32_t max_priority = fee_priority_utilities::as_integral(fee_priority_utilities::max_priority(fee_algo));
+      er.message = "Invalid priority value. Must be between 0 and " + std::to_string(max_priority);
       return false;
     }
 
@@ -1909,7 +1937,7 @@ namespace tools
     try
     {
       uint64_t mixin = m_wallet->adjust_mixin(req.ring_size ? req.ring_size - 1 : 0);
-      const fee_priority priority = m_wallet->adjust_priority(fee_priority_utilities::from_integral(req.priority));
+      const fee_priority priority = m_wallet->adjust_priority(fee_priority_utilities::from_integral(req.priority, fee_algo));
       std::vector<wallet2::pending_tx> ptx_vector = m_wallet->create_transactions_single(ki, dsts[0].addr, dsts[0].is_subaddress, req.outputs, mixin, priority, extra);
 
       if (ptx_vector.empty())
@@ -1925,7 +1953,7 @@ namespace tools
         return false;
       }
       const wallet2::pending_tx &ptx = ptx_vector[0];
-      if (ptx.selected_transfers.size() > 1)
+      if (ptx.tx.vin.size() > 1)
       {
         er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
         er.message = "The transaction uses multiple inputs, which is not supposed to happen";
@@ -2271,7 +2299,7 @@ namespace tools
     }
 
     wallet2::transfer_container transfers;
-    m_wallet->get_transfers(transfers);
+    m_wallet->get_transfers(transfers, false/*include_all*/);
 
     for (const auto& td : transfers)
     {
@@ -3166,13 +3194,13 @@ namespace tools
     CHECK_IF_RESTRICTED_BACKGROUND_SYNCING();
     try
     {
-      std::pair<uint64_t, std::vector<std::pair<crypto::key_image, crypto::signature>>> ski = m_wallet->export_key_images(req.all);
+      std::pair<uint64_t, std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>>> ski = m_wallet->export_key_images(req.all);
       res.offset = ski.first;
       res.signed_key_images.resize(ski.second.size());
       for (size_t n = 0; n < ski.second.size(); ++n)
       {
          res.signed_key_images[n].key_image = epee::string_tools::pod_to_hex(ski.second[n].first);
-         res.signed_key_images[n].signature = epee::string_tools::pod_to_hex(ski.second[n].second);
+         res.signed_key_images[n].signature = carrot::key_image_proof_to_readable_string(ski.second[n].second);
       }
     }
 
@@ -3187,6 +3215,7 @@ namespace tools
   //------------------------------------------------------------------------------------------------------------------------------
   bool wallet_rpc_server::on_import_key_images(const wallet_rpc::COMMAND_RPC_IMPORT_KEY_IMAGES::request& req, wallet_rpc::COMMAND_RPC_IMPORT_KEY_IMAGES::response& res, epee::json_rpc::error& er, const connection_context *ctx)
   {
+    using carrot::KeyImageProofVariant;
     if (m_restricted)
     {
       er.code = WALLET_RPC_ERROR_CODE_DENIED;
@@ -3203,7 +3232,7 @@ namespace tools
     CHECK_IF_BACKGROUND_SYNCING();
     try
     {
-      std::vector<std::pair<crypto::key_image, crypto::signature>> ski;
+      std::vector<std::pair<crypto::key_image, KeyImageProofVariant>> ski;
       ski.resize(req.signed_key_images.size());
       for (size_t n = 0; n < ski.size(); ++n)
       {
@@ -3214,7 +3243,7 @@ namespace tools
           return false;
         }
 
-        if (!epee::string_tools::hex_to_pod(req.signed_key_images[n].signature, ski[n].second))
+        if (!carrot::try_key_image_proof_from_readable_string(req.signed_key_images[n].signature, ski[n].second))
         {
           er.code = WALLET_RPC_ERROR_CODE_WRONG_SIGNATURE;
           er.message = "failed to parse signature";
@@ -3489,9 +3518,13 @@ namespace tools
 
       try {
           m_wallet->scan_tx(txids);
-      }  catch (const tools::error::wont_reprocess_recent_txs_via_untrusted_daemon &e) {
+      } catch (const tools::error::wont_reprocess_txs_via_untrusted_daemon &e) {
           er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
           er.message = e.what() + std::string(". Either connect to a trusted daemon or rescan the chain.");
+          return false;
+      } catch (const tools::error::wont_scan_future_tx &e) {
+          er.code = WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR;
+          er.message = e.what() + std::string(". Either refresh the wallet, or restore the wallet from the current chain height and then scan.");
           return false;
       } catch (const std::exception &e) {
           handle_rpc_exception(std::current_exception(), er, WALLET_RPC_ERROR_CODE_UNKNOWN_ERROR);

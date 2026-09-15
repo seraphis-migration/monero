@@ -65,7 +65,7 @@ namespace
   constexpr const char txpool_signal[] = "tx_signal";
 
   using chain_writer =  std::error_code(epee::byte_stream&, std::uint64_t, epee::span<const cryptonote::block>);
-  using miner_writer =  std::error_code(epee::byte_stream&, uint8_t, uint64_t, const crypto::hash&, const crypto::hash&, cryptonote::difficulty_type, uint64_t, uint64_t, const std::vector<cryptonote::tx_block_template_backlog_entry>&);
+  using miner_writer =  std::error_code(epee::byte_stream&, uint8_t, uint64_t, const crypto::hash&, const uint8_t, const crypto::ec_point&, const crypto::hash&, cryptonote::difficulty_type, uint64_t, uint64_t, const std::vector<cryptonote::tx_block_template_backlog_entry>&);
   using txpool_writer = std::error_code(epee::byte_stream&, epee::span<const cryptonote::txpool_event>);
 
   namespace error
@@ -205,6 +205,8 @@ namespace
     uint8_t major_version;
     uint64_t height;
     const crypto::hash& prev_id;
+    const uint8_t fcmp_pp_n_tree_layers;
+    const crypto::ec_point& fcmp_pp_tree_root;
     const crypto::hash& seed_hash;
     cryptonote::difficulty_type diff;
     uint64_t median_weight;
@@ -217,6 +219,8 @@ namespace
       WIRE_FIELD_COPY(major_version),
       WIRE_FIELD_COPY(height),
       WIRE_FIELD(prev_id),
+      WIRE_FIELD_COPY(fcmp_pp_n_tree_layers),
+      WIRE_FIELD(fcmp_pp_tree_root),
       WIRE_FIELD(seed_hash),
       wire::field("difficulty", cryptonote::hex(self.diff)),
       WIRE_FIELD_COPY(median_weight),
@@ -258,9 +262,9 @@ namespace
   }
 
   template<typename F>
-  std::error_code miner_data_format(epee::byte_stream& buf, uint8_t major_version, uint64_t height, const crypto::hash& prev_id, const crypto::hash& seed_hash, cryptonote::difficulty_type diff, uint64_t median_weight, uint64_t already_generated_coins, const std::vector<cryptonote::tx_block_template_backlog_entry>& tx_backlog)
+  std::error_code miner_data_format(epee::byte_stream& buf, uint8_t major_version, uint64_t height, const crypto::hash& prev_id, const uint8_t fcmp_pp_n_tree_layers, const crypto::ec_point& fcmp_pp_tree_root, const crypto::hash& seed_hash, cryptonote::difficulty_type diff, uint64_t median_weight, uint64_t already_generated_coins, const std::vector<cryptonote::tx_block_template_backlog_entry>& tx_backlog)
   {
-    return F::to_bytes(buf, miner_data{major_version, height, prev_id, seed_hash, diff, median_weight, already_generated_coins, tx_backlog});
+    return F::to_bytes(buf, miner_data{major_version, height, prev_id, fcmp_pp_n_tree_layers, fcmp_pp_tree_root, seed_hash, diff, median_weight, already_generated_coins, tx_backlog});
   }
 
   // boost::adaptors are in place "views" - no copy/move takes place
@@ -547,7 +551,7 @@ std::size_t zmq_pub::send_chain_main(const std::uint64_t height, const epee::spa
   return 0;
 }
 
-std::size_t zmq_pub::send_miner_data(uint8_t major_version, uint64_t height, const crypto::hash& prev_id, const crypto::hash& seed_hash, difficulty_type diff, uint64_t median_weight, uint64_t already_generated_coins, const std::vector<tx_block_template_backlog_entry>& tx_backlog)
+std::size_t zmq_pub::send_miner_data(uint8_t major_version, uint64_t height, const crypto::hash& prev_id, const uint8_t fcmp_pp_n_tree_layers, const crypto::ec_point& fcmp_pp_tree_root, const crypto::hash& seed_hash, difficulty_type diff, uint64_t median_weight, uint64_t already_generated_coins, const std::vector<tx_block_template_backlog_entry>& tx_backlog)
 {
   boost::unique_lock<boost::mutex> guard{sync_};
 
@@ -558,7 +562,7 @@ std::size_t zmq_pub::send_miner_data(uint8_t major_version, uint64_t height, con
   {
     if (sub)
     {
-        auto messages = make_pubs(subs_copy, miner_contexts, major_version, height, prev_id, seed_hash, diff, median_weight, already_generated_coins, tx_backlog);
+        auto messages = make_pubs(subs_copy, miner_contexts, major_version, height, prev_id, fcmp_pp_n_tree_layers, fcmp_pp_tree_root, seed_hash, diff, median_weight, already_generated_coins, tx_backlog);
         guard.lock();
         return send_messages(relay_.get(), messages);
     }
@@ -596,11 +600,11 @@ void zmq_pub::chain_main::operator()(const std::uint64_t height, epee::span<cons
     MERROR("Unable to send ZMQ/Pub - ZMQ server destroyed");
 }
 
-void zmq_pub::miner_data::operator()(uint8_t major_version, uint64_t height, const crypto::hash& prev_id, const crypto::hash& seed_hash, difficulty_type diff, uint64_t median_weight, uint64_t already_generated_coins, const std::vector<tx_block_template_backlog_entry>& tx_backlog) const
+void zmq_pub::miner_data::operator()(uint8_t major_version, uint64_t height, const crypto::hash& prev_id, const uint8_t fcmp_pp_n_tree_layers, const crypto::ec_point& fcmp_pp_tree_root, const crypto::hash& seed_hash, difficulty_type diff, uint64_t median_weight, uint64_t already_generated_coins, const std::vector<tx_block_template_backlog_entry>& tx_backlog) const
 {
   const std::shared_ptr<zmq_pub> self = self_.lock();
   if (self)
-    self->send_miner_data(major_version, height, prev_id, seed_hash, diff, median_weight, already_generated_coins, tx_backlog);
+    self->send_miner_data(major_version, height, prev_id, fcmp_pp_n_tree_layers, fcmp_pp_tree_root, seed_hash, diff, median_weight, already_generated_coins, tx_backlog);
   else
     MERROR("Unable to send ZMQ/Pub - ZMQ server destroyed");
 }

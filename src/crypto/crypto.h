@@ -33,6 +33,7 @@
 #include <cstddef>
 #include <iosfwd>
 #include <type_traits>
+#include <vector>
 
 #include "memwipe.h"
 #include "mlocker.h"
@@ -280,6 +281,20 @@ namespace crypto {
     return crypto_ops::check_ring_signature(prefix_hash, image, pubs, pubs_count, sig);
   }
 
+  /* Variants with vector<const public_key *> parameters.
+   */
+  inline void generate_ring_signature(const hash &prefix_hash, const key_image &image,
+    const std::vector<const public_key *> &pubs,
+    const secret_key &sec, std::size_t sec_index,
+    signature *sig) {
+    generate_ring_signature(prefix_hash, image, pubs.data(), pubs.size(), sec, sec_index, sig);
+  }
+  inline bool check_ring_signature(const hash &prefix_hash, const key_image &image,
+    const std::vector<const public_key *> &pubs,
+    const signature *sig) {
+    return check_ring_signature(prefix_hash, image, pubs.data(), pubs.size(), sig);
+  }
+
   /* Derive a 1-byte view tag from the sender-receiver shared secret to reduce scanning time.
    * When scanning outputs that were not sent to the user, checking the view tag for a match removes the need to proceed with expensive EC operations
    * for an expected 99.6% of outputs (expected false positive rate = 1/2^8 = 1/256 = 0.4% = 100% - 99.6%).
@@ -313,6 +328,19 @@ namespace crypto {
   inline bool operator>(const public_key &p1, const public_key &p2) { return p2 < p1; }
   inline bool operator<(const key_image &p1, const key_image &p2) { return memcmp(&p1, &p2, sizeof(key_image)) < 0; }
   inline bool operator>(const key_image &p1, const key_image &p2) { return p2 < p1; }
+
+  static const ec_point EC_I = {1};
+
+  static const ec_point EC_INV_EIGHT = {{
+      static_cast<char>(0x79), static_cast<char>(0x2f), static_cast<char>(0xdc), static_cast<char>(0xe2),
+      static_cast<char>(0x29), static_cast<char>(0xe5), static_cast<char>(0x06), static_cast<char>(0x61),
+      static_cast<char>(0xd0), static_cast<char>(0xda), static_cast<char>(0x1c), static_cast<char>(0x7d),
+      static_cast<char>(0xb3), static_cast<char>(0x9d), static_cast<char>(0xd3), static_cast<char>(0x07),
+      static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00),
+      static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00),
+      static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00),
+      static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x00), static_cast<char>(0x06)
+    }};
 }
 
 // type conversions for easier calls to sc_add(), sc_sub(), hash functions

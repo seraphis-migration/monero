@@ -118,6 +118,48 @@ namespace cryptonote
       if (candidate < next_check.load(std::memory_order_relaxed))
         next_check = candidate;
     }
+
+    // Quick check if inputs were rendered invalid. If false, this does not mean the inputs are still valid. The
+    // tx should still go through the full validation flow. But if true, we're sure the inputs are now
+    // invalid. This is helpful to avoid re-relaying invalid txs.
+    bool expect_invalid_tx_inputs(const crypto::hash &txid, const txpool_tx_meta_t &meta, const Blockchain& m_blockchain, std::unordered_map<uint64_t, std::pair<crypto::ec_point, uint8_t>> &tree_roots_by_block_inout)
+    {
+      if (meta.max_used_block_height < m_blockchain.get_earliest_ideal_height_for_version(HF_VERSION_FCMP_PLUS_PLUS + 1))
+        return false;
+
+      // After the FCMP++ fork, the max_used_block_height == tx's used reference_block. That's expected to be the tip of
+      // the chain when constructing a tx. We can use this value to quickly determine if the tx's proof is still
+      // expected to be valid. We couldn't do this quickly with ring signatures, so we start doing it after FCMP++.
+      const uint64_t reference_block = meta.max_used_block_height;
+
+      // If we don't already know this tree root by block index, get it from the db and cache it
+      if (tree_roots_by_block_inout.find(reference_block) == tree_roots_by_block_inout.end())
+      {
+        crypto::ec_point tree_root;
+        uint8_t n_tree_layers;
+        try
+        {
+          n_tree_layers = m_blockchain.get_db().get_tree_root_at_blk_idx(reference_block, tree_root);
+        }
+        catch (...)
+        {
+          MERROR("Failed to get tree root at block " << reference_block);
+          return true;
+        }
+        tree_roots_by_block_inout[reference_block] = {tree_root, n_tree_layers};
+      }
+
+      const auto &root_pair = tree_roots_by_block_inout[reference_block];
+      const crypto::ec_point &tree_root = root_pair.first;
+      const uint8_t n_tree_layers = root_pair.second;
+
+      const auto expected_ver_id = make_input_verification_id(txid, tree_root, n_tree_layers);
+      if (meta.valid_input_verification_id == expected_ver_id)
+        return false;
+
+      MINFO("Tx " << txid << " no longer has a valid input verification id, not re-relaying");
+      return true;
+    }
   }
   //---------------------------------------------------------------------------------
   //---------------------------------------------------------------------------------
@@ -161,7 +203,8 @@ namespace cryptonote
     bool fee_good = false;
     try
     {
-      fee_good = kept_by_block || m_blockchain.check_fee(tx_weight, fee);
+      fee_good = kept_by_block ||
+        (check_pool_capacity(id, tx_weight, fee) && m_blockchain.check_fee(tx_weight, fee));
     }
     catch(...) {}
     if (!fee_good) // if fee calculation failed or fee in relayed tx is too low...
@@ -235,7 +278,7 @@ namespace cryptonote
         meta.weight = tx_weight;
         meta.fee = fee;
         meta.max_used_block_id = null_hash;
-        meta.max_used_block_height = 0;
+        meta.max_used_block_height = (!tx.pruned && rct::is_rct_fcmp(tx.rct_signatures.type)) ? tx.rct_signatures.p.reference_block : 0;
         meta.last_failed_height = 0;
         meta.last_failed_id = null_hash;
         meta.receive_time = receive_time;
@@ -350,7 +393,7 @@ namespace cryptonote
 
     ++m_cookie;
 
-    MINFO("Transaction added to pool: txid " << id << " weight: " << tx_weight << " fee/byte: " << (fee / (double)(tx_weight ? tx_weight : 1)) << ", count: " << m_added_txs_by_id.size());
+    MINFO("Transaction added to pool: txid " << id << " weight: " << tx_weight << " fee/byte: " << (fee / (double)(tx_weight ? tx_weight : 1)) << ", count: " << m_added_txs_by_id.size() << ", pool total weight: " << m_txpool_weight);
 
     prune(m_txpool_max_weight);
 
@@ -368,6 +411,35 @@ namespace cryptonote
       return false;
     return add_tx(tx, h, bl, get_transaction_weight(tx, bl.size()), tvc, tx_relay, relayed, version,
       nic_verified_hf_version, valid_input_verification_id);
+  }
+  //---------------------------------------------------------------------------------
+  bool tx_memory_pool::check_pool_capacity(const crypto::hash &id, const size_t weight, const uint64_t fee) const
+  {
+    if (weight == 0)
+      return true;
+
+    CRITICAL_REGION_LOCAL(m_transactions_lock);
+
+    // If the tx doesn't push the pool over the capacity limit, it fits! We can immediately return true
+    if ((weight + m_txpool_weight) < m_txpool_max_weight)
+      return true;
+
+    // If it does, then see if it pays a higher fee than any txs already in the pool
+    if (m_txs_by_fee_and_receive_time.size() <= 1)
+      return true;
+    const auto it = --m_txs_by_fee_and_receive_time.end();
+    if (it == m_txs_by_fee_and_receive_time.begin())
+      return true;
+
+    const double fee_per_byte = (double) fee / weight;
+    MDEBUG("Check pool capacity for tx " << id << ", fee/byte: " << fee_per_byte << ", pool total weight: " << m_txpool_weight);
+
+    const double lowest_fee_per_byte = it->get_left().first;
+    if (fee_per_byte > lowest_fee_per_byte)
+      return true;
+
+    LOG_PRINT_L1("Pool is at capacity, and tx " << id << " does not pay a high enough fee to enter");
+    return false;
   }
   //---------------------------------------------------------------------------------
   void tx_memory_pool::reduce_txpool_weight(size_t weight)
@@ -665,7 +737,7 @@ namespace cryptonote
     return true;
   }
   //---------------------------------------------------------------------------------
-  bool tx_memory_pool::get_complement(std::vector<crypto::hash> hashes, std::vector<cryptonote::blobdata> &txes) const
+  bool tx_memory_pool::get_complement(std::vector<crypto::hash> hashes, std::vector<crypto::hash> &inv_txes) const
   {
     CRITICAL_REGION_LOCAL(m_transactions_lock);
     CRITICAL_REGION_LOCAL1(m_blockchain);
@@ -673,35 +745,15 @@ namespace cryptonote
     // Sort so we can do binary search later
     std::sort(hashes.begin(), hashes.end());
 
-    m_blockchain.for_all_txpool_txes([this, &hashes, &txes](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata_ref*) {
-      const auto tx_relay_method = meta.get_relay_method();
-      if (tx_relay_method != relay_method::block && tx_relay_method != relay_method::fluff)
-        return true;
-
+    m_blockchain.for_all_txpool_txes([this, &hashes, &inv_txes](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata_ref*) {
       // Do binary search for our pool TXID in given list, skip to next if already present
       const auto hash_it = std::lower_bound(hashes.cbegin(), hashes.cend(), txid);
       if (hash_it != hashes.cend() && *hash_it == txid)
         return true;
 
-      {
-        cryptonote::blobdata bd;
-        try
-        {
-          if (!m_blockchain.get_txpool_tx_blob(txid, bd, cryptonote::relay_category::broadcasted))
-          {
-            MERROR("Failed to get blob for txpool transaction " << txid);
-            return true;
-          }
-          txes.emplace_back(std::move(bd));
-        }
-        catch (const std::exception &e)
-        {
-          MERROR("Failed to get blob for txpool transaction " << txid << ": " << e.what());
-          return true;
-        }
-      }
+      inv_txes.push_back(txid);
       return true;
-    }, false);
+    }, false, cryptonote::relay_category::broadcasted);
     return true;
   }
   //---------------------------------------------------------------------------------
@@ -782,10 +834,12 @@ namespace cryptonote
     uint64_t next_check = clock::to_time_t(clock::from_time_t(time_t(now)) + max_relayable_check);
     std::vector<std::pair<crypto::hash, txpool_tx_meta_t>> change_timestamps;
 
+    std::unordered_map<uint64_t, std::pair<crypto::ec_point, uint8_t>> tree_roots_by_block;
+
     CRITICAL_REGION_LOCAL(m_transactions_lock);
     CRITICAL_REGION_LOCAL1(m_blockchain);
     txs.reserve(m_blockchain.get_txpool_tx_count());
-    m_blockchain.for_all_txpool_txes([this, now, &txs, &change_timestamps, &next_check](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata_ref *){
+    m_blockchain.for_all_txpool_txes([this, now, &txs, &change_timestamps, &next_check, &tree_roots_by_block](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata_ref *){
       // 0 fee transactions are never relayed
       if(!meta.pruned && meta.fee > 0 && !meta.do_not_relay)
       {
@@ -820,6 +874,8 @@ namespace cryptonote
         uint64_t max_age = (tx_relay == relay_method::block) ? CRYPTONOTE_MEMPOOL_TX_FROM_ALT_BLOCK_LIVETIME : CRYPTONOTE_MEMPOOL_TX_LIVETIME;
         if (now - meta.receive_time <= max_age / 2)
         {
+          if (expect_invalid_tx_inputs(txid, meta, m_blockchain, tree_roots_by_block))
+            return true; // continue to next tx
           try
           {
             txs.emplace_back(txid, m_blockchain.get_txpool_tx_blob(txid, relay_category::all), tx_relay);
@@ -1343,8 +1399,10 @@ namespace cryptonote
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::get_transaction(const crypto::hash& id, cryptonote::blobdata& txblob, relay_category tx_category) const
   {
-    CRITICAL_REGION_LOCAL(m_transactions_lock);
-    CRITICAL_REGION_LOCAL1(m_blockchain);
+    // WARNING: this function does not take m_blockchain_lock, and thus should only call read only
+    // m_db functions which do not depend on one another (ie, no getheight + gethash(height-1), as
+    // well as not accessing class members, even read only (ie, m_invalid_blocks). The caller must
+    // lock if it is otherwise needed.
     try
     {
       return m_blockchain.get_txpool_tx_blob(id, txblob, tx_category);
@@ -1373,8 +1431,10 @@ namespace cryptonote
   //---------------------------------------------------------------------------------
   bool tx_memory_pool::have_tx(const crypto::hash &id, relay_category tx_category) const
   {
-    CRITICAL_REGION_LOCAL(m_transactions_lock);
-    CRITICAL_REGION_LOCAL1(m_blockchain);
+    // WARNING: this function does not take m_blockchain_lock, and thus should only call read only
+    // m_db functions which do not depend on one another (ie, no getheight + gethash(height-1), as
+    // well as not accessing class members, even read only (ie, m_invalid_blocks). The caller must
+    // lock if it is otherwise needed.
     return m_blockchain.get_db().txpool_has_tx(id, tx_category);
   }
   //---------------------------------------------------------------------------------
@@ -1431,6 +1491,7 @@ namespace cryptonote
       const std::unordered_map<crypto::hash, std::tuple<bool, tx_verification_context, uint64_t, crypto::hash>>::const_iterator i = m_input_cache.find(txid);
       if (i != m_input_cache.end())
       {
+        MDEBUG("Input cache hit in check_tx_inputs: " << txid);
         max_used_block_height = std::get<2>(i->second);
         max_used_block_id = std::get<3>(i->second);
         tvc = std::get<1>(i->second);

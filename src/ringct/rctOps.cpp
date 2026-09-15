@@ -705,6 +705,8 @@ namespace rct {
     {
         for (int i = 0; i < 8; ++i)
             v.bytes[i] ^= k.bytes[i];
+        for (int i = 8; i < 32; ++i)
+            v.bytes[i] = 0;
     }
     key genCommitmentMask(const key &sk)
     {

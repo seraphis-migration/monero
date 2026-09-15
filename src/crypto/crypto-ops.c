@@ -229,7 +229,7 @@ static void fe_cmov(fe f, const fe g, unsigned int b) {
 h = f
 */
 
-static void fe_copy(fe h, const fe f) {
+void fe_copy(fe h, const fe f) {
   int32_t f0 = f[0];
   int32_t f1 = f[1];
   int32_t f2 = f[2];
@@ -377,7 +377,7 @@ Preconditions:
    |f| bounded by 1.1*2^26,1.1*2^25,1.1*2^26,1.1*2^25,etc.
 */
 
-static int fe_isnegative(const fe f) {
+int fe_isnegative(const fe f) {
   unsigned char s[32];
   fe_tobytes(s, f);
   return s[0] & 1;
@@ -2002,26 +2002,18 @@ void sc_reduce(unsigned char *s) {
   s[31] = s11 >> 17;
 }
 
-/* New code */
+/* From fe_pow22523.c */
 
-static void fe_divpowm1(fe r, const fe u, const fe v) {
-  fe v3, uv7, t0, t1, t2;
+void fe_pow22523(fe out, const fe z) {
+  fe t0;
+  fe t1;
+  fe t2;
   int i;
 
-  fe_sq(v3, v);
-  fe_mul(v3, v3, v); /* v3 = v^3 */
-  fe_sq(uv7, v3);
-  fe_mul(uv7, uv7, v);
-  fe_mul(uv7, uv7, u); /* uv7 = uv^7 */
-
-  /*fe_pow22523(uv7, uv7);*/
-
-  /* From fe_pow22523.c */
-
-  fe_sq(t0, uv7);
+  fe_sq(t0, z);
   fe_sq(t1, t0);
   fe_sq(t1, t1);
-  fe_mul(t1, uv7, t1);
+  fe_mul(t1, z, t1);
   fe_mul(t0, t0, t1);
   fe_sq(t0, t0);
   fe_mul(t0, t1, t0);
@@ -2060,12 +2052,24 @@ static void fe_divpowm1(fe r, const fe u, const fe v) {
   fe_mul(t0, t1, t0);
   fe_sq(t0, t0);
   fe_sq(t0, t0);
-  fe_mul(t0, t0, uv7);
+  fe_mul(out, t0, z);
+}
 
-  /* End fe_pow22523.c */
-  /* t0 = (uv^7)^((q-5)/8) */
-  fe_mul(t0, t0, v3);
-  fe_mul(r, t0, u); /* u^(m+1)v^(-(m+1)) */
+/* New code */
+
+static void fe_divpowm1(fe r, const fe u, const fe v) {
+  fe v3, uv7;
+
+  fe_sq(v3, v);
+  fe_mul(v3, v3, v); /* v3 = v^3 */
+  fe_sq(uv7, v3);
+  fe_mul(uv7, uv7, v);
+  fe_mul(uv7, uv7, u); /* uv7 = uv^7 */
+
+  fe_pow22523(r, uv7); /* (uv^7)^((q-5)/8) */
+
+  fe_mul(r, r, v3);
+  fe_mul(r, r, u); /* u^(m+1)v^(-(m+1)) */
 }
 
 static void ge_cached_0(ge_cached *r) {
@@ -4039,4 +4043,16 @@ void fe_ed_derivatives_to_wei_x_y(unsigned char *wei_x, unsigned char *wei_y, co
   fe wei_y_fe;
   fe_mul(wei_y_fe, fe_c_mul_one_plus_y, inv_one_minus_y_mul_x);
   fe_tobytes(wei_y, wei_y_fe);
+}
+
+void fe_dbl(fe h, const fe f)
+{
+  // Reduce the input for safety to ensure we meet the preconditions for fe_add
+  fe f_reduced;
+  fe_reduce_vartime(f_reduced, f);
+  fe h_res;
+  fe_add(h_res, f_reduced, f_reduced);
+  // Reduce the output for safety to ensure the result can be used as input to
+  // fe_add or fe_sub without an extra call to fe_reduce_vartime
+  fe_reduce_vartime(h, h_res);
 }

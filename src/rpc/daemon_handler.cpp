@@ -397,7 +397,11 @@ namespace rpc
 
     tx_verification_context tvc = AUTO_VAL_INIT(tvc);
 
-    if(!m_core.handle_incoming_tx(tx_blob, tvc, (relay ? relay_method::local : relay_method::none), false) || tvc.m_verifivation_failed)
+    cryptonote::transaction tx{};
+    crypto::hash txid;
+    if(!parse_and_validate_tx_from_blob(tx_blob, tx, txid, true)
+      || !m_core.handle_incoming_tx(tx_blob, tx, txid, tvc, (relay ? relay_method::local : relay_method::none), false)
+      || tvc.m_verifivation_failed)
     {
       if (tvc.m_verifivation_failed)
       {
@@ -479,7 +483,7 @@ namespace rpc
 
     NOTIFY_NEW_TRANSACTIONS::request r;
     r.txs.push_back(std::move(tx_blob));
-    m_core.get_protocol()->relay_transactions(r, boost::uuids::nil_uuid(), epee::net_utils::zone::invalid, relay_method::local);
+    m_core.get_protocol()->relay_transactions(r, {txid}, boost::uuids::nil_uuid(), epee::net_utils::zone::invalid, relay_method::local);
 
     //TODO: make sure that tx has reached other nodes here, probably wait to receive reflections from other nodes
     res.status = Message::STATUS_OK;
@@ -902,7 +906,7 @@ namespace rpc
   {
     res.hard_fork_version = m_core.get_blockchain_storage().get_current_hard_fork_version();
 
-    m_core.get_blockchain_storage().get_dynamic_base_fee_estimate_2021_scaling(req.num_grace_blocks, res.fees);
+    m_core.get_blockchain_storage().get_dynamic_base_fee_estimate(req.num_grace_blocks, res.fees);
     res.estimated_base_fee = res.fees.at(0);
 
     {

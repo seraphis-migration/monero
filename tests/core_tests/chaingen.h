@@ -250,7 +250,8 @@ public:
     uint8_t minor_ver = 0, uint64_t timestamp = 0, const crypto::hash& prev_id = crypto::hash(),
     const cryptonote::difficulty_type& diffic = 1, const cryptonote::transaction& miner_tx = cryptonote::transaction(),
     const std::vector<crypto::hash>& tx_hashes = std::vector<crypto::hash>(), size_t txs_sizes = 0, size_t max_outs = 999,
-    uint8_t hf_version = 1, uint64_t fees = 0);
+    uint8_t hf_version = 1, uint64_t fees = 0, const uint8_t fcmp_pp_n_tree_layres = 0,
+    const crypto::ec_point& fcmp_pp_tree_root = crypto::ec_point{});
   bool construct_block_manually_tx(cryptonote::block& blk, const cryptonote::block& prev_block,
     const cryptonote::account_base& miner_acc, const std::vector<crypto::hash>& tx_hashes, size_t txs_size);
   void fill_nonce(cryptonote::block& blk, const cryptonote::difficulty_type& diffic, uint64_t height);
@@ -596,7 +597,13 @@ public:
 
     cryptonote::tx_verification_context tvc{};
     size_t pool_size = m_c.get_pool_transactions_count();
-    m_c.handle_incoming_tx(t_serializable_object_to_blob(tx), tvc, m_tx_relay, false);
+    const cryptonote::blobdata tx_blob = t_serializable_object_to_blob(tx);
+    cryptonote::transaction reparsed_tx{};
+    crypto::hash txid{};
+    if (cryptonote::parse_and_validate_tx_from_blob(tx_blob, reparsed_tx, txid))
+      m_c.handle_incoming_tx(tx_blob, reparsed_tx, txid, tvc, m_tx_relay, false);
+    else
+      tvc.m_verifivation_failed = true;
     bool tx_added = pool_size + 1 == m_c.get_pool_transactions_count();
     bool r = m_validator.check_tx_verification_context(tvc, tx_added, m_ev_index, tx);
     CHECK_AND_NO_ASSERT_MES(r, false, "tx verification context check failed");
@@ -617,7 +624,14 @@ public:
     }
     size_t pool_size = m_c.get_pool_transactions_count();
     for (size_t i = 0; i < tx_blobs.size(); ++i)
-      m_c.handle_incoming_tx(tx_blobs[i], tvcs[i], m_tx_relay, false);
+    {
+      cryptonote::transaction tx{};
+      crypto::hash txid{};
+      if (cryptonote::parse_and_validate_tx_from_blob(tx_blobs[i], tx, txid))
+        m_c.handle_incoming_tx(tx_blobs[i], tx, txid, tvcs[i], m_tx_relay, false);
+      else
+        tvcs[i].m_verifivation_failed = true;
+    }
     size_t tx_added = m_c.get_pool_transactions_count() - pool_size;
     bool r = m_validator.check_tx_verification_context_array(tvcs, tx_added, m_ev_index, txs);
     CHECK_AND_NO_ASSERT_MES(r, false, "tx verification context check failed");
@@ -695,17 +709,13 @@ public:
 
     cryptonote::tx_verification_context tvc{};
     size_t pool_size = m_c.get_pool_transactions_count();
-    m_c.handle_incoming_tx(sr_tx.data, tvc, m_tx_relay, false);
+    cryptonote::transaction tx{};
+    crypto::hash txid;
+    if (cryptonote::parse_and_validate_tx_from_blob(sr_tx.data, tx, txid))
+      m_c.handle_incoming_tx(sr_tx.data, tx, txid, tvc, m_tx_relay, false);
+    else
+      tvc.m_verifivation_failed = true;
     bool tx_added = pool_size + 1 == m_c.get_pool_transactions_count();
-
-    cryptonote::transaction tx;
-    binary_archive<false> ba{epee::strspan<std::uint8_t>(sr_tx.data)};
-    ::serialization::serialize(ba, tx);
-    if (!ba.good())
-    {
-      tx = cryptonote::transaction();
-    }
-
     bool r = m_validator.check_tx_verification_context(tvc, tx_added, m_ev_index, tx);
     CHECK_AND_NO_ASSERT_MES(r, false, "transaction verification context check failed");
     return true;

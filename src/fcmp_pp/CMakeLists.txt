@@ -30,7 +30,9 @@ set(fcmp_pp_sources
   curve_trees.cpp
   fcmp_pp_crypto.cpp
   fcmp_pp_types.cpp
-  tower_cycle.cpp)
+  prove.cpp
+  tower_cycle.cpp
+  tree_cache.cpp)
 
 monero_find_all_headers(fcmp_pp_headers "${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -55,6 +57,7 @@ target_link_libraries(fcmp_pp
     common
     epee
   PRIVATE
+    ${Boost_SERIALIZATION_LIBRARY}
     ${CMAKE_CURRENT_BINARY_DIR}/fcmp_pp_rust/libfcmp_pp_rust.a
     ${EXTRA_LIBRARIES}
     ${EXTRA_RUST_LIBRARIES})

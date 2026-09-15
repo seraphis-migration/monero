@@ -76,6 +76,9 @@ static void validate_tx_outs(
     crypto::public_key &tx_pubkey_out,
     std::vector<crypto::public_key> &tx_additional_pubkeys_out)
 {
+    // TODO: Carrot support
+    const auto &construct = std::get<PreCarrotTransactionProposal>(ptx.construction_data);
+
     tx_pubkey_out = crypto::public_key{};
     tx_additional_pubkeys_out.clear();
     CHECK_AND_ASSERT_THROW_MES(ptx.tx.vout.size() == dests.size(),
@@ -136,7 +139,7 @@ static void validate_tx_outs(
                 tx_additional_pubkeys_out,
                 amount_keys,
                 repro_onetime_addr,
-                ptx.construction_data.use_view_tags,
+                construct.use_view_tags,
                 repro_view_tag
             );
         CHECK_AND_ASSERT_THROW_MES(r, "validate_tx_outs: failed to generate output ephemeral key");
@@ -235,7 +238,7 @@ void sanity_check_pending_tx(const wallet2::pending_tx &ptx,
     const std::optional<std::function<const crypto::key_image(const size_t)>> &transfer_ki_resolver,
     const bool allow_read_only)
 {
-    const auto &construct = ptx.construction_data;
+    const auto &construct = std::get<PreCarrotTransactionProposal>(ptx.construction_data);
     const bool transfer_ki_accessible = transfer_ki_resolver.has_value();
 
     // Extract outputs

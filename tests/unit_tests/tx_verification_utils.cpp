@@ -28,19 +28,25 @@
 
 #include "gtest/gtest.h"
 
+#define IN_UNIT_TESTS
+#include "cryptonote_core/blockchain.h"
 #include "cryptonote_core/cryptonote_tx_utils.h"
 #include "cryptonote_core/tx_verification_utils.h"
+#include "misc_log_ex.h"
 
-TEST(tx_verification_utils, make_input_verification_id)
+#undef MONERO_DEFAULT_LOG_CATEGORY
+#define MONERO_DEFAULT_LOG_CATEGORY "unit_tests.tx_verification_utils"
+
+TEST(tx_verification_utils, make_input_verification_id_ring)
 {
     rct::key key1, key2, key3;
     epee::from_hex::to_buffer(epee::as_mut_byte_span(key1), "e50f476129d40af31e0938743f7f2d60e867aab31294f7acaf6e38f0976f0228");
     epee::from_hex::to_buffer(epee::as_mut_byte_span(key2), "e50f476129d40af31e0938743f7f2d60e867aab31294f7acaf6e38f0976f0227");
     epee::from_hex::to_buffer(epee::as_mut_byte_span(key3), "d50f476129d40af31e0938743f7f2d60e867aab31294f7acaf6e38f0976f0228");
 
-    const crypto::hash hash1 = cryptonote::make_input_verification_id(rct::rct2hash(key1), {});
-    const crypto::hash hash2 = cryptonote::make_input_verification_id(rct::rct2hash(key2), {});    
-    const crypto::hash hash3 = cryptonote::make_input_verification_id(rct::rct2hash(key3), {});
+    const crypto::hash hash1 = cryptonote::make_input_verification_id(rct::rct2hash(key1), rct::ctkeyM{});
+    const crypto::hash hash2 = cryptonote::make_input_verification_id(rct::rct2hash(key2), rct::ctkeyM{});    
+    const crypto::hash hash3 = cryptonote::make_input_verification_id(rct::rct2hash(key3), rct::ctkeyM{});
     ASSERT_NE(hash1, hash2);
     ASSERT_NE(hash1, hash3);
     ASSERT_NE(hash2, hash3);
@@ -56,9 +62,9 @@ TEST(tx_verification_utils, make_input_verification_id)
     const crypto::hash hash8 = cryptonote::make_input_verification_id(rct::rct2hash(key1), {{{key1, key1}},{{key1, key1}}});
     ASSERT_NE(hash7, hash8);
 
-    const crypto::hash hash1_eq = cryptonote::make_input_verification_id(rct::rct2hash(key1), {});
-    const crypto::hash hash2_eq = cryptonote::make_input_verification_id(rct::rct2hash(key2), {});    
-    const crypto::hash hash3_eq = cryptonote::make_input_verification_id(rct::rct2hash(key3), {});
+    const crypto::hash hash1_eq = cryptonote::make_input_verification_id(rct::rct2hash(key1), rct::ctkeyM{});
+    const crypto::hash hash2_eq = cryptonote::make_input_verification_id(rct::rct2hash(key2), rct::ctkeyM{});    
+    const crypto::hash hash3_eq = cryptonote::make_input_verification_id(rct::rct2hash(key3), rct::ctkeyM{});
     const crypto::hash hash4_eq = cryptonote::make_input_verification_id(rct::rct2hash(key1), {{{key1, key1}}});
     const crypto::hash hash5_eq = cryptonote::make_input_verification_id(rct::rct2hash(key1), {{{key1, key2}}});
     const crypto::hash hash6_eq = cryptonote::make_input_verification_id(rct::rct2hash(key1), {{{key1, key3}}});
@@ -266,4 +272,61 @@ TEST(tx_verification_utils, ver_input_proofs_rings)
         mixring0.erase(mixring0.begin() + 1);
         EXPECT_FALSE(cryptonote::ver_input_proofs_rings(deserialized_tx, modified_mixrings));
     }
+}
+
+TEST(tx_verification_utils, max_v17_coinbase_size)
+{
+    static_assert(HF_VERSION_FCMP_PLUS_PLUS == 17);
+    constexpr std::size_t height = CRYPTONOTE_MAX_BLOCK_NUMBER;
+
+    cryptonote::transaction tx;
+    tx.version = 2;
+    tx.unlock_time = height + CRYPTONOTE_MINED_MONEY_UNLOCK_WINDOW;
+    tx.vin.push_back(cryptonote::txin_gen{height});
+    for (uint64_t i = 1; i <= FCMP_PLUS_PLUS_MAX_MINER_OUTPUTS; ++i)
+    {
+        // sorted output pubkeys
+        static_assert(FCMP_PLUS_PLUS_MAX_MINER_OUTPUTS < (1 << 15));
+        crypto::public_key pk = crypto::null_pkey;
+        pk.data[31] = static_cast<char>(i & 255);
+        pk.data[30] = static_cast<char>(i >> 8);
+        const cryptonote::txout_to_carrot_v1 target{.key = pk};
+        tx.vout.push_back({5, target});
+    }
+    tx.extra.resize(MAX_TX_EXTRA_SIZE + tx.vout.size() * 32 - 1);
+    tx.invalidate_hashes();
+
+    const auto prevalidate_miner_transaction = [](const cryptonote::transaction &tx) -> bool
+    {
+        cryptonote::block b;
+        b.miner_tx = tx;
+        return tx.is_coinbase()
+            && cryptonote::Blockchain::prevalidate_miner_transaction(b, height, HF_VERSION_FCMP_PLUS_PLUS);
+    };
+
+    ASSERT_TRUE(prevalidate_miner_transaction(tx));
+
+    const cryptonote::blobdata tx_blob = cryptonote::tx_to_blob(tx);
+    LOG_PRINT_L1("Max v17 coinbase tx size is " << tx_blob.size() << " bytes");
+
+    // We want the maximum implied v17 coinbase tx size to be <= 1MB, the explicit max allowed size of non-coinbase txs
+    EXPECT_LE(tx_blob.size(), cryptonote::get_max_tx_size());
+
+    // now do negative checks to verify we are maxed out as can be
+    cryptonote::transaction tx2;
+
+    tx2 = tx;
+    ASSERT_TRUE(prevalidate_miner_transaction(tx2));
+    tx2.vin.push_back(tx2.vin.at(0));
+    ASSERT_FALSE(prevalidate_miner_transaction(tx2));
+
+    tx2 = tx;
+    ASSERT_TRUE(prevalidate_miner_transaction(tx2));
+    tx2.vout.push_back({5, cryptonote::txout_to_carrot_v1{.key = rct::rct2pk(rct::H)}});
+    ASSERT_FALSE(prevalidate_miner_transaction(tx2));
+
+    tx2 = tx;
+    ASSERT_TRUE(prevalidate_miner_transaction(tx2));
+    tx2.extra.push_back(0);
+    ASSERT_FALSE(prevalidate_miner_transaction(tx2));
 }

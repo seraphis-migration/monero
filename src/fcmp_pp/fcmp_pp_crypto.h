@@ -69,10 +69,12 @@ struct EdDerivatives final
 };
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
+bool sqrt(fe y, const fe x);
 bool mul8_is_identity_vartime(const ge_p3 &point);
 crypto::ec_point clear_torsion_vartime(const ge_p3 &point);
+bool torsion_check_vartime(const ge_p3 &point);
 bool get_valid_torsion_cleared_point_vartime(const crypto::ec_point &point, crypto::ec_point &torsion_cleared_out);
-
+bool get_valid_torsion_cleared_point_fast_vartime(const crypto::ec_point &point, crypto::ec_point &torsion_cleared_out);
 /*
 point_to_ed_derivatives converts an Ed25519 point to Ed25519 derivatives used for converting to
 Weierstrauss coords, as per https://www.ietf.org/archive/id/draft-ietf-lwig-curve-representations-02.pdf E.2.
@@ -97,6 +99,11 @@ and does not equal identity. The `torsion_free_point` param is expected to be th
 get_valid_torsion_cleared_point_vartime.
 */
 bool point_to_wei_x_y(const crypto::ec_point &torsion_free_point, crypto::ec_coord &wei_x, crypto::ec_coord &wei_y);
+
+/**
+ * brief - scalarmult_and_add - Q = P + a * A
+ */
+void scalarmult_and_add(unsigned char *Q, const ge_p3 &P, const unsigned char *a, const ge_p3 &A);
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
 }//namespace fcmp_pp

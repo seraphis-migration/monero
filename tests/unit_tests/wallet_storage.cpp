@@ -181,8 +181,9 @@ TEST(wallet_storage, export_key_images_uses_generated_key_image)
     const crypto::public_key pkey = wallet_accessor_test::get_public_key(w, 0);
     std::vector<const crypto::public_key*> key_ptrs;
     key_ptrs.push_back(&pkey);
+    const auto &sig = std::get<crypto::signature>(exported.second.front().second);
     EXPECT_TRUE(crypto::check_ring_signature((const crypto::hash&)exported_key_image,
-        exported_key_image, key_ptrs.data(), key_ptrs.size(), &exported.second.front().second));
+        exported_key_image, key_ptrs.data(), key_ptrs.size(), &sig));
 }
 
 TEST(wallet_storage, change_password_same_file)

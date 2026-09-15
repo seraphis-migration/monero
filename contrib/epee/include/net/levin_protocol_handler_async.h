@@ -40,6 +40,8 @@
 #include "syncobj.h"
 #include "int-util.h"
 
+#include "cryptonote_basic/connection_context.h"
+
 #include <random>
 #include <chrono>
 
@@ -502,7 +504,7 @@ public:
             if (!validate_response_command())
               return false;
 
-            const size_t max_bytes = m_connection_context.get_max_bytes(m_current_head.m_command);
+            const size_t max_bytes = cryptonote::get_command_max_bytes(m_current_head.m_command);
             if(buff_to_invoke.size() > std::min<size_t>(max_packet_size, max_bytes))
             {
               MERROR(m_connection_context << "Maximum packet size exceed!, m_max_packet_size = " << std::min<size_t>(max_packet_size, max_bytes)
@@ -610,7 +612,8 @@ public:
 
           m_cache_in_buffer.erase(sizeof(bucket_head2));
           m_state = stream_state_body;
-          const size_t max_bytes = m_connection_context.get_max_bytes(m_current_head.m_command);
+
+          const size_t max_bytes = cryptonote::get_command_max_bytes(m_current_head.m_command);
           if(m_current_head.m_cb > std::min<size_t>(max_packet_size, max_bytes))
           {
             LOG_ERROR_CC(m_connection_context, "Maximum packet size exceed!, m_max_packet_size = " << std::min<size_t>(max_packet_size, max_bytes)

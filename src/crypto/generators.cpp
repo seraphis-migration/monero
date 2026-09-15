@@ -95,6 +95,13 @@ static ge_cached V_cached;
 static std::once_flag init_gens_once_flag;
 
 //-------------------------------------------------------------------------------------------------------------------
+// hash-to-point: H_p(x) = unbiased_hash_to_ec(x)
+//-------------------------------------------------------------------------------------------------------------------
+static void hash_to_point(const crypto::hash &x, crypto::ec_point &point_out)
+{
+    unbiased_hash_to_ec((const unsigned char*)x.data, sizeof(crypto::hash), point_out);
+}
+//-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 /**
  * @brief P = H^2_p(Keccak256(seed)) = Elligator2(Blake2b_512[personal="Monero"](Keccak256(seed)))

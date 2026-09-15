@@ -548,8 +548,8 @@ bool WalletImpl::createWatchOnly(const std::string &path, const std::string &pas
         view_wallet->generate(path, password, address, viewkey);
 
         // Export/Import outputs
-        auto outputs = m_wallet->export_outputs(true/*all*/);
-        view_wallet->import_outputs(outputs);
+        const std::string outputs_str = m_wallet->export_outputs_to_str(/*all=*/true);
+        view_wallet->import_outputs_from_str(outputs_str);
 
         // Copy scanned blockchain
         auto bc = m_wallet->export_blockchain();
@@ -1141,12 +1141,23 @@ UnsignedTransaction *WalletImpl::loadUnsignedTx(const std::string &unsigned_file
 
     return transaction;
   }
+
+  // expand into tx proposals at load time for useful information later
+  if (!m_wallet->get_transaction_proposals_from_unsigned_tx(transaction->m_unsigned_tx_set, transaction->m_tx_proposals))
+  {
+    setStatusError(tr("Failed to expand unsigned transaction set into its usable transaction proposals"));
+    transaction->m_status = UnsignedTransaction::Status::Status_Error;
+    transaction->m_errorString = errorString();
+
+    return transaction;
+  }
   
   // Check tx data and construct confirmation message
   std::string extra_message;
-  if (!std::get<2>(transaction->m_unsigned_tx_set.transfers).empty())
-    extra_message = (boost::format("%u outputs to import. ") % (unsigned)std::get<2>(transaction->m_unsigned_tx_set.transfers).size()).str();
-  transaction->checkLoadedTx([&transaction](){return transaction->m_unsigned_tx_set.txes.size();}, [&transaction](size_t n)->const tools::wallet2::tx_construction_data&{return transaction->m_unsigned_tx_set.txes[n];}, extra_message);
+  const std::size_t n_new_outputs = num_new_outputs_ref(transaction->m_unsigned_tx_set);
+  if (n_new_outputs)
+    extra_message = (boost::format("%u outputs to import. ") % (unsigned)n_new_outputs).str();
+  transaction->checkLoadedTx(extra_message);
   setStatus(transaction->status(), transaction->errorString());
     
   return transaction;
@@ -1158,7 +1169,7 @@ bool WalletImpl::submitTransaction(const string &fileName) {
     return false;
   std::unique_ptr<PendingTransactionImpl> transaction(new PendingTransactionImpl(*this));
 
-  bool r = m_wallet->load_tx(fileName, transaction->m_pending_tx);
+  bool r = m_wallet->prepare_tx_from_signed(fileName, transaction->m_pending_tx);
   if (!r) {
     setStatus(Status_Ok, tr("Failed to load transaction from file"));
     return false;
@@ -1317,7 +1328,7 @@ bool WalletImpl::scanTransactions(const std::vector<std::string> &txids)
     {
         m_wallet->scan_tx(txids_u);
     }
-    catch (const tools::error::wont_reprocess_recent_txs_via_untrusted_daemon &e)
+    catch (const tools::error::wont_reprocess_txs_via_untrusted_daemon &e)
     {
         setStatusError(e.what());
         return false;
@@ -1902,12 +1913,13 @@ uint64_t WalletImpl::estimateTransactionFee(const std::vector<std::pair<std::str
     const size_t pubkey_size = 33;
     const size_t encrypted_paymentid_size = 11;
     const size_t extra_size = pubkey_size + encrypted_paymentid_size;
+    const uint64_t min_ring_size = m_wallet->get_min_ring_size();
 
     return m_wallet->estimate_fee(
         m_wallet->use_fork_rules(HF_VERSION_PER_BYTE_FEE, 0),
         m_wallet->use_fork_rules(4, 0),
         1,
-        m_wallet->get_min_ring_size() - 1,
+        min_ring_size > 0 ? (min_ring_size - 1) : 0,
         destinations.size() + 1,
         extra_size,
         m_wallet->use_fork_rules(8, 0),
@@ -2550,6 +2562,7 @@ bool WalletImpl::doInit(const string &daemon_address, const std::string &proxy_a
     if (isNewWallet() && daemonSynced()) {
         LOG_PRINT_L2(__FUNCTION__ << ":New Wallet - fast refresh until " << daemonBlockChainHeight());
         m_wallet->set_refresh_from_block_height(daemonBlockChainHeight());
+        m_wallet->rewrite(m_wallet->get_wallet_file(), m_password);
     }
 
     if (m_rebuildWalletCache)
