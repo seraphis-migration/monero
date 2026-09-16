@@ -48,6 +48,9 @@
 #define CRYPTONOTE_BLOCK_FUTURE_TIME_LIMIT              60*60*2
 #define CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE             10
 
+#define FCMP_RELATIVE_LOCK                              1
+#define FCMP_RELATIVE_LOCK_DURATION                     720
+
 #define BLOCKCHAIN_TIMESTAMP_CHECK_WINDOW               60
 
 // MONEY_SUPPLY - total number coins to be generated

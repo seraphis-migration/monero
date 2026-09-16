@@ -102,8 +102,21 @@ static bool get_fcmp_tx_tree_root(const BlockchainDB *db, const cryptonote::tran
     return true;
   CHECK_AND_ASSERT_MES(!tx.pruned, false, "can't get root for pruned FCMP txs");
 
-  // Make sure reference block exists in the chain
-  CHECK_AND_NO_ASSERT_MES_L1(tx.rct_signatures.p.reference_block < db->height(), false,
+  uint64_t locked_height = db->height();
+
+  //Relative locks are enforced by requiring the transaction to use an old reference_block value.
+  //This proves that the transaction is not spending any outputs younger than
+  //FCMP_RELATIVE_LOCK_DURATION + CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE blocks.
+  if (tx.unlock_time == FCMP_RELATIVE_LOCK)
+  {
+    if (locked_height >= FCMP_RELATIVE_LOCK_DURATION)
+      locked_height -= FCMP_RELATIVE_LOCK_DURATION;
+    else
+      locked_height = 0;
+  }
+
+  // Make sure reference block exists in the chain and satisfies the relative lock
+  CHECK_AND_NO_ASSERT_MES_L1(tx.rct_signatures.p.reference_block < locked_height, false,
       "tx " << get_transaction_hash(tx) << " included reference block that was too high");
 
   // Get the tree root and n tree layers at provided block
