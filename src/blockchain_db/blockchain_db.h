@@ -196,7 +196,8 @@ struct txpool_tx_meta_t
   uint8_t is_local: 1;
   uint8_t dandelionpp_stem : 1;
   uint8_t is_forwarding: 1;
-  uint8_t bf_padding: 3;
+  uint8_t hard_height_requirement: 1; // true iff will NEVER verify when `max_used_block_height` not present & confirmed
+  uint8_t bf_padding: 2;
 
   uint8_t padding[44]; // til 160 bytes
 
