@@ -486,8 +486,8 @@ std::pair<uint64_t, fcmp_pp::CompressedPath> BlockchainDB::get_last_path(const u
 
 uint64_t BlockchainDB::get_path_by_unified_id(const std::vector<uint64_t> &unified_ids,
   const uint64_t as_of_n_blocks,
-  std::vector<uint64_t> &leaf_idxs_out,
-  std::vector<fcmp_pp::CompressedPath> &paths_out) const
+  std::vector<fcmp_pp::AssignedLeafIdx> &leaf_idxs_out,
+  fcmp_pp::ConsolidatedPaths &paths_out) const
 {
   LOG_PRINT_L3("BlockchainDB::" << __func__);
 
@@ -495,8 +495,9 @@ uint64_t BlockchainDB::get_path_by_unified_id(const std::vector<uint64_t> &unifi
 
   // Initialize result vectors with 0 values. If outptut is not in the tree,
   // result vectors kept as 0 values
-  leaf_idxs_out = std::vector<uint64_t>(unified_ids.size(), 0);
-  paths_out = std::vector<fcmp_pp::CompressedPath>(unified_ids.size(), fcmp_pp::CompressedPath{});
+  leaf_idxs_out = std::vector<fcmp_pp::AssignedLeafIdx>(unified_ids.size(), fcmp_pp::AssignedLeafIdx{false, 0});
+  std::vector<fcmp_pp::CompressedPath> paths(unified_ids.size(), fcmp_pp::CompressedPath{});
+  paths_out = {};
 
   if (unified_ids.empty())
     return 0;
@@ -576,7 +577,8 @@ uint64_t BlockchainDB::get_path_by_unified_id(const std::vector<uint64_t> &unifi
       continue;
     const uint64_t unified_id = out_keys.at(i).unified_id;
     const auto tuple_range = n_leaf_tuple_ranges.at(i);
-    leaf_idxs_out.at(i) = this->find_leaf_idx_by_unified_id_bounded_search(unified_id, tuple_range.first, tuple_range.second);
+    const uint64_t leaf_idx = this->find_leaf_idx_by_unified_id_bounded_search(unified_id, tuple_range.first, tuple_range.second);
+    leaf_idxs_out.at(i).assign_leaf(leaf_idx);
   }
 
   // 6. Use leaf idxs to get paths
@@ -589,7 +591,7 @@ uint64_t BlockchainDB::get_path_by_unified_id(const std::vector<uint64_t> &unifi
       continue;
 
     // Read path from the db using path indexes
-    const auto path_idxs = m_curve_trees->get_path_indexes(n_leaf_tuples, leaf_idxs_out.at(i));
+    const auto path_idxs = m_curve_trees->get_path_indexes(n_leaf_tuples, leaf_idxs_out.at(i).leaf_idx);
     auto path = this->get_path(path_idxs);
 
     CHECK_AND_ASSERT_THROW_MES(path.leaves.size() && path.layer_chunks.size(), "get_path_by_unified_id: empty path");
@@ -608,9 +610,10 @@ uint64_t BlockchainDB::get_path_by_unified_id(const std::vector<uint64_t> &unifi
       path.layer_chunks.at(i).elems.back() = last_path.second.layer_chunks.at(i).elems.back();
     }
 
-    paths_out.at(i) = std::move(path);
+    paths.at(i) = std::move(path);
   }
 
+  paths_out = m_curve_trees->consolidate_paths(n_leaf_tuples, leaf_idxs_out, std::move(paths));
   return n_leaf_tuples;
 }
 

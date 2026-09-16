@@ -59,3 +59,8 @@ BEGIN_SERIALIZE_OBJECT_FN(fcmp_pp::UnifiedOutput)
     FIELD_F(unified_id)
     FIELD_F(output_pair)
 END_SERIALIZE()
+
+BEGIN_SERIALIZE_OBJECT_FN(fcmp_pp::AssignedLeafIdx)
+    FIELD_F(assigned_leaf_idx)
+    FIELD_F(leaf_idx)
+END_SERIALIZE()

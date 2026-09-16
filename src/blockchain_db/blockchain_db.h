@@ -1893,8 +1893,8 @@ public:
 
   uint64_t get_path_by_unified_id(const std::vector<uint64_t> &unified_ids,
     const uint64_t as_of_n_blocks,
-    std::vector<uint64_t> &leaf_idxs_out,
-    std::vector<fcmp_pp::CompressedPath> &paths_out) const;
+    std::vector<fcmp_pp::AssignedLeafIdx> &leaf_idxs_out,
+    fcmp_pp::ConsolidatedPaths &paths_out) const;
 
   /**
    * @brief add outs to locked outputs tables

@@ -103,20 +103,6 @@ struct CachedTreeElemChunk final
     END_SERIALIZE()
 };
 
-struct AssignedLeafIdx final
-{
-    bool assigned_leaf_idx{false};
-    LeafIdx leaf_idx{0};
-
-    void assign_leaf(const LeafIdx idx) { leaf_idx = idx; assigned_leaf_idx = true; }
-    void unassign_leaf() { leaf_idx = 0; assigned_leaf_idx = false; }
-
-    BEGIN_SERIALIZE_OBJECT()
-        FIELD(assigned_leaf_idx)
-        FIELD(leaf_idx)
-    END_SERIALIZE()
-};
-
 using LockedOutsByLastLockedBlock = std::unordered_map<LastLockedBlockIdx, std::vector<UnifiedOutput>>;
 using LockedOutputRefHashes       = std::unordered_map<LastLockedBlockIdx, NumOutputs>;
 using LockedOutputsByCreated      = std::unordered_map<CreatedBlockIdx, LockedOutputRefHashes>;
