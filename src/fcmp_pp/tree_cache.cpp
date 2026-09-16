@@ -29,9 +29,9 @@
 #include "tree_cache.h"
 
 #include "common/merge_sorted_vectors.h"
+#include "int-util.h"
 #include "misc_log_ex.h"
 #include "profile_tools.h"
-#include "string_tools.h"
 
 #include <algorithm>
 
@@ -50,20 +50,18 @@ static OutputRefHash get_output_ref_hash(const OutputPair &o_variant)
 
     // Hash the type info as well
     crypto::public_key type = crypto::null_pkey;
-    const std::size_t variant_index = o_variant.index();
+    const std::uint64_t variant_index = SWAP64LE(static_cast<std::uint64_t>(o_variant.index()));
     static_assert(sizeof(type) >= sizeof(variant_index), "variant index type is too large");
     memcpy(&type, &variant_index, sizeof(variant_index));
 
     static constexpr std::size_t N_HASH_ELEMS = 3;
-    const crypto::public_key data[N_HASH_ELEMS] = {
+    const crypto::ec_point data[N_HASH_ELEMS] = {
             output_pubkey,
-            (crypto::public_key&)commitment,
+            commitment,
             type
         };
 
-    crypto::hash h;
-    crypto::cn_fast_hash(data, N_HASH_ELEMS * sizeof(crypto::public_key), h);
-    return h;
+    return crypto::cn_fast_hash(data, sizeof(data));
 };
 //----------------------------------------------------------------------------------------------------------------------
 static void assign_new_output(const OutputPair &output_pair,
