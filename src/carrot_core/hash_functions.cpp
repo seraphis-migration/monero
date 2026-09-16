@@ -37,14 +37,11 @@ extern "C"
 }
 #include "crypto/blake2b.h"
 #include "exceptions.h"
-#include "memwipe.h"
 #include "misc_log_ex.h"
 
 //third party headers
 
 //standard headers
-#include <cstdint>
-#include <limits>
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "carrot"
@@ -61,50 +58,8 @@ static void hash_base(const void *derivation_key,  //32 bytes
     void *hash_out,
     const std::size_t out_length)
 {
-    CARROT_CHECK_AND_THROW(out_length && out_length <= BLAKE2B_OUTBYTES,
-        carrot_logic_error, "Invalid blake2b digest length");
-
-    const bool is_keyed = derivation_key != nullptr;
-
-    // Typical blake2b setup with digest length and key length set
-    static_assert(std::has_unique_object_representations_v<blake2b_param>);
-    static_assert(static_cast<std::size_t>(BLAKE2B_OUTBYTES) < std::numeric_limits<std::uint8_t>::max());
-    blake2b_param b2b_param{};
-    b2b_param.digest_length = static_cast<std::uint8_t>(out_length);
-    b2b_param.key_length = is_keyed ? 32 : 0;
-    b2b_param.fanout = 1;
-    b2b_param.depth = 1;
-
-    // Set personal string!
-    static_assert(sizeof(CARROT_PERSONAL_STRING) <= BLAKE2B_PERSONALBYTES);
-    static_assert(CARROT_PERSONAL_STRING[sizeof(CARROT_PERSONAL_STRING) - 1] == 0, "str missing null terminator");
-    memcpy(b2b_param.personal, CARROT_PERSONAL_STRING, sizeof(CARROT_PERSONAL_STRING) - 1); // exclude null term
-
-    // init state, wiped on leave (TODO: can be sped up to wipe only on bad leave)
-    tools::scrubbed<blake2b_state> state;
-    CARROT_CHECK_AND_THROW(0 == blake2b_init_param(&state, &b2b_param),
-        crypto_function_failed, "carrot hash base: blake2b init failed");
-
-    // update with key block if applicable
-    if (is_keyed)
-    {
-        uint8_t block[BLAKE2B_BLOCKBYTES];
-        memset(block, 0, BLAKE2B_BLOCKBYTES);
-        memcpy(block, derivation_key, 32);
-        const int r = blake2b_update(&state, block, BLAKE2B_BLOCKBYTES);
-        // wipe the key from stack
-        memwipe(block, sizeof(block));
-        // only check success after wiping key block
-        CARROT_CHECK_AND_THROW(0 == r, crypto_function_failed, "carrot hash base: blake2b key update failed");
-	}
-
-    // update with data blocks
-    CARROT_CHECK_AND_THROW(0 == blake2b_update(&state, data, data_length),
-        crypto_function_failed, "carrot hash base: blake2b update failed");
-
-    // finalize
-    CARROT_CHECK_AND_THROW(0 == blake2b_final(&state, hash_out, out_length),
-        crypto_function_failed, "carrot hash base: blake2b final failed");
+    const int r = blake2b_monero(hash_out, out_length, data, data_length, derivation_key, derivation_key ? 32 : 0);
+    CARROT_CHECK_AND_THROW(0 == r, crypto_function_failed, "carrot hash base: blake2b_monero failed");
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
