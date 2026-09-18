@@ -28,6 +28,8 @@
 
 #include "fee_priority.h"
 
+#include <ostream>
+
 namespace tools
 {
     std::ostream& operator<<(std::ostream& os, const fee_priority priority)
