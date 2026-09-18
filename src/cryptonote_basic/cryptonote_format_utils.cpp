@@ -341,10 +341,6 @@ namespace cryptonote
   //---------------------------------------------------------------
   bool get_transaction_unprunable_summary(const blobdata_ref tx_blob, unprunable_summary_t &summary_out)
   {
-    //! @TODO: update for FCMP++:
-    //!    * Allow rct::RctTypeFcmpPlusPlus
-    //!    * Set output length for txout_to_carrot_v1
-
     const unsigned char *p = reinterpret_cast<const unsigned char*>(tx_blob.data());
     const unsigned char *end = reinterpret_cast<const unsigned char*>(tx_blob.data() + tx_blob.size());
 
@@ -400,11 +396,17 @@ namespace cryptonote
       std::ptrdiff_t output_length = 0;
       switch (output_tag)
       {
+      case 0x01: //txout_to_carrot_v1
+        output_length = 32 + 3 + 16;
+        static_assert(sizeof(cryptonote::txout_to_carrot_v1) == 32+3+16, "Unexpected sizeof txout_to_carrot_v1");
+        break;
       case 0x02: //txout_to_key
         output_length = 32;
+        static_assert(sizeof(cryptonote::txout_to_key) == 32, "Unexpected sizeof txout_to_key");
         break;
       case 0x03: //txout_to_tagged_key
         output_length = 32 + 1;
+        static_assert(sizeof(cryptonote::txout_to_tagged_key) == 32+1, "Unexpected sizeof txout_to_tagged_key");
         break;
       default:
         return false;
@@ -426,7 +428,7 @@ namespace cryptonote
       // read RingCT type
       std::uint8_t rct_type = std::numeric_limits<std::uint8_t>::max();
       READ_BYTE(rct_type);
-      if (rct_type > rct::RCTTypeBulletproofPlus)
+      if (rct_type > rct::RCTTypeFcmpPlusPlus)
         return false;
 
       // skip unprunable RingCT fields
