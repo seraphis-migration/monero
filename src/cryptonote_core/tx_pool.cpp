@@ -250,6 +250,19 @@ namespace cryptonote
       }
     }
 
+    // FCMP++ transaction can't reference a tree root not yet in the chain
+    if (!kept_by_block && !tx.pruned && rct::is_rct_fcmp(tx.rct_signatures.type))
+    {
+      if (tx.rct_signatures.p.reference_block >= m_blockchain.get_current_blockchain_height())
+      {
+        LOG_PRINT_L1("Transaction with id= "<< id << " included reference block that was too high");
+        tvc.m_verifivation_failed = true;
+        // We might not be synced yet and an honest synced peer may have sent us the tx, so we make this a no-drop-offense
+        tvc.m_no_drop_offense = true;
+        return false;
+      }
+    }
+
     // Do more expensive verification after plausible no-drop offenses
     if (version != nic_verified_hf_version && !cryptonote::ver_non_input_consensus(tx, tvc, version))
     {
