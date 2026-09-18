@@ -192,7 +192,7 @@ void make_carrot_enote_ephemeral_pubkey_cryptonote(const crypto::secret_key &eno
     static const mx25519_impl *auto_mx25519_impl = mx25519_select_impl(MX25519_TYPE_AUTO); //! @TODO: remove after #10965
 
     // D_e = d_e B
-    mx25519_scmul_base(auto_mx25519_impl,
+    mx25519_scmul_base_unclamped(auto_mx25519_impl,
         &enote_ephemeral_pubkey_out,
         reinterpret_cast<const mx25519_privkey*>(&enote_ephemeral_privkey));
 }
@@ -243,7 +243,7 @@ bool try_make_carrot_shared_key_receiver(const crypto::secret_key &k_view,
     static const mx25519_impl *auto_mx25519_impl = mx25519_select_impl(MX25519_TYPE_AUTO); //! @TODO: remove after #10965
 
     // s_sr = k_v D_e
-    mx25519_scmul_key(auto_mx25519_impl,
+    mx25519_scmul_key_unclamped(auto_mx25519_impl,
         &s_sender_receiver_out,
         reinterpret_cast<const mx25519_privkey*>(&k_view),
         &enote_ephemeral_pubkey);
@@ -267,7 +267,7 @@ bool try_make_carrot_shared_key_sender(const crypto::secret_key &enote_ephemeral
         return false;
 
     // s_sr = d_e D^j_v
-    mx25519_scmul_key(auto_mx25519_impl,
+    mx25519_scmul_key_unclamped(auto_mx25519_impl,
         &s_sender_receiver_out,
         reinterpret_cast<const mx25519_privkey*>(&enote_ephemeral_privkey),
         &address_view_pubkey_x25519);
