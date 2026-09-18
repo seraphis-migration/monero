@@ -49,7 +49,7 @@
     struct is_variant_serializable<Type>: std::false_type {};          \
   }
 
-/*! \struct variant_serialization_triats
+/*! \struct variant_serialization_traits
  * 
  * \brief used internally to contain a variant's traits/possible types
  *

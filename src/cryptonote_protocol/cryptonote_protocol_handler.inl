@@ -1047,6 +1047,7 @@ namespace cryptonote
     tx_hashes.reserve(arg.txs.size());
     {
       std::unordered_set<crypto::hash> seen;
+      seen.reserve(arg.txs.size());
       bool already_seen = false;
       bool parse_failed = false;
       for (auto& tx_blob : arg.txs)

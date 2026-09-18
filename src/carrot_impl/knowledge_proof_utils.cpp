@@ -108,7 +108,8 @@ static void prove_ring_signature_key_image_proof(const crypto::secret_key &x,
     // L = x Hp(O)
     crypto::generate_key_image(onetime_address, x, key_image_out);
 
-    crypto::generate_ring_signature(ki2hash(key_image_out), key_image_out, {&onetime_address}, x, 0, &ki_proof_out);
+    const crypto::public_key *p_onetime_address = &onetime_address;
+    crypto::generate_ring_signature(ki2hash(key_image_out), key_image_out, &p_onetime_address, 1, x, 0, &ki_proof_out);
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
@@ -198,9 +199,11 @@ bool validate_ring_signature_key_image_proof(const crypto::public_key &onetime_a
         << epee::string_tools::pod_to_hex(onetime_address) << " using bLSAG signature");
 
     //! @WARNING:: only safe after #11155 is merged, since we don't check KI validity as caller
+    const crypto::public_key *p_onetime_address = &onetime_address;
     return crypto::check_ring_signature(ki2hash(key_image),
         key_image,
-        {&onetime_address},
+        &p_onetime_address,
+        1,
         &ki_proof);
 }
 //-------------------------------------------------------------------------------------------------------------------

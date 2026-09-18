@@ -69,7 +69,7 @@ public:
     */
     size_t offset() const { return m_offset; }
     /**
-     * @brief: get the genesis block hash
+     * @brief Get the genesis block hash
     */
     const crypto::hash &genesis() const { return m_genesis; }
     /**

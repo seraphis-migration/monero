@@ -31,6 +31,7 @@
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 set(wallet_sources
+  fee_priority.cpp
   hot_cold.cpp
   wallet2.cpp
   wallet_args.cpp

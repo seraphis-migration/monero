@@ -98,7 +98,7 @@ epee::wipeable_string decrypt_with_ec_key(const char * const ciphertext,
         error::wallet_internal_error, "Failed to authenticate ciphertext");
     }
     std::unique_ptr<char[]> buffer{new char[ciphertext_len - prefix_size]};
-    const epee::scope_guard scope_exit_handler([&](){
+    const epee::scope_guard wiper([&](){
         memwipe(buffer.get(), ciphertext_len - prefix_size); });
     crypto::chacha20(ciphertext + sizeof(iv), ciphertext_len - prefix_size, key, iv, buffer.get());
     return epee::wipeable_string(buffer.get(), ciphertext_len - prefix_size);

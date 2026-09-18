@@ -598,6 +598,7 @@ namespace
 
     return true;
   }
+
   static std::string resolve_wallet_path(const std::string &filename, const std::string &wallet_dir)
   {
     boost::filesystem::path path(filename);

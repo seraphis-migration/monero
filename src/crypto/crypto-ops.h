@@ -205,7 +205,6 @@ uint64_t load_3(const unsigned char *in);
 uint64_t load_4(const unsigned char *in);
 void ge_sub(ge_p1p1 *r, const ge_p3 *p, const ge_cached *q);
 void fe_add(fe h, const fe f, const fe g);
-void fe_neg(fe h, const fe f);
 void fe_tobytes(unsigned char *, const fe);
 void fe_copy(fe h, const fe f);
 int fe_isnegative(const fe f);
@@ -222,6 +221,7 @@ No 0 fe's are expected for `in`, otherwise fails.
 **/
 int fe_batch_invert(fe* __restrict out, const fe* __restrict in, const unsigned int n);
 void fe_mul(fe out, const fe, const fe);
+void fe_neg(fe h, const fe f);
 void fe_sq(fe h, const fe f);
 void fe_sub(fe h, const fe f, const fe g);
 void fe_0(fe h);

@@ -313,9 +313,9 @@ std::vector<std::string> UnsignedTransactionImpl::recipientAddress() const
           MERROR("empty destinations, skipped");
           continue;
         }
-        result.push_back(cryptonote::get_account_address_as_str(m_wallet.m_wallet->nettype(),
-            dsts.at(0).is_subaddress,
-            dsts.at(0).addr));
+        for (const auto &unsigned_dest : dsts) {
+            result.push_back(cryptonote::get_account_address_as_str(m_wallet.m_wallet->nettype(), unsigned_dest.is_subaddress, unsigned_dest.addr));
+        }
     }
     return result;
 }

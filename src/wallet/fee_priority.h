@@ -153,8 +153,5 @@ namespace tools
         }
     }
 
-    inline std::ostream& operator<<(std::ostream& os, const fee_priority priority)
-    {
-        return os << fee_priority_utilities::to_string(priority);
-    }
+    std::ostream& operator<<(std::ostream& os, const fee_priority priority);
 }

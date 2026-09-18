@@ -97,7 +97,6 @@ using namespace epee;
 #include "device_trezor/device_trezor.hpp"
 #include "net/socks_connect.h"
 #include "pending_tx_validation.h"
-#include "carrot_core/device_ram_borrowed.h"
 #include "carrot_impl/address_device_ram_borrowed.h"
 #include "carrot_impl/address_utils.h"
 #include "carrot_impl/format_utils.h"
@@ -2311,7 +2310,7 @@ bool wallet2::frozen(const multisig_tx_set& txs) const
     const std::size_t n_inputs = ptx.tx.vin.size();
     const auto *cd = std::get_if<tools::wallet2::tx_construction_data>(&ptx.construction_data);
     CHECK_AND_ASSERT_THROW_MES(cd == nullptr || cd->sources.size() == n_inputs,
-      "mismatched multisg tx set source sizes");
+      "mismatched multisig tx set source sizes");
     for (std::size_t src_idx = 0; src_idx < n_inputs; ++src_idx)
     {
       // Extract keys images from tx vin and construction data
@@ -8421,14 +8420,6 @@ std::string wallet2::save_multisig_tx(multisig_tx_set txs)
 {
   LOG_PRINT_L0("saving " << txs.m_ptx.size() << " multisig transactions");
 
-  // txes generated, get rid of used k values
-  for (size_t n = 0; n < txs.m_ptx.size(); ++n)
-    for (size_t idx: tools::wallet::collect_selected_transfer_indices(txs.m_ptx[n].construction_data, m_transfers))
-    {
-      memwipe(m_transfers[idx].m_multisig_k.data(), m_transfers[idx].m_multisig_k.size() * sizeof(m_transfers[idx].m_multisig_k[0]));
-      m_transfers[idx].m_multisig_k.clear();
-    }
-
   // zero out some data we don't want to share
   for (auto &ptx: txs.m_ptx)
   {
@@ -8786,15 +8777,6 @@ bool wallet2::sign_multisig_tx(multisig_tx_set &exported_txs_inout, std::vector<
   }
 
   exported_txs.m_signers.insert(local_signer);
-
-  // signatures generated, get rid of any unused k values (must do export_multisig() to make more tx attempts with the
-  //   inputs in the transactions worked on here)
-  for (size_t n = 0; n < exported_txs.m_ptx.size(); ++n)
-    for (const size_t idx: tools::wallet::collect_selected_transfer_indices(exported_txs.m_ptx.at(n).construction_data, m_transfers))
-    {
-      memwipe(m_transfers[idx].m_multisig_k.data(), m_transfers[idx].m_multisig_k.size() * sizeof(m_transfers[idx].m_multisig_k[0]));
-      m_transfers[idx].m_multisig_k.clear();
-    }
 
   // Do not expose signatures until all nonce material for the selected inputs
   // has been erased from the wallet cache.
@@ -13699,6 +13681,10 @@ uint64_t wallet2::import_key_images(
 
     if (!td.m_key_image_known || !(key_image == td.m_key_image))
     {
+      THROW_WALLET_EXCEPTION_IF(!(rct::scalarmultKey(rct::ki2rct(key_image), rct::curveOrder()) == rct::identity()),
+          error::wallet_internal_error, "Key image out of validity domain: input " + boost::lexical_cast<std::string>(transfer_idx) + "/"
+          + boost::lexical_cast<std::string>(signed_key_images.size()) + ", key image " + epee::string_tools::pod_to_hex(key_image));
+
       const bool use_biased_hash_to_point
         = carrot::use_biased_hash_to_point(wallet::make_sal_opening_hint_from_transfer_details(td));
       THROW_WALLET_EXCEPTION_IF(!carrot::validate_key_image_proof(pkey, use_biased_hash_to_point, key_image, signature),

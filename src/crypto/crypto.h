@@ -33,7 +33,6 @@
 #include <cstddef>
 #include <iosfwd>
 #include <type_traits>
-#include <vector>
 
 #include "memwipe.h"
 #include "mlocker.h"
@@ -279,20 +278,6 @@ namespace crypto {
     const public_key *const *pubs, std::size_t pubs_count,
     const signature *sig) {
     return crypto_ops::check_ring_signature(prefix_hash, image, pubs, pubs_count, sig);
-  }
-
-  /* Variants with vector<const public_key *> parameters.
-   */
-  inline void generate_ring_signature(const hash &prefix_hash, const key_image &image,
-    const std::vector<const public_key *> &pubs,
-    const secret_key &sec, std::size_t sec_index,
-    signature *sig) {
-    generate_ring_signature(prefix_hash, image, pubs.data(), pubs.size(), sec, sec_index, sig);
-  }
-  inline bool check_ring_signature(const hash &prefix_hash, const key_image &image,
-    const std::vector<const public_key *> &pubs,
-    const signature *sig) {
-    return check_ring_signature(prefix_hash, image, pubs.data(), pubs.size(), sig);
   }
 
   /* Derive a 1-byte view tag from the sender-receiver shared secret to reduce scanning time.

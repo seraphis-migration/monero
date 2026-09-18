@@ -33,10 +33,10 @@
 #define FFI_STATIC_ASSERT static_assert
 #else
 #include <assert.h>
-#include <stdalign.h>
 #define FFI_STATIC_ASSERT _Static_assert
 #endif
 
+#include <stdalign.h>
 #include <stdbool.h>
 #include <stdint.h>
 

@@ -456,81 +456,6 @@ TEST(Crypto, fe_equals)
   ASSERT_EQ(fe_equals(fe_d2_reduced, fe_d2), 1);
 }
 
-
-TEST(Crypto, fe_constants)
-{
-  // D = -121665/121666
-  fe D;
-  {
-    fe fe_numer{121665, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    fe fe_denom{121666, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-    fe_neg(fe_numer, fe_numer);
-    fe_invert(fe_denom, fe_denom);
-    fe_mul(D, fe_numer, fe_denom);
-  }
-
-  fe one;
-  fe_1(one);
-  fe a;
-  fe_neg(a, one);
-
-  fe a_minus_D;
-  fe_sub(a_minus_D, a, D);
-  fe_reduce_vartime(a_minus_D, a_minus_D);
-
-  // A = 2*(a+D)
-  fe A;
-  fe_add(A, a, D);
-  fe_dbl(A, A);
-
-  // B = (a-D)^2
-  fe B;
-  fe_sq(B, a_minus_D);
-
-  // Ap = -2A
-  fe Ap;
-  fe_neg(Ap, A);
-  fe_dbl(Ap, Ap);
-
-  fe Asq;
-  fe_sq(Asq, A);
-
-  // Bp = A^2-4B
-  fe Bp;
-  fe_dbl(Bp, B);
-  fe_dbl(Bp, Bp);
-  fe_sub(Bp, Asq, Bp);
-
-  fe neg_sqrt_2b;
-  fe_dbl(neg_sqrt_2b, Bp);
-  ASSERT_TRUE(fcmp_pp::sqrt(neg_sqrt_2b, neg_sqrt_2b));
-  // needs sqrt implemented to match rust const usage
-  // fe_neg(neg_sqrt_2b, neg_sqrt_2b);
-
-  fe inv_2;
-  static const fe fe_2{2, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  fe_invert(inv_2, fe_2);
-
-  fe sqrtm1;
-  ASSERT_TRUE(fcmp_pp::sqrt(sqrtm1, a));
-
-  // c = sqrt(-(A + 2))
-  fe c;
-  fe_sub(c, fe_ma, fe_2);
-  fe_reduce_vartime(c, c);
-  ASSERT_TRUE(fcmp_pp::sqrt(c, c));
-  fe_reduce_vartime(c, c);
-
-  ASSERT_TRUE(memcmp(fe_d,       D,           sizeof(fe)) == 0);
-  ASSERT_TRUE(memcmp(fe_a_sub_d, a_minus_D,   sizeof(fe)) == 0);
-  ASSERT_TRUE(memcmp(fe_a0,      A,           sizeof(fe)) == 0);
-  ASSERT_TRUE(memcmp(fe_ap,      Ap,          sizeof(fe)) == 0);
-  ASSERT_TRUE(memcmp(fe_msqrt2b, neg_sqrt_2b, sizeof(fe)) == 0);
-  ASSERT_TRUE(memcmp(fe_inv2,    inv_2,       sizeof(fe)) == 0);
-  ASSERT_TRUE(memcmp(fe_sqrtm1,  sqrtm1,      sizeof(fe)) == 0);
-  ASSERT_TRUE(memcmp(fe_c,       c,           sizeof(fe)) == 0);
-}
-
 TEST(Crypto, ec_constants_rct_parity)
 {
   ASSERT_TRUE(memcmp(&fcmp_pp::EC_I,         &rct::I,         32) == 0);
@@ -618,6 +543,88 @@ TEST(Crypto, mul8_is_identity_vartime)
     crypto::ec_point _;
     ASSERT_FALSE(fcmp_pp::get_valid_torsion_cleared_point_vartime(rct::rct2pt(point), _));
   }
+}
+
+TEST(Crypto, fe_constants)
+{
+  // D = -121665/121666
+  fe D;
+  {
+    fe fe_numer{121665, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    fe fe_denom{121666, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    fe_neg(fe_numer, fe_numer);
+    fe_invert(fe_denom, fe_denom);
+    fe_mul(D, fe_numer, fe_denom);
+  }
+
+  fe one;
+  fe_1(one);
+  fe a;
+  fe_neg(a, one);
+
+  fe a_minus_D;
+  fe_sub(a_minus_D, a, D);
+  fe_reduce_vartime(a_minus_D, a_minus_D);
+
+  // A = 2*(a+D)
+  fe A;
+  fe_add(A, a, D);
+  fe_dbl(A, A);
+
+  // B = (a-D)^2
+  fe B;
+  fe_sq(B, a_minus_D);
+
+  // Ap = -2A
+  fe Ap;
+  fe_neg(Ap, A);
+  fe_dbl(Ap, Ap);
+
+  fe Asq;
+  fe_sq(Asq, A);
+
+  // Bp = A^2-4B
+  fe Bp;
+  fe_dbl(Bp, B);
+  fe_dbl(Bp, Bp);
+  fe_sub(Bp, Asq, Bp);
+
+  fe neg_sqrt_2b;
+  fe_dbl(neg_sqrt_2b, Bp);
+  ASSERT_TRUE(fcmp_pp::sqrt(neg_sqrt_2b, neg_sqrt_2b));
+  // needs sqrt implemented to match rust const usage
+  // fe_neg(neg_sqrt_2b, neg_sqrt_2b);
+
+  fe inv_2;
+  static const fe fe_2{2, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  fe_invert(inv_2, fe_2);
+
+  fe sqrtm1;
+  ASSERT_TRUE(fcmp_pp::sqrt(sqrtm1, a));
+
+  // A / 3
+  fe inv_3;
+  static const fe fe_3{3, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  fe_invert(inv_3, fe_3);
+  fe a_inv_3;
+  fe_mul(a_inv_3, fe_a, inv_3);
+
+  // c = sqrt(-(A + 2))
+  fe c;
+  fe_sub(c, fe_ma, fe_2);
+  fe_reduce_vartime(c, c);
+  ASSERT_TRUE(fcmp_pp::sqrt(c, c));
+  fe_reduce_vartime(c, c);
+
+  ASSERT_TRUE(memcmp(fe_d,       D,           sizeof(fe)) == 0);
+  ASSERT_TRUE(memcmp(fe_a_sub_d, a_minus_D,   sizeof(fe)) == 0);
+  ASSERT_TRUE(memcmp(fe_a0,      A,           sizeof(fe)) == 0);
+  ASSERT_TRUE(memcmp(fe_ap,      Ap,          sizeof(fe)) == 0);
+  ASSERT_TRUE(memcmp(fe_msqrt2b, neg_sqrt_2b, sizeof(fe)) == 0);
+  ASSERT_TRUE(memcmp(fe_inv2,    inv_2,       sizeof(fe)) == 0);
+  ASSERT_TRUE(memcmp(fe_sqrtm1,  sqrtm1,      sizeof(fe)) == 0);
+  ASSERT_TRUE(memcmp(fe_a_inv_3, a_inv_3,     sizeof(fe)) == 0);
+  ASSERT_TRUE(memcmp(fe_c,       c,           sizeof(fe)) == 0);
 }
 
 TEST(Crypto, fe_constants_parity_to_spec)
