@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <iterator>
 #include <optional>
+#include <ostream>
 #include <iosfwd>
 
 #include "fee_algorithm.h"
