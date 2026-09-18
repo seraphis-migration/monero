@@ -424,6 +424,11 @@ bool Blockchain::init(BlockchainDB* db, const network_type nettype, bool offline
 
   rtxn_guard.stop();
 
+  // STRESSNET SPECIFIC HACK: if using new beta 3.x software with a beta 2.x database, rollback to before old v17 height
+  static constexpr std::uint64_t beta_2x_v17_height = 3012000;
+  const bool contains_beta_2x_block = m_db->height() > beta_2x_v17_height
+    && m_db->get_blocks_range(beta_2x_v17_height, beta_2x_v17_height).at(0).miner_tx.vout.at(0).target.type() == typeid(txout_to_carrot_v1);
+
   uint64_t num_popped_blocks = 0;
   while (!m_db->is_read_only())
   {
@@ -431,7 +436,8 @@ bool Blockchain::init(BlockchainDB* db, const network_type nettype, bool offline
     const crypto::hash top_id = m_db->top_block_hash(&top_height);
     const block top_block = m_db->get_top_block();
     const uint8_t ideal_hf_version = get_ideal_hard_fork_version(top_height);
-    if (ideal_hf_version <= 1 || ideal_hf_version == top_block.major_version)
+    const bool beta_rollback = contains_beta_2x_block && top_height >= beta_2x_v17_height;
+    if (ideal_hf_version <= 1 || (ideal_hf_version == top_block.major_version && !beta_rollback))
     {
       if (num_popped_blocks > 0)
         MGINFO("Initial popping done, top block: " << top_id << ", top height: " << top_height << ", block version: " << (uint64_t)top_block.major_version);
