@@ -614,7 +614,7 @@ namespace cryptonote
         : COMMAND_RPC_GET_BLOCKS_FAST::FULL;
     }
 
-    if (req.init_tree_sync)
+    if (req.init_tree_sync && res.init_tree_sync_data.init_block_hash == crypto::null_hash)
     {
       // Get the first hash in the result
       if (res.blocks.empty())
