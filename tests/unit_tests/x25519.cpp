@@ -200,7 +200,7 @@ TEST(x25519, scmul_key_convergence)
       {
         // D2 = a * D_base
         mx25519_pubkey res_mx;
-        mx25519_scmul_key(impl, &res_mx, &scalar, &point.second);
+        mx25519_scmul_key_unclamped(impl, &res_mx, &scalar, &point.second);
 
         // D1 ?= D2
         EXPECT_EQ(res, res_mx);
@@ -256,7 +256,7 @@ TEST(x25519, small_order_mul_eq_0)
     for (const mx25519_impl* impl : available_mx25519_impls)
     {
       mx25519_pubkey Q;
-      mx25519_scmul_key(impl, &Q, &sk, &x25519_small_order_points[i]);
+      mx25519_scmul_key_unclamped(impl, &Q, &sk, &x25519_small_order_points[i]);
 
       EXPECT_EQ(x_eq_0, Q);
     }

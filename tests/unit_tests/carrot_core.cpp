@@ -99,7 +99,7 @@ TEST(carrot_core, ECDH_mx25519_convergence)
 
     // do Q = a * P using mx25519
     mx25519_pubkey Q_mx25519;
-    mx25519_scmul_key(impl, &Q_mx25519, reinterpret_cast<const mx25519_privkey*>(&a), &P);
+    mx25519_scmul_key_unclamped(impl, &Q_mx25519, reinterpret_cast<const mx25519_privkey*>(&a), &P);
 
     // do Q = a * P using try_make_carrot_shared_key_receiver()
     mx25519_pubkey Q_carrot;
