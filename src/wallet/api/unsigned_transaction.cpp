@@ -302,20 +302,15 @@ std::vector<std::string> UnsignedTransactionImpl::paymentId() const
 
 std::vector<std::string> UnsignedTransactionImpl::recipientAddress() const 
 {
-    const auto addr_dev = m_wallet.m_wallet->get_cryptonote_address_device();
+    const auto k_view_dev = this->m_wallet.m_wallet->get_view_incoming_key_device();
 
     // TODO: return integrated address if short payment ID exists
     std::vector<string> result;
-    result.reserve(m_tx_proposals.size());
+    result.reserve(8 * m_tx_proposals.size()); // just a guess
     for (const tools::wallet::tx_reconstruct_variant_t &tx_proposal: m_tx_proposals) {
-        const auto dsts = finalized_destinations(tx_proposal, *addr_dev);
-        if (dsts.empty()) {
-          MERROR("empty destinations, skipped");
-          continue;
-        }
-        for (const auto &unsigned_dest : dsts) {
-            result.push_back(cryptonote::get_account_address_as_str(m_wallet.m_wallet->nettype(), unsigned_dest.is_subaddress, unsigned_dest.addr));
-        }
+        const auto dsts = tools::wallet::user_destinations(tx_proposal, *k_view_dev);
+        for (const cryptonote::tx_destination_entry &dst : dsts)
+            result.push_back(cryptonote::get_account_address_as_str(m_wallet.m_wallet->nettype(), dst.is_subaddress, dst.addr));
     }
     return result;
 }
