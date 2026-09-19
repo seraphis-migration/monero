@@ -615,6 +615,7 @@ TEST(Crypto, fe_constants)
   fe_reduce_vartime(c, c);
   ASSERT_TRUE(fcmp_pp::sqrt(c, c));
   fe_reduce_vartime(c, c);
+  fe_neg(c, c); // need the negative value of the sqrt
 
   ASSERT_TRUE(memcmp(fe_d,       D,           sizeof(fe)) == 0);
   ASSERT_TRUE(memcmp(fe_a_sub_d, a_minus_D,   sizeof(fe)) == 0);
