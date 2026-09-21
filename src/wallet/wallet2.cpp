@@ -3882,21 +3882,38 @@ void wallet2::pull_and_parse_next_blocks(bool check_pool, uint64_t &blocks_start
     }
 
     boost::mutex error_lock;
+    struct tx_parse_params
+    {
+      size_t block_idx;
+      size_t tx_idx;
+    };
+    std::vector<tx_parse_params> parse_jobs;
     for (size_t i = 0; i < blocks.size(); ++i)
     {
       parsed_blocks[i].txes.resize(blocks[i].txs.size());
       for (size_t j = 0; j < blocks[i].txs.size(); ++j)
-      {
-        tpool.submit(&waiter, [&, i, j](){
-          if (!parse_and_validate_tx_base_from_blob(blocks[i].txs[j].blob, parsed_blocks[i].txes[j]))
+        parse_jobs.push_back(tx_parse_params{i, j});
+    }
+
+    tools::threadpool::waiter parse_waiter(tpool);
+    const size_t TX_PARSE_BATCH_SIZE = 100;
+    for (size_t batch_start = 0; batch_start < parse_jobs.size(); batch_start += TX_PARSE_BATCH_SIZE)
+    {
+      const size_t batch_end = std::min(batch_start + TX_PARSE_BATCH_SIZE, parse_jobs.size());
+      tpool.submit(&parse_waiter, [&, batch_start, batch_end](){
+        for (size_t k = batch_start; k < batch_end; ++k)
+        {
+          const tx_parse_params &p = parse_jobs[k];
+          if (!parse_and_validate_tx_base_from_blob(blocks[p.block_idx].txs[p.tx_idx].blob,
+                parsed_blocks[p.block_idx].txes[p.tx_idx]))
           {
             boost::unique_lock<boost::mutex> lock(error_lock);
             error = true;
           }
-        }, true);
-      }
+        }
+      }, true);
     }
-    THROW_WALLET_EXCEPTION_IF(!waiter.wait(), error::wallet_internal_error, "Exception in thread pool");
+    THROW_WALLET_EXCEPTION_IF(!parse_waiter.wait(), error::wallet_internal_error, "Exception in thread pool");
 
     // Ensure matching parent block hashes
     crypto::hash prev_block_id = (blocks.size() > 0) ? parsed_blocks.front().block.hash : crypto::hash{};
