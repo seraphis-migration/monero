@@ -3673,7 +3673,13 @@ void wallet2::process_parsed_blocks(const uint64_t start_height, const uint64_t 
   }; //tx_scan_job
 
   // create tx scanning jobs for all relevant tx outputs in all blocks
-  tools::threadpool::waiter scan_blocks_waiter(tpool);
+  struct tx_scan_params
+  {
+    const cryptonote::transaction &tx;
+    size_t tx_output_idx;
+  };
+  std::vector<tx_scan_params> scan_jobs;
+  scan_jobs.reserve(num_txes);
   size_t tx_output_idx = 0;
   for (size_t i = start_parsed_block_i; i < blocks.size(); ++i)
   {
@@ -3681,14 +3687,25 @@ void wallet2::process_parsed_blocks(const uint64_t start_height, const uint64_t 
     const std::uint64_t height = start_height + i;
     const bool skip_scan_for_this_block = should_skip_block(par_blk.block, height);
     if (!skip_scan_for_this_block && m_refresh_type != RefreshNoCoinbase)
-      tpool.submit(&scan_blocks_waiter, std::bind(tx_scan_job, std::cref(par_blk.block.miner_tx), tx_output_idx));
+      scan_jobs.push_back(tx_scan_params{par_blk.block.miner_tx, tx_output_idx});
     tx_output_idx += par_blk.block.miner_tx.vout.size();
     for (const cryptonote::transaction &tx : par_blk.txes)
     {
       if (!skip_scan_for_this_block)
-        tpool.submit(&scan_blocks_waiter, std::bind(tx_scan_job, std::cref(tx), tx_output_idx));
+        scan_jobs.push_back(tx_scan_params{tx, tx_output_idx});
       tx_output_idx += tx.vout.size();
     }
+  }
+
+  tools::threadpool::waiter scan_blocks_waiter(tpool);
+  const size_t TX_SCAN_BATCH_SIZE = 100;
+  for (size_t batch_start = 0; batch_start < scan_jobs.size(); batch_start += TX_SCAN_BATCH_SIZE)
+  {
+    const size_t batch_end = std::min(batch_start + TX_SCAN_BATCH_SIZE, scan_jobs.size());
+    tpool.submit(&scan_blocks_waiter, [&scan_jobs, &tx_scan_job, batch_start, batch_end]() {
+      for (size_t i = batch_start; i < batch_end; ++i)
+        tx_scan_job(scan_jobs[i].tx, scan_jobs[i].tx_output_idx);
+    });
   }
   if (!scan_blocks_waiter.wait())
   {
