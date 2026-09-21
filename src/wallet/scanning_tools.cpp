@@ -31,6 +31,7 @@
 
 //local headers
 #include "carrot_core/destination.h"
+#include "carrot_core/enote_utils.h"
 #include "carrot_core/scan.h"
 #include "carrot_impl/address_utils.h"
 #include "carrot_impl/format_utils.h"
@@ -289,6 +290,12 @@ static std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_carrot_
     const crypto::public_key &main_address_view_pubkey,
     const carrot::subaddress_map &subaddress_map)
 {
+    if (!carrot::test_carrot_view_tag(s_sender_receiver.data,
+            carrot::make_carrot_input_context_coinbase(enote.block_index),
+            enote.onetime_address,
+            enote.view_tag))
+        return std::nullopt;
+
     enote_view_incoming_scan_info_t res;
 
     if (!carrot::try_scan_carrot_coinbase_enote_receiver(enote,
@@ -363,6 +370,12 @@ static std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_carrot_
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
     const carrot::subaddress_map &subaddress_map)
 {
+    if (!carrot::test_carrot_view_tag(s_sender_receiver.data,
+            carrot::make_carrot_input_context(enote.tx_first_key_image),
+            enote.onetime_address,
+            enote.view_tag))
+        return std::nullopt;
+
     enote_view_incoming_scan_info_t res;
 
     crypto::secret_key amount_blinding_factor_sk;
