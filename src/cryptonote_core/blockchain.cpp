@@ -3502,7 +3502,7 @@ bool Blockchain::have_tx_keyimges_as_spent(const transaction &tx) const
     CHECKED_GET_SPECIFIC_VARIANT(in, const txin_to_key, in_to_key, true);
     if(have_tx_keyimg_as_spent(in_to_key.k_image))
     {
-      LOG_PRINT_L1("Key image already spent in blockchain: " << epee::string_tools::pod_to_hex(in_to_key));
+      LOG_PRINT_L1("Key image already spent in blockchain: " << epee::string_tools::pod_to_hex(in_to_key.k_image));
       return true;
     }
   }
