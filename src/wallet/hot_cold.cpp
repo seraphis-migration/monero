@@ -493,7 +493,8 @@ exported_carrot_transfer_details export_cold_carrot_output(const wallet2_basic::
 
     // 10. K^j_s, enote_type
     crypto::public_key address_spend_pubkey;
-    addr_dev.get_address_spend_pubkey({etd.subaddr_index}, address_spend_pubkey);
+    crypto::public_key address_view_pubkey;
+    addr_dev.get_address_pubkeys({etd.subaddr_index}, address_spend_pubkey, address_view_pubkey);
     crypto::secret_key amount_blinding_factor;
     etd.flags.m_enote_type_change = carrot::try_recompute_carrot_amount_commitment(s_sender_receiver_ctx,
         td.amount(), address_spend_pubkey, carrot::CarrotEnoteType::CHANGE,
@@ -513,6 +514,7 @@ exported_carrot_transfer_details export_cold_carrot_output(const wallet2_basic::
         CHECK_AND_ASSERT_THROW_MES(
             carrot::verify_carrot_normal_janus_protection(input_context,
                 address_spend_pubkey,
+                address_view_pubkey,
                 is_subaddress,
                 enote_ephemeral_pubkey,
                 etd.janus_anchor,
