@@ -234,12 +234,32 @@ namespace cryptonote
       return false;
     }
 
+    if (!check_inputs_types_supported(tx))
+    {
+      // TODO: do more cheap semantics checks earlier. This is here so the have_tx_keyimges_as_spent below can only fail when expected.
+      MERROR("Unsupported input types for tx id= " << id);
+      tvc.m_verifivation_failed = true;
+      tvc.m_invalid_input = true;
+      return false;
+    }
+
+    if (version && version > HF_VERSION_FCMP_PLUS_PLUS)
+    {
+      // TODO: do more cheap semantics checks earlier. This is here to protect overloading have_tx_keyimges_as_spent with many DB reads.
+      if (tx.vin.empty() || tx.vin.size() > FCMP_PLUS_PLUS_MAX_INPUTS)
+      {
+        tvc.m_verifivation_failed = true;
+        tvc.m_invalid_input = true;
+        return false;
+      }
+    }
+
     // if the transaction came from a block popped from the chain,
     // don't check if we have its key images as spent.
     // TODO: Investigate why not?
     if(!kept_by_block)
     {
-      if(have_tx_keyimges_as_spent(tx, id))
+      if(have_tx_keyimges_as_spent(tx, id) || m_blockchain.have_tx_keyimges_as_spent(tx))
       {
         mark_double_spend(tx);
         LOG_PRINT_L1("Transaction with id= "<< id << " used already spent key images");
