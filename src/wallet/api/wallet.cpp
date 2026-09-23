@@ -784,6 +784,9 @@ bool WalletImpl::close(bool store)
     bool result = false;
     LOG_PRINT_L1("closing wallet...");
     try {
+        LOG_PRINT_L1("Calling wallet::shutdown...");
+        m_wallet->shutdown();
+        LOG_PRINT_L1("wallet::shutdown done");
         if (store) {
             // Do not store wallet with invalid status
             // Status Critical refers to errors on opening or creating wallets.
@@ -793,9 +796,6 @@ bool WalletImpl::close(bool store)
                 LOG_ERROR("Status_Critical - not saving wallet");
             LOG_PRINT_L1("wallet::store done");
         }
-        LOG_PRINT_L1("Calling wallet::stop...");
-        m_wallet->stop();
-        LOG_PRINT_L1("wallet::stop done");
         m_wallet->deinit();
         result = true;
         clearStatus();

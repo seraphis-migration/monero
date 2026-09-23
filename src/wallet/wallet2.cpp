@@ -7100,6 +7100,8 @@ void wallet2::store()
 //----------------------------------------------------------------------------------------------------
 void wallet2::store_to(const std::string &path, const epee::wipeable_string &password, bool force_rewrite_keys)
 {
+  boost::lock_guard refresh_lock(m_refresh_mutex);
+
   const bool had_old_wallet_files = !m_wallet_file.empty();
   THROW_WALLET_EXCEPTION_IF(!had_old_wallet_files && path.empty(), error::wallet_internal_error,
     "Cannot resave wallet to current file since wallet was not loaded from file to begin with");
