@@ -3875,13 +3875,9 @@ bool Blockchain::check_tx_inputs(transaction& tx,
     if (pmax_used_block_height)
       *pmax_used_block_height = tx.rct_signatures.p.reference_block;
 
-    // Read the db for the tree root for FCMP tx. Enforces that the ref block is in the chain
+    // Read the db for the tree root for FCMP tx
     if (!get_fcmp_tx_tree_root(m_db, tx, ref_tree_root))
-    {
-      // We might not be synced yet and an honest synced peer may have sent us the tx, so we make this a no-drop-offense
-      tvc.m_no_drop_offense = true;
       return false;
-    }
   }
   else if (hf_version >= HF_VERSION_ENFORCE_MIN_AGE)
   {
