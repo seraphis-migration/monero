@@ -208,6 +208,8 @@
 #define HF_VERSION_REJECT_UNMIXABLE_V1          17
 #define HF_VERSION_REJECT_MANY_MINER_OUTPUTS    17
 #define HF_VERSION_2026_SCALING                 17
+#define HF_VERSION_POW_COMMITMENT               17
+#define HF_VERSION_RANDOMX_V2                   17
 #define MAX_HF_VERSION                          18
 
 #define PER_KB_FEE_QUANTIZATION_DECIMALS        8
