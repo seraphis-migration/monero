@@ -1510,7 +1510,9 @@ bool Blockchain::validate_miner_transaction(const block& b, size_t cumulative_bl
   }
 
   // From FCMP++ fork, we want to guarantee every output that enters the chain is a valid output with no torsion.
-  if (version >= HF_VERSION_FCMP_PLUS_PLUS || b.miner_tx.unlock_time >= m_hardfork->get_earliest_ideal_height_for_version(HF_VERSION_FCMP_PLUS_PLUS))
+  // Note: we skip the genesis block for tests since it has torsion.
+  if ((m_nettype != FAKECHAIN || get_block_height(b) > 0) &&
+      (version >= HF_VERSION_FCMP_PLUS_PLUS || b.miner_tx.unlock_time >= m_hardfork->get_earliest_ideal_height_for_version(HF_VERSION_FCMP_PLUS_PLUS)))
   {
     // We start requiring at least 1 coinbase out and valid outs as soon as unlock_time >= FCMP++ height,
     // so that we guarantee every usable tree root is unique, since at least 1 new out will be appended to the tree.
