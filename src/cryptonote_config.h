@@ -58,7 +58,7 @@
 #define CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V2    60000 //size of block (bytes) after which reward for block calculated using block size
 #define CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V1    20000 //size of block (bytes) after which reward for block calculated using block size - before first fork
 #define CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V5    300000 //size of block (bytes) after which reward for block calculated using block size - second change, from v5
-#define CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V17   625000 //size of block (bytes) after which reward for block calculated using block size - third change, from v17
+#define CRYPTONOTE_BLOCK_GRANTED_FULL_REWARD_ZONE_V17   10000000 //STRESSNET SPECIFIC size of block (bytes) after which reward for block calculated using block size - third change, from v17
 #define CRYPTONOTE_LONG_TERM_BLOCK_WEIGHT_WINDOW_SIZE   100000 // size in blocks of the long term block weight median window
 #define CRYPTONOTE_SHORT_TERM_BLOCK_SURGE_FACTOR_V10    50
 #define CRYPTONOTE_SHORT_TERM_BLOCK_SURGE_FACTOR_V17    8

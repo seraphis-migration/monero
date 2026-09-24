@@ -45,7 +45,7 @@ Test the following RPCs:
 from framework.daemon import Daemon
 from framework.wallet import Wallet
 
-BASE_FEE_ESTIMATE = 1200000
+BASE_FEE_ESTIMATE = 4400
 
 class BlockchainTest():
     def run_test(self):
