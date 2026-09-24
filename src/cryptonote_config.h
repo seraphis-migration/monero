@@ -160,8 +160,8 @@
 #define P2P_REQUEST_FAILURE_THRESHOLD_PERCENTAGE        70          // if more than 70% of requests fail, the peer is dropped
 #define P2P_MIN_SAMPLE_SIZE_FOR_DROPPING                5          // minimum number of requests to consider dropping a peer for failed requests
 
-#define P2P_FAILED_ADDR_FORGET_SECONDS                  (60*60)     //1 hour
-#define P2P_IP_BLOCKTIME                                (60*60*24)  //24 hour
+#define P2P_FAILED_ADDR_FORGET_SECONDS                  (60)     //1 minute
+#define P2P_IP_BLOCKTIME                                (60*2)  //2 minutes
 #define P2P_IP_FAILS_BEFORE_BLOCK                       10
 #define P2P_IDLE_CONNECTION_KILL_INTERVAL               (5*60) //5 minutes
 
