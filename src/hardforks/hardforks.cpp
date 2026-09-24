@@ -104,6 +104,10 @@ const hardfork_t testnet_hard_forks[] = {
   { 14, 1544659, 0, 1599069377 },
   { 15, 1982800, 0, 1652727000 },
   { 16, 1983520, 0, 1652813400 },
+
+  // FCMP++/Carrot Beta v3 hardfork
+  { 17, 3102800, 0, 1652813401 },
+  { 18, 3103520, 0, 1652813402 },
 };
 const size_t num_testnet_hard_forks = sizeof(testnet_hard_forks) / sizeof(testnet_hard_forks[0]);
 const uint64_t testnet_hard_fork_version_1_till = 624633;
