@@ -2915,6 +2915,7 @@ void wallet2::process_new_blockchain_entry(const cryptonote::block& b,
   const uint64_t height,
   epee::span<const std::optional<wallet::enote_view_incoming_scan_info_t>> enote_scan_infos,
   epee::span<const std::optional<crypto::key_image>> output_key_images,
+  std::unordered_set<crypto::hash> &pending_txids,
   std::map<std::pair<uint64_t, uint64_t>, size_t> &output_tracker_cache)
 {
   THROW_WALLET_EXCEPTION_IF(bche.txs.size() + 1 != parsed_block.o_indices.indices.size(), error::wallet_internal_error,
@@ -2975,6 +2976,7 @@ void wallet2::process_new_blockchain_entry(const cryptonote::block& b,
         /*pool=*/false,
         /*double_spend_seen=*/false,
         output_tracker_cache);
+      pending_txids.erase(b.tx_hashes[idx]);
       enote_scan_infos.remove_prefix(n_outs_in_tx);
       output_key_images.remove_prefix(n_outs_in_tx);
     }
@@ -3697,6 +3699,20 @@ void wallet2::process_parsed_blocks(const uint64_t start_height, const uint64_t 
     THROW_WALLET_EXCEPTION(error::wallet_internal_error, "Unrecognized exception in enote scanning threadpool");
   }
 
+  // Reconcile completed transactions even if a later transaction or block throws.
+  std::unordered_set<crypto::hash> pending_txids;
+  for (const auto &payment : m_unconfirmed_payments)
+    pending_txids.insert(payment.second.m_pd.m_tx_hash);
+  const epee::scope_guard reconcile_pool([&]() {
+    if (m_unconfirmed_payments.empty())
+      return;
+    // This path only appends a contiguous prefix; earlier hashes may already be trimmed.
+    for (size_t i = start_parsed_block_i; i < parsed_blocks.size() && start_height + i < m_blockchain.size(); ++i)
+      for (const auto &txid : parsed_blocks[i].block.tx_hashes)
+        pending_txids.erase(txid);
+    remove_obsolete_pool_txs(pending_txids, false);
+  });
+
   // Start processing blockchain entries with scanned outputs
   tx_output_idx = 0;
   for (size_t i = start_parsed_block_i; i < blocks.size(); ++i)
@@ -3713,7 +3729,7 @@ void wallet2::process_parsed_blocks(const uint64_t start_height, const uint64_t 
     const epee::span<const std::optional<crypto::key_image>> output_key_images_span(
       output_key_images.data() + tx_output_idx, n_block_outputs);
 
-    this->process_new_blockchain_entry(bl, blocks[i], parsed_blocks[i], bl_id, current_index, enote_scan_infos_span, output_key_images_span, output_tracker_cache);
+    this->process_new_blockchain_entry(bl, blocks[i], parsed_blocks[i], bl_id, current_index, enote_scan_infos_span, output_key_images_span, pending_txids, output_tracker_cache);
 
     ++blocks_added;
     tx_output_idx += n_block_outputs;
@@ -3973,6 +3989,8 @@ void wallet2::remove_obsolete_pool_txs(const std::unordered_set<crypto::hash> &t
     if ((!remove_if_found && !found) || (remove_if_found && found))
     {
       MDEBUG("Removing " << txid << " from unconfirmed payments");
+      m_scanned_pool_txs[0].erase(txid);
+      m_scanned_pool_txs[1].erase(txid);
       m_unconfirmed_payments.erase(pit);
     }
   }
@@ -4384,7 +4402,7 @@ std::map<std::pair<uint64_t, uint64_t>, size_t> wallet2::create_output_tracker_c
   return cache;
 }
 //----------------------------------------------------------------------------------------------------
-void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blocks_fetched, bool& received_money, bool check_pool, uint64_t max_blocks)
+void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blocks_fetched, bool& received_money, bool check_pool, uint64_t max_blocks, bool fetch_pool)
 {
   boost::lock_guard refresh_lock(m_refresh_mutex);
 
@@ -4487,7 +4505,7 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
           ? prepare_first_short_chain_history(m_first_refresh_done, trusted_daemon, m_blockchain)
           : prepare_next_short_chain_history(blocks_start_height, start_parsed_block_i, parsed_blocks, m_max_reorg_depth, m_blockchain);
 
-        const bool do_pool_check = first && check_pool && !m_background_syncing;
+        const bool do_pool_check = first && check_pool && fetch_pool && !m_background_syncing;
         tpool.submit(&waiter, [&]{pull_and_parse_next_blocks(do_pool_check, next_blocks_start_height, short_chain_history, next_blocks, next_parsed_blocks, process_pool_txs, cur_top_hash, error, exception);});
       }
 
