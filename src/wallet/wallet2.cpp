@@ -3698,17 +3698,30 @@ void wallet2::process_parsed_blocks(const uint64_t start_height, const uint64_t 
     }
   }
 
+  std::atomic<bool> scan_error{false};
+  // The waiter must drain queued jobs before their referenced storage is destroyed.
   tools::threadpool::waiter scan_blocks_waiter(tpool);
-  const size_t TX_SCAN_BATCH_SIZE = 100;
+  const size_t TX_SCAN_BATCH_SIZE = std::max<size_t>(1,
+    std::min<size_t>(100, scan_jobs.size() / std::max<size_t>(1, tpool.get_max_concurrency()) / 8));
   for (size_t batch_start = 0; batch_start < scan_jobs.size(); batch_start += TX_SCAN_BATCH_SIZE)
   {
     const size_t batch_end = std::min(batch_start + TX_SCAN_BATCH_SIZE, scan_jobs.size());
-    tpool.submit(&scan_blocks_waiter, [&scan_jobs, &tx_scan_job, batch_start, batch_end]() {
+    tpool.submit(&scan_blocks_waiter, [&scan_jobs, &tx_scan_job, &scan_error, batch_start, batch_end]() {
       for (size_t i = batch_start; i < batch_end; ++i)
-        tx_scan_job(scan_jobs[i].tx, scan_jobs[i].tx_output_idx);
+      {
+        try
+        {
+          tx_scan_job(scan_jobs[i].tx, scan_jobs[i].tx_output_idx);
+        }
+        catch (...)
+        {
+          // Later transactions must still get a chance to request a password.
+          scan_error.store(true, std::memory_order_relaxed);
+        }
+      }
     });
   }
-  if (!scan_blocks_waiter.wait())
+  if (!scan_blocks_waiter.wait() || scan_error.load(std::memory_order_relaxed))
   {
     THROW_WALLET_EXCEPTION_IF(password_failure, error::password_needed);
     THROW_WALLET_EXCEPTION(error::wallet_internal_error, "Unrecognized exception in enote scanning threadpool");
@@ -3881,39 +3894,8 @@ void wallet2::pull_and_parse_next_blocks(bool check_pool, uint64_t &blocks_start
       parsed_blocks[i].o_indices = std::move(o_indices[i]);
     }
 
-    boost::mutex error_lock;
-    struct tx_parse_params
-    {
-      size_t block_idx;
-      size_t tx_idx;
-    };
-    std::vector<tx_parse_params> parse_jobs;
-    for (size_t i = 0; i < blocks.size(); ++i)
-    {
-      parsed_blocks[i].txes.resize(blocks[i].txs.size());
-      for (size_t j = 0; j < blocks[i].txs.size(); ++j)
-        parse_jobs.push_back(tx_parse_params{i, j});
-    }
-
-    tools::threadpool::waiter parse_waiter(tpool);
-    const size_t TX_PARSE_BATCH_SIZE = 100;
-    for (size_t batch_start = 0; batch_start < parse_jobs.size(); batch_start += TX_PARSE_BATCH_SIZE)
-    {
-      const size_t batch_end = std::min(batch_start + TX_PARSE_BATCH_SIZE, parse_jobs.size());
-      tpool.submit(&parse_waiter, [&, batch_start, batch_end](){
-        for (size_t k = batch_start; k < batch_end; ++k)
-        {
-          const tx_parse_params &p = parse_jobs[k];
-          if (!parse_and_validate_tx_base_from_blob(blocks[p.block_idx].txs[p.tx_idx].blob,
-                parsed_blocks[p.block_idx].txes[p.tx_idx]))
-          {
-            boost::unique_lock<boost::mutex> lock(error_lock);
-            error = true;
-          }
-        }
-      }, true);
-    }
-    THROW_WALLET_EXCEPTION_IF(!parse_waiter.wait(), error::wallet_internal_error, "Exception in thread pool");
+    if (!parse_tx_batches(blocks, parsed_blocks))
+      error = true;
 
     // Ensure matching parent block hashes
     crypto::hash prev_block_id = (blocks.size() > 0) ? parsed_blocks.front().block.hash : crypto::hash{};
@@ -3987,6 +3969,54 @@ void wallet2::pull_and_parse_next_blocks(bool check_pool, uint64_t &blocks_start
     error = true;
     exception = std::current_exception();
   }
+}
+
+bool wallet2::parse_tx_batches(const std::vector<cryptonote::block_complete_entry> &blocks,
+  std::vector<parsed_block> &parsed_blocks)
+{
+  THROW_WALLET_EXCEPTION_IF(blocks.size() != parsed_blocks.size(), error::wallet_internal_error, "size mismatch");
+  tools::threadpool &tpool = tools::threadpool::getInstanceForCompute();
+  bool error = false;
+  boost::mutex error_lock;
+  struct tx_parse_params
+  {
+    size_t block_idx;
+    size_t tx_idx;
+  };
+  std::vector<tx_parse_params> parse_jobs;
+  size_t num_txes = 0;
+  for (const auto &block : blocks)
+    num_txes += block.txs.size();
+  parse_jobs.reserve(num_txes);
+  for (size_t i = 0; i < blocks.size(); ++i)
+  {
+    parsed_blocks[i].txes.resize(blocks[i].txs.size());
+    for (size_t j = 0; j < blocks[i].txs.size(); ++j)
+      parse_jobs.push_back(tx_parse_params{i, j});
+  }
+
+  // The waiter must drain queued jobs before their referenced storage is destroyed.
+  tools::threadpool::waiter parse_waiter(tpool);
+  const size_t TX_PARSE_BATCH_SIZE = std::max<size_t>(1,
+    std::min<size_t>(100, parse_jobs.size() / std::max<size_t>(1, tpool.get_max_concurrency()) / 8));
+  for (size_t batch_start = 0; batch_start < parse_jobs.size(); batch_start += TX_PARSE_BATCH_SIZE)
+  {
+    const size_t batch_end = std::min(batch_start + TX_PARSE_BATCH_SIZE, parse_jobs.size());
+    tpool.submit(&parse_waiter, [&, batch_start, batch_end]() {
+      for (size_t k = batch_start; k < batch_end; ++k)
+      {
+        const tx_parse_params &p = parse_jobs[k];
+        if (!parse_and_validate_tx_base_from_blob(blocks[p.block_idx].txs[p.tx_idx].blob,
+              parsed_blocks[p.block_idx].txes[p.tx_idx]))
+        {
+          boost::unique_lock<boost::mutex> lock(error_lock);
+          error = true;
+        }
+      }
+    }, true);
+  }
+  THROW_WALLET_EXCEPTION_IF(!parse_waiter.wait(), error::wallet_internal_error, "Exception in thread pool");
+  return !error;
 }
 
 void wallet2::remove_obsolete_pool_txs(const std::vector<crypto::hash> &tx_hashes, bool remove_if_found)
