@@ -27,6 +27,9 @@
 // THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "gtest/gtest.h"
+#include <boost/filesystem.hpp>
+#include "common/threadpool.h"
+#include "scope_guard.h"
 
 #include "carrot_impl/address_device_ram_borrowed.h"
 #include "carrot_impl/subaddress_map_legacy.h"
@@ -85,6 +88,58 @@ bool verify_enote_scan_info_sender_extensions(const tools::wallet::enote_view_in
 }
 } //anonymous namespace
 //----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, scan_view_key_survives_password_callback)
+{
+    struct password_callback : tools::i_wallet2_callback
+    {
+        crypto::secret_key *view_key = nullptr;
+        size_t calls = 0;
+        boost::optional<epee::wipeable_string> on_get_password(const char *) override
+        {
+            ++calls;
+            // Model the temporary account-key mutation during key unlocking.
+            *view_key = crypto::null_skey;
+            return epee::wipeable_string("");
+        }
+    } callback;
+    const auto directory = boost::filesystem::unique_path(
+        boost::filesystem::temp_directory_path() / "monero-view-key-%%%%-%%%%");
+    ASSERT_TRUE(boost::filesystem::create_directory(directory));
+    const epee::scope_guard cleanup([&] {
+        boost::system::error_code error;
+        boost::filesystem::remove_all(directory, error);
+    });
+    tools::wallet2 w(cryptonote::MAINNET, 1, false);
+    w.set_subaddress_lookahead(1, 1);
+    w.generate((directory / "wallet").string(), "");
+    w.m_sync_blocks_time_ms = 0;
+    w.m_outs_by_last_locked_time_ms = 0;
+    auto &key = const_cast<crypto::secret_key &>(w.get_account().get_keys().m_view_secret_key);
+    const crypto::secret_key saved_key = key;
+    callback.view_key = &key;
+    w.callback(&callback);
+    mock::fake_pruned_blockchain bc;
+    bc.init_wallet_for_starting_block(w);
+    std::vector<cryptonote::transaction> txs;
+    for (size_t i = 0; i < 2; ++i)
+    {
+        std::vector<cryptonote::tx_destination_entry> dests{{1000, w.get_account().get_keys().m_account_address, false}};
+        txs.push_back(mock::construct_pre_carrot_tx_with_fake_inputs(dests, 10, 1));
+    }
+    bc.add_block(1, std::move(txs), mock::null_addr);
+    auto &tpool = tools::threadpool::getInstanceForCompute();
+    tools::threadpool::waiter waiter(tpool);
+    // Nested non-leaf submissions run inline, making the key change deterministic and race-free.
+    tpool.submit(&waiter, [&] { EXPECT_EQ(1, bc.refresh_wallet(w)); });
+    const bool ok = waiter.wait();
+    key = saved_key;
+    w.m_encrypt_keys_after_refresh.reset();
+    EXPECT_TRUE(ok);
+    EXPECT_EQ(1, callback.calls);
+    EXPECT_EQ(2, w.m_transfers.size());
+    EXPECT_EQ(2000, w.balance_all(true));
+}
 //----------------------------------------------------------------------------------------------------------------------
 TEST(wallet_scanning, view_scan_as_sender_mainaddr)
 {
