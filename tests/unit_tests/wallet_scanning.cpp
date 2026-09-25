@@ -29,6 +29,7 @@
 #include "gtest/gtest.h"
 
 #include "carrot_impl/address_device_ram_borrowed.h"
+#include "carrot_impl/format_utils.h"
 #include "carrot_impl/subaddress_map_legacy.h"
 #include "carrot_impl/tx_builder_inputs.h"
 #include "carrot_mock_helpers.h"
@@ -38,6 +39,7 @@
 #include "fcmp_pp/prove.h"
 #include "tx_construction_helpers.h"
 #include "wallet/tx_builder.h"
+#include "common/threadpool.h"
 
 #undef MONERO_DEFAULT_LOG_CATEGORY
 #define MONERO_DEFAULT_LOG_CATEGORY "unit_tests.wallet_scanning"
@@ -85,6 +87,151 @@ bool verify_enote_scan_info_sender_extensions(const tools::wallet::enote_view_in
 }
 } //anonymous namespace
 //----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, scan_batch_boundaries)
+{
+    const size_t threads = tools::threadpool::getInstanceForCompute().get_max_concurrency();
+    for (const uint8_t hf : {uint8_t{1}, uint8_t{HF_VERSION_FCMP_PLUS_PLUS}})
+    {
+        tools::wallet2 w(cryptonote::MAINNET, 1, true);
+        w.set_subaddress_lookahead(1, 1);
+        w.generate("", "");
+        w.m_sync_blocks_time_ms = 0;
+        w.m_outs_by_last_locked_time_ms = 0;
+        mock::fake_pruned_blockchain bc;
+        bc.init_wallet_for_starting_block(w);
+        const size_t count = std::max<size_t>(202, 16 * threads + 1);
+        std::set<size_t> owned_jobs{1, 2, 3, 99, 100, 101, 199, 200, count};
+        cryptonote::account_base sender;
+        sender.generate();
+        std::vector<cryptonote::transaction> txs;
+        for (size_t job = 1; job <= count; ++job)
+        {
+            const auto &address = owned_jobs.count(job) ? w.get_account().get_keys().m_account_address : mock::null_addr;
+            std::vector<cryptonote::tx_destination_entry> dests{{1000, address, false}};
+            txs.push_back(hf < HF_VERSION_FCMP_PLUS_PLUS
+                ? mock::construct_pre_carrot_tx_with_fake_inputs(dests, 10, hf)
+                : mock::construct_carrot_pruned_transaction_fake_inputs(
+                    {carrot::mock::convert_normal_payment_proposal_v1(dests.front())}, {},
+                    sender.get_keys()));
+        }
+        bc.add_block(hf, std::move(txs), mock::null_addr);
+        ASSERT_EQ(1, bc.refresh_wallet(w));
+        EXPECT_EQ(1000 * owned_jobs.size(), w.balance_all(true));
+        EXPECT_EQ(owned_jobs.size(), w.m_transfers.size());
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, scan_batch_preserves_password_failure)
+{
+    struct password_callback : tools::i_wallet2_callback
+    {
+        size_t calls = 0;
+        bool nonstandard = false;
+        bool password_failure = true;
+        boost::optional<epee::wipeable_string> on_get_password(const char *) override
+        {
+            if (++calls == 1 || !password_failure)
+            {
+                if (nonstandard)
+                    throw 1;
+                throw std::bad_alloc();
+            }
+            return boost::none;
+        }
+    } callback;
+    tools::wallet2 w(cryptonote::MAINNET, 1, false);
+    w.set_subaddress_lookahead(1, 1);
+    w.generate("", "");
+    w.m_sync_blocks_time_ms = 0;
+    w.m_outs_by_last_locked_time_ms = 0;
+    w.callback(&callback);
+    mock::fake_pruned_blockchain bc;
+    bc.init_wallet_for_starting_block(w);
+    auto &tpool = tools::threadpool::getInstanceForCompute();
+    const size_t count = std::max<size_t>(1, tpool.get_max_concurrency()) * 16;
+    std::vector<cryptonote::transaction> txs;
+    for (size_t job = 1; job <= count; ++job)
+    {
+        // Miner is job zero; jobs two and three share a batch of size two.
+        const auto &address = (job == 2 || job == 3) ? w.get_account().get_keys().m_account_address : mock::null_addr;
+        std::vector<cryptonote::tx_destination_entry> dests{{1000, address, false}};
+        txs.push_back(mock::construct_pre_carrot_tx_with_fake_inputs(dests, 10, 1));
+    }
+    bc.add_block(1, std::move(txs), mock::null_addr);
+    for (bool nonstandard : {false, true})
+    for (bool password_failure : {false, true})
+    {
+        callback.nonstandard = nonstandard;
+        callback.password_failure = password_failure;
+        const auto check = [&] {
+            callback.calls = 0;
+            if (password_failure)
+                EXPECT_THROW(bc.refresh_wallet(w), tools::error::password_needed);
+            else
+                EXPECT_THROW(bc.refresh_wallet(w), tools::error::wallet_internal_error);
+            EXPECT_EQ(2, callback.calls);
+            EXPECT_TRUE(w.m_transfers.empty());
+        };
+        check();
+        // Nested submission exercises non-leaf batches running inline.
+        tools::threadpool::waiter waiter(tpool);
+        tpool.submit(&waiter, check);
+        ASSERT_TRUE(waiter.wait());
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, parse_batch_boundaries)
+{
+    const size_t threads = tools::threadpool::getInstanceForCompute().get_max_concurrency();
+    for (const size_t count : std::vector<size_t>{0, 1, 99, 100, 101, 199, 200, 201, 16 * threads + 1, 800 * threads + 1})
+    {
+        std::vector<cryptonote::block_complete_entry> blocks(3);
+        std::vector<tools::wallet2::parsed_block> parsed(3);
+        cryptonote::transaction tx;
+        tx.version = 1;
+        tx.vin.push_back(cryptonote::txin_gen{0});
+        std::vector<crypto::hash> hashes;
+        for (size_t i = 0; i < count; ++i)
+        {
+            tx.unlock_time = i;
+            tx.invalidate_hashes();
+            cryptonote::tx_blob_entry entry{};
+            entry.blob = cryptonote::tx_to_blob(tx);
+            blocks[i < count / 2 ? 0 : 2].txs.push_back(std::move(entry));
+            hashes.push_back(cryptonote::get_transaction_prefix_hash(tx));
+        }
+        ASSERT_TRUE(tools::wallet2::parse_tx_batches(blocks, parsed));
+        size_t i = 0;
+        for (size_t b = 0; b < blocks.size(); ++b)
+        {
+            ASSERT_EQ(blocks[b].txs.size(), parsed[b].txes.size());
+            for (const auto &result : parsed[b].txes)
+                EXPECT_EQ(hashes.at(i++), cryptonote::get_transaction_prefix_hash(result));
+        }
+        EXPECT_EQ(count, i);
+        if (count)
+        {
+            const size_t bad_block = count > 1 ? 0 : 2;
+            blocks[bad_block].txs.front().blob = "invalid";
+            parsed = std::vector<tools::wallet2::parsed_block>(3);
+            EXPECT_FALSE(tools::wallet2::parse_tx_batches(blocks, parsed));
+            i = 0;
+            for (size_t b = 0; b < blocks.size(); ++b)
+            {
+                ASSERT_EQ(blocks[b].txs.size(), parsed[b].txes.size());
+                for (const auto &result : parsed[b].txes)
+                {
+                    if (i)
+                    {
+                        EXPECT_EQ(hashes.at(i), cryptonote::get_transaction_prefix_hash(result));
+                    }
+                    ++i;
+                }
+            }
+        }
+    }
+}
 //----------------------------------------------------------------------------------------------------------------------
 TEST(wallet_scanning, view_scan_as_sender_mainaddr)
 {
@@ -151,6 +298,45 @@ TEST(wallet_scanning, view_scan_as_sender_mainaddr)
         }
         ASSERT_TRUE(matched);
     }
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, carrot_sender_view_tag)
+{
+    cryptonote::account_base sender, recipient;
+    sender.generate();
+    recipient.generate();
+    const auto &address = recipient.get_keys().m_account_address;
+    cryptonote::tx_destination_entry destination{1000, address, false};
+    auto tx = mock::construct_carrot_pruned_transaction_fake_inputs(
+        {carrot::mock::convert_normal_payment_proposal_v1(destination)}, {}, sender.get_keys());
+    carrot::cryptonote_view_incoming_key_ram_borrowed_device device(recipient.get_keys().m_view_secret_key);
+    std::vector<crypto::key_derivation> main, additional;
+    const auto derive = [&](const crypto::public_key &pubkey) {
+        mx25519_pubkey secret;
+        EXPECT_TRUE(device.view_key_scalar_mult_x25519(carrot::raw_byte_convert<mx25519_pubkey>(pubkey), secret));
+        return carrot::raw_byte_convert<crypto::key_derivation>(secret);
+    };
+    for (size_t i = 0;; ++i)
+    {
+        const auto pubkey = cryptonote::get_tx_pub_key_from_extra(tx, i);
+        if (pubkey == crypto::null_pkey)
+            break;
+        main.push_back(derive(pubkey));
+    }
+    for (const auto &pubkey : cryptonote::get_additional_tx_pub_keys_from_extra(tx))
+        additional.push_back(derive(pubkey));
+    const auto scan = [&] {
+        return tools::wallet::view_incoming_scan_transaction_as_sender(tx,
+            epee::to_span(main), epee::to_span(additional), address);
+    };
+    const auto results = scan();
+    ASSERT_EQ(1, std::count_if(results.begin(), results.end(), [](const auto &result) {
+        return result && result->amount == 1000;
+    }));
+    for (auto &output : tx.vout)
+        boost::get<cryptonote::txout_to_carrot_v1>(output.target).view_tag.bytes[0] ^= 1;
+    for (const auto &result : scan())
+        EXPECT_FALSE(result);
 }
 //----------------------------------------------------------------------------------------------------------------------
 TEST(wallet_scanning, view_scan_long_payment_id)
