@@ -289,6 +289,7 @@ static std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_carrot_
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
     const carrot::subaddress_map &subaddress_map)
 {
+    // Reject before constructing secret keys, which acquire the shared mlock mutex.
     if (!carrot::test_carrot_view_tag(s_sender_receiver.data,
             carrot::make_carrot_input_context_coinbase(enote.block_index),
             enote.onetime_address,
@@ -368,12 +369,6 @@ static std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_carrot_
     const epee::span<const crypto::public_key> main_address_spend_pubkeys,
     const carrot::subaddress_map &subaddress_map)
 {
-    if (!carrot::test_carrot_view_tag(s_sender_receiver.data,
-            carrot::make_carrot_input_context(enote.tx_first_key_image),
-            enote.onetime_address,
-            enote.view_tag))
-        return std::nullopt;
-
     enote_view_incoming_scan_info_t res;
 
     crypto::secret_key amount_blinding_factor_sk;
@@ -561,6 +556,13 @@ std::optional<enote_view_incoming_scan_info_t> view_incoming_scan_enote(
                 ? main_derivations[0]
                 : additional_derivations[local_output_index];
             const mx25519_pubkey s_sender_receiver = carrot::raw_byte_convert<mx25519_pubkey>(kd);
+
+            // Reject before either scan path constructs secret keys and locks mlock's mutex.
+            if (!carrot::test_carrot_view_tag(s_sender_receiver.data,
+                    carrot::make_carrot_input_context(enote.tx_first_key_image),
+                    enote.onetime_address,
+                    enote.view_tag))
+                return std::nullopt;
 
             const bool scan_as_sender = k_view_incoming_dev == nullptr;
             if (scan_as_sender)
