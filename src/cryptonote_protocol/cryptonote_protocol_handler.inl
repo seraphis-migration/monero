@@ -215,7 +215,7 @@ namespace cryptonote
                                                                                                               m_span_limit(BLOCK_QUEUE_NSPANS_MINIMUM),
                                                                                                               m_span_time(0),
                                                                                                               m_bss(0),
-                                                                                                              m_request_manager(max_n_txs_per_packet())
+                                                                                                              m_request_manager(max_n_txs_per_packet(), P2P_DEFAULT_REQUEST_TIMEOUT, max_n_tx_hashes_per_packet())
   {
     if(!m_p2p)
       m_p2p = &m_p2p_stub;
