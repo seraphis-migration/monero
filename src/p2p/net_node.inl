@@ -838,6 +838,7 @@ namespace nodetool
       full_addrs.insert("185.141.216.177:28180"); // ofrnxmr
       full_addrs.insert("208.123.187.228:28080"); // rucknium
       full_addrs.insert("185.141.216.147:28080"); // rucknium
+      full_addrs.insert("209.141.41.69:28080"); // ComputeryPony
     }
     else if (m_nettype == cryptonote::STAGENET)
     {
