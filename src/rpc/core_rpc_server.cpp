@@ -2213,6 +2213,16 @@ namespace cryptonote
     response.pow_hash = fill_pow_hash ? string_tools::pod_to_hex(get_block_longhash(&(m_core.get_blockchain_storage()), blk, height, 0)) : "";
     response.long_term_weight = m_core.get_blockchain_storage().get_db().get_block_long_term_weight(height);
     response.miner_tx_hash = string_tools::pod_to_hex(cryptonote::get_transaction_hash(blk.miner_tx));
+    if (blk.major_version >= HF_VERSION_FCMP_PLUS_PLUS)
+    {
+      response.fcmp_pp_n_tree_layers = blk.fcmp_pp_n_tree_layers;
+      response.fcmp_pp_tree_root = string_tools::pod_to_hex(blk.fcmp_pp_tree_root);
+    }
+    else
+    {
+      response.fcmp_pp_n_tree_layers = 0;
+      response.fcmp_pp_tree_root.clear();
+    }
     return true;
   }
   //------------------------------------------------------------------------------------------------------------------------------
