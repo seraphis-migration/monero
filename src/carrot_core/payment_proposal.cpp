@@ -83,6 +83,9 @@ static void get_output_proposal_parts(const crypto::hash &s_sender_receiver_ctx,
     encrypted_amount_t &encrypted_amount_out,
     encrypted_payment_id_t &encrypted_payment_id_out)
 {
+    CARROT_CHECK_AND_THROW(enote_type == CarrotEnoteType::PAYMENT || enote_type == CarrotEnoteType::CHANGE,
+        carrot_logic_error, "unknown enote type");
+
     // 1. k_a = H_n[s^ctx_sr](a, K^j_s, enote_type) if !coinbase, else 1
     memset(amount_blinding_factor_out.data, 0, sizeof(amount_blinding_factor_out));
     if (coinbase_amount_commitment)
