@@ -86,6 +86,13 @@ bool verify_enote_scan_info_sender_extensions(const tools::wallet::enote_view_in
 } //anonymous namespace
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, initial_scan_timings)
+{
+    tools::wallet2 w;
+    EXPECT_EQ(0, w.m_sync_blocks_time_ms);
+    EXPECT_EQ(0, w.m_outs_by_last_locked_time_ms);
+}
+//----------------------------------------------------------------------------------------------------------------------
 TEST(wallet_scanning, view_scan_as_sender_mainaddr)
 {
     cryptonote::account_base aether;
