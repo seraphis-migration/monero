@@ -86,6 +86,154 @@ bool verify_enote_scan_info_sender_extensions(const tools::wallet::enote_view_in
 } //anonymous namespace
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, confirmation_removes_cached_pool_payment)
+{
+    enum class failure_point { none, next_block, next_transaction, first_transaction };
+    for (const auto failure : {failure_point::none, failure_point::next_block,
+        failure_point::next_transaction, failure_point::first_transaction})
+    for (const bool other_pending : {false, true})
+    for (const auto &payment_id : {crypto::null_hash, crypto::rand<crypto::hash>()})
+    {
+        SCOPED_TRACE(::testing::Message() << "failure=" << static_cast<int>(failure)
+            << ", other_pending=" << other_pending << ", null_payment_id=" << (payment_id == crypto::null_hash));
+        const bool failed_first = failure == failure_point::first_transaction;
+        const bool same_block = failed_first || failure == failure_point::next_transaction;
+        tools::wallet2 w(cryptonote::MAINNET, 1, true);
+        w.set_subaddress_lookahead(1, 1);
+        w.generate("", "");
+        w.m_sync_blocks_time_ms = 0;
+        w.m_outs_by_last_locked_time_ms = 0;
+        mock::fake_pruned_blockchain bc;
+        bc.init_wallet_for_starting_block(w);
+        const auto make_payment = [&](uint64_t amount) {
+            std::vector<cryptonote::tx_destination_entry> dests{{amount, w.get_account().get_keys().m_account_address, false}};
+            return mock::construct_pre_carrot_tx_with_fake_inputs(dests, payment_id, 10, 1);
+        };
+        const auto confirmed = make_payment(14);
+        const auto pending = make_payment(22);
+        const auto txid = cryptonote::get_transaction_hash(confirmed);
+        const auto pending_id = cryptonote::get_transaction_hash(pending);
+        const auto pending_payments = [&](const crypto::hash &id) {
+            return std::count_if(w.m_unconfirmed_payments.begin(), w.m_unconfirmed_payments.end(),
+                [&](const auto &entry) { return entry.second.m_pd.m_tx_hash == id; });
+        };
+        w.process_pool_state({{confirmed, txid, false}});
+        if (other_pending)
+            w.process_pool_state({{pending, pending_id, false}});
+        const uint64_t expected_balance = other_pending ? 36 : 14;
+        ASSERT_EQ(1, pending_payments(txid));
+        ASSERT_EQ(other_pending ? 1 : 0, pending_payments(pending_id));
+        ASSERT_EQ(expected_balance, w.balance_all(false));
+        ASSERT_EQ(0, w.balance_all(true));
+
+        bc.add_block(12, same_block ? std::vector<cryptonote::transaction>{confirmed, pending}
+                                   : std::vector<cryptonote::transaction>{confirmed}, mock::null_addr);
+        if (failure == failure_point::next_block)
+            bc.add_block(12, {pending}, mock::null_addr);
+        std::vector<cryptonote::block_complete_entry> blocks;
+        std::vector<tools::wallet2::parsed_block> parsed;
+        bc.get_blocks_data(1, bc.height() - 1, blocks, parsed);
+        const size_t failing_index = failed_first ? 1 : 2;
+        std::vector<uint64_t> saved_indices;
+        if (same_block)
+        {
+            saved_indices = parsed.front().o_indices.indices[failing_index].indices;
+            parsed.front().o_indices.indices[failing_index].indices.clear();
+        }
+        else if (failure == failure_point::next_block)
+            parsed.back().o_indices.indices.clear();
+        auto cache = w.create_output_tracker_cache();
+        uint64_t added = 0;
+        const auto process = [&] { w.process_parsed_blocks(1, 0, blocks, parsed, added, cache); };
+        if (failure == failure_point::none)
+            process();
+        else
+            EXPECT_THROW(process(), tools::error::wallet_internal_error);
+        EXPECT_EQ(same_block ? 0 : 1, added);
+        EXPECT_EQ(same_block ? 1 : 2, w.get_blockchain_current_height());
+        EXPECT_EQ(failed_first ? 1 : 0, pending_payments(txid));
+        EXPECT_EQ(other_pending ? 1 : 0, pending_payments(pending_id));
+        EXPECT_EQ(expected_balance, w.balance_all(false));
+        EXPECT_EQ(failed_first ? 0 : 14, w.balance_all(true));
+        EXPECT_EQ(failed_first ? 0 : confirmed.vout.size(), w.m_transfers.size());
+        std::list<tools::wallet2::payment_details> payments;
+        w.get_payments(crypto::null_hash, payments);
+        ASSERT_EQ(failed_first ? 0 : 1, payments.size());
+        if (!failed_first)
+        {
+            EXPECT_EQ(txid, payments.front().m_tx_hash);
+            EXPECT_EQ(14, payments.front().m_amount);
+        }
+
+        if (same_block)
+        {
+            // Retry the identical block, repairing only the failing transaction's indices.
+            parsed.front().o_indices.indices[failing_index].indices = std::move(saved_indices);
+            process();
+            EXPECT_EQ(1, added);
+            EXPECT_EQ(2, w.get_blockchain_current_height());
+            EXPECT_EQ(0, pending_payments(txid));
+            EXPECT_EQ(0, pending_payments(pending_id));
+            EXPECT_EQ(36, w.balance_all(false));
+            EXPECT_EQ(36, w.balance_all(true));
+            EXPECT_EQ(confirmed.vout.size() + pending.vout.size(), w.m_transfers.size());
+            payments.clear();
+            w.get_payments(crypto::null_hash, payments);
+            EXPECT_EQ(2, std::count_if(payments.begin(), payments.end(),
+                [](const auto &payment) { return payment.m_amount != 0; }));
+            EXPECT_EQ(1, std::count_if(payments.begin(), payments.end(),
+                [&](const auto &payment) { return payment.m_tx_hash == txid && payment.m_amount == 14; }));
+            EXPECT_EQ(1, std::count_if(payments.begin(), payments.end(),
+                [&](const auto &payment) { return payment.m_tx_hash == pending_id && payment.m_amount == 22; }));
+        }
+
+        w.handle_reorg(1, cache);
+        ASSERT_TRUE(w.m_tree_cache.pop_to_block(0, w.m_blockchain[0]));
+        EXPECT_TRUE(w.m_transfers.empty());
+        payments.clear();
+        w.get_payments(crypto::null_hash, payments);
+        EXPECT_TRUE(payments.empty());
+        ASSERT_TRUE(w.accept_pool_tx_for_processing(txid, {}));
+        if (same_block)
+        {
+            ASSERT_TRUE(w.accept_pool_tx_for_processing(pending_id, {}));
+            w.process_pool_state({{pending, pending_id, false}});
+        }
+        w.process_pool_state({{confirmed, txid, false}});
+        EXPECT_EQ(1, pending_payments(txid));
+        EXPECT_EQ(same_block || other_pending ? 1 : 0, pending_payments(pending_id));
+        EXPECT_EQ(same_block ? 36 : expected_balance, w.balance_all(false));
+        EXPECT_EQ(0, w.balance_all(true));
+    }
+}
+//----------------------------------------------------------------------------------------------------------------------
+TEST(wallet_scanning, confirmation_cleanup_survives_hashchain_trimming)
+{
+    tools::wallet2 w(cryptonote::MAINNET, 1, true);
+    w.set_subaddress_lookahead(1, 1);
+    w.generate("", "");
+    w.m_sync_blocks_time_ms = 0;
+    w.m_outs_by_last_locked_time_ms = 0;
+    mock::fake_pruned_blockchain bc;
+    bc.init_wallet_for_starting_block(w);
+    w.set_refresh_type(tools::wallet2::RefreshNoCoinbase);
+    // Exercise hashchain eviction independently of the tree cache's retention window.
+    w.m_tree_cache.set_max_reorg_depth(2048);
+    std::vector<cryptonote::tx_destination_entry> dests{{14, w.get_account().get_keys().m_account_address, false}};
+    const auto tx = mock::construct_pre_carrot_tx_with_fake_inputs(dests, 10, 1);
+    w.process_pool_state({{tx, cryptonote::get_transaction_hash(tx), false}});
+    ASSERT_EQ(1, w.m_unconfirmed_payments.size());
+    bc.add_block(1, {tx}, mock::null_addr);
+    // Only block hashes matter here; omit synthetic miner outputs from the empty blocks.
+    for (size_t i = 0; i < 1024; ++i)
+        bc.add_block(1, {}, mock::null_addr, 0);
+    ASSERT_EQ(1025, bc.refresh_wallet(w));
+    ASSERT_FALSE(w.m_blockchain.is_in_bounds(1));
+    EXPECT_TRUE(w.m_unconfirmed_payments.empty());
+    EXPECT_EQ(14, w.balance_all(false));
+    EXPECT_EQ(14, w.balance_all(true));
+}
+//----------------------------------------------------------------------------------------------------------------------
 TEST(wallet_scanning, view_scan_as_sender_mainaddr)
 {
     cryptonote::account_base aether;
