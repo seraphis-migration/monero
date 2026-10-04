@@ -634,7 +634,7 @@ private:
     bool is_deprecated() const;
     void refresh(bool trusted_daemon);
     void refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blocks_fetched);
-    void refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blocks_fetched, bool& received_money, bool check_pool = true, uint64_t max_blocks = std::numeric_limits<uint64_t>::max());
+    void refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blocks_fetched, bool& received_money, bool check_pool = true, uint64_t max_blocks = std::numeric_limits<uint64_t>::max(), bool fetch_pool = true);
     bool refresh(bool trusted_daemon, uint64_t & blocks_fetched, bool& received_money, bool& ok);
 
     void set_refresh_type(RefreshType refresh_type) { m_refresh_type = refresh_type; }
@@ -1435,6 +1435,7 @@ private:
       const uint64_t height,
       epee::span<const std::optional<wallet::enote_view_incoming_scan_info_t>> enote_scan_infos,
       epee::span<const std::optional<crypto::key_image>> output_key_images,
+      std::unordered_set<crypto::hash> &pending_txids,
       std::map<std::pair<uint64_t, uint64_t>, size_t> &output_tracker_cache);
     detached_blockchain_data detach_blockchain(uint64_t height,
       std::map<std::pair<uint64_t, uint64_t>, size_t> &output_tracker_cache);
