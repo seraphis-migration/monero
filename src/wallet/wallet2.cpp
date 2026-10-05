@@ -3641,7 +3641,9 @@ void wallet2::process_parsed_blocks(const uint64_t start_height, const uint64_t 
   hw::reset_mode rst(hwdev);
   hwdev.set_mode(hw::device::TRANSACTION_PARSE);
 
-  const auto k_view_incoming_dev = this->get_view_incoming_key_device();
+  // Unlocking spend keys temporarily mutates the account's view key during scanning.
+  const crypto::secret_key scan_view_key = m_account.get_keys().m_view_secret_key;
+  const carrot::cryptonote_view_incoming_key_ram_borrowed_device k_view_incoming_dev(scan_view_key);
 
   // define view-incoming scan and key image derivation job
   std::vector<std::optional<wallet::enote_view_incoming_scan_info_t>> enote_scan_infos(num_tx_outputs);
@@ -3657,7 +3659,7 @@ void wallet2::process_parsed_blocks(const uint64_t start_height, const uint64_t 
       return;
     }
     wallet::view_incoming_scan_transaction(tx,
-      *k_view_incoming_dev,
+      k_view_incoming_dev,
       {&m_account.get_keys().m_account_address.m_spend_public_key, 1}, //! @TODO: Carrot
       m_account.get_keys().m_account_address.m_view_public_key,
       carrot::subaddress_map_legacy{this->m_subaddresses},
