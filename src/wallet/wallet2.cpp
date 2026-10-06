@@ -3623,13 +3623,11 @@ void wallet2::process_parsed_blocks(const uint64_t start_height, const uint64_t 
       prepare_tree_state_change(tree_sync_start_params, parsed_blocks, m_tree_cache, m_outs_by_last_locked_time_ms, m_sync_blocks_time_ms, new_block_hashes, tree_cache_state_change);
     });
 
-  // Count num_txes and num_tx_outputs we're going to scan
-  size_t num_txes = 0;
+  // Count num_tx_outputs we're going to scan
   size_t num_tx_outputs = 0;
   for (size_t i = start_parsed_block_i; i < parsed_blocks.size(); ++i)
   {
     const parsed_block &par_blk = parsed_blocks[i];
-    num_txes += 1 + par_blk.txes.size();
     num_tx_outputs += par_blk.block.miner_tx.vout.size();
     for (const cryptonote::transaction &tx : par_blk.txes)
       num_tx_outputs += tx.vout.size();
@@ -4525,7 +4523,7 @@ void wallet2::refresh(bool trusted_daemon, uint64_t start_height, uint64_t & blo
     crypto::hash cur_top_hash;
     bool error;
     std::exception_ptr exception;
-    uint64_t start_parsed_block_i;
+    uint64_t start_parsed_block_i = 0;
     std::list<crypto::hash> short_chain_history;
     added_blocks = 0;
     try
