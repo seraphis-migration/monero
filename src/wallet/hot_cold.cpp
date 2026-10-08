@@ -121,6 +121,43 @@ static bool decrypt_and_test_anchor(const carrot::encrypted_janus_anchor_t &encr
 }
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
+static void choose_used_legacy_tx_pubkey(const crypto::public_key &onetime_address,
+    const std::size_t local_output_index,
+    const carrot::subaddress_index_extended &subaddr_index,
+    const crypto::public_key &main_ephemeral_tx_pubkey,
+    const std::vector<crypto::public_key> &additional_ephemeral_tx_pubkeys,
+    const carrot::cryptonote_hierarchy_address_device &addr_dev,
+    crypto::public_key &used_ephemeral_tx_pubkey_out,
+    crypto::key_derivation &used_key_derivation_out,
+    crypto::secret_key &used_scalar_derivation_out)
+{
+    for (int tries = 0; tries < 2; ++tries)
+    {
+        if (1 == tries && additional_ephemeral_tx_pubkeys.size() <= local_output_index)
+            continue;
+        used_ephemeral_tx_pubkey_out = tries
+            ? additional_ephemeral_tx_pubkeys.at(local_output_index) : main_ephemeral_tx_pubkey;
+        crypto::public_key_memsafe kd_pk;
+        if (!addr_dev.view_key_scalar_mult8_ed25519(used_ephemeral_tx_pubkey_out, kd_pk))
+            continue;
+        memcpy(&used_key_derivation_out, &kd_pk, sizeof(used_key_derivation_out));
+        crypto::derivation_to_scalar(used_key_derivation_out, local_output_index,
+            used_scalar_derivation_out);
+        crypto::public_key onetime_extension;
+        crypto::secret_key_to_public_key(used_scalar_derivation_out, onetime_extension);
+        rct::key nominal_address_spend_pubkey;
+        rct::subKeys(nominal_address_spend_pubkey, rct::pk2rct(onetime_address), rct::pk2rct(onetime_extension));
+        crypto::public_key device_address_spend_pubkey;
+        addr_dev.get_address_spend_pubkey(subaddr_index, device_address_spend_pubkey);
+        if (rct::rct2pk(nominal_address_spend_pubkey) == device_address_spend_pubkey)
+            return; // success
+    }
+
+    CARROT_THROW(carrot::unexpected_scan_failure,
+        "Cannot choose ephemeral tx pubkey: neither works for given one-time address");
+}
+//-------------------------------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------------------------------
 static HotColdCarrotPaymentProposalV1 compress_carrot_normal_payment_proposal_lossy(
     const carrot::CarrotPaymentProposalV1 &payment_proposal)
 {
@@ -382,7 +419,8 @@ std::size_t num_new_outputs_ref(const UnsignedTransactionSetVariant &v)
     return std::visit(num_new_outputs_ref_visitor{}, v);
 }
 //-------------------------------------------------------------------------------------------------------------------
-exported_pre_carrot_transfer_details export_cold_pre_carrot_output(const wallet2_basic::transfer_details &td)
+exported_pre_carrot_transfer_details export_cold_pre_carrot_output(const wallet2_basic::transfer_details &td,
+    const carrot::cryptonote_hierarchy_address_device &addr_dev)
 {
     CARROT_CHECK_AND_THROW(!carrot::is_carrot_transaction_v1(td.m_tx),
         carrot::component_out_of_order, "Cannot export carrot output as pre-carrot output");
@@ -398,10 +436,35 @@ exported_pre_carrot_transfer_details export_cold_pre_carrot_output(const wallet2
     etd.m_flags.m_key_image_known = td.m_key_image_known;
     etd.m_flags.m_key_image_request = td.m_key_image_request;
     etd.m_flags.m_key_image_partial = td.m_key_image_partial;
+    etd.m_flags.m_coinbase = td.m_tx.is_coinbase();
     etd.m_amount = td.m_amount;
-    etd.m_additional_tx_keys = cryptonote::get_additional_tx_pub_keys_from_extra(td.m_tx);
     etd.m_subaddr_index_major = td.m_subaddr_index.major;
     etd.m_subaddr_index_minor = td.m_subaddr_index.minor;
+
+    // If an additional tx pubkey is present, determine whether to export it or the main tx pubkey.
+    // Do just one to save bandwidth
+    const carrot::subaddress_index_extended subaddr_index = {
+        { td.m_subaddr_index.major, td.m_subaddr_index.minor},
+        carrot::AddressDeriveType::PreCarrot
+    };
+    tools::scrubbed<crypto::key_derivation> kd;
+    crypto::secret_key kd_scalar;
+    choose_used_legacy_tx_pubkey(td.get_public_key(), td.m_internal_output_index, subaddr_index,
+        etd.m_tx_pubkey, cryptonote::get_additional_tx_pub_keys_from_extra(td.m_tx), addr_dev,
+        etd.m_tx_pubkey, kd, kd_scalar);
+
+    // Determine whether to export long ECDH mask
+    etd.m_flags.m_long_ecdh = false;
+    if (td.m_tx.version == 2 && !td.m_tx.is_coinbase())
+    {
+        const rct::key bp_mask = rct::genCommitmentMask(rct::sk2rct(kd_scalar));
+        if (bp_mask != td.m_mask)
+        {
+            etd.m_flags.m_long_ecdh = true;
+            etd.m_long_ecdh_mask = td.m_mask;
+        }
+    }
+
     return etd;
 }
 //-------------------------------------------------------------------------------------------------------------------
@@ -539,7 +602,7 @@ exported_transfer_details_variant export_cold_output(const wallet2_basic::transf
     if (carrot::is_carrot_transaction_v1(td.m_tx))
         etd_v = export_cold_carrot_output(td, addr_dev);
     else // not carrot
-        etd_v = export_cold_pre_carrot_output(td);
+        etd_v = export_cold_pre_carrot_output(td, addr_dev);
 
     return etd_v;
 }
@@ -584,32 +647,41 @@ wallet2_basic::transfer_details import_cold_pre_carrot_output(const exported_pre
     if (!etd.m_additional_tx_keys.empty())
       cryptonote::add_additional_tx_pub_keys_to_extra(td.m_tx.extra, etd.m_additional_tx_keys);
 
+    // save whether output is coinbase by populating vin
+    if (etd.m_flags.m_coinbase)
+      td.m_tx.vin.emplace_back(cryptonote::txin_gen{});
+    THROW_WALLET_EXCEPTION_IF(td.m_tx.is_coinbase() != etd.m_flags.m_coinbase,
+      error::wallet_internal_error, "Failed to save coinbase flag");
+
+    // determine which ephemeral tx pubkey, main or additional, is the one actually used
+    // new code only exports the used one, but legacy exports both
+    // then derive the one-time scalar, used for deriving the RingCT amount blinding factor later
+    const carrot::subaddress_index_extended subaddr_index{
+        {etd.m_subaddr_index_major, etd.m_subaddr_index_minor},
+        carrot::AddressDeriveType::PreCarrot
+    };
+    crypto::public_key used_ephemeral_pubkey;
+    crypto::secret_key used_kd_scalar;
+    tools::scrubbed<crypto::key_derivation> kd;
+    choose_used_legacy_tx_pubkey(td.get_public_key(), td.m_internal_output_index, subaddr_index,
+        etd.m_tx_pubkey, etd.m_additional_tx_keys, addr_dev,
+        used_ephemeral_pubkey, kd, used_kd_scalar);
+
     // get amount blinding factor if RingCT
-    if (td.m_rct)
-    {
-        const crypto::public_key tx_pubkey_mul8 = rct::rct2pk(rct::scalarmult8(rct::pk2rct(etd.m_tx_pubkey)));
-        crypto::public_key kd_pk;
-        CHECK_AND_ASSERT_THROW_MES(addr_dev.view_key_scalar_mult_ed25519(tx_pubkey_mul8, kd_pk),
-            "could not import transfer details: view-incoming key multiplication failed");
-        crypto::key_derivation kd;
-        memcpy(&kd, &kd_pk, sizeof(kd));
-
-        crypto::secret_key derivation_scalar;
-        crypto::derivation_to_scalar(kd, td.m_internal_output_index, derivation_scalar);
-
-        td.m_mask = rct::genCommitmentMask(rct::sk2rct(derivation_scalar));
-    }
+    const bool has_rct_amount_commitment = td.m_rct && !td.m_tx.is_coinbase();
+    if (etd.m_flags.m_long_ecdh)
+        td.m_mask = etd.m_long_ecdh_mask;
+    else if (has_rct_amount_commitment)
+        td.m_mask = rct::genCommitmentMask(rct::sk2rct(used_kd_scalar));
     else
-    {
         td.m_mask = rct::I;
-    }
 
     if (key_image_dev)
     {
         const carrot::LegacyOutputOpeningHintV1 opening_hint{
             .onetime_address = etd.m_pubkey,
             .ephemeral_tx_pubkey = etd.m_tx_pubkey,
-            .subaddr_index = {etd.m_subaddr_index_major, etd.m_subaddr_index_minor},
+            .subaddr_index = subaddr_index.index,
             .amount = etd.m_amount,
             .amount_blinding_factor = rct::rct2sk(td.m_mask),
             .local_output_index = static_cast<std::size_t>(etd.m_internal_output_index)
@@ -1031,7 +1103,7 @@ UnsignedTransactionSetVariant generate_unsigned_tx_set_from_pending_txs(
         {
             const wallet2_basic::transfer_details &td = transfers.at(td_idx);
             exported_pre_carrot_transfer_details &etd = exported_transfer_details.emplace_back();
-            etd = export_cold_pre_carrot_output(td);
+            etd = export_cold_pre_carrot_output(td, addr_dev);
         }
         unsigned_tx_set_v = std::move(unsigned_tx_set);
     }

@@ -185,20 +185,23 @@ struct key_image_message_v4
 //-------------------------------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------------------------------
 BEGIN_SERIALIZE_OBJECT_FN(exported_pre_carrot_transfer_details, uint32_t version = (uint32_t)-1)
-    PASSTHROUGH_VERSION(1, 1)
+    const std::uint32_t max_version = (typename Archive<W>::is_saving() && !v.m_flags.m_long_ecdh) ? 1 : 2;
+    PASSTHROUGH_VERSION(1, max_version)
     FIELD_F(m_pubkey)
     VARINT_FIELD_F(m_internal_output_index)
     VARINT_FIELD_F(m_global_output_index)
     FIELD_F(m_tx_pubkey)
     FIELD_F(m_flags.flags)
     VARINT_FIELD_F(m_amount)
+    if (v.m_flags.m_long_ecdh)
+        FIELD_F(m_long_ecdh_mask)
     FIELD_F(m_additional_tx_keys)
     VARINT_FIELD_F(m_subaddr_index_major)
     VARINT_FIELD_F(m_subaddr_index_minor)
 END_SERIALIZE()
 //-------------------------------------------------------------------------------------------------------------------
 BEGIN_SERIALIZE_OBJECT_FN(exported_carrot_transfer_details, uint32_t version = (uint32_t)-1)
-    PASSTHROUGH_VERSION(2, 2)
+    PASSTHROUGH_VERSION(3, 3)
     VARINT_FIELD_N("flags", v.flags.flags)
     if (v.flags.m_coinbase)
     {
