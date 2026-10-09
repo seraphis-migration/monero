@@ -72,10 +72,13 @@ struct exported_pre_carrot_transfer_details
             uint8_t m_key_image_known: 1;
             uint8_t m_key_image_request: 1; // view wallets: we want to request it; cold wallets: it was requested
             uint8_t m_key_image_partial: 1;
+            uint8_t m_coinbase: 1;
+            uint8_t m_long_ecdh: 1;
         };
         uint8_t flags;
     } m_flags;
     uint64_t m_amount;
+    rct::key m_long_ecdh_mask;
     std::vector<crypto::public_key> m_additional_tx_keys;
     uint32_t m_subaddr_index_major;
     uint32_t m_subaddr_index_minor;
@@ -275,12 +278,15 @@ using SignedTransactionSetVariant = std::variant<
 /**
  * @brief Convert transfer details for pre-Carrot UTXO into compressed export form
  * @param td transfer details entry representing pre-Carrot UTXO
+ * @param addr_dev address device
  * @return compressed pre-Carrot exported output
  */
-exported_pre_carrot_transfer_details export_cold_pre_carrot_output(const wallet2_basic::transfer_details &td);
+exported_pre_carrot_transfer_details export_cold_pre_carrot_output(const wallet2_basic::transfer_details &td,
+    const carrot::cryptonote_hierarchy_address_device &addr_dev);
 /**
  * @brief Convert transfer details for post-Carrot UTXO into compressed export form
  * @param td transfer details entry representing post-Carrot UTXO
+ * @param addr_dev address device
  * @return compressed post-Carrot exported output
  */
 exported_carrot_transfer_details export_cold_carrot_output(const wallet2_basic::transfer_details &td,
@@ -288,6 +294,7 @@ exported_carrot_transfer_details export_cold_carrot_output(const wallet2_basic::
 /**
  * @brief Convert transfer details for any type UTXO into compressed export form
  * @param td transfer details entry
+ * @param addr_dev address device
  * @return compressed exported output
  */
 exported_transfer_details_variant export_cold_output(const wallet2_basic::transfer_details &td,
