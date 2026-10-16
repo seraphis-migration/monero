@@ -44,6 +44,7 @@
 #include <boost/uuid/uuid_hash.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <cstdint>
+#include <limits>
 #include <unordered_map>
 #include <unordered_set>
 #include <shared_mutex>
@@ -56,6 +57,7 @@ private:
 
   const std::size_t m_max_in_flight;
   const int64_t m_request_timeout;
+  const std::size_t m_max_queued_per_peer;
 
   request_manager(const request_manager &) = delete;
   request_manager &operator=(const request_manager &) = delete;
@@ -84,12 +86,14 @@ public:
   };
 
   request_manager(const std::size_t max_in_flight,
-      const int64_t request_timeout = P2P_DEFAULT_REQUEST_TIMEOUT)
+      const int64_t request_timeout = P2P_DEFAULT_REQUEST_TIMEOUT,
+      const std::size_t max_queued_per_peer = std::numeric_limits<std::size_t>::max())
     : m_requested_txs(),
       m_mutex(),
       m_connection_stats(),
       m_max_in_flight(max_in_flight),
-      m_request_timeout(request_timeout)
+      m_request_timeout(request_timeout),
+      m_max_queued_per_peer(max_queued_per_peer)
     {};
 
   void remove_peer(const boost::uuids::uuid &peer_id);
