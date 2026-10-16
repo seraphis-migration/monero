@@ -1709,7 +1709,7 @@ std::vector<fcmp_pp::UnifiedOutput> BlockchainLMDB::get_unified_output_by_id(
     // Amount commitment
     const auto &out = tx.vout.at(toi.second);
     rct::key commitment;
-    if (out.amount == 0)
+    if (tx.version >= 2 && !tx.is_coinbase())
     {
       commitment = tx.rct_signatures.outPk.at(toi.second).mask;
     }
