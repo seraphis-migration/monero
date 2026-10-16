@@ -103,7 +103,7 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
 // Don't go over 32767 for any of these
 // TODO: make sure this matches RPC version expected in wallet2::check_version when FCMP++ is ready
 #define CORE_RPC_VERSION_MAJOR 3
-#define CORE_RPC_VERSION_MINOR 18
+#define CORE_RPC_VERSION_MINOR 19
 #define MAKE_CORE_RPC_VERSION(major,minor) (((major)<<16)|(minor))
 #define CORE_RPC_VERSION MAKE_CORE_RPC_VERSION(CORE_RPC_VERSION_MAJOR, CORE_RPC_VERSION_MINOR)
 
@@ -1267,6 +1267,8 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
       std::string pow_hash;
       uint64_t long_term_weight;
       std::string miner_tx_hash;
+      uint8_t fcmp_pp_n_tree_layers;
+      std::string fcmp_pp_tree_root;
       
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(major_version)
@@ -1291,6 +1293,11 @@ inline const std::string get_rpc_status(const bool trusted_daemon, const std::st
         KV_SERIALIZE(pow_hash)
         KV_SERIALIZE_OPT(long_term_weight, (uint64_t)0)
         KV_SERIALIZE(miner_tx_hash)
+        if (major_version >= HF_VERSION_FCMP_PLUS_PLUS)
+        {
+          KV_SERIALIZE(fcmp_pp_n_tree_layers)
+          KV_SERIALIZE(fcmp_pp_tree_root)
+        }
       END_KV_SERIALIZE_MAP()
   };
 
