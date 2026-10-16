@@ -881,6 +881,9 @@ void TreeCache<C1, C2>::prepare_to_grow_cache(const uint64_t start_block_idx,
         const auto &unlocked_unified_ids = unlocked_unified_ids_by_block[i];
         for (const uint64_t unified_id : unlocked_unified_ids)
         {
+            if (new_leaf_tuple_it == cache_state_change_out.tree_extension.leaves.tuples.end())
+                break;
+
             // This expects the unlocked outputs in a block to be inserted to the tree in sorted order
             if (unified_id == new_leaf_tuple_it->unified_id)
             {
