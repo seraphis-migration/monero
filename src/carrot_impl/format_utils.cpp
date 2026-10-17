@@ -237,7 +237,8 @@ bool try_load_carrot_extra_v1(
 cryptonote::transaction store_carrot_to_transaction_v1(const std::vector<CarrotEnoteV1> &enotes,
     const std::vector<crypto::key_image> &key_images,
     const xmr_amount fee,
-    const encrypted_payment_id_t encrypted_payment_id)
+    const encrypted_payment_id_t encrypted_payment_id,
+    bool rel_lock)
 {
     const size_t nins = key_images.size();
     const size_t nouts = enotes.size();
@@ -245,7 +246,7 @@ cryptonote::transaction store_carrot_to_transaction_v1(const std::vector<CarrotE
     cryptonote::transaction tx;
     tx.pruned = true;
     tx.version = 2;
-    tx.unlock_time = 0;
+    tx.unlock_time = rel_lock ? FCMP_RELATIVE_LOCK : 0;
     tx.vin.reserve(nins);
     tx.vout.reserve(nouts);
     tx.extra.reserve(MAX_TX_EXTRA_SIZE);

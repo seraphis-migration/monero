@@ -91,7 +91,8 @@ struct gen_fcmp_pp_tx_validation_base : public test_chain_unit_base
   bool generate_with(std::vector<test_event_entry>& events,
       size_t n_txes, const uint64_t *amounts_paid, bool valid, uint8_t hf_version,
       const FcmpPpFromTxType spend_tx_type,
-      const std::function<bool(cryptonote::transaction &tx, size_t)> &post_tx) const;
+      const std::function<bool(cryptonote::transaction &tx, size_t)> &post_tx,
+      bool rel_lock = false, uint64_t n_blocks_delay = 0) const;
 
   bool check_fcmp_pp(const cryptonote::transaction &tx, size_t tx_idx, const size_t *sizes, const char *context) const;
 
@@ -133,3 +134,21 @@ struct gen_fcmp_pp_tx_from_pre_rct_regular : public gen_fcmp_pp_tx_validation_ba
   bool generate(std::vector<test_event_entry>& events) const;
 };
 template<> struct get_test_options<gen_fcmp_pp_tx_from_pre_rct_regular>: public get_fcmp_pp_versioned_test_options<HF_VERSION_FCMP_PLUS_PLUS> {};
+
+struct gen_fcmp_pp_tx_rel_lock_before_fork : public gen_fcmp_pp_tx_validation_base
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+template<> struct get_test_options<gen_fcmp_pp_tx_rel_lock_before_fork>: public get_fcmp_pp_versioned_test_options<HF_VERSION_FCMP_PLUS_PLUS> {};
+
+struct gen_fcmp_pp_tx_rel_lock_one_block_early : public gen_fcmp_pp_tx_validation_base
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+template<> struct get_test_options<gen_fcmp_pp_tx_rel_lock_one_block_early>: public get_fcmp_pp_versioned_test_options<HF_VERSION_RELATIVE_LOCK> {};
+
+struct gen_fcmp_pp_tx_rel_lock_expired : public gen_fcmp_pp_tx_validation_base
+{
+  bool generate(std::vector<test_event_entry>& events) const;
+};
+template<> struct get_test_options<gen_fcmp_pp_tx_rel_lock_expired>: public get_fcmp_pp_versioned_test_options<HF_VERSION_RELATIVE_LOCK> {};
