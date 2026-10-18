@@ -4207,6 +4207,8 @@ void Blockchain::get_dynamic_base_fee_estimate(uint64_t grace_blocks, std::vecto
   {
     MWARNING("Grace blocks not equal to expected 1000 in dynamic base fee estimate, possible wallet fingerprint.");
   }
+  CHECK_AND_ASSERT_THROW_MES(grace_blocks <= 1000 /*FEE_ESTIMATE_GRACE_BLOCKS_2026*/,
+    "Grace blocks invalid in 2026 fee scaling estimate.");
 
   const uint64_t already_generated_coins = db_height ? m_db->get_block_already_generated_coins(db_height - 1) : 0;
   uint64_t base_reward;
