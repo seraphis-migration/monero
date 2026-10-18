@@ -745,7 +745,7 @@ namespace cryptonote
     // Sort so we can do binary search later
     std::sort(hashes.begin(), hashes.end());
 
-    m_blockchain.for_all_txpool_txes([this, &hashes, &inv_txes](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata_ref*) {
+    m_blockchain.for_all_txpool_txes([&hashes, &inv_txes](const crypto::hash &txid, const txpool_tx_meta_t &meta, const cryptonote::blobdata_ref*) {
       // Do binary search for our pool TXID in given list, skip to next if already present
       const auto hash_it = std::lower_bound(hashes.cbegin(), hashes.cend(), txid);
       if (hash_it != hashes.cend() && *hash_it == txid)
