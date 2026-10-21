@@ -225,7 +225,7 @@ namespace cryptonote
       return false;
     }
 
-    if (!kept_by_block && tx.unlock_time)
+    if (version < HF_VERSION_REJECT_UNLOCK_TIME && !kept_by_block && tx.unlock_time > 0)
     {
       LOG_PRINT_L1("transaction unlock time is not zero: " << tx.unlock_time);
       tvc.m_verifivation_failed = true;

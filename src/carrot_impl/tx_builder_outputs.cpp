@@ -285,7 +285,8 @@ void make_pruned_transaction_from_proposal_v1(const CarrotTransactionProposalV1 
     pruned_tx_out = store_carrot_to_transaction_v1(enotes,
         sorted_input_key_images,
         tx_proposal.fee,
-        encrypted_payment_id);
+        encrypted_payment_id,
+        tx_proposal.rel_lock);
 
     // add extra payload and sort
     if (!tx_proposal.extra.empty())

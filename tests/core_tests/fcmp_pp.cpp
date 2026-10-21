@@ -58,7 +58,8 @@ using TreeCacheV1 = fcmp_pp::curve_trees::TreeCache<Selene, Helios>;
 bool gen_fcmp_pp_tx_validation_base::generate_with(std::vector<test_event_entry>& events,
     size_t n_txes, const uint64_t *amounts_paid, bool valid, uint8_t hf_version,
     const FcmpPpFromTxType spend_tx_type,
-    const std::function<bool(transaction &tx, size_t tx_idx)> &post_tx) const
+    const std::function<bool(transaction &tx, size_t tx_idx)> &post_tx,
+    bool rel_lock, uint64_t n_blocks_delay) const
 {
   uint64_t ts_start = 1338224400;
 
@@ -417,7 +418,9 @@ bool gen_fcmp_pp_tx_validation_base::generate_with(std::vector<test_event_entry>
   const crypto::public_key &K_s = miner_account.get_keys().m_account_address.m_spend_public_key;
   const auto k_view_incoming_dev = std::make_shared<carrot::cryptonote_view_incoming_key_ram_borrowed_device>(k_v);
   const carrot::cryptonote_hierarchy_address_device cn_addr_dev(k_view_incoming_dev, K_s);
-  rct_txes.back() = tools::wallet::finalize_all_fcmp_pp_proofs(tx_proposals.front(),
+  carrot::CarrotTransactionProposalV1 tx_proposal = tx_proposals.front();
+  tx_proposal.rel_lock = rel_lock;
+  rct_txes.back() = tools::wallet::finalize_all_fcmp_pp_proofs(tx_proposal,
       tree_cache,
       *fcmp_pp::curve_trees::curve_trees_v1(),
       cn_addr_dev,
@@ -439,23 +442,58 @@ bool gen_fcmp_pp_tx_validation_base::generate_with(std::vector<test_event_entry>
   get_tx_fee(rct_txes.back(), fee);
   fees += fee;
 
+  std::vector<cryptonote::block> delay_blocks;
+  crypto::hash prev_sync_hash = blocks[n_manual_blocks - 1].hash;
+  uint8_t fcmp_pp_n_tree_layers = 0;
+  crypto::ec_point fcmp_pp_tree_root{};
+  const auto sync_and_get_tree_root = [&](uint64_t blk_idx)
+  {
+    // Sync the mined delay blocks with their real coinbase outputs.
+    while (tree_cache.n_synced_blocks() < blk_idx)
+    {
+      const uint64_t synced_blk_idx = tree_cache.n_synced_blocks();
+      const cryptonote::block &blk = delay_blocks.at(synced_blk_idx - n_synced_blocks);
+      const auto tx_refs = cryptonote::collect_transparent_amount_commitments(blk.miner_tx, std::vector<transaction>{}, transparent_amount_commitments);
+      auto outs_meta = cryptonote::get_outs_by_last_locked_block(tx_refs, transparent_amount_commitments, first_unified_id, synced_blk_idx);
+      first_unified_id = outs_meta.next_unified_id;
+      const crypto::hash blk_hash = cryptonote::get_block_hash(blk);
+      tree_cache.sync_block(synced_blk_idx, blk_hash, prev_sync_hash, outs_meta.outs_by_last_locked_block);
+      prev_sync_hash = blk_hash;
+    }
+    // To calculate the tree root needed for the block header,
+    // we sync empty blocks so all outputs staged for insertion in the cache
+    // enter the tree. This is done on a copy of the cache, which is much
+    // faster than syncing them into tree_cache and popping them afterwards.
+    TreeCacheV1 lookahead_cache = tree_cache;
+    crypto::hash lookahead_prev_hash = prev_sync_hash;
+    while (lookahead_cache.n_synced_blocks() < cryptonote::get_default_last_locked_block_index(blk_idx))
+    {
+      lookahead_cache.sync_block(lookahead_cache.n_synced_blocks(), crypto::hash{}, lookahead_prev_hash, {});
+      lookahead_prev_hash = crypto::hash{};
+    }
+    fcmp_pp_n_tree_layers = lookahead_cache.get_tree_root(fcmp_pp_tree_root);
+  };
+
+  // Mine n_blocks_delay empty blocks before relaying the tx (this is for the relative lock test)
+  for (uint64_t i = 0; i < n_blocks_delay; ++i)
+  {
+    sync_and_get_tree_root(n_synced_blocks + i);
+    cryptonote::block empty_blk;
+    CHECK_AND_ASSERT_MES(generator.construct_block_manually(empty_blk, blk_last, genesis_account,
+        test_generator::bf_major_ver | test_generator::bf_minor_ver | test_generator::bf_timestamp | test_generator::bf_hf_version | test_generator::bf_max_outs,
+        hf_version, hf_version, blk_last.timestamp + DIFFICULTY_BLOCKS_ESTIMATE_TIMESPAN * 2,
+        crypto::hash(), 0, transaction(), std::vector<crypto::hash>(), 0, 6, hf_version, 0, fcmp_pp_n_tree_layers, fcmp_pp_tree_root),
+        false, "Failed to generate block");
+    events.push_back(empty_blk);
+    blk_last = empty_blk;
+    delay_blocks.push_back(empty_blk);
+  }
+
   if (!valid)
     DO_CALLBACK(events, "mark_invalid_tx");
   events.push_back(rct_txes);
 
-  // To calculate the tree root needed for the block header,
-  // we sync empty blocks so all outputs staged for insertion in the cache
-  // enter the tree. This assumes assumes we don't need the tree cache after
-  // this. We can call pop_block after reading the root to reverse this
-  // if we need the cache to be in the correct state after this op.
-  const uint64_t new_block_idx = n_synced_blocks;
-  tree_cache.sync_block(new_block_idx, crypto::hash{}, blocks[n_manual_blocks - 1].hash, {});
-  uint64_t synced_blk_idx = new_block_idx;
-  while (tree_cache.n_synced_blocks() < cryptonote::get_default_last_locked_block_index(new_block_idx))
-    tree_cache.sync_block(++synced_blk_idx, crypto::hash{}, crypto::hash{}, {});
-
-  crypto::ec_point fcmp_pp_tree_root;
-  const uint8_t fcmp_pp_n_tree_layers = tree_cache.get_tree_root(fcmp_pp_tree_root);
+  sync_and_get_tree_root(n_synced_blocks + n_blocks_delay);
 
   cryptonote::block tx_block;
   CHECK_AND_ASSERT_MES(generator.construct_block_manually(tx_block, blk_last, genesis_account,
@@ -487,4 +525,25 @@ bool gen_fcmp_pp_tx_from_bpp::generate(std::vector<test_event_entry>& events) co
 {
   const uint64_t amounts_paid[] = {5000, 5000, (uint64_t)-1};
   return generate_with(events, 1/*n_txes*/, amounts_paid, true/*valid*/, HF_VERSION_FCMP_PLUS_PLUS, FcmpPpFromTxType::BulletproofPlus, NULL);
+}
+
+bool gen_fcmp_pp_tx_rel_lock_before_fork::generate(std::vector<test_event_entry>& events) const
+{
+  const uint64_t amounts_paid[] = {10000, (uint64_t)-1};
+  return generate_with(events, 1/*n_txes*/, amounts_paid, false/*valid*/, HF_VERSION_FCMP_PLUS_PLUS, FcmpPpFromTxType::PreRctRegular, NULL,
+      true/*rel_lock*/, FCMP_RELATIVE_LOCK_DURATION/*n_blocks_delay*/);
+}
+
+bool gen_fcmp_pp_tx_rel_lock_one_block_early::generate(std::vector<test_event_entry>& events) const
+{
+  const uint64_t amounts_paid[] = {10000, (uint64_t)-1};
+  return generate_with(events, 1/*n_txes*/, amounts_paid, false/*valid*/, HF_VERSION_RELATIVE_LOCK, FcmpPpFromTxType::PreRctRegular, NULL,
+      true/*rel_lock*/, FCMP_RELATIVE_LOCK_DURATION - 1/*n_blocks_delay*/);
+}
+
+bool gen_fcmp_pp_tx_rel_lock_expired::generate(std::vector<test_event_entry>& events) const
+{
+  const uint64_t amounts_paid[] = {10000, (uint64_t)-1};
+  return generate_with(events, 1/*n_txes*/, amounts_paid, true/*valid*/, HF_VERSION_RELATIVE_LOCK, FcmpPpFromTxType::PreRctRegular, NULL,
+      true/*rel_lock*/, FCMP_RELATIVE_LOCK_DURATION/*n_blocks_delay*/);
 }

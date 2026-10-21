@@ -100,8 +100,14 @@ static bool get_fcmp_tx_tree_root(const BlockchainDB *db,
     return true;
   CHECK_AND_ASSERT_MES(!tx.pruned, false, "can't get root for pruned FCMP txs");
 
-  // Make sure reference block exists in the chain
-  CHECK_AND_NO_ASSERT_MES_L1(tx.rct_signatures.p.reference_block < db->height(), false,
+  //Relative locks are enforced by requiring the transaction to use an old reference_block value.
+  //This proves that the transaction is not spending any outputs younger than
+  //FCMP_RELATIVE_LOCK_DURATION + CRYPTONOTE_DEFAULT_TX_SPENDABLE_AGE blocks.
+  const uint64_t lock_duration = tx.unlock_time == FCMP_RELATIVE_LOCK ? FCMP_RELATIVE_LOCK_DURATION : 0;
+
+  // Make sure reference block exists in the chain and satisfies the relative lock
+  CHECK_AND_NO_ASSERT_MES_L1(tx.rct_signatures.p.reference_block < db->height()
+      && db->height() - tx.rct_signatures.p.reference_block > lock_duration, false,
       "tx " << get_transaction_hash(tx) << " included reference block that was too high");
 
   // Make sure the reference block is from the block immediately before the FCMP++ fork height or higher.
