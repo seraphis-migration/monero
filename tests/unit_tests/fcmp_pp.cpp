@@ -1562,33 +1562,34 @@ TEST(fcmp_pp, tx_sizes_and_verification_times)
             ASSERT_TRUE(cryptonote::tx_to_blob(finalized_tx, tx_blob));
 
             // 4c. Validate the tx
-            const uint64_t start_validate = tools::get_tick_count();
+            const unsigned long long start_validate = tools::get_tick_count();
 
             // Parse the tx
-            const uint64_t start_parse = tools::get_tick_count();
+            const unsigned long long start_parse = tools::get_tick_count();
             cryptonote::transaction tx;
             ASSERT_TRUE(cryptonote::parse_and_validate_tx_from_blob(tx_blob, tx));
-            const uint64_t end_parse = tools::get_tick_count();
+            const unsigned long long end_parse = tools::get_tick_count();
 
             // Verify non-input consensus rules
-            const uint64_t start_non_input = tools::get_tick_count();
+            const unsigned long long start_non_input = tools::get_tick_count();
             cryptonote::tx_verification_context tvc{};
             ASSERT_TRUE(cryptonote::ver_non_input_consensus(tx, tvc, HF_VERSION_FCMP_PLUS_PLUS));
             ASSERT_FALSE(tvc.m_verifivation_failed);
-            const uint64_t end_non_input = tools::get_tick_count();
+            const unsigned long long end_non_input = tools::get_tick_count();
 
             // Verify input proofs
-            const uint64_t start_input = tools::get_tick_count();
+            const unsigned long long start_input = tools::get_tick_count();
             ASSERT_TRUE(cryptonote::ver_input_proofs_fcmps(tx, tree_root));
-            const uint64_t end_input = tools::get_tick_count();
+            const unsigned long long end_input = tools::get_tick_count();
 
             // 4d. Print byte size and verification time
             // Collect timings
-            const auto ticks_to_ms = [](const uint64_t ticks) -> uint64_t { return tools::ticks_to_ns(ticks) / 1e6; };
-            const uint64_t validate_ms = ticks_to_ms(end_input - start_validate);
-            const uint64_t parse_ms = ticks_to_ms(end_parse - start_parse);
-            const uint64_t non_input_ms = ticks_to_ms(end_non_input - start_non_input);
-            const uint64_t input_ms = ticks_to_ms(end_input - start_input);
+            const auto ticks_to_ms = [](const unsigned long long ticks) -> unsigned long long {
+                return tools::ticks_to_ns(ticks) / 1e6; };
+            const unsigned long long validate_ms = ticks_to_ms(end_input - start_validate);
+            const unsigned long long parse_ms = ticks_to_ms(end_parse - start_parse);
+            const unsigned long long non_input_ms = ticks_to_ms(end_non_input - start_non_input);
+            const unsigned long long input_ms = ticks_to_ms(end_input - start_input);
 
             // 5. Do the membership proof only
             fcmp_pp::FcmpMembershipProof membership_proof;
@@ -1610,11 +1611,11 @@ TEST(fcmp_pp, tx_sizes_and_verification_times)
                     fcmp_raw_inputs);
             }
 
-            const uint64_t start_membership = tools::get_tick_count();
+            const unsigned long long start_membership = tools::get_tick_count();
             ASSERT_TRUE(fcmp_pp::verify_membership(membership_proof, n_layers, tree_root_ptr, fcmp_raw_inputs));
-            const uint64_t end_membership = tools::get_tick_count();
+            const unsigned long long end_membership = tools::get_tick_count();
 
-            const uint64_t membership_ms = ticks_to_ms(end_membership - start_membership);
+            const unsigned long long membership_ms = ticks_to_ms(end_membership - start_membership);
 
             LOG_PRINT_L1("Tx: " << obj_to_json_str(tx));
             LOG_PRINT_L1("Timings (ms) ... validate: " << validate_ms
@@ -1624,7 +1625,7 @@ TEST(fcmp_pp, tx_sizes_and_verification_times)
                 << " , membership_ms: "                << membership_ms);
 
             // Inputs, Outputs, Tx Size (bytes), Verify (ms), Membership Proof Size (bytes), Membership Proof Verify (ms)
-            printf("%lu, %lu, %lu, %lu, %lu, %lu\n",
+            printf("%zu, %zu, %zu, %llu, %zu, %llu\n",
                 tx.vin.size(),
                 tx.vout.size(),
                 tx_blob.size(),
