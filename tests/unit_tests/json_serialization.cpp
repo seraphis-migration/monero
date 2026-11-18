@@ -12,7 +12,9 @@
 #include "cryptonote_basic/cryptonote_basic.h"
 #include "cryptonote_basic/cryptonote_format_utils.h"
 #include "cryptonote_core/cryptonote_tx_utils.h"
+#include "fcmp_pp/fcmp_pp_types.h"
 #include "file_io_utils.h"
+#include "ringct/rctSigs.h"
 #include "rpc/daemon_messages.h"
 #include "serialization/json_object.h"
 #include "string_tools.h"
@@ -732,7 +734,69 @@ TEST(JsonSerialization, BulletproofTransaction)
     EXPECT_EQ(tx_bytes, tx_copy_bytes);
 }
 
-// TODO: FCMP++ / Carrot tx JSON serialization
+TEST(JsonSerialization, FcmpPpTransaction)
+{
+    // The FCMP++ data in the prunable part is hashed, so it must survive JSON
+    const std::size_t n_inputs = 2;
+    const std::size_t n_outputs = 2;
+    const std::uint8_t n_tree_layers = 3;
+
+    cryptonote::transaction tx{};
+    tx.version = 2;
+    tx.rct_signatures.type = rct::RCTTypeFcmpPlusPlus;
+    tx.rct_signatures.txnFee = 1000;
+
+    for (std::size_t i = 0; i < n_inputs; ++i)
+    {
+        cryptonote::txin_to_key in{};
+        in.k_image = rct::rct2ki(rct::pkGen());
+        tx.vin.push_back(in);
+    }
+
+    std::vector<std::uint64_t> amounts;
+    for (std::size_t i = 0; i < n_outputs; ++i)
+    {
+        cryptonote::tx_out out{};
+        cryptonote::set_tx_out(0, rct::rct2pk(rct::pkGen()), true, crypto::view_tag{}, out);
+        tx.vout.push_back(out);
+        tx.rct_signatures.ecdhInfo.push_back({rct::zero(), rct::skGen()});
+        tx.rct_signatures.outPk.push_back({rct::zero(), rct::pkGen()});
+        amounts.push_back(i + 1);
+    }
+
+    rct::keyV C, masks;
+    tx.rct_signatures.p.bulletproofs_plus.push_back(rct::make_dummy_bulletproof_plus(amounts, C, masks));
+    for (std::size_t i = 0; i < n_inputs; ++i)
+        tx.rct_signatures.p.pseudoOuts.push_back(rct::pkGen());
+
+    tx.rct_signatures.p.reference_block = 3118750;
+    tx.rct_signatures.p.n_tree_layers = n_tree_layers;
+    tx.rct_signatures.p.fcmp_pp.resize(fcmp_pp::fcmp_pp_proof_len(n_inputs, n_tree_layers));
+    for (std::size_t i = 0; i < tx.rct_signatures.p.fcmp_pp.size(); ++i)
+        tx.rct_signatures.p.fcmp_pp[i] = std::uint8_t(i);
+
+    crypto::hash tx_hash{};
+    ASSERT_TRUE(cryptonote::get_transaction_hash(tx, tx_hash));
+
+    cryptonote::transaction tx_copy = test_json(tx);
+    EXPECT_EQ(tx.rct_signatures.p.reference_block, tx_copy.rct_signatures.p.reference_block);
+    EXPECT_EQ(tx.rct_signatures.p.n_tree_layers, tx_copy.rct_signatures.p.n_tree_layers);
+    EXPECT_EQ(tx.rct_signatures.p.fcmp_pp, tx_copy.rct_signatures.p.fcmp_pp);
+
+    crypto::hash tx_copy_hash{};
+    ASSERT_TRUE(cryptonote::get_transaction_hash(tx_copy, tx_copy_hash));
+    EXPECT_EQ(tx_hash, tx_copy_hash);
+
+    cryptonote::blobdata tx_bytes{};
+    cryptonote::blobdata tx_copy_bytes{};
+
+    ASSERT_TRUE(cryptonote::t_serializable_object_to_blob(tx, tx_bytes));
+    ASSERT_TRUE(cryptonote::t_serializable_object_to_blob(tx_copy, tx_copy_bytes));
+
+    EXPECT_EQ(tx_bytes, tx_copy_bytes);
+}
+
+// TODO: Carrot tx JSON serialization
 
 TEST(JsonRpcSerialization, HandlerFromJson)
 {
