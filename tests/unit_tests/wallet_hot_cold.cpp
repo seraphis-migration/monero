@@ -28,12 +28,14 @@
 
 #include "gtest/gtest.h"
 
+#include "carrot_core/enote_utils.h"
 #include "carrot_impl/format_utils.h"
 #include "carrot_impl/key_image_device_precomputed.h"
 #include "carrot_impl/spend_device_ram_borrowed.h"
 #include "carrot_impl/tx_builder_inputs.h"
 #include "carrot_impl/tx_builder_outputs.h"
 #include "carrot_mock_helpers.h"
+#include "crypto/generators.h"
 #include "fcmp_pp/prove.h"
 #include "output_opening_types.h"
 #include "tx_construction_helpers.h"
@@ -90,6 +92,116 @@ static std::vector<wallet2_basic::transfer_details> hot_scan_into_transfer_detai
     }
 
     return res;
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static bool compare_transfer_details_output_points(const wallet2_basic::transfer_details &td,
+    const cryptonote::transaction &tx)
+{
+    if (td.m_internal_output_index >= tx.vout.size())
+        return false;
+
+    crypto::public_key tx_ota;
+    if (!cryptonote::get_output_public_key(tx.vout.at(td.m_internal_output_index), tx_ota))
+        return false;
+
+    if (td.get_public_key() != tx_ota)
+        return false;
+
+    const rct::key td_commitment = rct::commit(td.amount(), td.m_mask);
+
+    rct::key tx_commitment = rct::zeroCommitVartime(tx.vout.at(td.m_internal_output_index).amount);
+    if (tx.version == 2 && !tx.is_coinbase())
+    {
+        if (td.m_internal_output_index >= tx.rct_signatures.outPk.size())
+            return false;
+        tx_commitment = tx.rct_signatures.outPk.at(td.m_internal_output_index).mask;
+    }
+
+    if (td_commitment != tx_commitment)
+        return false;
+
+    return true;
+}
+//----------------------------------------------------------------------------------------------------------------------
+//----------------------------------------------------------------------------------------------------------------------
+static bool compare_transfer_details_by_opening_hint(const wallet2_basic::transfer_details &td1,
+    const wallet2_basic::transfer_details &td2,
+    const carrot::view_incoming_key_device &k_view_incoming_dev)
+{
+    const carrot::OutputOpeningHintVariant &oh1 = tools::wallet::make_sal_opening_hint_from_transfer_details(td1);
+    const carrot::OutputOpeningHintVariant &oh2 = tools::wallet::make_sal_opening_hint_from_transfer_details(td2);
+    if (oh1 == oh2)
+        return true;
+
+    // If Carrot v2 hints but only differ in pid_enc for non-integrated reeived, then return true
+    if (std::holds_alternative<carrot::CarrotOutputOpeningHintV2>(oh1)
+        && std::holds_alternative<carrot::CarrotOutputOpeningHintV2>(oh2))
+    {
+        const auto &coh1 = std::get<carrot::CarrotOutputOpeningHintV2>(oh1);
+        const auto &coh2 = std::get<carrot::CarrotOutputOpeningHintV2>(oh2);
+        if (coh1.onetime_address != coh2.onetime_address
+                || coh1.amount_commitment != coh2.amount_commitment
+                || coh1.anchor_enc != coh2.anchor_enc
+                || coh1.view_tag != coh2.view_tag
+                || memcmp(&coh1.enote_ephemeral_pubkey, &coh2.enote_ephemeral_pubkey, 32)
+                || coh1.tx_first_key_image != coh2.tx_first_key_image
+                || coh1.amount != coh2.amount
+                || coh1.onetime_address != coh2.onetime_address
+                || coh1.subaddr_index != coh2.subaddr_index)
+            return false;
+
+        mx25519_pubkey s_sender_receiver;
+        if (!carrot::try_make_carrot_shared_key_receiver(k_view_incoming_dev,
+                coh1.enote_ephemeral_pubkey, s_sender_receiver))
+            return false;
+
+        const carrot::input_context_t input_context = carrot::make_carrot_input_context(coh1.tx_first_key_image);
+
+        crypto::hash s_sender_receiver_ctx;
+        carrot::make_carrot_contextualized_sender_receiver_secret(s_sender_receiver.data,
+            coh1.enote_ephemeral_pubkey,
+            input_context,
+            s_sender_receiver_ctx);
+
+        crypto::secret_key sender_extension_g;
+        crypto::secret_key sender_extension_t;
+        crypto::public_key nominal_address_spend_pubkey;
+        carrot::make_carrot_sender_extension_g(s_sender_receiver_ctx, coh1.amount_commitment, sender_extension_g);
+        carrot::make_carrot_sender_extension_t(s_sender_receiver_ctx, coh1.amount_commitment, sender_extension_t);
+        if (!carrot::try_recover_address_spend_pubkey(coh1.onetime_address, sender_extension_g, sender_extension_t, nominal_address_spend_pubkey))
+            return false;
+
+        crypto::public_key nominal_address_view_pubkey;
+        if (coh1.subaddr_index.index.is_subaddress())
+        {
+            if (!k_view_incoming_dev.view_key_scalar_mult_ed25519(nominal_address_spend_pubkey,
+                nominal_address_view_pubkey))
+                return false;
+        }
+        else
+        {
+            if (!k_view_incoming_dev.view_key_scalar_mult_ed25519(crypto::get_G(),
+                nominal_address_view_pubkey))
+                return false;
+        }
+
+        const carrot::janus_anchor_t nominal_anchor = carrot::decrypt_carrot_anchor(coh1.anchor_enc,
+            s_sender_receiver_ctx, coh1.onetime_address);
+
+        if (carrot::verify_carrot_normal_janus_protection(nominal_anchor, input_context,
+                nominal_address_spend_pubkey, nominal_address_view_pubkey, coh1.subaddr_index.index.is_subaddress(),
+                carrot::null_payment_id, coh1.enote_ephemeral_pubkey))
+            return true;
+
+        carrot::janus_anchor_t special_anchor;
+        k_view_incoming_dev.make_janus_anchor_special(coh1.enote_ephemeral_pubkey, input_context, coh1.onetime_address,
+            special_anchor);
+
+        return nominal_anchor == special_anchor;
+    }
+
+    return false;
 }
 //----------------------------------------------------------------------------------------------------------------------
 //----------------------------------------------------------------------------------------------------------------------
@@ -270,7 +382,7 @@ TEST(wallet_hot_cold, export_import_simple)
         return spent_key_image;
     };
 
-    // a. scan pre-ringct coinbase tx
+    // a. pre-ringct coinbase tx
     {
         const std::uint64_t block_index = 21;
         const rct::xmr_amount reward = 42;
@@ -289,13 +401,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -318,13 +431,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -347,13 +461,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -376,13 +491,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -405,13 +521,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -434,13 +551,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -464,13 +582,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -494,13 +613,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -523,13 +643,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_carrot_transfer_details etd
             = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(reward, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -553,13 +674,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_carrot_transfer_details etd
             = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -583,13 +705,14 @@ TEST(wallet_hot_cold, export_import_simple)
         ASSERT_EQ(2, scanned_enotes.size()); // b/c transfer always adds a self-send
         const wallet2_basic::transfer_details &dest_enote = (scanned_enotes.front().amount() == amount)
             ? scanned_enotes.front() : scanned_enotes.back();
+            EXPECT_TRUE(compare_transfer_details_output_points(dest_enote, tx));
         EXPECT_TRUE(verify_cold_sal(dest_enote));
         const tools::wallet::cold::exported_carrot_transfer_details etd
             = tools::wallet::cold::export_cold_carrot_output(dest_enote, bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(dest_enote, imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -617,13 +740,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_carrot_transfer_details etd
             = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -647,13 +771,14 @@ TEST(wallet_hot_cold, export_import_simple)
         const wallet2_basic::transfer_container scanned_enotes =
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
+        EXPECT_TRUE(compare_transfer_details_output_points(scanned_enotes.front(), tx));
         EXPECT_TRUE(verify_cold_sal(scanned_enotes.front()));
         const tools::wallet::cold::exported_carrot_transfer_details etd
             = tools::wallet::cold::export_cold_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(scanned_enotes.at(0), imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -685,13 +810,14 @@ TEST(wallet_hot_cold, export_import_simple)
         ASSERT_EQ(2, scanned_enotes.size()); // b/c transfer always adds a self-send
         const wallet2_basic::transfer_details &dest_enote = (scanned_enotes.front().amount() == amount)
             ? scanned_enotes.front() : scanned_enotes.back();
+        EXPECT_TRUE(compare_transfer_details_output_points(dest_enote, tx));
         EXPECT_TRUE(verify_cold_sal(dest_enote));
         const tools::wallet::cold::exported_carrot_transfer_details etd
             = tools::wallet::cold::export_cold_carrot_output(dest_enote, bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
-        EXPECT_EQ(amount, imported_td.amount());
+        EXPECT_TRUE(compare_transfer_details_by_opening_hint(dest_enote, imported_td, bob_hot.k_view_incoming_dev));
         EXPECT_TRUE(verify_cold_sal(imported_td));
     }
 
@@ -762,7 +888,7 @@ TEST(wallet_hot_cold, export_serialization_completeness)
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         EXPECT_TRUE(verify_serialization_completeness(etd));
     }
 
@@ -786,7 +912,7 @@ TEST(wallet_hot_cold, export_serialization_completeness)
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
@@ -814,7 +940,7 @@ TEST(wallet_hot_cold, export_serialization_completeness)
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
@@ -842,7 +968,7 @@ TEST(wallet_hot_cold, export_serialization_completeness)
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
@@ -870,7 +996,7 @@ TEST(wallet_hot_cold, export_serialization_completeness)
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
@@ -898,7 +1024,7 @@ TEST(wallet_hot_cold, export_serialization_completeness)
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
@@ -927,7 +1053,7 @@ TEST(wallet_hot_cold, export_serialization_completeness)
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
@@ -956,7 +1082,7 @@ TEST(wallet_hot_cold, export_serialization_completeness)
             hot_scan_into_transfer_details(bob_hot, tx, block_index, global_output_index);
         ASSERT_EQ(1, scanned_enotes.size());
         const tools::wallet::cold::exported_pre_carrot_transfer_details etd
-            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front());
+            = tools::wallet::cold::export_cold_pre_carrot_output(scanned_enotes.front(), bob_hot.cn_addr_dev);
         const wallet2_basic::transfer_details imported_td = tools::wallet::cold::import_cold_pre_carrot_output(etd,
             bob_cold.cn_addr_dev,
             bob_cold.key_image_dev.get());
