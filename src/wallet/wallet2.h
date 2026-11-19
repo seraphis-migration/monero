@@ -1196,8 +1196,7 @@ private:
     payment_container export_payments() const;
     void import_payments(const payment_container &payments);
     void import_payments_out(const std::list<std::pair<crypto::hash,wallet2::confirmed_transfer_details>> &confirmed_payments);
-    std::tuple<size_t, crypto::hash, std::vector<crypto::hash>> export_blockchain() const;
-    void import_blockchain(const std::tuple<size_t, crypto::hash, std::vector<crypto::hash>> &bc);
+    void copy_watch_only_state_from(const wallet2 &source);
     bool export_key_images(const std::string &filename, bool all = false) const;
     std::pair<uint64_t, std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>>> export_key_images(bool all = false) const;
     uint64_t import_key_images(const std::vector<std::pair<crypto::key_image, carrot::KeyImageProofVariant>> &signed_key_images, const std::vector<crypto::public_key> &associated_onetime_addresses, uint64_t &spent, uint64_t &unspent, const bool check_spent);

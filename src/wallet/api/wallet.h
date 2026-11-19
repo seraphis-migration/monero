@@ -282,7 +282,7 @@ private:
     boost::mutex        m_refreshMutex;
 
     // synchronizing  sync and async refresh
-    boost::mutex        m_refreshMutex2;
+    mutable boost::mutex m_refreshMutex2;
     boost::condition_variable m_refreshCV;
     boost::thread       m_refreshThread;
     // flag indicating wallet is recovering from seed
