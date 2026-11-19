@@ -34,6 +34,8 @@
 #include "wallet/wallet2.h"
 #include "include_base_utils.h"
 #include "common/util.h"
+#include "rpc/core_rpc_server_commands_defs.h"
+#include "net/http_client.h"
 
 #include <boost/chrono/chrono.hpp>
 #include <boost/filesystem.hpp>
@@ -662,6 +664,78 @@ TEST_F(WalletTest1, WalletShowsBalance)
     ASSERT_TRUE(unlockedBalance1 == wallet2->unlockedBalance(0));
     std::cout << "wallet unlocked balance: " << wallet2->unlockedBalance(0) << std::endl;
     ASSERT_TRUE(wmgr->closeWallet(wallet2));
+}
+
+TEST_F(WalletTest1, WalletCreatesWatchOnlyFromSyncedWallet)
+{
+    const std::string watch_path = WALLETS_ROOT_DIR + "/wallet_watch_only.bin";
+    Utils::deleteWallet(watch_path);
+
+    Monero::Wallet * source = wmgr->openWallet(CURRENT_SRC_WALLET, TESTNET_WALLET_PASS, WALLET_NETWORK_TYPE);
+    ASSERT_NE(source, nullptr);
+    ASSERT_TRUE(init_wallet(source));
+    ASSERT_TRUE(source->refresh());
+    ASSERT_GT(source->balance(0), 0);
+
+    const uint64_t source_height = source->blockChainHeight();
+    const uint64_t source_balance = source->balance(0);
+    const bool created = source->createWatchOnly(watch_path, TESTNET_WALLET_PASS, WALLET_LANG);
+    EXPECT_TRUE(created) << source->errorString();
+    if (created)
+    {
+        Monero::Wallet * watch = wmgr->openWallet(watch_path, TESTNET_WALLET_PASS, WALLET_NETWORK_TYPE);
+        ASSERT_NE(watch, nullptr);
+        ASSERT_EQ(watch->status(), Monero::Wallet::Status_Ok) << watch->errorString();
+        EXPECT_TRUE(watch->watchOnly());
+        EXPECT_EQ(watch->blockChainHeight(), source_height);
+        EXPECT_EQ(watch->balance(0), source_balance);
+        ASSERT_TRUE(init_wallet(watch));
+        epee::net_utils::http::http_simple_client rpc;
+        ASSERT_TRUE(rpc.set_server(DAEMON_ADDRESS, boost::none));
+        cryptonote::COMMAND_RPC_GENERATEBLOCKS::request gen_req;
+        cryptonote::COMMAND_RPC_GENERATEBLOCKS::response gen_res;
+        gen_req.amount_of_blocks = 1;
+        gen_req.wallet_address = source->mainAddress();
+        ASSERT_TRUE(epee::net_utils::invoke_http_json_rpc("/json_rpc", "generateblocks", gen_req, gen_res, rpc, std::chrono::seconds(30)));
+        ASSERT_EQ(gen_res.status, CORE_RPC_STATUS_OK);
+        ASSERT_TRUE(source->refresh()) << source->errorString();
+        ASSERT_TRUE(watch->refresh()) << watch->errorString();
+        EXPECT_GT(watch->blockChainHeight(), source_height);
+        EXPECT_GE(watch->blockChainHeight(), gen_res.height + 1);
+        EXPECT_GT(watch->balance(0), source_balance);
+        EXPECT_EQ(watch->balance(0), source->balance(0));
+        ASSERT_TRUE(wmgr->closeWallet(watch));
+    }
+    ASSERT_TRUE(wmgr->closeWallet(source));
+    Utils::deleteWallet(watch_path);
+}
+
+TEST_F(WalletTest1, WalletCreatesWatchOnlyBeforeFirstRefresh)
+{
+    const std::string source_path = WALLETS_ROOT_DIR + "/wallet_watch_source.bin";
+    const std::string watch_path = WALLETS_ROOT_DIR + "/wallet_watch_empty.bin";
+    Utils::deleteWallet(source_path);
+    Utils::deleteWallet(watch_path);
+
+    Monero::Wallet * source = wmgr->createWallet(source_path, TESTNET_WALLET_PASS, WALLET_LANG, WALLET_NETWORK_TYPE);
+    ASSERT_NE(source, nullptr);
+    ASSERT_EQ(source->status(), Monero::Wallet::Status_Ok) << source->errorString();
+    configure_wallet(source);
+    ASSERT_TRUE(source->createWatchOnly(watch_path, TESTNET_WALLET_PASS, WALLET_LANG)) << source->errorString();
+    ASSERT_TRUE(wmgr->closeWallet(source));
+
+    Monero::Wallet * watch = wmgr->openWallet(watch_path, TESTNET_WALLET_PASS, WALLET_NETWORK_TYPE);
+    ASSERT_NE(watch, nullptr);
+    ASSERT_EQ(watch->status(), Monero::Wallet::Status_Ok) << watch->errorString();
+    ASSERT_TRUE(watch->watchOnly());
+    ASSERT_TRUE(init_wallet(watch));
+    ASSERT_TRUE(watch->refresh()) << watch->errorString();
+    EXPECT_GT(watch->blockChainHeight(), 1);
+    EXPECT_EQ(watch->balance(0), 0);
+    ASSERT_TRUE(wmgr->closeWallet(watch));
+
+    Utils::deleteWallet(source_path);
+    Utils::deleteWallet(watch_path);
 }
 
 TEST_F(WalletTest1, WalletReturnsCurrentBlockHeight)

@@ -157,6 +157,13 @@ public:
             TreeSync<C1, C2>(curve_trees, max_reorg_depth)
     {};
 
+    TreeCache clone_with_curve_trees(const std::shared_ptr<CurveTrees<C1, C2>> &curve_trees) const
+    {
+        TreeCache copy(*this);
+        copy.m_curve_trees = curve_trees;
+        return copy;
+    }
+
     bool register_output(const OutputPair &output) override;
 
     // TODO: bool cancel_output_registration

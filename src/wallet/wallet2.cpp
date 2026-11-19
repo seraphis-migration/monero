@@ -14523,38 +14523,35 @@ void wallet2::import_payments_out(const std::list<std::pair<crypto::hash,wallet2
   }
 }
 
-std::tuple<size_t,crypto::hash,std::vector<crypto::hash>> wallet2::export_blockchain() const
+void wallet2::copy_watch_only_state_from(const wallet2 &source)
 {
-  std::tuple<size_t, crypto::hash, std::vector<crypto::hash>> bc;
-  std::get<0>(bc) = m_blockchain.offset();
-  std::get<1>(bc) = m_blockchain.empty() ? crypto::null_hash: m_blockchain.genesis();
-  for (size_t n = m_blockchain.offset(); n < m_blockchain.size(); ++n)
-  {
-    std::get<2>(bc).push_back(m_blockchain[n]);
-  }
-  return bc;
-}
+  THROW_WALLET_EXCEPTION_IF(!m_watch_only || m_nettype != source.m_nettype
+    || m_account_public_address != source.m_account_public_address,
+    error::wallet_internal_error, "Wallets are not a matching watch-only pair");
+  THROW_WALLET_EXCEPTION_IF(!m_transfers.empty() || m_blockchain.size() != 1
+    || m_tree_cache.n_synced_blocks() != 0,
+    error::wallet_internal_error, "Watch-only wallet is not empty");
 
-void wallet2::import_blockchain(const std::tuple<size_t, crypto::hash, std::vector<crypto::hash>> &bc)
-{
-  THROW_WALLET_EXCEPTION(error::wallet_internal_error, "import_blockchain is not implemented for FCMP++");
-  m_blockchain.clear();
-  // FIXME: make sure m_blockchain does not have more than max reorg depth elems
-  if (std::get<0>(bc))
+  if (source.m_tree_cache.n_synced_blocks() != 0)
+    assert_top_block_match(source.m_blockchain, source.m_tree_cache);
+  else
+    THROW_WALLET_EXCEPTION_IF(source.m_blockchain.size() != 1,
+      error::wallet_internal_error, "Source wallet has no synced tree");
+
+  transfer_container transfers;
+  source.get_transfers(transfers, true);
+  for (auto &td : transfers)
   {
-    for (size_t n = std::get<0>(bc); n > 0; --n)
-      m_blockchain.push_back(std::get<1>(bc));
+    memwipe(td.m_multisig_k.data(), td.m_multisig_k.size() * sizeof(td.m_multisig_k[0]));
+    td.m_multisig_k.clear();
   }
-  for (auto const &b : std::get<2>(bc))
-  {
-    m_blockchain.push_back(b);
-  }
-  cryptonote::block genesis;
-  generate_genesis(genesis);
-  crypto::hash genesis_hash = get_block_hash(genesis);
-  check_genesis(genesis_hash);
-  m_last_block_reward = cryptonote::get_outs_money_amount(genesis.miner_tx);
-  // FIXME: the above is only checking genesis not syncing. This function also needs to import tree elems to work correctly
+  import_outputs(std::make_tuple(uint64_t{0}, uint64_t{transfers.size()}, std::move(transfers)));
+
+  m_blockchain = source.m_blockchain;
+  m_last_block_reward = source.m_last_block_reward;
+  m_max_reorg_depth = source.m_max_reorg_depth;
+  m_tree_cache = source.m_tree_cache.clone_with_curve_trees(m_curve_trees);
+  m_has_ever_refreshed_from_node = source.m_has_ever_refreshed_from_node;
 }
 //----------------------------------------------------------------------------------------------------
 std::tuple<uint64_t, uint64_t, std::vector<wallet::cold::exported_transfer_details_variant>> wallet2::export_outputs(bool all, uint32_t start, uint32_t count) const

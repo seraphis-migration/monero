@@ -518,6 +518,7 @@ bool WalletImpl::create(const std::string &path, const std::string &password, co
 bool WalletImpl::createWatchOnly(const std::string &path, const std::string &password, const std::string &language) const
 {
     clearStatus();
+    boost::mutex::scoped_lock refresh_lock(m_refreshMutex2);
     std::unique_ptr<tools::wallet2> view_wallet(new tools::wallet2(m_wallet->nettype()));
 
     // Store same refresh height as original wallet
@@ -547,13 +548,8 @@ bool WalletImpl::createWatchOnly(const std::string &path, const std::string &pas
         // Generate view only wallet
         view_wallet->generate(path, password, address, viewkey);
 
-        // Export/Import outputs
-        const std::string outputs_str = m_wallet->export_outputs_to_str(/*all=*/true);
-        view_wallet->import_outputs_from_str(outputs_str);
-
-        // Copy scanned blockchain
-        auto bc = m_wallet->export_blockchain();
-        view_wallet->import_blockchain(bc);
+        // Copy outputs and the scanned blockchain/tree state
+        view_wallet->copy_watch_only_state_from(*m_wallet);
 
         // copy payments
         auto payments = m_wallet->export_payments();
